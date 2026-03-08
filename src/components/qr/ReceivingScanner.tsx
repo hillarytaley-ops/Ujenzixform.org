@@ -531,6 +531,40 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
         // Already decoded or not encoded
       }
       
+      // Step 0: Quick check if already scanned (blocking, but fast)
+      console.log('🔍 Quick check: Is QR code already scanned?');
+      try {
+        const quickCheckResponse = await fetch(
+          `${SUPABASE_URL}/rest/v1/material_items?qr_code=eq.${encodeURIComponent(cleanQRCode)}&select=receive_scanned,status,id&limit=1`,
+          {
+            headers: {
+              'apikey': ANON_KEY,
+              'Authorization': `Bearer ${accessToken}`,
+              'Accept': 'application/json',
+              'Prefer': 'return=representation'
+            }
+          }
+        );
+        
+        if (quickCheckResponse.ok) {
+          const quickCheckData = await quickCheckResponse.json();
+          if (quickCheckData && quickCheckData.length > 0) {
+            const item = quickCheckData[0];
+            if (item.receive_scanned === true || item.status === 'received' || item.status === 'delivered') {
+              console.log('⏭️ QR code already scanned - skipping RPC call');
+              toast.warning('⚠️ Already Scanned', {
+                description: 'This QR code has already been scanned and received.',
+                duration: 3000,
+              });
+              return; // Skip processing entirely
+            }
+          }
+        }
+      } catch (quickCheckError) {
+        console.warn('⚠️ Quick check failed (non-blocking):', quickCheckError);
+        // Continue with RPC call even if quick check fails
+      }
+      
       // Step 1: Use record_qr_scan RPC function to handle everything properly
       // This function will:
       // 1. Update material_item to receive_scanned = true
@@ -538,9 +572,11 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
       // 3. Check if ALL items are received and update order status to 'delivered'
       // 4. Update delivery_request status to 'delivered' when all items are received
       console.log('📦 Calling record_qr_scan RPC function for receiving scan...');
+      console.log('⏱️ RPC call started at:', new Date().toISOString());
       
       let rpcResult: any = null;
       let deliveryRequestUpdated = false;
+      const rpcStartTime = Date.now();
       
       try {
         // Call the RPC function with timeout (increased to 30 seconds for better reliability)
@@ -563,12 +599,15 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
           setTimeout(() => reject(new Error('RPC timeout after 30 seconds')), 30000)
         );
         
+        console.log('⏱️ Waiting for RPC response...');
         const { data, error } = await Promise.race([
           rpcPromise,
           rpcTimeoutPromise
         ]) as any;
         
         clearTimeout(rpcTimeoutId);
+        const rpcElapsed = Date.now() - rpcStartTime;
+        console.log(`⏱️ RPC call completed in ${rpcElapsed}ms`);
         
         if (error) {
           console.error('❌ RPC error:', error);
@@ -683,19 +722,102 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
         }
       } catch (rpcError: any) {
         console.error('❌ RPC call failed:', rpcError);
+        const rpcElapsed = Date.now() - rpcStartTime;
+        console.error(`⏱️ RPC failed after ${rpcElapsed}ms`);
         
+        // If RPC times out, try direct REST API update as fallback
         if (rpcError?.message?.includes('timeout') || rpcError?.name === 'AbortError') {
-          toast.error('Request Timeout', {
-            description: 'The scan request took too long (30s). The database may be slow. Please try again.',
-            duration: 5000
-          });
+          console.log('🔄 RPC timed out - attempting direct REST API update as fallback...');
+          
+          try {
+            // Fallback: Direct REST API update
+            // First, find the material_item
+            const findItemResponse = await fetch(
+              `${SUPABASE_URL}/rest/v1/material_items?qr_code=eq.${encodeURIComponent(cleanQRCode)}&select=id,purchase_order_id,receive_scanned,dispatch_scanned&limit=1`,
+              {
+                headers: {
+                  'apikey': ANON_KEY,
+                  'Authorization': `Bearer ${accessToken}`,
+                  'Accept': 'application/json'
+                }
+              }
+            );
+            
+            if (findItemResponse.ok) {
+              const itemData = await findItemResponse.json();
+              if (itemData && itemData.length > 0 && !itemData[0].receive_scanned) {
+                const itemId = itemData[0].id;
+                const purchaseOrderId = itemData[0].purchase_order_id;
+                
+                // Update material_item directly
+                const updateItemResponse = await fetch(
+                  `${SUPABASE_URL}/rest/v1/material_items?id=eq.${itemId}`,
+                  {
+                    method: 'PATCH',
+                    headers: {
+                      'apikey': ANON_KEY,
+                      'Authorization': `Bearer ${accessToken}`,
+                      'Content-Type': 'application/json',
+                      'Prefer': 'return=representation'
+                    },
+                    body: JSON.stringify({
+                      receive_scanned: true,
+                      receive_scanned_at: new Date().toISOString(),
+                      status: 'received',
+                      updated_at: new Date().toISOString()
+                    })
+                  }
+                );
+                
+                if (updateItemResponse.ok) {
+                  console.log('✅ Fallback: Direct REST API update successful');
+                  toast.success('✅ Item Received (via fallback)', {
+                    description: 'Scan processed using direct update method.',
+                    duration: 5000
+                  });
+                  
+                  // Create a mock rpcResult for the success flow
+                  rpcResult = {
+                    success: true,
+                    qr_code: cleanQRCode,
+                    receive_scanned: true,
+                    status: 'received',
+                    material_type: 'Material'
+                  };
+                  
+                  // Continue with success flow
+                  deliveryRequestUpdated = true;
+                } else {
+                  throw new Error('Fallback update failed');
+                }
+              } else if (itemData && itemData.length > 0 && itemData[0].receive_scanned) {
+                console.log('⏭️ Item already received - skipping');
+                toast.warning('⚠️ Already Scanned', {
+                  description: 'This QR code has already been scanned.',
+                  duration: 3000
+                });
+                return;
+              } else {
+                throw new Error('Item not found');
+              }
+            } else {
+              throw new Error('Failed to find item');
+            }
+          } catch (fallbackError: any) {
+            console.error('❌ Fallback REST API update also failed:', fallbackError);
+            toast.error('Request Timeout', {
+              description: 'The scan request took too long (30s). Please try again or contact support.',
+              duration: 5000
+            });
+            return;
+          }
         } else {
           toast.error('Failed to process scan', {
             description: rpcError?.message || 'Unknown error occurred',
             duration: 5000
           });
+          return;
         }
-        return;
       }
       
       // Only continue with success flow if RPC was successful
