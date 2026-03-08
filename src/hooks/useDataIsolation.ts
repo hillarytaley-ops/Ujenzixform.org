@@ -693,18 +693,29 @@ export const useDeliveryProviderData = () => {
                                       d.status !== 'completed' && 
                                       d.status !== 'cancelled';
                   
-                  // Provider must match: either provider_id = userId OR provider_id = delivery_provider.id
-                  // If provider_id is null/undefined, it means the request hasn't been accepted yet (should be filtered out)
-                  const providerMatch = d.provider_id === userId || 
-                                       (providerIdToMatch && d.provider_id === providerIdToMatch);
+                  // CRITICAL: delivery_requests.provider_id stores delivery_provider.id (UUID), NOT user_id
+                  // So we MUST use providerIdToMatch (delivery_provider.id), not userId
+                  // If providerIdToMatch is null (lookup failed), we'll filter by matching purchase_orders later
+                  let providerMatch = false;
+                  if (providerIdToMatch) {
+                    providerMatch = d.provider_id === providerIdToMatch;
+                  } else {
+                    // Provider lookup failed - we'll include this delivery_request for now
+                    // It will be filtered later by matching with purchase_orders that have the correct provider
+                    providerMatch = true;
+                    console.warn('⚠️ Provider lookup failed - including delivery_request for later filtering:', {
+                      id: d.id?.substring(0, 8),
+                      status: d.status,
+                      purchase_order_id: d.purchase_order_id?.substring(0, 8) || 'NULL'
+                    });
+                  }
                   
                   if (!providerMatch && statusMatch) {
                     console.warn('🚫 Filtered out delivery_request (wrong provider):', {
                       id: d.id?.substring(0, 8),
                       status: d.status,
                       provider_id: d.provider_id?.substring(0, 8) || 'NULL/UNDEFINED',
-                      expected_userId: userId.substring(0, 8),
-                      expected_providerId: providerIdToMatch?.substring(0, 8) || 'NULL'
+                      expected_providerId: providerIdToMatch?.substring(0, 8) || 'NULL (lookup failed)'
                     });
                   }
                   
@@ -1163,6 +1174,43 @@ export const useDeliveryProviderData = () => {
           }
         });
         console.log('✅ Added', purchaseOrdersToProcess.length, 'purchase orders to active deliveries');
+      }
+      
+      // CRITICAL: Filter delivery_requests by matching with purchase_orders that have correct provider
+      // This ensures we only show delivery_requests for orders assigned to this provider
+      if (purchaseOrdersData && purchaseOrdersData.length > 0) {
+        const validPurchaseOrderIds = new Set(purchaseOrdersData.map((po: any) => po.id).filter(Boolean));
+        console.log('🔍 Filtering delivery_requests by matching purchase_orders:', {
+          total_delivery_requests: allActiveDeliveries.filter(d => d.source === 'delivery_requests').length,
+          valid_purchase_order_ids: validPurchaseOrderIds.size
+        });
+        
+        // Filter delivery_requests to only those with purchase_order_ids that match purchase_orders
+        const beforeFilter = allActiveDeliveries.length;
+        const filteredDeliveries = allActiveDeliveries.filter((delivery: any) => {
+          if (delivery.source === 'delivery_requests' && delivery.purchase_order_id) {
+            const matches = validPurchaseOrderIds.has(delivery.purchase_order_id);
+            if (!matches) {
+              console.warn('🚫 Filtering out delivery_request (no matching purchase_order):', {
+                id: delivery.id?.substring(0, 8),
+                purchase_order_id: delivery.purchase_order_id?.substring(0, 8),
+                status: delivery.status
+              });
+            }
+            return matches;
+          }
+          return true; // Keep purchase_orders entries
+        });
+        
+        // Replace allActiveDeliveries with filtered list
+        allActiveDeliveries.length = 0;
+        filteredDeliveries.forEach(d => allActiveDeliveries.push(d));
+        
+        console.log('✅ Filtered delivery_requests by purchase_orders:', {
+          before: beforeFilter,
+          after: allActiveDeliveries.length,
+          removed: beforeFilter - allActiveDeliveries.length
+        });
       }
       
       // Final pass: Ensure all entries with purchase_order_id have order_number

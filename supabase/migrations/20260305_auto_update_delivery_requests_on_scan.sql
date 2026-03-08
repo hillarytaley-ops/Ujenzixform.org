@@ -167,19 +167,25 @@ BEGIN
       -- This moves the delivery from Scheduled to In Transit tab
       -- ============================================================
       -- Find the delivery_request linked to this purchase_order
+      -- CRITICAL: Include ALL non-delivered statuses to catch any delivery_request
       SELECT id INTO delivery_request_id
       FROM delivery_requests
       WHERE purchase_order_id = order_id
-        AND status IN ('accepted', 'assigned', 'pending')
+        AND status NOT IN ('delivered', 'completed', 'cancelled')
+        AND status IN ('accepted', 'assigned', 'pending', 'pending_pickup', 'delivery_assigned', 'ready_for_dispatch', 'provider_assigned', 'scheduled')
       LIMIT 1;
       
       IF delivery_request_id IS NOT NULL THEN
         UPDATE delivery_requests
         SET status = 'in_transit',
             updated_at = NOW()
-        WHERE id = delivery_request_id;
+        WHERE id = delivery_request_id
+          AND status NOT IN ('delivered', 'completed', 'cancelled');
         
         RAISE NOTICE 'Updated delivery_request % status to in_transit (supplier dispatched)', delivery_request_id;
+      ELSE
+        -- Log if no delivery_request found (for debugging)
+        RAISE WARNING 'No delivery_request found for purchase_order % to update to in_transit', order_id;
       END IF;
       
       RAISE NOTICE 'Updated purchase_order % status to shipped', order_id;
