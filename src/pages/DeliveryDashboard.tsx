@@ -722,6 +722,18 @@ const DeliveryDashboard = () => {
     };
   }, [user?.id, refetchData, toast, activeTab]);
 
+  // Auto-refresh data when switching to Delivered tab to ensure latest data is shown
+  useEffect(() => {
+    if (activeTab === 'deliveries' && deliveriesSubTab === 'delivered') {
+      console.log('🔄 Delivered tab active - refreshing data to show latest deliveries...');
+      // Small delay to ensure tab switch is complete, then refresh
+      const timer = setTimeout(() => {
+        refetchData();
+      }, 300);
+      return () => clearTimeout(timer);
+    }
+  }, [activeTab, deliveriesSubTab, refetchData]);
+
   // Function to load notification counts
   const loadNotificationCounts = useCallback(async () => {
     try {
@@ -1400,9 +1412,9 @@ const DeliveryDashboard = () => {
                       
                       // Only show badge if there are actually in-transit orders (not delivered)
                       return inTransitCount > 0 ? (
-                        <Badge className="ml-1 bg-purple-500 text-white text-xs">
+                      <Badge className="ml-1 bg-purple-500 text-white text-xs">
                           {inTransitCount}
-                        </Badge>
+                      </Badge>
                       ) : null;
                     })()}
                   </TabsTrigger>
@@ -1788,17 +1800,17 @@ const DeliveryDashboard = () => {
                         );
                         
                         return sortedDelivered.length === 0 ? (
-                          <div className="text-center py-12">
-                            <Package className="h-12 w-12 mx-auto text-gray-400 mb-4" />
-                            <p className={`text-lg font-medium ${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`}>
-                              No delivery history yet
-                            </p>
-                            <p className={`text-sm ${isDarkMode ? 'text-gray-500' : 'text-gray-400'}`}>
-                              Your completed deliveries will appear here
-                            </p>
-                          </div>
-                        ) : (
-                          <div className="space-y-4">
+                        <div className="text-center py-12">
+                          <Package className="h-12 w-12 mx-auto text-gray-400 mb-4" />
+                          <p className={`text-lg font-medium ${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`}>
+                            No delivery history yet
+                          </p>
+                          <p className={`text-sm ${isDarkMode ? 'text-gray-500' : 'text-gray-400'}`}>
+                            Your completed deliveries will appear here
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="space-y-4">
                             {sortedDelivered.map((delivery, index) => {
                               const completedDate = new Date(delivery.completed_at);
                               const isToday = completedDate.toDateString() === new Date().toDateString();
@@ -1856,7 +1868,7 @@ const DeliveryDashboard = () => {
                                 </div>
                               );
                             })}
-                          </div>
+                        </div>
                         );
                       })()}
                     </CardContent>
@@ -1954,15 +1966,49 @@ const DeliveryDashboard = () => {
                       onDeliveryComplete={async () => {
                         // Refresh data first to get updated status
                         console.log('🔄 Refreshing delivery data after scan...');
-                        await refetchData();
                         
-                        // Then switch to delivered tab
+                        // Wait a moment for database update to propagate (RPC updates are usually fast but give it time)
+                        await new Promise(resolve => setTimeout(resolve, 1000));
+                        
+                        // Refetch data with retries to ensure we get the updated status
+                        let retries = 5;
+                        let dataRefreshed = false;
+                        
+                        while (retries > 0 && !dataRefreshed) {
+                          try {
+                            console.log(`🔄 Refreshing data (attempt ${6 - retries}/5)...`);
+                            await refetchData();
+                            
+                            // Wait longer for data to load and process
+                            await new Promise(resolve => setTimeout(resolve, 800));
+                            
+                            dataRefreshed = true;
+                            console.log('✅ Data refreshed successfully');
+                          } catch (error) {
+                            console.error('❌ Error refreshing data:', error);
+                            retries--;
+                            if (retries > 0) {
+                              await new Promise(resolve => setTimeout(resolve, 1000));
+                            }
+                          }
+                        }
+                        
+                        // Switch to delivered tab BEFORE showing toast
+                        console.log('🔄 Switching to Delivered tab...');
                         setActiveTab('deliveries');
                         setDeliveriesSubTab('delivered');
                         
+                        // Force another refresh after switching tabs to ensure data is loaded
+                        await new Promise(resolve => setTimeout(resolve, 500));
+                        await refetchData();
+                        await new Promise(resolve => setTimeout(resolve, 500));
+                        
+                        // Force a final re-render
+                        await new Promise(resolve => setTimeout(resolve, 300));
+                        
                         toast({
                           title: '✅ Delivery Complete!',
-                          description: 'Order has been scanned as delivered. Switching to "Delivered" tab.',
+                          description: 'Order has been scanned as delivered. Viewing "Delivered" tab.',
                           duration: 5000,
                         });
                       }}
