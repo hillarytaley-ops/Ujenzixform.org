@@ -35,7 +35,7 @@ interface OrderItem {
 
 interface Order {
   id: string;
-  order_number: string;
+  order_number?: string; // Optional - only real po_number from purchase_orders, no fake fallback
   buyer_id: string;
   buyer_name: string;
   buyer_email: string;
@@ -920,7 +920,7 @@ export const DispatchScanner: React.FC = () => {
         if (!orderMap[orderId]) {
           orderMap[orderId] = {
             id: orderId,
-            order_number: purchaseOrder?.po_number || orderId.slice(0, 8).toUpperCase(),
+            order_number: purchaseOrder?.po_number || undefined, // NO FAKE FALLBACK - only real po_number
             buyer_id: item.buyer_id || purchaseOrder?.buyer_id || 'unknown',
             buyer_name: item.buyer_name || purchaseOrder?.builder_name || 'Unknown Client',
             buyer_email: item.buyer_email || purchaseOrder?.builder_email || '',
@@ -962,8 +962,17 @@ export const DispatchScanner: React.FC = () => {
       console.log('📦 Orders grouped:', Object.keys(orderMap).length);
       console.log('📦 Orders with pending items:', Object.values(orderMap).filter(o => o.pending_items > 0).length);
 
-      // Convert to array and sort by pending items (orders with pending items first)
+      // Convert to array, filter out orders without REAL order numbers, then sort
       const ordersArray = Object.values(orderMap)
+        .filter((order) => {
+          // CRITICAL: Only include orders with REAL order_numbers (from purchase_orders.po_number)
+          // Filter out orders without real order numbers to avoid showing fake/fallback numbers
+          if (!order.order_number || order.order_number === 'unknown' || order.id === 'unknown') {
+            console.warn('🚫 Dispatch Scanner: Filtering out order without real order_number:', order.id, 'order_number:', order.order_number);
+            return false;
+          }
+          return true;
+        })
         .sort((a, b) => {
           // First, prioritize orders with pending items
           if (a.pending_items > 0 && b.pending_items === 0) return -1;
@@ -971,6 +980,9 @@ export const DispatchScanner: React.FC = () => {
           // Then sort by date
           return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
         });
+
+      console.log('✅ Dispatch Scanner: Orders with REAL order_numbers:', ordersArray.length);
+      console.log('📋 Sample real order numbers:', ordersArray.slice(0, 5).map(o => o.order_number).filter(Boolean));
 
       setOrders(ordersArray);
       console.log('📦 Fetched orders:', ordersArray.length);
@@ -2091,7 +2103,7 @@ export const DispatchScanner: React.FC = () => {
         </Button>
         
         <div className="flex-1 text-right">
-          <h2 className="text-xl font-bold">Order #{selectedOrder.order_number}</h2>
+          <h2 className="text-xl font-bold">Order #{selectedOrder.order_number || 'Loading...'}</h2>
           <p className="text-sm text-muted-foreground">{selectedOrder.buyer_name}</p>
         </div>
       </div>
@@ -2421,7 +2433,7 @@ export const DispatchScanner: React.FC = () => {
               Order Complete! 🎉
             </h3>
             <p className="text-green-700 mb-4">
-              All {selectedOrder.total_items} items have been dispatched for Order #{selectedOrder.order_number}
+              All {selectedOrder.total_items} items have been dispatched for Order #{selectedOrder.order_number || 'N/A'}
             </p>
             <p className="text-sm text-green-600 mb-6">
               Client: {selectedOrder.buyer_name}
@@ -2525,7 +2537,7 @@ const OrderCard: React.FC<{
               )}
             </div>
             <div>
-              <p className="font-bold text-lg">Order #{order.order_number}</p>
+              <p className="font-bold text-lg">Order #{order.order_number || 'Loading...'}</p>
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <User className="h-3 w-3" />
                 <span>{order.buyer_name}</span>
