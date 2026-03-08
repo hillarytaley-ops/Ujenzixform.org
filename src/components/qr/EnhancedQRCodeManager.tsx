@@ -64,7 +64,7 @@ interface ClientGroup {
 
 interface OrderGroup {
   order_id: string;
-  order_number: string;  // Display-friendly order number
+  order_number?: string;  // Display-friendly order number (from purchase_orders.po_number) - optional to allow filtering
   buyer_id: string;
   buyer_name: string;
   buyer_email: string;
@@ -2151,7 +2151,7 @@ export const EnhancedQRCodeManager: React.FC<EnhancedQRCodeManagerProps> = ({ su
                         <Package className="h-7 w-7 text-white" />
                       </div>
                       <div className="text-left">
-                        <p className="font-bold text-xl text-blue-800">Order #{group.order_number}</p>
+                        <p className="font-bold text-xl text-blue-800">Order #{group.order_number || 'Loading...'}</p>
                         <div className="flex items-center gap-3 text-sm text-slate-600 mt-1">
                           <span className="flex items-center gap-1 font-medium">
                             <User className="h-3 w-3" /> {group.buyer_name}
@@ -2943,7 +2943,7 @@ const OrderAccordionItem: React.FC<{
             </div>
             <div className="text-left">
               <div className="flex items-center gap-2">
-                <p className="font-bold text-xl text-slate-800">Order #{group.order_number}</p>
+                <p className="font-bold text-xl text-slate-800">Order #{group.order_number || 'Loading...'}</p>
                 {showShippedBadge && (
                   <Badge className="bg-green-600 text-white">
                     <Truck className="h-3 w-3 mr-1" />
