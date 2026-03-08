@@ -962,17 +962,17 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
       }
       
       // Success! Add to results
-      const scanResult: ScanResult = {
-        qr_code: cleanQRCode,
+      const scanResultForUI: ScanResult = {
+        qr_code: rpcResult?.qr_code || cleanQRCode,
         material_type: rpcResult?.material_type || 'Material',
         category: 'General',
-        quantity: 1,
-        unit: 'unit',
+        quantity: rpcResult?.quantity || 1,
+        unit: rpcResult?.unit || 'unit',
         status: rpcResult?.status || 'delivered',
         timestamp: new Date()
       };
 
-      setScanResults(prev => [scanResult, ...prev.slice(0, 9)]);
+      setScanResults(prev => [scanResultForUI, ...prev.slice(0, 9)]);
       
       toast.success('✅ Item Received!', {
         description: `${rpcResult?.material_type || 'Material'} confirmed${rpcResult?.is_invalidated ? ' (QR code invalidated)' : ''}`,
