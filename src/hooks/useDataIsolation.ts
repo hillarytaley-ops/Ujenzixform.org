@@ -2620,6 +2620,12 @@ export const useDeliveryProviderData = () => {
       
       console.log('📦 Transformed', deliveredFromPOs.length, 'delivered purchase_orders to history format (ALL delivered orders, not filtered by provider)');
       console.log('📋 Transformed order numbers:', deliveredFromPOs.map(po => po.order_number || po.id?.substring(0, 8)).join(', '));
+      console.log('🔍 CRITICAL: deliveredFromPOs details:', deliveredFromPOs.map(po => ({ 
+        id: po.id?.substring(0, 8), 
+        order_number: po.order_number, 
+        status: po.status,
+        provider_id: po.provider_id?.substring(0, 8) || 'none'
+      })));
       
       // Combine both sources and remove duplicates (prefer delivery_requests if both exist)
       const allHistory: any[] = [];
@@ -2631,6 +2637,8 @@ export const useDeliveryProviderData = () => {
         purchase_orders_count: deliveredFromPOs.length,
         expected_total: (historyData?.length || 0) + deliveredFromPOs.length
       });
+      console.log('🔍 CRITICAL: Before combining - deliveredFromPOs.length:', deliveredFromPOs.length);
+      console.log('🔍 CRITICAL: Before combining - historyData.length:', historyData?.length || 0);
       
       // Add delivery_requests first
       (historyData || []).forEach((dr: any) => {
@@ -2900,7 +2908,16 @@ export const useDeliveryProviderData = () => {
       }, 'items (most recent first)');
       console.log('📋 FINAL Delivery history order numbers:', filteredHistory.map(h => h.order_number || h.po_number || h.id?.substring(0, 8)).join(', '));
       console.log('📋 FINAL Delivery history count:', filteredHistory.length, '(should match supplier dashboard: 3)');
+      console.log('🔍 CRITICAL: FINAL STEP - About to setDeliveryHistory');
+      console.log('🔍 CRITICAL: filteredHistory.length:', filteredHistory.length);
+      console.log('🔍 CRITICAL: filteredHistory order numbers:', filteredHistory.map(h => h.order_number || 'NO_ORDER_NUMBER').join(', '));
+      console.log('🔍 CRITICAL: Checking for known delivered orders in FINAL filteredHistory:', {
+        has1772673713715: filteredHistory.some(h => (h.order_number || '').includes('1772673713715')),
+        has1772340447370: filteredHistory.some(h => (h.order_number || '').includes('1772340447370')),
+        has1772295614017: filteredHistory.some(h => (h.order_number || '').includes('1772295614017'))
+      });
       setDeliveryHistory(filteredHistory);
+      console.log('✅ CRITICAL: setDeliveryHistory called with', filteredHistory.length, 'items');
 
       // Fetch ALL pending requests from multiple tables for testing
       // All registered providers can see and accept any pending request
