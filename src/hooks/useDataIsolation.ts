@@ -2339,6 +2339,22 @@ export const useDeliveryProviderData = () => {
       }
       console.log('🔄 CRITICAL: After try-catch block. deliveredPOs.length:', deliveredPOs?.length || 0);
       
+      // Now await delivery_requests history (with timeout to avoid hanging)
+      console.log('🔄 CRITICAL: Now awaiting delivery_requests history (with 10s timeout)...');
+      try {
+        const drTimeoutPromise = new Promise<never>((_, reject) => 
+          setTimeout(() => reject(new Error('delivery_requests history timeout after 10s')), 10000)
+        );
+        historyData = await Promise.race([deliveryRequestsHistoryPromise, drTimeoutPromise]).catch((e: any) => {
+          console.warn('⚠️ delivery_requests history fetch timed out or failed:', e?.message || e);
+          return [];
+        }) as any[];
+        console.log('🔄 CRITICAL: delivery_requests history completed. historyData.length:', historyData.length);
+      } catch (e) {
+        console.warn('⚠️ Error awaiting delivery_requests history:', e);
+        historyData = [];
+      }
+      
       // FINAL SAFETY CHECK: If we still don't have the known delivered orders, query them directly one more time
       // This is a last resort to ensure the 3 delivered orders from supplier dashboard always appear
       const knownOrderNumbers = ['1772673713715', '1772340447370', '1772295614017'];
