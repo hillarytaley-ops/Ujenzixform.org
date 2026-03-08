@@ -335,18 +335,24 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
           }
           
           // Call processQRScan and handle errors with timeout
+          // Increased timeout to 60 seconds to allow RPC to complete (RPC has 45s timeout + network delays)
           const processPromise = processQRScan(decodedText, 'mobile_camera');
           const timeoutPromise = new Promise((_, reject) => 
-            setTimeout(() => reject(new Error('Scan processing timeout after 30 seconds')), 30000)
+            setTimeout(() => reject(new Error('Scan processing timeout after 60 seconds')), 60000)
           );
           
-          Promise.race([processPromise, timeoutPromise]).catch((error) => {
-            console.error('❌ Error in processQRScan:', error);
-            console.error('❌ Error type:', error?.constructor?.name);
-            console.error('❌ Error message:', error?.message);
-            console.error('❌ Full error:', error);
-            toast.error('❌ Scan Processing Error', {
-              description: error?.message || 'Failed to process QR code. Please try again.',
+          Promise.race([processPromise, timeoutPromise])
+            .then((result) => {
+              // Success - processQRScan completed
+              console.log('✅ processQRScan completed successfully');
+            })
+            .catch((error) => {
+              console.error('❌ Error in processQRScan:', error);
+              console.error('❌ Error type:', error?.constructor?.name);
+              console.error('❌ Error message:', error?.message);
+              console.error('❌ Full error:', error);
+              toast.error('❌ Scan Processing Error', {
+                description: error?.message || 'Failed to process QR code. Please try again.',
               duration: 5000,
             });
           });
@@ -617,9 +623,9 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
           _photo_url: null
         });
         
-        // Set timeout to 20 seconds (reasonable for RPC)
+        // Set timeout to 45 seconds (RPC can be slow with database operations, especially when updating multiple tables)
         const rpcTimeoutPromise = new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error('RPC timeout after 20 seconds')), 20000)
+          setTimeout(() => reject(new Error('RPC timeout after 45 seconds')), 45000)
         );
         
         const { data: rpcResult, error: rpcError } = await Promise.race([
@@ -655,7 +661,7 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
                 });
                 
                 const variantTimeoutPromise = new Promise<never>((_, reject) =>
-                  setTimeout(() => reject(new Error('RPC variant timeout')), 10000)
+                  setTimeout(() => reject(new Error('RPC variant timeout')), 15000)
                 );
                 
                 const { data: variantResult, error: variantError } = await Promise.race([
