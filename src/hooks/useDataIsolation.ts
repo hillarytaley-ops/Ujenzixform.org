@@ -748,18 +748,56 @@ export const useDeliveryProviderData = () => {
         })(),
         
         // 2. Fetch from purchase_orders using direct fetch (faster than supabase client)
-        // Only fetch shipped/in_transit orders to reduce query load
+        // CRITICAL: purchase_orders.delivery_provider_id stores delivery_provider.id (UUID), not user_id
+        // We need to first get the delivery_provider.id for this userId, then query purchase_orders
         (async () => {
           try {
-            console.log('📦 Fetching purchase_orders (shipped/in_transit only) for provider:', userId);
+            console.log('📦 Fetching purchase_orders for provider (userId):', userId);
+            
+            // First, get the delivery_provider.id for this userId
+            let providerIdForPO: string | null = null;
+            try {
+              const providerLookupPromise = supabase
+                .from('delivery_providers')
+                .select('id')
+                .eq('user_id', userId)
+                .maybeSingle();
+              
+              const providerTimeoutPromise = new Promise<never>((_, reject) => 
+                setTimeout(() => reject(new Error('Provider lookup timeout')), 2000)
+              );
+              
+              const { data: deliveryProvider, error: dpError } = await Promise.race([
+                providerLookupPromise,
+                providerTimeoutPromise
+              ]).catch((e: any) => {
+                console.warn('⚠️ Provider lookup for purchase_orders timed out:', e?.message || e);
+                return { data: null, error: e };
+              }) as any;
+              
+              if (!dpError && deliveryProvider) {
+                providerIdForPO = deliveryProvider.id;
+                console.log('✅ Found delivery_provider.id for purchase_orders query:', providerIdForPO?.substring(0, 8));
+              } else {
+                console.warn('⚠️ Could not find delivery_provider.id for userId:', userId.substring(0, 8));
+                // Fallback: try using userId directly (in case delivery_provider_id was set incorrectly)
+                providerIdForPO = userId;
+                console.warn('⚠️ Using userId as fallback for purchase_orders query');
+              }
+            } catch (e: any) {
+              console.warn('⚠️ Exception fetching delivery_provider.id for purchase_orders:', e?.message || e);
+              // Fallback: use userId directly
+              providerIdForPO = userId;
+            }
             
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
             
             // Use direct fetch with minimal columns and status filter
             // Include 'delivered' and 'completed' statuses to sync with delivery_requests, but filter them out later
+            // CRITICAL: Use providerIdForPO (delivery_provider.id) not userId
             const poResponse = await fetch(
-              `${SUPABASE_URL}/rest/v1/purchase_orders?delivery_provider_id=eq.${userId}&status=in.(shipped,in_transit,dispatched,out_for_delivery,delivery_arrived,processing,delivered,completed)&select=id,status,delivery_provider_id,delivery_address,items,total_amount,created_at,updated_at,supplier_id,buyer_id,delivery_provider_name,delivery_assigned_at,po_number,delivered_at,completed_at&order=created_at.desc&limit=100`,
+              `${SUPABASE_URL}/rest/v1/purchase_orders?delivery_provider_id=eq.${providerIdForPO}&status=in.(shipped,in_transit,dispatched,out_for_delivery,delivery_arrived,processing,delivered,completed)&select=id,status,delivery_provider_id,delivery_address,items,total_amount,created_at,updated_at,supplier_id,buyer_id,delivery_provider_name,delivery_assigned_at,po_number,delivered_at,completed_at&order=created_at.desc&limit=100`,
               {
                 headers: {
                   'apikey': SUPABASE_ANON_KEY,
@@ -1326,9 +1364,11 @@ export const useDeliveryProviderData = () => {
           console.log('📦 Fetched material_items for', materialItemsMap.size, 'purchase orders');
           
           // Categorize each delivery based on material_items scan status
-          // Logic matches EnhancedQRCodeManager:
+          // Logic matches EnhancedQRCodeManager (supplier dashboard "Dispatched" tab):
           // - Scheduled: No items have dispatch_scanned = true
-          // - In Transit: All items have dispatch_scanned = true, and some have receive_scanned = true
+          // - In Transit: Some or all items have dispatch_scanned = true (matches supplier "Dispatched" tab)
+          //   - If all dispatched AND some received = in_transit (partially delivered)
+          //   - If some/all dispatched AND none received = in_transit (just dispatched, awaiting receiving)
           // - Delivered: All items have receive_scanned = true
           
           const categorized = allActiveDeliveries.map((delivery: any) => {
@@ -1410,10 +1450,11 @@ export const useDeliveryProviderData = () => {
               // All items received = delivered
               categorizedStatus = 'delivered';
             } else if (allItemsDispatched && hasReceivedItems) {
-              // All dispatched, some received = in transit
+              // All dispatched, some received = in transit (partially delivered)
               categorizedStatus = 'in_transit';
             } else if (hasDispatchedItems) {
-              // Some or all dispatched, none received = dispatched/in_transit
+              // Some or all dispatched, none received = in_transit
+              // This matches supplier dashboard "Dispatched" tab - when supplier dispatches, provider sees it as "In Transit"
               categorizedStatus = 'in_transit';
             } else {
               // No items dispatched = scheduled
@@ -1476,6 +1517,26 @@ export const useDeliveryProviderData = () => {
               dispatched_count: d._dispatched_count,
               received_count: d._received_count
             })));
+          } else {
+            // CRITICAL: Log why no in_transit orders found
+            // Check if there are orders that should be in_transit but aren't categorized correctly
+            const shouldBeInTransit = categorized.filter((d: any) => {
+              // Orders with dispatched items but not all received should be in_transit
+              const hasDispatched = d._dispatched_count > 0;
+              const allReceived = d._items_count > 0 && d._received_count === d._items_count;
+              return hasDispatched && !allReceived && d._categorized_status !== 'in_transit';
+            });
+            if (shouldBeInTransit.length > 0) {
+              console.warn('⚠️ Found', shouldBeInTransit.length, 'orders that should be in_transit but are not:', shouldBeInTransit.map((d: any) => ({
+                id: d.id?.substring(0, 8),
+                order_number: d.order_number || d.po_number,
+                _categorized_status: d._categorized_status,
+                items_count: d._items_count,
+                dispatched_count: d._dispatched_count,
+                received_count: d._received_count
+              })));
+            }
+            console.log('📊 Categorization summary: No in_transit orders found. Total categorized:', categorized.length);
           }
           
           return categorized;
