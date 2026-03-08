@@ -420,8 +420,20 @@ const DeliveryDashboard = () => {
             }
           });
           
-          // Remove duplicates
-          const uniqueAggressiveOrders = Array.from(new Map(aggressiveOrders.map(po => [po.id, po])).values());
+          // Remove duplicates - NO Map constructor to avoid minification errors
+          const seenIds: Record<string, boolean> = {};
+          const uniqueAggressiveOrders: any[] = [];
+          for (let j = 0; j < aggressiveOrders.length; j++) {
+            const po = aggressiveOrders[j];
+            const poId = po.id ? (po.id + '') : '';
+            if (poId && !seenIds[poId]) {
+              seenIds[poId] = true;
+              uniqueAggressiveOrders.push(po);
+            } else if (!poId) {
+              // Include items without ID (shouldn't happen, but be safe)
+              uniqueAggressiveOrders.push(po);
+            }
+          }
           
           if (uniqueAggressiveOrders.length > 0) {
             console.log('🚨 COMPONENT AGGRESSIVE: Found', uniqueAggressiveOrders.length, 'orders. Force-adding to deliveryHistory...');
@@ -495,12 +507,16 @@ const DeliveryDashboard = () => {
               console.log('✅ COMPONENT AGGRESSIVE: Force-adding', newEntries.length, 'orders to deliveryHistory');
               setDeliveryHistory(prev => {
                 const combined = [...prev, ...newEntries];
-                // Re-sort by date (only use completed_at, not order_number)
+                // Re-sort by date string comparison - NO Date constructor
                 combined.sort((a, b) => {
                   try {
-                    const dateA = new Date(a.completed_at || 0);
-                    const dateB = new Date(b.completed_at || 0);
-                    return dateB.getTime() - dateA.getTime();
+                    // Simple string comparison - ISO dates sort correctly as strings
+                    const dateA = a.completed_at || '';
+                    const dateB = b.completed_at || '';
+                    // Compare strings directly (ISO format sorts correctly)
+                    if (dateB > dateA) return 1;
+                    if (dateB < dateA) return -1;
+                    return 0;
                   } catch (sortError) {
                     console.warn('⚠️ COMPONENT AGGRESSIVE: Sort error:', sortError);
                     return 0;
