@@ -604,23 +604,56 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
       
       try {
         // Try different QR code formats to find the item
+        // Extract various parts of the QR code for flexible matching
+        const numericPart = cleanQRCode.match(/\d{13,}/)?.[0] || '';
+        const poPart = cleanQRCode.match(/PO-\d{13,}/)?.[0] || '';
+        const itemPart = cleanQRCode.match(/ITEM\d+/)?.[0] || '';
+        const unitPart = cleanQRCode.match(/UNIT\d+/)?.[0] || '';
+        // Extract date and random suffix
+        const dateMatch = cleanQRCode.match(/(\d{8})-\d{4}$/);
+        const datePart = dateMatch ? dateMatch[1] : (cleanQRCode.match(/\d{8}/)?.[0] || '');
+        const randomSuffix = cleanQRCode.match(/\d{8}-(\d{4})$/)?.[1] || cleanQRCode.match(/-(\d{4})$/)?.[1] || '';
+        
+        // Try to reconstruct QR codes in different formats that might be in the database
+        // Format 1: UJP-FILM-PO-{PO}-ITEM{ITEM}-{DATE}-{RANDOM} (older format, no buyer/unit)
+        const reconstructedOldFormat = numericPart && itemPart && datePart && randomSuffix
+          ? `UJP-FILM-PO-${numericPart}-${itemPart}-${datePart}-${randomSuffix}`
+          : null;
+        
+        // Format 2: UJP-FILM-PO-{PO}-{BUYER}-ITEM{ITEM}-UNIT{UNIT}-{DATE}-{RANDOM} (newer format)
+        const buyerCode = cleanQRCode.match(/PO-\d{13,}-([A-Z0-9]+)-ITEM/)?.[1] || '';
+        const reconstructedNewFormat = numericPart && buyerCode && itemPart && unitPart && datePart && randomSuffix
+          ? `UJP-FILM-PO-${numericPart}-${buyerCode}-${itemPart}-${unitPart}-${datePart}-${randomSuffix}`
+          : null;
+        
+        // Format 3: Without buyer code but with unit
+        const reconstructedNoBuyer = numericPart && itemPart && unitPart && datePart && randomSuffix
+          ? `UJP-FILM-PO-${numericPart}-${itemPart}-${unitPart}-${datePart}-${randomSuffix}`
+          : null;
+        
         const qrVariations = [
           cleanQRCode, // Original
+          reconstructedNewFormat, // Reconstructed new format (with buyer and unit)
+          reconstructedNoBuyer, // Reconstructed without buyer code
+          reconstructedOldFormat, // Reconstructed old format (no buyer/unit)
           cleanQRCode.replace(/^UJP-FILM-/, ''), // Remove UJP-FILM- prefix
           cleanQRCode.replace(/^UJP-/, ''), // Remove UJP- prefix
-          cleanQRCode.match(/PO-\d{13,}-[A-Z0-9]+/)?.[0] || '', // Extract PO- format
-          cleanQRCode.match(/\d{13,}/)?.[0] || '', // Extract numeric part
+          // Try without buyer code
+          cleanQRCode.replace(/-[A-Z0-9]+-ITEM/, '-ITEM'), // Remove buyer code
+          poPart, // Extract PO- format
+          numericPart, // Extract numeric part
+          itemPart, // Extract ITEM-UNIT format
         ].filter(v => v && v !== '');
 
         let foundItem: any = null;
         let foundVariant = '';
 
-        // Try each variation to find the item
+        // Try exact matches first (sequential for better error handling)
         for (const variant of qrVariations) {
           if (!variant) continue;
           
           try {
-            console.log(`🔍 REST API: Trying QR code variant: ${variant.substring(0, 50)}...`);
+            console.log(`🔍 REST API: Trying exact match: ${variant.substring(0, 50)}...`);
             const findItemResponse = await fetch(
               `${SUPABASE_URL}/rest/v1/material_items?qr_code=eq.${encodeURIComponent(variant)}&select=id,purchase_order_id,receive_scanned,dispatch_scanned,qr_code,material_type,quantity,unit&limit=1`,
               {
@@ -637,13 +670,77 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
               if (itemData && itemData.length > 0) {
                 foundItem = itemData[0];
                 foundVariant = variant;
-                console.log(`✅ REST API: Found item with variant: ${variant.substring(0, 50)}...`);
+                console.log(`✅ REST API: Found item with exact match: ${foundVariant.substring(0, 50)}...`);
+                console.log(`   Database QR code: ${foundItem.qr_code}`);
                 break;
               }
+            } else {
+              const errorText = await findItemResponse.text();
+              console.log(`⚠️ REST API: Query returned ${findItemResponse.status} for ${variant.substring(0, 30)}...`);
             }
           } catch (variantError) {
-            console.log(`⚠️ REST API: Variant ${variant.substring(0, 30)}... failed:`, variantError);
+            console.log(`⚠️ REST API: Exact match failed for ${variant.substring(0, 30)}...:`, variantError);
             continue;
+          }
+        }
+        
+        // If exact match failed, try pattern matching with ilike (PostgREST uses % for wildcards)
+        if (!foundItem && numericPart) {
+          try {
+            console.log(`🔍 REST API: Trying pattern match with PO number: ${numericPart}...`);
+            // PostgREST ilike syntax: ilike.*pattern* where * becomes %
+            // Try matching by PO number first (most specific)
+            const poPattern = `PO-${numericPart}`;
+            const findItemResponse = await fetch(
+              `${SUPABASE_URL}/rest/v1/material_items?qr_code=ilike.*${encodeURIComponent(poPattern)}*&select=id,purchase_order_id,receive_scanned,dispatch_scanned,qr_code,material_type,quantity,unit&limit=50`,
+              {
+                headers: {
+                  'apikey': ANON_KEY,
+                  'Authorization': `Bearer ${accessToken}`,
+                  'Accept': 'application/json'
+                }
+              }
+            );
+            
+            if (findItemResponse.ok) {
+              const itemData = await findItemResponse.json();
+              console.log(`📊 REST API: Pattern match found ${itemData.length} potential matches for PO ${numericPart}`);
+              
+              if (itemData && itemData.length > 0) {
+                // Find the best match - prefer ones that match item/unit/date
+                const bestMatch = itemData.find((item: any) => {
+                  const itemQR = item.qr_code || '';
+                  // Match by item number and date if available
+                  if (itemPart && itemQR.includes(itemPart)) {
+                    if (datePart && itemQR.includes(datePart)) {
+                      return true; // Perfect match on item and date
+                    }
+                    return true; // Good match on item
+                  }
+                  return false;
+                }) || itemData.find((item: any) => {
+                  const itemQR = item.qr_code || '';
+                  // Match by date if available
+                  return datePart && itemQR.includes(datePart);
+                }) || itemData.find((item: any) => {
+                  const itemQR = item.qr_code || '';
+                  // Match by item number
+                  return itemPart && itemQR.includes(itemPart);
+                }) || itemData[0]; // Fallback to first result
+                
+                foundItem = bestMatch;
+                foundVariant = foundItem.qr_code;
+                console.log(`✅ REST API: Found item with pattern match: ${foundVariant.substring(0, 50)}...`);
+                console.log(`   Database QR code: ${foundItem.qr_code}`);
+                console.log(`   Scanned QR code: ${cleanQRCode.substring(0, 50)}...`);
+                console.log(`   Match confidence: ${foundItem.qr_code === cleanQRCode ? 'EXACT' : 'PARTIAL'}`);
+              }
+            } else {
+              const errorText = await findItemResponse.text();
+              console.log(`⚠️ REST API: Pattern match query failed: ${findItemResponse.status} ${errorText.substring(0, 100)}`);
+            }
+          } catch (patternError) {
+            console.log(`⚠️ REST API: Pattern match failed:`, patternError);
           }
         }
         
