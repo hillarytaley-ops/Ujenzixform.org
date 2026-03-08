@@ -2291,19 +2291,19 @@ export const useDeliveryProviderData = () => {
           return dateB.getTime() - dateA.getTime();
         }).slice(0, 100);
         
-        console.log('📦 Final delivery_requests history count:', historyData.length);
-        console.log('📋 History order numbers:', historyData.map(dr => dr.order_number || dr.po_number || 'N/A').filter(n => n !== 'N/A'));
-        console.log('🔄 CRITICAL: delivery_requests history fetch section COMPLETED successfully');
-      } catch (e) {
-        historyError = e;
-        console.error('❌ Error fetching delivery history:', e);
-        console.log('🔄 CRITICAL: delivery_requests history fetch section FAILED with error');
-      }
-
-      if (historyError) {
-        console.warn('Error fetching delivery history from delivery_requests:', historyError);
-      }
-      console.log('🔄 CRITICAL: After delivery_requests history fetch section. historyData.length:', historyData.length);
+          console.log('📦 Final delivery_requests history count:', historyData.length);
+          console.log('📋 History order numbers:', historyData.map(dr => dr.order_number || dr.po_number || 'N/A').filter(n => n !== 'N/A'));
+          console.log('🔄 CRITICAL: delivery_requests history fetch section COMPLETED successfully');
+          return historyData;
+        } catch (e) {
+          console.error('❌ Error fetching delivery history:', e);
+          console.log('🔄 CRITICAL: delivery_requests history fetch section FAILED with error');
+          return [];
+        }
+      })();
+      
+      // Now await deliveredPOsPromise FIRST (before delivery_requests completes)
+      // This ensures we get the delivered orders even if delivery_requests hangs
       
       // ═══════════════════════════════════════════════════════════════════════════════
       // 2. CRITICAL FIX: Await the purchase_orders fetch FIRST (before delivery_requests completes)
