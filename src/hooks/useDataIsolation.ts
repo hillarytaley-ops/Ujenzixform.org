@@ -1176,51 +1176,16 @@ export const useDeliveryProviderData = () => {
         console.log('✅ Added', purchaseOrdersToProcess.length, 'purchase orders to active deliveries');
       }
       
-      // CRITICAL: Filter delivery_requests by matching with purchase_orders that have correct provider
-      // BUT: Only filter if we have purchase_orders AND provider lookup succeeded
-      // If provider lookup failed, we can't reliably filter, so keep all delivery_requests
-      // This prevents removing all data when purchase_orders query fails or times out
-      if (purchaseOrdersData && purchaseOrdersData.length > 0 && providerIdToMatch) {
-        const validPurchaseOrderIds = new Set(purchaseOrdersData.map((po: any) => po.id).filter(Boolean));
-        console.log('🔍 Filtering delivery_requests by matching purchase_orders:', {
-          total_delivery_requests: allActiveDeliveries.filter(d => d.source === 'delivery_requests').length,
-          valid_purchase_order_ids: validPurchaseOrderIds.size,
-          providerIdToMatch: providerIdToMatch.substring(0, 8)
-        });
-        
-        // Filter delivery_requests to only those with purchase_order_ids that match purchase_orders
-        const beforeFilter = allActiveDeliveries.length;
-        const filteredDeliveries = allActiveDeliveries.filter((delivery: any) => {
-          if (delivery.source === 'delivery_requests' && delivery.purchase_order_id) {
-            const matches = validPurchaseOrderIds.has(delivery.purchase_order_id);
-            if (!matches) {
-              console.warn('🚫 Filtering out delivery_request (no matching purchase_order):', {
-                id: delivery.id?.substring(0, 8),
-                purchase_order_id: delivery.purchase_order_id?.substring(0, 8),
-                status: delivery.status
-              });
-            }
-            return matches;
-          }
-          return true; // Keep purchase_orders entries
-        });
-        
-        // Replace allActiveDeliveries with filtered list
-        allActiveDeliveries.length = 0;
-        filteredDeliveries.forEach(d => allActiveDeliveries.push(d));
-        
-        console.log('✅ Filtered delivery_requests by purchase_orders:', {
-          before: beforeFilter,
-          after: allActiveDeliveries.length,
-          removed: beforeFilter - allActiveDeliveries.length
-        });
-      } else {
-        console.log('⚠️ Skipping purchase_order matching filter:', {
-          hasPurchaseOrders: purchaseOrdersData && purchaseOrdersData.length > 0,
-          hasProviderId: !!providerIdToMatch,
-          reason: !providerIdToMatch ? 'Provider lookup failed' : 'No purchase_orders found'
-        });
-      }
+      // NOTE: We do NOT filter delivery_requests by matching purchase_orders anymore
+      // The delivery_requests are already filtered by provider_id during the fetch (via RLS or REST API)
+      // An additional filter would be too aggressive and could remove valid delivery_requests
+      // if purchase_orders data is incomplete (e.g., due to RLS, timeout, or other issues)
+      // The delivery_requests should be trusted if they're already filtered by provider_id
+      console.log('📦 Keeping all delivery_requests (already filtered by provider_id during fetch):', {
+        total_delivery_requests: allActiveDeliveries.filter(d => d.source === 'delivery_requests').length,
+        total_purchase_orders: allActiveDeliveries.filter(d => d.source === 'purchase_orders').length,
+        total_all: allActiveDeliveries.length
+      });
       
       // Final pass: Ensure all entries with purchase_order_id have order_number
       // Prioritize actual po_number from database, only use fallback if truly missing
