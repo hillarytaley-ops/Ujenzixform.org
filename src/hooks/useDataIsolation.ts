@@ -2320,15 +2320,9 @@ export const useDeliveryProviderData = () => {
       console.log('🔄 CRITICAL: About to await deliveredPOsPromise (BEFORE delivery_requests completes)...');
       try {
         console.log('🔄 CRITICAL: Calling await deliveredPOsPromise...');
-        // Use Promise.race to timeout after 45 seconds if it hangs (increased to allow fallback REST API queries to complete)
-        // The fallback queries can take up to 5s each (9 queries = up to 45s), so we need a longer timeout
-        const timeoutPromise = new Promise<never>((_, reject) => 
-          setTimeout(() => reject(new Error('deliveredPOsPromise timeout after 45s')), 45000)
-        );
-        deliveredPOs = await Promise.race([deliveredPOsPromise, timeoutPromise]).catch((e: any) => {
-          console.error('❌ deliveredPOsPromise timed out or failed:', e?.message || e);
-          return [];
-        }) as any[];
+        // CRITICAL: Don't timeout - let the fallback complete naturally
+        // The fallback REST API queries are finding the 3 orders, but timeouts were cutting them off
+        deliveredPOs = await deliveredPOsPromise;
         console.log('🔄 CRITICAL: deliveredPOsPromise resolved! deliveredPOs.length:', deliveredPOs?.length || 0);
         console.log('✅ Successfully fetched', deliveredPOs.length, 'delivered purchase_orders from supplier dashboard logic');
         console.log('📋 Order numbers in deliveredPOs:', deliveredPOs.map(po => po.po_number || po.id?.substring(0, 8)).join(', '));
