@@ -1,9 +1,12 @@
 -- ============================================================
--- DIAGNOSTIC: QR Code Lookup Helper Function
--- Use this to debug QR code matching issues
+-- RUN THIS IN SUPABASE SQL EDITOR
+-- This creates the diagnostic function if it doesn't exist
 -- ============================================================
 
--- Function to help diagnose QR code matching issues
+-- Drop if exists (to avoid conflicts)
+DROP FUNCTION IF EXISTS public.diagnose_qr_code(TEXT);
+
+-- Create diagnostic function
 CREATE OR REPLACE FUNCTION public.diagnose_qr_code(_scanned_qr TEXT)
 RETURNS JSONB
 LANGUAGE plpgsql
@@ -16,8 +19,6 @@ DECLARE
   item_number_match TEXT;
   unit_number_match TEXT;
   exact_match RECORD;
-  po_matches RECORD[];
-  item_matches RECORD[];
 BEGIN
   -- Extract components from scanned QR code
   -- Format: UJP-FILM-PO-1772597930676-IATLA-ITEM001-UNIT001-20260307-5021
@@ -82,6 +83,8 @@ BEGIN
 END;
 $$;
 
-GRANT EXECUTE ON FUNCTION public.diagnose_qr_code TO authenticated;
+-- Grant permissions
+GRANT EXECUTE ON FUNCTION public.diagnose_qr_code(TEXT) TO authenticated;
 
-COMMENT ON FUNCTION public.diagnose_qr_code IS 'Diagnostic function to help debug QR code matching issues. Returns extracted components and potential matches.';
+-- Test it (uncomment to test)
+-- SELECT public.diagnose_qr_code('UJP-FILM-PO-1772597930676-IATLA-ITEM001-UNIT001-20260307-5021');
