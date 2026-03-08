@@ -47,14 +47,19 @@ DECLARE
 BEGIN
   current_user_id := auth.uid();
   
-  -- AGGRESSIVE: Try exact match first
+  -- CRITICAL: Try exact match first (fastest, most reliable)
+  -- Based on diagnostic: exact match exists, so this should work immediately
   SELECT * INTO item_record
   FROM material_items
   WHERE qr_code = _qr_code
   LIMIT 1;
   
-  -- If not found, try format variations
-  IF NOT FOUND THEN
+  -- If exact match found, skip all variation logic (saves time)
+  IF FOUND THEN
+    -- Exact match found, proceed with scan logic
+    NULL; -- Continue to scan processing
+  -- If not found, try format variations (fallback only)
+  ELSIF NOT FOUND THEN
     -- Extract potential PO number and item number from QR code
     -- Format: UJP-FILM-PO-1772597930676-IATLA-ITEM001-UNIT001-20260307-5021
     -- Try to extract: PO number (1772597930676) and ITEM number (ITEM001)

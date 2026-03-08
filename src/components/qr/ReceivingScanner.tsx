@@ -462,54 +462,69 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
       const ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
       
       // Get current session from Supabase (most reliable method)
-      // Add timeout to prevent hanging
+      // OPTIMIZED: Try localStorage first (faster), then Supabase session as fallback
       let accessToken = ANON_KEY;
-      try {
-        console.log('🔐 Attempting to get Supabase session...');
-        const sessionPromise = supabase.auth.getSession();
-        const timeoutPromise = new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error('Session fetch timeout after 5 seconds')), 5000)
-        );
-        
-        const { data: sessionData, error: sessionError } = await Promise.race([
-          sessionPromise,
-          timeoutPromise
-        ]) as any;
-        
-        console.log('🔐 Session fetch completed');
-        if (sessionData?.session?.access_token) {
-          accessToken = sessionData.session.access_token;
-          console.log('🔐 Using Supabase session token (authenticated)');
-        } else {
-          console.warn('⚠️ No active Supabase session, trying localStorage fallback...');
-          // Fallback to localStorage if session not available
+      
+      // STRATEGY: Try localStorage first (instant, no network call)
           try {
             const stored = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
             if (stored) {
               const parsed = JSON.parse(stored);
-              accessToken = parsed.access_token || ANON_KEY;
-              console.log('🔐 Using localStorage token (fallback)');
+          if (parsed.access_token) {
+            // Check if token is expired (basic check - if expired, try to refresh)
+            const tokenExp = parsed.expires_at ? new Date(parsed.expires_at * 1000) : null;
+            const now = new Date();
+            const buffer = 5 * 60 * 1000; // 5 minutes buffer
+            
+            if (!tokenExp || tokenExp.getTime() > now.getTime() + buffer) {
+              // Token is still valid
+              accessToken = parsed.access_token;
+              console.log('🔐 Using localStorage token (fast path, token valid)');
             } else {
-              console.error('❌ No access token found - RLS policies will block access!');
+              // Token expired, try to get fresh session
+              console.log('⚠️ localStorage token expired, trying Supabase session...');
+              throw new Error('Token expired');
             }
-          } catch (e) {
-            console.error('❌ Error reading localStorage token:', e);
           }
         }
-      } catch (e) {
-        console.error('❌ Error getting Supabase session (will use fallback):', e);
-        // Fallback to localStorage
+      } catch (localStorageError) {
+        // localStorage failed or token expired, try Supabase session
+        console.log('🔄 localStorage token not available or expired, trying Supabase session...');
+        
+        try {
+          // Try Supabase session with shorter timeout (3 seconds) since localStorage already failed
+          const sessionPromise = supabase.auth.getSession();
+          const timeoutPromise = new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error('Session fetch timeout after 3 seconds')), 3000)
+          );
+          
+          const { data: sessionData, error: sessionError } = await Promise.race([
+            sessionPromise,
+            timeoutPromise
+          ]) as any;
+          
+          if (sessionData?.session?.access_token) {
+            accessToken = sessionData.session.access_token;
+            console.log('🔐 Using Supabase session token (authenticated)');
+          } else {
+            console.warn('⚠️ No active Supabase session, using anon key (RLS may block)');
+          }
+        } catch (sessionError) {
+          console.warn('⚠️ Supabase session fetch failed:', sessionError?.message || 'Unknown error');
+          // Final fallback: try localStorage one more time (maybe it was a parse error)
         try {
           const stored = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
           if (stored) {
             const parsed = JSON.parse(stored);
             accessToken = parsed.access_token || ANON_KEY;
-            console.log('🔐 Using localStorage token (error fallback)');
-          } else {
-            console.warn('⚠️ No localStorage token available, using anon key');
+              console.log('🔐 Using localStorage token (final fallback)');
+            } else {
+              console.warn('⚠️ No access token available, using anon key (RLS may block)');
+            }
+          } catch (e2) {
+            console.error('❌ Error reading localStorage token:', e2);
+            console.warn('⚠️ Using anon key - RLS policies may block access');
           }
-        } catch (e2) {
-          console.error('❌ Error reading localStorage token:', e2);
         }
       }
       
@@ -605,142 +620,161 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
       let scanResult: any = null;
       let deliveryRequestUpdated = false;
       const rpcStartTime = Date.now();
+      let lastError: any = null; // Track last error for final error message
       
-      // Try RPC first (bypasses RLS)
+      // STRATEGY: Try simplified RPC FIRST (faster, direct PO lookup) before complex RPC
+      console.log('🔄 Trying simplified RPC function FIRST (direct PO + item lookup, 10s timeout)...');
+      let simpleRpcSucceeded = false;
       try {
-        console.log('🔄 Calling record_qr_scan RPC function...');
-        
-        // Try RPC with original QR code first
-        const rpcPromise = supabase.rpc('record_qr_scan', {
+        const simpleRpcPromise = supabase.rpc('record_qr_scan_simple', {
           _qr_code: cleanQRCode,
           _scan_type: 'receiving',
           _scanner_device_id: deviceInfo || null,
           _scanner_type: scannerType === 'mobile_camera' ? 'mobile_camera' : 'web_scanner',
-          _scan_location: null,
-          _material_condition: materialCondition || 'good',
-          _quantity_scanned: null,
-          _notes: notes || null,
-          _photo_url: null
+          _material_condition: materialCondition || 'good'
         });
         
-        // Set timeout to 45 seconds (RPC can be slow with database operations, especially when updating multiple tables)
-        const rpcTimeoutPromise = new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error('RPC timeout after 45 seconds')), 45000)
+        const simpleRpcTimeoutPromise = new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error('Simple RPC timeout after 10 seconds')), 10000)
         );
         
-        const { data: rpcResult, error: rpcError } = await Promise.race([
-          rpcPromise,
-          rpcTimeoutPromise
+        const { data: simpleRpcData, error: simpleRpcError } = await Promise.race([
+          simpleRpcPromise,
+          simpleRpcTimeoutPromise
         ]) as any;
         
-        if (rpcError) {
-          // If QR_NOT_FOUND, try variations
-          if (rpcError.message?.includes('QR_NOT_FOUND') || rpcError.code === 'QR_NOT_FOUND') {
-            console.log('⚠️ RPC: QR code not found, trying variations...');
-            
-            // Try QR code variations
-            const qrVariations = [
-              cleanQRCode.replace(/^UJP-FILM-/, ''), // Remove UJP-FILM- prefix
-              cleanQRCode.replace(/^UJP-/, ''), // Remove UJP- prefix
-              cleanQRCode.match(/PO-\d{13,}-[A-Z0-9-]+/)?.[0] || '', // Extract PO- format
-            ].filter(v => v && v !== '');
-            
-            let foundViaVariation = false;
-            for (const variant of qrVariations) {
-              try {
-                const variantPromise = supabase.rpc('record_qr_scan', {
-                  _qr_code: variant,
-                  _scan_type: 'receiving',
-                  _scanner_device_id: deviceInfo || null,
-                  _scanner_type: scannerType === 'mobile_camera' ? 'mobile_camera' : 'web_scanner',
-                  _scan_location: null,
-                  _material_condition: materialCondition || 'good',
-                  _quantity_scanned: null,
-                  _notes: notes || null,
-                  _photo_url: null
-                });
-                
-                const variantTimeoutPromise = new Promise<never>((_, reject) =>
-                  setTimeout(() => reject(new Error('RPC variant timeout')), 15000)
-                );
-                
-                const { data: variantResult, error: variantError } = await Promise.race([
-                  variantPromise,
-                  variantTimeoutPromise
-                ]) as any;
-                
-                if (!variantError && variantResult?.success === true) {
-                  scanResult = variantResult;
-                  foundViaVariation = true;
-                  console.log(`✅ RPC: Found with variation: ${variant.substring(0, 50)}...`);
-                  break;
-                }
-              } catch (variantErr) {
-                console.log(`⚠️ RPC: Variant ${variant.substring(0, 30)}... failed`);
-                continue;
-              }
-            }
-            
-            if (!foundViaVariation) {
-              throw rpcError; // Re-throw original error if no variation worked
-            }
-          } else {
-            throw rpcError; // Re-throw other errors
-          }
-        } else if (rpcResult?.success === true) {
-          scanResult = rpcResult;
-          console.log('✅ RPC: Scan successful');
+        if (!simpleRpcError && simpleRpcData?.success === true) {
+          console.log('✅ Simplified RPC succeeded!');
+          scanResult = {
+            success: true,
+            qr_code: simpleRpcData.qr_code || cleanQRCode,
+            material_type: simpleRpcData.material_type || 'Unknown',
+            status: simpleRpcData.status || 'received',
+            scan_event_id: simpleRpcData.scan_event_id
+          };
+          deliveryRequestUpdated = true;
+          simpleRpcSucceeded = true;
+          const simpleRpcElapsed = Date.now() - rpcStartTime;
+          console.log(`✅ Simplified RPC: Scan completed successfully in ${simpleRpcElapsed}ms`);
+        } else if (simpleRpcError) {
+          console.log('⚠️ Simplified RPC failed:', simpleRpcError.message);
+          // Continue to complex RPC fallback
         } else {
-          throw new Error('RPC returned unsuccessful result');
+          console.log('⚠️ Simplified RPC returned unsuccessful result');
+          // Continue to complex RPC fallback
         }
-        
-        const rpcElapsed = Date.now() - rpcStartTime;
-        console.log(`✅ RPC: Scan completed successfully in ${rpcElapsed}ms`);
-        
-        // RPC handles everything, so we can proceed with success flow
-        deliveryRequestUpdated = true;
-        
-      } catch (rpcError: any) {
-        console.error('❌ RPC method failed:', rpcError);
-        const rpcElapsed = Date.now() - rpcStartTime;
-        console.error(`⏱️ RPC failed after ${rpcElapsed}ms`);
-        
-        // STRATEGIC FALLBACK: Try simplified RPC function first (faster, direct PO lookup)
-        console.log('🔄 Trying simplified RPC function (direct PO + item lookup)...');
-        let simpleRpcSucceeded = false;
+      } catch (simpleRpcError: any) {
+        console.log('⚠️ Simplified RPC exception:', simpleRpcError.message);
+        // Continue to complex RPC fallback
+      }
+      
+      // If simple RPC succeeded, skip complex RPC and REST API
+      if (simpleRpcSucceeded) {
+        console.log('✅ Using simple RPC result, skipping complex RPC and REST API fallback');
+        // Continue to success flow below - scanResult is already set
+      } else {
+        // FALLBACK: Try complex RPC function (handles more format variations)
+        console.log('🔄 Simplified RPC failed - trying complex RPC function (45s timeout)...');
         try {
-          const simpleRpcResult = await Promise.race([
-            supabase.rpc('record_qr_scan_simple', {
-              _qr_code: cleanQRCode,
-              _scan_type: 'receiving',
-              _scanner_device_id: deviceInfo || null,
-              _scanner_type: scannerType === 'mobile_camera' ? 'mobile_camera' : 'web_scanner',
-              _material_condition: materialCondition || 'good'
-            }),
-            new Promise((_, reject) => setTimeout(() => reject(new Error('Simple RPC timeout')), 10000))
-          ]);
+          console.log('🔄 Calling record_qr_scan RPC function...');
           
-          if (simpleRpcResult?.data?.success === true) {
-            console.log('✅ Simplified RPC succeeded!');
-            scanResult = {
-              success: true,
-              qrCode: simpleRpcResult.data.qr_code || cleanQRCode,
-              materialType: simpleRpcResult.data.material_type || 'Unknown',
-              message: 'Item received successfully',
-              scanEventId: simpleRpcResult.data.scan_event_id
-            };
-            deliveryRequestUpdated = true;
-            simpleRpcSucceeded = true;
+          // Try RPC with original QR code first
+          const rpcPromise = supabase.rpc('record_qr_scan', {
+            _qr_code: cleanQRCode,
+            _scan_type: 'receiving',
+            _scanner_device_id: deviceInfo || null,
+            _scanner_type: scannerType === 'mobile_camera' ? 'mobile_camera' : 'web_scanner',
+            _scan_location: null,
+            _material_condition: materialCondition || 'good',
+            _quantity_scanned: null,
+            _notes: notes || null,
+            _photo_url: null
+          });
+          
+          // Set timeout to 45 seconds (RPC can be slow with database operations, especially when updating multiple tables)
+          const rpcTimeoutPromise = new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error('RPC timeout after 45 seconds')), 45000)
+          );
+          
+          const { data: rpcResult, error: rpcError } = await Promise.race([
+            rpcPromise,
+            rpcTimeoutPromise
+          ]) as any;
+          
+          if (rpcError) {
+            // If QR_NOT_FOUND, try variations
+            if (rpcError.message?.includes('QR_NOT_FOUND') || rpcError.code === 'QR_NOT_FOUND') {
+              console.log('⚠️ RPC: QR code not found, trying variations...');
+              
+              // Try QR code variations
+              const qrVariations = [
+                cleanQRCode.replace(/^UJP-FILM-/, ''), // Remove UJP-FILM- prefix
+                cleanQRCode.replace(/^UJP-/, ''), // Remove UJP- prefix
+                cleanQRCode.match(/PO-\d{13,}-[A-Z0-9-]+/)?.[0] || '', // Extract PO- format
+              ].filter(v => v && v !== '');
+              
+              let foundViaVariation = false;
+              for (const variant of qrVariations) {
+                try {
+                  const variantPromise = supabase.rpc('record_qr_scan', {
+                    _qr_code: variant,
+                    _scan_type: 'receiving',
+                    _scanner_device_id: deviceInfo || null,
+                    _scanner_type: scannerType === 'mobile_camera' ? 'mobile_camera' : 'web_scanner',
+                    _scan_location: null,
+                    _material_condition: materialCondition || 'good',
+                    _quantity_scanned: null,
+                    _notes: notes || null,
+                    _photo_url: null
+                  });
+                  
+                  const variantTimeoutPromise = new Promise<never>((_, reject) =>
+                    setTimeout(() => reject(new Error('RPC variant timeout')), 15000)
+                  );
+                  
+                  const { data: variantResult, error: variantError } = await Promise.race([
+                    variantPromise,
+                    variantTimeoutPromise
+                  ]) as any;
+                  
+                  if (!variantError && variantResult?.success === true) {
+                    scanResult = variantResult;
+                    foundViaVariation = true;
+                    console.log(`✅ RPC: Found with variation: ${variant.substring(0, 50)}...`);
+                    break;
+                  }
+                } catch (variantErr) {
+                  console.log(`⚠️ RPC: Variant ${variant.substring(0, 30)}... failed`);
+                  continue;
+                }
+              }
+              
+              if (!foundViaVariation) {
+                throw rpcError; // Re-throw original error if no variation worked
+              }
+          } else {
+              throw rpcError; // Re-throw other errors
           }
-        } catch (simpleRpcError: any) {
-          console.log('⚠️ Simplified RPC also failed, trying REST API...', simpleRpcError.message);
-        }
-        
-        // If simple RPC succeeded, skip REST API
-        if (simpleRpcSucceeded) {
-          console.log('✅ Using simple RPC result, skipping REST API fallback');
-          // Continue to success flow below - scanResult is already set
+          } else if (rpcResult?.success === true) {
+            scanResult = rpcResult;
+            console.log('✅ RPC: Scan successful');
         } else {
+            throw new Error('RPC returned unsuccessful result');
+          }
+          
+          const rpcElapsed = Date.now() - rpcStartTime;
+          console.log(`✅ RPC: Scan completed successfully in ${rpcElapsed}ms`);
+          
+          // RPC handles everything, so we can proceed with success flow
+          deliveryRequestUpdated = true;
+          
+        } catch (rpcError: any) {
+          console.error('❌ Complex RPC method also failed:', rpcError);
+          const rpcElapsed = Date.now() - rpcStartTime;
+          console.error(`⏱️ Complex RPC failed after ${rpcElapsed}ms`);
+          lastError = rpcError; // Store error for final error message
+          
+          // Final fallback: REST API (may fail due to RLS, but worth trying)
           // If RPC fails, try REST API as fallback (may fail due to RLS, but worth trying)
           console.log('🔄 RPC failed - trying REST API as fallback...');
         
@@ -948,21 +982,21 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
         
         if (!foundItem) {
           console.error('❌ REST API: Item not found with any QR code variation or PO-based query');
-        toast.error('❓ QR Code Not Found', {
+          toast.error('❓ QR Code Not Found', {
             description: `"${cleanQRCode.substring(0, 30)}..." not in system. Please verify the QR code is correct.`,
-          duration: 8000
-        });
-        return;
-      }
-      
+            duration: 8000
+          });
+          return;
+        }
+        
         if (foundItem.receive_scanned) {
           console.log('⏭️ Item already received - skipping');
           toast.warning('⚠️ Already Scanned', {
             description: 'This QR code has already been scanned.',
             duration: 3000
-        });
-        return;
-      }
+          });
+          return;
+        }
       
         const itemId = foundItem.id;
         const purchaseOrderId = foundItem.purchase_order_id;
@@ -1187,14 +1221,13 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
         }
         
           } catch (restApiError: any) {
-            console.error('❌ REST API fallback also failed:', restApiError);
-            const restApiElapsed = Date.now() - rpcStartTime;
-            console.error(`⏱️ REST API fallback failed after ${restApiElapsed}ms`);
-          }
-        } // End of simpleRpcSucceeded else block
+          console.error('❌ REST API fallback also failed:', restApiError);
+          const restApiElapsed = Date.now() - rpcStartTime;
+          console.error(`⏱️ REST API fallback failed after ${restApiElapsed}ms`);
+          lastError = restApiError; // Update last error
           
-          // Both RPC and REST API failed
-          const errorMessage = restApiError?.message || rpcError?.message || 'Unknown error';
+          // All methods failed - show error to user
+          const errorMessage = lastError?.message || 'Unknown error';
           if (errorMessage.includes('QR_NOT_FOUND') || errorMessage.includes('not found')) {
             toast.error('❓ QR Code Not Found', {
               description: `"${cleanQRCode.substring(0, 30)}..." not in system. Please verify the QR code is correct.`,
@@ -1207,13 +1240,15 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
             });
           } else {
             toast.error('Failed to process scan', {
-              description: 'Both RPC and REST API methods failed. Please try again or contact support.',
+              description: 'All scan methods failed. Please try again or contact support.',
               duration: 5000
             });
           }
           return;
         }
-      }
+      } // End of rpcError catch block (REST API fallback)
+      } // End of simpleRpcSucceeded else block (complex RPC + REST API fallback)
+    }
       
       // Success flow - use scanResult from either RPC or REST API
       if (!scanResult || scanResult.success !== true) {

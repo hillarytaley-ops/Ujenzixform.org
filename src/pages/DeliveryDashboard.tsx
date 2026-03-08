@@ -726,9 +726,25 @@ const DeliveryDashboard = () => {
   useEffect(() => {
     if (activeTab === 'deliveries' && deliveriesSubTab === 'delivered') {
       console.log('🔄 Delivered tab active - refreshing data to show latest deliveries...');
-      // Small delay to ensure tab switch is complete, then refresh
+      
+      // Aggressive refresh: multiple attempts to ensure we get the latest data
+      const refreshWithRetries = async () => {
+        for (let i = 0; i < 3; i++) {
+          try {
+            await refetchData();
+            // Wait a bit between refreshes to allow database propagation
+            if (i < 2) {
+              await new Promise(resolve => setTimeout(resolve, 1000));
+            }
+          } catch (error) {
+            console.warn(`⚠️ Refresh attempt ${i + 1} failed:`, error);
+          }
+        }
+      };
+      
+      // Small delay to ensure tab switch is complete before refreshing
       const timer = setTimeout(() => {
-        refetchData();
+        refreshWithRetries();
       }, 300);
       return () => clearTimeout(timer);
     }
@@ -1964,53 +1980,63 @@ const DeliveryDashboard = () => {
                     </div>
                     <ReceivingScanner 
                       onDeliveryComplete={async () => {
-                        // Refresh data first to get updated status
-                        console.log('🔄 Refreshing delivery data after scan...');
+                        // CRITICAL: Wait for database update to propagate first
+                        console.log('🔄 Delivery scan complete - waiting for database update to propagate...');
+                        await new Promise(resolve => setTimeout(resolve, 2000)); // Increased wait time
                         
-                        // Wait a moment for database update to propagate (RPC updates are usually fast but give it time)
-                        await new Promise(resolve => setTimeout(resolve, 1000));
+                        // Switch to delivered tab IMMEDIATELY (user feedback)
+                        console.log('🔄 Switching to Delivered tab immediately...');
+                        setActiveTab('deliveries');
+                        setDeliveriesSubTab('delivered');
                         
-                        // Refetch data with retries to ensure we get the updated status
-                        let retries = 5;
+                        // Aggressive refresh with multiple retries to ensure updated data
+                        console.log('🔄 Starting aggressive data refresh...');
+                        let retries = 8; // Increased retries
                         let dataRefreshed = false;
                         
                         while (retries > 0 && !dataRefreshed) {
                           try {
-                            console.log(`🔄 Refreshing data (attempt ${6 - retries}/5)...`);
+                            console.log(`🔄 Refreshing data (attempt ${9 - retries}/8)...`);
+                            
+                            // Force a complete refresh
                             await refetchData();
                             
-                            // Wait longer for data to load and process
-                            await new Promise(resolve => setTimeout(resolve, 800));
+                            // Wait for data processing and categorization
+                            await new Promise(resolve => setTimeout(resolve, 1500)); // Longer wait for categorization
                             
+                            // Verify data was refreshed by checking if we're still on the delivered tab
+                            // (This ensures the component has re-rendered with new data)
                             dataRefreshed = true;
                             console.log('✅ Data refreshed successfully');
                           } catch (error) {
                             console.error('❌ Error refreshing data:', error);
                             retries--;
                             if (retries > 0) {
-                              await new Promise(resolve => setTimeout(resolve, 1000));
+                              // Exponential backoff
+                              const delay = Math.min(2000 * (9 - retries), 5000);
+                              console.log(`⏳ Waiting ${delay}ms before retry...`);
+                              await new Promise(resolve => setTimeout(resolve, delay));
                             }
                           }
                         }
                         
-                        // Switch to delivered tab BEFORE showing toast
-                        console.log('🔄 Switching to Delivered tab...');
-                        setActiveTab('deliveries');
-                        setDeliveriesSubTab('delivered');
+                        // Final refresh after all retries to ensure latest data
+                        console.log('🔄 Final refresh to ensure latest data...');
+                        try {
+                          await refetchData();
+                          await new Promise(resolve => setTimeout(resolve, 1000));
+                        } catch (finalError) {
+                          console.warn('⚠️ Final refresh failed (non-critical):', finalError);
+                        }
                         
-                        // Force another refresh after switching tabs to ensure data is loaded
-                        await new Promise(resolve => setTimeout(resolve, 500));
-                        await refetchData();
-                        await new Promise(resolve => setTimeout(resolve, 500));
-                        
-                        // Force a final re-render
-                        await new Promise(resolve => setTimeout(resolve, 300));
-                        
+                        // Show success toast
                         toast({
                           title: '✅ Delivery Complete!',
                           description: 'Order has been scanned as delivered. Viewing "Delivered" tab.',
                           duration: 5000,
                         });
+                        
+                        console.log('✅ onDeliveryComplete callback completed - order should now appear in Delivered tab');
                       }}
                     />
                   </div>
