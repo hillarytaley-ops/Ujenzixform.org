@@ -1758,15 +1758,19 @@ export const useDeliveryProviderData = () => {
           // CRITICAL FALLBACK: ALWAYS query known delivered orders directly
           // This ensures all 3 delivered orders appear even if provider lookup failed or orders aren't linked correctly
           console.log('🚨 FALLBACK: ALWAYS querying known delivered orders directly to ensure they appear...');
+          console.log('🚨 FALLBACK: Current deliveredPOs before fallback check:', deliveredPOs.length);
           const knownDeliveredOrderNumbers = ['1772673713715', '1772340447370', '1772295614017'];
           
           // Check if we already have all known orders
           const existingOrderNumbers = deliveredPOs.map(po => po.po_number || '').join(',');
+          console.log('🚨 FALLBACK: Existing order numbers:', existingOrderNumbers || '(none)');
           const hasAllKnown = knownDeliveredOrderNumbers.every(num => existingOrderNumbers.includes(num));
+          console.log('🚨 FALLBACK: Has all known orders?', hasAllKnown, '| deliveredPOs.length:', deliveredPOs.length);
           
           // ALWAYS run fallback if we don't have all known orders OR if deliveredPOs is empty
           // This ensures we get the delivered orders even if the main logic failed
           if (!hasAllKnown || deliveredPOs.length === 0) {
+            console.log('🚨 FALLBACK: Condition met - will execute fallback query');
             console.log('🚨 FALLBACK: Missing known delivered orders, querying directly by po_number...');
             console.log('🚨 FALLBACK: Looking for orders:', knownDeliveredOrderNumbers);
             console.log('🚨 FALLBACK: Current deliveredPOs count:', deliveredPOs.length);
