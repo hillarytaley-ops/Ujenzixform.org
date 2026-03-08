@@ -214,11 +214,16 @@ export const EnhancedQRCodeManager: React.FC<EnhancedQRCodeManagerProps> = ({ su
             table: 'material_items'
           },
           (payload) => {
-            console.log('🔄 QR code updated:', payload.new);
-            // Update the item in the list
-            setItems(prev => prev.map(item => 
-              item.id === (payload.new as MaterialItem).id ? (payload.new as MaterialItem) : item
-            ));
+            console.log('🔄 QR code updated (receive/dispatch scan):', payload.new);
+            const updatedItem = payload.new as MaterialItem;
+            setItems(prev => {
+              const updated = prev.map(item =>
+                item.id === updatedItem.id ? updatedItem : item
+              );
+              // CRITICAL: Re-run categorization so Dispatched/In Transit/Delivered tabs update
+              groupItemsByOrder(updated);
+              return updated;
+            });
           }
         )
         .subscribe();
