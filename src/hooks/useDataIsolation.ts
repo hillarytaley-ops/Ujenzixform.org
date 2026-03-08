@@ -2587,8 +2587,14 @@ export const useDeliveryProviderData = () => {
       console.log('🔄 CRITICAL: About to transform delivered purchase orders to history format...');
       console.log('🔄 CRITICAL: enrichedDeliveredPOs.length:', enrichedDeliveredPOs?.length || 0);
       console.log('🔄 CRITICAL: enrichedDeliveredPOs details:', enrichedDeliveredPOs?.map((po: any) => ({ id: po.id?.substring(0, 8), po_number: po.po_number, status: po.status })));
-      console.log('🔄 Transforming', enrichedDeliveredPOs?.length || 0, 'enriched delivered purchase orders to history format...');
-      const deliveredFromPOs = (enrichedDeliveredPOs || []).map((po: any) => ({
+      
+      // CRITICAL FIX: If enrichedDeliveredPOs is still empty, use deliveredPOs directly
+      const ordersToTransform = (enrichedDeliveredPOs && enrichedDeliveredPOs.length > 0) ? enrichedDeliveredPOs : deliveredPOs;
+      console.log('🔄 CRITICAL: Using ordersToTransform.length:', ordersToTransform?.length || 0);
+      console.log('🔄 CRITICAL: ordersToTransform details:', ordersToTransform?.map((po: any) => ({ id: po.id?.substring(0, 8), po_number: po.po_number, status: po.status })));
+      
+      console.log('🔄 Transforming', ordersToTransform?.length || 0, 'delivered purchase orders to history format...');
+      const deliveredFromPOs = (ordersToTransform || []).map((po: any) => ({
         id: po.id,
         purchase_order_id: po.id,
         provider_id: po.delivery_provider_id || userId, // Use actual provider_id from PO if available
