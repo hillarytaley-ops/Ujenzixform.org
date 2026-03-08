@@ -2299,8 +2299,11 @@ export const useDeliveryProviderData = () => {
       
       // Await the purchase_orders fetch that was started FIRST
       let deliveredPOs: any[] = [];
+      console.log('🔄 CRITICAL: About to await deliveredPOsPromise...');
       try {
+        console.log('🔄 CRITICAL: Calling await deliveredPOsPromise...');
         deliveredPOs = await deliveredPOsPromise;
+        console.log('🔄 CRITICAL: deliveredPOsPromise resolved! deliveredPOs.length:', deliveredPOs?.length || 0);
         console.log('✅ Successfully fetched', deliveredPOs.length, 'delivered purchase_orders from supplier dashboard logic');
         console.log('📋 Order numbers in deliveredPOs:', deliveredPOs.map(po => po.po_number || po.id?.substring(0, 8)).join(', '));
         console.log('📋 Full deliveredPOs details:', deliveredPOs.map(po => ({ id: po.id?.substring(0, 8), po_number: po.po_number, status: po.status })));
@@ -2309,6 +2312,7 @@ export const useDeliveryProviderData = () => {
         console.error('❌ Stack trace:', e?.stack);
         console.error('❌ This error prevents provider dashboard from matching supplier dashboard delivered count!');
       }
+      console.log('🔄 CRITICAL: After try-catch block. deliveredPOs.length:', deliveredPOs?.length || 0);
       
       // FINAL SAFETY CHECK: If we still don't have the known delivered orders, query them directly one more time
       // This is a last resort to ensure the 3 delivered orders from supplier dashboard always appear
