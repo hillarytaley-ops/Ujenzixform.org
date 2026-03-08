@@ -1220,7 +1220,7 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
           });
         }
         
-          } catch (restApiError: any) {
+        } catch (restApiError: any) {
             console.error('❌ REST API fallback also failed:', restApiError);
             const restApiElapsed = Date.now() - rpcStartTime;
             console.error(`⏱️ REST API fallback failed after ${restApiElapsed}ms`);
