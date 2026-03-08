@@ -590,60 +590,161 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
         // Continue with RPC call even if quick check fails
       }
       
-      // Step 1: Use REST API FIRST (RPC is too slow/unreliable)
-      // This approach:
-      // 1. Finds the material_item using format variations
-      // 2. Updates material_item to receive_scanned = true
-      // 3. Checks if ALL items are received and updates order/delivery_request status
-      console.log('📦 Using REST API as PRIMARY method (RPC is unreliable)...');
-      console.log('⏱️ REST API call started at:', new Date().toISOString());
+      // Step 1: Use RPC FIRST (bypasses RLS - delivery providers don't have direct access to material_items)
+      // REST API will fail for delivery providers due to RLS restrictions
+      // RPC uses SECURITY DEFINER and can access material_items regardless of RLS
+      console.log('📦 Using RPC as PRIMARY method (bypasses RLS for delivery providers)...');
+      console.log('⏱️ RPC call started at:', new Date().toISOString());
       
       let scanResult: any = null;
       let deliveryRequestUpdated = false;
-      const restApiStartTime = Date.now();
+      const rpcStartTime = Date.now();
       
+      // Try RPC first (bypasses RLS)
       try {
-        // Try different QR code formats to find the item
-        // Extract various parts of the QR code for flexible matching
-        const numericPart = cleanQRCode.match(/\d{13,}/)?.[0] || '';
-        const poPart = cleanQRCode.match(/PO-\d{13,}/)?.[0] || '';
-        const itemPart = cleanQRCode.match(/ITEM\d+/)?.[0] || '';
-        const unitPart = cleanQRCode.match(/UNIT\d+/)?.[0] || '';
-        // Extract date and random suffix
-        const dateMatch = cleanQRCode.match(/(\d{8})-\d{4}$/);
-        const datePart = dateMatch ? dateMatch[1] : (cleanQRCode.match(/\d{8}/)?.[0] || '');
-        const randomSuffix = cleanQRCode.match(/\d{8}-(\d{4})$/)?.[1] || cleanQRCode.match(/-(\d{4})$/)?.[1] || '';
+        console.log('🔄 Calling record_qr_scan RPC function...');
         
-        // Try to reconstruct QR codes in different formats that might be in the database
-        // Format 1: UJP-FILM-PO-{PO}-ITEM{ITEM}-{DATE}-{RANDOM} (older format, no buyer/unit)
-        const reconstructedOldFormat = numericPart && itemPart && datePart && randomSuffix
-          ? `UJP-FILM-PO-${numericPart}-${itemPart}-${datePart}-${randomSuffix}`
-          : null;
+        // Try RPC with original QR code first
+        const rpcPromise = supabase.rpc('record_qr_scan', {
+          _qr_code: cleanQRCode,
+          _scan_type: 'receiving',
+          _scanner_device_id: deviceInfo || null,
+          _scanner_type: scannerType === 'mobile_camera' ? 'mobile_camera' : 'web_scanner',
+          _scan_location: null,
+          _material_condition: materialCondition || 'good',
+          _quantity_scanned: null,
+          _notes: notes || null,
+          _photo_url: null
+        });
         
-        // Format 2: UJP-FILM-PO-{PO}-{BUYER}-ITEM{ITEM}-UNIT{UNIT}-{DATE}-{RANDOM} (newer format)
-        const buyerCode = cleanQRCode.match(/PO-\d{13,}-([A-Z0-9]+)-ITEM/)?.[1] || '';
-        const reconstructedNewFormat = numericPart && buyerCode && itemPart && unitPart && datePart && randomSuffix
-          ? `UJP-FILM-PO-${numericPart}-${buyerCode}-${itemPart}-${unitPart}-${datePart}-${randomSuffix}`
-          : null;
+        // Set timeout to 20 seconds (reasonable for RPC)
+        const rpcTimeoutPromise = new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error('RPC timeout after 20 seconds')), 20000)
+        );
         
-        // Format 3: Without buyer code but with unit
-        const reconstructedNoBuyer = numericPart && itemPart && unitPart && datePart && randomSuffix
-          ? `UJP-FILM-PO-${numericPart}-${itemPart}-${unitPart}-${datePart}-${randomSuffix}`
-          : null;
+        const { data: rpcResult, error: rpcError } = await Promise.race([
+          rpcPromise,
+          rpcTimeoutPromise
+        ]) as any;
         
-        const qrVariations = [
-          cleanQRCode, // Original
-          reconstructedNewFormat, // Reconstructed new format (with buyer and unit)
-          reconstructedNoBuyer, // Reconstructed without buyer code
-          reconstructedOldFormat, // Reconstructed old format (no buyer/unit)
-          cleanQRCode.replace(/^UJP-FILM-/, ''), // Remove UJP-FILM- prefix
-          cleanQRCode.replace(/^UJP-/, ''), // Remove UJP- prefix
-          // Try without buyer code
-          cleanQRCode.replace(/-[A-Z0-9]+-ITEM/, '-ITEM'), // Remove buyer code
-          poPart, // Extract PO- format
-          numericPart, // Extract numeric part
-          itemPart, // Extract ITEM-UNIT format
-        ].filter(v => v && v !== '');
+        if (rpcError) {
+          // If QR_NOT_FOUND, try variations
+          if (rpcError.message?.includes('QR_NOT_FOUND') || rpcError.code === 'QR_NOT_FOUND') {
+            console.log('⚠️ RPC: QR code not found, trying variations...');
+            
+            // Try QR code variations
+            const qrVariations = [
+              cleanQRCode.replace(/^UJP-FILM-/, ''), // Remove UJP-FILM- prefix
+              cleanQRCode.replace(/^UJP-/, ''), // Remove UJP- prefix
+              cleanQRCode.match(/PO-\d{13,}-[A-Z0-9-]+/)?.[0] || '', // Extract PO- format
+            ].filter(v => v && v !== '');
+            
+            let foundViaVariation = false;
+            for (const variant of qrVariations) {
+              try {
+                const variantPromise = supabase.rpc('record_qr_scan', {
+                  _qr_code: variant,
+                  _scan_type: 'receiving',
+                  _scanner_device_id: deviceInfo || null,
+                  _scanner_type: scannerType === 'mobile_camera' ? 'mobile_camera' : 'web_scanner',
+                  _scan_location: null,
+                  _material_condition: materialCondition || 'good',
+                  _quantity_scanned: null,
+                  _notes: notes || null,
+                  _photo_url: null
+                });
+                
+                const variantTimeoutPromise = new Promise<never>((_, reject) =>
+                  setTimeout(() => reject(new Error('RPC variant timeout')), 10000)
+                );
+                
+                const { data: variantResult, error: variantError } = await Promise.race([
+                  variantPromise,
+                  variantTimeoutPromise
+                ]) as any;
+                
+                if (!variantError && variantResult?.success === true) {
+                  scanResult = variantResult;
+                  foundViaVariation = true;
+                  console.log(`✅ RPC: Found with variation: ${variant.substring(0, 50)}...`);
+                  break;
+                }
+              } catch (variantErr) {
+                console.log(`⚠️ RPC: Variant ${variant.substring(0, 30)}... failed`);
+                continue;
+              }
+            }
+            
+            if (!foundViaVariation) {
+              throw rpcError; // Re-throw original error if no variation worked
+            }
+          } else {
+            throw rpcError; // Re-throw other errors
+          }
+        } else if (rpcResult?.success === true) {
+          scanResult = rpcResult;
+          console.log('✅ RPC: Scan successful');
+        } else {
+          throw new Error('RPC returned unsuccessful result');
+        }
+        
+        const rpcElapsed = Date.now() - rpcStartTime;
+        console.log(`✅ RPC: Scan completed successfully in ${rpcElapsed}ms`);
+        
+        // RPC handles everything, so we can proceed with success flow
+        deliveryRequestUpdated = true;
+        
+      } catch (rpcError: any) {
+        console.error('❌ RPC method failed:', rpcError);
+        const rpcElapsed = Date.now() - rpcStartTime;
+        console.error(`⏱️ RPC failed after ${rpcElapsed}ms`);
+        
+        // If RPC fails, try REST API as fallback (may fail due to RLS, but worth trying)
+        console.log('🔄 RPC failed - trying REST API as fallback...');
+        
+        // REST API fallback code (existing REST API logic)
+        try {
+          // Try different QR code formats to find the item
+          // Extract various parts of the QR code for flexible matching
+          const numericPart = cleanQRCode.match(/\d{13,}/)?.[0] || '';
+          const poPart = cleanQRCode.match(/PO-\d{13,}/)?.[0] || '';
+          const itemPart = cleanQRCode.match(/ITEM\d+/)?.[0] || '';
+          const unitPart = cleanQRCode.match(/UNIT\d+/)?.[0] || '';
+          // Extract date and random suffix
+          const dateMatch = cleanQRCode.match(/(\d{8})-\d{4}$/);
+          const datePart = dateMatch ? dateMatch[1] : (cleanQRCode.match(/\d{8}/)?.[0] || '');
+          const randomSuffix = cleanQRCode.match(/\d{8}-(\d{4})$/)?.[1] || cleanQRCode.match(/-(\d{4})$/)?.[1] || '';
+          
+          // Try to reconstruct QR codes in different formats that might be in the database
+          // Format 1: UJP-FILM-PO-{PO}-ITEM{ITEM}-{DATE}-{RANDOM} (older format, no buyer/unit)
+          const reconstructedOldFormat = numericPart && itemPart && datePart && randomSuffix
+            ? `UJP-FILM-PO-${numericPart}-${itemPart}-${datePart}-${randomSuffix}`
+            : null;
+          
+          // Format 2: UJP-FILM-PO-{PO}-{BUYER}-ITEM{ITEM}-UNIT{UNIT}-{DATE}-{RANDOM} (newer format)
+          const buyerCode = cleanQRCode.match(/PO-\d{13,}-([A-Z0-9]+)-ITEM/)?.[1] || '';
+          const reconstructedNewFormat = numericPart && buyerCode && itemPart && unitPart && datePart && randomSuffix
+            ? `UJP-FILM-PO-${numericPart}-${buyerCode}-${itemPart}-${unitPart}-${datePart}-${randomSuffix}`
+            : null;
+          
+          // Format 3: Without buyer code but with unit
+          const reconstructedNoBuyer = numericPart && itemPart && unitPart && datePart && randomSuffix
+            ? `UJP-FILM-PO-${numericPart}-${itemPart}-${unitPart}-${datePart}-${randomSuffix}`
+            : null;
+          
+          const qrVariations = [
+            cleanQRCode, // Original
+            reconstructedNewFormat, // Reconstructed new format (with buyer and unit)
+            reconstructedNoBuyer, // Reconstructed without buyer code
+            reconstructedOldFormat, // Reconstructed old format (no buyer/unit)
+            cleanQRCode.replace(/^UJP-FILM-/, ''), // Remove UJP-FILM- prefix
+            cleanQRCode.replace(/^UJP-/, ''), // Remove UJP- prefix
+            // Try without buyer code
+            cleanQRCode.replace(/-[A-Z0-9]+-ITEM/, '-ITEM'), // Remove buyer code
+            poPart, // Extract PO- format
+            numericPart, // Extract numeric part
+            itemPart, // Extract ITEM-UNIT format
+          ].filter(v => v && v !== '');
 
         let foundItem: any = null;
         let foundVariant = '';
@@ -972,8 +1073,9 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
           is_invalidated: isInvalidated
         };
         
-        const restApiElapsed = Date.now() - restApiStartTime;
+        const restApiElapsed = Date.now() - rpcStartTime;
         console.log(`✅ REST API: Scan completed successfully in ${restApiElapsed}ms`);
+        deliveryRequestUpdated = true; // Mark as updated so success flow knows
         
         if (isInvalidated) {
           console.log('✅ QR code invalidated - both dispatch and receive completed');
@@ -983,71 +1085,44 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
           });
         }
         
-      } catch (restApiError: any) {
-        console.error('❌ REST API method failed:', restApiError);
-        const restApiElapsed = Date.now() - restApiStartTime;
-        console.error(`⏱️ REST API failed after ${restApiElapsed}ms`);
-        
-        // If REST API fails, try RPC as last resort (but with very short timeout)
-        console.log('🔄 REST API failed - trying RPC as last resort (5s timeout)...');
-        
-        try {
-          const rpcPromise = supabase.rpc('record_qr_scan', {
-            _qr_code: cleanQRCode,
-            _scan_type: 'receiving',
-            _scanner_device_id: deviceInfo || null,
-            _scanner_type: scannerType === 'mobile_camera' ? 'mobile_camera' : 'web_scanner',
-            _scan_location: null,
-            _material_condition: materialCondition || 'good',
-            _quantity_scanned: null,
-            _notes: notes || null,
-            _photo_url: null
-          });
+        } catch (restApiError: any) {
+          console.error('❌ REST API fallback also failed:', restApiError);
+          const restApiElapsed = Date.now() - rpcStartTime;
+          console.error(`⏱️ REST API fallback failed after ${restApiElapsed}ms`);
           
-          const rpcTimeoutPromise = new Promise<never>((_, reject) =>
-            setTimeout(() => reject(new Error('RPC timeout after 5 seconds')), 5000)
-          );
-          
-          const { data, error } = await Promise.race([
-            rpcPromise,
-            rpcTimeoutPromise
-          ]) as any;
-          
-          if (error) {
-            throw error;
-          }
-          
-          if (data && data.success === true) {
-            scanResult = data;
-            deliveryRequestUpdated = true;
-            console.log('✅ RPC fallback succeeded');
+          // Both RPC and REST API failed
+          const errorMessage = restApiError?.message || rpcError?.message || 'Unknown error';
+          if (errorMessage.includes('QR_NOT_FOUND') || errorMessage.includes('not found')) {
+            toast.error('❓ QR Code Not Found', {
+              description: `"${cleanQRCode.substring(0, 30)}..." not in system. Please verify the QR code is correct.`,
+              duration: 8000
+            });
+          } else if (errorMessage.includes('timeout') || errorMessage.includes('Timeout')) {
+            toast.error('Request Timeout', {
+              description: 'The scan request took too long. Please check your connection and try again.',
+              duration: 5000
+            });
           } else {
-            throw new Error('RPC returned error');
+            toast.error('Failed to process scan', {
+              description: 'Both RPC and REST API methods failed. Please try again or contact support.',
+              duration: 5000
+            });
           }
-        } catch (rpcError: any) {
-          console.error('❌ RPC fallback also failed:', rpcError);
-          toast.error('Failed to process scan', {
-            description: 'Both REST API and RPC methods failed. Please try again or contact support.',
-            duration: 5000
-          });
           return;
         }
       }
       
-      // Use scanResult (from REST API or RPC fallback)
-      const rpcResult = scanResult;
-      
-      // Only continue with success flow if scan was successful
-      if (!rpcResult || rpcResult.success !== true) {
+      // Success flow - use scanResult from either RPC or REST API
+      if (!scanResult || scanResult.success !== true) {
         console.error('❌ Scan did not succeed, cannot continue with success flow');
         return;
       }
       
       // Step 3: IMMEDIATELY switch to delivered tab when item is successfully scanned
-      // The REST API (or RPC fallback) has already updated delivery_request status if all items are received
+      // RPC or REST API has already updated delivery_request status if all items are received
       if (onDeliveryComplete) {
         console.log('🔄 Triggering onDeliveryComplete callback - moving to Delivered tab NOW');
-        console.log('   Scan result:', rpcResult);
+        console.log('   Scan result:', scanResult);
         try {
           onDeliveryComplete();
           console.log('✅ onDeliveryComplete callback executed successfully');
@@ -1060,22 +1135,22 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
       
       // Success! Add to results
       const scanResultForUI: ScanResult = {
-        qr_code: rpcResult?.qr_code || cleanQRCode,
-        material_type: rpcResult?.material_type || 'Material',
+        qr_code: scanResult?.qr_code || cleanQRCode,
+        material_type: scanResult?.material_type || 'Material',
         category: 'General',
-        quantity: rpcResult?.quantity || 1,
-        unit: rpcResult?.unit || 'unit',
-        status: rpcResult?.status || 'delivered',
+        quantity: scanResult?.quantity || 1,
+        unit: scanResult?.unit || 'unit',
+        status: scanResult?.status || 'delivered',
         timestamp: new Date()
       };
 
       setScanResults(prev => [scanResultForUI, ...prev.slice(0, 9)]);
       
       toast.success('✅ Item Received!', {
-        description: `${rpcResult?.material_type || 'Material'} confirmed${rpcResult?.is_invalidated ? ' (QR code invalidated)' : ''}`,
+        description: `${scanResult?.material_type || 'Material'} confirmed${scanResult?.is_invalidated ? ' (QR code invalidated)' : ''}`,
         duration: 5000
       });
-
+      
       // Reset form
       setManualQRCode('');
       setNotes('');
