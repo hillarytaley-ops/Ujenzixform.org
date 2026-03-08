@@ -510,9 +510,6 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
       console.log('🔐 Access token status:', accessToken !== ANON_KEY ? 'Authenticated token found' : 'Using anon key (RLS may block)');
       console.log('⏱️ After auth token fetch:', Date.now() - startTime, 'ms');
       
-      // DIRECT DATABASE UPDATE: Look up the material_item by QR code and update it
-      // This bypasses the RPC function which may not exist
-      
       // Clean up the QR code - handle different formats
       let cleanQRCode = qrCode.trim();
       console.log('📦 Raw QR code scanned:', cleanQRCode);
@@ -534,292 +531,7 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
         // Already decoded or not encoded
       }
       
-      // Build a list of possible QR code values to search for
-      const qrCodeVariants: string[] = [cleanQRCode];
-      
-      // If it doesn't start with UJP-, try adding the prefix
-      if (!cleanQRCode.startsWith('UJP-')) {
-        qrCodeVariants.push('UJP-' + cleanQRCode);
-      }
-      
-      // If it starts with QR-, try replacing with UJP-
-      if (cleanQRCode.startsWith('QR-')) {
-        qrCodeVariants.push('UJP-' + cleanQRCode.substring(3));
-      }
-      
-      // Extract any numeric sequences that might be item IDs
-      const numericMatches = cleanQRCode.match(/\d{5,}/g);
-      if (numericMatches) {
-        numericMatches.forEach(num => qrCodeVariants.push(num));
-      }
-      
-      console.log('📦 Will search for QR code variants:', qrCodeVariants);
-      console.log('⏱️ After QR variant generation:', Date.now() - startTime, 'ms');
-      
-      // Step 1: Find the material_item with this QR code
-      // Use Supabase client for proper query handling
-      console.log('📦 Looking up material_item with QR code:', cleanQRCode);
-      console.log('📦 QR code variants to try:', qrCodeVariants);
-      console.log('📦 Starting database lookup...');
-      console.log('⏱️ Before database lookup:', Date.now() - startTime, 'ms');
-      console.log('🔐 Access token available:', accessToken ? 'YES' : 'NO');
-      console.log('🔐 Access token length:', accessToken?.length || 0);
-      
-      let items: any[] = [];
-      
-      // Use REST API directly (more reliable than Supabase client for this)
-      try {
-        console.log('🔎 Strategy 1: Exact match lookup via REST API...');
-        console.log('⏱️ Before Strategy 1 fetch:', Date.now() - startTime, 'ms');
-        
-        // Strategy 1: Exact match on qr_code using REST API
-        console.log('🔎 Strategy 1: Making REST API call...');
-        const fetchUrl = `${SUPABASE_URL}/rest/v1/material_items?qr_code=eq.${encodeURIComponent(cleanQRCode)}&select=*&limit=1`;
-        console.log('   URL:', fetchUrl);
-        console.log('⏱️ About to fetch:', Date.now() - startTime, 'ms');
-        
-        const fetchStartTime = Date.now();
-        
-        // Add timeout to prevent hanging
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
-        
-        let restResponse: Response;
-        try {
-          restResponse = await fetch(
-            fetchUrl,
-            {
-              headers: {
-                'apikey': ANON_KEY,
-                'Authorization': `Bearer ${accessToken}`,
-                'Accept': 'application/json',
-                'Content-Type': 'application/json',
-                'Prefer': 'return=representation'
-              },
-              signal: controller.signal
-            }
-          );
-          clearTimeout(timeoutId);
-        } catch (fetchError: any) {
-          clearTimeout(timeoutId);
-          if (fetchError.name === 'AbortError') {
-            console.error('❌ Database fetch timeout after 10 seconds');
-            throw new Error('Database query timeout - please try again');
-          }
-          throw fetchError;
-        }
-        
-        const fetchDuration = Date.now() - fetchStartTime;
-        console.log('⏱️ Fetch completed in:', fetchDuration, 'ms');
-        console.log('🔎 Strategy 1 REST response status:', restResponse.status, restResponse.statusText);
-        
-        if (restResponse.ok) {
-          console.log('⏱️ Before parsing JSON:', Date.now() - startTime, 'ms');
-          const restData = await restResponse.json();
-          console.log('⏱️ After parsing JSON:', Date.now() - startTime, 'ms');
-          console.log('🔎 Strategy 1 result:', { found: restData?.length || 0, data: restData });
-          
-          if (restData && restData.length > 0) {
-            items = restData;
-            console.log('✅ Found with exact qr_code match:', items[0].qr_code);
-          } else {
-            console.log('⚠️ Strategy 1: No exact match found (empty array returned)');
-          }
-        } else {
-          const errorText = await restResponse.text();
-          console.error('❌ Strategy 1 REST error:', restResponse.status, errorText);
-        }
-        
-        // Strategy 2: Try other variants via REST API
-        if (items.length === 0) {
-          console.log('🔎 Strategy 2: Trying variants via REST API...');
-          for (const variant of qrCodeVariants) {
-            if (items.length > 0) break;
-            if (variant === cleanQRCode) continue; // Skip already tried
-            
-            console.log('   Trying variant:', variant);
-            try {
-              const variantResponse = await fetch(
-                `${SUPABASE_URL}/rest/v1/material_items?qr_code=eq.${encodeURIComponent(variant)}&select=*&limit=1`,
-                {
-                  headers: {
-                    'apikey': ANON_KEY,
-                    'Authorization': `Bearer ${accessToken}`,
-                    'Accept': 'application/json'
-                  }
-                }
-              );
-              
-              if (variantResponse.ok) {
-                const variantData = await variantResponse.json();
-                if (variantData && variantData.length > 0) {
-                  items = variantData;
-                  console.log('✅ Found with variant match:', variant);
-                  break;
-                }
-              }
-            } catch (e) {
-              console.error('   Variant error:', e);
-            }
-          }
-        }
-        
-        // Strategy 3: Case-insensitive search (ilike) via REST API
-        if (items.length === 0) {
-          console.log('🔎 Strategy 3: Case-insensitive (ilike) search via REST API...');
-          try {
-            const ilikeResponse = await fetch(
-              `${SUPABASE_URL}/rest/v1/material_items?qr_code=ilike.*${encodeURIComponent(cleanQRCode)}*&select=*&limit=5`,
-              {
-                headers: {
-                  'apikey': ANON_KEY,
-                  'Authorization': `Bearer ${accessToken}`,
-                  'Accept': 'application/json'
-                }
-              }
-            );
-            
-            if (ilikeResponse.ok) {
-              const ilikeData = await ilikeResponse.json();
-              console.log('🔎 Strategy 3 result:', { found: ilikeData?.length || 0 });
-              
-              if (ilikeData && ilikeData.length > 0) {
-                items = ilikeData;
-                console.log('✅ Found with ilike search:', items.length, 'items');
-              }
-            }
-          } catch (e) {
-            console.error('❌ Strategy 3 error:', e);
-          }
-        }
-        
-        // Strategy 4: Fetch recent items and search client-side via REST API
-        if (items.length === 0) {
-          console.log('📦 Strategy 4: Fetching recent items for client-side search via REST API...');
-          try {
-            const recentResponse = await fetch(
-              `${SUPABASE_URL}/rest/v1/material_items?select=*&order=created_at.desc&limit=500`,
-              {
-                headers: {
-                  'apikey': ANON_KEY,
-                  'Authorization': `Bearer ${accessToken}`,
-                  'Accept': 'application/json',
-                  'Prefer': 'return=representation'
-                }
-              }
-            );
-            
-            console.log('📦 Strategy 4 REST response status:', recentResponse.status, recentResponse.statusText);
-            
-            if (recentResponse.ok) {
-              const recentItems = await recentResponse.json();
-              console.log('📦 Strategy 4: Received', recentItems?.length || 0, 'items from database');
-              
-              if (recentItems && recentItems.length > 0) {
-                console.log('📦 Searching through', recentItems.length, 'recent items...');
-                // Try to find a match - check if scanned QR contains or is contained in stored QR
-                const found = recentItems.find((item: any) => {
-                  if (!item.qr_code) return false;
-                  const storedQR = item.qr_code.toLowerCase();
-                  const scannedQR = cleanQRCode.toLowerCase();
-                  
-                  // Check various matching conditions
-                  return storedQR === scannedQR ||
-                         storedQR.includes(scannedQR) ||
-                         scannedQR.includes(storedQR) ||
-                         // Check if the numeric parts match
-                         storedQR.replace(/[^0-9]/g, '').includes(scannedQR.replace(/[^0-9]/g, '')) ||
-                         scannedQR.replace(/[^0-9]/g, '').includes(storedQR.replace(/[^0-9]/g, ''));
-                });
-                
-                if (found) {
-                  items = [found];
-                  console.log('✅ Found via client-side search! Stored QR:', found.qr_code);
-                } else {
-                  // Log some sample QR codes from database for debugging
-                  console.log('📦 Sample QR codes in database (first 10):');
-                  recentItems.slice(0, 10).forEach((item: any, idx: number) => {
-                    console.log(`  ${idx + 1}.`, item.qr_code || '(no qr_code)', '| Status:', item.status, '| Dispatch:', item.dispatch_scanned);
-                  });
-                  
-                  // Check if scanned QR matches any partial
-                  const scannedTimestamp = cleanQRCode.match(/1772673713715/);
-                  if (scannedTimestamp) {
-                    const partialMatch = recentItems.find((item: any) => 
-                      item.qr_code && item.qr_code.includes('1772673713715')
-                    );
-                    if (partialMatch) {
-                      console.log('⚠️ Found partial match by timestamp:', partialMatch.qr_code);
-                    }
-                  }
-                }
-              } else {
-                console.error('❌ Strategy 4: Database returned 0 items! This might be an RLS (Row Level Security) issue.');
-                console.error('   The delivery provider may not have permission to view material_items.');
-              }
-            } else {
-              const errorText = await recentResponse.text();
-              console.error('❌ Strategy 4 REST error:', recentResponse.status, errorText);
-            }
-          } catch (e) {
-            console.error('❌ Strategy 4 exception:', e);
-          }
-        }
-      } catch (lookupError) {
-        console.error('❌ Lookup error:', lookupError);
-      }
-      
-      console.log('📦 Database lookup complete. Found items:', items?.length || 0);
-      
-      if (!items || items.length === 0) {
-        console.error('❌ QR CODE NOT FOUND IN DATABASE!');
-        console.error('   Scanned value:', cleanQRCode);
-        console.error('   Variants tried:', qrCodeVariants);
-        console.error('   This QR code does not exist in material_items table');
-        
-        // Fetch sample to show expected format
-        try {
-          const { data: sampleItems } = await supabase
-            .from('material_items')
-            .select('qr_code')
-            .not('qr_code', 'is', null)
-            .order('created_at', { ascending: false })
-            .limit(3);
-          
-          if (sampleItems && sampleItems.length > 0) {
-            console.error('   📝 Expected QR code format (examples from database):');
-            sampleItems.forEach((s: any) => console.error('     -', s.qr_code));
-          }
-        } catch (e) { /* ignore */ }
-        
-        toast.error('❓ QR Code Not Found', {
-          description: `"${cleanQRCode.substring(0, 25)}..." not in system. Open console (F12) for QR format details.`,
-          duration: 8000
-        });
-        return;
-      }
-      
-      const item = items[0];
-      
-      // Check if already received (check correct field name: receive_scanned, not receiving_scanned)
-      if (item.receive_scanned === true || item.status === 'delivered' || item.status === 'received') {
-        toast.error('⚠️ Already Received', {
-          description: `This item (${item.material_type || 'Material'}) has already been scanned and confirmed.`,
-          duration: 5000
-        });
-        return;
-      }
-      
-      // Check if not yet dispatched
-      if (!item.dispatch_scanned && item.status !== 'dispatched' && item.status !== 'in_transit') {
-        toast.warning('🚫 Not Dispatched Yet', {
-          description: 'This item has not been dispatched by the supplier yet. Please wait for dispatch.',
-          duration: 5000
-        });
-        return;
-      }
-      
-      // Step 2: Use record_qr_scan RPC function to handle everything properly
+      // Step 1: Use record_qr_scan RPC function to handle everything properly
       // This function will:
       // 1. Update material_item to receive_scanned = true
       // 2. Invalidate QR code when both dispatch and receive are done
@@ -905,6 +617,62 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
               duration: 5000
             });
             return;
+          } else if (errorCode === 'QR_NOT_FOUND') {
+            // Try format variations if QR code not found
+            console.log('🔄 QR code not found, trying format variations...');
+            
+            // Try variations: remove UJP-FILM- prefix, try just the numeric part, etc.
+            const variations = [
+              cleanQRCode.replace(/^UJP-FILM-/, ''), // Remove UJP-FILM- prefix
+              cleanQRCode.replace(/^UJP-/, ''), // Remove UJP- prefix
+              cleanQRCode.match(/\d{13,}/)?.[0] || '', // Extract long numeric sequence (order number)
+            ].filter(v => v && v !== cleanQRCode);
+            
+            let found = false;
+            for (const variant of variations) {
+              if (!variant) continue;
+              try {
+                console.log(`🔄 Trying QR code variant: ${variant.substring(0, 50)}...`);
+                const variantResult = await supabase.rpc('record_qr_scan', {
+                  _qr_code: variant,
+                  _scan_type: 'receiving',
+                  _scanner_device_id: deviceInfo || null,
+                  _scanner_type: scannerType === 'mobile_camera' ? 'mobile_camera' : 'web_scanner',
+                  _scan_location: null,
+                  _material_condition: materialCondition || 'good',
+                  _quantity_scanned: null,
+                  _notes: notes || null,
+                  _photo_url: null
+                });
+                
+                if (variantResult.error) {
+                  console.log(`⚠️ Variant ${variant.substring(0, 30)}... Supabase error:`, variantResult.error.message);
+                  continue;
+                }
+                
+                if (variantResult.data && variantResult.data.success === true) {
+                  console.log('✅ Found QR code with variant:', variant);
+                  rpcResult = variantResult.data;
+                  found = true;
+                  deliveryRequestUpdated = true;
+                  // Continue with success flow - break out of loop and continue after try-catch
+                  break;
+                } else if (variantResult.data && variantResult.data.error_code) {
+                  console.log(`⚠️ Variant ${variant.substring(0, 30)}... returned error:`, variantResult.data.error_code);
+                }
+              } catch (e) {
+                console.log(`⚠️ Variant ${variant.substring(0, 30)}... exception:`, e);
+              }
+            }
+            
+            if (!found) {
+              toast.error('❓ QR Code Not Found', {
+                description: `"${cleanQRCode.substring(0, 30)}..." not in system. Please verify the QR code is correct.`,
+                duration: 8000
+              });
+              return;
+            }
+            // If found, continue with success flow (rpcResult is already set above)
           } else {
             toast.error('❌ Scan Failed', {
               description: errorMsg,
@@ -930,6 +698,12 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
         return;
       }
       
+      // Only continue with success flow if RPC was successful
+      if (!rpcResult || rpcResult.success !== true) {
+        console.error('❌ RPC did not succeed, cannot continue with success flow');
+        return;
+      }
+      
       // Step 3: IMMEDIATELY switch to delivered tab when item is successfully scanned
       // The RPC function has already updated delivery_request status if all items are received
       if (onDeliveryComplete) {
@@ -948,10 +722,10 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
       // Success! Add to results
       const scanResult: ScanResult = {
         qr_code: cleanQRCode,
-        material_type: rpcResult?.material_type || item.material_type || 'Material',
-        category: item.category || 'General',
-        quantity: item.quantity || 1,
-        unit: item.unit || 'unit',
+        material_type: rpcResult?.material_type || 'Material',
+        category: 'General',
+        quantity: 1,
+        unit: 'unit',
         status: rpcResult?.status || 'delivered',
         timestamp: new Date()
       };
@@ -959,7 +733,7 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
       setScanResults(prev => [scanResult, ...prev.slice(0, 9)]);
       
       toast.success('✅ Item Received!', {
-        description: `${rpcResult?.material_type || item.material_type || 'Material'} - ${item.quantity || 1} ${item.unit || 'unit(s)'} confirmed${rpcResult?.is_invalidated ? ' (QR code invalidated)' : ''}`,
+        description: `${rpcResult?.material_type || 'Material'} confirmed${rpcResult?.is_invalidated ? ' (QR code invalidated)' : ''}`,
         duration: 5000
       });
 
