@@ -819,365 +819,122 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
         return;
       }
       
-      // Step 2: Update the material_item to mark as received
-      console.log('📦 Updating material_item to received:', item.id);
+      // Step 2: Use record_qr_scan RPC function to handle everything properly
+      // This function will:
+      // 1. Update material_item to receive_scanned = true
+      // 2. Invalidate QR code when both dispatch and receive are done
+      // 3. Check if ALL items are received and update order status to 'delivered'
+      // 4. Update delivery_request status to 'delivered' when all items are received
+      console.log('📦 Calling record_qr_scan RPC function for receiving scan...');
       
-      // Get current user ID - try multiple methods with timeouts
-      let currentUserId: string | null = null;
+      let rpcResult: any = null;
+      let deliveryRequestUpdated = false;
       
-      // Method 1: Try getUser() with timeout
       try {
-        console.log('👤 Getting current user ID (method 1: getUser)...');
-        const getUserPromise = supabase.auth.getUser();
-        const getUserTimeout = new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error('getUser timeout after 2 seconds')), 2000)
+        // Call the RPC function with timeout
+        const rpcController = new AbortController();
+        const rpcTimeoutId = setTimeout(() => rpcController.abort(), 15000); // 15 second timeout
+        
+        const rpcPromise = supabase.rpc('record_qr_scan', {
+          _qr_code: cleanQRCode,
+          _scan_type: 'receiving',
+          _scanner_device_id: deviceInfo || null,
+          _scanner_type: scannerType === 'mobile_camera' ? 'mobile_camera' : 'web_scanner',
+          _scan_location: null,
+          _material_condition: materialCondition || 'good',
+          _quantity_scanned: null,
+          _notes: notes || null,
+          _photo_url: null
+        });
+        
+        const rpcTimeoutPromise = new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error('RPC timeout after 15 seconds')), 15000)
         );
-        const { data: userData } = await Promise.race([getUserPromise, getUserTimeout]) as any;
-        currentUserId = userData?.user?.id || null;
-        if (currentUserId) {
-          console.log('✅ Got user ID from getUser:', currentUserId);
+        
+        const { data, error } = await Promise.race([
+          rpcPromise,
+          rpcTimeoutPromise
+        ]) as any;
+        
+        clearTimeout(rpcTimeoutId);
+        
+        if (error) {
+          console.error('❌ RPC error:', error);
+          throw error;
         }
-      } catch (e) {
-        console.warn('⚠️ getUser() failed, trying localStorage fallback...');
-      }
-      
-      // Method 2: Try to extract from localStorage token if getUser failed
-      if (!currentUserId) {
-        try {
-          console.log('👤 Getting current user ID (method 2: localStorage token)...');
-          const stored = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
-          if (stored) {
-            const parsed = JSON.parse(stored);
-            // Try to get user ID from the token (JWT payload)
-            if (parsed.access_token) {
-              // Decode JWT to get user ID (simple base64 decode)
-              try {
-                const payload = JSON.parse(atob(parsed.access_token.split('.')[1]));
-                currentUserId = payload.sub || null;
-                if (currentUserId) {
-                  console.log('✅ Got user ID from localStorage token:', currentUserId);
-                }
-              } catch (e) {
-                console.warn('⚠️ Could not decode token:', e);
-              }
-            }
+        
+        rpcResult = data;
+        console.log('✅ RPC call successful:', rpcResult);
+        
+        // Check if the scan was successful
+        if (rpcResult && rpcResult.success === true) {
+          console.log('✅ QR scan recorded successfully');
+          console.log('📋 Scan result:', {
+            qr_code: rpcResult.qr_code,
+            receive_scanned: rpcResult.receive_scanned,
+            is_invalidated: rpcResult.is_invalidated,
+            status: rpcResult.status
+          });
+          
+          // If QR code is invalidated, it means both dispatch and receive are done
+          if (rpcResult.is_invalidated === true) {
+            console.log('✅ QR code invalidated - both dispatch and receive completed');
+            toast.success('✅ QR Code Invalidated', {
+              description: 'This QR code has been marked as used and cannot be scanned again.',
+              duration: 3000
+            });
           }
-        } catch (e) {
-          console.warn('⚠️ Could not get user ID from localStorage:', e);
+          
+          deliveryRequestUpdated = true; // RPC function handles delivery_request update
+        } else {
+          // Handle error response from RPC
+          const errorMsg = rpcResult?.error || 'Unknown error';
+          const errorCode = rpcResult?.error_code || 'UNKNOWN_ERROR';
+          
+          console.error('❌ RPC returned error:', errorMsg, 'Code:', errorCode);
+          
+          if (errorCode === 'ALREADY_RECEIVED') {
+            toast.error('⚠️ Already Received', {
+              description: errorMsg,
+              duration: 5000
+            });
+            return;
+          } else if (errorCode === 'QR_INVALIDATED') {
+            toast.error('⚠️ QR Code Invalidated', {
+              description: errorMsg,
+              duration: 5000
+            });
+            return;
+          } else {
+            toast.error('❌ Scan Failed', {
+              description: errorMsg,
+              duration: 5000
+            });
+            return;
+          }
         }
-      }
-      
-      if (!currentUserId) {
-        console.warn('⚠️ Could not get current user ID - some features may not work');
-      }
-      
-      console.log('📦 Starting material_item update fetch...');
-      const updateStartTime = Date.now();
-      const updateController = new AbortController();
-      const updateTimeoutId = setTimeout(() => updateController.abort(), 10000); // 10 second timeout
-      
-      let updateResponse: Response;
-      try {
-        updateResponse = await fetch(
-          `${SUPABASE_URL}/rest/v1/material_items?id=eq.${item.id}`,
-          {
-            method: 'PATCH',
-            headers: {
-              'apikey': ANON_KEY,
-              'Authorization': `Bearer ${accessToken}`,
-              'Content-Type': 'application/json',
-              'Prefer': 'return=representation'
-            },
-            body: JSON.stringify({
-              receive_scanned: true,
-              receive_scanned_at: new Date().toISOString(),
-              receive_scanned_by: currentUserId,
-              status: 'received',
-              // Note: material_condition column doesn't exist in material_items table
-              // Condition is tracked via status field (good = 'received', damaged = 'damaged')
-              updated_at: new Date().toISOString()
-            }),
-            signal: updateController.signal
-          }
-        );
-        clearTimeout(updateTimeoutId);
-        console.log('⏱️ Material item update fetch completed in:', Date.now() - updateStartTime, 'ms');
-      } catch (fetchError: any) {
-        clearTimeout(updateTimeoutId);
-        if (fetchError.name === 'AbortError') {
-          console.error('❌ Material item update timed out after 10 seconds');
+      } catch (rpcError: any) {
+        console.error('❌ RPC call failed:', rpcError);
+        
+        if (rpcError?.message?.includes('timeout') || rpcError?.name === 'AbortError') {
           toast.error('Request Timeout', {
-            description: 'Material item update took too long. Please check your connection.',
+            description: 'The scan request took too long. Please check your connection and try again.',
             duration: 5000
           });
-          return;
+        } else {
+          toast.error('Failed to process scan', {
+            description: rpcError?.message || 'Unknown error occurred',
+            duration: 5000
+          });
         }
-        throw fetchError;
-      }
-      
-      if (!updateResponse.ok) {
-        const errorText = await updateResponse.text();
-        console.error('❌ Failed to update material_item:', updateResponse.status, errorText);
-        toast.error('❌ Update Failed', {
-          description: 'Could not mark item as received. Please try again.',
-          duration: 5000
-        });
         return;
       }
       
-      // Parse JSON with timeout to prevent hanging
-      console.log('📦 Parsing material_item update response...');
-      let updatedItems: any[];
-      try {
-        const jsonPromise = updateResponse.json();
-        const jsonTimeout = new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error('JSON parsing timeout after 5 seconds')), 5000)
-        );
-        updatedItems = await Promise.race([jsonPromise, jsonTimeout]) as any[];
-        console.log('✅ JSON parsed successfully');
-      } catch (jsonError: any) {
-        console.error('❌ JSON parsing error:', jsonError);
-        // Continue with original item if JSON parsing fails
-        updatedItems = [item];
-        toast.warning('⚠️ Response Parse Warning', {
-          description: 'Item was updated but response parsing failed. Continuing...',
-          duration: 3000
-        });
-      }
-      
-      const updatedItem = updatedItems[0] || item;
-      console.log('✅ Material item updated successfully:', updatedItem.id);
-      console.log('📋 Updated item data:', { 
-        id: updatedItem.id, 
-        receive_scanned: updatedItem.receive_scanned, 
-        status: updatedItem.status,
-        purchase_order_id: updatedItem.purchase_order_id 
-      });
-      
-      // Step 3: Update delivery_request status immediately when item is scanned
-      // This moves the order to "Delivered" tab as soon as ANY item is scanned
-      let deliveryRequestUpdated = false;
-      if (item.purchase_order_id) {
-        try {
-          console.log('📦 Updating delivery_request for purchase_order_id:', item.purchase_order_id);
-          
-          // First, get the current user's delivery_provider.id to ensure delivery_request has it
-          // This is CRITICAL for the order to appear in "Delivered" tab
-          let providerId: string | null = null;
-          
-          if (currentUserId) {
-            try {
-              console.log('🔍 Fetching delivery_provider.id for user:', currentUserId);
-              const providerController = new AbortController();
-              const providerTimeoutId = setTimeout(() => providerController.abort(), 5000); // 5 second timeout
-              
-              // Try to get delivery_provider.id for this user
-              let providerResponse: Response | null = null;
-              try {
-                providerResponse = await fetch(
-                  `${SUPABASE_URL}/rest/v1/delivery_providers?user_id=eq.${currentUserId}&select=id&limit=1`,
-                  {
-                    headers: {
-                      'apikey': ANON_KEY,
-                      'Authorization': `Bearer ${accessToken}`,
-                      'Accept': 'application/json'
-                    },
-                    signal: providerController.signal
-                  }
-                );
-                clearTimeout(providerTimeoutId);
-              } catch (fetchError: any) {
-                clearTimeout(providerTimeoutId);
-                if (fetchError.name === 'AbortError') {
-                  console.warn('⚠️ Provider lookup timed out, will try alternative method');
-                  // Don't throw - try alternative method below
-                } else {
-                  throw fetchError;
-                }
-              }
-              
-              if (providerResponse && providerResponse.ok) {
-                const providerData = await providerResponse.json();
-                if (providerData && providerData.length > 0) {
-                  providerId = providerData[0].id;
-                  console.log('✅ Found delivery_provider.id:', providerId);
-                } else {
-                  console.warn('⚠️ No delivery_provider found for user_id:', currentUserId);
-                }
-              }
-            } catch (e) {
-              console.warn('⚠️ Could not fetch delivery_provider.id:', e);
-            }
-          } else {
-            console.warn('⚠️ Cannot fetch provider_id - currentUserId is null');
-          }
-          
-          // First, check if delivery_request exists and get its current state
-          // This is important to get the existing provider_id if lookup fails
-          let existingDeliveryRequest: any = null;
-          try {
-            console.log('🔍 Checking existing delivery_request...');
-            const checkController = new AbortController();
-            const checkTimeoutId = setTimeout(() => checkController.abort(), 5000); // 5 second timeout
-            
-            let checkResponse: Response;
-            try {
-              checkResponse = await fetch(
-                `${SUPABASE_URL}/rest/v1/delivery_requests?purchase_order_id=eq.${item.purchase_order_id}&select=*&limit=1`,
-                {
-                  headers: {
-                    'apikey': ANON_KEY,
-                    'Authorization': `Bearer ${accessToken}`,
-                    'Accept': 'application/json'
-                  },
-                  signal: checkController.signal
-                }
-              );
-              clearTimeout(checkTimeoutId);
-            } catch (fetchError: any) {
-              clearTimeout(checkTimeoutId);
-              if (fetchError.name === 'AbortError') {
-                console.warn('⚠️ Delivery request check timed out, continuing without check');
-                throw new Error('Delivery request check timeout');
-              }
-              throw fetchError;
-            }
-            if (checkResponse.ok) {
-              const checkData = await checkResponse.json();
-              if (checkData && checkData.length > 0) {
-                existingDeliveryRequest = checkData[0];
-                console.log('📋 Found existing delivery_request:', {
-                  id: existingDeliveryRequest.id,
-                  status: existingDeliveryRequest.status,
-                  provider_id: existingDeliveryRequest.provider_id
-                });
-                
-                // CRITICAL: Use existing provider_id if we don't have one yet
-                if (!providerId && existingDeliveryRequest.provider_id) {
-                  providerId = existingDeliveryRequest.provider_id;
-                  console.log('✅ Using provider_id from existing delivery_request:', providerId);
-                }
-              } else {
-                console.warn('⚠️ No delivery_request found for purchase_order_id:', item.purchase_order_id);
-              }
-            }
-          } catch (e) {
-            console.warn('⚠️ Could not check existing delivery_request:', e);
-          }
-          
-          // Update delivery_request to 'delivered' when item is received
-          // Also ensure provider_id is set so it appears in deliveryHistory
-          const updateBody: any = {
-            status: 'delivered',
-            delivered_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
-          };
-          
-          // CRITICAL: Always set provider_id if we have it
-          // This ensures the order appears in "Delivered" tab
-          if (providerId) {
-            // Always update provider_id to ensure it's set correctly
-            updateBody.provider_id = providerId;
-            console.log('📦 Setting provider_id on delivery_request:', providerId);
-            console.log('   This is CRITICAL for the order to appear in "Delivered" tab');
-          } else {
-            console.error('❌ CRITICAL: No provider_id available - order may not appear in Delivered tab!');
-            console.error('   currentUserId:', currentUserId);
-            console.error('   existingDeliveryRequest?.provider_id:', existingDeliveryRequest?.provider_id);
-            toast.error('⚠️ Warning', {
-              description: 'Could not set provider_id. Order may not appear in Delivered tab.',
-              duration: 5000
-            });
-          }
-          
-          console.log('📦 Updating delivery_request status to delivered...');
-          const deliveryUpdateController = new AbortController();
-          const deliveryUpdateTimeoutId = setTimeout(() => deliveryUpdateController.abort(), 10000); // 10 second timeout
-          
-          let deliveryRequestResponse: Response | null = null;
-          try {
-            deliveryRequestResponse = await fetch(
-              `${SUPABASE_URL}/rest/v1/delivery_requests?purchase_order_id=eq.${item.purchase_order_id}`,
-              {
-                method: 'PATCH',
-                headers: {
-                  'apikey': ANON_KEY,
-                  'Authorization': `Bearer ${accessToken}`,
-                  'Content-Type': 'application/json',
-                  'Prefer': 'return=representation'
-                },
-                body: JSON.stringify(updateBody),
-                signal: deliveryUpdateController.signal
-              }
-            );
-            clearTimeout(deliveryUpdateTimeoutId);
-            console.log('⏱️ Delivery request update completed');
-          } catch (fetchError: any) {
-            clearTimeout(deliveryUpdateTimeoutId);
-            if (fetchError.name === 'AbortError') {
-              console.error('❌ Delivery request update timed out after 10 seconds');
-              toast.warning('⚠️ Update Timeout', {
-                description: 'Delivery status update timed out, but item was scanned. Tab will still switch.',
-                duration: 5000,
-              });
-              // Continue anyway - item is scanned, just status update failed
-              deliveryRequestUpdated = false;
-              deliveryRequestResponse = null;
-            } else {
-              throw fetchError;
-            }
-          }
-          
-          if (deliveryRequestResponse && deliveryRequestResponse.ok) {
-            // Parse JSON with timeout
-            let updatedDeliveryRequest: any[];
-            try {
-              const jsonPromise = deliveryRequestResponse.json();
-              const jsonTimeout = new Promise<never>((_, reject) =>
-                setTimeout(() => reject(new Error('JSON parsing timeout after 5 seconds')), 5000)
-              );
-              updatedDeliveryRequest = await Promise.race([jsonPromise, jsonTimeout]) as any[];
-              console.log('✅ Delivery request JSON parsed successfully');
-            } catch (jsonError: any) {
-              console.error('❌ Delivery request JSON parsing error:', jsonError);
-              updatedDeliveryRequest = [];
-            }
-            
-            if (updatedDeliveryRequest && updatedDeliveryRequest.length > 0) {
-              console.log('✅ Delivery request updated to delivered status:', updatedDeliveryRequest);
-              console.log('📋 Updated delivery_request data:', JSON.stringify(updatedDeliveryRequest, null, 2));
-              console.log('📋 Delivery request provider_id:', updatedDeliveryRequest[0]?.provider_id || 'NOT SET');
-              console.log('📋 Delivery request status:', updatedDeliveryRequest[0]?.status);
-              deliveryRequestUpdated = true;
-            }
-          } else if (deliveryRequestResponse) {
-            const errorText = await deliveryRequestResponse.text();
-            console.error('❌ Could not update delivery_request status:', deliveryRequestResponse.status, errorText);
-            console.error('   This might be due to RLS policies or missing delivery_request record');
-            console.error('   Purchase order ID:', item.purchase_order_id);
-            console.error('   Provider ID attempted:', providerId);
-            toast.warning('⚠️ Status Update Warning', {
-              description: 'Item scanned successfully, but delivery status update may have failed. Tab will still switch.',
-              duration: 4000,
-            });
-          }
-        } catch (e) {
-          console.error('❌ Error updating delivery_request:', e);
-          toast.warning('⚠️ Update Warning', {
-            description: 'Item scanned successfully, but delivery status update failed. Tab will still switch.',
-            duration: 4000,
-          });
-        }
-      } else {
-        console.warn('⚠️ No purchase_order_id found for item:', item.id);
-        console.warn('   Item data:', { id: item.id, purchase_order_id: item.purchase_order_id });
-      }
-      
-      // IMMEDIATELY switch to delivered tab when item is successfully scanned
-      // This happens regardless of whether delivery_request update succeeded
+      // Step 3: IMMEDIATELY switch to delivered tab when item is successfully scanned
+      // The RPC function has already updated delivery_request status if all items are received
       if (onDeliveryComplete) {
         console.log('🔄 Triggering onDeliveryComplete callback - moving to Delivered tab NOW');
-        console.log('   Delivery request updated:', deliveryRequestUpdated);
+        console.log('   RPC result:', rpcResult);
         try {
           onDeliveryComplete();
           console.log('✅ onDeliveryComplete callback executed successfully');
@@ -1188,127 +945,21 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
         console.warn('⚠️ No onDeliveryComplete callback provided');
       }
       
-      // Step 4: Check if all items in the order are now delivered (non-blocking, with timeouts)
-      // This runs AFTER the callback, so it won't block the tab switch
-      if (item.purchase_order_id) {
-        // Run this asynchronously without blocking
-        (async () => {
-          try {
-            console.log('📦 Checking if all items are delivered...');
-            const countController = new AbortController();
-            const countTimeoutId = setTimeout(() => countController.abort(), 5000); // 5 second timeout
-            
-            let countResponse: Response;
-            try {
-              countResponse = await fetch(
-                `${SUPABASE_URL}/rest/v1/material_items?purchase_order_id=eq.${item.purchase_order_id}&receive_scanned=eq.false&select=id`,
-                {
-                  headers: {
-                    'apikey': ANON_KEY,
-                    'Authorization': `Bearer ${accessToken}`,
-                    'Accept': 'application/json'
-                  },
-                  signal: countController.signal
-                }
-              );
-              clearTimeout(countTimeoutId);
-            } catch (fetchError: any) {
-              clearTimeout(countTimeoutId);
-              if (fetchError.name === 'AbortError') {
-                console.warn('⚠️ Item count check timed out, skipping');
-                return;
-              }
-              throw fetchError;
-            }
-            
-            if (countResponse.ok) {
-              const remainingItems = await countResponse.json();
-              console.log('📦 Remaining undelivered items:', remainingItems.length);
-              
-              if (remainingItems.length === 0) {
-                // All items delivered - update purchase_order status (with timeout)
-                const poController = new AbortController();
-                const poTimeoutId = setTimeout(() => poController.abort(), 5000);
-                
-                try {
-                  await fetch(
-                    `${SUPABASE_URL}/rest/v1/purchase_orders?id=eq.${item.purchase_order_id}`,
-                    {
-                      method: 'PATCH',
-                      headers: {
-                        'apikey': ANON_KEY,
-                        'Authorization': `Bearer ${accessToken}`,
-                        'Content-Type': 'application/json'
-                      },
-                      body: JSON.stringify({
-                        status: 'delivered',
-                        updated_at: new Date().toISOString()
-                      }),
-                      signal: poController.signal
-                    }
-                  );
-                  clearTimeout(poTimeoutId);
-                } catch (e: any) {
-                  clearTimeout(poTimeoutId);
-                  if (e.name !== 'AbortError') {
-                    console.warn('⚠️ Could not update purchase_order:', e);
-                  }
-                }
-                
-                // Also update delivery_request if exists (with timeout)
-                const drController = new AbortController();
-                const drTimeoutId = setTimeout(() => drController.abort(), 5000);
-                
-                try {
-                  await fetch(
-                    `${SUPABASE_URL}/rest/v1/delivery_requests?purchase_order_id=eq.${item.purchase_order_id}`,
-                    {
-                      method: 'PATCH',
-                      headers: {
-                        'apikey': ANON_KEY,
-                        'Authorization': `Bearer ${accessToken}`,
-                        'Content-Type': 'application/json'
-                      },
-                      body: JSON.stringify({
-                        status: 'delivered',
-                        delivered_at: new Date().toISOString(),
-                        updated_at: new Date().toISOString()
-                      }),
-                      signal: drController.signal
-                    }
-                  );
-                  clearTimeout(drTimeoutId);
-                } catch (e: any) {
-                  clearTimeout(drTimeoutId);
-                  if (e.name !== 'AbortError') {
-                    console.warn('⚠️ Could not update delivery_request:', e);
-                  }
-                }
-                
-                console.log('✅ All items delivered - order marked as complete');
-              }
-            }
-          } catch (e) {
-            console.warn('⚠️ Could not check/update order status (non-blocking):', e);
-          }
-        })(); // Fire and forget - don't await
-      }
-      
       // Success! Add to results
       const scanResult: ScanResult = {
-        qr_code: qrCode,
-        material_type: item.material_type || 'Material',
+        qr_code: cleanQRCode,
+        material_type: rpcResult?.material_type || item.material_type || 'Material',
         category: item.category || 'General',
         quantity: item.quantity || 1,
         unit: item.unit || 'unit',
-        status: 'delivered',
+        status: rpcResult?.status || 'delivered',
         timestamp: new Date()
       };
 
       setScanResults(prev => [scanResult, ...prev.slice(0, 9)]);
       
       toast.success('✅ Item Received!', {
-        description: `${item.material_type || 'Material'} - ${item.quantity || 1} ${item.unit || 'unit(s)'} confirmed`,
+        description: `${rpcResult?.material_type || item.material_type || 'Material'} - ${item.quantity || 1} ${item.unit || 'unit(s)'} confirmed${rpcResult?.is_invalidated ? ' (QR code invalidated)' : ''}`,
         duration: 5000
       });
 
