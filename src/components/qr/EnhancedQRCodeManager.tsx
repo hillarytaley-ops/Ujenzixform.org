@@ -747,7 +747,7 @@ export const EnhancedQRCodeManager: React.FC<EnhancedQRCodeManagerProps> = ({ su
       if (!groups[orderId]) {
         groups[orderId] = {
           order_id: orderId,
-          order_number: orderId.slice(0, 8).toUpperCase(), // Short display version
+          order_number: undefined, // Will be set from purchase_orders - NO FAKE FALLBACK
           buyer_id: item.buyer_id || 'unknown',
           buyer_name: item.buyer_name || 'Unknown Client',
           buyer_email: item.buyer_email || '',
@@ -806,17 +806,30 @@ export const EnhancedQRCodeManager: React.FC<EnhancedQRCodeManagerProps> = ({ su
           headers['Authorization'] = `Bearer ${stored.accessToken}`;
         }
         
-        // Fetch purchase orders with delivery provider info
+        // Fetch purchase orders with delivery provider info - CRITICAL: Must complete to get real order numbers
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+        
         const purchaseOrdersResponse = await fetch(
           `${SUPABASE_URL}/rest/v1/purchase_orders?id=in.(${orderIds.join(',')})&select=id,po_number,delivery_provider_id,delivery_provider_name,delivery_provider_phone,delivery_status,delivery_required`,
-          { headers, cache: 'no-store' }
+          { headers, cache: 'no-store', signal: controller.signal }
         );
+        clearTimeout(timeoutId);
         
         if (purchaseOrdersResponse.ok) {
           const purchaseOrders = await purchaseOrdersResponse.json();
+          console.log('📦 Fetched purchase_orders for order_number assignment:', purchaseOrders.length);
+          
+          let realOrderNumbersCount = 0;
           purchaseOrders.forEach((po: any) => {
             if (groups[po.id]) {
-              groups[po.id].order_number = po.po_number || groups[po.id].order_number;
+              // ONLY set order_number if we have a real po_number from purchase_orders
+              if (po.po_number) {
+                groups[po.id].order_number = po.po_number;
+                realOrderNumbersCount++;
+              } else {
+                console.warn('⚠️ Purchase order', po.id, 'has no po_number - will be filtered out');
+              }
               groups[po.id].delivery_provider_id = po.delivery_provider_id;
               groups[po.id].delivery_provider_name = po.delivery_provider_name;
               groups[po.id].delivery_provider_phone = po.delivery_provider_phone;
@@ -824,9 +837,16 @@ export const EnhancedQRCodeManager: React.FC<EnhancedQRCodeManagerProps> = ({ su
               groups[po.id].delivery_required = po.delivery_required || false;
             }
           });
+          console.log('✅ Assigned real order_numbers to', realOrderNumbersCount, 'orders');
+        } else {
+          console.error('❌ Failed to fetch purchase_orders for order_number assignment:', purchaseOrdersResponse.status);
         }
-      } catch (error) {
-        console.log('⚠️ Could not fetch purchase order data:', error);
+      } catch (error: any) {
+        if (error.name === 'AbortError') {
+          console.error('⏱️ Purchase orders fetch timeout - order_numbers will be missing');
+        } else {
+          console.error('❌ Could not fetch purchase order data:', error);
+        }
       }
     }
     
@@ -853,6 +873,13 @@ export const EnhancedQRCodeManager: React.FC<EnhancedQRCodeManagerProps> = ({ su
     const delivered: OrderGroup[] = [];
     
     sortedGroups.forEach(group => {
+      // CRITICAL: Only process orders with REAL order_numbers (from purchase_orders.po_number)
+      // Filter out orders without real order numbers to avoid showing fake/fallback numbers
+      if (!group.order_number || group.order_number === 'unknown' || group.order_id === 'unknown') {
+        console.warn('🚫 Filtering out order without real order_number:', group.order_id, 'order_number:', group.order_number);
+        return; // Skip this order - it doesn't have a real order number
+      }
+      
       const hasDispatchedItems = group.items.some(item => item.dispatch_scanned === true);
       const hasReceivedItems = group.items.some(item => item.receive_scanned === true);
       const allItemsDispatched = group.items.every(item => item.dispatch_scanned === true);
@@ -871,6 +898,14 @@ export const EnhancedQRCodeManager: React.FC<EnhancedQRCodeManagerProps> = ({ su
         // No items dispatched = awaiting dispatch
         awaitingDispatch.push(group);
       }
+    });
+    
+    // Log counts with real order numbers
+    console.log('✅ Orders with REAL order_numbers:', {
+      awaitingDispatch: awaitingDispatch.length,
+      dispatched: dispatched.length,
+      inTransit: inTransit.length,
+      delivered: delivered.length
     });
     
     setAwaitingDispatchOrders(awaitingDispatch);
