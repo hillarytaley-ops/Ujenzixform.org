@@ -590,304 +590,367 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
         // Continue with RPC call even if quick check fails
       }
       
-      // Step 1: Use record_qr_scan RPC function to handle everything properly
-      // This function will:
-      // 1. Update material_item to receive_scanned = true
-      // 2. Invalidate QR code when both dispatch and receive are done
-      // 3. Check if ALL items are received and update order status to 'delivered'
-      // 4. Update delivery_request status to 'delivered' when all items are received
-      console.log('📦 Calling record_qr_scan RPC function for receiving scan...');
-      console.log('⏱️ RPC call started at:', new Date().toISOString());
+      // Step 1: Use REST API FIRST (RPC is too slow/unreliable)
+      // This approach:
+      // 1. Finds the material_item using format variations
+      // 2. Updates material_item to receive_scanned = true
+      // 3. Checks if ALL items are received and updates order/delivery_request status
+      console.log('📦 Using REST API as PRIMARY method (RPC is unreliable)...');
+      console.log('⏱️ REST API call started at:', new Date().toISOString());
       
-      let rpcResult: any = null;
+      let scanResult: any = null;
       let deliveryRequestUpdated = false;
-      const rpcStartTime = Date.now();
+      const restApiStartTime = Date.now();
       
       try {
-        // Call the RPC function with timeout (increased to 30 seconds for better reliability)
-        const rpcController = new AbortController();
-        const rpcTimeoutId = setTimeout(() => rpcController.abort(), 30000); // 30 second timeout
-        
-        const rpcPromise = supabase.rpc('record_qr_scan', {
-          _qr_code: cleanQRCode,
-          _scan_type: 'receiving',
-          _scanner_device_id: deviceInfo || null,
-          _scanner_type: scannerType === 'mobile_camera' ? 'mobile_camera' : 'web_scanner',
-          _scan_location: null,
-          _material_condition: materialCondition || 'good',
-          _quantity_scanned: null,
-          _notes: notes || null,
-          _photo_url: null
-        });
-        
-        const rpcTimeoutPromise = new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error('RPC timeout after 30 seconds')), 30000)
-        );
-        
-        console.log('⏱️ Waiting for RPC response...');
-        const { data, error } = await Promise.race([
-          rpcPromise,
-          rpcTimeoutPromise
-        ]) as any;
-        
-        clearTimeout(rpcTimeoutId);
-        const rpcElapsed = Date.now() - rpcStartTime;
-        console.log(`⏱️ RPC call completed in ${rpcElapsed}ms`);
-        
-        if (error) {
-          console.error('❌ RPC error:', error);
-          throw error;
-        }
-        
-        rpcResult = data;
-        console.log('✅ RPC call successful:', rpcResult);
-        
-        // Check if the scan was successful
-        if (rpcResult && rpcResult.success === true) {
-          console.log('✅ QR scan recorded successfully');
-          console.log('📋 Scan result:', {
-            qr_code: rpcResult.qr_code,
-            receive_scanned: rpcResult.receive_scanned,
-            is_invalidated: rpcResult.is_invalidated,
-            status: rpcResult.status
-          });
-          
-          // If QR code is invalidated, it means both dispatch and receive are done
-          if (rpcResult.is_invalidated === true) {
-            console.log('✅ QR code invalidated - both dispatch and receive completed');
-            toast.success('✅ QR Code Invalidated', {
-              description: 'This QR code has been marked as used and cannot be scanned again.',
-              duration: 3000
-            });
-          }
-          
-          deliveryRequestUpdated = true; // RPC function handles delivery_request update
-        } else {
-          // Handle error response from RPC
-          const errorMsg = rpcResult?.error || 'Unknown error';
-          const errorCode = rpcResult?.error_code || 'UNKNOWN_ERROR';
-          
-          console.error('❌ RPC returned error:', errorMsg, 'Code:', errorCode);
-          
-          if (errorCode === 'ALREADY_RECEIVED') {
-            toast.error('⚠️ Already Received', {
-              description: errorMsg,
-              duration: 5000
-            });
-            return;
-          } else if (errorCode === 'QR_INVALIDATED') {
-            toast.error('⚠️ QR Code Invalidated', {
-              description: errorMsg,
-              duration: 5000
-            });
-            return;
-          } else if (errorCode === 'QR_NOT_FOUND') {
-            // Try format variations if QR code not found
-            console.log('🔄 QR code not found, trying format variations...');
-            
-            // Try variations: remove UJP-FILM- prefix, try just the numeric part, etc.
-            const variations = [
-              cleanQRCode.replace(/^UJP-FILM-/, ''), // Remove UJP-FILM- prefix
-              cleanQRCode.replace(/^UJP-/, ''), // Remove UJP- prefix
-              cleanQRCode.match(/\d{13,}/)?.[0] || '', // Extract long numeric sequence (order number)
-            ].filter(v => v && v !== cleanQRCode);
-            
-            let found = false;
-            for (const variant of variations) {
-              if (!variant) continue;
-              try {
-                console.log(`🔄 Trying QR code variant: ${variant.substring(0, 50)}...`);
-                const variantResult = await supabase.rpc('record_qr_scan', {
-                  _qr_code: variant,
-                  _scan_type: 'receiving',
-                  _scanner_device_id: deviceInfo || null,
-                  _scanner_type: scannerType === 'mobile_camera' ? 'mobile_camera' : 'web_scanner',
-                  _scan_location: null,
-                  _material_condition: materialCondition || 'good',
-                  _quantity_scanned: null,
-                  _notes: notes || null,
-                  _photo_url: null
-                });
-                
-                if (variantResult.error) {
-                  console.log(`⚠️ Variant ${variant.substring(0, 30)}... Supabase error:`, variantResult.error.message);
-                  continue;
-                }
-                
-                if (variantResult.data && variantResult.data.success === true) {
-                  console.log('✅ Found QR code with variant:', variant);
-                  rpcResult = variantResult.data;
-                  found = true;
-                  deliveryRequestUpdated = true;
-                  // Continue with success flow - break out of loop and continue after try-catch
-                  break;
-                } else if (variantResult.data && variantResult.data.error_code) {
-                  console.log(`⚠️ Variant ${variant.substring(0, 30)}... returned error:`, variantResult.data.error_code);
-                }
-              } catch (e) {
-                console.log(`⚠️ Variant ${variant.substring(0, 30)}... exception:`, e);
-              }
-            }
-            
-            if (!found) {
-              toast.error('❓ QR Code Not Found', {
-                description: `"${cleanQRCode.substring(0, 30)}..." not in system. Please verify the QR code is correct.`,
-                duration: 8000
-              });
-              return;
-            }
-            // If found, continue with success flow (rpcResult is already set above)
-          } else {
-            toast.error('❌ Scan Failed', {
-              description: errorMsg,
-              duration: 5000
-            });
-            return;
-          }
-        }
-      } catch (rpcError: any) {
-        console.error('❌ RPC call failed:', rpcError);
-        const rpcElapsed = Date.now() - rpcStartTime;
-        console.error(`⏱️ RPC failed after ${rpcElapsed}ms`);
-        
-        // If RPC times out, try direct REST API update as fallback
-        if (rpcError?.message?.includes('timeout') || rpcError?.name === 'AbortError') {
-          console.log('🔄 RPC timed out - attempting direct REST API update as fallback...');
+        // Try different QR code formats to find the item
+        const qrVariations = [
+          cleanQRCode, // Original
+          cleanQRCode.replace(/^UJP-FILM-/, ''), // Remove UJP-FILM- prefix
+          cleanQRCode.replace(/^UJP-/, ''), // Remove UJP- prefix
+          cleanQRCode.match(/PO-\d{13,}-[A-Z0-9]+/)?.[0] || '', // Extract PO- format
+          cleanQRCode.match(/\d{13,}/)?.[0] || '', // Extract numeric part
+        ].filter(v => v && v !== '');
+
+        let foundItem: any = null;
+        let foundVariant = '';
+
+        // Try each variation to find the item
+        for (const variant of qrVariations) {
+          if (!variant) continue;
           
           try {
-            // Fallback: Direct REST API update with format variations
-            // Try different QR code formats to find the item
-            const qrVariations = [
-              cleanQRCode, // Original
-              cleanQRCode.replace(/^UJP-FILM-/, ''), // Remove UJP-FILM- prefix
-              cleanQRCode.replace(/^UJP-/, ''), // Remove UJP- prefix
-              cleanQRCode.match(/PO-\d{13,}-[A-Z0-9]+/)?.[0] || '', // Extract PO- format
-              cleanQRCode.match(/\d{13,}/)?.[0] || '', // Extract numeric part
-            ].filter(v => v && v !== '');
-
-            let foundItem: any = null;
-            let foundVariant = '';
-
-            // Try each variation
-            for (const variant of qrVariations) {
-              if (!variant) continue;
-              
-              try {
-                console.log(`🔄 Fallback: Trying QR code variant: ${variant.substring(0, 50)}...`);
-                const findItemResponse = await fetch(
-                  `${SUPABASE_URL}/rest/v1/material_items?qr_code=eq.${encodeURIComponent(variant)}&select=id,purchase_order_id,receive_scanned,dispatch_scanned,qr_code&limit=1`,
-                  {
-                    headers: {
-                      'apikey': ANON_KEY,
-                      'Authorization': `Bearer ${accessToken}`,
-                      'Accept': 'application/json'
-                    }
-                  }
-                );
-                
-                if (findItemResponse.ok) {
-                  const itemData = await findItemResponse.json();
-                  if (itemData && itemData.length > 0) {
-                    foundItem = itemData[0];
-                    foundVariant = variant;
-                    console.log(`✅ Fallback: Found item with variant: ${variant.substring(0, 50)}...`);
-                    break;
-                  }
+            console.log(`🔍 REST API: Trying QR code variant: ${variant.substring(0, 50)}...`);
+            const findItemResponse = await fetch(
+              `${SUPABASE_URL}/rest/v1/material_items?qr_code=eq.${encodeURIComponent(variant)}&select=id,purchase_order_id,receive_scanned,dispatch_scanned,qr_code,material_type,quantity,unit&limit=1`,
+              {
+                headers: {
+                  'apikey': ANON_KEY,
+                  'Authorization': `Bearer ${accessToken}`,
+                  'Accept': 'application/json'
                 }
-              } catch (variantError) {
-                console.log(`⚠️ Fallback: Variant ${variant.substring(0, 30)}... failed:`, variantError);
-                continue;
               }
-            }
+            );
             
-            if (foundItem) {
-              if (foundItem.receive_scanned) {
-                console.log('⏭️ Item already received - skipping');
-                toast.warning('⚠️ Already Scanned', {
-                  description: 'This QR code has already been scanned.',
-                  duration: 3000
-                });
-                return;
+            if (findItemResponse.ok) {
+              const itemData = await findItemResponse.json();
+              if (itemData && itemData.length > 0) {
+                foundItem = itemData[0];
+                foundVariant = variant;
+                console.log(`✅ REST API: Found item with variant: ${variant.substring(0, 50)}...`);
+                break;
               }
-              
-              const itemId = foundItem.id;
-              const purchaseOrderId = foundItem.purchase_order_id;
-              
-              // Update material_item directly
-              const updateItemResponse = await fetch(
-                `${SUPABASE_URL}/rest/v1/material_items?id=eq.${itemId}`,
-                {
-                  method: 'PATCH',
-                  headers: {
-                    'apikey': ANON_KEY,
-                    'Authorization': `Bearer ${accessToken}`,
-                    'Content-Type': 'application/json',
-                    'Prefer': 'return=representation'
-                  },
-                  body: JSON.stringify({
-                    receive_scanned: true,
-                    receive_scanned_at: new Date().toISOString(),
-                    status: 'received',
-                    updated_at: new Date().toISOString()
-                  })
-                }
-              );
-              
-              if (updateItemResponse.ok) {
-                console.log('✅ Fallback: Direct REST API update successful');
-                toast.success('✅ Item Received (via fallback)', {
-                  description: 'Scan processed using direct update method.',
-                  duration: 5000
-                });
-                
-                // Create a mock rpcResult for the success flow
-                rpcResult = {
-                  success: true,
-                  qr_code: foundItem.qr_code || foundVariant,
-                  receive_scanned: true,
-                  status: 'received',
-                  material_type: 'Material'
-                };
-                
-                // Continue with success flow
-                deliveryRequestUpdated = true;
-              } else {
-                const errorText = await updateItemResponse.text();
-                console.error('❌ Fallback update failed:', errorText);
-                throw new Error('Fallback update failed');
-              }
-            } else {
-              console.error('❌ Fallback: Item not found with any QR code variation');
-              throw new Error('Item not found');
             }
-          } catch (fallbackError: any) {
-            console.error('❌ Fallback REST API update also failed:', fallbackError);
-            toast.error('Request Timeout', {
-              description: 'The scan request took too long (30s). The RPC function may be slow. Please try again or contact support.',
-              duration: 5000
-            });
-            return;
+          } catch (variantError) {
+            console.log(`⚠️ REST API: Variant ${variant.substring(0, 30)}... failed:`, variantError);
+            continue;
           }
-        } else {
+        }
+        
+        if (!foundItem) {
+          console.error('❌ REST API: Item not found with any QR code variation');
+          toast.error('❓ QR Code Not Found', {
+            description: `"${cleanQRCode.substring(0, 30)}..." not in system. Please verify the QR code is correct.`,
+            duration: 8000
+          });
+          return;
+        }
+        
+        if (foundItem.receive_scanned) {
+          console.log('⏭️ Item already received - skipping');
+          toast.warning('⚠️ Already Scanned', {
+            description: 'This QR code has already been scanned.',
+            duration: 3000
+          });
+          return;
+        }
+        
+        const itemId = foundItem.id;
+        const purchaseOrderId = foundItem.purchase_order_id;
+        
+        // First, insert scan event (like RPC function does)
+        console.log('📝 REST API: Inserting scan event...');
+        let scanEventId: string | null = null;
+        try {
+          const scanEventResponse = await fetch(
+            `${SUPABASE_URL}/rest/v1/qr_scan_events`,
+            {
+              method: 'POST',
+              headers: {
+                'apikey': ANON_KEY,
+                'Authorization': `Bearer ${accessToken}`,
+                'Content-Type': 'application/json',
+                'Prefer': 'return=representation'
+              },
+              body: JSON.stringify({
+                qr_code: foundItem.qr_code || foundVariant,
+                scan_type: 'receiving',
+                scanner_device_id: deviceInfo || null,
+                scanner_type: scannerType === 'mobile_camera' ? 'mobile_camera' : 'web_scanner',
+                scan_location: null,
+                material_condition: materialCondition || 'good',
+                quantity_scanned: null,
+                notes: notes || null,
+                photo_url: null
+              })
+            }
+          );
+          
+          if (scanEventResponse.ok) {
+            const scanEventData = await scanEventResponse.json();
+            scanEventId = scanEventData[0]?.id || null;
+            console.log('✅ REST API: Scan event inserted');
+          } else {
+            console.warn('⚠️ REST API: Failed to insert scan event (non-critical)');
+          }
+        } catch (scanEventError) {
+          console.warn('⚠️ REST API: Error inserting scan event (non-critical):', scanEventError);
+          // Continue anyway - scan event is not critical
+        }
+        
+        // Update material_item directly
+        console.log('📝 REST API: Updating material_item...');
+        const updateItemBody: any = {
+          receive_scanned: true,
+          receive_scanned_at: new Date().toISOString(),
+          status: 'received',
+          updated_at: new Date().toISOString()
+        };
+        
+        if (scanEventId) {
+          updateItemBody.receiving_scan_id = scanEventId;
+        }
+        
+        const updateItemResponse = await fetch(
+          `${SUPABASE_URL}/rest/v1/material_items?id=eq.${itemId}`,
+          {
+            method: 'PATCH',
+            headers: {
+              'apikey': ANON_KEY,
+              'Authorization': `Bearer ${accessToken}`,
+              'Content-Type': 'application/json',
+              'Prefer': 'return=representation'
+            },
+            body: JSON.stringify(updateItemBody)
+          }
+        );
+        
+        if (!updateItemResponse.ok) {
+          const errorText = await updateItemResponse.text();
+          console.error('❌ REST API: Failed to update material_item:', errorText);
+          throw new Error('Failed to update material_item');
+        }
+        
+        console.log('✅ REST API: Material item updated successfully');
+        
+        // Check if all items in the order are received
+        if (purchaseOrderId) {
+          console.log('🔍 REST API: Checking if all items are received for purchase_order:', purchaseOrderId);
+          
+          try {
+            // Get all items for this purchase order
+            const allItemsResponse = await fetch(
+              `${SUPABASE_URL}/rest/v1/material_items?purchase_order_id=eq.${purchaseOrderId}&select=id,receive_scanned&limit=1000`,
+              {
+                headers: {
+                  'apikey': ANON_KEY,
+                  'Authorization': `Bearer ${accessToken}`,
+                  'Accept': 'application/json'
+                }
+              }
+            );
+            
+            if (allItemsResponse.ok) {
+              const allItems = await allItemsResponse.json();
+              const totalItems = allItems.length;
+              const receivedItems = allItems.filter((item: any) => item.receive_scanned === true).length;
+              
+              console.log(`📊 REST API: Order items status: ${receivedItems}/${totalItems} received`);
+              
+              // If all items are received, update purchase_order and delivery_request
+              if (totalItems > 0 && receivedItems === totalItems) {
+                console.log('✅ REST API: All items received - updating order status to delivered');
+                
+                // Update purchase_order status
+                try {
+                  const updatePOResponse = await fetch(
+                    `${SUPABASE_URL}/rest/v1/purchase_orders?id=eq.${purchaseOrderId}`,
+                    {
+                      method: 'PATCH',
+                      headers: {
+                        'apikey': ANON_KEY,
+                        'Authorization': `Bearer ${accessToken}`,
+                        'Content-Type': 'application/json'
+                      },
+                      body: JSON.stringify({
+                        status: 'delivered',
+                        updated_at: new Date().toISOString()
+                      })
+                    }
+                  );
+                  
+                  if (updatePOResponse.ok) {
+                    console.log('✅ REST API: Purchase order status updated to delivered');
+                  }
+                } catch (poError) {
+                  console.warn('⚠️ REST API: Failed to update purchase_order status:', poError);
+                }
+                
+                // Update delivery_request status
+                try {
+                  const updateDRResponse = await fetch(
+                    `${SUPABASE_URL}/rest/v1/delivery_requests?purchase_order_id=eq.${purchaseOrderId}`,
+                    {
+                      method: 'PATCH',
+                      headers: {
+                        'apikey': ANON_KEY,
+                        'Authorization': `Bearer ${accessToken}`,
+                        'Content-Type': 'application/json'
+                      },
+                      body: JSON.stringify({
+                        status: 'delivered',
+                        delivered_at: new Date().toISOString(),
+                        updated_at: new Date().toISOString()
+                      })
+                    }
+                  );
+                  
+                  if (updateDRResponse.ok) {
+                    console.log('✅ REST API: Delivery request status updated to delivered');
+                    deliveryRequestUpdated = true;
+                  }
+                } catch (drError) {
+                  console.warn('⚠️ REST API: Failed to update delivery_request status:', drError);
+                }
+              }
+            }
+          } catch (checkError) {
+            console.warn('⚠️ REST API: Failed to check all items status:', checkError);
+            // Continue anyway - the item was updated successfully
+          }
+        }
+        
+        // Check if both dispatch and receive are done (for QR invalidation)
+        // Since we just set receive_scanned to true, check if dispatch_scanned was already true
+        const isInvalidated = foundItem.dispatch_scanned === true; // receive_scanned is now true after our update
+        
+        // If invalidated, update the QR code to mark it as invalidated
+        if (isInvalidated) {
+          try {
+            const invalidateResponse = await fetch(
+              `${SUPABASE_URL}/rest/v1/material_items?id=eq.${itemId}`,
+              {
+                method: 'PATCH',
+                headers: {
+                  'apikey': ANON_KEY,
+                  'Authorization': `Bearer ${accessToken}`,
+                  'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                  is_invalidated: true,
+                  invalidated_at: new Date().toISOString(),
+                  status: 'verified'
+                })
+              }
+            );
+            
+            if (invalidateResponse.ok) {
+              console.log('✅ REST API: QR code invalidated');
+            }
+          } catch (invalidateError) {
+            console.warn('⚠️ REST API: Failed to invalidate QR code:', invalidateError);
+            // Continue anyway
+          }
+        }
+        
+        // Create scan result
+        scanResult = {
+          success: true,
+          qr_code: foundItem.qr_code || foundVariant,
+          receive_scanned: true,
+          status: 'received',
+          material_type: foundItem.material_type || 'Material',
+          quantity: foundItem.quantity || 1,
+          unit: foundItem.unit || 'unit',
+          is_invalidated: isInvalidated
+        };
+        
+        const restApiElapsed = Date.now() - restApiStartTime;
+        console.log(`✅ REST API: Scan completed successfully in ${restApiElapsed}ms`);
+        
+        if (isInvalidated) {
+          console.log('✅ QR code invalidated - both dispatch and receive completed');
+          toast.success('✅ QR Code Invalidated', {
+            description: 'This QR code has been marked as used and cannot be scanned again.',
+            duration: 3000
+          });
+        }
+        
+      } catch (restApiError: any) {
+        console.error('❌ REST API method failed:', restApiError);
+        const restApiElapsed = Date.now() - restApiStartTime;
+        console.error(`⏱️ REST API failed after ${restApiElapsed}ms`);
+        
+        // If REST API fails, try RPC as last resort (but with very short timeout)
+        console.log('🔄 REST API failed - trying RPC as last resort (5s timeout)...');
+        
+        try {
+          const rpcPromise = supabase.rpc('record_qr_scan', {
+            _qr_code: cleanQRCode,
+            _scan_type: 'receiving',
+            _scanner_device_id: deviceInfo || null,
+            _scanner_type: scannerType === 'mobile_camera' ? 'mobile_camera' : 'web_scanner',
+            _scan_location: null,
+            _material_condition: materialCondition || 'good',
+            _quantity_scanned: null,
+            _notes: notes || null,
+            _photo_url: null
+          });
+          
+          const rpcTimeoutPromise = new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error('RPC timeout after 5 seconds')), 5000)
+          );
+          
+          const { data, error } = await Promise.race([
+            rpcPromise,
+            rpcTimeoutPromise
+          ]) as any;
+          
+          if (error) {
+            throw error;
+          }
+          
+          if (data && data.success === true) {
+            scanResult = data;
+            deliveryRequestUpdated = true;
+            console.log('✅ RPC fallback succeeded');
+          } else {
+            throw new Error('RPC returned error');
+          }
+        } catch (rpcError: any) {
+          console.error('❌ RPC fallback also failed:', rpcError);
           toast.error('Failed to process scan', {
-            description: rpcError?.message || 'Unknown error occurred',
+            description: 'Both REST API and RPC methods failed. Please try again or contact support.',
             duration: 5000
           });
           return;
         }
       }
       
-      // Only continue with success flow if RPC was successful
+      // Use scanResult (from REST API or RPC fallback)
+      const rpcResult = scanResult;
+      
+      // Only continue with success flow if scan was successful
       if (!rpcResult || rpcResult.success !== true) {
-        console.error('❌ RPC did not succeed, cannot continue with success flow');
+        console.error('❌ Scan did not succeed, cannot continue with success flow');
         return;
       }
       
       // Step 3: IMMEDIATELY switch to delivered tab when item is successfully scanned
-      // The RPC function has already updated delivery_request status if all items are received
+      // The REST API (or RPC fallback) has already updated delivery_request status if all items are received
       if (onDeliveryComplete) {
         console.log('🔄 Triggering onDeliveryComplete callback - moving to Delivered tab NOW');
-        console.log('   RPC result:', rpcResult);
+        console.log('   Scan result:', rpcResult);
         try {
           onDeliveryComplete();
           console.log('✅ onDeliveryComplete callback executed successfully');
