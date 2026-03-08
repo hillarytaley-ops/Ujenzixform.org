@@ -532,33 +532,58 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
       }
       
       // Step 0: Quick check if already scanned (blocking, but fast)
+      // Try format variations to find the item
       console.log('🔍 Quick check: Is QR code already scanned?');
       try {
-        const quickCheckResponse = await fetch(
-          `${SUPABASE_URL}/rest/v1/material_items?qr_code=eq.${encodeURIComponent(cleanQRCode)}&select=receive_scanned,status,id&limit=1`,
-          {
-            headers: {
-              'apikey': ANON_KEY,
-              'Authorization': `Bearer ${accessToken}`,
-              'Accept': 'application/json',
-              'Prefer': 'return=representation'
+        const qrVariations = [
+          cleanQRCode, // Original
+          cleanQRCode.replace(/^UJP-FILM-/, ''), // Remove UJP-FILM- prefix
+          cleanQRCode.replace(/^UJP-/, ''), // Remove UJP- prefix
+          cleanQRCode.match(/PO-\d{13,}-[A-Z0-9]+/)?.[0] || '', // Extract PO- format
+          cleanQRCode.match(/\d{13,}/)?.[0] || '', // Extract numeric part
+        ].filter(v => v && v !== '');
+
+        let alreadyScanned = false;
+
+        for (const variant of qrVariations) {
+          if (!variant) continue;
+          
+          try {
+            const quickCheckResponse = await fetch(
+              `${SUPABASE_URL}/rest/v1/material_items?qr_code=eq.${encodeURIComponent(variant)}&select=receive_scanned,status,id&limit=1`,
+              {
+                headers: {
+                  'apikey': ANON_KEY,
+                  'Authorization': `Bearer ${accessToken}`,
+                  'Accept': 'application/json',
+                  'Prefer': 'return=representation'
+                }
+              }
+            );
+            
+            if (quickCheckResponse.ok) {
+              const quickCheckData = await quickCheckResponse.json();
+              if (quickCheckData && quickCheckData.length > 0) {
+                const item = quickCheckData[0];
+                if (item.receive_scanned === true || item.status === 'received' || item.status === 'delivered') {
+                  console.log(`⏭️ QR code already scanned (found with variant: ${variant.substring(0, 30)}...) - skipping RPC call`);
+                  toast.warning('⚠️ Already Scanned', {
+                    description: 'This QR code has already been scanned and received.',
+                    duration: 3000,
+                  });
+                  alreadyScanned = true;
+                  break;
+                }
+              }
             }
+          } catch (variantError) {
+            // Continue to next variant
+            continue;
           }
-        );
-        
-        if (quickCheckResponse.ok) {
-          const quickCheckData = await quickCheckResponse.json();
-          if (quickCheckData && quickCheckData.length > 0) {
-            const item = quickCheckData[0];
-            if (item.receive_scanned === true || item.status === 'received' || item.status === 'delivered') {
-              console.log('⏭️ QR code already scanned - skipping RPC call');
-              toast.warning('⚠️ Already Scanned', {
-                description: 'This QR code has already been scanned and received.',
-                duration: 3000,
-              });
-              return; // Skip processing entirely
-            }
-          }
+        }
+
+        if (alreadyScanned) {
+          return; // Skip processing entirely
         }
       } catch (quickCheckError) {
         console.warn('⚠️ Quick check failed (non-blocking):', quickCheckError);
@@ -730,83 +755,115 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
           console.log('🔄 RPC timed out - attempting direct REST API update as fallback...');
           
           try {
-            // Fallback: Direct REST API update
-            // First, find the material_item
-            const findItemResponse = await fetch(
-              `${SUPABASE_URL}/rest/v1/material_items?qr_code=eq.${encodeURIComponent(cleanQRCode)}&select=id,purchase_order_id,receive_scanned,dispatch_scanned&limit=1`,
-              {
-                headers: {
-                  'apikey': ANON_KEY,
-                  'Authorization': `Bearer ${accessToken}`,
-                  'Accept': 'application/json'
-                }
-              }
-            );
-            
-            if (findItemResponse.ok) {
-              const itemData = await findItemResponse.json();
-              if (itemData && itemData.length > 0 && !itemData[0].receive_scanned) {
-                const itemId = itemData[0].id;
-                const purchaseOrderId = itemData[0].purchase_order_id;
-                
-                // Update material_item directly
-                const updateItemResponse = await fetch(
-                  `${SUPABASE_URL}/rest/v1/material_items?id=eq.${itemId}`,
+            // Fallback: Direct REST API update with format variations
+            // Try different QR code formats to find the item
+            const qrVariations = [
+              cleanQRCode, // Original
+              cleanQRCode.replace(/^UJP-FILM-/, ''), // Remove UJP-FILM- prefix
+              cleanQRCode.replace(/^UJP-/, ''), // Remove UJP- prefix
+              cleanQRCode.match(/PO-\d{13,}-[A-Z0-9]+/)?.[0] || '', // Extract PO- format
+              cleanQRCode.match(/\d{13,}/)?.[0] || '', // Extract numeric part
+            ].filter(v => v && v !== '');
+
+            let foundItem: any = null;
+            let foundVariant = '';
+
+            // Try each variation
+            for (const variant of qrVariations) {
+              if (!variant) continue;
+              
+              try {
+                console.log(`🔄 Fallback: Trying QR code variant: ${variant.substring(0, 50)}...`);
+                const findItemResponse = await fetch(
+                  `${SUPABASE_URL}/rest/v1/material_items?qr_code=eq.${encodeURIComponent(variant)}&select=id,purchase_order_id,receive_scanned,dispatch_scanned,qr_code&limit=1`,
                   {
-                    method: 'PATCH',
                     headers: {
                       'apikey': ANON_KEY,
                       'Authorization': `Bearer ${accessToken}`,
-                      'Content-Type': 'application/json',
-                      'Prefer': 'return=representation'
-                    },
-                    body: JSON.stringify({
-                      receive_scanned: true,
-                      receive_scanned_at: new Date().toISOString(),
-                      status: 'received',
-                      updated_at: new Date().toISOString()
-                    })
+                      'Accept': 'application/json'
+                    }
                   }
                 );
                 
-                if (updateItemResponse.ok) {
-                  console.log('✅ Fallback: Direct REST API update successful');
-                  toast.success('✅ Item Received (via fallback)', {
-                    description: 'Scan processed using direct update method.',
-                    duration: 5000
-                  });
-                  
-                  // Create a mock rpcResult for the success flow
-                  rpcResult = {
-                    success: true,
-                    qr_code: cleanQRCode,
-                    receive_scanned: true,
-                    status: 'received',
-                    material_type: 'Material'
-                  };
-                  
-                  // Continue with success flow
-                  deliveryRequestUpdated = true;
-                } else {
-                  throw new Error('Fallback update failed');
+                if (findItemResponse.ok) {
+                  const itemData = await findItemResponse.json();
+                  if (itemData && itemData.length > 0) {
+                    foundItem = itemData[0];
+                    foundVariant = variant;
+                    console.log(`✅ Fallback: Found item with variant: ${variant.substring(0, 50)}...`);
+                    break;
+                  }
                 }
-              } else if (itemData && itemData.length > 0 && itemData[0].receive_scanned) {
+              } catch (variantError) {
+                console.log(`⚠️ Fallback: Variant ${variant.substring(0, 30)}... failed:`, variantError);
+                continue;
+              }
+            }
+            
+            if (foundItem) {
+              if (foundItem.receive_scanned) {
                 console.log('⏭️ Item already received - skipping');
                 toast.warning('⚠️ Already Scanned', {
                   description: 'This QR code has already been scanned.',
                   duration: 3000
                 });
                 return;
+              }
+              
+              const itemId = foundItem.id;
+              const purchaseOrderId = foundItem.purchase_order_id;
+              
+              // Update material_item directly
+              const updateItemResponse = await fetch(
+                `${SUPABASE_URL}/rest/v1/material_items?id=eq.${itemId}`,
+                {
+                  method: 'PATCH',
+                  headers: {
+                    'apikey': ANON_KEY,
+                    'Authorization': `Bearer ${accessToken}`,
+                    'Content-Type': 'application/json',
+                    'Prefer': 'return=representation'
+                  },
+                  body: JSON.stringify({
+                    receive_scanned: true,
+                    receive_scanned_at: new Date().toISOString(),
+                    status: 'received',
+                    updated_at: new Date().toISOString()
+                  })
+                }
+              );
+              
+              if (updateItemResponse.ok) {
+                console.log('✅ Fallback: Direct REST API update successful');
+                toast.success('✅ Item Received (via fallback)', {
+                  description: 'Scan processed using direct update method.',
+                  duration: 5000
+                });
+                
+                // Create a mock rpcResult for the success flow
+                rpcResult = {
+                  success: true,
+                  qr_code: foundItem.qr_code || foundVariant,
+                  receive_scanned: true,
+                  status: 'received',
+                  material_type: 'Material'
+                };
+                
+                // Continue with success flow
+                deliveryRequestUpdated = true;
               } else {
-                throw new Error('Item not found');
+                const errorText = await updateItemResponse.text();
+                console.error('❌ Fallback update failed:', errorText);
+                throw new Error('Fallback update failed');
               }
             } else {
-              throw new Error('Failed to find item');
+              console.error('❌ Fallback: Item not found with any QR code variation');
+              throw new Error('Item not found');
             }
           } catch (fallbackError: any) {
             console.error('❌ Fallback REST API update also failed:', fallbackError);
             toast.error('Request Timeout', {
-              description: 'The scan request took too long (30s). Please try again or contact support.',
+              description: 'The scan request took too long (30s). The RPC function may be slow. Please try again or contact support.',
               duration: 5000
             });
             return;
