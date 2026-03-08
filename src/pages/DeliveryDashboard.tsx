@@ -427,17 +427,45 @@ const DeliveryDashboard = () => {
             console.log('🚨 COMPONENT AGGRESSIVE: Found', uniqueAggressiveOrders.length, 'orders. Force-adding to deliveryHistory...');
             
             // Transform to history format
-            const aggressiveHistoryEntries: DeliveryHistory[] = uniqueAggressiveOrders.map((po: any) => ({
-              id: po.id || `aggressive-${po.po_number}`,
-              pickup_location: 'Supplier location',
-              delivery_location: po.delivery_address || 'Delivery location',
-              material_type: 'Construction Materials',
-              status: 'delivered',
-              completed_at: po.delivered_at || po.updated_at || po.created_at || new Date().toISOString(),
-              price: po.total_amount || 0,
-              rating: 0,
-              order_number: po.po_number || null
-            }));
+            const aggressiveHistoryEntries: DeliveryHistory[] = uniqueAggressiveOrders.map((po: any) => {
+              try {
+                // Ensure completed_at is a valid ISO string
+                let completedAt = new Date().toISOString();
+                if (po.delivered_at) {
+                  completedAt = new Date(po.delivered_at).toISOString();
+                } else if (po.updated_at) {
+                  completedAt = new Date(po.updated_at).toISOString();
+                } else if (po.created_at) {
+                  completedAt = new Date(po.created_at).toISOString();
+                }
+                
+                return {
+                  id: String(po.id || `aggressive-${po.po_number || 'unknown'}`),
+                  pickup_location: String('Supplier location'),
+                  delivery_location: String(po.delivery_address || 'Delivery location'),
+                  material_type: String('Construction Materials'),
+                  status: String('delivered'),
+                  completed_at: completedAt,
+                  price: Number(po.total_amount || 0),
+                  rating: 0,
+                  order_number: po.po_number ? String(po.po_number) : undefined
+                };
+              } catch (mapError: any) {
+                console.error('❌ COMPONENT AGGRESSIVE: Error mapping order:', po.po_number || po.id, mapError);
+                // Return a safe fallback
+                return {
+                  id: String(po.id || `aggressive-${Date.now()}`),
+                  pickup_location: 'Supplier location',
+                  delivery_location: 'Delivery location',
+                  material_type: 'Construction Materials',
+                  status: 'delivered',
+                  completed_at: new Date().toISOString(),
+                  price: 0,
+                  rating: 0,
+                  order_number: po.po_number ? String(po.po_number) : undefined
+                };
+              }
+            });
             
             // Check for duplicates before adding
             const existingIds = new Set(deliveryHistory.map(h => h.id));
@@ -453,11 +481,16 @@ const DeliveryDashboard = () => {
               console.log('✅ COMPONENT AGGRESSIVE: Force-adding', newEntries.length, 'orders to deliveryHistory');
               setDeliveryHistory(prev => {
                 const combined = [...prev, ...newEntries];
-                // Re-sort by date
+                // Re-sort by date (only use completed_at, not order_number)
                 combined.sort((a, b) => {
-                  const dateA = new Date(a.completed_at || a.order_number || '');
-                  const dateB = new Date(b.completed_at || b.order_number || '');
-                  return dateB.getTime() - dateA.getTime();
+                  try {
+                    const dateA = new Date(a.completed_at || 0);
+                    const dateB = new Date(b.completed_at || 0);
+                    return dateB.getTime() - dateA.getTime();
+                  } catch (sortError) {
+                    console.warn('⚠️ COMPONENT AGGRESSIVE: Sort error:', sortError);
+                    return 0;
+                  }
                 });
                 console.log('🚨🚨🚨 COMPONENT AGGRESSIVE: Final deliveryHistory count:', combined.length);
                 return combined;
