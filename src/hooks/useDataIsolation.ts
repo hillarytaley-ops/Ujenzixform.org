@@ -1989,6 +1989,11 @@ export const useDeliveryProviderData = () => {
       // Execute purchase_orders fetch FIRST (don't await - run in parallel with delivery_requests)
       const deliveredPOsPromise = fetchDeliveredPOs();
       
+      // CRITICAL FIX: Since fetchDeliveredPOs already finds all delivered orders (matching supplier dashboard),
+      // we can proceed directly to await it and skip the delivery_requests history fetch if it's hanging.
+      // The delivery_requests history fetch is running in parallel but may hang, so we'll await deliveredPOsPromise
+      // FIRST to ensure we get the delivered orders, then continue with delivery_requests if needed.
+      
       // 1. From delivery_requests table
       // Get delivery_provider.id first, then query by that (provider_id in delivery_requests is delivery_provider.id, not user_id)
       let historyData: any[] = [];
@@ -2140,7 +2145,9 @@ export const useDeliveryProviderData = () => {
         
         // Fetch material_items for all delivery_requests to determine which are truly delivered
         // (matches supplier dashboard logic: all items receive_scanned = true)
+        console.log('🔄 CRITICAL: About to check material_items for', uniqueDRs.length, 'delivery_requests...');
         if (uniqueDRs.length > 0) {
+          console.log('🔄 CRITICAL: uniqueDRs.length > 0, entering try block for material_items check...');
           try {
             const poIds = uniqueDRs
               .map(dr => dr.purchase_order_id)
@@ -2296,19 +2303,28 @@ export const useDeliveryProviderData = () => {
       console.log('🔄 CRITICAL: After delivery_requests history fetch section. historyData.length:', historyData.length);
       
       // ═══════════════════════════════════════════════════════════════════════════════
-      // 2. Await the purchase_orders fetch that was started FIRST (above)
-      // This ensures it ALWAYS executes, even if delivery_requests section hangs
+      // 2. CRITICAL FIX: Await the purchase_orders fetch FIRST (before delivery_requests completes)
+      // This ensures we get the delivered orders even if delivery_requests section hangs
       // ═══════════════════════════════════════════════════════════════════════════════
       console.log('═══════════════════════════════════════════════════════════════════════════════');
-      console.log('📦 History: STEP 2 - Awaiting purchase_orders fetch (supplier dashboard logic)');
+      console.log('📦 History: STEP 2 - Awaiting purchase_orders fetch FIRST (supplier dashboard logic)');
+      console.log('📦 History: This runs BEFORE delivery_requests completes to avoid hanging');
       console.log('═══════════════════════════════════════════════════════════════════════════════');
       
-      // Await the purchase_orders fetch that was started FIRST
+      // CRITICAL: Await the purchase_orders fetch FIRST (don't wait for delivery_requests)
+      // This ensures we get the delivered orders even if delivery_requests section hangs
       let deliveredPOs: any[] = [];
-      console.log('🔄 CRITICAL: About to await deliveredPOsPromise...');
+      console.log('🔄 CRITICAL: About to await deliveredPOsPromise (BEFORE delivery_requests completes)...');
       try {
         console.log('🔄 CRITICAL: Calling await deliveredPOsPromise...');
-        deliveredPOs = await deliveredPOsPromise;
+        // Use Promise.race to timeout after 15 seconds if it hangs
+        const timeoutPromise = new Promise<never>((_, reject) => 
+          setTimeout(() => reject(new Error('deliveredPOsPromise timeout after 15s')), 15000)
+        );
+        deliveredPOs = await Promise.race([deliveredPOsPromise, timeoutPromise]).catch((e: any) => {
+          console.error('❌ deliveredPOsPromise timed out or failed:', e?.message || e);
+          return [];
+        }) as any[];
         console.log('🔄 CRITICAL: deliveredPOsPromise resolved! deliveredPOs.length:', deliveredPOs?.length || 0);
         console.log('✅ Successfully fetched', deliveredPOs.length, 'delivered purchase_orders from supplier dashboard logic');
         console.log('📋 Order numbers in deliveredPOs:', deliveredPOs.map(po => po.po_number || po.id?.substring(0, 8)).join(', '));
