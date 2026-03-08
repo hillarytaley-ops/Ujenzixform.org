@@ -2320,9 +2320,10 @@ export const useDeliveryProviderData = () => {
       console.log('🔄 CRITICAL: About to await deliveredPOsPromise (BEFORE delivery_requests completes)...');
       try {
         console.log('🔄 CRITICAL: Calling await deliveredPOsPromise...');
-        // Use Promise.race to timeout after 15 seconds if it hangs
+        // Use Promise.race to timeout after 45 seconds if it hangs (increased to allow fallback REST API queries to complete)
+        // The fallback queries can take up to 5s each (9 queries = up to 45s), so we need a longer timeout
         const timeoutPromise = new Promise<never>((_, reject) => 
-          setTimeout(() => reject(new Error('deliveredPOsPromise timeout after 15s')), 15000)
+          setTimeout(() => reject(new Error('deliveredPOsPromise timeout after 45s')), 45000)
         );
         deliveredPOs = await Promise.race([deliveredPOsPromise, timeoutPromise]).catch((e: any) => {
           console.error('❌ deliveredPOsPromise timed out or failed:', e?.message || e);
