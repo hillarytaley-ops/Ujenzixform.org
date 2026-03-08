@@ -1248,7 +1248,6 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
           }
       } // End of rpcError catch block (REST API fallback)
       } // End of simpleRpcSucceeded else block (complex RPC + REST API fallback)
-    }
       
       // Success flow - use scanResult from either RPC or REST API
       if (!scanResult || scanResult.success !== true) {
