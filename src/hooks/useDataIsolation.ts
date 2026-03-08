@@ -1996,11 +1996,14 @@ export const useDeliveryProviderData = () => {
       
       // 1. From delivery_requests table
       // Get delivery_provider.id first, then query by that (provider_id in delivery_requests is delivery_provider.id, not user_id)
+      // CRITICAL: Wrap this in an async function so it runs in parallel and doesn't block awaiting deliveredPOsPromise
       let historyData: any[] = [];
       let historyError: any = null;
       
-      try {
-        console.log('📦 History: Starting delivery_requests history fetch...');
+      // Run delivery_requests fetch in parallel (don't await yet - we'll await deliveredPOsPromise first)
+      const deliveryRequestsHistoryPromise = (async () => {
+        try {
+          console.log('📦 History: Starting delivery_requests history fetch (running in parallel)...');
         // First, get the delivery_provider.id for this user with timeout
         let providerId: string | null = null;
         try {
