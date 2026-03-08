@@ -1,3 +1,5 @@
+// QR Receiving Scanner - Optimized for delivery providers
+// Last updated: March 8, 2026 - Fixed syntax errors and optimized RPC flow
 import React, { useRef, useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
