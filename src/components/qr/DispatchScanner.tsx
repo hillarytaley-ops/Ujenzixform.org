@@ -600,12 +600,57 @@ export const DispatchScanner: React.FC = () => {
           console.warn('⚠️ Could not get token from localStorage:', e);
         }
         
-        // Token is expired or missing, refresh it
+        // Token is expired or missing, try to refresh it
         try {
-          console.log('🔄 Refreshing session...');
+          // First, try to get refresh_token from localStorage
+          const stored = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+          let refreshToken: string | null = null;
+          if (stored) {
+            try {
+              const parsed = JSON.parse(stored);
+              refreshToken = parsed.refresh_token || null;
+            } catch {
+              // Ignore
+            }
+          }
+          
+          // Try refreshing with refresh_token if available
+          if (refreshToken) {
+            try {
+              console.log('🔄 Refreshing session with refresh_token...');
+              const { data: { session }, error: refreshError } = await withTimeout(
+                supabase.auth.refreshSession({ refresh_token: refreshToken }),
+                5000
+              );
+              
+              if (session?.access_token && !refreshError) {
+                // Update localStorage with fresh token
+                try {
+                  const sessionData = {
+                    access_token: session.access_token,
+                    refresh_token: session.refresh_token,
+                    expires_at: session.expires_at,
+                    expires_in: session.expires_in,
+                    token_type: session.token_type,
+                    user: session.user
+                  };
+                  localStorage.setItem('sb-wuuyjjpgzgeimiptuuws-auth-token', JSON.stringify(sessionData));
+                  console.log('✅ Token refreshed with refresh_token and saved to localStorage');
+                  return session.access_token;
+                } catch (e) {
+                  console.warn('⚠️ Could not save refreshed token to localStorage:', e);
+                }
+              }
+            } catch (refreshErr) {
+              console.warn('⚠️ Refresh with refresh_token failed:', refreshErr);
+            }
+          }
+          
+          // Fallback: try getSession (which might auto-refresh)
+          console.log('🔄 Trying getSession (auto-refresh)...');
           const { data: { session }, error: sessionError } = await withTimeout(
-            supabase.auth.getSession(), // This auto-refreshes expired tokens
-            5000 // Increased timeout for refresh
+            supabase.auth.getSession(),
+            5000
           );
           
           if (session?.access_token && !sessionError) {
@@ -620,12 +665,11 @@ export const DispatchScanner: React.FC = () => {
                 user: session.user
               };
               localStorage.setItem('sb-wuuyjjpgzgeimiptuuws-auth-token', JSON.stringify(sessionData));
-              console.log('✅ Token refreshed and saved to localStorage');
+              console.log('✅ Token refreshed via getSession and saved to localStorage');
+              return session.access_token;
             } catch (e) {
               console.warn('⚠️ Could not save refreshed token to localStorage:', e);
             }
-            
-            return session.access_token;
           } else {
             console.warn('⚠️ Session refresh failed:', sessionError);
           }
@@ -633,8 +677,21 @@ export const DispatchScanner: React.FC = () => {
           console.warn('⚠️ Error refreshing session:', e);
         }
         
-        // Final fallback: anon key
-        console.warn('⚠️ Using anon key as final fallback');
+        // Last resort: try using expired token anyway (sometimes it still works)
+        if (stored) {
+          try {
+            const parsed = JSON.parse(stored);
+            if (parsed.access_token) {
+              console.warn('⚠️ Using expired token as fallback (may fail due to RLS)');
+              return parsed.access_token;
+            }
+          } catch {
+            // Ignore
+          }
+        }
+        
+        // Final fallback: anon key (will likely fail due to RLS, but better than nothing)
+        console.warn('⚠️ Using anon key as final fallback (may return 0 results due to RLS)');
         return ANON_KEY;
       };
       
