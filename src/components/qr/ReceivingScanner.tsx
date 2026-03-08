@@ -557,16 +557,16 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
           try {
             const quickCheckResponse = await fetch(
               `${SUPABASE_URL}/rest/v1/material_items?qr_code=eq.${encodeURIComponent(variant)}&select=receive_scanned,status,id&limit=1`,
-              {
-                headers: {
-                  'apikey': ANON_KEY,
-                  'Authorization': `Bearer ${accessToken}`,
-                  'Accept': 'application/json',
-                  'Prefer': 'return=representation'
-                }
-              }
-            );
-            
+          {
+            headers: {
+              'apikey': ANON_KEY,
+              'Authorization': `Bearer ${accessToken}`,
+              'Accept': 'application/json',
+              'Prefer': 'return=representation'
+            }
+          }
+        );
+        
             if (quickCheckResponse.ok) {
               const quickCheckData = await quickCheckResponse.json();
               if (quickCheckData && quickCheckData.length > 0) {
@@ -705,11 +705,47 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
         const rpcElapsed = Date.now() - rpcStartTime;
         console.error(`⏱️ RPC failed after ${rpcElapsed}ms`);
         
-        // If RPC fails, try REST API as fallback (may fail due to RLS, but worth trying)
-        console.log('🔄 RPC failed - trying REST API as fallback...');
-        
-        // REST API fallback code (existing REST API logic)
+        // STRATEGIC FALLBACK: Try simplified RPC function first (faster, direct PO lookup)
+        console.log('🔄 Trying simplified RPC function (direct PO + item lookup)...');
+        let simpleRpcSucceeded = false;
         try {
+          const simpleRpcResult = await Promise.race([
+            supabase.rpc('record_qr_scan_simple', {
+              _qr_code: cleanQRCode,
+              _scan_type: 'receiving',
+              _scanner_device_id: deviceInfo || null,
+              _scanner_type: scannerType === 'mobile_camera' ? 'mobile_camera' : 'web_scanner',
+              _material_condition: materialCondition || 'good'
+            }),
+            new Promise((_, reject) => setTimeout(() => reject(new Error('Simple RPC timeout')), 10000))
+          ]);
+          
+          if (simpleRpcResult?.data?.success === true) {
+            console.log('✅ Simplified RPC succeeded!');
+            scanResult = {
+              success: true,
+              qrCode: simpleRpcResult.data.qr_code || cleanQRCode,
+              materialType: simpleRpcResult.data.material_type || 'Unknown',
+              message: 'Item received successfully',
+              scanEventId: simpleRpcResult.data.scan_event_id
+            };
+            deliveryRequestUpdated = true;
+            simpleRpcSucceeded = true;
+          }
+        } catch (simpleRpcError: any) {
+          console.log('⚠️ Simplified RPC also failed, trying REST API...', simpleRpcError.message);
+        }
+        
+        // If simple RPC succeeded, skip REST API
+        if (simpleRpcSucceeded) {
+          console.log('✅ Using simple RPC result, skipping REST API fallback');
+          // Continue to success flow below - scanResult is already set
+        } else {
+          // If RPC fails, try REST API as fallback (may fail due to RLS, but worth trying)
+          console.log('🔄 RPC failed - trying REST API as fallback...');
+        
+          // REST API fallback code (existing REST API logic)
+          try {
           // Try different QR code formats to find the item
           // Extract various parts of the QR code for flexible matching
           const numericPart = cleanQRCode.match(/\d{13,}/)?.[0] || '';
@@ -763,15 +799,15 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
             console.log(`🔍 REST API: Trying exact match: ${variant.substring(0, 50)}...`);
             const findItemResponse = await fetch(
               `${SUPABASE_URL}/rest/v1/material_items?qr_code=eq.${encodeURIComponent(variant)}&select=id,purchase_order_id,receive_scanned,dispatch_scanned,qr_code,material_type,quantity,unit&limit=1`,
-              {
-                headers: {
-                  'apikey': ANON_KEY,
-                  'Authorization': `Bearer ${accessToken}`,
-                  'Accept': 'application/json'
+                {
+                  headers: {
+                    'apikey': ANON_KEY,
+                    'Authorization': `Bearer ${accessToken}`,
+                    'Accept': 'application/json'
+                  }
                 }
-              }
-            );
-            
+              );
+              
             if (findItemResponse.ok) {
               const itemData = await findItemResponse.json();
               if (itemData && itemData.length > 0) {
@@ -779,8 +815,8 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
                 foundVariant = variant;
                 console.log(`✅ REST API: Found item with exact match: ${foundVariant.substring(0, 50)}...`);
                 console.log(`   Database QR code: ${foundItem.qr_code}`);
-                break;
-              }
+                  break;
+                }
             } else {
               const errorText = await findItemResponse.text();
               console.log(`⚠️ REST API: Query returned ${findItemResponse.status} for ${variant.substring(0, 30)}...`);
@@ -862,10 +898,10 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
               // First, find purchase_order by po_number
               const poResponse = await fetch(
                 `${SUPABASE_URL}/rest/v1/purchase_orders?po_number=ilike.*${encodeURIComponent(numericPart)}*&select=id,po_number&limit=10`,
-                {
-                  headers: {
-                    'apikey': ANON_KEY,
-                    'Authorization': `Bearer ${accessToken}`,
+              {
+                headers: {
+                  'apikey': ANON_KEY,
+                  'Authorization': `Bearer ${accessToken}`,
                     'Accept': 'application/json'
                   }
                 }
@@ -912,22 +948,22 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
         
         if (!foundItem) {
           console.error('❌ REST API: Item not found with any QR code variation or PO-based query');
-          toast.error('❓ QR Code Not Found', {
+        toast.error('❓ QR Code Not Found', {
             description: `"${cleanQRCode.substring(0, 30)}..." not in system. Please verify the QR code is correct.`,
-            duration: 8000
-          });
-          return;
-        }
-        
+          duration: 8000
+        });
+        return;
+      }
+      
         if (foundItem.receive_scanned) {
           console.log('⏭️ Item already received - skipping');
           toast.warning('⚠️ Already Scanned', {
             description: 'This QR code has already been scanned.',
             duration: 3000
-          });
-          return;
-        }
-        
+        });
+        return;
+      }
+      
         const itemId = foundItem.id;
         const purchaseOrderId = foundItem.purchase_order_id;
         
@@ -939,13 +975,13 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
             `${SUPABASE_URL}/rest/v1/qr_scan_events`,
             {
               method: 'POST',
-              headers: {
-                'apikey': ANON_KEY,
-                'Authorization': `Bearer ${accessToken}`,
-                'Content-Type': 'application/json',
-                'Prefer': 'return=representation'
-              },
-              body: JSON.stringify({
+          headers: {
+            'apikey': ANON_KEY,
+            'Authorization': `Bearer ${accessToken}`,
+            'Content-Type': 'application/json',
+            'Prefer': 'return=representation'
+          },
+          body: JSON.stringify({
                 qr_code: foundItem.qr_code || foundVariant,
                 scan_type: 'receiving',
                 scanner_device_id: deviceInfo || null,
@@ -955,10 +991,10 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
                 quantity_scanned: null,
                 notes: notes || null,
                 photo_url: null
-              })
-            }
-          );
-          
+          })
+        }
+      );
+      
           if (scanEventResponse.ok) {
             const scanEventData = await scanEventResponse.json();
             scanEventId = scanEventData[0]?.id || null;
@@ -1014,15 +1050,15 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
             // Get all items for this purchase order
             const allItemsResponse = await fetch(
               `${SUPABASE_URL}/rest/v1/material_items?purchase_order_id=eq.${purchaseOrderId}&select=id,receive_scanned&limit=1000`,
-              {
-                headers: {
-                  'apikey': ANON_KEY,
-                  'Authorization': `Bearer ${accessToken}`,
-                  'Accept': 'application/json'
-                }
+            {
+              headers: {
+                'apikey': ANON_KEY,
+                'Authorization': `Bearer ${accessToken}`,
+                'Accept': 'application/json'
               }
-            );
-            
+            }
+          );
+          
             if (allItemsResponse.ok) {
               const allItems = await allItemsResponse.json();
               const totalItems = allItems.length;
@@ -1038,20 +1074,20 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
                 try {
                   const updatePOResponse = await fetch(
                     `${SUPABASE_URL}/rest/v1/purchase_orders?id=eq.${purchaseOrderId}`,
-                    {
-                      method: 'PATCH',
-                      headers: {
-                        'apikey': ANON_KEY,
-                        'Authorization': `Bearer ${accessToken}`,
-                        'Content-Type': 'application/json'
-                      },
-                      body: JSON.stringify({
-                        status: 'delivered',
-                        updated_at: new Date().toISOString()
-                      })
-                    }
-                  );
-                  
+                {
+                  method: 'PATCH',
+                  headers: {
+                    'apikey': ANON_KEY,
+                    'Authorization': `Bearer ${accessToken}`,
+                    'Content-Type': 'application/json'
+                  },
+                  body: JSON.stringify({
+                    status: 'delivered',
+                    updated_at: new Date().toISOString()
+                  })
+                }
+              );
+              
                   if (updatePOResponse.ok) {
                     console.log('✅ REST API: Purchase order status updated to delivered');
                   }
@@ -1063,21 +1099,21 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
                 try {
                   const updateDRResponse = await fetch(
                     `${SUPABASE_URL}/rest/v1/delivery_requests?purchase_order_id=eq.${purchaseOrderId}`,
-                    {
-                      method: 'PATCH',
-                      headers: {
-                        'apikey': ANON_KEY,
-                        'Authorization': `Bearer ${accessToken}`,
-                        'Content-Type': 'application/json'
-                      },
-                      body: JSON.stringify({
-                        status: 'delivered',
+                {
+                  method: 'PATCH',
+                  headers: {
+                    'apikey': ANON_KEY,
+                    'Authorization': `Bearer ${accessToken}`,
+                    'Content-Type': 'application/json'
+                  },
+                  body: JSON.stringify({
+                    status: 'delivered',
                         delivered_at: new Date().toISOString(),
-                        updated_at: new Date().toISOString()
-                      })
-                    }
-                  );
-                  
+                    updated_at: new Date().toISOString()
+                  })
+                }
+              );
+              
                   if (updateDRResponse.ok) {
                     console.log('✅ REST API: Delivery request status updated to delivered');
                     deliveryRequestUpdated = true;
@@ -1150,10 +1186,12 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
           });
         }
         
-        } catch (restApiError: any) {
-          console.error('❌ REST API fallback also failed:', restApiError);
-          const restApiElapsed = Date.now() - rpcStartTime;
-          console.error(`⏱️ REST API fallback failed after ${restApiElapsed}ms`);
+          } catch (restApiError: any) {
+            console.error('❌ REST API fallback also failed:', restApiError);
+            const restApiElapsed = Date.now() - rpcStartTime;
+            console.error(`⏱️ REST API fallback failed after ${restApiElapsed}ms`);
+          }
+        } // End of simpleRpcSucceeded else block
           
           // Both RPC and REST API failed
           const errorMessage = restApiError?.message || rpcError?.message || 'Unknown error';
@@ -1215,12 +1253,12 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
         description: `${scanResult?.material_type || 'Material'} confirmed${scanResult?.is_invalidated ? ' (QR code invalidated)' : ''}`,
         duration: 5000
       });
-      
+
       // Reset form
       setManualQRCode('');
       setNotes('');
       
-        } catch (error) {
+    } catch (error) {
           const elapsed = Date.now() - startTime;
           console.error('❌ Scan processing error after', elapsed, 'ms:', error);
           console.error('❌ Error stack:', error instanceof Error ? error.stack : 'No stack trace');
@@ -1230,21 +1268,21 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
             qrCode: qrCode.substring(0, 50) + '...'
           });
           
-          const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-          if (errorMessage.includes('timeout') || errorMessage.includes('Timeout')) {
-            toast.error('Request Timeout', {
-              description: 'The scan request took too long. Please check your connection and try again.',
-              duration: 5000
-            });
-          } else {
-            toast.error('Failed to process scan', {
-              description: errorMessage,
-              duration: 5000
-            });
-          }
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      if (errorMessage.includes('timeout') || errorMessage.includes('Timeout')) {
+        toast.error('Request Timeout', {
+          description: 'The scan request took too long. Please check your connection and try again.',
+          duration: 5000
+        });
+      } else {
+        toast.error('Failed to process scan', {
+          description: errorMessage,
+          duration: 5000
+        });
+      }
           throw error; // Re-throw to be caught by outer catch
-        }
-      };
+    }
+  };
 
   const handleManualScan = () => {
     if (!manualQRCode.trim()) {
