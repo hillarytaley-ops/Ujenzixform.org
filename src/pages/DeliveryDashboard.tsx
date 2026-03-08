@@ -426,47 +426,57 @@ const DeliveryDashboard = () => {
           if (uniqueAggressiveOrders.length > 0) {
             console.log('🚨 COMPONENT AGGRESSIVE: Found', uniqueAggressiveOrders.length, 'orders. Force-adding to deliveryHistory...');
             
-            // Transform to history format - ULTRA-SIMPLIFIED to avoid minification errors
+            // Transform to history format - NO CONSTRUCTORS to avoid minification errors
             const aggressiveHistoryEntries: DeliveryHistory[] = [];
             for (let i = 0; i < uniqueAggressiveOrders.length; i++) {
               const po = uniqueAggressiveOrders[i];
               try {
-                // Get completed_at - use string directly if available, otherwise current time
+                // Get completed_at - use string directly, avoid String() constructor
                 let completedAt = '';
                 if (po.delivered_at) {
-                  completedAt = String(po.delivered_at);
+                  completedAt = po.delivered_at + '';
                 } else if (po.updated_at) {
-                  completedAt = String(po.updated_at);
+                  completedAt = po.updated_at + '';
                 } else if (po.created_at) {
-                  completedAt = String(po.created_at);
+                  completedAt = po.created_at + '';
                 } else {
-                  // Use current timestamp as ISO string
-                  const now = new Date();
-                  completedAt = now.toISOString();
+                  // Use current timestamp as ISO string - avoid new Date() if possible
+                  try {
+                    const now = new Date();
+                    completedAt = now.toISOString();
+                  } catch {
+                    completedAt = new Date().toISOString();
+                  }
                 }
                 
-                // Get price - simple type check
+                // Get price - avoid Number() constructor
                 let price = 0;
                 if (po.total_amount != null) {
                   if (typeof po.total_amount === 'number') {
                     price = po.total_amount;
                   } else {
-                    const num = Number(po.total_amount);
-                    price = isNaN(num) ? 0 : num;
+                    // Use unary + operator instead of Number()
+                    const num = +po.total_amount;
+                    price = (num === num) ? num : 0; // NaN check: NaN !== NaN
                   }
                 }
                 
-                // Build entry with minimal operations
+                // Build entry - NO String() or Number() constructors
+                const poId = po.id || '';
+                const poNumber = po.po_number || '';
+                const idValue = poId ? (poId + '') : ('aggressive-' + (poNumber || i) + '');
+                const deliveryAddr = po.delivery_address || 'Delivery location';
+                
                 const entry: DeliveryHistory = {
-                  id: String(po.id || `aggressive-${po.po_number || i}`),
+                  id: idValue,
                   pickup_location: 'Supplier location',
-                  delivery_location: String(po.delivery_address || 'Delivery location'),
+                  delivery_location: deliveryAddr + '',
                   material_type: 'Construction Materials',
                   status: 'delivered',
                   completed_at: completedAt,
                   price: price,
                   rating: 0,
-                  order_number: po.po_number ? String(po.po_number) : undefined
+                  order_number: poNumber ? (poNumber + '') : undefined
                 };
                 
                 aggressiveHistoryEntries.push(entry);
