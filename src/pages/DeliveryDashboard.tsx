@@ -426,45 +426,49 @@ const DeliveryDashboard = () => {
           if (uniqueAggressiveOrders.length > 0) {
             console.log('🚨 COMPONENT AGGRESSIVE: Found', uniqueAggressiveOrders.length, 'orders. Force-adding to deliveryHistory...');
             
-            // Transform to history format
+            // Transform to history format - SIMPLIFIED to avoid constructor errors
             const aggressiveHistoryEntries: DeliveryHistory[] = uniqueAggressiveOrders.map((po: any) => {
+              // Get completed_at safely
+              let completedAt = new Date().toISOString();
               try {
-                // Ensure completed_at is a valid ISO string
-                let completedAt = new Date().toISOString();
                 if (po.delivered_at) {
-                  completedAt = new Date(po.delivered_at).toISOString();
+                  const date = new Date(po.delivered_at);
+                  if (!isNaN(date.getTime())) completedAt = date.toISOString();
                 } else if (po.updated_at) {
-                  completedAt = new Date(po.updated_at).toISOString();
+                  const date = new Date(po.updated_at);
+                  if (!isNaN(date.getTime())) completedAt = date.toISOString();
                 } else if (po.created_at) {
-                  completedAt = new Date(po.created_at).toISOString();
+                  const date = new Date(po.created_at);
+                  if (!isNaN(date.getTime())) completedAt = date.toISOString();
                 }
-                
-                return {
-                  id: String(po.id || `aggressive-${po.po_number || 'unknown'}`),
-                  pickup_location: String('Supplier location'),
-                  delivery_location: String(po.delivery_address || 'Delivery location'),
-                  material_type: String('Construction Materials'),
-                  status: String('delivered'),
-                  completed_at: completedAt,
-                  price: Number(po.total_amount || 0),
-                  rating: 0,
-                  order_number: po.po_number ? String(po.po_number) : undefined
-                };
-              } catch (mapError: any) {
-                console.error('❌ COMPONENT AGGRESSIVE: Error mapping order:', po.po_number || po.id, mapError);
-                // Return a safe fallback
-                return {
-                  id: String(po.id || `aggressive-${Date.now()}`),
-                  pickup_location: 'Supplier location',
-                  delivery_location: 'Delivery location',
-                  material_type: 'Construction Materials',
-                  status: 'delivered',
-                  completed_at: new Date().toISOString(),
-                  price: 0,
-                  rating: 0,
-                  order_number: po.po_number ? String(po.po_number) : undefined
-                };
+              } catch (e) {
+                // Use default
               }
+              
+              // Get price safely
+              let price = 0;
+              try {
+                if (po.total_amount != null) {
+                  price = typeof po.total_amount === 'number' ? po.total_amount : parseFloat(po.total_amount) || 0;
+                }
+              } catch (e) {
+                // Use 0
+              }
+              
+              // Build object without using String/Number constructors
+              const entry: DeliveryHistory = {
+                id: (po.id || `aggressive-${po.po_number || Date.now()}`) + '',
+                pickup_location: 'Supplier location',
+                delivery_location: (po.delivery_address || 'Delivery location') + '',
+                material_type: 'Construction Materials',
+                status: 'delivered',
+                completed_at: completedAt,
+                price: price,
+                rating: 0,
+                order_number: po.po_number ? (po.po_number + '') : undefined
+              };
+              
+              return entry;
             });
             
             // Check for duplicates before adding
