@@ -39,22 +39,93 @@ DECLARE
   is_invalidated_value BOOLEAN;
   delivery_request_id UUID;
   v_all_items_received BOOLEAN;
+  qr_variations TEXT[];
+  qr_variant TEXT;
+  po_number_match TEXT;
+  item_number_match TEXT;
+  found_via_variant BOOLEAN := FALSE;
 BEGIN
   current_user_id := auth.uid();
   
-  -- Verify QR code exists (use LIMIT 1 for better performance)
+  -- AGGRESSIVE: Try exact match first
   SELECT * INTO item_record
   FROM material_items
   WHERE qr_code = _qr_code
   LIMIT 1;
   
+  -- If not found, try format variations
   IF NOT FOUND THEN
-    RETURN jsonb_build_object(
-      'success', false,
-      'error', 'QR code not found. This code may be invalid or expired.',
-      'error_code', 'QR_NOT_FOUND',
-      'qr_code', _qr_code
-    );
+    -- Extract potential PO number and item number from QR code
+    -- Format: UJP-FILM-PO-1772597930676-IATLA-ITEM001-UNIT001-20260307-5021
+    -- Try to extract: PO number (1772597930676) and ITEM number (ITEM001)
+    po_number_match := (regexp_match(_qr_code, 'PO-(\d{13,})'))[1];
+    item_number_match := (regexp_match(_qr_code, 'ITEM(\d+)'))[1];
+    
+    -- Build QR code variations to try
+    qr_variations := ARRAY[
+      _qr_code, -- Original
+      regexp_replace(_qr_code, '^UJP-FILM-', ''), -- Remove UJP-FILM- prefix
+      regexp_replace(_qr_code, '^UJP-', ''), -- Remove UJP- prefix
+      (regexp_match(_qr_code, 'PO-\d{13,}-[A-Z0-9-]+'))[0], -- Extract PO- format
+      CASE WHEN po_number_match IS NOT NULL THEN 'PO-' || po_number_match END,
+      CASE WHEN po_number_match IS NOT NULL THEN po_number_match END
+    ];
+    
+    -- Try each variation
+    FOREACH qr_variant IN ARRAY qr_variations
+    LOOP
+      IF qr_variant IS NOT NULL AND qr_variant != '' THEN
+        SELECT * INTO item_record
+        FROM material_items
+        WHERE qr_code = qr_variant
+        LIMIT 1;
+        
+        IF FOUND THEN
+          found_via_variant := TRUE;
+          EXIT; -- Found it!
+        END IF;
+      END IF;
+    END LOOP;
+    
+    -- If still not found, try matching by PO number + item number
+    IF NOT found_via_variant AND po_number_match IS NOT NULL AND item_number_match IS NOT NULL THEN
+      SELECT mi.* INTO item_record
+      FROM material_items mi
+      JOIN purchase_orders po ON po.id = mi.purchase_order_id
+      WHERE po.po_number LIKE '%' || po_number_match || '%'
+        AND mi.item_sequence = (item_number_match::INTEGER)
+      LIMIT 1;
+      
+      IF FOUND THEN
+        found_via_variant := TRUE;
+      END IF;
+    END IF;
+    
+    -- If still not found, try pattern matching on QR code
+    IF NOT found_via_variant AND po_number_match IS NOT NULL THEN
+      SELECT * INTO item_record
+      FROM material_items
+      WHERE qr_code LIKE '%' || po_number_match || '%'
+         OR (item_number_match IS NOT NULL AND qr_code LIKE '%ITEM' || item_number_match || '%')
+      LIMIT 1;
+      
+      IF FOUND THEN
+        found_via_variant := TRUE;
+      END IF;
+    END IF;
+    
+    -- Final check: if still not found, return error
+    IF NOT found_via_variant THEN
+      RETURN jsonb_build_object(
+        'success', false,
+        'error', 'QR code not found. This code may be invalid or expired. Tried multiple format variations.',
+        'error_code', 'QR_NOT_FOUND',
+        'qr_code', _qr_code,
+        'tried_variations', array_length(qr_variations, 1),
+        'po_number_extracted', po_number_match,
+        'item_number_extracted', item_number_match
+      );
+    END IF;
   END IF;
   
   -- Store the purchase_order_id for later use
@@ -125,7 +196,7 @@ BEGIN
     END IF;
   END IF;
   
-  -- Insert scan event
+  -- Insert scan event (use database QR code, not scanned one, for consistency)
   INSERT INTO qr_scan_events (
     qr_code,
     scan_type,
@@ -138,7 +209,7 @@ BEGIN
     notes,
     photo_url
   ) VALUES (
-    _qr_code,
+    item_record.qr_code,
     _scan_type,
     current_user_id,
     _scanner_device_id,
@@ -159,7 +230,7 @@ BEGIN
         dispatch_scanned_at = NOW(),
         dispatch_scanned_by = current_user_id,
         updated_at = NOW()
-    WHERE qr_code = _qr_code;
+    WHERE id = item_record.id;
     
     -- Update purchase_order status to 'dispatched'
     IF order_id IS NOT NULL THEN
@@ -209,7 +280,7 @@ BEGIN
         receive_scanned_at = NOW(),
         receive_scanned_by = current_user_id,
         updated_at = NOW()
-    WHERE qr_code = _qr_code;
+    WHERE id = item_record.id;
     
     -- Auto-invalidate if both dispatch and receive are done
     -- OPTIMIZED: Use direct UPDATE with conditional column instead of checking information_schema
@@ -218,14 +289,14 @@ BEGIN
       SET is_invalidated = TRUE,
           invalidated_at = NOW(),
           status = 'verified'
-      WHERE qr_code = _qr_code
+      WHERE id = item_record.id
         AND dispatch_scanned = TRUE
         AND receive_scanned = TRUE;
     EXCEPTION WHEN undefined_column THEN
       -- Column doesn't exist, just update status
       UPDATE material_items
       SET status = 'verified'
-      WHERE qr_code = _qr_code
+      WHERE id = item_record.id
         AND dispatch_scanned = TRUE
         AND receive_scanned = TRUE;
     END;
@@ -274,10 +345,10 @@ BEGIN
     WHERE qr_code = _qr_code;
   END IF;
   
-  -- Refresh item record to get updated values (use LIMIT 1 for performance)
+  -- Refresh item record to get updated values (use item ID for performance)
   SELECT * INTO item_record
   FROM material_items
-  WHERE qr_code = _qr_code
+  WHERE id = item_record.id
   LIMIT 1;
   
   -- Return success with item details

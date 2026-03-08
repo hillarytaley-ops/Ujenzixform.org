@@ -851,8 +851,67 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
           }
         }
         
+        // AGGRESSIVE: If still not found, try querying by purchase_order_id and item_sequence
+        if (!foundItem && numericPart && itemPart) {
+          try {
+            const itemSeqMatch = itemPart.match(/\d+/)?.[0];
+            if (itemSeqMatch) {
+              console.log(`🔍 REST API: Trying query by PO number and item sequence...`);
+              console.log(`   PO number: ${numericPart}, Item sequence: ${itemSeqMatch}`);
+              
+              // First, find purchase_order by po_number
+              const poResponse = await fetch(
+                `${SUPABASE_URL}/rest/v1/purchase_orders?po_number=ilike.*${encodeURIComponent(numericPart)}*&select=id,po_number&limit=10`,
+                {
+                  headers: {
+                    'apikey': ANON_KEY,
+                    'Authorization': `Bearer ${accessToken}`,
+                    'Accept': 'application/json'
+                  }
+                }
+              );
+              
+              if (poResponse.ok) {
+                const poData = await poResponse.json();
+                console.log(`📊 REST API: Found ${poData.length} purchase orders matching PO number`);
+                
+                if (poData && poData.length > 0) {
+                  // Try each purchase order
+                  for (const po of poData) {
+                    const itemSeq = parseInt(itemSeqMatch, 10);
+                    const itemResponse = await fetch(
+                      `${SUPABASE_URL}/rest/v1/material_items?purchase_order_id=eq.${po.id}&item_sequence=eq.${itemSeq}&select=id,purchase_order_id,receive_scanned,dispatch_scanned,qr_code,material_type,quantity,unit&limit=1`,
+                      {
+                        headers: {
+                          'apikey': ANON_KEY,
+                          'Authorization': `Bearer ${accessToken}`,
+                          'Accept': 'application/json'
+                        }
+                      }
+                    );
+                    
+                    if (itemResponse.ok) {
+                      const itemData = await itemResponse.json();
+                      if (itemData && itemData.length > 0) {
+                        foundItem = itemData[0];
+                        foundVariant = foundItem.qr_code;
+                        console.log(`✅ REST API: Found item by PO ID + item sequence!`);
+                        console.log(`   Database QR code: ${foundItem.qr_code}`);
+                        console.log(`   Scanned QR code: ${cleanQRCode.substring(0, 50)}...`);
+                        break;
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          } catch (poQueryError) {
+            console.warn('⚠️ REST API: PO-based query failed:', poQueryError);
+          }
+        }
+        
         if (!foundItem) {
-          console.error('❌ REST API: Item not found with any QR code variation');
+          console.error('❌ REST API: Item not found with any QR code variation or PO-based query');
           toast.error('❓ QR Code Not Found', {
             description: `"${cleanQRCode.substring(0, 30)}..." not in system. Please verify the QR code is correct.`,
             duration: 8000
