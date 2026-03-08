@@ -543,9 +543,9 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
       let deliveryRequestUpdated = false;
       
       try {
-        // Call the RPC function with timeout
+        // Call the RPC function with timeout (increased to 30 seconds for better reliability)
         const rpcController = new AbortController();
-        const rpcTimeoutId = setTimeout(() => rpcController.abort(), 15000); // 15 second timeout
+        const rpcTimeoutId = setTimeout(() => rpcController.abort(), 30000); // 30 second timeout
         
         const rpcPromise = supabase.rpc('record_qr_scan', {
           _qr_code: cleanQRCode,
@@ -560,7 +560,7 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
         });
         
         const rpcTimeoutPromise = new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error('RPC timeout after 15 seconds')), 15000)
+          setTimeout(() => reject(new Error('RPC timeout after 30 seconds')), 30000)
         );
         
         const { data, error } = await Promise.race([
@@ -686,7 +686,7 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
         
         if (rpcError?.message?.includes('timeout') || rpcError?.name === 'AbortError') {
           toast.error('Request Timeout', {
-            description: 'The scan request took too long. Please check your connection and try again.',
+            description: 'The scan request took too long (30s). The database may be slow. Please try again.',
             duration: 5000
           });
         } else {
