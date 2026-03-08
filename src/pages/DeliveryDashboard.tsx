@@ -426,50 +426,55 @@ const DeliveryDashboard = () => {
           if (uniqueAggressiveOrders.length > 0) {
             console.log('🚨 COMPONENT AGGRESSIVE: Found', uniqueAggressiveOrders.length, 'orders. Force-adding to deliveryHistory...');
             
-            // Transform to history format - SIMPLIFIED to avoid constructor errors
-            const aggressiveHistoryEntries: DeliveryHistory[] = uniqueAggressiveOrders.map((po: any) => {
-              // Get completed_at safely
-              let completedAt = new Date().toISOString();
+            // Transform to history format - ULTRA-SIMPLIFIED to avoid minification errors
+            const aggressiveHistoryEntries: DeliveryHistory[] = [];
+            for (let i = 0; i < uniqueAggressiveOrders.length; i++) {
+              const po = uniqueAggressiveOrders[i];
               try {
+                // Get completed_at - use string directly if available, otherwise current time
+                let completedAt = '';
                 if (po.delivered_at) {
-                  const date = new Date(po.delivered_at);
-                  if (!isNaN(date.getTime())) completedAt = date.toISOString();
+                  completedAt = String(po.delivered_at);
                 } else if (po.updated_at) {
-                  const date = new Date(po.updated_at);
-                  if (!isNaN(date.getTime())) completedAt = date.toISOString();
+                  completedAt = String(po.updated_at);
                 } else if (po.created_at) {
-                  const date = new Date(po.created_at);
-                  if (!isNaN(date.getTime())) completedAt = date.toISOString();
+                  completedAt = String(po.created_at);
+                } else {
+                  // Use current timestamp as ISO string
+                  const now = new Date();
+                  completedAt = now.toISOString();
                 }
-              } catch (e) {
-                // Use default
-              }
-              
-              // Get price safely
-              let price = 0;
-              try {
+                
+                // Get price - simple type check
+                let price = 0;
                 if (po.total_amount != null) {
-                  price = typeof po.total_amount === 'number' ? po.total_amount : parseFloat(po.total_amount) || 0;
+                  if (typeof po.total_amount === 'number') {
+                    price = po.total_amount;
+                  } else {
+                    const num = Number(po.total_amount);
+                    price = isNaN(num) ? 0 : num;
+                  }
                 }
-              } catch (e) {
-                // Use 0
+                
+                // Build entry with minimal operations
+                const entry: DeliveryHistory = {
+                  id: String(po.id || `aggressive-${po.po_number || i}`),
+                  pickup_location: 'Supplier location',
+                  delivery_location: String(po.delivery_address || 'Delivery location'),
+                  material_type: 'Construction Materials',
+                  status: 'delivered',
+                  completed_at: completedAt,
+                  price: price,
+                  rating: 0,
+                  order_number: po.po_number ? String(po.po_number) : undefined
+                };
+                
+                aggressiveHistoryEntries.push(entry);
+              } catch (mapError: any) {
+                console.error('❌ COMPONENT AGGRESSIVE: Error mapping order:', po?.po_number || po?.id, mapError);
+                // Skip this entry on error
               }
-              
-              // Build object without using String/Number constructors
-              const entry: DeliveryHistory = {
-                id: (po.id || `aggressive-${po.po_number || Date.now()}`) + '',
-                pickup_location: 'Supplier location',
-                delivery_location: (po.delivery_address || 'Delivery location') + '',
-                material_type: 'Construction Materials',
-                status: 'delivered',
-                completed_at: completedAt,
-                price: price,
-                rating: 0,
-                order_number: po.po_number ? (po.po_number + '') : undefined
-              };
-              
-              return entry;
-            });
+            }
             
             // Check for duplicates before adding
             const existingIds = new Set(deliveryHistory.map(h => h.id));
