@@ -2127,8 +2127,11 @@ export const useDeliveryProviderData = () => {
         }
         
         // Execute all queries in parallel and merge results
+        console.log('🔄 CRITICAL: About to execute', queries.length, 'delivery_requests history queries in parallel...');
         const results = await Promise.all(queries);
+        console.log('🔄 CRITICAL: delivery_requests history queries completed. Results count:', results.length);
         const allDeliveryRequests = results.flat();
+        console.log('🔄 CRITICAL: Flattened delivery_requests:', allDeliveryRequests.length);
         
         // Remove duplicates
         const uniqueDRs = Array.from(
@@ -2280,14 +2283,17 @@ export const useDeliveryProviderData = () => {
         
         console.log('📦 Final delivery_requests history count:', historyData.length);
         console.log('📋 History order numbers:', historyData.map(dr => dr.order_number || dr.po_number || 'N/A').filter(n => n !== 'N/A'));
+        console.log('🔄 CRITICAL: delivery_requests history fetch section COMPLETED successfully');
       } catch (e) {
         historyError = e;
         console.error('❌ Error fetching delivery history:', e);
+        console.log('🔄 CRITICAL: delivery_requests history fetch section FAILED with error');
       }
 
       if (historyError) {
         console.warn('Error fetching delivery history from delivery_requests:', historyError);
       }
+      console.log('🔄 CRITICAL: After delivery_requests history fetch section. historyData.length:', historyData.length);
       
       // ═══════════════════════════════════════════════════════════════════════════════
       // 2. Await the purchase_orders fetch that was started FIRST (above)
