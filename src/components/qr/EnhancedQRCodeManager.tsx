@@ -893,11 +893,11 @@ export const EnhancedQRCodeManager: React.FC<EnhancedQRCodeManagerProps> = ({ su
       if (allItemsReceived) {
         // All items received = delivered
         delivered.push(group);
-      } else if (allItemsDispatched && hasReceivedItems) {
-        // All dispatched, some received = in transit
+      } else if (allItemsDispatched) {
+        // All items dispatched (whether or not any received yet) = in transit
         inTransit.push(group);
       } else if (hasDispatchedItems) {
-        // Some or all dispatched, none received = dispatched
+        // Some but not all items dispatched = dispatched (partial)
         dispatched.push(group);
       } else {
         // No items dispatched = awaiting dispatch

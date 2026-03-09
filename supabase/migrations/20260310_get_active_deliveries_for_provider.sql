@@ -11,7 +11,7 @@ RETURNS JSONB
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = public
-AS $$
+AS $fn$
 DECLARE
   v_provider_id UUID;
   v_result JSONB := '[]'::JSONB;
@@ -125,7 +125,7 @@ BEGIN
   
   RETURN COALESCE(v_result, '[]'::JSONB);
 END;
-$$;
+$fn$;
 
 GRANT EXECUTE ON FUNCTION public.get_active_deliveries_for_provider() TO authenticated;
 
@@ -139,7 +139,7 @@ RETURNS JSONB
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = public
-AS $$
+AS $dbg$
 DECLARE
   v_provider_id UUID;
   v_dr_count INT;
@@ -182,5 +182,5 @@ BEGIN
     'provider_found', v_provider_id IS NOT NULL
   );
 END;
-$$;
+$dbg$;
 GRANT EXECUTE ON FUNCTION public.debug_provider_deliveries() TO authenticated;
