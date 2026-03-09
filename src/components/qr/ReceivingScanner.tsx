@@ -213,7 +213,7 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
 
       // Adjust scanner config based on device type
       // Desktop/laptop webcams need different settings than mobile cameras
-      const qrboxSize = isMobile ? { width: 250, height: 250 } : { width: 300, height: 300 };
+      const qrboxSize = isMobile ? { width: 200, height: 200 } : { width: 250, height: 250 };
       const scannerFps = isMobile ? 10 : 15; // Higher FPS for desktop
       
       const scannerConfig = {
@@ -1435,13 +1435,13 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
             </Alert>
           )}
           
-          {/* Camera View - html5-qrcode creates its own video element */}
-          <div className="relative bg-black rounded-lg overflow-hidden" style={{ minHeight: isMobile ? '300px' : '400px' }}>
+          {/* Camera View - compact standard scan size (max 400px wide, ~260px tall) */}
+          <div className="relative bg-black rounded-lg overflow-hidden mx-auto" style={{ maxWidth: '400px', height: isMobile ? '240px' : '280px' }}>
             {/* Scanner container - html5-qrcode will render here */}
             <div 
               id={scannerContainerId} 
-              className="w-full"
-              style={{ minHeight: isMobile ? '300px' : '400px' }}
+              className="w-full h-full"
+              style={{ height: isMobile ? '240px' : '280px' }}
             />
             
             {/* Scanning Frame Overlay - helps users position QR code */}
@@ -1451,10 +1451,10 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
                 <div 
                   className="relative"
                   style={{ 
-                    width: 'min(80%, 350px)', 
-                    height: 'min(70%, 350px)',
-                    minWidth: '200px',
-                    minHeight: '200px'
+                    width: 'min(90%, 280px)', 
+                    height: 'min(85%, 240px)',
+                    minWidth: '180px',
+                    minHeight: '160px'
                   }}
                 >
                   {/* Corner brackets - using larger sizes */}
