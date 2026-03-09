@@ -2024,11 +2024,11 @@ const DeliveryDashboard = () => {
                     </div>
                     <ReceivingScanner 
                       onDeliveryComplete={async (orderCompleted) => {
-                        // CRITICAL: Wait for database update to propagate first
+                        // Provider Delivered = Supplier Delivered (material_items.receive_scanned)
                         console.log('🔄 Delivery scan complete - orderCompleted:', orderCompleted);
-                        await new Promise(resolve => setTimeout(resolve, 1500));
+                        await new Promise(resolve => setTimeout(resolve, 800));
                         
-                        // Only switch to Delivered tab when full order is complete (avoids confusion for multi-item orders)
+                        // Switch to Delivered tab when full order complete (aligns with supplier QR tab)
                         if (orderCompleted) {
                           console.log('🔄 Full order delivered - switching to Delivered tab');
                           setActiveTab('deliveries');
@@ -2044,11 +2044,11 @@ const DeliveryDashboard = () => {
                           try {
                             console.log(`🔄 Refreshing data (attempt ${9 - retries}/8)...`);
                             
-                            // Force a complete refresh
+                            // Force complete refresh (material_items drives Provider↔Supplier sync)
                             await refetchData();
                             
-                            // Wait for data processing and categorization
-                            await new Promise(resolve => setTimeout(resolve, 1500)); // Longer wait for categorization
+                            // Brief wait for categorization to complete
+                            await new Promise(resolve => setTimeout(resolve, 800));
                             
                             // Verify data was refreshed by checking if we're still on the delivered tab
                             // (This ensures the component has re-rendered with new data)

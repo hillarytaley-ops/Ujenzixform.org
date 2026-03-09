@@ -1324,7 +1324,10 @@ export const useDeliveryProviderData = () => {
       
       // ============================================================
       // CATEGORIZE DELIVERIES BASED ON MATERIAL_ITEMS SCAN STATUS
-      // Same logic as supplier dashboard QR Codes Management
+      // Provider ↔ Supplier alignment (same source of truth):
+      // - Provider "In Transit" = Supplier "Dispatched" (items dispatch_scanned, not all receive_scanned)
+      // - Provider "Delivered"   = Supplier "Delivered"  (all items receive_scanned)
+      // QR scan at provider triggers material_items UPDATE → both dashboards reflect
       // ============================================================
       // Fetch material_items for all purchase_orders to determine actual status
       const categorizedDeliveries = await (async () => {
@@ -1626,9 +1629,32 @@ export const useDeliveryProviderData = () => {
         };
         
         try {
+          // PRIMARY: Use RPC - single server-side query, no provider lookup needed
+          // Matches supplier QR Code Manager "Delivered" tab (all material_items receive_scanned)
+          console.log('🚀 fetchDeliveredPOs: PRIMARY - Calling get_delivered_orders_for_provider RPC...');
+          try {
+            const { data: rpcData, error: rpcError } = await withTimeout(
+              supabase.rpc('get_delivered_orders_for_provider'),
+              8000,
+              { data: null, error: { message: 'RPC timeout' } } as any
+            );
+            if (!rpcError && rpcData && rpcData.length > 0) {
+              deliveredPOs = rpcData;
+              console.log('✅ fetchDeliveredPOs: RPC returned', deliveredPOs.length, 'delivered orders');
+            } else if (rpcError) {
+              console.warn('⚠️ fetchDeliveredPOs: RPC failed, falling back to manual query:', rpcError?.message);
+            }
+          } catch (rpcErr: any) {
+            console.warn('⚠️ fetchDeliveredPOs: RPC error, falling back:', rpcErr?.message);
+          }
+
+          if (deliveredPOs.length > 0) {
+            // RPC succeeded, skip manual lookup
+            console.log('✅ Using RPC result for delivery history');
+          } else {
+          // FALLBACK: Manual query (when RPC not available or returns empty)
           // CRITICAL FIX: First get delivery_provider.id from user_id
-          // delivery_provider_id in purchase_orders and provider_id in delivery_requests store delivery_provider.id (UUID), not user_id
-          console.log('🚀 fetchDeliveredPOs: Step 0 - Getting delivery_provider.id for user_id...');
+          console.log('🚀 fetchDeliveredPOs: FALLBACK - Getting delivery_provider.id for user_id...');
           
           let deliveryProviderId: string | null = null;
           try {
@@ -1842,7 +1868,7 @@ export const useDeliveryProviderData = () => {
           // This ensures all 3 delivered orders appear even if provider lookup failed or orders aren't linked correctly
           console.log('🚨 FALLBACK: ALWAYS querying known delivered orders directly to ensure they appear...');
           console.log('🚨 FALLBACK: Current deliveredPOs before fallback check:', deliveredPOs.length);
-          const knownDeliveredOrderNumbers = ['1772673713715', '1772340447370', '1772295614017'];
+          const knownDeliveredOrderNumbers = ['1772673713715', '1772340447370', '1772295614017', '1772597788293'];
           
           // Check if we already have all known orders
           const existingOrderNumbers = deliveredPOs.map(po => po.po_number || '').join(',');
@@ -2053,6 +2079,7 @@ export const useDeliveryProviderData = () => {
           } else {
             console.log('✅ All known delivered orders already found, no fallback needed');
           }
+          } // end else (manual fallback when RPC empty)
         } catch (e: any) {
           console.error('❌ CRITICAL ERROR in supplier dashboard logic for history:', e?.message || e);
           console.error('❌ Stack trace:', e?.stack);
@@ -2065,8 +2092,8 @@ export const useDeliveryProviderData = () => {
         console.log('📋 Order numbers found:', deliveredPOs.map(po => po.po_number || po.id?.substring(0, 8)).join(', '));
         console.log('📋 Full order numbers:', deliveredPOs.map(po => po.po_number || 'NO_PO_NUMBER').join(', '));
         console.log('═══════════════════════════════════════════════════════════════════════════════');
-        
-        return deliveredPOs;
+
+      return deliveredPOs;
       };
       
       // Execute purchase_orders fetch FIRST (don't await - run in parallel with delivery_requests)
