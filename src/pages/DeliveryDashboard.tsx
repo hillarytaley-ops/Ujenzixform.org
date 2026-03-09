@@ -151,6 +151,7 @@ const DeliveryDashboard = () => {
   const [showProfileView, setShowProfileView] = useState(false);
   const [selectedDeliveryForScan, setSelectedDeliveryForScan] = useState<string | null>(null);
   const [showArrivalScanner, setShowArrivalScanner] = useState(false);
+  const [linkingDeliveries, setLinkingDeliveries] = useState(false);
   const [notificationCount, setNotificationCount] = useState(0);
   const [pendingNotificationCount, setPendingNotificationCount] = useState(0);
   const acceptingDeliveryRef = useRef<string | null>(null); // Prevent double-clicks on Accept
@@ -1413,33 +1414,41 @@ const DeliveryDashboard = () => {
                   <span>Delivered</span>
                 </div>
                 <Button
+                  type="button"
                   variant="outline"
                   size="sm"
                   className="shrink-0 text-xs"
+                  disabled={linkingDeliveries}
                   title="If an In Transit or Scheduled order is missing, click to link it to your provider account"
                   onClick={async () => {
+                    setLinkingDeliveries(true);
                     try {
                       const { data, error } = await (supabase as any).rpc('link_my_deliveries_to_provider_id');
+                      const errMsg = error?.message || (error && String(error));
                       if (error) {
-                        toast({ title: 'Link failed', description: error.message, variant: 'destructive' });
+                        console.warn('link_my_deliveries_to_provider_id error:', error);
+                        toast({ title: 'Link failed', description: errMsg || 'RPC error. Run migration 20260322_link_deliveries_by_delivery_provider_id.sql in Supabase.', variant: 'destructive' });
                         return;
                       }
-                      const res = data as { success?: boolean; message?: string; updated_dr?: number; updated_po?: number };
-                      if (res?.success && (res?.updated_dr > 0 || res?.updated_po > 0)) {
+                      const res = (data != null ? data : {}) as { success?: boolean; message?: string; updated_dr?: number; updated_po?: number };
+                      if (res?.success && ((res?.updated_dr ?? 0) > 0 || (res?.updated_po ?? 0) > 0)) {
                         toast({ title: 'Links updated', description: res.message || 'Your deliveries are now linked. Refreshing…' });
                         await refetchData();
                       } else if (res?.success) {
-                        toast({ title: 'Already linked', description: 'All your deliveries are already linked.' });
+                        toast({ title: 'Already linked', description: res?.message || 'All your deliveries are already linked.' });
                       } else {
-                        toast({ title: 'Could not link', description: res?.message || 'No provider account found.' });
+                        toast({ title: 'Could not link', description: res?.message || 'No provider account found. Register as a delivery provider first.' });
                       }
                     } catch (e: any) {
+                      console.error('Link my deliveries error:', e);
                       toast({ title: 'Error', description: e?.message || 'Failed to link deliveries', variant: 'destructive' });
+                    } finally {
+                      setLinkingDeliveries(false);
                     }
                   }}
                 >
-                  <Link2 className="h-3.5 w-3.5 mr-1" />
-                  Link my deliveries
+                  {linkingDeliveries ? <RefreshCw className="h-3.5 w-3.5 mr-1 animate-spin" /> : <Link2 className="h-3.5 w-3.5 mr-1" />}
+                  {linkingDeliveries ? 'Linking…' : 'Link my deliveries'}
                 </Button>
               </div>
               {/* Sub-tabs for Deliveries - Only accepted jobs */}
