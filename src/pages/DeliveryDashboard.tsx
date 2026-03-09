@@ -618,10 +618,12 @@ const DeliveryDashboard = () => {
         },
         (payload) => {
           const newRow = payload.new as { receive_scanned?: boolean; dispatch_scanned?: boolean };
-          // Provider receives scan → move to Delivered tab
+          // Provider receives scan → move to Delivered tab after refetch
           if (newRow?.receive_scanned === true) {
             console.log('📦 material_items receive_scanned=true - will refetch (Scheduled/In Transit → Delivered)');
             debouncedRefetchFromMaterialItems();
+            setActiveTab('deliveries');
+            setDeliveriesSubTab('delivered');
           }
           // Supplier dispatches scan → move to In Transit tab (from Scheduled)
           if (newRow?.dispatch_scanned === true) {
