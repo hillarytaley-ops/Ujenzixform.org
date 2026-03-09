@@ -41,7 +41,8 @@ import {
   Zap,
   Headphones,
   LogOut,
-  X
+  X,
+  ChevronRight
 } from "lucide-react";
 import { DeliveryCharts } from "@/components/delivery/DeliveryCharts";
 import { DeliveryMap } from "@/components/delivery/DeliveryMap";
@@ -615,10 +616,23 @@ const DeliveryDashboard = () => {
           table: 'material_items'
         },
         (payload) => {
-          const newRow = payload.new as { receive_scanned?: boolean };
+          const newRow = payload.new as { receive_scanned?: boolean; dispatch_scanned?: boolean };
+          // Provider receives scan → move to Delivered tab
           if (newRow?.receive_scanned === true) {
-            console.log('📦 material_items receive_scanned=true - will refetch');
+            console.log('📦 material_items receive_scanned=true - will refetch (Scheduled/In Transit → Delivered)');
             debouncedRefetchFromMaterialItems();
+          }
+          // Supplier dispatches scan → move to In Transit tab (from Scheduled)
+          if (newRow?.dispatch_scanned === true) {
+            console.log('📦 material_items dispatch_scanned=true - will refetch (Scheduled → In Transit)');
+            debouncedRefetchFromMaterialItems();
+            toast({
+              title: '🚚 Materials Dispatched!',
+              description: 'Supplier has dispatched. Order moved to "In Transit" tab.',
+              duration: 4000,
+            });
+            setActiveTab('deliveries');
+            setDeliveriesSubTab('in_transit');
           }
         }
       )
@@ -1379,6 +1393,21 @@ const DeliveryDashboard = () => {
           {/* Deliveries Tab with Sub-tabs */}
           <TabsContent value="deliveries">
             <div className="space-y-4">
+              {/* Workflow: Accept → Scheduled → In Transit → Delivered */}
+              <div className={`flex flex-wrap items-center gap-2 text-xs px-3 py-2 rounded-lg ${isDarkMode ? 'bg-teal-900/20 border border-teal-800' : 'bg-teal-50 border border-teal-200'}`}>
+                <span className="font-medium text-teal-700">Delivery flow:</span>
+                <span>Accept</span>
+                <ChevronRight className="h-3 w-3 text-teal-500" />
+                <span>Scheduled</span>
+                <ChevronRight className="h-3 w-3 text-teal-500" />
+                <span>Supplier dispatches</span>
+                <ChevronRight className="h-3 w-3 text-teal-500" />
+                <span>In Transit</span>
+                <ChevronRight className="h-3 w-3 text-teal-500" />
+                <span>You scan received</span>
+                <ChevronRight className="h-3 w-3 text-teal-500" />
+                <span>Delivered</span>
+              </div>
               {/* Sub-tabs for Deliveries - Only accepted jobs */}
               <Tabs value={deliveriesSubTab} onValueChange={setDeliveriesSubTab} className="w-full">
                 <TabsList className={`grid w-full grid-cols-3 ${isDarkMode ? 'bg-gray-800' : 'bg-gray-100'}`}>
