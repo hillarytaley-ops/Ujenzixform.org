@@ -678,9 +678,10 @@ export const DispatchScanner: React.FC = () => {
         }
         
         // Last resort: try using expired token anyway (sometimes it still works)
-        if (stored) {
+        const storedFallback = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+        if (storedFallback) {
           try {
-            const parsed = JSON.parse(stored);
+            const parsed = JSON.parse(storedFallback);
             if (parsed.access_token) {
               console.warn('⚠️ Using expired token as fallback (may fail due to RLS)');
               return parsed.access_token;
