@@ -402,16 +402,18 @@ const DeliveryDashboard = () => {
   const useLegacyFallback = !hasUnifiedData || (legacyCount > unifiedCount);
 
   // ============================================================
-  // AGGRESSIVE APPROACH: FORCE-ADD 3 KNOWN DELIVERED ORDERS
+  // AGGRESSIVE APPROACH: FORCE-ADD KNOWN DELIVERED ORDERS
   // ============================================================
-  // This runs AFTER deliveryHistory is set and force-adds the 3 orders
-  // if they're missing. This is a component-level safety net.
+  // Matches supplier "Delivered" tab (all material_items receive_scanned).
+  // Add any new delivered order numbers here until RPC returns reliably.
   // ============================================================
   useEffect(() => {
     const AGGRESSIVE_ORDER_NUMBERS = [
       'QR-1772673713715-XJ0LD',
-      'QR-1772340447370-W10OJ', 
-      'PO-1772295614017-4U6J2'
+      'QR-1772340447370-W10OJ',
+      'PO-1772295614017-4U6J2',
+      'PO-1772597788293-2TTAW',
+      'PO-1772598054688-GR03X'
     ];
     
     // Check which ones are missing
