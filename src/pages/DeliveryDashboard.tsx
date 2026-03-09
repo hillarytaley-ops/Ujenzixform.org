@@ -1493,11 +1493,16 @@ const DeliveryDashboard = () => {
                     <CheckCircle className="h-4 w-4" />
                     Delivered
                     {(() => {
-                      const deliveredFromActive = activeDeliveries.filter(d => {
-                        const status = d._categorized_status || d.status;
-                        return status === 'delivered' || status === 'completed';
-                      }).length;
-                      const total = deliveryHistory.length + deliveredFromActive;
+                      const getKey = (x: any) => ((x.order_number || (x as any).po_number || '').toString().split('-')[1] || (x as any).purchase_order_id || x.id || '');
+                      const deliveredFromActive = activeDeliveries
+                        .filter(d => (d._categorized_status || d.status) === 'delivered' || (d._categorized_status || d.status) === 'completed')
+                        .map(d => ({ ...d, _key: getKey(d) }));
+                      const historyWithKey = deliveryHistory.map(h => ({ ...h, _key: getKey(h) }));
+                      const seen = new Set<string>();
+                      [...deliveredFromActive, ...historyWithKey].forEach(item => {
+                        if (item._key) seen.add(item._key);
+                      });
+                      const total = seen.size;
                       return total > 0 ? (
                         <Badge className="ml-1 bg-green-500 text-white text-xs">{total}</Badge>
                       ) : null;
@@ -1843,11 +1848,13 @@ const DeliveryDashboard = () => {
                           <CardTitle className={isDarkMode ? 'text-white' : ''}>Delivery History</CardTitle>
                           <CardDescription className={isDarkMode ? 'text-gray-400' : ''}>
                             Your past deliveries • Most recent first • {(() => {
-                              const deliveredFromActive = activeDeliveries.filter(d => {
-                                const status = d._categorized_status || d.status;
-                                return status === 'delivered' || status === 'completed';
-                              }).length;
-                              return deliveryHistory.length + deliveredFromActive;
+                              const deliveredFromActive = activeDeliveries.filter(d =>
+                                (d._categorized_status || d.status) === 'delivered' || (d._categorized_status || d.status) === 'completed'
+                              );
+                              const getKey = (d: any) => ((d.order_number || d.po_number || '').toString().split('-')[1] || d.purchase_order_id || d.id || '');
+                              const seen = new Set<string>();
+                              [...deliveredFromActive, ...deliveryHistory].forEach(d => { const k = getKey(d); if (k) seen.add(k); });
+                              return seen.size;
                             })()} total
                           </CardDescription>
                         </div>
@@ -1860,12 +1867,8 @@ const DeliveryDashboard = () => {
                     <CardContent>
                       {(() => {
                         // Combine deliveryHistory with delivered orders from activeDeliveries
-                        // (orders that are categorized as 'delivered' based on material_items scan status)
                         const deliveredFromActive = activeDeliveries
-                          .filter(d => {
-                            const status = d._categorized_status || d.status;
-                            return status === 'delivered' || status === 'completed';
-                          })
+                          .filter(d => (d._categorized_status || d.status) === 'delivered' || (d._categorized_status || d.status) === 'completed')
                           .map(d => ({
                             id: d.id,
                             pickup_location: d.pickup_location || d.pickup_address || 'N/A',
@@ -1877,12 +1880,15 @@ const DeliveryDashboard = () => {
                             rating: d.rating || 0,
                             order_number: d.order_number || d.po_number || 'N/A'
                           }));
-                        
-                        // Combine with deliveryHistory and remove duplicates
+                        const getKey = (d: any) => ((d.order_number || d.po_number || '').toString().split('-')[1] || d.purchase_order_id || d.id || '');
                         const allDelivered = [...deliveredFromActive, ...deliveryHistory];
-                        const uniqueDelivered = allDelivered.filter((d, index, self) => 
-                          index === self.findIndex(t => t.id === d.id)
-                        );
+                        const seenKeys = new Set<string>();
+                        const uniqueDelivered = allDelivered.filter(d => {
+                          const key = getKey(d);
+                          if (!key || seenKeys.has(key)) return false;
+                          seenKeys.add(key);
+                          return true;
+                        });
                         
                         const sortedDelivered = uniqueDelivered.sort((a, b) => 
                           new Date(b.completed_at).getTime() - new Date(a.completed_at).getTime()

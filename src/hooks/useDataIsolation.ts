@@ -3277,8 +3277,20 @@ export const useDeliveryProviderData = () => {
         console.log('✅ AGGRESSIVE: All 3 known delivered orders are already in history!');
       }
       
-      setDeliveryHistory(filteredHistory);
-      console.log('✅ CRITICAL: setDeliveryHistory called with', filteredHistory.length, 'items');
+      // CRITICAL: Deduplicate by stable key to prevent Delivered count fluctuation (9→6→3 on refresh)
+      const seenKeys = new Set<string>();
+      const dedupedHistory = filteredHistory.filter((h: any) => {
+        const orderNum = (h.order_number || h.po_number || '').toString();
+        const poId = (h.purchase_order_id || h.id || '').toString();
+        const numericPart = orderNum.split('-')[1];
+        const key = (numericPart && /^\d+$/.test(numericPart)) ? numericPart : (poId || orderNum || (h.id || ''));
+        if (!key || seenKeys.has(key)) return false;
+        seenKeys.add(key);
+        return true;
+      });
+      
+      setDeliveryHistory(dedupedHistory);
+      console.log('✅ CRITICAL: setDeliveryHistory called with', dedupedHistory.length, 'items (deduped from', filteredHistory.length, ')');
 
       // Fetch ALL pending requests from multiple tables for testing
       // All registered providers can see and accept any pending request
