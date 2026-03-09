@@ -1439,6 +1439,29 @@ export const useDeliveryProviderData = () => {
           
           console.log('📦 Fetched material_items for', materialItemsMap.size, 'purchase orders');
           
+          // FALLBACK: When REST returns empty (RLS may block provider), use RPC to get scan status
+          const rpcScanStatusMap = new Map<string, { total: number; dispatched: number; received: number }>();
+          if (materialItemsMap.size === 0 && purchaseOrderIds.length > 0) {
+            try {
+              console.log('📦 material_items REST returned empty - trying RPC get_material_items_scan_status_for_provider (bypasses RLS)');
+              const { data: rpcData, error: rpcErr } = await supabase.rpc('get_material_items_scan_status_for_provider', { po_ids: purchaseOrderIds });
+              if (!rpcErr && rpcData && typeof rpcData === 'object') {
+                Object.entries(rpcData).forEach(([poId, stats]: [string, any]) => {
+                  if (stats && typeof stats === 'object' && typeof stats.total === 'number') {
+                    rpcScanStatusMap.set(poId, {
+                      total: stats.total ?? 0,
+                      dispatched: stats.dispatched ?? 0,
+                      received: stats.received ?? 0
+                    });
+                  }
+                });
+                console.log('📦 RPC scan status: got data for', rpcScanStatusMap.size, 'purchase orders');
+              }
+            } catch (e: any) {
+              console.warn('⚠️ RPC get_material_items_scan_status_for_provider failed:', e?.message || e);
+            }
+          }
+          
           // Categorize each delivery based on material_items scan status
           // Logic matches EnhancedQRCodeManager (supplier dashboard "Dispatched" tab):
           // - Scheduled: No items have dispatch_scanned = true
@@ -1456,7 +1479,11 @@ export const useDeliveryProviderData = () => {
                                  delivery.po_number?.includes('1772673713715') ||
                                  poId?.toString().includes('d8683262');
             
-            if (items.length === 0) {
+            // Use RPC scan status when REST returned empty (RLS fallback)
+            const rpcStats = rpcScanStatusMap.get(poId || '');
+            const hasRpcStats = rpcStats && rpcStats.total > 0;
+            
+            if (items.length === 0 && !hasRpcStats) {
               // No material_items found - could be RLS blocking or fetch failure
               // CRITICAL: Check multiple sources to determine if order is delivered:
               // 1. delivery.status (delivery_request status)
@@ -1513,6 +1540,29 @@ export const useDeliveryProviderData = () => {
               }
               
               return { ...delivery, _categorized_status: fallbackStatus };
+            }
+            
+            // Use RPC scan status when REST returned empty (RLS fallback)
+            if (hasRpcStats && rpcStats) {
+              const hasDispatchedItems = rpcStats.dispatched > 0;
+              const hasReceivedItems = rpcStats.received > 0;
+              const allItemsDispatched = rpcStats.total > 0 && rpcStats.dispatched === rpcStats.total;
+              const allItemsReceived = rpcStats.total > 0 && rpcStats.received === rpcStats.total;
+              let categorizedStatus = 'scheduled';
+              if (allItemsReceived) {
+                categorizedStatus = 'delivered';
+              } else if (allItemsDispatched && hasReceivedItems) {
+                categorizedStatus = 'in_transit';
+              } else if (hasDispatchedItems) {
+                categorizedStatus = 'in_transit';
+              }
+              return {
+                ...delivery,
+                _categorized_status: categorizedStatus,
+                _items_count: rpcStats.total,
+                _dispatched_count: rpcStats.dispatched,
+                _received_count: rpcStats.received
+              };
             }
             
             const hasDispatchedItems = items.some((item: any) => item.dispatch_scanned === true);
