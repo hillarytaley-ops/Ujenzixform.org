@@ -2956,13 +2956,18 @@ const OrderAccordionItem: React.FC<{
                   </Badge>
                 )}
               </div>
-              <div className="flex items-center gap-3 text-sm text-slate-600 mt-1">
+              <div className="flex items-center gap-3 text-sm text-slate-600 mt-1 flex-wrap">
                 <span className="flex items-center gap-1 font-medium">
                   <User className="h-3 w-3" /> {group.buyer_name}
                 </span>
                 {orderDate && (
                   <span className="flex items-center gap-1">
                     <Clock className="h-3 w-3" /> {orderDate.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
+                  </span>
+                )}
+                {group.delivery_provider_id && (
+                  <span className="flex items-center gap-1 text-green-700 font-medium">
+                    <Truck className="h-3 w-3" /> {group.delivery_provider_name || 'Delivery Provider'}
                   </span>
                 )}
               </div>
@@ -3062,6 +3067,30 @@ const OrderAccordionItem: React.FC<{
               </span>
             )}
           </div>
+          {/* Delivery Provider - show for dispatched/in-transit/delivered orders */}
+          {(group.delivery_required || group.delivery_provider_id) && (
+            <div className="mt-2 pt-2 border-t border-blue-200">
+              {group.delivery_provider_id ? (
+                <div className="flex items-center gap-2 flex-wrap">
+                  <Truck className="h-4 w-4 text-green-600 shrink-0" />
+                  <span className="text-sm font-medium text-green-700">
+                    Provider:
+                  </span>
+                  <span className="text-sm text-slate-700">
+                    {group.delivery_provider_name || 'Delivery Provider'}
+                    {group.delivery_provider_phone && ` • ${group.delivery_provider_phone}`}
+                  </span>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <Clock className="h-4 w-4 text-yellow-600" />
+                  <span className="text-sm font-medium text-yellow-700">
+                    Awaiting delivery provider
+                  </span>
+                </div>
+              )}
+            </div>
+          )}
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2">
           {group.items.map((item) => (
