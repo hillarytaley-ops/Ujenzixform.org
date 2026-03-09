@@ -445,39 +445,39 @@ export const useDeliveryProviderData = () => {
         
         if (quickDeliveries.length > 0) {
           console.log('⚡ FAST PATH: Found', quickDeliveries.length, 'accepted orders with real order numbers');
-          // Set ref immediately so REST path cannot overwrite with [] while we enrich
-          fastPathCountRef.current = quickDeliveries.length;
-          // Enrich with _categorized_status from material_items (for In Transit tab - FAST PATH lacks this)
+          // Show data immediately so UI is not blocked by enrichment RPC (which can hang)
+          const withDefaultCategory = quickDeliveries.map((d: any) => ({
+            ...d,
+            _categorized_status: d._categorized_status || 'scheduled'
+          }));
+          setActiveDeliveries(withDefaultCategory);
+          fastPathCountRef.current = withDefaultCategory.length;
+          setLoading(false);
+          console.log('⚡ FAST PATH: Set activeDeliveries state to', withDefaultCategory.length, 'items (enrichment in background)');
+          // Enrich in background for In Transit tab - do not block (RPC can hang)
           const poIds = quickDeliveries.map((d: any) => d.purchase_order_id).filter(Boolean);
           if (poIds.length > 0) {
-            try {
-              const { data: scanStatus } = await supabase.rpc('get_material_items_scan_status_for_provider', { po_ids: poIds });
-              const statusMap = (scanStatus && typeof scanStatus === 'object') ? scanStatus as Record<string, { total: number; dispatched: number; received: number }> : {};
-              const enriched = quickDeliveries.map((d: any) => {
-                const stats = d.purchase_order_id ? statusMap[d.purchase_order_id] : null;
-                let _cat = 'scheduled';
-                if (stats) {
-                  if (stats.received >= stats.total && stats.total > 0) _cat = 'delivered';
-                  else if (stats.dispatched > 0) _cat = 'in_transit';
-                }
-                return { ...d, _categorized_status: _cat, _items_count: stats?.total ?? 0, _dispatched_count: stats?.dispatched ?? 0, _received_count: stats?.received ?? 0 };
+            supabase.rpc('get_material_items_scan_status_for_provider', { po_ids: poIds })
+              .then(({ data: scanStatus }) => {
+                const statusMap = (scanStatus && typeof scanStatus === 'object') ? scanStatus as Record<string, { total: number; dispatched: number; received: number }> : {};
+                const enriched = quickDeliveries.map((d: any) => {
+                  const stats = d.purchase_order_id ? statusMap[d.purchase_order_id] : null;
+                  let _cat = 'scheduled';
+                  if (stats) {
+                    if (stats.received >= stats.total && stats.total > 0) _cat = 'delivered';
+                    else if (stats.dispatched > 0) _cat = 'in_transit';
+                  }
+                  return { ...d, _categorized_status: _cat, _items_count: stats?.total ?? 0, _dispatched_count: stats?.dispatched ?? 0, _received_count: stats?.received ?? 0 };
+                });
+                setActiveDeliveries(enriched);
+                fastPathCountRef.current = enriched.length;
+                const inTransit = enriched.filter((d: any) => d._categorized_status === 'in_transit').length;
+                if (inTransit > 0) console.log('⚡ FAST PATH: Enriched -', inTransit, 'in transit (from material_items)');
+              })
+              .catch((e) => {
+                console.warn('⚡ FAST PATH: Enrichment failed (non-blocking):', e);
               });
-              setActiveDeliveries(enriched);
-              fastPathCountRef.current = enriched.length;
-              console.log('⚡ FAST PATH: Set activeDeliveries state to', enriched.length, 'items');
-              const inTransit = enriched.filter((d: any) => d._categorized_status === 'in_transit').length;
-              if (inTransit > 0) console.log('⚡ FAST PATH: Enriched -', inTransit, 'in transit (from material_items)');
-            } catch (e) {
-              setActiveDeliveries(quickDeliveries);
-              fastPathCountRef.current = quickDeliveries.length;
-              console.log('⚡ FAST PATH: Set activeDeliveries state to', quickDeliveries.length, 'items (no enrichment)');
-            }
-          } else {
-            setActiveDeliveries(quickDeliveries);
-            fastPathCountRef.current = quickDeliveries.length;
-            console.log('⚡ FAST PATH: Set activeDeliveries state to', quickDeliveries.length, 'items');
           }
-          setLoading(false); // Show data immediately!
         } else {
           console.log('⚡ FAST PATH: No accepted orders found, continuing full fetch...');
         }
