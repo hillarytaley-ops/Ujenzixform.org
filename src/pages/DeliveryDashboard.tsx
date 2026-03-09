@@ -54,7 +54,7 @@ import { DeliveryRequestCard } from "@/components/delivery/DeliveryRequestCard";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useToast } from "@/hooks/use-toast";
 import { useDeliveryProviderData, logDataAccessAttempt } from "@/hooks/useDataIsolation";
-import { MessageSquare, User, QrCode, Scan } from "lucide-react";
+import { MessageSquare, User, QrCode, Scan, RefreshCw } from "lucide-react";
 import { InAppCommunication } from "@/components/communication/InAppCommunication";
 import { ProfileEditDialog } from "@/components/profile/ProfileEditDialog";
 import { ProfileViewDialog } from "@/components/profile/ProfileViewDialog";
@@ -1814,6 +1814,36 @@ const DeliveryDashboard = () => {
                                         ? `Scan to Complete (${delivery._received_count ?? 0}/${delivery._items_count} scanned)`
                                         : "Scan QR to Complete Delivery"}
                                     </Button>
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      title="If you already scanned all items but order is still here, click to sync status to Delivered"
+                                      onClick={async () => {
+                                        const poId = delivery.order_number || delivery.purchase_order_id;
+                                        if (!poId) {
+                                          toast({ title: 'Cannot sync', description: 'Order identifier missing', variant: 'destructive' });
+                                          return;
+                                        }
+                                        try {
+                                          const { data, error } = await (supabase as any).rpc('sync_po_to_delivered_if_all_received', { po_identifier: poId });
+                                          if (error) {
+                                            toast({ title: 'Sync failed', description: error.message || 'RPC error', variant: 'destructive' });
+                                            return;
+                                          }
+                                          if (data?.success) {
+                                            toast({ title: '✅ Synced', description: 'Order moved to Delivered. Refreshing...' });
+                                            await refetchData();
+                                            setDeliveriesSubTab('delivered');
+                                          } else {
+                                            toast({ title: 'Could not sync', description: data?.message || 'Not all items received yet', variant: 'destructive' });
+                                          }
+                                        } catch (e: any) {
+                                          toast({ title: 'Sync failed', description: e?.message || 'Network error', variant: 'destructive' });
+                                        }
+                                      }}
+                                    >
+                                      <RefreshCw className="h-4 w-4" />
+                                    </Button>
                                     {delivery.customer_phone && (
                                       <Button 
                                         variant="outline" 
@@ -2064,7 +2094,8 @@ const DeliveryDashboard = () => {
                       onDeliveryComplete={async (orderCompleted) => {
                         // Provider Delivered = Supplier Delivered (material_items.receive_scanned)
                         console.log('🔄 Delivery scan complete - orderCompleted:', orderCompleted);
-                        await new Promise(resolve => setTimeout(resolve, 800));
+                        // Wait for DB trigger to commit before refetch so order moves to Delivered
+                        await new Promise(resolve => setTimeout(resolve, 1800));
                         
                         // Switch to Delivered tab when full order complete (aligns with supplier QR tab)
                         if (orderCompleted) {
