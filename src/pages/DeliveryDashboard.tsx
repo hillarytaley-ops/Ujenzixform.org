@@ -338,6 +338,30 @@ const DeliveryDashboard = () => {
     }
   }, [isolatedProfile, isolatedStats, isolatedActiveDeliveries, isolatedHistory, isolatedPendingRequests]);
 
+  // Single source of truth: categorize each delivery so badge counts and tab content always match
+  const deliveryCategories = useMemo(() => {
+    const getCategory = (d: any): 'scheduled' | 'in_transit' | 'delivered' => {
+      const cat = String(d._categorized_status || d.status || '').toLowerCase();
+      if (cat === 'delivered' || cat === 'completed') return 'delivered';
+      const allReceived = d._items_count != null && d._received_count != null &&
+        d._items_count > 0 && d._received_count >= d._items_count;
+      if (allReceived) return 'delivered';
+      const inTransitList = ['in_transit', 'picked_up', 'on_the_way', 'near_destination', 'dispatched', 'shipped', 'out_for_delivery', 'delivery_arrived'];
+      if (inTransitList.includes(cat)) return 'in_transit';
+      return 'scheduled';
+    };
+    const scheduled: any[] = [];
+    const inTransit: any[] = [];
+    const deliveredFromActive: any[] = [];
+    activeDeliveries.forEach(d => {
+      const c = getCategory(d);
+      if (c === 'scheduled') scheduled.push(d);
+      else if (c === 'in_transit') inTransit.push(d);
+      else deliveredFromActive.push(d);
+    });
+    return { scheduled, inTransit, deliveredFromActive };
+  }, [activeDeliveries]);
+
   // ============================================================
   // AGGRESSIVE APPROACH: FORCE-ADD 3 KNOWN DELIVERED ORDERS
   // ============================================================
@@ -1462,93 +1486,30 @@ const DeliveryDashboard = () => {
                   <TabsTrigger value="scheduled" className="flex items-center gap-2">
                     <Calendar className="h-4 w-4" />
                     Scheduled
-                    {(() => {
-                      // Use _categorized_status if available (from material_items scan status), otherwise fallback to status
-                      const scheduledCount = activeDeliveries.filter(d => {
-                        const status = d._categorized_status || d.status;
-                        // Scheduled: no items dispatched yet
-                        return status === 'scheduled' || 
-                               status === 'accepted' || 
-                               status === 'assigned' || 
-                               status === 'pending_pickup' || 
-                               status === 'delivery_assigned' || 
-                               status === 'ready_for_dispatch' || 
-                               status === 'provider_assigned';
-                      }).length;
-                      
-                      return scheduledCount > 0 ? (
-                        <Badge className="ml-1 bg-blue-500 text-white text-xs">
-                          {scheduledCount}
-                        </Badge>
-                      ) : null;
-                    })()}
+                    {deliveryCategories.scheduled.length > 0 ? (
+                      <Badge className="ml-1 bg-blue-500 text-white text-xs">
+                        {deliveryCategories.scheduled.length}
+                      </Badge>
+                    ) : null}
                   </TabsTrigger>
                   <TabsTrigger value="in_transit" className="flex items-center gap-2">
                     <Truck className="h-4 w-4" />
                     In Transit
-                    {(() => {
-                      const inTransitCount = activeDeliveries.filter(d => {
-                        const status = d._categorized_status || d.status;
-                        // CRITICAL: Exclude delivered orders - they should NOT appear in In Transit tab
-                        if (status === 'delivered' || status === 'completed') {
-                          // Log if we're excluding a delivered order
-                          if (d.order_number?.includes('1772673713715') || d.order_number?.includes('1772340447370')) {
-                            console.log('🚫 Badge count: Excluding delivered order:', {
-                              order_number: d.order_number,
-                              _categorized_status: d._categorized_status,
-                              original_status: d.status
-                            });
-                          }
-                          return false;
-                        }
-                        // Only count orders that are truly in transit (dispatched but not all items received)
-                        const matches = status === 'in_transit' || 
-                               status === 'picked_up' ||
-                               status === 'on_the_way' ||
-                               status === 'near_destination' ||
-                               status === 'dispatched' ||
-                               status === 'shipped' ||
-                               status === 'out_for_delivery';
-                        
-                        // Log if we're including an order in the count
-                        if (matches && (d.order_number?.includes('1772673713715') || d.order_number?.includes('1772340447370'))) {
-                          console.log('⚠️ Badge count: Including order in In Transit count:', {
-                            order_number: d.order_number,
-                            _categorized_status: d._categorized_status,
-                            original_status: d.status,
-                            items_count: d._items_count,
-                            received_count: d._received_count
-                          });
-                        }
-                        
-                        return matches;
-                      }).length;
-                      
-                      // Log the final badge count
-                      if (inTransitCount > 0) {
-                        console.log('📊 Badge count calculation: In Transit count =', inTransitCount);
-                      }
-                      
-                      // Only show badge if there are actually in-transit orders (not delivered)
-                      return inTransitCount > 0 ? (
+                    {deliveryCategories.inTransit.length > 0 ? (
                       <Badge className="ml-1 bg-purple-500 text-white text-xs">
-                          {inTransitCount}
+                        {deliveryCategories.inTransit.length}
                       </Badge>
-                      ) : null;
-                    })()}
+                    ) : null}
                   </TabsTrigger>
                   <TabsTrigger value="delivered" className="flex items-center gap-2">
                     <CheckCircle className="h-4 w-4" />
                     Delivered
                     {(() => {
                       const getKey = (x: any) => ((x.order_number || (x as any).po_number || '').toString().split('-')[1] || (x as any).purchase_order_id || x.id || '');
-                      const deliveredFromActive = activeDeliveries
-                        .filter(d => (d._categorized_status || d.status) === 'delivered' || (d._categorized_status || d.status) === 'completed')
-                        .map(d => ({ ...d, _key: getKey(d) }));
-                      const historyWithKey = deliveryHistory.map(h => ({ ...h, _key: getKey(h) }));
                       const seen = new Set<string>();
-                      [...deliveredFromActive, ...historyWithKey].forEach(item => {
-                        if (item._key) seen.add(item._key);
+                      [...deliveryCategories.deliveredFromActive, ...deliveryHistory].forEach(item => {
+                        const k = getKey(item);
+                        if (k) seen.add(k);
                       });
                       const total = seen.size;
                       return total > 0 ? (
@@ -1558,41 +1519,18 @@ const DeliveryDashboard = () => {
                   </TabsTrigger>
                 </TabsList>
 
-                {/* Scheduled Sub-tab - Accepted jobs waiting for pickup */}
+                {/* Scheduled Sub-tab - same list as badge count (deliveryCategories.scheduled) */}
                 <TabsContent value="scheduled" className="mt-4">
                   <div className="space-y-4">
-                    {(() => {
-                      // Use _categorized_status from material_items scan status (same logic as supplier dashboard)
-                      // Scheduled = no items dispatched yet
-                      const scheduled = activeDeliveries.filter(d => {
-                        const status = d._categorized_status || d.status;
-                        // Scheduled: no items have dispatch_scanned = true
-                        return status === 'scheduled' || 
-                               status === 'accepted' || 
-                               status === 'assigned' || 
-                               status === 'pending_pickup' || 
-                               status === 'delivery_assigned' || 
-                               status === 'ready_for_dispatch' || 
-                               status === 'provider_assigned';
-                      });
-                      
-                      // Debug logging
-                      if (activeDeliveries.length > 0 && scheduled.length === 0) {
-                        console.log('⚠️ Scheduled filter: Found', activeDeliveries.length, 'active deliveries but 0 scheduled');
-                        console.log('📋 All statuses in activeDeliveries:', [...new Set(activeDeliveries.map(d => d._categorized_status || d.status))]);
-                      } else if (scheduled.length > 0) {
-                        console.log('✅ Scheduled filter: Found', scheduled.length, 'scheduled deliveries');
-                      }
-                      
-                      return scheduled.length > 0 ? (
+                    {deliveryCategories.scheduled.length > 0 ? (
                         <div className="space-y-4">
                           <div className="flex items-center gap-2 mb-3">
                             <div className="h-2 w-2 bg-blue-500 rounded-full animate-pulse"></div>
                             <h3 className={`text-lg font-semibold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
-                              📅 Scheduled Deliveries ({scheduled.length})
+                              📅 Scheduled Deliveries ({deliveryCategories.scheduled.length})
                             </h3>
                           </div>
-                          {scheduled
+                          {deliveryCategories.scheduled
                             .sort((a, b) => {
                               const urgencyOrder = { emergency: 0, urgent: 1, normal: 2 };
                               return (urgencyOrder[a.urgency || 'normal'] || 2) - (urgencyOrder[b.urgency || 'normal'] || 2);
@@ -1608,7 +1546,7 @@ const DeliveryDashboard = () => {
                               />
                             ))}
                         </div>
-                      ) : (
+                    ) : (
                         <Card className={isDarkMode ? 'bg-gray-800 border-gray-700' : ''}>
                           <CardContent className="py-12 text-center">
                             <Calendar className={`h-12 w-12 ${isDarkMode ? 'text-gray-600' : 'text-gray-300'} mx-auto mb-4`} />
@@ -1616,144 +1554,19 @@ const DeliveryDashboard = () => {
                             <p className={`text-sm ${isDarkMode ? 'text-gray-500' : 'text-gray-400'}`}>Accepted deliveries will appear here</p>
                           </CardContent>
                         </Card>
-                      );
-                    })()}
+                    )}
                   </div>
                 </TabsContent>
 
-                {/* In Transit Sub-tab - Orders currently on their way (auto-updated when supplier dispatches) */}
+                {/* In Transit Sub-tab - same list as badge count (deliveryCategories.inTransit) */}
                 <TabsContent value="in_transit" className="mt-4">
                   <div className="space-y-4">
-                    {(() => {
-                      // Use _categorized_status from material_items scan status
-                      // In Transit = all items dispatched, some received
-                      // EXCLUDE delivered orders (they should be in Delivered tab)
-                      const inTransit = activeDeliveries.filter(d => {
-                        const categorizedStatus = d._categorized_status || d.status;
-                        const originalStatus = d.status;
-                        const poStatus = d.po_status || d.purchase_order_status;
-                        const isTargetOrder = d.order_number?.includes('1772673713715') || 
-                                             d.po_number?.includes('1772673713715');
-                        
-                        // CRITICAL: Exclude delivered orders - check ALL status sources
-                        // Also exclude when all items received (in case categorization missed it)
-                        const allItemsReceived = (d._items_count != null && d._received_count != null && 
-                                                  d._items_count > 0 && d._received_count >= d._items_count);
-                        const isDelivered = categorizedStatus === 'delivered' || 
-                                           categorizedStatus === 'completed' ||
-                                           originalStatus === 'delivered' || 
-                                           originalStatus === 'completed' ||
-                                           poStatus === 'delivered' ||
-                                           poStatus === 'completed' ||
-                                           allItemsReceived;
-                        
-                        if (isDelivered) {
-                          if (isTargetOrder) {
-                            console.log('🚫 Excluding target order from In Transit (delivered):', {
-                              order_number: d.order_number,
-                              _categorized_status: d._categorized_status,
-                              original_status: d.status,
-                              po_status: poStatus,
-                              items_count: d._items_count,
-                              received_count: d._received_count
-                            });
-                          }
-                          return false;
-                        }
-                        
-                        const matches = categorizedStatus === 'in_transit' || 
-                                       categorizedStatus === 'picked_up' ||
-                                       categorizedStatus === 'on_the_way' ||
-                                       categorizedStatus === 'near_destination' ||
-                                       categorizedStatus === 'dispatched' ||
-                                       categorizedStatus === 'shipped' ||
-                                       categorizedStatus === 'out_for_delivery' ||
-                                       categorizedStatus === 'delivery_arrived' ||
-                                       categorizedStatus === 'ready_for_dispatch' ||
-                                       categorizedStatus === 'processing';
-                        
-                        if (isTargetOrder) {
-                          console.log('🔍 Target order In Transit filter check:', {
-                            order_number: d.order_number,
-                            _categorized_status: d._categorized_status,
-                            original_status: d.status,
-                            po_status: poStatus,
-                            matches,
-                            items_count: d._items_count,
-                            received_count: d._received_count
-                          });
-                        }
-                        
-                        return matches;
-                      });
-                      
-                      // Debug logging - check for delivered orders that shouldn't be in transit
-                      const deliveredInTransit = activeDeliveries.filter(d => {
-                        const status = d._categorized_status || d.status;
-                        return (status === 'delivered' || status === 'completed') && 
-                               (d.status === 'dispatched' || d.status === 'in_transit' || d.status === 'shipped');
-                      });
-                      
-                      if (deliveredInTransit.length > 0) {
-                        console.log('🚨 FOUND DELIVERED ORDERS IN ACTIVE DELIVERIES:', deliveredInTransit.map(d => ({
-                          id: d.id?.substring(0, 8),
-                          order_number: d.order_number,
-                          _categorized_status: d._categorized_status,
-                          original_status: d.status,
-                          items_count: d._items_count,
-                          dispatched_count: d._dispatched_count,
-                          received_count: d._received_count
-                        })));
-                      }
-                      
-                      // Debug logging
-                      if (activeDeliveries.length > 0 && inTransit.length === 0) {
-                        console.log('⚠️ In Transit filter: Found', activeDeliveries.length, 'active deliveries but 0 in transit');
-                        console.log('📋 All statuses in activeDeliveries:', [...new Set(activeDeliveries.map(d => d._categorized_status || d.status))]);
-                        console.log('📋 Sample deliveries:', activeDeliveries.slice(0, 3).map(d => ({
-                          id: d.id,
-                          status: d._categorized_status || d.status,
-                          original_status: d.status,
-                          source: d.source,
-                          items_count: d._items_count,
-                          dispatched_count: d._dispatched_count,
-                          received_count: d._received_count
-                        })));
-                      } else if (inTransit.length > 0) {
-                        console.log('✅ In Transit filter: Found', inTransit.length, 'in transit deliveries');
-                        console.log('📋 In Transit statuses:', [...new Set(inTransit.map(d => d._categorized_status || d.status))]);
-                        console.log('📋 In Transit deliveries details:', inTransit.map(d => ({
-                          id: d.id?.substring(0, 8),
-                          order_number: d.order_number,
-                          _categorized_status: d._categorized_status,
-                          original_status: d.status,
-                          items_count: d._items_count,
-                          dispatched_count: d._dispatched_count,
-                          received_count: d._received_count,
-                          // Check if this should actually be delivered
-                          should_be_delivered: d._items_count > 0 && d._received_count === d._items_count
-                        })));
-                        
-                        // Check for any orders that should be delivered but are showing as in_transit
-                        const misclassified = inTransit.filter(d => 
-                          d._items_count > 0 && d._received_count === d._items_count && d._items_count > 0
-                        );
-                        if (misclassified.length > 0) {
-                          console.error('🚨 MISCLASSIFIED ORDERS IN IN TRANSIT:', misclassified.map(d => ({
-                            order_number: d.order_number,
-                            items_count: d._items_count,
-                            received_count: d._received_count,
-                            _categorized_status: d._categorized_status
-                          })));
-                        }
-                      }
-                      
-                      return inTransit.length > 0 ? (
+                    {deliveryCategories.inTransit.length > 0 ? (
                         <div className="space-y-4">
                           <div className="flex items-center gap-2 mb-3">
                             <div className="h-2 w-2 bg-purple-500 rounded-full animate-pulse"></div>
                             <h3 className={`text-lg font-semibold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
-                              🚚 Deliveries In Transit ({inTransit.length})
+                              🚚 Deliveries In Transit ({deliveryCategories.inTransit.length})
                             </h3>
                           </div>
                           <Alert className="mb-4 bg-purple-50 border-purple-200">
@@ -1762,7 +1575,7 @@ const DeliveryDashboard = () => {
                               Materials have been dispatched by supplier. Navigate to delivery location and <strong>scan all QR codes</strong> (one per item) upon arrival to complete delivery. Each order moves to &quot;Delivered&quot; only when every item is scanned.
                             </AlertDescription>
                           </Alert>
-                          {inTransit.map((delivery) => (
+                          {deliveryCategories.inTransit.map((delivery) => (
                             <Card key={delivery.id} className={isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-2 border-purple-100'}>
                               <CardContent className="p-6">
                                 <div className="space-y-4">
@@ -1912,8 +1725,7 @@ const DeliveryDashboard = () => {
                             <p className={`text-sm ${isDarkMode ? 'text-gray-500' : 'text-gray-400'}`}>Active deliveries will appear here when in transit</p>
                           </CardContent>
                         </Card>
-                      );
-                    })()}
+                    )}
                   </div>
                 </TabsContent>
 
@@ -1926,12 +1738,9 @@ const DeliveryDashboard = () => {
                           <CardTitle className={isDarkMode ? 'text-white' : ''}>Delivery History</CardTitle>
                           <CardDescription className={isDarkMode ? 'text-gray-400' : ''}>
                             Your past deliveries • Most recent first • {(() => {
-                              const deliveredFromActive = activeDeliveries.filter(d =>
-                                (d._categorized_status || d.status) === 'delivered' || (d._categorized_status || d.status) === 'completed'
-                              );
                               const getKey = (d: any) => ((d.order_number || d.po_number || '').toString().split('-')[1] || d.purchase_order_id || d.id || '');
                               const seen = new Set<string>();
-                              [...deliveredFromActive, ...deliveryHistory].forEach(d => { const k = getKey(d); if (k) seen.add(k); });
+                              [...deliveryCategories.deliveredFromActive, ...deliveryHistory].forEach(d => { const k = getKey(d); if (k) seen.add(k); });
                               return seen.size;
                             })()} total
                           </CardDescription>
@@ -1944,20 +1753,18 @@ const DeliveryDashboard = () => {
                     </CardHeader>
                     <CardContent>
                       {(() => {
-                        // Combine deliveryHistory with delivered orders from activeDeliveries
-                        const deliveredFromActive = activeDeliveries
-                          .filter(d => (d._categorized_status || d.status) === 'delivered' || (d._categorized_status || d.status) === 'completed')
-                          .map(d => ({
-                            id: d.id,
-                            pickup_location: d.pickup_location || d.pickup_address || 'N/A',
-                            delivery_location: d.delivery_location || d.delivery_address || 'N/A',
-                            material_type: d.material_type || d.item_description || 'Materials',
-                            status: d._categorized_status || d.status,
-                            completed_at: d.delivered_at || d.completed_at || d.updated_at || d.created_at,
-                            price: d.price || d.delivery_fee || d.estimated_cost || 0,
-                            rating: d.rating || 0,
-                            order_number: d.order_number || d.po_number || 'N/A'
-                          }));
+                        // Same source as badge: deliveryCategories.deliveredFromActive + deliveryHistory
+                        const deliveredFromActive = deliveryCategories.deliveredFromActive.map(d => ({
+                          id: d.id,
+                          pickup_location: d.pickup_location || d.pickup_address || 'N/A',
+                          delivery_location: d.delivery_location || d.delivery_address || 'N/A',
+                          material_type: d.material_type || d.item_description || 'Materials',
+                          status: d._categorized_status || d.status,
+                          completed_at: d.delivered_at || d.completed_at || d.updated_at || d.created_at,
+                          price: d.price || d.delivery_fee || d.estimated_cost || 0,
+                          rating: d.rating || 0,
+                          order_number: d.order_number || d.po_number || 'N/A'
+                        }));
                         const getKey = (d: any) => ((d.order_number || d.po_number || '').toString().split('-')[1] || d.purchase_order_id || d.id || '');
                         const allDelivered = [...deliveredFromActive, ...deliveryHistory];
                         const seenKeys = new Set<string>();
