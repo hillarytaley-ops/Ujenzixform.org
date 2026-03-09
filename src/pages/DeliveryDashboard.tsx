@@ -667,10 +667,11 @@ const DeliveryDashboard = () => {
       if (materialItemsDebounceTimer) clearTimeout(materialItemsDebounceTimer);
       materialItemsDebounceTimer = setTimeout(() => {
         materialItemsDebounceTimer = null;
-        console.log('📦 material_items changed (receive scan) - refetching delivery data...');
+        console.log('📦 material_items changed (QR scan) - refetching delivery data...');
         refetchData();
+        refetchUnified();
         loadNotificationCounts();
-      }, 600);
+      }, 120);
     };
     
     const channel = supabase
@@ -678,23 +679,20 @@ const DeliveryDashboard = () => {
       .on(
         'postgres_changes',
         {
-          event: 'UPDATE',
+          event: '*',
           schema: 'public',
           table: 'material_items'
         },
         (payload) => {
           const newRow = payload.new as { receive_scanned?: boolean; dispatch_scanned?: boolean };
-          // Provider receives scan → move to Delivered tab after refetch
+          debouncedRefetchFromMaterialItems();
+          // Provider receives scan → move to Delivered tab
           if (newRow?.receive_scanned === true) {
-            console.log('📦 material_items receive_scanned=true - will refetch (Scheduled/In Transit → Delivered)');
-            debouncedRefetchFromMaterialItems();
             setActiveTab('deliveries');
             setDeliveriesSubTab('delivered');
           }
-          // Supplier dispatches scan → move to In Transit tab (from Scheduled)
+          // Supplier dispatches scan → move to In Transit tab
           if (newRow?.dispatch_scanned === true) {
-            console.log('📦 material_items dispatch_scanned=true - will refetch (Scheduled → In Transit)');
-            debouncedRefetchFromMaterialItems();
             toast({
               title: '🚚 Materials Dispatched!',
               description: 'Supplier has dispatched. Order moved to "In Transit" tab.',

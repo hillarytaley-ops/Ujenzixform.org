@@ -319,7 +319,7 @@ export const EnhancedQRCodeManager: React.FC<EnhancedQRCodeManagerProps> = ({ su
         .subscribe();
       
       console.log('📡 QR Manager: Real-time subscriptions active');
-    }, 2000); // Delay subscription by 2 seconds
+    }, 500); // Short delay to not block initial load
     
     return () => {
       clearTimeout(safetyTimeout);
