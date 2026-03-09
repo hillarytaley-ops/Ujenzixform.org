@@ -193,8 +193,8 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
       // Stop any existing scanner
       await stopScanning();
       
-      // Small delay to ensure cleanup is complete
-      await new Promise(resolve => setTimeout(resolve, 100));
+      // Delay for cleanup and container readiness (html5-qrcode needs stable DOM)
+      await new Promise(resolve => setTimeout(resolve, 300));
 
       // Create new scanner instance
       console.log('🎥 Creating Html5Qrcode instance for container:', scannerContainerId);
@@ -211,21 +211,24 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
         console.log('📷 Using facing mode:', facing);
       }
 
-      // Adjust scanner config based on device type
-      // Desktop/laptop webcams need different settings than mobile cameras
-      const qrboxSize = isMobile ? { width: 200, height: 200 } : { width: 250, height: 250 };
-      const scannerFps = isMobile ? 10 : 15; // Higher FPS for desktop
+      // Responsive qrbox - standard size (250x250), adapts to viewport
+      const baseSize = isMobile ? 200 : 250;
+      const scannerFps = isMobile ? 10 : 15;
       
       const scannerConfig = {
         fps: scannerFps,
-        qrbox: qrboxSize,
+        qrbox: (viewfinderWidth: number, viewfinderHeight: number) => {
+          const w = Math.max(150, Math.min(baseSize, Math.floor(viewfinderWidth * 0.85)));
+          const h = Math.max(150, Math.min(baseSize, Math.floor(viewfinderHeight * 0.85)));
+          return { width: w, height: h };
+        },
         rememberLastUsedCamera: true,
         supportedScanTypes: [],
         formatsToSupport: [Html5QrcodeSupportedFormats.QR_CODE],
         aspectRatio: isMobile ? 1.0 : 1.333, // 4:3 for desktop
         disableFlip: false, // Allow flipped images (mirror mode)
         experimentalFeatures: {
-          useBarCodeDetectorIfSupported: true // Use native API if available
+          useBarCodeDetectorIfSupported: false // Disable - can cause camera issues on some devices
         }
       };
 
@@ -1435,33 +1438,40 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
             </Alert>
           )}
           
-          {/* Camera View - compact standard scan size (max 400px wide, ~260px tall) */}
-          <div className="relative bg-black rounded-lg overflow-hidden mx-auto" style={{ maxWidth: '400px', height: isMobile ? '240px' : '280px' }}>
-            {/* Scanner container - html5-qrcode will render here */}
+          {/* Camera View - responsive standard size (280-400px, works on all devices) */}
+          <div 
+            className="relative bg-black rounded-lg overflow-hidden mx-auto w-full"
+            style={{ 
+              maxWidth: '400px', 
+              minHeight: isMobile ? '220px' : '260px',
+              aspectRatio: '4/3'
+            }}
+          >
+            {/* Scanner container - html5-qrcode renders video + viewfinder here */}
             <div 
               id={scannerContainerId} 
-              className="w-full h-full"
-              style={{ height: isMobile ? '240px' : '280px' }}
+              className="w-full h-full min-h-[220px]"
+              style={{ minHeight: isMobile ? '220px' : '260px' }}
             />
             
-            {/* Scanning Frame Overlay - helps users position QR code */}
+            {/* White scan frame - visible border for positioning QR code */}
             {isScanning && (
               <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
-                {/* Scanning frame with animated corners - responsive sizing */}
                 <div 
-                  className="relative"
+                  className="relative border-2 border-white rounded-lg bg-black/30"
                   style={{ 
-                    width: 'min(90%, 280px)', 
-                    height: 'min(85%, 240px)',
-                    minWidth: '180px',
-                    minHeight: '160px'
+                    width: 'min(85%, 260px)', 
+                    height: 'min(75%, 260px)',
+                    minWidth: '160px',
+                    minHeight: '160px',
+                    boxShadow: 'inset 0 0 0 2px rgba(255,255,255,0.5), 0 0 0 9999px rgba(0,0,0,0.4)'
                   }}
                 >
-                  {/* Corner brackets - using larger sizes */}
-                  <div className="absolute top-0 left-0 border-t-4 border-l-4 border-green-400 rounded-tl-lg" style={{ width: '20%', height: '20%', minWidth: '40px', minHeight: '40px' }}></div>
-                  <div className="absolute top-0 right-0 border-t-4 border-r-4 border-green-400 rounded-tr-lg" style={{ width: '20%', height: '20%', minWidth: '40px', minHeight: '40px' }}></div>
-                  <div className="absolute bottom-0 left-0 border-b-4 border-l-4 border-green-400 rounded-bl-lg" style={{ width: '20%', height: '20%', minWidth: '40px', minHeight: '40px' }}></div>
-                  <div className="absolute bottom-0 right-0 border-b-4 border-r-4 border-green-400 rounded-br-lg" style={{ width: '20%', height: '20%', minWidth: '40px', minHeight: '40px' }}></div>
+                  {/* Corner brackets - green accent */}
+                  <div className="absolute top-0 left-0 border-t-2 border-l-2 border-green-400 rounded-tl" style={{ width: '25%', height: '25%' }}></div>
+                  <div className="absolute top-0 right-0 border-t-2 border-r-2 border-green-400 rounded-tr" style={{ width: '25%', height: '25%' }}></div>
+                  <div className="absolute bottom-0 left-0 border-b-2 border-l-2 border-green-400 rounded-bl" style={{ width: '25%', height: '25%' }}></div>
+                  <div className="absolute bottom-0 right-0 border-b-2 border-r-2 border-green-400 rounded-br" style={{ width: '25%', height: '25%' }}></div>
                   
                   {/* Scanning line animation */}
                   <div 

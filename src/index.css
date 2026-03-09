@@ -216,22 +216,14 @@ body {
   box-shadow: 0 0 8px 2px rgba(34, 197, 94, 0.6);
 }
 
-/* Fix html5-qrcode viewfinder blocking camera - the shaded region can render as a white block */
-/* Hide the library's viewfinder overlay so the full camera feed is visible for scanning */
-#receiving-qr-scanner #qr-shaded-region {
-  display: none !important;
-}
-#receiving-qr-scanner svg {
-  display: none !important;
-}
-#receiving-qr-scanner .qr-shaded-region {
-  display: none !important;
-}
-/* Ensure video stays visible - scanning works on the full frame */
+/* Delivery scanner - ensure video visible, make viewfinder semi-transparent */
 #receiving-qr-scanner video {
-  position: relative !important;
-  z-index: 1 !important;
   width: 100% !important;
   height: 100% !important;
   object-fit: cover !important;
+  display: block !important;
+}
+#receiving-qr-scanner #qr-shaded-region {
+  fill: rgba(0, 0, 0, 0.4) !important;
+  stroke: none !important;
 }
