@@ -351,6 +351,9 @@ export const useDeliveryProviderData = () => {
     
     if (!userId) {
       console.log('📦 useDeliveryProviderData: No userId available');
+      setActiveDeliveries([]);
+      setDeliveryHistory([]);
+      setPendingRequests([]);
       setLoading(false);
       return;
     }
@@ -723,20 +726,13 @@ export const useDeliveryProviderData = () => {
                   
                   // CRITICAL: delivery_requests.provider_id stores delivery_provider.id (UUID), NOT user_id
                   // So we MUST use providerIdToMatch (delivery_provider.id), not userId
-                  // If providerIdToMatch is null (lookup failed), we'll filter by matching purchase_orders later
+                  // If providerIdToMatch is null (lookup failed), EXCLUDE all - never show unfiltered data
+                  // (Previously we used providerMatch=true which caused 330→22 schedule count flakiness)
                   let providerMatch = false;
                   if (providerIdToMatch) {
                     providerMatch = d.provider_id === providerIdToMatch;
-                  } else {
-                    // Provider lookup failed - we'll include this delivery_request for now
-                    // It will be filtered later by matching with purchase_orders that have the correct provider
-                    providerMatch = true;
-                    console.warn('⚠️ Provider lookup failed - including delivery_request for later filtering:', {
-                      id: d.id?.substring(0, 8),
-                      status: d.status,
-                      purchase_order_id: d.purchase_order_id?.substring(0, 8) || 'NULL'
-                    });
                   }
+                  // else: providerMatch stays false - exclude to prevent wrong count on first load
                   
                   if (!providerMatch && statusMatch) {
                     console.warn('🚫 Filtered out delivery_request (wrong provider):', {
@@ -770,8 +766,8 @@ export const useDeliveryProviderData = () => {
               });
             } catch (filterError: any) {
               console.error('❌ Error in filtering process:', filterError);
-              // Return all deliveries if filtering fails (better than returning empty)
-              filtered = allDeliveries;
+              // Do NOT return all - that would show unfiltered data (schedule count 330→22 bug). Return empty.
+              filtered = [];
             }
             
             console.log('✅ Filtering complete, returning', filtered.length, 'deliveries');
