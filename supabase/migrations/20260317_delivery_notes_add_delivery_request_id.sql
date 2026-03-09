@@ -31,4 +31,12 @@ BEGIN
     ALTER TABLE delivery_notes ADD COLUMN delivery_date DATE;
     RAISE NOTICE 'Added delivery_date to delivery_notes';
   END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'delivery_notes' AND column_name = 'created_by'
+  ) THEN
+    ALTER TABLE delivery_notes ADD COLUMN created_by UUID REFERENCES auth.users(id);
+    RAISE NOTICE 'Added created_by to delivery_notes';
+  END IF;
 END $$;
