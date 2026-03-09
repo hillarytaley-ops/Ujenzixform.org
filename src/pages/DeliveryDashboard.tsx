@@ -587,14 +587,41 @@ const DeliveryDashboard = () => {
     }
   }, [user?.id]);
 
-  // Real-time subscription for new delivery requests and purchase_orders status updates
+  // Real-time subscription for delivery updates - including material_items (receive scans)
+  // CRITICAL: material_items subscription catches receive_scanned updates so orders move to Delivered tab
   useEffect(() => {
     if (!user?.id) return;
 
-    console.log('🔔 Setting up real-time subscription for delivery requests and purchase orders...');
+    console.log('🔔 Setting up real-time subscription for delivery requests, purchase orders, and material_items...');
+    
+    let materialItemsDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+    const debouncedRefetchFromMaterialItems = () => {
+      if (materialItemsDebounceTimer) clearTimeout(materialItemsDebounceTimer);
+      materialItemsDebounceTimer = setTimeout(() => {
+        materialItemsDebounceTimer = null;
+        console.log('📦 material_items changed (receive scan) - refetching delivery data...');
+        refetchData();
+        loadNotificationCounts();
+      }, 600);
+    };
     
     const channel = supabase
       .channel('delivery-requests-updates')
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'material_items'
+        },
+        (payload) => {
+          const newRow = payload.new as { receive_scanned?: boolean };
+          if (newRow?.receive_scanned === true) {
+            console.log('📦 material_items receive_scanned=true - will refetch');
+            debouncedRefetchFromMaterialItems();
+          }
+        }
+      )
       .on(
         'postgres_changes',
         {
@@ -618,8 +645,7 @@ const DeliveryDashboard = () => {
         {
           event: 'UPDATE',
           schema: 'public',
-          table: 'delivery_requests',
-          filter: `provider_id=eq.${user.id}`
+          table: 'delivery_requests'
         },
         (payload) => {
           console.log('📦 Delivery request updated:', payload);
@@ -669,8 +695,7 @@ const DeliveryDashboard = () => {
         {
           event: 'UPDATE',
           schema: 'public',
-          table: 'purchase_orders',
-          filter: `delivery_provider_id=eq.${user.id}`
+          table: 'purchase_orders'
         },
         (payload) => {
           console.log('📦 Purchase order status updated:', payload.new.status);
@@ -717,6 +742,7 @@ const DeliveryDashboard = () => {
       .subscribe();
 
     return () => {
+      if (materialItemsDebounceTimer) clearTimeout(materialItemsDebounceTimer);
       console.log('🔔 Cleaning up delivery requests subscription');
       supabase.removeChannel(channel);
     };
