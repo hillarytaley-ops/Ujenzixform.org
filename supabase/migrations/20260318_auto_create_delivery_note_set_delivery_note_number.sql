@@ -1,6 +1,6 @@
 -- ============================================================
--- Fix: auto_create_delivery_note() must set delivery_note_number (NOT NULL)
--- INSERT was failing with 23502 when column exists and is NOT NULL.
+-- Fix: auto_create_delivery_note() must set delivery_note_number and file_path (NOT NULL).
+-- INSERT was failing with 23502 when these columns exist and are NOT NULL.
 -- Created: March 18, 2026
 -- ============================================================
 
@@ -66,7 +66,8 @@ BEGIN
             delivery_time,
             items,
             status,
-            created_by
+            created_by,
+            file_path
         ) VALUES (
             NEW.id,
             v_delivery_request_id,
@@ -80,7 +81,8 @@ BEGIN
             NOW(),
             v_items,
             'pending_signature',
-            auth.uid()
+            auth.uid(),
+            ''
         );
 
         RAISE NOTICE 'Auto-created Delivery Note % for purchase order %', v_dn_number, NEW.id;
