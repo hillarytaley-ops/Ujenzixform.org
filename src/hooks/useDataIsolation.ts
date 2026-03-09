@@ -532,7 +532,48 @@ export const useDeliveryProviderData = () => {
       
       console.log('📦 Starting to fetch active deliveries for provider:', userId);
       
-      // Fetch from BOTH tables in parallel for better performance
+      // Try RPC first (server-side, bypasses RLS) - ensures dispatched orders show in In Transit
+      try {
+        const rpcPromise = (supabase as any).rpc('get_active_deliveries_for_provider');
+        const rpcResult = await Promise.race([
+          rpcPromise,
+          new Promise<{ data: null; error: Error }>((_, rj) => setTimeout(() => rj({ data: null, error: new Error('RPC timeout') }), 10000))
+        ]).catch(() => ({ data: null, error: true })) as { data: unknown; error: unknown };
+        const rpcData = Array.isArray(rpcResult?.data) ? rpcResult.data : (typeof rpcResult?.data === 'object' && rpcResult?.data !== null && Array.isArray((rpcResult.data as any)?.data) ? (rpcResult.data as any).data : null);
+        let rpcDeliveries: any[] = [];
+        if (rpcData && Array.isArray(rpcData)) {
+          rpcDeliveries = rpcData;
+        } else if (rpcData && typeof rpcData === 'object' && !Array.isArray(rpcData)) {
+          rpcDeliveries = [rpcData];
+        }
+        // RPC is authoritative - use all returned data
+        const validRpc = rpcDeliveries.filter((d: any) => d && (d.id || d.purchase_order_id));
+        if (validRpc.length > 0) {
+          console.log('✅ RPC get_active_deliveries_for_provider: got', validRpc.length, 'deliveries');
+          const inTransitCount = validRpc.filter((d: any) => (d._categorized_status || d.status) === 'in_transit').length;
+          console.log('🚚 RPC in_transit count:', inTransitCount);
+          setActiveDeliveries(validRpc);
+          setLoading(false);
+          clearTimeout(safetyTimeout);
+          // Still fetch deliveryHistory (separate path)
+          try {
+            const { data: deliveredData } = await supabase.rpc('get_delivered_orders_for_provider').then((r: any) => r).catch(() => ({ data: [] }));
+            const delivered = Array.isArray(deliveredData) ? deliveredData : [];
+            setDeliveryHistory(delivered.map((po: any) => ({ ...po, status: 'delivered', completed_at: po.delivered_at || po.updated_at })));
+          } catch {
+            // Ignore
+          }
+          return;
+        } else if (rpcDeliveries.length > 0) {
+          console.log('⚠️ RPC returned', rpcDeliveries.length, 'deliveries but 0 with real order numbers - falling back to REST');
+        } else {
+          console.log('📦 RPC returned empty or failed - falling back to REST fetch');
+        }
+      } catch (rpcErr: any) {
+        console.warn('⚠️ RPC get_active_deliveries_for_provider failed:', rpcErr?.message || rpcErr);
+      }
+      
+      // Fetch from BOTH tables in parallel for better performance (fallback)
       const [deliveryRequestsResult, purchaseOrdersResult] = await Promise.allSettled([
         // 1. Fetch from delivery_requests
         (async () => {
