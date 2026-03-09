@@ -371,7 +371,11 @@ const DeliveryDashboard = () => {
     _received_count: row._received_count,
   }), []);
 
-  // Single source of truth (legacy fallback when not using unified): categorize each delivery so badge counts and tab content always match
+  // When unified RPC returns empty (e.g. auth context in SQL Editor), use legacy data so dashboard always shows something
+  const hasUnifiedData = (unifiedScheduled.length + unifiedInTransit.length + unifiedDelivered.length) > 0;
+  const useLegacyFallback = !hasUnifiedData;
+
+  // Single source of truth (legacy fallback when unified returns empty): categorize each delivery so badge counts and tab content always match
   const deliveryCategories = useMemo(() => {
     const getCategory = (d: any): 'scheduled' | 'in_transit' | 'delivered' => {
       const cat = String(d._categorized_status || d.status || '').toLowerCase();
@@ -1522,55 +1526,71 @@ const DeliveryDashboard = () => {
                   <TabsTrigger value="scheduled" className="flex items-center gap-2">
                     <Calendar className="h-4 w-4" />
                     Scheduled
-                    {unifiedScheduled.length > 0 ? (
-                      <Badge className="ml-1 bg-blue-500 text-white text-xs">{unifiedScheduled.length}</Badge>
+                    {(useLegacyFallback ? deliveryCategories.scheduled.length : unifiedScheduled.length) > 0 ? (
+                      <Badge className="ml-1 bg-blue-500 text-white text-xs">
+                        {useLegacyFallback ? deliveryCategories.scheduled.length : unifiedScheduled.length}
+                      </Badge>
                     ) : null}
                   </TabsTrigger>
                   <TabsTrigger value="in_transit" className="flex items-center gap-2">
                     <Truck className="h-4 w-4" />
                     In Transit
-                    {unifiedInTransit.length > 0 ? (
-                      <Badge className="ml-1 bg-purple-500 text-white text-xs">{unifiedInTransit.length}</Badge>
+                    {(useLegacyFallback ? deliveryCategories.inTransit.length : unifiedInTransit.length) > 0 ? (
+                      <Badge className="ml-1 bg-purple-500 text-white text-xs">
+                        {useLegacyFallback ? deliveryCategories.inTransit.length : unifiedInTransit.length}
+                      </Badge>
                     ) : null}
                   </TabsTrigger>
                   <TabsTrigger value="delivered" className="flex items-center gap-2">
                     <CheckCircle className="h-4 w-4" />
                     Delivered
-                    {unifiedDelivered.length > 0 ? (
-                      <Badge className="ml-1 bg-green-500 text-white text-xs">{unifiedDelivered.length}</Badge>
-                    ) : null}
+                    {(() => {
+                      const deliveredCount = useLegacyFallback
+                        ? (() => { const k = (x: any) => (x.order_number || x.po_number || '').toString().split('-')[1] || x.purchase_order_id || x.id || ''; const s = new Set<string>(); [...deliveryCategories.deliveredFromActive, ...deliveryHistory].forEach(d => { const v = k(d); if (v) s.add(v); }); return s.size; })()
+                        : unifiedDelivered.length;
+                      return deliveredCount > 0 ? (
+                        <Badge className="ml-1 bg-green-500 text-white text-xs">{deliveredCount}</Badge>
+                      ) : null;
+                    })()}
                   </TabsTrigger>
                 </TabsList>
 
-                {/* Scheduled - from unified RPC (same source as badge) */}
+                {/* Scheduled - unified RPC or legacy fallback */}
                 <TabsContent value="scheduled" className="mt-4">
                   <div className="space-y-4">
-                    {unifiedLoading ? (
-                        <div className="flex items-center justify-center py-12">
-                          <RefreshCw className="h-8 w-8 animate-spin text-teal-500" />
-                        </div>
-                    ) : unifiedScheduled.length > 0 ? (
+                    {(() => {
+                      const scheduled = useLegacyFallback ? deliveryCategories.scheduled : unifiedScheduled.map(toCardDelivery);
+                      const showSpinner = !useLegacyFallback && unifiedLoading && scheduled.length === 0;
+                      if (showSpinner) {
+                        return (
+                          <div className="flex items-center justify-center py-12">
+                            <RefreshCw className="h-8 w-8 animate-spin text-teal-500" />
+                          </div>
+                        );
+                      }
+                      if (scheduled.length > 0) {
+                        return (
                         <div className="space-y-4">
                           <div className="flex items-center gap-2 mb-3">
                             <div className="h-2 w-2 bg-blue-500 rounded-full animate-pulse" />
                             <h3 className={`text-lg font-semibold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
-                              📅 Scheduled ({unifiedScheduled.length})
+                              📅 Scheduled ({scheduled.length})
                             </h3>
                           </div>
-                          {unifiedScheduled
-                            .map((row) => toCardDelivery(row))
-                            .map((delivery) => (
+                          {scheduled.map((delivery) => (
                               <DeliveryRequestCard
                                 key={delivery.id}
                                 delivery={delivery}
                                 isDarkMode={isDarkMode}
-                                onNavigate={(delivery) => console.log('Navigate to:', delivery)}
+                                onNavigate={() => {}}
                                 onCall={(phone) => window.open(`tel:${phone}`)}
                                 onCaptureProof={(id) => setShowProofCapture(id)}
                               />
                             ))}
                         </div>
-                    ) : (
+                        );
+                      }
+                      return (
                         <Card className={isDarkMode ? 'bg-gray-800 border-gray-700' : ''}>
                           <CardContent className="py-12 text-center">
                             <Calendar className={`h-12 w-12 ${isDarkMode ? 'text-gray-600' : 'text-gray-300'} mx-auto mb-4`} />
@@ -1578,32 +1598,39 @@ const DeliveryDashboard = () => {
                             <p className={`text-sm ${isDarkMode ? 'text-gray-500' : 'text-gray-400'}`}>Accepted deliveries will appear here</p>
                           </CardContent>
                         </Card>
-                    )}
+                      );
+                    })()}
                   </div>
                 </TabsContent>
 
-                {/* In Transit - from unified RPC (same source as badge) */}
                 <TabsContent value="in_transit" className="mt-4">
                   <div className="space-y-4">
-                    {unifiedLoading ? (
-                        <div className="flex items-center justify-center py-12">
-                          <RefreshCw className="h-8 w-8 animate-spin text-teal-500" />
-                        </div>
-                    ) : unifiedInTransit.length > 0 ? (
+                    {(() => {
+                      const inTransit = useLegacyFallback ? deliveryCategories.inTransit : unifiedInTransit.map(toCardDelivery);
+                      const showSpinner = !useLegacyFallback && unifiedLoading && inTransit.length === 0;
+                      if (showSpinner) {
+                        return (
+                          <div className="flex items-center justify-center py-12">
+                            <RefreshCw className="h-8 w-8 animate-spin text-teal-500" />
+                          </div>
+                        );
+                      }
+                      if (inTransit.length > 0) {
+                        return (
                         <div className="space-y-4">
                           <div className="flex items-center gap-2 mb-3">
                             <div className="h-2 w-2 bg-purple-500 rounded-full animate-pulse" />
                             <h3 className={`text-lg font-semibold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
-                              🚚 In Transit ({unifiedInTransit.length})
+                              🚚 In Transit ({inTransit.length})
                             </h3>
                           </div>
                           <Alert className="mb-4 bg-purple-50 border-purple-200">
                             <Truck className="h-4 w-4 text-purple-600" />
                             <AlertDescription className="text-purple-700">
-                              Supplier has dispatched (see their QR tab). Navigate to the delivery location and <strong>scan all item QR codes</strong> to complete. Order moves to Delivered when every item is scanned.
+                              Supplier has dispatched. Navigate to the delivery location and <strong>scan all item QR codes</strong> to complete.
                             </AlertDescription>
                           </Alert>
-                          {unifiedInTransit.map((row) => toCardDelivery(row)).map((delivery) => (
+                          {inTransit.map((delivery) => (
                             <Card key={delivery.id} className={isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-2 border-purple-100'}>
                               <CardContent className="p-6">
                                 <div className="space-y-4">
@@ -1745,19 +1772,22 @@ const DeliveryDashboard = () => {
                             </Card>
                           ))}
                         </div>
-                      ) : (
+                        );
+                      }
+                      return (
                         <Card className={isDarkMode ? 'bg-gray-800 border-gray-700' : ''}>
                           <CardContent className="py-12 text-center">
                             <Truck className={`h-12 w-12 ${isDarkMode ? 'text-gray-600' : 'text-gray-300'} mx-auto mb-4`} />
                             <p className={isDarkMode ? 'text-gray-400' : 'text-gray-500'}>No deliveries in transit</p>
-                            <p className={`text-sm ${isDarkMode ? 'text-gray-500' : 'text-gray-400'}`}>Active deliveries will appear here when in transit</p>
+                            <p className={`text-sm ${isDarkMode ? 'text-gray-500' : 'text-gray-400'}`}>Active deliveries will appear here when supplier dispatches</p>
                           </CardContent>
                         </Card>
-                    )}
+                      );
+                    })()}
                   </div>
                 </TabsContent>
 
-                {/* Delivered - from unified RPC (same source as badge) */}
+                {/* Delivered - unified RPC or legacy fallback */}
                 <TabsContent value="delivered" className="mt-4">
                   <Card className={isDarkMode ? 'bg-gray-800 border-gray-700' : ''}>
                     <CardHeader>
@@ -1765,7 +1795,9 @@ const DeliveryDashboard = () => {
                         <div>
                           <CardTitle className={isDarkMode ? 'text-white' : ''}>Delivered</CardTitle>
                           <CardDescription className={isDarkMode ? 'text-gray-400' : ''}>
-                            Completed deliveries (all items scanned) • {unifiedDelivered.length} total
+                            {useLegacyFallback
+                              ? `Completed • ${(() => { const k = (d: any) => (d.order_number || d.po_number || '').toString().split('-')[1] || d.purchase_order_id || d.id || ''; const s = new Set<string>(); [...deliveryCategories.deliveredFromActive, ...deliveryHistory].forEach(d => { const v = k(d); if (v) s.add(v); }); return s.size; })()} total`
+                              : `Completed deliveries (all items scanned) • ${unifiedDelivered.length} total`}
                           </CardDescription>
                         </div>
                         <Button variant="outline" size="sm" onClick={() => { refetchData(); refetchUnified(); }}>
@@ -1775,31 +1807,42 @@ const DeliveryDashboard = () => {
                       </div>
                     </CardHeader>
                     <CardContent>
-                      {unifiedLoading ? (
-                        <div className="flex items-center justify-center py-12">
-                          <RefreshCw className="h-8 w-8 animate-spin text-teal-500" />
-                        </div>
-                      ) : unifiedDelivered.length === 0 ? (
-                        <div className="text-center py-12">
-                          <Package className="h-12 w-12 mx-auto text-gray-400 mb-4" />
-                          <p className={`text-lg font-medium ${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`}>
-                            No delivered orders yet
-                          </p>
-                          <p className={`text-sm ${isDarkMode ? 'text-gray-500' : 'text-gray-400'}`}>
-                            Completed deliveries will appear here after you scan all item QR codes
-                          </p>
-                        </div>
-                      ) : (
+                      {(() => {
+                        const getKey = (d: any) => ((d.order_number || d.po_number || '').toString().split('-')[1] || d.purchase_order_id || d.id || '');
+                        const legacyDelivered = [...deliveryCategories.deliveredFromActive, ...deliveryHistory];
+                        const seenKeys = new Set<string>();
+                        const uniqueLegacy = legacyDelivered.filter(d => { const k = getKey(d); if (!k || seenKeys.has(k)) return false; seenKeys.add(k); return true; });
+                        const deliveredList = useLegacyFallback
+                          ? uniqueLegacy.sort((a, b) => new Date((b as any).completed_at || (b as any).delivered_at || (b as any).updated_at || 0).getTime() - new Date((a as any).completed_at || (a as any).delivered_at || (a as any).updated_at || 0).getTime())
+                          : unifiedDelivered;
+                        const showSpinner = !useLegacyFallback && unifiedLoading && deliveredList.length === 0;
+                        if (showSpinner) {
+                          return (
+                            <div className="flex items-center justify-center py-12">
+                              <RefreshCw className="h-8 w-8 animate-spin text-teal-500" />
+                            </div>
+                          );
+                        }
+                        if (deliveredList.length === 0) {
+                          return (
+                            <div className="text-center py-12">
+                              <Package className="h-12 w-12 mx-auto text-gray-400 mb-4" />
+                              <p className={`text-lg font-medium ${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`}>No delivered orders yet</p>
+                              <p className={`text-sm ${isDarkMode ? 'text-gray-500' : 'text-gray-400'}`}>Completed deliveries will appear here after you scan all item QR codes</p>
+                            </div>
+                          );
+                        }
+                        return (
                         <div className="space-y-4">
-                            {unifiedDelivered.map((row, index) => {
-                              const delivery = toCardDelivery(row);
-                              const completedAt = row.delivered_at || row.updated_at || row.created_at;
+                            {deliveredList.map((item: any, index: number) => {
+                              const delivery = useLegacyFallback ? { ...item, delivery_location: item.delivery_location || item.delivery_address || 'N/A', material_type: item.material_type || 'Materials', pickup_location: item.pickup_location || 'N/A' } : toCardDelivery(item);
+                              const completedAt = useLegacyFallback ? (item.completed_at || item.delivered_at || item.updated_at || item.created_at) : (item.delivered_at || item.updated_at || item.created_at);
                               const completedDate = new Date(completedAt);
                               const isToday = completedDate.toDateString() === new Date().toDateString();
                               const isYesterday = completedDate.toDateString() === new Date(Date.now() - 86400000).toDateString();
                               
                               return (
-                                <div key={row.id || row.purchase_order_id} className={`flex items-center justify-between p-4 ${isDarkMode ? 'bg-gray-700' : 'bg-gray-50'} rounded-lg hover:${isDarkMode ? 'bg-gray-600' : 'bg-gray-100'} transition-colors border-l-4 ${index === 0 ? 'border-l-green-500' : 'border-l-gray-300'}`}>
+                                <div key={item.id || item.purchase_order_id} className={`flex items-center justify-between p-4 ${isDarkMode ? 'bg-gray-700' : 'bg-gray-50'} rounded-lg hover:${isDarkMode ? 'bg-gray-600' : 'bg-gray-100'} transition-colors border-l-4 ${index === 0 ? 'border-l-green-500' : 'border-l-gray-300'}`}>
                                   <div className="flex items-center gap-4">
                                     <div className={`p-2 ${isDarkMode ? 'bg-gray-600' : 'bg-white'} rounded-lg shadow-sm`}>
                                       <CheckCircle className="h-8 w-8 text-green-500" />
@@ -1845,7 +1888,8 @@ const DeliveryDashboard = () => {
                               );
                             })}
                         </div>
-                      )}
+                        );
+                      })()}
                     </CardContent>
                   </Card>
                 </TabsContent>
