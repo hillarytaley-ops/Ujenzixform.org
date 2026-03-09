@@ -1817,7 +1817,7 @@ const DeliveryDashboard = () => {
                                     <Button
                                       variant="outline"
                                       size="sm"
-                                      title="If you already scanned all items but order is still here, click to sync status to Delivered"
+                                      title="Scanned but still here? Click to mark items received and move to Delivered"
                                       onClick={async () => {
                                         const poId = delivery.order_number || delivery.purchase_order_id;
                                         if (!poId) {
@@ -1825,17 +1825,17 @@ const DeliveryDashboard = () => {
                                           return;
                                         }
                                         try {
-                                          const { data, error } = await (supabase as any).rpc('sync_po_to_delivered_if_all_received', { po_identifier: poId });
+                                          const { data, error } = await (supabase as any).rpc('mark_material_items_received_for_po', { po_identifier: poId });
                                           if (error) {
                                             toast({ title: 'Sync failed', description: error.message || 'RPC error', variant: 'destructive' });
                                             return;
                                           }
                                           if (data?.success) {
-                                            toast({ title: '✅ Synced', description: 'Order moved to Delivered. Refreshing...' });
+                                            toast({ title: '✅ Marked received', description: data?.message || 'Order moving to Delivered. Refreshing...' });
                                             await refetchData();
                                             setDeliveriesSubTab('delivered');
                                           } else {
-                                            toast({ title: 'Could not sync', description: data?.message || 'Not all items received yet', variant: 'destructive' });
+                                            toast({ title: 'Could not sync', description: data?.message || 'Order not found', variant: 'destructive' });
                                           }
                                         } catch (e: any) {
                                           toast({ title: 'Sync failed', description: e?.message || 'Network error', variant: 'destructive' });
