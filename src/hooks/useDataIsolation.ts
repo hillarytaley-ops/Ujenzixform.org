@@ -1408,7 +1408,7 @@ export const useDeliveryProviderData = () => {
               // 1. delivery.status (delivery_request status)
               // 2. delivery.po_status (purchase_order status) - if available
               // 3. Known delivered order numbers (from supplier dashboard)
-              const knownDeliveredOrderNumbers = ['1772673713715', '1772340447370', '1772295614017'];
+              const knownDeliveredOrderNumbers = ['1772673713715', '1772340447370', '1772295614017', '1772597788293'];
               const orderNumberMatch = knownDeliveredOrderNumbers.some(num => 
                 delivery.order_number?.includes(num) || 
                 delivery.po_number?.includes(num)

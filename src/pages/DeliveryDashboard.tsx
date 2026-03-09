@@ -1554,12 +1554,16 @@ const DeliveryDashboard = () => {
                                              d.po_number?.includes('1772673713715');
                         
                         // CRITICAL: Exclude delivered orders - check ALL status sources
+                        // Also exclude when all items received (in case categorization missed it)
+                        const allItemsReceived = (d._items_count != null && d._received_count != null && 
+                                                  d._items_count > 0 && d._received_count >= d._items_count);
                         const isDelivered = categorizedStatus === 'delivered' || 
                                            categorizedStatus === 'completed' ||
                                            originalStatus === 'delivered' || 
                                            originalStatus === 'completed' ||
                                            poStatus === 'delivered' ||
-                                           poStatus === 'completed';
+                                           poStatus === 'completed' ||
+                                           allItemsReceived;
                         
                         if (isDelivered) {
                           if (isTargetOrder) {
