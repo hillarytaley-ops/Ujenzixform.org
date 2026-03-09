@@ -380,7 +380,35 @@ export const useDeliveryProviderData = () => {
       } catch (e) {}
       
       console.log('⚡ FAST PATH: Loading accepted orders immediately for provider:', userId);
-      
+
+      // Prefer RPC so we get all orders (provider_id = id OR auth.uid()) in one call; bypasses RLS
+      let fastPathUsedRpc = false;
+      try {
+        const { data: rpcActive } = await supabase.rpc('get_active_deliveries_for_provider');
+        const rpcList = Array.isArray(rpcActive) ? rpcActive : [];
+        const isRealOrder = (orderNum: string | null) => {
+          if (!orderNum || !String(orderNum).trim()) return false;
+          return !/^PO-[A-F0-9]{8}$/i.test(String(orderNum));
+        };
+        const fromRpc = rpcList.filter((d: any) => isRealOrder(d?.order_number));
+        if (fromRpc.length > 0) {
+          const inTransitStatuses = ['dispatched', 'in_transit', 'picked_up', 'out_for_delivery', 'delivery_arrived', 'shipped', 'on_the_way'];
+          const withCat = fromRpc.map((d: any) => {
+            const raw = (d.status || '').toLowerCase();
+            const _cat = inTransitStatuses.includes(raw) ? 'in_transit' : (raw === 'delivered' || raw === 'completed' ? 'delivered' : (d._categorized_status || 'scheduled'));
+            return { ...d, _categorized_status: _cat };
+          });
+          setActiveDeliveries(withCat);
+          fastPathCountRef.current = withCat.length;
+          setLoading(false);
+          fastPathUsedRpc = true;
+          console.log('⚡ FAST PATH: RPC returned', withCat.length, 'active deliveries (incl. auth.uid), in_transit:', withCat.filter((d: any) => d._categorized_status === 'in_transit').length);
+        }
+      } catch (rpcErr) {
+        console.log('⚡ FAST PATH: RPC skipped, using REST:', (rpcErr as Error)?.message);
+      }
+
+      if (!fastPathUsedRpc) {
       // First, try to get the delivery_provider.id for this user
       let providerIdToUse = userId;
       try {
@@ -515,6 +543,7 @@ export const useDeliveryProviderData = () => {
           console.log('⚡ FAST PATH: No accepted orders found, continuing full fetch...');
         }
       }
+      } // end if (!fastPathUsedRpc)
     } catch (e) {
       console.warn('⚡ FAST PATH failed, continuing with full fetch:', e);
     }
