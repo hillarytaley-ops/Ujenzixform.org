@@ -39,7 +39,7 @@ BEGIN
     v_provider_id := auth.uid();
   END IF;
 
-  -- Final fallback: if no delivery_providers row, use auth.uid() so orders linked by user id still show
+  -- Final fallback: use auth.uid() so orders linked by user id still show
   IF v_provider_id IS NULL AND auth.uid() IS NOT NULL THEN
     v_provider_id := auth.uid();
   END IF;

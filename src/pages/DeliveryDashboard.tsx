@@ -371,10 +371,6 @@ const DeliveryDashboard = () => {
     _received_count: row._received_count,
   }), []);
 
-  // When unified RPC returns empty (e.g. auth context in SQL Editor), use legacy data so dashboard always shows something
-  const hasUnifiedData = (unifiedScheduled.length + unifiedInTransit.length + unifiedDelivered.length) > 0;
-  const useLegacyFallback = !hasUnifiedData;
-
   // Single source of truth (legacy fallback when unified returns empty): categorize each delivery so badge counts and tab content always match
   const deliveryCategories = useMemo(() => {
     const getCategory = (d: any): 'scheduled' | 'in_transit' | 'delivered' => {
@@ -398,6 +394,12 @@ const DeliveryDashboard = () => {
     });
     return { scheduled, inTransit, deliveredFromActive };
   }, [activeDeliveries]);
+
+  // When unified RPC returns empty or legacy has more data (FAST PATH/REST wins), use legacy so dashboard always shows something
+  const unifiedCount = unifiedScheduled.length + unifiedInTransit.length + unifiedDelivered.length;
+  const legacyCount = deliveryCategories.scheduled.length + deliveryCategories.inTransit.length + deliveryCategories.deliveredFromActive.length + deliveryHistory.length;
+  const hasUnifiedData = unifiedCount > 0;
+  const useLegacyFallback = !hasUnifiedData || (legacyCount > unifiedCount);
 
   // ============================================================
   // AGGRESSIVE APPROACH: FORCE-ADD 3 KNOWN DELIVERED ORDERS
