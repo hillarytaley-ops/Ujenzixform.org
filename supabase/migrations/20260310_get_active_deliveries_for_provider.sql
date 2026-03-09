@@ -16,11 +16,20 @@ DECLARE
   v_provider_id UUID;
   v_result JSONB := '[]'::JSONB;
 BEGIN
-  -- Get delivery_provider.id for current user
+  -- Get delivery_provider.id for current user (multiple fallbacks)
   SELECT id INTO v_provider_id
   FROM delivery_providers
   WHERE user_id = auth.uid()
   LIMIT 1;
+  
+  IF v_provider_id IS NULL THEN
+    -- Fallback: delivery_providers.user_id = delivery_provider_registrations.auth_user_id
+    SELECT dp.id INTO v_provider_id
+    FROM delivery_provider_registrations dpr
+    JOIN delivery_providers dp ON dp.user_id = dpr.auth_user_id
+    WHERE dpr.auth_user_id = auth.uid()
+    LIMIT 1;
+  END IF;
   
   IF v_provider_id IS NULL THEN
     RETURN v_result;
@@ -114,3 +123,32 @@ GRANT EXECUTE ON FUNCTION public.get_active_deliveries_for_provider() TO authent
 
 COMMENT ON FUNCTION public.get_active_deliveries_for_provider() IS 
   'Returns active (scheduled + in_transit) deliveries for current provider. Uses material_items for categorization. Bypasses RLS for reliable provider dashboard.';
+
+-- Diagnostic RPC: run when get_active_deliveries_for_provider returns []
+-- Returns {provider_id, auth_uid, dr_count} to debug empty results
+CREATE OR REPLACE FUNCTION public.debug_provider_deliveries()
+RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_provider_id UUID;
+  v_dr_count INT;
+BEGIN
+  SELECT id INTO v_provider_id FROM delivery_providers WHERE user_id = auth.uid() LIMIT 1;
+  IF v_provider_id IS NULL THEN
+    SELECT dp.id INTO v_provider_id FROM delivery_provider_registrations dpr
+    JOIN delivery_providers dp ON dp.user_id = dpr.auth_user_id
+    WHERE dpr.auth_user_id = auth.uid() LIMIT 1;
+  END IF;
+  SELECT COUNT(*) INTO v_dr_count FROM delivery_requests WHERE provider_id = v_provider_id AND status NOT IN ('delivered','completed','cancelled');
+  RETURN jsonb_build_object(
+    'auth_uid', auth.uid(),
+    'provider_id', v_provider_id,
+    'delivery_requests_count', v_dr_count,
+    'provider_found', v_provider_id IS NOT NULL
+  );
+END;
+$$;
+GRANT EXECUTE ON FUNCTION public.debug_provider_deliveries() TO authenticated;
