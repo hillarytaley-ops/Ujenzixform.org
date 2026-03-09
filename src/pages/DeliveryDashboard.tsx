@@ -54,7 +54,7 @@ import { DeliveryRequestCard } from "@/components/delivery/DeliveryRequestCard";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useToast } from "@/hooks/use-toast";
 import { useDeliveryProviderData, logDataAccessAttempt } from "@/hooks/useDataIsolation";
-import { MessageSquare, User, QrCode, Scan, RefreshCw } from "lucide-react";
+import { MessageSquare, User, QrCode, Scan, RefreshCw, Link2 } from "lucide-react";
 import { InAppCommunication } from "@/components/communication/InAppCommunication";
 import { ProfileEditDialog } from "@/components/profile/ProfileEditDialog";
 import { ProfileViewDialog } from "@/components/profile/ProfileViewDialog";
@@ -1397,19 +1397,50 @@ const DeliveryDashboard = () => {
           <TabsContent value="deliveries">
             <div className="space-y-4">
               {/* Workflow: Accept → Scheduled → In Transit → Delivered */}
-              <div className={`flex flex-wrap items-center gap-2 text-xs px-3 py-2 rounded-lg ${isDarkMode ? 'bg-teal-900/20 border border-teal-800' : 'bg-teal-50 border border-teal-200'}`}>
-                <span className="font-medium text-teal-700">Delivery flow:</span>
-                <span>Accept</span>
-                <ChevronRight className="h-3 w-3 text-teal-500" />
-                <span>Scheduled</span>
-                <ChevronRight className="h-3 w-3 text-teal-500" />
-                <span>Supplier dispatches</span>
-                <ChevronRight className="h-3 w-3 text-teal-500" />
-                <span>In Transit</span>
-                <ChevronRight className="h-3 w-3 text-teal-500" />
-                <span>You scan received</span>
-                <ChevronRight className="h-3 w-3 text-teal-500" />
-                <span>Delivered</span>
+              <div className={`flex flex-wrap items-center justify-between gap-2 text-xs px-3 py-2 rounded-lg ${isDarkMode ? 'bg-teal-900/20 border border-teal-800' : 'bg-teal-50 border border-teal-200'}`}>
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="font-medium text-teal-700">Delivery flow:</span>
+                  <span>Accept</span>
+                  <ChevronRight className="h-3 w-3 text-teal-500" />
+                  <span>Scheduled</span>
+                  <ChevronRight className="h-3 w-3 text-teal-500" />
+                  <span>Supplier dispatches</span>
+                  <ChevronRight className="h-3 w-3 text-teal-500" />
+                  <span>In Transit</span>
+                  <ChevronRight className="h-3 w-3 text-teal-500" />
+                  <span>You scan received</span>
+                  <ChevronRight className="h-3 w-3 text-teal-500" />
+                  <span>Delivered</span>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="shrink-0 text-xs"
+                  title="If an In Transit or Scheduled order is missing, click to link it to your provider account"
+                  onClick={async () => {
+                    try {
+                      const { data, error } = await (supabase as any).rpc('link_my_deliveries_to_provider_id');
+                      if (error) {
+                        toast({ title: 'Link failed', description: error.message, variant: 'destructive' });
+                        return;
+                      }
+                      const res = data as { success?: boolean; message?: string; updated_dr?: number; updated_po?: number };
+                      if (res?.success && (res?.updated_dr > 0 || res?.updated_po > 0)) {
+                        toast({ title: 'Links updated', description: res.message || 'Your deliveries are now linked. Refreshing…' });
+                        await refetchData();
+                      } else if (res?.success) {
+                        toast({ title: 'Already linked', description: 'All your deliveries are already linked.' });
+                      } else {
+                        toast({ title: 'Could not link', description: res?.message || 'No provider account found.' });
+                      }
+                    } catch (e: any) {
+                      toast({ title: 'Error', description: e?.message || 'Failed to link deliveries', variant: 'destructive' });
+                    }
+                  }}
+                >
+                  <Link2 className="h-3.5 w-3.5 mr-1" />
+                  Link my deliveries
+                </Button>
               </div>
               {/* Sub-tabs for Deliveries - Only accepted jobs */}
               <Tabs value={deliveriesSubTab} onValueChange={setDeliveriesSubTab} className="w-full">
