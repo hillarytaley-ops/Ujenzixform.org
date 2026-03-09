@@ -322,6 +322,7 @@ export const useDeliveryProviderData = () => {
   const { user } = useAuth();
   const [loading, setLoading] = useState(true);
   const acceptingRef = useRef<string | null>(null); // Track which delivery is being accepted
+  const fastPathSetRef = useRef(false); // Don't let REST overwrite FAST PATH data with empty
   const [error, setError] = useState<string | null>(null);
   const [profile, setProfile] = useState<any>(null);
   const [activeDeliveries, setActiveDeliveries] = useState<any[]>([]);
@@ -361,6 +362,7 @@ export const useDeliveryProviderData = () => {
     console.log('📦 useDeliveryProviderData: Fetching data for userId:', userId);
     setLoading(true);
     setError(null);
+    fastPathSetRef.current = false;
     
     // ⚡ FAST PATH: Immediately load accepted orders to show in Schedule tab
     // This runs first and sets data instantly, then the full fetch continues in background
@@ -460,13 +462,16 @@ export const useDeliveryProviderData = () => {
                 return { ...d, _categorized_status: _cat, _items_count: stats?.total ?? 0, _dispatched_count: stats?.dispatched ?? 0, _received_count: stats?.received ?? 0 };
               });
               setActiveDeliveries(enriched);
+              fastPathSetRef.current = true;
               const inTransit = enriched.filter((d: any) => d._categorized_status === 'in_transit').length;
               if (inTransit > 0) console.log('⚡ FAST PATH: Enriched -', inTransit, 'in transit (from material_items)');
             } catch (e) {
               setActiveDeliveries(quickDeliveries);
+              fastPathSetRef.current = true;
             }
           } else {
             setActiveDeliveries(quickDeliveries);
+            fastPathSetRef.current = true;
           }
           setLoading(false); // Show data immediately!
         } else {
@@ -975,12 +980,17 @@ export const useDeliveryProviderData = () => {
         
         console.log('📦 Setting ONLY REAL deliveries:', realDeliveries.length, 'out of', activeData.length, 'total');
         console.log('🚨 Filtered out', activeData.length - realDeliveries.length, 'fake orders');
-        console.log('📋 Sample real deliveries:', realDeliveries.slice(0, 3).map((d: any) => ({
-          id: d.id?.substring(0, 8),
-          status: d.status,
-          order_number: d.order_number
-        })));
-        setActiveDeliveries(realDeliveries);
+        // Don't overwrite FAST PATH data with empty (REST can return 0 when provider lookup fails)
+        if (realDeliveries.length === 0 && fastPathSetRef.current) {
+          console.log('📦 REST fallback: Keeping FAST PATH data (avoid overwrite with empty)');
+        } else {
+          console.log('📋 Sample real deliveries:', realDeliveries.slice(0, 3).map((d: any) => ({
+            id: d.id?.substring(0, 8),
+            status: d.status,
+            order_number: d.order_number
+          })));
+          setActiveDeliveries(realDeliveries);
+        }
         setLoading(false); // Clear loading state so UI updates immediately
         clearTimeout(safetyTimeout); // Clear safety timeout since we've set the data
         console.log('✅ Real deliveries set successfully, loading cleared');
