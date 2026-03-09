@@ -54,6 +54,7 @@ import { DeliveryRequestCard } from "@/components/delivery/DeliveryRequestCard";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useToast } from "@/hooks/use-toast";
 import { useDeliveryProviderData, logDataAccessAttempt } from "@/hooks/useDataIsolation";
+import { useDeliveriesUnified, type UnifiedDeliveryRow } from "@/hooks/useDeliveriesUnified";
 import { MessageSquare, User, QrCode, Scan, RefreshCw, Link2 } from "lucide-react";
 import { InAppCommunication } from "@/components/communication/InAppCommunication";
 import { ProfileEditDialog } from "@/components/profile/ProfileEditDialog";
@@ -128,6 +129,16 @@ const DeliveryDashboard = () => {
     rejectDelivery: handleRejectDelivery,
     updateDeliveryStatus
   } = useDeliveryProviderData();
+
+  // Single source for Deliveries tab: one RPC, aligned with Supplier Orders/QR
+  const {
+    scheduled: unifiedScheduled,
+    inTransit: unifiedInTransit,
+    delivered: unifiedDelivered,
+    loading: unifiedLoading,
+    error: unifiedError,
+    refetch: refetchUnified,
+  } = useDeliveriesUnified();
   
   const [loading, setLoading] = useState(true);
   const [providerProfile, setProviderProfile] = useState<any>(null);
@@ -338,7 +349,29 @@ const DeliveryDashboard = () => {
     }
   }, [isolatedProfile, isolatedStats, isolatedActiveDeliveries, isolatedHistory, isolatedPendingRequests]);
 
-  // Single source of truth: categorize each delivery so badge counts and tab content always match
+  // Map unified RPC row to card shape (delivery_location, material_type, etc.)
+  const toCardDelivery = useCallback((row: UnifiedDeliveryRow): ActiveDelivery & { _items_count?: number; _received_count?: number } => ({
+    id: row.id,
+    pickup_location: row.pickup_location ?? 'N/A',
+    delivery_location: row.delivery_address ?? 'N/A',
+    material_type: 'Materials',
+    quantity: String(row._items_count ?? 0),
+    customer_name: 'Customer',
+    customer_phone: '',
+    status: row.status,
+    estimated_time: '',
+    price: 0,
+    distance: 0,
+    created_at: row.created_at,
+    purchase_order_id: row.purchase_order_id,
+    order_number: row.order_number,
+    _categorized_status: row._categorized_status,
+    _items_count: row._items_count,
+    _dispatched_count: row._dispatched_count,
+    _received_count: row._received_count,
+  }), []);
+
+  // Single source of truth (legacy fallback when not using unified): categorize each delivery so badge counts and tab content always match
   const deliveryCategories = useMemo(() => {
     const getCategory = (d: any): 'scheduled' | 'in_transit' | 'delivered' => {
       const cat = String(d._categorized_status || d.status || '').toLowerCase();
@@ -1418,54 +1451,51 @@ const DeliveryDashboard = () => {
             <TabsTrigger value="support">Support</TabsTrigger>
           </TabsList>
 
-          {/* Deliveries Tab with Sub-tabs */}
+          {/* Deliveries Tab - Single source: get_deliveries_for_provider_unified (aligned with Supplier Orders/QR) */}
           <TabsContent value="deliveries">
             <div className="space-y-4">
-              {/* Seamless flow: Scheduled → In Transit → Delivered */}
-              <div className={`space-y-1.5`}>
-                <div className={`flex flex-wrap items-center justify-between gap-2 text-xs px-3 py-2 rounded-lg ${isDarkMode ? 'bg-teal-900/20 border border-teal-800' : 'bg-teal-50 border border-teal-200'}`}>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className={`font-medium ${isDarkMode ? 'text-teal-300' : 'text-teal-700'}`}>Delivery flow:</span>
-                    <span>Accept</span>
-                    <ChevronRight className="h-3 w-3 text-teal-500" />
-                    <span className="font-medium">Scheduled</span>
-                    <ChevronRight className="h-3 w-3 text-teal-500" />
-                    <span>Supplier dispatches</span>
-                    <ChevronRight className="h-3 w-3 text-teal-500" />
-                    <span className="font-medium">In Transit</span>
-                    <ChevronRight className="h-3 w-3 text-teal-500" />
-                    <span>You scan all items</span>
-                    <ChevronRight className="h-3 w-3 text-teal-500" />
-                    <span className="font-medium">Delivered</span>
-                  </div>
+              <div className={`flex flex-wrap items-center justify-between gap-2 text-xs px-3 py-2 rounded-lg ${isDarkMode ? 'bg-teal-900/20 border border-teal-800' : 'bg-teal-50 border border-teal-200'}`}>
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className={`font-medium ${isDarkMode ? 'text-teal-300' : 'text-teal-700'}`}>Delivery flow:</span>
+                  <span>Accept</span>
+                  <ChevronRight className="h-3 w-3 text-teal-500" />
+                  <span className="font-medium">Scheduled</span>
+                  <ChevronRight className="h-3 w-3 text-teal-500" />
+                  <span>Supplier dispatches</span>
+                  <ChevronRight className="h-3 w-3 text-teal-500" />
+                  <span className="font-medium">In Transit</span>
+                  <ChevronRight className="h-3 w-3 text-teal-500" />
+                  <span>You scan all items</span>
+                  <ChevronRight className="h-3 w-3 text-teal-500" />
+                  <span className="font-medium">Delivered</span>
+                </div>
                 <Button
                   type="button"
                   variant="outline"
                   size="sm"
                   className="shrink-0 text-xs"
                   disabled={linkingDeliveries}
-                  title="If an In Transit or Scheduled order is missing, click to link it to your provider account"
+                  title="Link orders to your provider account if any are missing"
                   onClick={async () => {
                     setLinkingDeliveries(true);
                     try {
                       const { data, error } = await (supabase as any).rpc('link_my_deliveries_to_provider_id');
                       const errMsg = error?.message || (error && String(error));
                       if (error) {
-                        console.warn('link_my_deliveries_to_provider_id error:', error);
-                        toast({ title: 'Link failed', description: errMsg || 'RPC error. Run migration 20260322_link_deliveries_by_delivery_provider_id.sql in Supabase.', variant: 'destructive' });
+                        toast({ title: 'Link failed', description: errMsg || 'RPC error.', variant: 'destructive' });
                         return;
                       }
                       const res = (data != null ? data : {}) as { success?: boolean; message?: string; updated_dr?: number; updated_po?: number };
                       if (res?.success && ((res?.updated_dr ?? 0) > 0 || (res?.updated_po ?? 0) > 0)) {
-                        toast({ title: 'Links updated', description: res.message || 'Your deliveries are now linked. Refreshing…' });
-                        refetchData(); // refresh in background, don't await so button doesn't stay loading
+                        toast({ title: 'Links updated', description: res.message || 'Your deliveries are now linked.' });
+                        refetchData();
+                        refetchUnified();
                       } else if (res?.success) {
                         toast({ title: 'Already linked', description: res?.message || 'All your deliveries are already linked.' });
                       } else {
-                        toast({ title: 'Could not link', description: res?.message || 'No provider account found. Register as a delivery provider first.' });
+                        toast({ title: 'Could not link', description: res?.message || 'No provider account found.' });
                       }
                     } catch (e: any) {
-                      console.error('Link my deliveries error:', e);
                       toast({ title: 'Error', description: e?.message || 'Failed to link deliveries', variant: 'destructive' });
                     } finally {
                       setLinkingDeliveries(false);
@@ -1475,66 +1505,60 @@ const DeliveryDashboard = () => {
                   {linkingDeliveries ? <RefreshCw className="h-3.5 w-3.5 mr-1 animate-spin" /> : <Link2 className="h-3.5 w-3.5 mr-1" />}
                   {linkingDeliveries ? 'Linking…' : 'Link my deliveries'}
                 </Button>
-                </div>
-                <p className={`text-xs px-3 ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-                  Orders move automatically: <strong>Scheduled</strong> → <strong>In Transit</strong> when the supplier dispatches; → <strong>Delivered</strong> when you scan all item QR codes.
-                </p>
               </div>
-              {/* Sub-tabs for Deliveries - Only accepted jobs */}
+              <p className={`text-xs px-3 ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                Orders move automatically: <strong>Scheduled</strong> → <strong>In Transit</strong> when the supplier dispatches (QR tab); → <strong>Delivered</strong> when you scan all item QR codes.
+              </p>
+
+              {unifiedError && (
+                <Alert variant="destructive">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription>{unifiedError} <Button variant="outline" size="sm" className="ml-2" onClick={() => refetchUnified()}>Retry</Button></AlertDescription>
+                </Alert>
+              )}
+
               <Tabs value={deliveriesSubTab} onValueChange={setDeliveriesSubTab} className="w-full">
                 <TabsList className={`grid w-full grid-cols-3 ${isDarkMode ? 'bg-gray-800' : 'bg-gray-100'}`}>
                   <TabsTrigger value="scheduled" className="flex items-center gap-2">
                     <Calendar className="h-4 w-4" />
                     Scheduled
-                    {deliveryCategories.scheduled.length > 0 ? (
-                      <Badge className="ml-1 bg-blue-500 text-white text-xs">
-                        {deliveryCategories.scheduled.length}
-                      </Badge>
+                    {unifiedScheduled.length > 0 ? (
+                      <Badge className="ml-1 bg-blue-500 text-white text-xs">{unifiedScheduled.length}</Badge>
                     ) : null}
                   </TabsTrigger>
                   <TabsTrigger value="in_transit" className="flex items-center gap-2">
                     <Truck className="h-4 w-4" />
                     In Transit
-                    {deliveryCategories.inTransit.length > 0 ? (
-                      <Badge className="ml-1 bg-purple-500 text-white text-xs">
-                        {deliveryCategories.inTransit.length}
-                      </Badge>
+                    {unifiedInTransit.length > 0 ? (
+                      <Badge className="ml-1 bg-purple-500 text-white text-xs">{unifiedInTransit.length}</Badge>
                     ) : null}
                   </TabsTrigger>
                   <TabsTrigger value="delivered" className="flex items-center gap-2">
                     <CheckCircle className="h-4 w-4" />
                     Delivered
-                    {(() => {
-                      const getKey = (x: any) => ((x.order_number || (x as any).po_number || '').toString().split('-')[1] || (x as any).purchase_order_id || x.id || '');
-                      const seen = new Set<string>();
-                      [...deliveryCategories.deliveredFromActive, ...deliveryHistory].forEach(item => {
-                        const k = getKey(item);
-                        if (k) seen.add(k);
-                      });
-                      const total = seen.size;
-                      return total > 0 ? (
-                        <Badge className="ml-1 bg-green-500 text-white text-xs">{total}</Badge>
-                      ) : null;
-                    })()}
+                    {unifiedDelivered.length > 0 ? (
+                      <Badge className="ml-1 bg-green-500 text-white text-xs">{unifiedDelivered.length}</Badge>
+                    ) : null}
                   </TabsTrigger>
                 </TabsList>
 
-                {/* Scheduled Sub-tab - same list as badge count (deliveryCategories.scheduled) */}
+                {/* Scheduled - from unified RPC (same source as badge) */}
                 <TabsContent value="scheduled" className="mt-4">
                   <div className="space-y-4">
-                    {deliveryCategories.scheduled.length > 0 ? (
+                    {unifiedLoading ? (
+                        <div className="flex items-center justify-center py-12">
+                          <RefreshCw className="h-8 w-8 animate-spin text-teal-500" />
+                        </div>
+                    ) : unifiedScheduled.length > 0 ? (
                         <div className="space-y-4">
                           <div className="flex items-center gap-2 mb-3">
-                            <div className="h-2 w-2 bg-blue-500 rounded-full animate-pulse"></div>
+                            <div className="h-2 w-2 bg-blue-500 rounded-full animate-pulse" />
                             <h3 className={`text-lg font-semibold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
-                              📅 Scheduled Deliveries ({deliveryCategories.scheduled.length})
+                              📅 Scheduled ({unifiedScheduled.length})
                             </h3>
                           </div>
-                          {deliveryCategories.scheduled
-                            .sort((a, b) => {
-                              const urgencyOrder = { emergency: 0, urgent: 1, normal: 2 };
-                              return (urgencyOrder[a.urgency || 'normal'] || 2) - (urgencyOrder[b.urgency || 'normal'] || 2);
-                            })
+                          {unifiedScheduled
+                            .map((row) => toCardDelivery(row))
                             .map((delivery) => (
                               <DeliveryRequestCard
                                 key={delivery.id}
@@ -1558,24 +1582,28 @@ const DeliveryDashboard = () => {
                   </div>
                 </TabsContent>
 
-                {/* In Transit Sub-tab - same list as badge count (deliveryCategories.inTransit) */}
+                {/* In Transit - from unified RPC (same source as badge) */}
                 <TabsContent value="in_transit" className="mt-4">
                   <div className="space-y-4">
-                    {deliveryCategories.inTransit.length > 0 ? (
+                    {unifiedLoading ? (
+                        <div className="flex items-center justify-center py-12">
+                          <RefreshCw className="h-8 w-8 animate-spin text-teal-500" />
+                        </div>
+                    ) : unifiedInTransit.length > 0 ? (
                         <div className="space-y-4">
                           <div className="flex items-center gap-2 mb-3">
-                            <div className="h-2 w-2 bg-purple-500 rounded-full animate-pulse"></div>
+                            <div className="h-2 w-2 bg-purple-500 rounded-full animate-pulse" />
                             <h3 className={`text-lg font-semibold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
-                              🚚 Deliveries In Transit ({deliveryCategories.inTransit.length})
+                              🚚 In Transit ({unifiedInTransit.length})
                             </h3>
                           </div>
                           <Alert className="mb-4 bg-purple-50 border-purple-200">
                             <Truck className="h-4 w-4 text-purple-600" />
                             <AlertDescription className="text-purple-700">
-                              Materials have been dispatched by supplier. Navigate to delivery location and <strong>scan all QR codes</strong> (one per item) upon arrival to complete delivery. Each order moves to &quot;Delivered&quot; only when every item is scanned.
+                              Supplier has dispatched (see their QR tab). Navigate to the delivery location and <strong>scan all item QR codes</strong> to complete. Order moves to Delivered when every item is scanned.
                             </AlertDescription>
                           </Alert>
-                          {deliveryCategories.inTransit.map((delivery) => (
+                          {unifiedInTransit.map((row) => toCardDelivery(row)).map((delivery) => (
                             <Card key={delivery.id} className={isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-2 border-purple-100'}>
                               <CardContent className="p-6">
                                 <div className="space-y-4">
@@ -1729,75 +1757,49 @@ const DeliveryDashboard = () => {
                   </div>
                 </TabsContent>
 
-                {/* Delivered Sub-tab - Successfully delivered orders */}
+                {/* Delivered - from unified RPC (same source as badge) */}
                 <TabsContent value="delivered" className="mt-4">
                   <Card className={isDarkMode ? 'bg-gray-800 border-gray-700' : ''}>
                     <CardHeader>
                       <div className="flex justify-between items-center">
                         <div>
-                          <CardTitle className={isDarkMode ? 'text-white' : ''}>Delivery History</CardTitle>
+                          <CardTitle className={isDarkMode ? 'text-white' : ''}>Delivered</CardTitle>
                           <CardDescription className={isDarkMode ? 'text-gray-400' : ''}>
-                            Your past deliveries • Most recent first • {(() => {
-                              const getKey = (d: any) => ((d.order_number || d.po_number || '').toString().split('-')[1] || d.purchase_order_id || d.id || '');
-                              const seen = new Set<string>();
-                              [...deliveryCategories.deliveredFromActive, ...deliveryHistory].forEach(d => { const k = getKey(d); if (k) seen.add(k); });
-                              return seen.size;
-                            })()} total
+                            Completed deliveries (all items scanned) • {unifiedDelivered.length} total
                           </CardDescription>
                         </div>
-                        <Button variant="outline" size="sm" onClick={() => refetchData()}>
-                          <Clock className="h-4 w-4 mr-2" />
+                        <Button variant="outline" size="sm" onClick={() => { refetchData(); refetchUnified(); }}>
+                          <RefreshCw className="h-4 w-4 mr-2" />
                           Refresh
                         </Button>
                       </div>
                     </CardHeader>
                     <CardContent>
-                      {(() => {
-                        // Same source as badge: deliveryCategories.deliveredFromActive + deliveryHistory
-                        const deliveredFromActive = deliveryCategories.deliveredFromActive.map(d => ({
-                          id: d.id,
-                          pickup_location: d.pickup_location || d.pickup_address || 'N/A',
-                          delivery_location: d.delivery_location || d.delivery_address || 'N/A',
-                          material_type: d.material_type || d.item_description || 'Materials',
-                          status: d._categorized_status || d.status,
-                          completed_at: d.delivered_at || d.completed_at || d.updated_at || d.created_at,
-                          price: d.price || d.delivery_fee || d.estimated_cost || 0,
-                          rating: d.rating || 0,
-                          order_number: d.order_number || d.po_number || 'N/A'
-                        }));
-                        const getKey = (d: any) => ((d.order_number || d.po_number || '').toString().split('-')[1] || d.purchase_order_id || d.id || '');
-                        const allDelivered = [...deliveredFromActive, ...deliveryHistory];
-                        const seenKeys = new Set<string>();
-                        const uniqueDelivered = allDelivered.filter(d => {
-                          const key = getKey(d);
-                          if (!key || seenKeys.has(key)) return false;
-                          seenKeys.add(key);
-                          return true;
-                        });
-                        
-                        const sortedDelivered = uniqueDelivered.sort((a, b) => 
-                          new Date(b.completed_at).getTime() - new Date(a.completed_at).getTime()
-                        );
-                        
-                        return sortedDelivered.length === 0 ? (
+                      {unifiedLoading ? (
+                        <div className="flex items-center justify-center py-12">
+                          <RefreshCw className="h-8 w-8 animate-spin text-teal-500" />
+                        </div>
+                      ) : unifiedDelivered.length === 0 ? (
                         <div className="text-center py-12">
                           <Package className="h-12 w-12 mx-auto text-gray-400 mb-4" />
                           <p className={`text-lg font-medium ${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`}>
-                            No delivery history yet
+                            No delivered orders yet
                           </p>
                           <p className={`text-sm ${isDarkMode ? 'text-gray-500' : 'text-gray-400'}`}>
-                            Your completed deliveries will appear here
+                            Completed deliveries will appear here after you scan all item QR codes
                           </p>
                         </div>
                       ) : (
                         <div className="space-y-4">
-                            {sortedDelivered.map((delivery, index) => {
-                              const completedDate = new Date(delivery.completed_at);
+                            {unifiedDelivered.map((row, index) => {
+                              const delivery = toCardDelivery(row);
+                              const completedAt = row.delivered_at || row.updated_at || row.created_at;
+                              const completedDate = new Date(completedAt);
                               const isToday = completedDate.toDateString() === new Date().toDateString();
                               const isYesterday = completedDate.toDateString() === new Date(Date.now() - 86400000).toDateString();
                               
                               return (
-                                <div key={delivery.id} className={`flex items-center justify-between p-4 ${isDarkMode ? 'bg-gray-700' : 'bg-gray-50'} rounded-lg hover:${isDarkMode ? 'bg-gray-600' : 'bg-gray-100'} transition-colors border-l-4 ${index === 0 ? 'border-l-green-500' : 'border-l-gray-300'}`}>
+                                <div key={row.id || row.purchase_order_id} className={`flex items-center justify-between p-4 ${isDarkMode ? 'bg-gray-700' : 'bg-gray-50'} rounded-lg hover:${isDarkMode ? 'bg-gray-600' : 'bg-gray-100'} transition-colors border-l-4 ${index === 0 ? 'border-l-green-500' : 'border-l-gray-300'}`}>
                                   <div className="flex items-center gap-4">
                                     <div className={`p-2 ${isDarkMode ? 'bg-gray-600' : 'bg-white'} rounded-lg shadow-sm`}>
                                       <CheckCircle className="h-8 w-8 text-green-500" />
@@ -1838,19 +1840,12 @@ const DeliveryDashboard = () => {
                                         {delivery.status === 'delivered' || delivery.status === 'completed' ? '✓ Completed' : delivery.status}
                                       </Badge>
                                     </div>
-                                    {delivery.rating > 0 && (
-                                      <div className="flex items-center gap-1 bg-amber-50 px-2 py-1 rounded">
-                                        <Star className="h-4 w-4 text-amber-400 fill-amber-400" />
-                                        <span className={`font-medium text-amber-700`}>{delivery.rating.toFixed(1)}</span>
-                                      </div>
-                                    )}
                                   </div>
                                 </div>
                               );
                             })}
                         </div>
-                        );
-                      })()}
+                      )}
                     </CardContent>
                   </Card>
                 </TabsContent>
