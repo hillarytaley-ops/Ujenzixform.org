@@ -405,22 +405,44 @@ export const useDeliveryProviderData = () => {
       } catch (e) {
         console.log('⚡ FAST PATH: delivery_providers lookup skipped:', e);
       }
-      
-      // Quick fetch of active orders - include accepted, assigned, in_transit, etc. (broader than just 'accepted')
+
+      const statusFilter = 'status=in.(accepted,assigned,picked_up,in_transit,dispatched,out_for_delivery,delivery_arrived)';
+      const opts = { headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${accessToken}`, 'Accept': 'application/json' }, cache: 'no-store' as RequestCache };
+
+      // Fetch by primary provider id (delivery_providers.id or userId)
       const fastResponse = await fetch(
-        `${SUPABASE_URL}/rest/v1/delivery_requests?provider_id=eq.${providerIdToUse}&status=in.(accepted,assigned,picked_up,in_transit,dispatched,out_for_delivery,delivery_arrived)&select=*&order=created_at.desc&limit=150`,
-        {
-          headers: {
-            'apikey': SUPABASE_ANON_KEY,
-            'Authorization': `Bearer ${accessToken}`,
-            'Accept': 'application/json'
-          },
-          cache: 'no-store'
-        }
+        `${SUPABASE_URL}/rest/v1/delivery_requests?provider_id=eq.${providerIdToUse}&${statusFilter}&select=*&order=created_at.desc&limit=150`,
+        opts
       );
-      
+
+      let fastData: any[] = [];
       if (fastResponse.ok) {
-        const fastData = await fastResponse.json();
+        const parsed = await fastResponse.json();
+        fastData = Array.isArray(parsed) ? parsed : [];
+      }
+      // If we're using delivery_providers.id, also fetch by user id so we don't miss orders linked by auth.uid()
+      if (userId && providerIdToUse !== userId) {
+        const byUserResponse = await fetch(
+          `${SUPABASE_URL}/rest/v1/delivery_requests?provider_id=eq.${userId}&${statusFilter}&select=*&order=created_at.desc&limit=150`,
+          opts
+        );
+        if (byUserResponse.ok) {
+          const byUserData = await byUserResponse.json();
+          const seen = new Set((fastData || []).map((r: any) => r.id));
+          let added = 0;
+          for (const r of byUserData || []) {
+            if (!seen.has(r.id)) {
+              fastData = fastData || [];
+              fastData.push(r);
+              seen.add(r.id);
+              added++;
+            }
+          }
+          if (added > 0) console.log('⚡ FAST PATH: Included', added, 'extra delivery_requests by user id (no duplicate)');
+        }
+      }
+
+      if (fastResponse.ok || fastData.length > 0) {
         
         // Helper to check if order number is real
         const isRealOrder = (orderNum: string | null) => {
