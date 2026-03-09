@@ -19,10 +19,9 @@ WHERE purchase_order_id IN (
      OR po_number LIKE 'PO-1772598054688-GR03X%'
 );
 
--- 3. Mark purchase_order as delivered
+-- 3. Mark purchase_order as delivered (status only; order_status column may not exist)
 UPDATE purchase_orders
 SET status = 'delivered',
-    order_status = 'delivered',
     delivered_at = COALESCE(delivered_at, NOW()),
     updated_at = NOW()
 WHERE po_number = 'PO-1772598054688-GR03X'
