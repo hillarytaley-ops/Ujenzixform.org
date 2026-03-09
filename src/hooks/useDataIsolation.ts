@@ -1727,9 +1727,14 @@ export const useDeliveryProviderData = () => {
         removed_delivered: categorizedDeliveries.length - activeNonDelivered.length
       });
       
-      // Create new array reference to ensure React detects changes
-      setActiveDeliveries([...activeNonDelivered]);
-      console.log('✅ Final: Set active deliveries with', activeNonDelivered.length, 'deliveries (categorized by material_items, delivered orders removed)');
+      // Don't overwrite FAST PATH data with empty (REST can return 0 when provider lookup fails)
+      if (activeNonDelivered.length === 0 && fastPathCountRef.current > 0) {
+        console.log('📦 REST merge path: Keeping', fastPathCountRef.current, 'FAST PATH deliveries (avoid overwrite with empty)');
+      } else {
+        setActiveDeliveries([...activeNonDelivered]);
+        fastPathCountRef.current = activeNonDelivered.length;
+        console.log('✅ Final: Set active deliveries with', activeNonDelivered.length, 'deliveries (categorized by material_items, delivered orders removed)');
+      }
 
       // Fetch completed deliveries for THIS provider only
       // Fetch from BOTH delivery_requests AND purchase_orders tables
