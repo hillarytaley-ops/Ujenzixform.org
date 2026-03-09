@@ -446,10 +446,15 @@ export const useDeliveryProviderData = () => {
         if (quickDeliveries.length > 0) {
           console.log('⚡ FAST PATH: Found', quickDeliveries.length, 'accepted orders with real order numbers');
           // Show data immediately so UI is not blocked by enrichment RPC (which can hang)
-          const withDefaultCategory = quickDeliveries.map((d: any) => ({
-            ...d,
-            _categorized_status: d._categorized_status || 'scheduled'
-          }));
+          // Use delivery_requests.status so In Transit shows correctly before enrichment (dispatched/in_transit etc.)
+          const inTransitStatuses = ['dispatched', 'in_transit', 'picked_up', 'out_for_delivery', 'delivery_arrived', 'shipped', 'on_the_way'];
+          const withDefaultCategory = quickDeliveries.map((d: any) => {
+            const raw = (d.status || '').toLowerCase();
+            let _cat = d._categorized_status || 'scheduled';
+            if (inTransitStatuses.includes(raw)) _cat = 'in_transit';
+            else if (raw === 'delivered' || raw === 'completed') _cat = 'delivered';
+            return { ...d, _categorized_status: _cat };
+          });
           setActiveDeliveries(withDefaultCategory);
           fastPathCountRef.current = withDefaultCategory.length;
           setLoading(false);
