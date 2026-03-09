@@ -252,6 +252,7 @@ const DeliveryDashboard = () => {
       setStats(isolatedStats);
     }
     // Transform active deliveries - ONLY THIS PROVIDER'S DELIVERIES
+    console.log('📋 Dashboard sync: isolatedActiveDeliveries.length =', isolatedActiveDeliveries?.length ?? 0);
     if (isolatedActiveDeliveries && isolatedActiveDeliveries.length > 0) {
       const formattedActive: ActiveDelivery[] = isolatedActiveDeliveries.map((d: any) => ({
         id: d.id,

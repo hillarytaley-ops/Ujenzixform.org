@@ -464,15 +464,18 @@ export const useDeliveryProviderData = () => {
               });
               setActiveDeliveries(enriched);
               fastPathCountRef.current = enriched.length;
+              console.log('⚡ FAST PATH: Set activeDeliveries state to', enriched.length, 'items');
               const inTransit = enriched.filter((d: any) => d._categorized_status === 'in_transit').length;
               if (inTransit > 0) console.log('⚡ FAST PATH: Enriched -', inTransit, 'in transit (from material_items)');
             } catch (e) {
               setActiveDeliveries(quickDeliveries);
               fastPathCountRef.current = quickDeliveries.length;
+              console.log('⚡ FAST PATH: Set activeDeliveries state to', quickDeliveries.length, 'items (no enrichment)');
             }
           } else {
             setActiveDeliveries(quickDeliveries);
             fastPathCountRef.current = quickDeliveries.length;
+            console.log('⚡ FAST PATH: Set activeDeliveries state to', quickDeliveries.length, 'items');
           }
           setLoading(false); // Show data immediately!
         } else {
