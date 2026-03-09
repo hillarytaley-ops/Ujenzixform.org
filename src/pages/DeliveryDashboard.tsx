@@ -1397,22 +1397,23 @@ const DeliveryDashboard = () => {
           {/* Deliveries Tab with Sub-tabs */}
           <TabsContent value="deliveries">
             <div className="space-y-4">
-              {/* Workflow: Accept → Scheduled → In Transit → Delivered */}
-              <div className={`flex flex-wrap items-center justify-between gap-2 text-xs px-3 py-2 rounded-lg ${isDarkMode ? 'bg-teal-900/20 border border-teal-800' : 'bg-teal-50 border border-teal-200'}`}>
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="font-medium text-teal-700">Delivery flow:</span>
-                  <span>Accept</span>
-                  <ChevronRight className="h-3 w-3 text-teal-500" />
-                  <span>Scheduled</span>
-                  <ChevronRight className="h-3 w-3 text-teal-500" />
-                  <span>Supplier dispatches</span>
-                  <ChevronRight className="h-3 w-3 text-teal-500" />
-                  <span>In Transit</span>
-                  <ChevronRight className="h-3 w-3 text-teal-500" />
-                  <span>You scan received</span>
-                  <ChevronRight className="h-3 w-3 text-teal-500" />
-                  <span>Delivered</span>
-                </div>
+              {/* Seamless flow: Scheduled → In Transit → Delivered */}
+              <div className={`space-y-1.5`}>
+                <div className={`flex flex-wrap items-center justify-between gap-2 text-xs px-3 py-2 rounded-lg ${isDarkMode ? 'bg-teal-900/20 border border-teal-800' : 'bg-teal-50 border border-teal-200'}`}>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className={`font-medium ${isDarkMode ? 'text-teal-300' : 'text-teal-700'}`}>Delivery flow:</span>
+                    <span>Accept</span>
+                    <ChevronRight className="h-3 w-3 text-teal-500" />
+                    <span className="font-medium">Scheduled</span>
+                    <ChevronRight className="h-3 w-3 text-teal-500" />
+                    <span>Supplier dispatches</span>
+                    <ChevronRight className="h-3 w-3 text-teal-500" />
+                    <span className="font-medium">In Transit</span>
+                    <ChevronRight className="h-3 w-3 text-teal-500" />
+                    <span>You scan all items</span>
+                    <ChevronRight className="h-3 w-3 text-teal-500" />
+                    <span className="font-medium">Delivered</span>
+                  </div>
                 <Button
                   type="button"
                   variant="outline"
@@ -1450,6 +1451,10 @@ const DeliveryDashboard = () => {
                   {linkingDeliveries ? <RefreshCw className="h-3.5 w-3.5 mr-1 animate-spin" /> : <Link2 className="h-3.5 w-3.5 mr-1" />}
                   {linkingDeliveries ? 'Linking…' : 'Link my deliveries'}
                 </Button>
+                </div>
+                <p className={`text-xs px-3 ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                  Orders move automatically: <strong>Scheduled</strong> → <strong>In Transit</strong> when the supplier dispatches; → <strong>Delivered</strong> when you scan all item QR codes.
+                </p>
               </div>
               {/* Sub-tabs for Deliveries - Only accepted jobs */}
               <Tabs value={deliveriesSubTab} onValueChange={setDeliveriesSubTab} className="w-full">
