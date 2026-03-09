@@ -465,12 +465,18 @@ export const useDeliveryProviderData = () => {
             supabase.rpc('get_material_items_scan_status_for_provider', { po_ids: poIds })
               .then(({ data: scanStatus }) => {
                 const statusMap = (scanStatus && typeof scanStatus === 'object') ? scanStatus as Record<string, { total: number; dispatched: number; received: number }> : {};
+                const inTransitStatusesEnrich = ['dispatched', 'in_transit', 'picked_up', 'out_for_delivery', 'delivery_arrived', 'shipped', 'on_the_way'];
                 const enriched = quickDeliveries.map((d: any) => {
                   const stats = d.purchase_order_id ? statusMap[d.purchase_order_id] : null;
-                  let _cat = 'scheduled';
+                  // Baseline from delivery_requests.status so In Transit doesn't disappear when scan stats are missing/wrong
+                  const raw = (d.status || '').toLowerCase();
+                  let _cat = inTransitStatusesEnrich.includes(raw) ? 'in_transit' : (raw === 'delivered' || raw === 'completed' ? 'delivered' : 'scheduled');
                   if (stats) {
                     if (stats.received >= stats.total && stats.total > 0) _cat = 'delivered';
                     else if (stats.dispatched > 0) _cat = 'in_transit';
+                    // never downgrade in_transit -> scheduled when stats are 0/missing (RLS or sync delay)
+                  } else if (_cat === 'scheduled' && (d.po_status || d.purchase_order_status || '').toLowerCase() && inTransitStatusesEnrich.includes((d.po_status || d.purchase_order_status || '').toLowerCase())) {
+                    _cat = 'in_transit';
                   }
                   return { ...d, _categorized_status: _cat, _items_count: stats?.total ?? 0, _dispatched_count: stats?.dispatched ?? 0, _received_count: stats?.received ?? 0 };
                 });
