@@ -1433,7 +1433,7 @@ const DeliveryDashboard = () => {
                       const res = (data != null ? data : {}) as { success?: boolean; message?: string; updated_dr?: number; updated_po?: number };
                       if (res?.success && ((res?.updated_dr ?? 0) > 0 || (res?.updated_po ?? 0) > 0)) {
                         toast({ title: 'Links updated', description: res.message || 'Your deliveries are now linked. Refreshing…' });
-                        await refetchData();
+                        refetchData(); // refresh in background, don't await so button doesn't stay loading
                       } else if (res?.success) {
                         toast({ title: 'Already linked', description: res?.message || 'All your deliveries are already linked.' });
                       } else {
