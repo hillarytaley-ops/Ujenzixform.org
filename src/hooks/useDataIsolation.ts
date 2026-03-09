@@ -631,39 +631,23 @@ export const useDeliveryProviderData = () => {
             console.log('🔍 Starting filtering process for', allDeliveries.length, 'deliveries');
             
             // Filter active deliveries AND filter by provider_id (client-side safety check)
-            // First, get the delivery_provider.id for this user_id to match against provider_id
-            // Add timeout to prevent blocking
+            // Use RPC for fast server-side lookup (avoids client RLS/join timeouts)
             let providerIdToMatch: string | null = null;
             try {
               console.log('🔍 Looking up delivery_provider for userId:', userId.substring(0, 8));
-              
-              // Add 2 second timeout to provider lookup
-              const providerLookupPromise = supabase
-                .from('delivery_providers')
-                .select('id')
-                .eq('user_id', userId)
-                .maybeSingle();
-              
-              const providerTimeoutPromise = new Promise<never>((_, reject) => 
-                setTimeout(() => reject(new Error('Provider lookup timeout')), 2000)
+              const providerTimeoutMs = 6000;
+              const rpcPromise = (supabase as any).rpc('get_delivery_provider_id_for_user').then((r: any) => r);
+              const timeoutPromise = new Promise<never>((_, reject) => 
+                setTimeout(() => reject(new Error('Provider lookup timeout')), providerTimeoutMs)
               );
-              
-              const { data: deliveryProvider, error: dpError } = await Promise.race([
-                providerLookupPromise,
-                providerTimeoutPromise
-              ]).catch((e: any) => {
+              const result = await Promise.race([rpcPromise, timeoutPromise]).catch((e: any) => {
                 console.warn('⚠️ Provider lookup timed out or failed:', e?.message || e);
                 return { data: null, error: e };
               }) as any;
-              
-              if (dpError) {
-                console.warn('⚠️ Error fetching delivery_provider.id:', dpError.message);
-              } else if (deliveryProvider) {
-                providerIdToMatch = deliveryProvider?.id || null;
-                console.log('🔍 Delivery provider lookup:', { 
-                  userId: userId.substring(0, 8), 
-                  providerId: providerIdToMatch?.substring(0, 8) || 'NULL' 
-                });
+              const providerId = result?.data ?? result;
+              if (providerId && typeof providerId === 'string') {
+                providerIdToMatch = providerId;
+                console.log('🔍 Delivery provider lookup:', { userId: userId.substring(0, 8), providerId: providerIdToMatch.substring(0, 8) });
               } else {
                 console.log('🔍 No delivery_provider found for userId:', userId.substring(0, 8));
               }
@@ -765,39 +749,22 @@ export const useDeliveryProviderData = () => {
           try {
             console.log('📦 Fetching purchase_orders for provider (userId):', userId);
             
-            // First, get the delivery_provider.id for this userId
+            // Use RPC for fast provider ID lookup (avoids table query timeouts)
             let providerIdForPO: string | null = null;
             try {
-              const providerLookupPromise = supabase
-                .from('delivery_providers')
-                .select('id')
-                .eq('user_id', userId)
-                .maybeSingle();
-              
-              const providerTimeoutPromise = new Promise<never>((_, reject) => 
-                setTimeout(() => reject(new Error('Provider lookup timeout')), 2000)
-              );
-              
-              const { data: deliveryProvider, error: dpError } = await Promise.race([
-                providerLookupPromise,
-                providerTimeoutPromise
-              ]).catch((e: any) => {
-                console.warn('⚠️ Provider lookup for purchase_orders timed out:', e?.message || e);
-                return { data: null, error: e };
-              }) as any;
-              
-              if (!dpError && deliveryProvider) {
-                providerIdForPO = deliveryProvider.id;
-                console.log('✅ Found delivery_provider.id for purchase_orders query:', providerIdForPO?.substring(0, 8));
+              const rpcPromise = (supabase as any).rpc('get_delivery_provider_id_for_user').then((r: any) => r);
+              const { data: pid } = await Promise.race([
+                rpcPromise,
+                new Promise<{ data: null }>((r) => setTimeout(() => r({ data: null }), 6000))
+              ]).catch(() => ({ data: null })) as any;
+              if (pid && typeof pid === 'string') {
+                providerIdForPO = pid;
+                console.log('✅ Found delivery_provider.id for purchase_orders query:', providerIdForPO.substring(0, 8));
               } else {
                 console.warn('⚠️ Could not find delivery_provider.id for userId:', userId.substring(0, 8));
-                // Fallback: try using userId directly (in case delivery_provider_id was set incorrectly)
                 providerIdForPO = userId;
-                console.warn('⚠️ Using userId as fallback for purchase_orders query');
               }
             } catch (e: any) {
-              console.warn('⚠️ Exception fetching delivery_provider.id for purchase_orders:', e?.message || e);
-              // Fallback: use userId directly
               providerIdForPO = userId;
             }
             
@@ -1633,11 +1600,14 @@ export const useDeliveryProviderData = () => {
           // Matches supplier QR Code Manager "Delivered" tab (all material_items receive_scanned)
           console.log('🚀 fetchDeliveredPOs: PRIMARY - Calling get_delivered_orders_for_provider RPC...');
           try {
-            const { data: rpcData, error: rpcError } = await withTimeout(
-              supabase.rpc('get_delivered_orders_for_provider'),
-              8000,
+            const rpcPromise = Promise.resolve((supabase as any).rpc('get_delivered_orders_for_provider'));
+            const rpcResult = await withTimeout(
+              rpcPromise,
+              10000,
               { data: null, error: { message: 'RPC timeout' } } as any
             );
+            const rpcData = rpcResult?.data ?? rpcResult;
+            const rpcError = rpcResult?.error;
             if (!rpcError && rpcData && rpcData.length > 0) {
               deliveredPOs = rpcData;
               console.log('✅ fetchDeliveredPOs: RPC returned', deliveredPOs.length, 'delivered orders');
@@ -1653,28 +1623,22 @@ export const useDeliveryProviderData = () => {
             console.log('✅ Using RPC result for delivery history');
           } else {
           // FALLBACK: Manual query (when RPC not available or returns empty)
-          // CRITICAL FIX: First get delivery_provider.id from user_id
-          console.log('🚀 fetchDeliveredPOs: FALLBACK - Getting delivery_provider.id for user_id...');
+          // Use get_delivery_provider_id_for_user RPC for fast lookup (avoids table query timeout)
+          console.log('🚀 fetchDeliveredPOs: FALLBACK - Getting delivery_provider.id via RPC...');
           
           let deliveryProviderId: string | null = null;
           try {
-            const providerLookupPromise = supabase
-              .from('delivery_providers')
-              .select('id')
-              .eq('user_id', userId)
-              .maybeSingle();
-            
-            const { data: provider, error: providerError } = await withTimeout(
-              providerLookupPromise,
-              5000,
+            const rpcRes = await withTimeout(
+              (supabase as any).rpc('get_delivery_provider_id_for_user').then((r: any) => r),
+              6000,
               { data: null, error: { message: 'Provider lookup timeout' } } as any
             );
-            
-            if (providerError || !provider) {
-              console.warn('⚠️ Could not get delivery_provider.id, trying fallback queries with user_id directly');
-            } else {
-              deliveryProviderId = provider.id;
+            const pid = (rpcRes && typeof rpcRes === 'object' && 'data' in rpcRes) ? rpcRes.data : rpcRes;
+            if (pid && typeof pid === 'string') {
+              deliveryProviderId = pid;
               console.log('✅ Found delivery_provider.id:', deliveryProviderId.substring(0, 8));
+            } else {
+              console.warn('⚠️ Could not get delivery_provider.id, trying fallback queries with user_id directly');
             }
           } catch (e: any) {
             console.warn('⚠️ Error looking up delivery_provider.id:', e?.message);
@@ -2114,31 +2078,17 @@ export const useDeliveryProviderData = () => {
       const deliveryRequestsHistoryPromise = (async () => {
         try {
           console.log('📦 History: Starting delivery_requests history fetch (running in parallel)...');
-        // First, get the delivery_provider.id for this user with timeout
+        // Use RPC for fast provider ID lookup (avoids table query timeouts)
         let providerId: string | null = null;
         try {
-          const providerLookupPromise = supabase
-            .from('delivery_providers')
-            .select('id')
-            .eq('user_id', userId)
-            .maybeSingle();
-          
-          const providerTimeoutPromise = new Promise<never>((_, reject) => 
-            setTimeout(() => reject(new Error('Provider lookup timeout')), 3000)
-          );
-          
-          const { data: provider, error: providerError } = await Promise.race([
-            providerLookupPromise,
-            providerTimeoutPromise
-          ]).catch((e: any) => {
-            console.warn('⚠️ Provider lookup timed out or failed:', e?.message || e);
-            return { data: null, error: e };
-          }) as any;
-          
-          if (providerError) {
-            console.warn('⚠️ Error fetching delivery_provider.id:', providerError.message);
-          } else if (provider?.id) {
-            providerId = provider.id;
+          const rpcPromise = (supabase as any).rpc('get_delivery_provider_id_for_user').then((r: any) => r);
+          const res = await Promise.race([
+            rpcPromise,
+            new Promise<{ data: null }>((r) => setTimeout(() => r({ data: null }), 6000))
+          ]).catch(() => ({ data: null })) as any;
+          const pid = res?.data ?? res;
+          if (pid && typeof pid === 'string') {
+            providerId = pid;
             console.log('✅ Found delivery_provider.id for history query:', providerId);
           } else {
             console.warn('⚠️ No delivery_provider found for user_id:', userId);
