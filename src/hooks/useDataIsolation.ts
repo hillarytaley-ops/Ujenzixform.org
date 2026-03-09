@@ -784,7 +784,7 @@ export const useDeliveryProviderData = () => {
             // Include 'delivered' and 'completed' statuses to sync with delivery_requests, but filter them out later
             // CRITICAL: Use providerIdForPO (delivery_provider.id) not userId
             const poResponse = await fetch(
-              `${SUPABASE_URL}/rest/v1/purchase_orders?delivery_provider_id=eq.${providerIdForPO}&status=in.(shipped,in_transit,dispatched,out_for_delivery,delivery_arrived,processing,delivered,completed)&select=id,status,delivery_provider_id,delivery_address,items,total_amount,created_at,updated_at,supplier_id,buyer_id,delivery_provider_name,delivery_assigned_at,po_number,delivered_at,completed_at&order=created_at.desc&limit=100`,
+              `${SUPABASE_URL}/rest/v1/purchase_orders?delivery_provider_id=eq.${providerIdForPO}&status=in.(shipped,in_transit,dispatched,out_for_delivery,delivery_arrived,processing,confirmed,quote_accepted,delivered,completed)&select=id,status,delivery_provider_id,delivery_address,items,total_amount,created_at,updated_at,supplier_id,buyer_id,delivery_provider_name,delivery_assigned_at,po_number,delivered_at,completed_at&order=created_at.desc&limit=100`,
               {
                 headers: {
                   'apikey': SUPABASE_ANON_KEY,
@@ -842,6 +842,40 @@ export const useDeliveryProviderData = () => {
       // Extract results - these should already be filtered by provider_id
       const activeData: any[] = deliveryRequestsResult.status === 'fulfilled' ? (deliveryRequestsResult.value || []) : [];
       let purchaseOrdersData: any[] = purchaseOrdersResult.status === 'fulfilled' ? (purchaseOrdersResult.value || []) : [];
+      
+      // CRITICAL: Supplement with purchase_orders fetched by IDs from delivery_requests
+      // Handles case where delivery_provider_id is wrong/missing on PO but provider is assigned via delivery_request
+      const drPOIds = [...new Set(activeData.filter((d: any) => d.purchase_order_id).map((d: any) => d.purchase_order_id))];
+      if (drPOIds.length > 0) {
+        const existingIds = new Set(purchaseOrdersData.map((p: any) => p.id));
+        const missingIds = drPOIds.filter((id: string) => !existingIds.has(id));
+        if (missingIds.length > 0) {
+          try {
+            const idsParam = missingIds.slice(0, 50).join(',');
+            const suppRes = await fetch(
+              `${SUPABASE_URL}/rest/v1/purchase_orders?id=in.(${idsParam})&select=id,status,delivery_provider_id,delivery_address,items,total_amount,created_at,updated_at,supplier_id,buyer_id,delivery_provider_name,delivery_assigned_at,po_number,delivered_at,completed_at&limit=100`,
+              {
+                headers: {
+                  'apikey': SUPABASE_ANON_KEY,
+                  'Authorization': `Bearer ${accessToken}`,
+                  'Content-Type': 'application/json'
+                },
+                cache: 'no-store',
+                signal: AbortSignal.timeout(5000)
+              }
+            );
+            if (suppRes.ok) {
+              const supplemental = await suppRes.json() || [];
+              if (supplemental.length > 0) {
+                purchaseOrdersData = [...purchaseOrdersData, ...supplemental];
+                console.log('📦 Supplement: Added', supplemental.length, 'purchase_orders by delivery_request IDs (dispatched orders may have been missing)');
+              }
+            }
+          } catch (e: any) {
+            console.warn('⚠️ Supplement purchase_orders fetch failed:', e?.message || e);
+          }
+        }
+      }
       
       // Log results immediately - BEFORE po_number fetching
       console.log('📦 IMMEDIATE RESULTS (before po_number fetch):', {
@@ -1420,12 +1454,12 @@ export const useDeliveryProviderData = () => {
               }
               
               // If status is 'accepted' or 'assigned', it's scheduled (waiting for dispatch)
+              // If status is dispatched/shipped/in_transit (supplier dispatched), show as in_transit
               // Otherwise, keep the original status
-              const fallbackStatus = (delivery.status === 'accepted' || delivery.status === 'assigned' || 
-                                      delivery.status === 'pending_pickup' || delivery.status === 'delivery_assigned' ||
-                                      delivery.status === 'ready_for_dispatch' || delivery.status === 'provider_assigned')
-                ? 'scheduled' 
-                : delivery.status;
+              const isScheduled = ['accepted', 'assigned', 'pending_pickup', 'delivery_assigned', 'ready_for_dispatch', 'provider_assigned'].includes(delivery.status);
+              const isDispatchedBySupplier = ['dispatched', 'shipped', 'in_transit', 'out_for_delivery', 'delivery_arrived', 'picked_up'].includes(delivery.status) ||
+                ['dispatched', 'shipped', 'in_transit', 'out_for_delivery', 'delivery_arrived'].includes(delivery.po_status || delivery.purchase_order_status || '');
+              const fallbackStatus = isScheduled ? 'scheduled' : (isDispatchedBySupplier ? 'in_transit' : delivery.status);
               
               if (isTargetOrder) {
                 console.log('🔍 Target order (no items found):', {
