@@ -445,6 +445,8 @@ export const useDeliveryProviderData = () => {
         
         if (quickDeliveries.length > 0) {
           console.log('⚡ FAST PATH: Found', quickDeliveries.length, 'accepted orders with real order numbers');
+          // Set ref immediately so REST path cannot overwrite with [] while we enrich
+          fastPathCountRef.current = quickDeliveries.length;
           // Enrich with _categorized_status from material_items (for In Transit tab - FAST PATH lacks this)
           const poIds = quickDeliveries.map((d: any) => d.purchase_order_id).filter(Boolean);
           if (poIds.length > 0) {
