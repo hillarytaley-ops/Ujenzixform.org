@@ -23,11 +23,19 @@ BEGIN
   LIMIT 1;
   
   IF v_provider_id IS NULL THEN
-    -- Fallback: delivery_providers.user_id = delivery_provider_registrations.auth_user_id
+    -- Fallback: delivery_provider_registrations (auth_user_id)
     SELECT dp.id INTO v_provider_id
     FROM delivery_provider_registrations dpr
     JOIN delivery_providers dp ON dp.user_id = dpr.auth_user_id
     WHERE dpr.auth_user_id = auth.uid()
+    LIMIT 1;
+  END IF;
+  
+  IF v_provider_id IS NULL THEN
+    -- Fallback: match by email (auth.users.email = delivery_providers.email)
+    SELECT dp.id INTO v_provider_id
+    FROM delivery_providers dp
+    JOIN auth.users u ON u.id = auth.uid() AND LOWER(TRIM(dp.email)) = LOWER(TRIM(u.email))
     LIMIT 1;
   END IF;
   
@@ -125,7 +133,7 @@ COMMENT ON FUNCTION public.get_active_deliveries_for_provider() IS
   'Returns active (scheduled + in_transit) deliveries for current provider. Uses material_items for categorization. Bypasses RLS for reliable provider dashboard.';
 
 -- Diagnostic RPC: run when get_active_deliveries_for_provider returns []
--- Returns {provider_id, auth_uid, dr_count} to debug empty results
+-- Returns {provider_id, auth_uid, provider_found_via, dr_count, ...}
 CREATE OR REPLACE FUNCTION public.debug_provider_deliveries()
 RETURNS JSONB
 LANGUAGE plpgsql
@@ -135,18 +143,42 @@ AS $$
 DECLARE
   v_provider_id UUID;
   v_dr_count INT;
+  v_provider_found_via TEXT := 'none';
 BEGIN
   SELECT id INTO v_provider_id FROM delivery_providers WHERE user_id = auth.uid() LIMIT 1;
+  IF v_provider_id IS NOT NULL THEN
+    v_provider_found_via := 'user_id';
+  END IF;
+  
   IF v_provider_id IS NULL THEN
     SELECT dp.id INTO v_provider_id FROM delivery_provider_registrations dpr
     JOIN delivery_providers dp ON dp.user_id = dpr.auth_user_id
     WHERE dpr.auth_user_id = auth.uid() LIMIT 1;
+    IF v_provider_id IS NOT NULL THEN
+      v_provider_found_via := 'registration';
+    END IF;
   END IF;
-  SELECT COUNT(*) INTO v_dr_count FROM delivery_requests WHERE provider_id = v_provider_id AND status NOT IN ('delivered','completed','cancelled');
+  
+  IF v_provider_id IS NULL THEN
+    SELECT dp.id INTO v_provider_id FROM delivery_providers dp
+    JOIN auth.users u ON u.id = auth.uid() AND LOWER(TRIM(dp.email)) = LOWER(TRIM(u.email))
+    LIMIT 1;
+    IF v_provider_id IS NOT NULL THEN
+      v_provider_found_via := 'email';
+    END IF;
+  END IF;
+  
+  IF v_provider_id IS NOT NULL THEN
+    SELECT COUNT(*) INTO v_dr_count FROM delivery_requests WHERE provider_id = v_provider_id AND status NOT IN ('delivered','completed','cancelled');
+  ELSE
+    v_dr_count := 0;
+  END IF;
+  
   RETURN jsonb_build_object(
     'auth_uid', auth.uid(),
     'provider_id', v_provider_id,
-    'delivery_requests_count', v_dr_count,
+    'provider_found_via', v_provider_found_via,
+    'delivery_requests_count', COALESCE(v_dr_count, 0),
     'provider_found', v_provider_id IS NOT NULL
   );
 END;
