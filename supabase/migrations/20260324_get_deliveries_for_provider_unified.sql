@@ -68,11 +68,23 @@ BEGIN
   from_po AS (
     SELECT po.id, po.id AS purchase_order_id, po.po_number AS order_number, po.status, po.status AS po_status,
       po.created_at, po.updated_at, po.delivery_address, NULL::text AS pickup_location, NULL::text AS dropoff_location,
-      po.delivery_provider_id, po.delivery_provider_name, v_provider_id AS provider_id,
+      po.delivery_provider_id, po.delivery_provider_name, 
+      -- CRITICAL FIX: Use delivery_provider_id as provider_id, or fallback to delivery_request provider_id
+      COALESCE(po.delivery_provider_id, (SELECT provider_id FROM delivery_requests WHERE purchase_order_id = po.id AND provider_id IS NOT NULL LIMIT 1), v_provider_id) AS provider_id,
       po.po_number AS dr_order_number, po.po_number,
       po.delivered_at, po.delivery_address AS po_delivery_address
     FROM purchase_orders po
-    WHERE (po.delivery_provider_id = v_provider_id OR po.delivery_provider_id = auth.uid())
+    WHERE (
+      -- Match by delivery_provider_id
+      (po.delivery_provider_id = v_provider_id OR po.delivery_provider_id = auth.uid())
+      -- OR match by delivery_request provider_id (fallback for orders missing delivery_provider_id)
+      OR EXISTS (
+        SELECT 1 FROM delivery_requests dr 
+        WHERE dr.purchase_order_id = po.id 
+          AND (dr.provider_id = v_provider_id OR dr.provider_id = auth.uid())
+          AND dr.status NOT IN ('cancelled')
+      )
+    )
       AND po.status NOT IN ('cancelled', 'rejected', 'quote_rejected')
       AND po.id NOT IN (SELECT purchase_order_id FROM from_dr WHERE purchase_order_id IS NOT NULL)
   ),
