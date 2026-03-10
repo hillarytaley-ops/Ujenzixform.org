@@ -498,10 +498,10 @@ export const DeliveryRequestCard: React.FC<DeliveryRequestCardProps> = ({
                       <Button 
                         size="sm" 
                         className="bg-teal-600 hover:bg-teal-700"
-                        disabled={!['dispatched', 'shipped', 'in_transit', 'out_for_delivery', 'delivery_arrived', 'picked_up', 'on_the_way'].includes(delivery.status)}
+                        disabled={!['dispatched', 'shipped', 'in_transit', 'out_for_delivery', 'delivery_arrived', 'picked_up', 'on_the_way', 'accepted', 'scheduled', 'assigned'].includes(delivery.status)}
                         onClick={() => onNavigate?.(delivery)}
                         title={
-                          !['dispatched', 'shipped', 'in_transit', 'out_for_delivery', 'delivery_arrived', 'picked_up', 'on_the_way'].includes(delivery.status)
+                          !['dispatched', 'shipped', 'in_transit', 'out_for_delivery', 'delivery_arrived', 'picked_up', 'on_the_way', 'accepted', 'scheduled', 'assigned'].includes(delivery.status)
                             ? 'Navigation will be available after supplier dispatches the order'
                             : 'Navigate to delivery location'
                         }
