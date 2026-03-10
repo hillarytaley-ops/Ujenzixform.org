@@ -297,12 +297,12 @@ export const DeliveryRequestCard: React.FC<DeliveryRequestCardProps> = ({
         delivery.urgency === 'emergency' ? 'ring-2 ring-red-500 ring-opacity-50' : 
         delivery.urgency === 'urgent' ? 'ring-2 ring-orange-500 ring-opacity-50' : ''
       }`}>
-        <CardContent className="p-6">
-          <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
+        <CardContent className="p-4">
+          <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-3">
             {/* Left Section - Delivery Details */}
             <div className="flex-1">
               {/* Status and ID Row */}
-              <div className="flex flex-wrap items-center gap-2 mb-3">
+              <div className="flex flex-wrap items-center gap-2 mb-2">
                 <Badge className={`${getStatusColor(delivery.status)} flex items-center gap-1`}>
                   {getStatusIcon(delivery.status)}
                   {formatStatus(delivery.status)}
@@ -324,22 +324,22 @@ export const DeliveryRequestCard: React.FC<DeliveryRequestCardProps> = ({
               </div>
               
               {/* Locations */}
-              <div className="grid md:grid-cols-2 gap-4">
+              <div className="grid md:grid-cols-2 gap-3">
                 <div>
-                  <div className="flex items-start gap-2 mb-2">
-                    <div className="w-3 h-3 bg-green-500 rounded-full mt-1.5 flex-shrink-0"></div>
+                  <div className="flex items-start gap-1.5 mb-1.5">
+                    <div className="w-2.5 h-2.5 bg-green-500 rounded-full mt-1 flex-shrink-0"></div>
                     <div>
-                      <p className={`text-xs ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>Pickup Location</p>
-                      <p className={`text-sm font-medium ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                      <p className={`text-[10px] ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>Pickup Location</p>
+                      <p className={`text-xs font-medium ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
                         {delivery.pickup_location}
                       </p>
                     </div>
                   </div>
-                  <div className="flex items-start gap-2">
-                    <div className="w-3 h-3 bg-red-500 rounded-full mt-1.5 flex-shrink-0"></div>
+                  <div className="flex items-start gap-1.5">
+                    <div className="w-2.5 h-2.5 bg-red-500 rounded-full mt-1 flex-shrink-0"></div>
                     <div>
-                      <p className={`text-xs ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>Delivery Location</p>
-                      <p className={`text-sm font-medium ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                      <p className={`text-[10px] ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>Delivery Location</p>
+                      <p className={`text-xs font-medium ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
                         {delivery.delivery_location}
                       </p>
                     </div>
@@ -347,22 +347,22 @@ export const DeliveryRequestCard: React.FC<DeliveryRequestCardProps> = ({
                 </div>
                 
                 {/* Details */}
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2">
-                    <Package className="h-4 w-4 text-gray-400 flex-shrink-0" />
-                    <span className={`text-sm ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                <div className="space-y-1">
+                  <div className="flex items-center gap-1.5">
+                    <Package className="h-3.5 w-3.5 text-gray-400 flex-shrink-0" />
+                    <span className={`text-xs ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
                       {delivery.material_type} - {delivery.quantity}
                     </span>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <Users className="h-4 w-4 text-gray-400 flex-shrink-0" />
-                    <span className={`text-sm ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                  <div className="flex items-center gap-1.5">
+                    <Users className="h-3.5 w-3.5 text-gray-400 flex-shrink-0" />
+                    <span className={`text-xs ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
                       {delivery.customer_name}
                     </span>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <Phone className="h-4 w-4 text-gray-400 flex-shrink-0" />
-                    <span className={`text-sm ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                  <div className="flex items-center gap-1.5">
+                    <Phone className="h-3.5 w-3.5 text-gray-400 flex-shrink-0" />
+                    <span className={`text-xs ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
                       {delivery.customer_phone}
                     </span>
                   </div>
@@ -371,10 +371,10 @@ export const DeliveryRequestCard: React.FC<DeliveryRequestCardProps> = ({
 
               {/* Expected Delivery Date - IMPORTANT for scheduling */}
               {(delivery.delivery_date || delivery.expected_delivery_date || delivery.pickup_date) && (
-                <div className={`mt-3 p-2 rounded-lg ${isDarkMode ? 'bg-blue-900/30' : 'bg-blue-50'} border ${isDarkMode ? 'border-blue-800' : 'border-blue-200'}`}>
-                  <div className="flex items-center gap-2">
-                    <Calendar className={`h-4 w-4 ${isDarkMode ? 'text-blue-400' : 'text-blue-600'}`} />
-                    <span className={`text-sm font-medium ${isDarkMode ? 'text-blue-300' : 'text-blue-800'}`}>
+                <div className={`mt-2 p-1.5 rounded ${isDarkMode ? 'bg-blue-900/30' : 'bg-blue-50'} border ${isDarkMode ? 'border-blue-800' : 'border-blue-200'}`}>
+                  <div className="flex items-center gap-1.5">
+                    <Calendar className={`h-3.5 w-3.5 ${isDarkMode ? 'text-blue-400' : 'text-blue-600'}`} />
+                    <span className={`text-xs font-medium ${isDarkMode ? 'text-blue-300' : 'text-blue-800'}`}>
                       Expected Delivery: {(() => {
                         const dateStr = delivery.delivery_date || delivery.expected_delivery_date || delivery.pickup_date;
                         if (!dateStr) return 'Not specified';
@@ -414,12 +414,12 @@ export const DeliveryRequestCard: React.FC<DeliveryRequestCardProps> = ({
 
               {/* Special Instructions */}
               {delivery.special_instructions && (
-                <div className={`mt-3 p-2 rounded-lg ${isDarkMode ? 'bg-gray-700' : 'bg-yellow-50'}`}>
-                  <p className={`text-xs font-medium ${isDarkMode ? 'text-yellow-400' : 'text-yellow-700'}`}>
+                <div className={`mt-2 p-1.5 rounded ${isDarkMode ? 'bg-gray-700' : 'bg-yellow-50'}`}>
+                  <p className={`text-[10px] font-medium ${isDarkMode ? 'text-yellow-400' : 'text-yellow-700'}`}>
                     <MessageSquare className="h-3 w-3 inline mr-1" />
                     Special Instructions:
                   </p>
-                  <p className={`text-sm ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                  <p className={`text-xs ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
                     {delivery.special_instructions}
                   </p>
                 </div>
@@ -427,21 +427,21 @@ export const DeliveryRequestCard: React.FC<DeliveryRequestCardProps> = ({
             </div>
             
             {/* Right Section - Price and Actions */}
-            <div className="flex flex-col items-end gap-3 min-w-[200px]">
+            <div className="flex flex-col items-end gap-2 min-w-[180px]">
               {/* Price and Distance */}
               <div className="text-right">
-                <p className="text-2xl font-bold text-teal-600">{formatCurrency(delivery.price)}</p>
-                <div className={`flex items-center gap-2 text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-                  <Timer className="h-4 w-4" />
+                <p className="text-xl font-bold text-teal-600">{formatCurrency(delivery.price)}</p>
+                <div className={`flex items-center gap-1.5 text-xs ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                  <Timer className="h-3.5 w-3.5" />
                   {delivery.estimated_time}
-                  <span className="mx-1">•</span>
-                  <Route className="h-4 w-4" />
+                  <span className="mx-0.5">•</span>
+                  <Route className="h-3.5 w-3.5" />
                   {delivery.distance} km
                 </div>
               </div>
 
               {/* Action Buttons */}
-              <div className="flex flex-col gap-2 w-full">
+              <div className="flex flex-col gap-1.5 w-full">
                 {/* Accept/Reject Buttons for Pending Requests - SINGLE CLICK */}
                 {isPendingRequest && (
                   <div className="flex gap-2 w-full">
