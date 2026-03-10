@@ -478,26 +478,28 @@ export const DeliveryRequestCard: React.FC<DeliveryRequestCardProps> = ({
                 {/* Action Buttons for Accepted Deliveries */}
                 {isAccepted && (
                   <div className="space-y-1">
-                    <div className="flex flex-wrap gap-1.5">
+                    <div className="flex flex-wrap gap-1">
                       <Button 
                         size="sm" 
                         variant="outline"
+                        className="h-7 px-2 text-xs"
                         onClick={() => onCall?.(delivery.customer_phone)}
                       >
-                        <Phone className="h-4 w-4 mr-1" />
+                        <Phone className="h-3 w-3 mr-0.5" />
                         Call
                       </Button>
                       <Button 
                         size="sm" 
                         variant="outline"
+                        className="h-7 px-2 text-xs"
                         onClick={() => onCaptureProof?.(delivery.id)}
                       >
-                        <Camera className="h-4 w-4 mr-1" />
+                        <Camera className="h-3 w-3 mr-0.5" />
                         Proof
                       </Button>
                       <Button 
                         size="sm" 
-                        className="bg-teal-600 hover:bg-teal-700"
+                        className="h-7 px-2 text-xs bg-teal-600 hover:bg-teal-700"
                         disabled={!['dispatched', 'shipped', 'in_transit', 'out_for_delivery', 'delivery_arrived', 'picked_up', 'on_the_way', 'accepted', 'scheduled', 'assigned'].includes(delivery.status)}
                         onClick={() => onNavigate?.(delivery)}
                         title={
@@ -506,7 +508,7 @@ export const DeliveryRequestCard: React.FC<DeliveryRequestCardProps> = ({
                             : 'Navigate to delivery location'
                         }
                       >
-                        <NavigationIcon className="h-4 w-4 mr-1" />
+                        <NavigationIcon className="h-3 w-3 mr-0.5" />
                         Navigate
                       </Button>
                     </div>
