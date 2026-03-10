@@ -32,6 +32,8 @@ DECLARE
   result JSONB;
   current_user_id UUID;
   order_id UUID;
+  v_delivery_request_provider_id UUID;
+  v_delivery_request_status TEXT;
 BEGIN
   current_user_id := auth.uid();
   
