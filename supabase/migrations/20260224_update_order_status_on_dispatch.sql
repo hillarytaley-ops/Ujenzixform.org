@@ -197,12 +197,21 @@ BEGIN
         WHERE purchase_order_id = order_id 
           AND (receive_scanned = FALSE OR receive_scanned IS NULL)
       ) THEN
+        -- Update purchase_order status to delivered
         UPDATE purchase_orders
         SET status = 'delivered',
             updated_at = NOW()
         WHERE id = order_id;
         
-        RAISE NOTICE 'All items received - Updated purchase_order % status to delivered', order_id;
+        -- Also update delivery_request status to delivered
+        UPDATE delivery_requests
+        SET status = 'delivered',
+            delivered_at = NOW(),
+            updated_at = NOW()
+        WHERE purchase_order_id = order_id
+          AND (status != 'delivered' OR status IS NULL);
+        
+        RAISE NOTICE 'All items received - Updated purchase_order % and delivery_request status to delivered', order_id;
       END IF;
     END IF;
       

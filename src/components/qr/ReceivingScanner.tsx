@@ -262,6 +262,20 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
           
           console.log('✅ PROCESSING QR CODE NOW:', decodedText);
           
+          // Stop scanning temporarily to prevent duplicate scans while processing
+          // We'll resume after processing completes
+          try {
+            if (scannerRef.current) {
+              const state = scannerRef.current.getState();
+              if (state === Html5QrcodeScannerState.SCANNING) {
+                await scannerRef.current.pause();
+                console.log('⏸️ Scanner paused for processing');
+              }
+            }
+          } catch (pauseError) {
+            console.warn('⚠️ Could not pause scanner:', pauseError);
+          }
+          
           // EARLY CHECK: Verify QR code hasn't been scanned in database (non-blocking)
           // This prevents re-scanning even after page refresh, but doesn't block if check fails
           const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
@@ -316,6 +330,9 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
             description: `Processing: ${decodedText.substring(0, 30)}...`,
             duration: 3000,
           });
+          
+          // Process the scan (this will handle the database update)
+          await processQRScan(decodedText, 'mobile_camera');
           
           // Vibrate on successful scan (mobile)
           if (navigator.vibrate) {
@@ -1297,6 +1314,19 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
       setManualQRCode('');
       setNotes('');
       
+      // Resume scanning after successful scan (if it was paused)
+      try {
+        if (scannerRef.current && isScanning) {
+          const state = scannerRef.current.getState();
+          if (state === Html5QrcodeScannerState.PAUSED) {
+            await scannerRef.current.resume();
+            console.log('▶️ Scanner resumed after successful scan');
+          }
+        }
+      } catch (resumeError) {
+        console.warn('⚠️ Could not resume scanner:', resumeError);
+      }
+      
     } catch (error) {
           const elapsed = Date.now() - startTime;
           console.error('❌ Scan processing error after', elapsed, 'ms:', error);
@@ -1625,6 +1655,62 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
+            {/* File Upload for QR Code Images */}
+            <div className="space-y-2">
+              <Label htmlFor="qr-image-upload">Scan QR Code from Image</Label>
+              <div className="flex gap-2">
+                <Input
+                  id="qr-image-upload"
+                  type="file"
+                  accept="image/*"
+                  onChange={async (e) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    
+                    try {
+                      toast.info('Scanning QR code from image...');
+                      if (scannerRef.current) {
+                        const result = await scannerRef.current.scanFile(file, true);
+                        console.log('✅ QR code scanned from image:', result);
+                        await processQRScan(result, 'web_scanner');
+                        // Clear the file input
+                        e.target.value = '';
+                      } else {
+                        // Create temporary scanner instance for file scanning
+                        const tempScanner = new Html5Qrcode(scannerContainerId, { verbose: false });
+                        try {
+                          const result = await tempScanner.scanFile(file, true);
+                          console.log('✅ QR code scanned from image:', result);
+                          await processQRScan(result, 'web_scanner');
+                          // Clear the file input
+                          e.target.value = '';
+                        } finally {
+                          // Clean up temporary scanner
+                          try {
+                            await tempScanner.clear();
+                          } catch (e) {
+                            // Ignore cleanup errors
+                          }
+                        }
+                      }
+                    } catch (error: any) {
+                      console.error('❌ Failed to scan QR code from image:', error);
+                      toast.error('Failed to scan QR code', {
+                        description: error.message || 'Could not read QR code from image. Please ensure the image contains a valid QR code.',
+                        duration: 5000
+                      });
+                      // Clear the file input
+                      e.target.value = '';
+                    }
+                  }}
+                  className="cursor-pointer"
+                />
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Upload an image file containing a QR code to scan it
+              </p>
+            </div>
+
             <div className="space-y-2">
               <Label htmlFor="qr-code">QR Code (from physical scanner)</Label>
               <Input
