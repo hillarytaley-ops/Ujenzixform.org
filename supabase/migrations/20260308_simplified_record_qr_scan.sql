@@ -124,12 +124,14 @@ BEGIN
       WHERE purchase_order_id = order_id;
       
       IF v_all_items_received = TRUE THEN
+        -- Update purchase_orders status AND delivery_status to 'delivered'
         UPDATE purchase_orders
         SET status = 'delivered',
+            delivery_status = 'delivered',
             updated_at = NOW()
         WHERE id = order_id;
         
-        -- Only update delivery_requests that are in transit (exclude cancelled/completed)
+        -- Also update delivery_requests that are in transit (exclude cancelled/completed)
         UPDATE delivery_requests
         SET status = 'delivered',
             delivered_at = NOW(),

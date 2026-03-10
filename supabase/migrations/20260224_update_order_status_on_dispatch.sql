@@ -197,9 +197,10 @@ BEGIN
         WHERE purchase_order_id = order_id 
           AND (receive_scanned = FALSE OR receive_scanned IS NULL)
       ) THEN
-        -- Update purchase_order status to delivered
+        -- Update purchase_order status AND delivery_status to delivered
         UPDATE purchase_orders
         SET status = 'delivered',
+            delivery_status = 'delivered',
             updated_at = NOW()
         WHERE id = order_id;
         
