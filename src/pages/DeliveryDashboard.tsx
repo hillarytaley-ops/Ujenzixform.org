@@ -1909,8 +1909,8 @@ const DeliveryDashboard = () => {
 
         {/* Photo Proof Modal */}
         {showProofCapture && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-            <div className="max-w-lg w-full">
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-2">
+            <div className="max-w-md w-full max-h-[90vh] overflow-y-auto">
               <DeliveryPhotoProof
                 deliveryId={showProofCapture}
                 deliveryType="delivery"
@@ -1922,7 +1922,8 @@ const DeliveryDashboard = () => {
               />
               <Button 
                 variant="outline" 
-                className="w-full mt-4"
+                size="sm"
+                className="w-full mt-2"
                 onClick={() => setShowProofCapture(null)}
               >
                 Cancel

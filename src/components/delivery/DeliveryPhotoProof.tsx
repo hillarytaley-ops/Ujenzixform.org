@@ -241,61 +241,63 @@ export const DeliveryPhotoProof: React.FC<DeliveryPhotoProofProps> = ({
 
   return (
     <Card className="shadow-lg">
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-lg">
-          <Camera className="h-5 w-5 text-teal-600" />
+      <CardHeader className="pb-3">
+        <CardTitle className="flex items-center gap-1.5 text-base">
+          <Camera className="h-4 w-4 text-teal-600" />
           {deliveryType === 'pickup' ? 'Pickup' : 'Delivery'} Proof
         </CardTitle>
-        <CardDescription>
+        <CardDescription className="text-xs">
           Capture photos and signature for {customerName}
         </CardDescription>
       </CardHeader>
-      <CardContent className="space-y-4">
+      <CardContent className="space-y-3 p-4">
         {/* Photo Capture Section */}
-        <div className="space-y-2">
-          <Label className="flex items-center gap-2">
-            <Image className="h-4 w-4" />
+        <div className="space-y-1.5">
+          <Label className="flex items-center gap-1.5 text-xs">
+            <Image className="h-3.5 w-3.5" />
             Photos (Required)
           </Label>
           
-          <div className="flex flex-wrap gap-3">
+          <div className="flex flex-wrap gap-2">
             {photos.map((photo, index) => (
-              <div key={index} className="relative w-24 h-24 rounded-lg overflow-hidden border-2 border-gray-200">
+              <div key={index} className="relative w-20 h-20 rounded overflow-hidden border border-gray-200">
                 <img src={photo} alt={`Proof ${index + 1}`} className="w-full h-full object-cover" />
                 <button
                   onClick={() => removePhoto(index)}
-                  className="absolute top-1 right-1 p-1 bg-red-500 text-white rounded-full hover:bg-red-600"
+                  className="absolute top-0.5 right-0.5 p-0.5 bg-red-500 text-white rounded-full hover:bg-red-600"
                 >
-                  <X className="h-3 w-3" />
+                  <X className="h-2.5 w-2.5" />
                 </button>
               </div>
             ))}
             
             {photos.length < 4 && (
-              <div className="flex gap-2">
+              <div className="flex gap-1.5">
                 <Button 
                   variant="outline" 
-                  className="w-24 h-24 flex flex-col items-center justify-center border-dashed"
+                  size="sm"
+                  className="w-20 h-20 flex flex-col items-center justify-center border-dashed p-1"
                   onClick={handleCameraCapture}
                   disabled={isCapturing}
                 >
                   {isCapturing ? (
-                    <Loader2 className="h-6 w-6 animate-spin" />
+                    <Loader2 className="h-4 w-4 animate-spin" />
                   ) : (
                     <>
-                      <Camera className="h-6 w-6 mb-1" />
-                      <span className="text-xs">Camera</span>
+                      <Camera className="h-4 w-4 mb-0.5" />
+                      <span className="text-[10px]">Camera</span>
                     </>
                   )}
                 </Button>
                 
                 <Button 
                   variant="outline" 
-                  className="w-24 h-24 flex flex-col items-center justify-center border-dashed"
+                  size="sm"
+                  className="w-20 h-20 flex flex-col items-center justify-center border-dashed p-1"
                   onClick={() => fileInputRef.current?.click()}
                 >
-                  <Upload className="h-6 w-6 mb-1" />
-                  <span className="text-xs">Upload</span>
+                  <Upload className="h-4 w-4 mb-0.5" />
+                  <span className="text-[10px]">Upload</span>
                 </Button>
                 <input
                   ref={fileInputRef}
@@ -309,56 +311,57 @@ export const DeliveryPhotoProof: React.FC<DeliveryPhotoProofProps> = ({
             )}
           </div>
           
-          <p className="text-xs text-gray-500">
+          <p className="text-[10px] text-gray-500">
             Capture photos of materials, packaging, or delivery location ({photos.length}/4)
           </p>
         </div>
 
         {/* Signature Section */}
-        <div className="space-y-2">
-          <Label className="flex items-center gap-2">
-            <User className="h-4 w-4" />
+        <div className="space-y-1.5">
+          <Label className="flex items-center gap-1.5 text-xs">
+            <User className="h-3.5 w-3.5" />
             Customer Signature
           </Label>
           
-          <div className="border-2 border-gray-200 rounded-lg p-2 bg-white">
+          <div className="border border-gray-200 rounded p-1.5 bg-white">
             <canvas
               ref={canvasRef}
               width={300}
-              height={100}
+              height={80}
               className="w-full touch-none cursor-crosshair bg-gray-50 rounded"
               onMouseDown={startSignature}
               onMouseMove={drawSignature}
               onTouchStart={startSignature}
               onTouchMove={drawSignature}
             />
-            <div className="flex justify-between mt-2">
-              <Button variant="outline" size="sm" onClick={clearSignature}>
+            <div className="flex justify-between mt-1.5 gap-1.5">
+              <Button variant="outline" size="sm" className="h-7 px-2 text-xs" onClick={clearSignature}>
                 Clear
               </Button>
-              <Button variant="outline" size="sm" onClick={saveSignature}>
-                <CheckCircle className="h-4 w-4 mr-1" />
-                Save Signature
+              <Button variant="outline" size="sm" className="h-7 px-2 text-xs" onClick={saveSignature}>
+                <CheckCircle className="h-3 w-3 mr-0.5" />
+                Save
               </Button>
             </div>
           </div>
           
           {signature && (
-            <Badge className="bg-green-100 text-green-800">
-              <CheckCircle className="h-3 w-3 mr-1" />
+            <Badge className="bg-green-100 text-green-800 text-[10px] px-1.5 py-0.5">
+              <CheckCircle className="h-2.5 w-2.5 mr-0.5" />
               Signature captured
             </Badge>
           )}
         </div>
 
         {/* Receiver Name */}
-        <div className="space-y-2">
-          <Label htmlFor="receiverName" className="flex items-center gap-2">
-            <User className="h-4 w-4" />
+        <div className="space-y-1.5">
+          <Label htmlFor="receiverName" className="flex items-center gap-1.5 text-xs">
+            <User className="h-3.5 w-3.5" />
             Receiver Name
           </Label>
           <Input
             id="receiverName"
+            className="h-8 text-xs"
             value={receiverName}
             onChange={(e) => setReceiverName(e.target.value)}
             placeholder="Name of person receiving delivery"
@@ -366,13 +369,14 @@ export const DeliveryPhotoProof: React.FC<DeliveryPhotoProofProps> = ({
         </div>
 
         {/* Notes */}
-        <div className="space-y-2">
-          <Label htmlFor="notes" className="flex items-center gap-2">
-            <Package className="h-4 w-4" />
+        <div className="space-y-1.5">
+          <Label htmlFor="notes" className="flex items-center gap-1.5 text-xs">
+            <Package className="h-3.5 w-3.5" />
             Delivery Notes
           </Label>
           <Textarea
             id="notes"
+            className="text-xs min-h-[60px]"
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
             placeholder="Any additional notes about the delivery..."
@@ -381,51 +385,52 @@ export const DeliveryPhotoProof: React.FC<DeliveryPhotoProofProps> = ({
         </div>
 
         {/* Location Capture */}
-        <div className="flex items-center justify-between p-2 bg-gray-50 rounded-lg">
-          <div className="flex items-center gap-2">
-            <MapPin className="h-4 w-4 text-gray-500" />
-            <span className="text-sm">
+        <div className="flex items-center justify-between p-1.5 bg-gray-50 rounded">
+          <div className="flex items-center gap-1.5">
+            <MapPin className="h-3.5 w-3.5 text-gray-500" />
+            <span className="text-xs">
               {location 
-                ? `Location: ${location.lat.toFixed(4)}, ${location.lng.toFixed(4)}`
+                ? `${location.lat.toFixed(4)}, ${location.lng.toFixed(4)}`
                 : 'GPS location not captured'
               }
             </span>
           </div>
-          <Button variant="outline" size="sm" onClick={getCurrentLocation}>
-            <MapPin className="h-4 w-4 mr-1" />
-            Capture Location
+          <Button variant="outline" size="sm" className="h-7 px-2 text-xs" onClick={getCurrentLocation}>
+            <MapPin className="h-3 w-3 mr-0.5" />
+            Capture
           </Button>
         </div>
 
         {/* Timestamp */}
-        <div className="flex items-center gap-2 text-sm text-gray-500">
-          <Clock className="h-4 w-4" />
+        <div className="flex items-center gap-1.5 text-xs text-gray-500">
+          <Clock className="h-3.5 w-3.5" />
           <span>Timestamp: {new Date().toLocaleString()}</span>
         </div>
 
         {/* Submit Button */}
         <Button 
-          className="w-full bg-teal-600 hover:bg-teal-700"
+          size="sm"
+          className="w-full h-8 bg-teal-600 hover:bg-teal-700 text-xs"
           onClick={handleSubmit}
           disabled={isSubmitting || photos.length === 0}
         >
           {isSubmitting ? (
             <>
-              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
               Submitting...
             </>
           ) : (
             <>
-              <Send className="h-4 w-4 mr-2" />
+              <Send className="h-3.5 w-3.5 mr-1.5" />
               Submit {deliveryType === 'pickup' ? 'Pickup' : 'Delivery'} Proof
             </>
           )}
         </Button>
 
         {photos.length === 0 && (
-          <Alert>
-            <AlertCircle className="h-4 w-4" />
-            <AlertDescription>
+          <Alert className="py-2">
+            <AlertCircle className="h-3.5 w-3.5" />
+            <AlertDescription className="text-xs">
               At least one photo is required as proof of {deliveryType}.
             </AlertDescription>
           </Alert>
