@@ -316,7 +316,7 @@ export const EnhancedQRCodeManager: React.FC<EnhancedQRCodeManagerProps> = ({ su
         )
         .subscribe();
       
-      // Also listen to purchase_orders for delivery provider updates
+      // Also listen to purchase_orders for delivery provider updates AND status changes
       purchaseOrdersSubscription = supabase
         .channel('qr-purchase-orders-realtime')
         .on(
@@ -327,7 +327,21 @@ export const EnhancedQRCodeManager: React.FC<EnhancedQRCodeManagerProps> = ({ su
             table: 'purchase_orders'
           },
           async (payload) => {
-            console.log('🚚 QR Manager: Purchase order updated with delivery provider:', payload.new?.po_number);
+            console.log('🚚 QR Manager: Purchase order updated:', {
+              po_number: payload.new?.po_number,
+              old_status: payload.old?.status,
+              new_status: payload.new?.status,
+              old_delivery_status: payload.old?.delivery_status,
+              new_delivery_status: payload.new?.delivery_status
+            });
+            
+            // CRITICAL: If status changed to 'delivered', refresh ALL data immediately
+            if (payload.new?.status === 'delivered' && payload.old?.status !== 'delivered') {
+              console.log('✅ Order delivered! Triggering full refresh...');
+              setTimeout(() => {
+                fastCheckAuthAndFetch();
+              }, 500);
+            }
             
             // Update order groups with delivery provider information
             if (payload.new?.id) {
