@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { DashboardLoader } from "@/components/ui/DashboardLoader";
@@ -157,7 +158,8 @@ const DeliveryDashboard = () => {
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [showProofCapture, setShowProofCapture] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState("alerts"); // Default to Alerts for new requests
-  const [deliveriesSubTab, setDeliveriesSubTab] = useState("scheduled"); // Sub-tab for Deliveries (scheduled, in_transit, delivered) - removed pending
+  const [deliveriesSubTab, setDeliveriesSubTab] = useState("scheduled"); // Sub-tab for Deliveries (scheduled only now)
+  const [selectedScheduledOrderId, setSelectedScheduledOrderId] = useState<string>(""); // Selected order from dropdown
   const [showProfileEdit, setShowProfileEdit] = useState(false);
   const [showProfileView, setShowProfileView] = useState(false);
   const [selectedDeliveryForScan, setSelectedDeliveryForScan] = useState<string | null>(null);
@@ -686,20 +688,22 @@ const DeliveryDashboard = () => {
         (payload) => {
           const newRow = payload.new as { receive_scanned?: boolean; dispatch_scanned?: boolean };
           debouncedRefetchFromMaterialItems();
-          // Provider receives scan → move to Delivered tab
+          // Provider receives scan → refresh data (delivery provider only needs scheduled tab)
           if (newRow?.receive_scanned === true) {
             setActiveTab('deliveries');
-            setDeliveriesSubTab('delivered');
+            setDeliveriesSubTab('scheduled');
+            refetchData();
           }
-          // Supplier dispatches scan → move to In Transit tab
+          // Supplier dispatches scan → refresh data (delivery provider only needs scheduled tab)
           if (newRow?.dispatch_scanned === true) {
             toast({
               title: '🚚 Materials Dispatched!',
-              description: 'Supplier has dispatched. Order moved to "In Transit" tab.',
+              description: 'Supplier has dispatched. Data refreshed.',
               duration: 4000,
             });
             setActiveTab('deliveries');
-            setDeliveriesSubTab('in_transit');
+            setDeliveriesSubTab('scheduled');
+            refetchData();
           }
         }
       )
@@ -744,10 +748,10 @@ const DeliveryDashboard = () => {
               description: 'Materials are now in transit. Switching to "In Transit" tab.',
               duration: 5000,
             });
-            // NAVIGATE to Deliveries > In Transit tab regardless of current tab
+            // NAVIGATE to Deliveries tab (delivery provider only needs scheduled tab)
             setActiveTab('deliveries');
-            setDeliveriesSubTab('in_transit');
-            console.log('🧭 Auto-navigating to Deliveries > In Transit tab');
+            setDeliveriesSubTab('scheduled');
+            console.log('🧭 Auto-navigating to Deliveries tab');
           }
           
           // When provider receives, status changes to 'delivered' or 'completed'
@@ -758,13 +762,13 @@ const DeliveryDashboard = () => {
           if (isNowDelivered && wasNotDelivered) {
             toast({
               title: '✅ Delivery Complete!',
-              description: 'Delivery has been completed successfully. Switching to "Delivered" tab.',
+              description: 'Delivery has been completed successfully. Data refreshed.',
               duration: 5000,
             });
-            // NAVIGATE to Deliveries > Delivered tab regardless of current tab
+            // NAVIGATE to Deliveries tab (delivery provider only needs scheduled tab)
             setActiveTab('deliveries');
-            setDeliveriesSubTab('delivered');
-            console.log('🧭 Auto-navigating to Deliveries > Delivered tab');
+            setDeliveriesSubTab('scheduled');
+            console.log('🧭 Auto-navigating to Deliveries tab');
           }
           
           refetchData();
@@ -794,10 +798,10 @@ const DeliveryDashboard = () => {
               description: 'Supplier has dispatched materials. Switching to "In Transit" tab.',
               duration: 5000,
             });
-            // NAVIGATE to Deliveries > In Transit tab regardless of current tab
+            // NAVIGATE to Deliveries tab (delivery provider only needs scheduled tab)
             setActiveTab('deliveries');
-            setDeliveriesSubTab('in_transit');
-            console.log('🧭 Auto-navigating to Deliveries > In Transit tab (from PO update)');
+            setDeliveriesSubTab('scheduled');
+            console.log('🧭 Auto-navigating to Deliveries tab (from PO update)');
           }
           
           // When delivery is completed
@@ -808,13 +812,13 @@ const DeliveryDashboard = () => {
           if (isNowDelivered && wasNotDelivered) {
             toast({
               title: '✅ Delivery Complete!',
-              description: 'Delivery has been completed successfully. Switching to "Delivered" tab.',
+              description: 'Delivery has been completed successfully. Data refreshed.',
               duration: 5000,
             });
-            // NAVIGATE to Deliveries > Delivered tab regardless of current tab
+            // NAVIGATE to Deliveries tab (delivery provider only needs scheduled tab)
             setActiveTab('deliveries');
-            setDeliveriesSubTab('delivered');
-            console.log('🧭 Auto-navigating to Deliveries > Delivered tab (from PO update)');
+            setDeliveriesSubTab('scheduled');
+            console.log('🧭 Auto-navigating to Deliveries tab (from PO update)');
           }
           
           refetchData();
@@ -829,33 +833,24 @@ const DeliveryDashboard = () => {
     };
   }, [user?.id, refetchData, toast, activeTab]);
 
-  // Auto-refresh data when switching to Delivered tab to ensure latest data is shown
+  // Update selected scheduled order when scheduled orders change
   useEffect(() => {
-    if (activeTab === 'deliveries' && deliveriesSubTab === 'delivered') {
-      console.log('🔄 Delivered tab active - refreshing data to show latest deliveries...');
-      
-      // Aggressive refresh: multiple attempts to ensure we get the latest data
-      const refreshWithRetries = async () => {
-        for (let i = 0; i < 3; i++) {
-          try {
-            await refetchData();
-            // Wait a bit between refreshes to allow database propagation
-            if (i < 2) {
-              await new Promise(resolve => setTimeout(resolve, 1000));
-            }
-          } catch (error) {
-            console.warn(`⚠️ Refresh attempt ${i + 1} failed:`, error);
-          }
-        }
-      };
-      
-      // Small delay to ensure tab switch is complete before refreshing
-      const timer = setTimeout(() => {
-        refreshWithRetries();
-      }, 300);
-      return () => clearTimeout(timer);
+    if (activeTab !== 'deliveries') return;
+    
+    // Check both unified and legacy scheduled orders
+    const unifiedIds = unifiedScheduled.map(d => d.id || d.purchase_order_id || '').filter(Boolean);
+    const legacyIds = deliveryCategories.scheduled.map(d => d.id || d.purchase_order_id || '').filter(Boolean);
+    const allScheduledIds = [...new Set([...unifiedIds, ...legacyIds])];
+    
+    if (allScheduledIds.length > 0) {
+      // If current selection is invalid or empty, select the first one
+      if (!selectedScheduledOrderId || !allScheduledIds.includes(selectedScheduledOrderId)) {
+        setSelectedScheduledOrderId(allScheduledIds[0]);
+      }
+    } else if (selectedScheduledOrderId) {
+      setSelectedScheduledOrderId("");
     }
-  }, [activeTab, deliveriesSubTab, refetchData]);
+  }, [unifiedScheduled, deliveryCategories.scheduled, activeTab, selectedScheduledOrderId]);
 
   // Function to load notification counts
   const loadNotificationCounts = useCallback(async () => {
@@ -1513,7 +1508,7 @@ const DeliveryDashboard = () => {
                 </Button>
               </div>
               <p className={`text-xs px-3 ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-                Orders move automatically: <strong>Scheduled</strong> → <strong>In Transit</strong> when the supplier dispatches (QR tab); → <strong>Delivered</strong> when you scan all item QR codes.
+                Scheduled orders ready for delivery. Select an order from the dropdown to view details.
               </p>
 
               {unifiedError && (
@@ -1523,379 +1518,112 @@ const DeliveryDashboard = () => {
                 </Alert>
               )}
 
-              <Tabs value={deliveriesSubTab} onValueChange={setDeliveriesSubTab} className="w-full">
-                <TabsList className={`grid w-full grid-cols-3 ${isDarkMode ? 'bg-gray-800' : 'bg-gray-100'}`}>
-                  <TabsTrigger value="scheduled" className="flex items-center gap-2">
-                    <Calendar className="h-4 w-4" />
-                    Scheduled
-                    {(useLegacyFallback ? deliveryCategories.scheduled.length : unifiedScheduled.length) > 0 ? (
-                      <Badge className="ml-1 bg-blue-500 text-white text-xs">
-                        {useLegacyFallback ? deliveryCategories.scheduled.length : unifiedScheduled.length}
-                      </Badge>
-                    ) : null}
-                  </TabsTrigger>
-                  <TabsTrigger value="in_transit" className="flex items-center gap-2">
-                    <Truck className="h-4 w-4" />
-                    In Transit
-                    {(useLegacyFallback ? deliveryCategories.inTransit.length : unifiedInTransit.length) > 0 ? (
-                      <Badge className="ml-1 bg-purple-500 text-white text-xs">
-                        {useLegacyFallback ? deliveryCategories.inTransit.length : unifiedInTransit.length}
-                      </Badge>
-                    ) : null}
-                  </TabsTrigger>
-                  <TabsTrigger value="delivered" className="flex items-center gap-2">
-                    <CheckCircle className="h-4 w-4" />
-                    Delivered
-                    {(() => {
-                      const deliveredCount = useLegacyFallback
-                        ? (() => { const k = (x: any) => (x.order_number || x.po_number || '').toString().split('-')[1] || x.purchase_order_id || x.id || ''; const s = new Set<string>(); [...deliveryCategories.deliveredFromActive, ...deliveryHistory].forEach(d => { const v = k(d); if (v) s.add(v); }); return s.size; })()
-                        : unifiedDelivered.length;
-                      return deliveredCount > 0 ? (
-                        <Badge className="ml-1 bg-green-500 text-white text-xs">{deliveredCount}</Badge>
-                      ) : null;
-                    })()}
-                  </TabsTrigger>
-                </TabsList>
-
-                {/* Scheduled - unified RPC or legacy fallback */}
-                <TabsContent value="scheduled" className="mt-4">
-                  <div className="space-y-4">
-                    {(() => {
-                      const scheduled = useLegacyFallback ? deliveryCategories.scheduled : unifiedScheduled.map(toCardDelivery);
-                      const showSpinner = !useLegacyFallback && unifiedLoading && scheduled.length === 0;
-                      if (showSpinner) {
-                        return (
-                          <div className="flex items-center justify-center py-12">
-                            <RefreshCw className="h-8 w-8 animate-spin text-teal-500" />
-                          </div>
-                        );
-                      }
-                      if (scheduled.length > 0) {
-                        return (
-                        <div className="space-y-4">
-                          <div className="flex items-center gap-2 mb-3">
+              {/* Scheduled Orders - unified RPC or legacy fallback */}
+              <div className="space-y-4 mt-4">
+                {(() => {
+                  const scheduled = useLegacyFallback ? deliveryCategories.scheduled : unifiedScheduled.map(toCardDelivery);
+                  const showSpinner = !useLegacyFallback && unifiedLoading && scheduled.length === 0;
+                  
+                  if (showSpinner) {
+                    return (
+                      <div className="flex items-center justify-center py-12">
+                        <RefreshCw className="h-8 w-8 animate-spin text-teal-500" />
+                      </div>
+                    );
+                  }
+                  
+                  // Update selected order if current selection is invalid or empty
+                  const currentSelected = scheduled.find(d => d.id === selectedScheduledOrderId);
+                  const defaultSelected = scheduled[0];
+                  const selectedDelivery = currentSelected || defaultSelected;
+                  
+                  if (scheduled.length > 0) {
+                    return (
+                      <div className="space-y-4">
+                        <div className="flex items-center justify-between mb-3">
+                          <div className="flex items-center gap-2">
                             <div className="h-2 w-2 bg-blue-500 rounded-full animate-pulse" />
                             <h3 className={`text-lg font-semibold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
-                              📅 Scheduled ({scheduled.length})
+                              📅 Scheduled Orders ({scheduled.length})
                             </h3>
+                            {(useLegacyFallback ? deliveryCategories.scheduled.length : unifiedScheduled.length) > 0 && (
+                              <Badge className="ml-1 bg-blue-500 text-white text-xs">
+                                {useLegacyFallback ? deliveryCategories.scheduled.length : unifiedScheduled.length}
+                              </Badge>
+                            )}
                           </div>
-                          {scheduled.map((delivery) => (
-                              <DeliveryRequestCard
-                                key={delivery.id}
-                                delivery={delivery}
-                                isDarkMode={isDarkMode}
-                                onNavigate={() => {}}
-                                onCall={(phone) => window.open(`tel:${phone}`)}
-                                onCaptureProof={(id) => setShowProofCapture(id)}
-                              />
-                            ))}
                         </div>
-                        );
-                      }
-                      return (
-                        <Card className={isDarkMode ? 'bg-gray-800 border-gray-700' : ''}>
-                          <CardContent className="py-12 text-center">
-                            <Calendar className={`h-12 w-12 ${isDarkMode ? 'text-gray-600' : 'text-gray-300'} mx-auto mb-4`} />
-                            <p className={isDarkMode ? 'text-gray-400' : 'text-gray-500'}>No scheduled deliveries</p>
-                            <p className={`text-sm ${isDarkMode ? 'text-gray-500' : 'text-gray-400'}`}>Accepted deliveries will appear here</p>
-                          </CardContent>
-                        </Card>
-                      );
-                    })()}
-                  </div>
-                </TabsContent>
-
-                <TabsContent value="in_transit" className="mt-4">
-                  <div className="space-y-4">
-                    {(() => {
-                      const inTransit = useLegacyFallback ? deliveryCategories.inTransit : unifiedInTransit.map(toCardDelivery);
-                      const showSpinner = !useLegacyFallback && unifiedLoading && inTransit.length === 0;
-                      if (showSpinner) {
-                        return (
-                          <div className="flex items-center justify-center py-12">
-                            <RefreshCw className="h-8 w-8 animate-spin text-teal-500" />
-                          </div>
-                        );
-                      }
-                      if (inTransit.length > 0) {
-                        return (
-                        <div className="space-y-4">
-                          <div className="flex items-center gap-2 mb-3">
-                            <div className="h-2 w-2 bg-purple-500 rounded-full animate-pulse" />
-                            <h3 className={`text-lg font-semibold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
-                              🚚 In Transit ({inTransit.length})
-                            </h3>
-                          </div>
-                          <Alert className="mb-4 bg-purple-50 border-purple-200">
-                            <Truck className="h-4 w-4 text-purple-600" />
-                            <AlertDescription className="text-purple-700">
-                              Supplier has dispatched. Navigate to the delivery location and <strong>scan all item QR codes</strong> to complete.
-                            </AlertDescription>
-                          </Alert>
-                          {inTransit.map((delivery) => (
-                            <Card key={delivery.id} className={isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-2 border-purple-100'}>
-                              <CardContent className="p-6">
-                                <div className="space-y-4">
-                                  {/* Delivery Header */}
-                                  <div className="flex items-start justify-between">
-                                    <div className="flex-1">
-                                      <div className="flex items-center gap-2 mb-2">
-                                        <h3 className={`text-lg font-bold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
-                                          {delivery.material_type}
-                                        </h3>
-                                        {delivery.order_number && (
-                                          <span className={`text-sm font-semibold px-2 py-1 rounded ${isDarkMode ? 'bg-blue-900 text-blue-300' : 'bg-blue-100 text-blue-700'}`}>
-                                            Order: {delivery.order_number}
-                                          </span>
-                                        )}
-                                      </div>
-                                      <p className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-                                        Being delivered to: {delivery.delivery_location}
-                                      </p>
-                                      {(delivery._items_count ?? 0) > 1 && (
-                                        <p className={`text-sm font-medium mt-1 flex items-center gap-1 ${delivery._received_count === delivery._items_count ? 'text-green-600 dark:text-green-400' : isDarkMode ? 'text-amber-400' : 'text-amber-600'}`}>
-                                          <Scan className="h-3.5 w-3.5" />
-                                          {delivery._received_count ?? 0} of {delivery._items_count} items scanned
-                                          {delivery._received_count === delivery._items_count ? ' ✓' : ' — scan remaining to complete delivery'}
-                                        </p>
-                                      )}
-                                      {delivery.purchase_order_id && !delivery.order_number && (
-                                        <p className={`text-xs mt-1 ${isDarkMode ? 'text-yellow-400' : 'text-yellow-600'}`}>
-                                          ⚠️ Order number not available (PO ID: {delivery.purchase_order_id.slice(0, 8)}...)
-                                        </p>
-                                      )}
-                                    </div>
-                                    <Badge className="bg-purple-100 text-purple-700 border-purple-300">
-                                      <Truck className="h-3 w-3 mr-1" />
-                                      In Transit
-                                    </Badge>
-                                  </div>
-
-                                  {/* Delivery Location & Navigation */}
-                                  <div className={`p-4 rounded-lg ${isDarkMode ? 'bg-gray-700' : 'bg-green-50'} border border-green-200`}>
-                                    <div className="flex items-center justify-between">
-                                      <div>
-                                        <div className="flex items-center gap-2 mb-2">
-                                          <MapPin className="h-4 w-4 text-green-600" />
-                                          <span className={`font-semibold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>Delivery Location</span>
-                                        </div>
-                                        <p className={`text-sm ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>{delivery.delivery_location}</p>
-                                        {delivery.distance > 0 && (
-                                          <p className={`text-xs mt-1 ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-                                            📍 {delivery.distance} km away • Est. {delivery.estimated_time}
-                                          </p>
-                                        )}
-                                      </div>
-                                      <Button 
-                                        variant="outline" 
-                                        size="sm"
-                                        disabled={!['dispatched', 'shipped', 'in_transit', 'out_for_delivery', 'delivery_arrived', 'picked_up', 'on_the_way'].includes(delivery.status)}
-                                        onClick={() => {
-                                          const address = encodeURIComponent(delivery.delivery_location);
-                                          window.open(`https://www.google.com/maps/search/?api=1&query=${address}`, '_blank');
-                                        }}
-                                        title={
-                                          !['dispatched', 'shipped', 'in_transit', 'out_for_delivery', 'delivery_arrived', 'picked_up', 'on_the_way'].includes(delivery.status)
-                                            ? 'Navigation will be available after supplier dispatches the order'
-                                            : 'Navigate to delivery location'
-                                        }
-                                      >
-                                        <NavigationIcon className="h-4 w-4 mr-2" />
-                                        Navigate
-                                      </Button>
-                                    </div>
-                                  </div>
-
-                                  {/* Actions */}
-                                  <div className="flex gap-2 pt-2 border-t">
-                                    <Button 
-                                      className="flex-1 bg-green-600 hover:bg-green-700"
-                                      onClick={() => {
-                                        setSelectedDeliveryForScan(delivery.id);
-                                        setActiveTab('scanning');
-                                        const itemsCount = delivery._items_count ?? 0;
-                                        const scannedCount = delivery._received_count ?? 0;
-                                        const remaining = itemsCount - scannedCount;
-                                        toast({
-                                          title: "📍 Ready to Scan",
-                                          description: remaining > 0 && itemsCount > 1 
-                                            ? `Scan ${remaining} remaining QR code${remaining > 1 ? 's' : ''} (${scannedCount} of ${itemsCount} done) to complete delivery.`
-                                            : "Scan QR codes when you arrive at the delivery location.",
-                                        });
-                                      }}
-                                    >
-                                      <Scan className="h-4 w-4 mr-2" />
-                                      {delivery._items_count && delivery._items_count > 1 && (delivery._received_count ?? 0) < delivery._items_count
-                                        ? `Scan to Complete (${delivery._received_count ?? 0}/${delivery._items_count} scanned)`
-                                        : "Scan QR to Complete Delivery"}
-                                    </Button>
-                                    <Button
-                                      variant="outline"
-                                      size="sm"
-                                      title="Scanned but still here? Click to mark items received and move to Delivered"
-                                      onClick={async () => {
-                                        const poId = delivery.order_number || delivery.purchase_order_id;
-                                        if (!poId) {
-                                          toast({ title: 'Cannot sync', description: 'Order identifier missing', variant: 'destructive' });
-                                          return;
-                                        }
-                                        try {
-                                          const { data, error } = await (supabase as any).rpc('mark_material_items_received_for_po', { po_identifier: poId });
-                                          if (error) {
-                                            toast({ title: 'Sync failed', description: error.message || 'RPC error', variant: 'destructive' });
-                                            return;
-                                          }
-                                          if (data?.success) {
-                                            toast({ title: '✅ Marked received', description: data?.message || 'Order moving to Delivered. Refreshing...' });
-                                            await refetchData();
-                                            setDeliveriesSubTab('delivered');
-                                          } else {
-                                            toast({ title: 'Could not sync', description: data?.message || 'Order not found', variant: 'destructive' });
-                                          }
-                                        } catch (e: any) {
-                                          toast({ title: 'Sync failed', description: e?.message || 'Network error', variant: 'destructive' });
-                                        }
-                                      }}
-                                    >
-                                      <RefreshCw className="h-4 w-4" />
-                                    </Button>
-                                    {delivery.customer_phone && (
-                                      <Button 
-                                        variant="outline" 
-                                        size="sm"
-                                        onClick={() => window.open(`tel:${delivery.customer_phone}`, '_blank')}
-                                      >
-                                        <Phone className="h-4 w-4" />
-                                      </Button>
+                        
+                        {/* Dropdown for selecting scheduled orders */}
+                        <div className="mb-4">
+                          <Label className={`mb-2 block ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                            Select Scheduled Order
+                          </Label>
+                          <Select 
+                            value={selectedScheduledOrderId || defaultSelected?.id || ''} 
+                            onValueChange={setSelectedScheduledOrderId}
+                          >
+                            <SelectTrigger className={`w-full ${isDarkMode ? 'bg-gray-800 border-gray-700 text-white' : ''}`}>
+                              <SelectValue>
+                                {selectedDelivery ? (
+                                  <div className="flex items-center gap-2">
+                                    <span>{selectedDelivery.order_number || selectedDelivery.purchase_order_id || 'Order'}</span>
+                                    {selectedDelivery.material_type && (
+                                      <span className="text-xs text-gray-500">- {selectedDelivery.material_type}</span>
                                     )}
                                   </div>
-                                </div>
-                              </CardContent>
-                            </Card>
-                          ))}
+                                ) : (
+                                  'Select an order'
+                                )}
+                              </SelectValue>
+                            </SelectTrigger>
+                            <SelectContent>
+                              {scheduled.map((delivery) => (
+                                <SelectItem key={delivery.id} value={delivery.id}>
+                                  <div className="flex flex-col">
+                                    <span className="font-medium">
+                                      {delivery.order_number || delivery.purchase_order_id || 'Order'}
+                                    </span>
+                                    {delivery.material_type && (
+                                      <span className="text-xs text-gray-500">{delivery.material_type}</span>
+                                    )}
+                                    {delivery.delivery_location && (
+                                      <span className="text-xs text-gray-400">{delivery.delivery_location}</span>
+                                    )}
+                                  </div>
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
                         </div>
-                        );
-                      }
-                      return (
-                        <Card className={isDarkMode ? 'bg-gray-800 border-gray-700' : ''}>
-                          <CardContent className="py-12 text-center">
-                            <Truck className={`h-12 w-12 ${isDarkMode ? 'text-gray-600' : 'text-gray-300'} mx-auto mb-4`} />
-                            <p className={isDarkMode ? 'text-gray-400' : 'text-gray-500'}>No deliveries in transit</p>
-                            <p className={`text-sm ${isDarkMode ? 'text-gray-500' : 'text-gray-400'}`}>Active deliveries will appear here when supplier dispatches</p>
-                          </CardContent>
-                        </Card>
-                      );
-                    })()}
-                  </div>
-                </TabsContent>
-
-                {/* Delivered - unified RPC or legacy fallback */}
-                <TabsContent value="delivered" className="mt-4">
-                  <Card className={isDarkMode ? 'bg-gray-800 border-gray-700' : ''}>
-                    <CardHeader>
-                      <div className="flex justify-between items-center">
-                        <div>
-                          <CardTitle className={isDarkMode ? 'text-white' : ''}>Delivered</CardTitle>
-                          <CardDescription className={isDarkMode ? 'text-gray-400' : ''}>
-                            {useLegacyFallback
-                              ? `Completed • ${(() => { const k = (d: any) => (d.order_number || d.po_number || '').toString().split('-')[1] || d.purchase_order_id || d.id || ''; const s = new Set<string>(); [...deliveryCategories.deliveredFromActive, ...deliveryHistory].forEach(d => { const v = k(d); if (v) s.add(v); }); return s.size; })()} total`
-                              : `Completed deliveries (all items scanned) • ${unifiedDelivered.length} total`}
-                          </CardDescription>
-                        </div>
-                        <Button variant="outline" size="sm" onClick={() => { refetchData(); refetchUnified(); }}>
-                          <RefreshCw className="h-4 w-4 mr-2" />
-                          Refresh
-                        </Button>
+                        
+                        {/* Display selected order details */}
+                        {selectedDelivery && (
+                          <DeliveryRequestCard
+                            key={selectedDelivery.id}
+                            delivery={selectedDelivery}
+                            isDarkMode={isDarkMode}
+                            onNavigate={() => {}}
+                            onCall={(phone) => window.open(`tel:${phone}`)}
+                            onCaptureProof={(id) => setShowProofCapture(id)}
+                          />
+                        )}
                       </div>
-                    </CardHeader>
-                    <CardContent>
-                      {(() => {
-                        const getKey = (d: any) => ((d.order_number || d.po_number || '').toString().split('-')[1] || d.purchase_order_id || d.id || '');
-                        const legacyDelivered = [...deliveryCategories.deliveredFromActive, ...deliveryHistory];
-                        const seenKeys = new Set<string>();
-                        const uniqueLegacy = legacyDelivered.filter(d => { const k = getKey(d); if (!k || seenKeys.has(k)) return false; seenKeys.add(k); return true; });
-                        const deliveredList = useLegacyFallback
-                          ? uniqueLegacy.sort((a, b) => new Date((b as any).completed_at || (b as any).delivered_at || (b as any).updated_at || 0).getTime() - new Date((a as any).completed_at || (a as any).delivered_at || (a as any).updated_at || 0).getTime())
-                          : unifiedDelivered;
-                        const showSpinner = !useLegacyFallback && unifiedLoading && deliveredList.length === 0;
-                        if (showSpinner) {
-                          return (
-                            <div className="flex items-center justify-center py-12">
-                              <RefreshCw className="h-8 w-8 animate-spin text-teal-500" />
-                            </div>
-                          );
-                        }
-                        if (deliveredList.length === 0) {
-                          return (
-                            <div className="text-center py-12">
-                              <Package className="h-12 w-12 mx-auto text-gray-400 mb-4" />
-                              <p className={`text-lg font-medium ${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`}>No delivered orders yet</p>
-                              <p className={`text-sm ${isDarkMode ? 'text-gray-500' : 'text-gray-400'}`}>Completed deliveries will appear here after you scan all item QR codes</p>
-                            </div>
-                          );
-                        }
-                        return (
-                        <div className="space-y-4">
-                            {deliveredList.map((item: any, index: number) => {
-                              const delivery = useLegacyFallback ? { ...item, delivery_location: item.delivery_location || item.delivery_address || 'N/A', material_type: item.material_type || 'Materials', pickup_location: item.pickup_location || 'N/A' } : toCardDelivery(item);
-                              const completedAt = useLegacyFallback ? (item.completed_at || item.delivered_at || item.updated_at || item.created_at) : (item.delivered_at || item.updated_at || item.created_at);
-                              const completedDate = new Date(completedAt);
-                              const isToday = completedDate.toDateString() === new Date().toDateString();
-                              const isYesterday = completedDate.toDateString() === new Date(Date.now() - 86400000).toDateString();
-                              
-                              return (
-                                <div key={item.id || item.purchase_order_id} className={`flex items-center justify-between p-4 ${isDarkMode ? 'bg-gray-700' : 'bg-gray-50'} rounded-lg hover:${isDarkMode ? 'bg-gray-600' : 'bg-gray-100'} transition-colors border-l-4 ${index === 0 ? 'border-l-green-500' : 'border-l-gray-300'}`}>
-                                  <div className="flex items-center gap-4">
-                                    <div className={`p-2 ${isDarkMode ? 'bg-gray-600' : 'bg-white'} rounded-lg shadow-sm`}>
-                                      <CheckCircle className="h-8 w-8 text-green-500" />
-                                    </div>
-                                    <div>
-                                      <div className="flex items-center gap-2">
-                                        <p className={`font-medium ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>{delivery.material_type}</p>
-                                        {index === 0 && (
-                                          <Badge className="bg-green-100 text-green-700 text-xs">Most Recent</Badge>
-                                        )}
-                                      </div>
-                                      <p className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-                                        <MapPin className="h-3 w-3 inline mr-1" />
-                                        {delivery.pickup_location} → {delivery.delivery_location}
-                                      </p>
-                                      <p className={`text-xs ${isDarkMode ? 'text-gray-500' : 'text-gray-400'} mt-1`}>
-                                        <Calendar className="h-3 w-3 inline mr-1" />
-                                        {isToday ? 'Today' : isYesterday ? 'Yesterday' : completedDate.toLocaleDateString('en-US', { 
-                                          weekday: 'short', 
-                                          month: 'short', 
-                                          day: 'numeric',
-                                          year: completedDate.getFullYear() !== new Date().getFullYear() ? 'numeric' : undefined
-                                        })}
-                                        {' at '}
-                                        {completedDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
-                                      </p>
-                                    </div>
-                                  </div>
-                                  <div className="flex items-center gap-4">
-                                    <div className="text-right">
-                                      <Badge variant="outline" className={`text-xs ${
-                                        delivery.status === 'delivered' || delivery.status === 'completed' 
-                                          ? 'border-green-300 text-green-600' 
-                                          : delivery.status === 'cancelled' 
-                                            ? 'border-red-300 text-red-600' 
-                                            : 'border-gray-300 text-gray-600'
-                                      }`}>
-                                        {delivery.status === 'delivered' || delivery.status === 'completed' ? '✓ Completed' : delivery.status}
-                                      </Badge>
-                                    </div>
-                                  </div>
-                                </div>
-                              );
-                            })}
-                        </div>
-                        );
-                      })()}
-                    </CardContent>
-                  </Card>
-                </TabsContent>
-              </Tabs>
+                    );
+                  }
+                  
+                  return (
+                    <Card className={isDarkMode ? 'bg-gray-800 border-gray-700' : ''}>
+                      <CardContent className="py-12 text-center">
+                        <Calendar className={`h-12 w-12 ${isDarkMode ? 'text-gray-600' : 'text-gray-300'} mx-auto mb-4`} />
+                        <p className={isDarkMode ? 'text-gray-400' : 'text-gray-500'}>No scheduled deliveries</p>
+                        <p className={`text-sm ${isDarkMode ? 'text-gray-500' : 'text-gray-400'}`}>Accepted deliveries will appear here</p>
+                      </CardContent>
+                    </Card>
+                  );
+                })()}
+              </div>
+
             </div>
           </TabsContent>
 
@@ -1992,9 +1720,9 @@ const DeliveryDashboard = () => {
                         
                         // Switch to Delivered tab when full order complete (aligns with supplier QR tab)
                         if (orderCompleted) {
-                          console.log('🔄 Full order delivered - switching to Delivered tab');
+                          console.log('🔄 Full order delivered - refreshing data');
                           setActiveTab('deliveries');
-                          setDeliveriesSubTab('delivered');
+                          setDeliveriesSubTab('scheduled');
                         }
                         
                         // Aggressive refresh with multiple retries to ensure updated data
