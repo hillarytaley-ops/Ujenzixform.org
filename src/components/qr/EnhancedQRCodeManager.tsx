@@ -217,8 +217,9 @@ export const EnhancedQRCodeManager: React.FC<EnhancedQRCodeManagerProps> = ({ su
             console.log('🔄 QR code updated (receive/dispatch scan):', payload.new);
             const updatedItem = payload.new as MaterialItem;
             
-            // CRITICAL: Fetch fresh data from database to ensure we have latest receive_scanned status
-            // The payload might not include all fields, so we need to refetch
+            // CRITICAL: When an item is scanned, we need to refresh ALL items for that order
+            // because the categorization depends on checking ALL items in the order
+            // Just updating one item isn't enough - we need the full order context
             try {
               const stored = getUserFromStorage();
               const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
@@ -232,7 +233,50 @@ export const EnhancedQRCodeManager: React.FC<EnhancedQRCodeManagerProps> = ({ su
                 headers['Authorization'] = `Bearer ${stored.accessToken}`;
               }
               
-              // Fetch the updated item with all fields
+              // Fetch ALL items for this order to get accurate receive_scanned status
+              const orderId = updatedItem.purchase_order_id;
+              if (orderId) {
+                console.log('🔄 Refreshing ALL items for order:', orderId);
+                const allItemsResponse = await fetch(
+                  `${SUPABASE_URL}/rest/v1/material_items?purchase_order_id=eq.${orderId}&select=*`,
+                  { headers, cache: 'no-store' }
+                );
+                
+                if (allItemsResponse.ok) {
+                  const allOrderItems = await allItemsResponse.json() as MaterialItem[];
+                  console.log(`✅ Fetched ${allOrderItems.length} items for order ${orderId}`);
+                  console.log('📊 Receive scanned status:', allOrderItems.map(i => ({ id: i.id, receive_scanned: i.receive_scanned })));
+                  
+                  // Update all items for this order in state
+                  setItems(prev => {
+                    const updated = prev.map(item => {
+                      const freshItem = allOrderItems.find(fi => fi.id === item.id);
+                      return freshItem || item;
+                    });
+                    
+                    // Add any new items that weren't in the previous state
+                    allOrderItems.forEach(freshItem => {
+                      if (!updated.find(i => i.id === freshItem.id)) {
+                        updated.push(freshItem);
+                      }
+                    });
+                    
+                    // CRITICAL: Re-run categorization with fresh data
+                    console.log('🔄 Re-categorizing orders with fresh data...');
+                    groupItemsByOrder(updated);
+                    return updated;
+                  });
+                  
+                  // ALSO trigger a full refresh in the background to ensure everything is up to date
+                  setTimeout(() => {
+                    console.log('🔄 Triggering full refresh after scan...');
+                    fastCheckAuthAndFetch();
+                  }, 2000);
+                  return;
+                }
+              }
+              
+              // Fallback: Fetch just the updated item
               const itemResponse = await fetch(
                 `${SUPABASE_URL}/rest/v1/material_items?id=eq.${updatedItem.id}&select=*&limit=1`,
                 { headers, cache: 'no-store' }
@@ -259,7 +303,7 @@ export const EnhancedQRCodeManager: React.FC<EnhancedQRCodeManagerProps> = ({ su
               console.error('⚠️ Could not fetch fresh item data, using payload:', error);
             }
             
-            // Fallback: Use payload data if fetch fails
+            // Final fallback: Use payload data if fetch fails
             setItems(prev => {
               const updated = prev.map(item =>
                 item.id === updatedItem.id ? { ...item, ...updatedItem } : item
@@ -934,17 +978,33 @@ export const EnhancedQRCodeManager: React.FC<EnhancedQRCodeManagerProps> = ({ su
       const allItemsDispatched = group.items.every(item => item.dispatch_scanned === true);
       const allItemsReceived = group.items.every(item => item.receive_scanned === true);
       
+      // DEBUG: Log the status for this order
+      if (group.order_number) {
+        console.log(`📊 Order ${group.order_number}:`, {
+          total_items: group.items.length,
+          dispatched_count: group.items.filter(i => i.dispatch_scanned === true).length,
+          received_count: group.items.filter(i => i.receive_scanned === true).length,
+          allItemsDispatched,
+          allItemsReceived,
+          receive_scanned_status: group.items.map(i => ({ id: i.id.slice(0, 8), receive_scanned: i.receive_scanned }))
+        });
+      }
+      
       if (allItemsReceived) {
         // All items received = delivered
+        console.log(`✅ Order ${group.order_number || group.order_id}: ALL ITEMS RECEIVED → DELIVERED`);
         delivered.push(group);
       } else if (allItemsDispatched) {
         // All items dispatched (whether or not any received yet) = in transit
+        console.log(`🚚 Order ${group.order_number || group.order_id}: ALL ITEMS DISPATCHED → IN TRANSIT`);
         inTransit.push(group);
       } else if (hasDispatchedItems) {
         // Some but not all items dispatched = dispatched (partial)
+        console.log(`📦 Order ${group.order_number || group.order_id}: SOME ITEMS DISPATCHED → DISPATCHED`);
         dispatched.push(group);
       } else {
         // No items dispatched = awaiting dispatch
+        console.log(`⏳ Order ${group.order_number || group.order_id}: NO ITEMS DISPATCHED → AWAITING DISPATCH`);
         awaitingDispatch.push(group);
       }
     });
