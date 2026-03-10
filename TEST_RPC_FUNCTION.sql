@@ -42,12 +42,10 @@ WHERE po.po_number IN ('PO-1772597930676-IATLA', 'QR-1772324057410-ROZCS')
 GROUP BY po.id, po.po_number, po.status, po.delivery_provider_id, dr.provider_id, dr.status;
 
 -- Step 4: Check what provider_id the current user should match
--- Replace 'YOUR_USER_ID' with the actual delivery provider user ID
 SELECT 
   dp.id as delivery_provider_id,
   dp.user_id,
   dp.provider_name,
-  dp.company_name,
   'This is the provider_id that should match' as note
 FROM delivery_providers dp
 WHERE dp.user_id = auth.uid()
