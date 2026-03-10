@@ -113,6 +113,7 @@ const ProfessionalBuilderDashboardPage = () => {
   const [activeTab, setActiveTab] = useState('projects');
   const [extrasSubTab, setExtrasSubTab] = useState('team'); // Sub-tab for Extras (team or support)
   const [deliveriesSubTab, setDeliveriesSubTab] = useState('request'); // Sub-tab for Deliveries (request, schedule, history)
+  const [supplierResponseCount, setSupplierResponseCount] = useState(0); // Count of supplier responses for notification badge
 
   // Projects state - start with loading false to show empty state immediately
   const [projects, setProjects] = useState<any[]>([]);
@@ -168,6 +169,59 @@ const ProfessionalBuilderDashboardPage = () => {
   };
 
   // Helper to get user ID reliably (from AuthContext or localStorage)
+  // Function to fetch supplier response count (quotes that suppliers have responded to)
+  const fetchSupplierResponseCount = async (builderId: string) => {
+    if (!builderId) {
+      setSupplierResponseCount(0);
+      return;
+    }
+
+    try {
+      const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
+      const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
+      
+      let accessToken = SUPABASE_ANON_KEY;
+      try {
+        const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+        if (storedSession) {
+          const parsed = JSON.parse(storedSession);
+          accessToken = parsed.access_token || SUPABASE_ANON_KEY;
+        }
+      } catch (e) {
+        console.warn('Could not get auth token');
+      }
+
+      const headers: Record<string, string> = {
+        'apikey': SUPABASE_ANON_KEY,
+        'Authorization': `Bearer ${accessToken}`,
+        'Content-Type': 'application/json'
+      };
+
+      // Count purchase orders with supplier responses (statuses: quoted, quote_responded, quote_revised, quote_viewed_by_builder)
+      const statusFilter = ['quote_responded', 'quote_revised', 'quote_viewed_by_builder', 'quoted'];
+      const statusParam = statusFilter.map(s => `"${s}"`).join(',');
+      
+      // Try buyer_id first
+      const response = await fetch(
+        `${SUPABASE_URL}/rest/v1/purchase_orders?buyer_id=eq.${builderId}&status=in.(${statusParam})&supplier_id=not.is.null&select=id&limit=1000`,
+        { headers, cache: 'no-store' }
+      );
+
+      if (response.ok) {
+        const data = await response.json();
+        const count = Array.isArray(data) ? data.length : 0;
+        setSupplierResponseCount(count);
+        console.log('📊 Supplier response count:', count);
+      } else {
+        console.error('Failed to fetch supplier response count:', response.status);
+        setSupplierResponseCount(0);
+      }
+    } catch (error) {
+      console.error('Error fetching supplier response count:', error);
+      setSupplierResponseCount(0);
+    }
+  };
+
   const getUserId = (): string => {
     if (authUser?.id) return authUser.id;
     try {
@@ -1296,6 +1350,13 @@ const ProfessionalBuilderDashboardPage = () => {
         }
       )
       .on('postgres_changes',
+        { event: '*', schema: 'public', table: 'purchase_orders', filter: `buyer_id=eq.${userId}` },
+        (payload) => {
+          console.log('📋 Purchase order change detected (for supplier responses):', payload);
+          fetchSupplierResponseCount(userId); // Refresh supplier response count
+        }
+      )
+      .on('postgres_changes',
         { event: '*', schema: 'public', table: 'deliveries', filter: `builder_id=eq.${userId}` },
         (payload) => {
           console.log('🚚 Delivery change detected:', payload);
@@ -1307,6 +1368,34 @@ const ProfessionalBuilderDashboardPage = () => {
     return () => {
       supabase.removeChannel(channel);
     };
+  }, [authUser]);
+
+  // Fetch supplier response count on mount and when user changes
+  useEffect(() => {
+    const userId = getUserId();
+    if (userId) {
+      fetchSupplierResponseCount(userId);
+      
+      // Set up real-time subscription for purchase_orders changes to update count
+      const channel = supabase
+        .channel('supplier-responses-count')
+        .on('postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'purchase_orders',
+            filter: `buyer_id=eq.${userId}`
+          },
+          () => {
+            fetchSupplierResponseCount(userId);
+          }
+        )
+        .subscribe();
+
+      return () => {
+        supabase.removeChannel(channel);
+      };
+    }
   }, [authUser]);
 
   const handleMonitoringRequest = async () => {
@@ -1568,13 +1657,20 @@ const ProfessionalBuilderDashboardPage = () => {
             <span className="text-[10px] sm:text-xs">Projects</span>
           </Button>
           <Button 
-            className={`h-auto py-3 px-2 transition-all flex flex-col items-center gap-1 ${activeTab === 'quotes' 
+            className={`h-auto py-3 px-2 transition-all flex flex-col items-center gap-1 relative ${activeTab === 'quotes' 
               ? 'bg-gradient-to-r from-green-500 to-green-600 ring-2 ring-green-300 shadow-lg text-white' 
               : 'bg-white hover:bg-green-50 text-gray-700 border shadow-sm'}`}
             onClick={() => setActiveTab('quotes')}
           >
             <CreditCard className="h-5 w-5" />
             <span className="text-[10px] sm:text-xs">Quotes</span>
+            {supplierResponseCount > 0 && (
+              <Badge 
+                className="absolute -top-1 -right-1 h-5 w-5 rounded-full p-0 flex items-center justify-center text-xs bg-red-500 text-white border-2 border-white"
+              >
+                {supplierResponseCount > 9 ? '9+' : supplierResponseCount}
+              </Badge>
+            )}
           </Button>
           <Button 
             className={`h-auto py-3 px-2 transition-all flex flex-col items-center gap-1 ${activeTab === 'orders' 
