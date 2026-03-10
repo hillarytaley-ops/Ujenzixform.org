@@ -61,14 +61,22 @@ WHERE po.po_number IN ('PO-1772597930676-IATLA', 'QR-1772324057410-ROZCS');
 
 DO $$
 DECLARE
-  v_user_id UUID := 'YOUR_USER_ID_HERE'::uuid;  -- ⚠️ REPLACE THIS with your user_id from Step 1
+  v_user_id_text TEXT := 'YOUR_USER_ID_HERE';  -- ⚠️ REPLACE THIS with your user_id from Step 1
+  v_user_id UUID;
   v_provider_id UUID := 'f783939a-f7f1-4c78-a9a3-295e55fa4956'::uuid;
   v_user_email TEXT;
 BEGIN
   -- Check if placeholder was replaced
-  IF v_user_id::text = 'YOUR_USER_ID_HERE' THEN
-    RAISE EXCEPTION '❌ ERROR: You must replace "YOUR_USER_ID_HERE" with your actual user_id from Step 1!';
+  IF v_user_id_text = 'YOUR_USER_ID_HERE' THEN
+    RAISE EXCEPTION '❌ ERROR: You must replace "YOUR_USER_ID_HERE" with your actual user_id from Step 1! Example: v_user_id_text TEXT := ''123e4567-e89b-12d3-a456-426614174000'';';
   END IF;
+
+  -- Convert to UUID (will fail if invalid)
+  BEGIN
+    v_user_id := v_user_id_text::uuid;
+  EXCEPTION WHEN OTHERS THEN
+    RAISE EXCEPTION '❌ ERROR: Invalid UUID format: %. Please use a valid UUID from Step 1.', v_user_id_text;
+  END;
 
   -- Verify user exists
   SELECT email INTO v_user_email
