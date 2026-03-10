@@ -40,23 +40,32 @@ BEGIN
   RAISE NOTICE 'Linking provider % to user...', v_provider_id;
 
   -- Create or update provider record
-  INSERT INTO delivery_providers (
-    id, user_id, provider_name, provider_type, phone, email,
-    is_active, is_verified, created_at, updated_at
-  )
-  SELECT 
-    v_provider_id, v_user_id,
-    COALESCE(u.raw_user_meta_data->>'full_name', 'Delivery Provider'),
-    'individual',
-    COALESCE(u.raw_user_meta_data->>'phone', '+254000000000'),
-    COALESCE(u.email, ''),
-    true, true, NOW(), NOW()
-  FROM auth.users u
-  WHERE u.id = v_user_id
-  ON CONFLICT (id) DO UPDATE
-  SET 
-    user_id = EXCLUDED.user_id,
-    updated_at = NOW();
+  -- First check if it exists, then update or insert accordingly
+  IF EXISTS (SELECT 1 FROM delivery_providers WHERE id = v_provider_id) THEN
+    -- Update existing record
+    UPDATE delivery_providers
+    SET 
+      user_id = v_user_id,
+      updated_at = NOW()
+    WHERE id = v_provider_id;
+    RAISE NOTICE '✅ Updated existing provider record';
+  ELSE
+    -- Insert new record
+    INSERT INTO delivery_providers (
+      id, user_id, provider_name, provider_type, phone, email,
+      is_active, is_verified, created_at, updated_at
+    )
+    SELECT 
+      v_provider_id, v_user_id,
+      COALESCE(u.raw_user_meta_data->>'full_name', 'Delivery Provider'),
+      'individual',
+      COALESCE(u.raw_user_meta_data->>'phone', '+254000000000'),
+      COALESCE(u.email, ''),
+      true, true, NOW(), NOW()
+    FROM auth.users u
+    WHERE u.id = v_user_id;
+    RAISE NOTICE '✅ Created new provider record';
+  END IF;
 
   RAISE NOTICE '✅ Provider record created/updated';
 
