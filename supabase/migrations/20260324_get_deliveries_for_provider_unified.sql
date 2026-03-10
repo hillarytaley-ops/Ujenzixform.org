@@ -114,7 +114,12 @@ BEGIN
             ELSE COALESCE(pd.status, 'scheduled')
           END
         WHEN ms.received = ms.total AND ms.total > 0 THEN 'delivered'
-        WHEN ms.dispatched > 0 THEN 'in_transit'
+        -- CRITICAL FIX: Orders with dispatched items but not all received should be BOTH 'scheduled' AND 'in_transit'
+        -- For delivery provider: they need to see these in "Scheduled Orders" to complete delivery
+        -- So we mark them as 'scheduled' so they appear in the schedule dropdown
+        WHEN ms.dispatched > 0 AND ms.dispatched < ms.total THEN 'scheduled'  -- Partial dispatch = still scheduled
+        WHEN ms.dispatched = ms.total AND ms.received < ms.total THEN 'scheduled'  -- All dispatched but not received = scheduled (needs delivery)
+        WHEN ms.dispatched > 0 THEN 'in_transit'  -- Fallback (shouldn't reach here with above conditions)
         ELSE 'scheduled'
       END AS _categorized_status
     FROM provider_deliveries pd

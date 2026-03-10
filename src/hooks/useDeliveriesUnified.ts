@@ -107,7 +107,9 @@ export function useDeliveriesUnified(): UseDeliveriesUnifiedResult {
       const poIds = new Set<string>();
       rows.forEach((r) => {
         if (r.purchase_order_id) poIds.add(r.purchase_order_id);
-        if (r._categorized_status === 'scheduled') scheduledList.push(r);
+        // CRITICAL FIX: Include 'in_transit' orders in scheduled list for delivery providers
+        // These are orders that are dispatched but not yet delivered - delivery providers need to see them
+        if (r._categorized_status === 'scheduled' || r._categorized_status === 'in_transit') scheduledList.push(r);
         else if (r._categorized_status === 'in_transit') inTransitList.push(r);
         else deliveredList.push(r);
       });
