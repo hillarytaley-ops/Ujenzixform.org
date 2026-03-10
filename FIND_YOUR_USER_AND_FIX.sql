@@ -149,10 +149,33 @@ END $$;
 
 -- ============================================================
 -- STEP 5: Verify the fix worked
+-- Replace 'YOUR_USER_ID_HERE' with your actual user_id from Step 1
 -- ============================================================
 
+-- First, let's see if the orders are now linked correctly
 SELECT 
-  'Verification' as section,
+  'Verification - Orders' as section,
+  po.po_number,
+  po.delivery_provider_id as order_provider_id,
+  dr.provider_id as dr_provider_id,
+  dp.id as provider_id,
+  dp.user_id as provider_user_id,
+  u.email as provider_user_email,
+  CASE
+    WHEN dp.user_id IS NOT NULL THEN '✅ Provider has user_id'
+    ELSE '❌ Provider missing user_id'
+  END as provider_status
+FROM purchase_orders po
+LEFT JOIN delivery_requests dr ON dr.purchase_order_id = po.id
+LEFT JOIN delivery_providers dp ON dp.id = COALESCE(po.delivery_provider_id, dr.provider_id)
+LEFT JOIN auth.users u ON u.id = dp.user_id
+WHERE po.po_number IN ('PO-1772597930676-IATLA', 'QR-1772324057410-ROZCS');
+
+-- Now verify for your specific user (replace YOUR_USER_ID_HERE)
+-- Uncomment and replace YOUR_USER_ID_HERE with your actual user_id:
+/*
+SELECT 
+  'Verification - Your Account' as section,
   u.id as your_user_id,
   u.email as your_email,
   dp.id as your_provider_id,
@@ -169,3 +192,4 @@ CROSS JOIN purchase_orders po
 LEFT JOIN delivery_requests dr ON dr.purchase_order_id = po.id
 WHERE u.id = 'YOUR_USER_ID_HERE'::uuid  -- REPLACE THIS with your user_id
   AND po.po_number IN ('PO-1772597930676-IATLA', 'QR-1772324057410-ROZCS');
+*/
