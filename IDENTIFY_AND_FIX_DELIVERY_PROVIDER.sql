@@ -116,10 +116,13 @@ BEGIN
 END $$;
 */
 
--- OPTION C: Generic fix - Replace 'YOUR_USER_ID_HERE' with any user_id from the list above
+-- OPTION C: Generic fix - Uncomment and replace 'YOUR_USER_ID_HERE' with any user_id from Step 1
+-- Example: If your user_id is '77e8a153-3b0a-45e2-b86c-dffa93e080b1', use:
+-- v_user_id_text TEXT := '77e8a153-3b0a-45e2-b86c-dffa93e080b1';
+/*
 DO $$
 DECLARE
-  v_user_id_text TEXT := 'YOUR_USER_ID_HERE';  -- Replace with one of the user_ids from Step 1
+  v_user_id_text TEXT := 'YOUR_USER_ID_HERE';  -- ⚠️ REPLACE THIS with your user_id from Step 1
   v_user_id UUID;
   v_provider_id UUID := 'f783939a-f7f1-4c78-a9a3-295e55fa4956'::uuid;
   v_user_email TEXT;
@@ -163,6 +166,7 @@ BEGIN
   RAISE NOTICE 'Orders should now appear in your delivery dashboard.';
   RAISE NOTICE 'Refresh your browser to see them.';
 END $$;
+*/
 
 -- Step 4: Final Verification
 SELECT 
