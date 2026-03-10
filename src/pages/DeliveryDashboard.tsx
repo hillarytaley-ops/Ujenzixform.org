@@ -1640,7 +1640,25 @@ const DeliveryDashboard = () => {
                                 });
                               }
                             }}
-                            onNavigate={() => {}}
+                            onNavigate={(delivery) => {
+                              // Open Google Maps with the delivery location
+                              const deliveryAddress = delivery.delivery_location || delivery.delivery_address || '';
+                              if (deliveryAddress) {
+                                const encodedAddress = encodeURIComponent(deliveryAddress);
+                                const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodedAddress}`;
+                                window.open(mapsUrl, '_blank');
+                                toast({
+                                  title: "🗺️ Opening Maps",
+                                  description: `Navigating to ${deliveryAddress}`,
+                                });
+                              } else {
+                                toast({
+                                  title: "Location Not Available",
+                                  description: "Delivery location is not specified for this order.",
+                                  variant: "destructive",
+                                });
+                              }
+                            }}
                             onCall={(phone) => window.open(`tel:${phone}`)}
                             onCaptureProof={(id) => setShowProofCapture(id)}
                           />
