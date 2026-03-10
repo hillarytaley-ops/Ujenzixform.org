@@ -213,12 +213,56 @@ export const EnhancedQRCodeManager: React.FC<EnhancedQRCodeManagerProps> = ({ su
             schema: 'public',
             table: 'material_items'
           },
-          (payload) => {
+          async (payload) => {
             console.log('🔄 QR code updated (receive/dispatch scan):', payload.new);
             const updatedItem = payload.new as MaterialItem;
+            
+            // CRITICAL: Fetch fresh data from database to ensure we have latest receive_scanned status
+            // The payload might not include all fields, so we need to refetch
+            try {
+              const stored = getUserFromStorage();
+              const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
+              const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
+              
+              const headers: Record<string, string> = {
+                'apikey': SUPABASE_ANON_KEY,
+                'Content-Type': 'application/json'
+              };
+              if (stored?.accessToken) {
+                headers['Authorization'] = `Bearer ${stored.accessToken}`;
+              }
+              
+              // Fetch the updated item with all fields
+              const itemResponse = await fetch(
+                `${SUPABASE_URL}/rest/v1/material_items?id=eq.${updatedItem.id}&select=*&limit=1`,
+                { headers, cache: 'no-store' }
+              );
+              
+              if (itemResponse.ok) {
+                const items = await itemResponse.json();
+                if (items && items.length > 0) {
+                  const freshItem = items[0] as MaterialItem;
+                  console.log('✅ Fetched fresh item data:', freshItem.id, 'receive_scanned:', freshItem.receive_scanned);
+                  
+                  setItems(prev => {
+                    const updated = prev.map(item =>
+                      item.id === freshItem.id ? freshItem : item
+                    );
+                    // CRITICAL: Re-run categorization so Dispatched/In Transit/Delivered tabs update
+                    groupItemsByOrder(updated);
+                    return updated;
+                  });
+                  return;
+                }
+              }
+            } catch (error) {
+              console.error('⚠️ Could not fetch fresh item data, using payload:', error);
+            }
+            
+            // Fallback: Use payload data if fetch fails
             setItems(prev => {
               const updated = prev.map(item =>
-                item.id === updatedItem.id ? updatedItem : item
+                item.id === updatedItem.id ? { ...item, ...updatedItem } : item
               );
               // CRITICAL: Re-run categorization so Dispatched/In Transit/Delivered tabs update
               groupItemsByOrder(updated);
