@@ -154,16 +154,33 @@ BEGIN
     -- ============================================================
     -- UPDATE PURCHASE ORDER STATUS TO 'shipped'
     -- This updates the order status when ANY item is dispatched
+    -- CRITICAL: Also ensure delivery_provider_id is set from delivery_request
+    -- so orders appear in delivery provider's schedule
     -- ============================================================
     IF order_id IS NOT NULL THEN
+      -- First, check if there's a delivery_request with a provider_id
+      -- and ensure purchase_order has delivery_provider_id set
+      SELECT provider_id, status INTO v_delivery_request_provider_id, v_delivery_request_status
+      FROM delivery_requests
+      WHERE purchase_order_id = order_id
+        AND provider_id IS NOT NULL
+      ORDER BY created_at DESC
+      LIMIT 1;
+      
+      -- Update purchase_order with status and provider info
       UPDATE purchase_orders
       SET status = 'shipped',
+          delivery_provider_id = COALESCE(delivery_provider_id, v_delivery_request_provider_id),
+          delivery_status = CASE 
+            WHEN v_delivery_request_status = 'accepted' THEN 'in_transit'
+            ELSE delivery_status
+          END,
           updated_at = NOW()
       WHERE id = order_id
         AND status IN ('confirmed', 'processing', 'pending'); -- Only update if not already shipped/delivered
       
       -- Log the status change
-      RAISE NOTICE 'Updated purchase_order % status to shipped', order_id;
+      RAISE NOTICE 'Updated purchase_order % status to shipped, delivery_provider_id: %', order_id, v_delivery_request_provider_id;
     END IF;
     
   ELSIF _scan_type = 'receiving' THEN

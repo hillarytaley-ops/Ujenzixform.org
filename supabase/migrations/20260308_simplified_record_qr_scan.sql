@@ -29,6 +29,9 @@ DECLARE
   item_number_match TEXT;
   delivery_request_id UUID;
   v_all_items_received BOOLEAN;
+  v_all_items_dispatched BOOLEAN;
+  v_delivery_request_provider_id UUID;
+  v_delivery_request_status TEXT;
 BEGIN
   current_user_id := auth.uid();
   
@@ -92,6 +95,74 @@ BEGIN
     _notes,
     _photo_url
   ) RETURNING id INTO scan_event_id;
+  
+  -- Handle dispatch scan
+  IF _scan_type = 'dispatch' THEN
+    -- Check if already dispatched
+    IF item_record.dispatch_scanned = TRUE THEN
+      RETURN jsonb_build_object(
+        'success', false,
+        'error', 'This QR code has already been scanned for DISPATCH.',
+        'error_code', 'ALREADY_DISPATCHED',
+        'qr_code', item_record.qr_code
+      );
+    END IF;
+    
+    -- Update material item
+    UPDATE material_items
+    SET status = 'dispatched',
+        dispatch_scan_id = scan_event_id,
+        dispatch_scanned = TRUE,
+        dispatch_scanned_at = NOW(),
+        dispatch_scanned_by = current_user_id,
+        updated_at = NOW()
+    WHERE id = item_record.id;
+    
+    -- Check if all items dispatched and ensure delivery_provider_id is set
+    IF order_id IS NOT NULL THEN
+      -- Check if all items are dispatched
+      SELECT 
+        COUNT(*) = COUNT(*) FILTER (WHERE dispatch_scanned = TRUE)
+      INTO v_all_items_dispatched
+      FROM material_items
+      WHERE purchase_order_id = order_id;
+      
+      -- Get delivery_request provider_id if exists
+      SELECT provider_id, status INTO v_delivery_request_provider_id, v_delivery_request_status
+      FROM delivery_requests
+      WHERE purchase_order_id = order_id
+        AND provider_id IS NOT NULL
+      ORDER BY created_at DESC
+      LIMIT 1;
+      
+      -- Update purchase_order status and ensure delivery_provider_id is set
+      UPDATE purchase_orders
+      SET status = CASE 
+          WHEN v_all_items_dispatched = TRUE THEN 'shipped'
+          ELSE status
+        END,
+        delivery_provider_id = COALESCE(delivery_provider_id, v_delivery_request_provider_id),
+        delivery_status = CASE 
+          WHEN v_all_items_dispatched = TRUE AND v_delivery_request_status = 'accepted' THEN 'in_transit'
+          ELSE delivery_status
+        END,
+        updated_at = NOW()
+      WHERE id = order_id
+        AND status IN ('confirmed', 'processing', 'pending', 'quote_accepted', 'order_created');
+      
+      RAISE NOTICE 'Dispatch scan: order_id=%, all_dispatched=%, provider_id=%', order_id, v_all_items_dispatched, v_delivery_request_provider_id;
+    END IF;
+    
+    -- Return success for dispatch
+    RETURN jsonb_build_object(
+      'success', true,
+      'scan_event_id', scan_event_id,
+      'qr_code', item_record.qr_code,
+      'material_type', item_record.material_type,
+      'status', 'dispatched',
+      'all_items_dispatched', COALESCE(v_all_items_dispatched, FALSE)
+    );
+  END IF;
   
   -- Handle receiving scan
   IF _scan_type = 'receiving' THEN
