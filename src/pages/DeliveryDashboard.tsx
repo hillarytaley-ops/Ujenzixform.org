@@ -1603,6 +1603,43 @@ const DeliveryDashboard = () => {
                             key={selectedDelivery.id}
                             delivery={selectedDelivery}
                             isDarkMode={isDarkMode}
+                            onAccept={async (deliveryId) => {
+                              try {
+                                await handleAcceptDelivery(deliveryId);
+                                // Refresh data after accepting
+                                await refetchData();
+                                await refetchUnified();
+                                loadNotificationCounts();
+                                toast({
+                                  title: "✅ Delivery Accepted!",
+                                  description: "The delivery has been accepted successfully.",
+                                });
+                              } catch (error: any) {
+                                toast({
+                                  title: "Error",
+                                  description: error.message || "Failed to accept delivery. Please try again.",
+                                  variant: "destructive",
+                                });
+                              }
+                            }}
+                            onReject={async (deliveryId, reason) => {
+                              try {
+                                await handleRejectDelivery(deliveryId, reason);
+                                await refetchData();
+                                await refetchUnified();
+                                loadNotificationCounts();
+                                toast({
+                                  title: "Delivery Rejected",
+                                  description: "The delivery request has been rejected.",
+                                });
+                              } catch (error: any) {
+                                toast({
+                                  title: "Error",
+                                  description: error.message || "Failed to reject delivery. Please try again.",
+                                  variant: "destructive",
+                                });
+                              }
+                            }}
                             onNavigate={() => {}}
                             onCall={(phone) => window.open(`tel:${phone}`)}
                             onCaptureProof={(id) => setShowProofCapture(id)}
