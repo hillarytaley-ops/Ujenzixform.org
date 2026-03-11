@@ -125,6 +125,7 @@ export function useDeliveriesUnified(): UseDeliveriesUnifiedResult {
           dataLength: Array.isArray(data) ? data.length : (data ? 'not-array' : 'null/undefined')
         });
         
+        if (rpcError) {
           console.error('❌ Unified RPC Error:', {
             message: rpcError.message,
             details: rpcError.details,
