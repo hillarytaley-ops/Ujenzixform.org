@@ -92,17 +92,48 @@ export function useDeliveriesUnified(): UseDeliveriesUnifiedResult {
     setLoading(true);
     setError(null);
     try {
-      console.log('🔵 Calling unified RPC function...');
+      console.log('🔵 Calling unified RPC function...', { userId });
+      const startTime = Date.now();
       const { data, error: rpcError } = await (supabase as any).rpc('get_deliveries_for_provider_unified');
+      const duration = Date.now() - startTime;
+      
+      console.log('🔵 Unified RPC Response received:', {
+        duration: `${duration}ms`,
+        hasError: !!rpcError,
+        hasData: !!data,
+        dataType: typeof data,
+        dataIsArray: Array.isArray(data),
+        dataLength: Array.isArray(data) ? data.length : (data ? 'not-array' : 'null/undefined')
+      });
+      
       if (rpcError) {
-        console.error('❌ Unified RPC Error:', rpcError);
+        console.error('❌ Unified RPC Error:', {
+          message: rpcError.message,
+          details: rpcError.details,
+          hint: rpcError.hint,
+          code: rpcError.code,
+          fullError: rpcError
+        });
         setError(rpcError.message ?? 'Failed to load deliveries');
         setScheduled([]);
         setInTransit([]);
         setDelivered([]);
         return;
       }
-      console.log('🔵 Unified RPC Success - Raw response:', data);
+      
+      if (!data) {
+        console.warn('⚠️ Unified RPC returned null/undefined data');
+        setScheduled([]);
+        setInTransit([]);
+        setDelivered([]);
+        return;
+      }
+      
+      console.log('🔵 Unified RPC Success - Raw response:', {
+        data,
+        isArray: Array.isArray(data),
+        length: Array.isArray(data) ? data.length : 'N/A'
+      });
       const rows = parseUnifiedRows(data);
       console.log('🔵 Unified RPC Response:', {
         rawDataLength: Array.isArray(data) ? data.length : (data ? 1 : 0),
