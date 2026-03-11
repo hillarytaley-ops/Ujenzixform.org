@@ -6,14 +6,18 @@
 -- Step 1: Check current provider ID resolution
 SELECT 
   'Step 1: Provider ID Check' as section,
-  auth.uid() as your_auth_uid,
-  (SELECT id FROM delivery_providers WHERE user_id = auth.uid() LIMIT 1) as provider_id,
-  (SELECT COUNT(*) FROM delivery_providers WHERE user_id = auth.uid()) as provider_count,
+  u.id as your_user_id,
+  u.email,
+  dp.id as provider_id,
   CASE
-    WHEN (SELECT id FROM delivery_providers WHERE user_id = auth.uid() LIMIT 1) IS NOT NULL
+    WHEN dp.id IS NOT NULL
     THEN '✅ Provider ID found'
     ELSE '❌ Provider ID NOT found - Will fix this'
-  END as status;
+  END as status
+FROM auth.users u
+LEFT JOIN delivery_providers dp ON dp.user_id = u.id
+WHERE LOWER(TRIM(u.email)) = LOWER(TRIM('taleyk@gmail.com'))
+LIMIT 1;
 
 -- Step 2: Find all orders that should be in your schedule
 SELECT 
@@ -33,12 +37,9 @@ LEFT JOIN delivery_requests dr ON dr.purchase_order_id = po.id
 LEFT JOIN material_items mi ON mi.purchase_order_id = po.id
 WHERE (
   -- Match by purchase_orders.delivery_provider_id
-  po.delivery_provider_id = (SELECT id FROM delivery_providers WHERE user_id = auth.uid() LIMIT 1)
+  po.delivery_provider_id = (SELECT dp.id FROM delivery_providers dp JOIN auth.users u ON u.id = dp.user_id WHERE LOWER(TRIM(u.email)) = LOWER(TRIM('taleyk@gmail.com')) LIMIT 1)
   -- OR match by delivery_requests.provider_id
-  OR dr.provider_id = (SELECT id FROM delivery_providers WHERE user_id = auth.uid() LIMIT 1)
-  -- OR match by user_id directly (fallback)
-  OR po.delivery_provider_id = auth.uid()
-  OR dr.provider_id = auth.uid()
+  OR dr.provider_id = (SELECT dp.id FROM delivery_providers dp JOIN auth.users u ON u.id = dp.user_id WHERE LOWER(TRIM(u.email)) = LOWER(TRIM('taleyk@gmail.com')) LIMIT 1)
 )
   AND po.status NOT IN ('cancelled', 'rejected', 'quote_rejected', 'delivered')
 GROUP BY po.id, po.po_number, po.status, po.delivery_provider_id, dr.id, dr.provider_id, dr.status
@@ -50,9 +51,20 @@ ORDER BY po.created_at DESC;
 DO $$
 DECLARE
   v_provider_id UUID;
-  v_user_id UUID := auth.uid();
+  v_user_id UUID;
+  v_user_email TEXT;
   v_count INTEGER;
 BEGIN
+  -- Find user by email (works in SQL Editor without auth.uid())
+  SELECT id, email INTO v_user_id, v_user_email
+  FROM auth.users
+  WHERE LOWER(TRIM(email)) = LOWER(TRIM('taleyk@gmail.com'))
+  LIMIT 1;
+
+  IF v_user_id IS NULL THEN
+    RAISE EXCEPTION 'User with email "taleyk@gmail.com" not found.';
+  END IF;
+
   -- Get your provider ID
   SELECT id INTO v_provider_id
   FROM delivery_providers
@@ -60,10 +72,10 @@ BEGIN
   LIMIT 1;
 
   IF v_provider_id IS NULL THEN
-    RAISE EXCEPTION 'Provider ID not found for user. Please run FIX_FOR_TALEYK.sql first.';
+    RAISE EXCEPTION 'Provider ID not found for user %. Please run FIX_FOR_TALEYK.sql first.', v_user_email;
   END IF;
 
-  RAISE NOTICE 'Found provider ID: % for user: %', v_provider_id, v_user_id;
+  RAISE NOTICE 'Found provider ID: % for user: % (%)', v_provider_id, v_user_email, v_user_id;
 
   -- Update purchase_orders that are linked via delivery_requests but missing delivery_provider_id
   UPDATE purchase_orders po
