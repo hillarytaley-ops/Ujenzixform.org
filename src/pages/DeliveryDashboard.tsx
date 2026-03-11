@@ -401,7 +401,17 @@ const DeliveryDashboard = () => {
   const unifiedCount = unifiedScheduled.length + unifiedInTransit.length + unifiedDelivered.length;
   const legacyCount = deliveryCategories.scheduled.length + deliveryCategories.inTransit.length + deliveryCategories.deliveredFromActive.length + deliveryHistory.length;
   const hasUnifiedData = unifiedCount > 0;
-  const useLegacyFallback = !hasUnifiedData || (legacyCount > unifiedCount);
+  // FIX: Prefer unified source when it has data, even if legacy has more (unified is the single source of truth)
+  const useLegacyFallback = !hasUnifiedData; // Only use legacy if unified has no data
+  console.log('📊 Data Source Selection:', {
+    unifiedCount,
+    legacyCount,
+    unifiedScheduled: unifiedScheduled.length,
+    unifiedInTransit: unifiedInTransit.length,
+    unifiedDelivered: unifiedDelivered.length,
+    useLegacyFallback,
+    unifiedLoading
+  });
 
   // ============================================================
   // AGGRESSIVE APPROACH: FORCE-ADD KNOWN DELIVERED ORDERS
