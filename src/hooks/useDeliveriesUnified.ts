@@ -94,7 +94,14 @@ export function useDeliveriesUnified(): UseDeliveriesUnifiedResult {
     try {
       console.log('🔵 Calling unified RPC function...', { userId });
       const startTime = Date.now();
-      const { data, error: rpcError } = await (supabase as any).rpc('get_deliveries_for_provider_unified');
+      
+      // Add timeout to RPC call (30 seconds)
+      const rpcPromise = (supabase as any).rpc('get_deliveries_for_provider_unified');
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('RPC call timed out after 30 seconds')), 30000)
+      );
+      
+      const { data, error: rpcError } = await Promise.race([rpcPromise, timeoutPromise]) as any;
       const duration = Date.now() - startTime;
       
       console.log('🔵 Unified RPC Response received:', {
@@ -167,6 +174,12 @@ export function useDeliveriesUnified(): UseDeliveriesUnifiedResult {
       setInTransit(inTransitList);
       setDelivered(deliveredList);
     } catch (e: any) {
+      console.error('❌ Unified RPC Exception:', {
+        message: e?.message,
+        name: e?.name,
+        stack: e?.stack,
+        fullError: e
+      });
       setError(e?.message ?? 'Failed to load deliveries');
       setScheduled([]);
       setInTransit([]);
