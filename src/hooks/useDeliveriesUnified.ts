@@ -92,15 +92,27 @@ export function useDeliveriesUnified(): UseDeliveriesUnifiedResult {
     setLoading(true);
     setError(null);
     try {
+      console.log('🔵 Calling unified RPC function...');
       const { data, error: rpcError } = await (supabase as any).rpc('get_deliveries_for_provider_unified');
       if (rpcError) {
+        console.error('❌ Unified RPC Error:', rpcError);
         setError(rpcError.message ?? 'Failed to load deliveries');
         setScheduled([]);
         setInTransit([]);
         setDelivered([]);
         return;
       }
+      console.log('🔵 Unified RPC Success - Raw response:', data);
       const rows = parseUnifiedRows(data);
+      console.log('🔵 Unified RPC Response:', {
+        rawDataLength: Array.isArray(data) ? data.length : (data ? 1 : 0),
+        parsedRowsLength: rows.length,
+        sampleRows: rows.slice(0, 3).map(r => ({
+          order_number: r.order_number,
+          status: r._categorized_status,
+          po_id: r.purchase_order_id
+        }))
+      });
       const scheduledList: UnifiedDeliveryRow[] = [];
       const inTransitList: UnifiedDeliveryRow[] = [];
       const deliveredList: UnifiedDeliveryRow[] = [];
@@ -112,6 +124,12 @@ export function useDeliveriesUnified(): UseDeliveriesUnifiedResult {
         if (r._categorized_status === 'scheduled' || r._categorized_status === 'in_transit') scheduledList.push(r);
         else if (r._categorized_status === 'in_transit') inTransitList.push(r);
         else deliveredList.push(r);
+      });
+      console.log('🔵 Unified RPC Categorized:', {
+        scheduled: scheduledList.length,
+        inTransit: inTransitList.length,
+        delivered: deliveredList.length,
+        total: scheduledList.length + inTransitList.length + deliveredList.length
       });
       poIdsRef.current = poIds;
       setScheduled(scheduledList);
