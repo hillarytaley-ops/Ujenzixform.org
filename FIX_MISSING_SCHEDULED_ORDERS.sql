@@ -51,6 +51,7 @@ DO $$
 DECLARE
   v_provider_id UUID;
   v_user_id UUID := auth.uid();
+  v_count INTEGER;
 BEGIN
   -- Get your provider ID
   SELECT id INTO v_provider_id
