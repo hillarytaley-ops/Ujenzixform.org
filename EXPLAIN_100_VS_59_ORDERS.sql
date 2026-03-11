@@ -117,13 +117,16 @@ SELECT
   'Initial Load (useDeliveryProviderData)' as source,
   'Filters: dr.status IN (accepted, assigned, picked_up, in_transit, dispatched, out_for_delivery, delivery_arrived)' as filter_logic,
   'NO filtering by purchase_orders.status' as purchase_order_filter,
-  'Result: Shows ALL delivery_requests with active statuses' as result
+  'Result: Shows ALL delivery_requests with active statuses' as result,
+  '' as placeholder
 UNION ALL
 SELECT 
+  'After Refresh (useDeliveriesUnified RPC)' as section,
   'After Refresh (useDeliveriesUnified RPC)' as source,
   'Filters: dr.status NOT IN (cancelled) AND po.status NOT IN (cancelled, rejected, quote_rejected)' as filter_logic,
   'EXCLUDES orders where purchase_orders.status is rejected or quote_rejected' as purchase_order_filter,
-  'Result: Excludes 41 orders with rejected/quote_rejected purchase_orders' as result;
+  'Result: Excludes 41 orders with rejected/quote_rejected purchase_orders' as result,
+  '' as placeholder;
 
 -- Step 6: The Solution
 SELECT 
