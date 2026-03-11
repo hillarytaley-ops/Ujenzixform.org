@@ -121,7 +121,7 @@ SELECT
   '' as placeholder
 UNION ALL
 SELECT 
-  'After Refresh (useDeliveriesUnified RPC)' as section,
+  'Step 5: Filtering Logic Comparison' as section,
   'After Refresh (useDeliveriesUnified RPC)' as source,
   'Filters: dr.status NOT IN (cancelled) AND po.status NOT IN (cancelled, rejected, quote_rejected)' as filter_logic,
   'EXCLUDES orders where purchase_orders.status is rejected or quote_rejected' as purchase_order_filter,
