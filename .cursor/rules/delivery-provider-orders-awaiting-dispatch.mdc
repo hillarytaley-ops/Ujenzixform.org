@@ -1,0 +1,119 @@
+---
+description: Rule ensuring delivery providers can only accept orders from Awaiting Dispatch tab
+globs: **/DeliveryDashboard.tsx,**/DeliveryRequestCard.tsx,**/DeliveryIntegrationService.ts,**/TrackingNumberService.ts,**/notify-delivery-providers/**
+---
+
+# Delivery Provider Order Acceptance Rule
+
+## CRITICAL BUSINESS RULE
+
+**All orders accepted by a delivery provider MUST be from the "Awaiting Dispatch" sub-tab of the supplier dashboard.**
+
+## Definition of "Awaiting Dispatch"
+
+An order is in "Awaiting Dispatch" status when:
+- **ALL** `material_items` for the order have `dispatch_scanned = FALSE`
+- The order has at least one `material_item` with matching `supplier_id`
+- The order has a valid `po_number` from `purchase_orders`
+- The order is NOT already dispatched, in transit, or delivered
+
+## Implementation Requirements
+
+### 1. Validation Before Acceptance
+
+When a delivery provider accepts a delivery request, the system MUST verify:
+
+```typescript
+// Pseudo-code validation
+const isAwaitingDispatch = 
+  order.material_items.every(item => item.dispatch_scanned === false) &&
+  order.material_items.some(item => item.supplier_id === order.supplier_id) &&
+  order.po_number !== null &&
+  order.po_number !== '';
+```
+
+### 2. Files That Must Enforce This Rule
+
+- [DeliveryDashboard.tsx](mdc:src/pages/DeliveryDashboard.tsx) - Main delivery provider dashboard
+- [DeliveryRequestCard.tsx](mdc:src/components/delivery/DeliveryRequestCard.tsx) - Individual delivery request cards
+- [TrackingNumberService.ts](mdc:src/services/TrackingNumberService.ts) - Service handling order acceptance
+- [DeliveryIntegrationService.ts](mdc:src/services/DeliveryIntegrationService.ts) - Delivery integration logic
+- [notify-delivery-providers/index.ts](mdc:supabase/functions/notify-delivery-providers/index.ts) - Serverless function creating delivery requests
+
+### 3. Database-Level Validation
+
+When creating or accepting delivery requests, ensure:
+
+```sql
+-- Only create delivery_requests for orders where:
+-- 1. All material_items have dispatch_scanned = FALSE
+-- 2. Order has valid po_number
+-- 3. Order has material_items with matching supplier_id
+
+SELECT po.id
+FROM purchase_orders po
+INNER JOIN material_items mi ON mi.purchase_order_id = po.id
+WHERE po.po_number IS NOT NULL
+  AND po.po_number != ''
+  AND mi.supplier_id = po.supplier_id
+  AND NOT EXISTS (
+    SELECT 1 FROM material_items mi2 
+    WHERE mi2.purchase_order_id = po.id 
+      AND mi2.dispatch_scanned = TRUE
+  )
+GROUP BY po.id
+HAVING COUNT(mi.id) > 0;
+```
+
+### 4. Error Handling
+
+If a delivery provider attempts to accept an order that is NOT in "Awaiting Dispatch":
+
+- **Reject the acceptance** with clear error message
+- **Log the attempt** for audit purposes
+- **Show user-friendly message**: "This order is not available for delivery. Only orders awaiting dispatch can be accepted."
+
+### 5. UI Display Rules
+
+- Only show delivery requests for orders in "Awaiting Dispatch" status
+- Hide or disable "Accept" button for orders that are:
+  - Already dispatched (any `material_item` has `dispatch_scanned = TRUE`)
+  - In transit (all items dispatched but not all received)
+  - Delivered (all items received)
+
+### 6. Real-time Updates
+
+When a supplier dispatches items (scans QR codes):
+- Immediately remove the order from delivery provider's available requests
+- Update delivery provider dashboard in real-time
+- Notify delivery provider if they had the order in their pending list
+
+## Related Code References
+
+- Supplier dashboard categorization: [EnhancedQRCodeManager.tsx](mdc:src/components/qr/EnhancedQRCodeManager.tsx) - Lines 1020-1023 define "Awaiting Dispatch" logic
+- Material items scan status: `material_items.dispatch_scanned` and `material_items.receive_scanned` fields
+- Order categorization: Orders are categorized based on `material_items` scan status, not just `purchase_orders.status`
+
+## Testing Requirements
+
+When implementing or modifying delivery acceptance logic:
+
+1. ✅ Test that orders with `dispatch_scanned = TRUE` cannot be accepted
+2. ✅ Test that orders without `material_items` cannot be accepted
+3. ✅ Test that orders with wrong `supplier_id` in `material_items` cannot be accepted
+4. ✅ Test that orders without `po_number` cannot be accepted
+5. ✅ Test real-time removal when supplier dispatches items
+
+## Violation Prevention
+
+**NEVER:**
+- Allow acceptance of orders where any `material_item` has `dispatch_scanned = TRUE`
+- Create `delivery_requests` for orders not in "Awaiting Dispatch"
+- Show delivery requests for dispatched/in-transit/delivered orders
+- Bypass this validation for any reason
+
+**ALWAYS:**
+- Validate order status before allowing acceptance
+- Check `material_items.dispatch_scanned` status
+- Verify `po_number` exists
+- Ensure `supplier_id` matches in `material_items`
