@@ -320,6 +320,7 @@ export function useDeliveriesUnified(): UseDeliveriesUnifiedResult {
     } finally {
       setLoading(false);
     }
+    */ // End of disabled RPC code
   }, [user?.id]);
 
   useEffect(() => {
