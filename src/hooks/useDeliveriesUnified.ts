@@ -99,22 +99,36 @@ export function useDeliveriesUnified(): UseDeliveriesUnifiedResult {
       let timeoutId: NodeJS.Timeout | null = null;
       const timeoutPromise = new Promise<never>((_, reject) => {
         timeoutId = setTimeout(() => {
+          console.error('⏱️ RPC timeout triggered after 30 seconds');
           reject(new Error('RPC call timed out after 30 seconds'));
         }, 30000);
       });
       
-      const rpcPromise = (supabase as any).rpc('get_deliveries_for_provider_unified');
+      console.log('🔵 Starting RPC promise...');
+      const rpcPromise = supabase.rpc('get_deliveries_for_provider_unified');
+      console.log('🔵 RPC promise created, racing with timeout...');
+      
       let result: any;
       try {
         result = await Promise.race([rpcPromise, timeoutPromise]);
+        console.log('🔵 Promise.race completed:', {
+          hasResult: !!result,
+          resultKeys: result ? Object.keys(result) : [],
+          resultType: typeof result
+        });
       } catch (raceError: any) {
         if (timeoutId) clearTimeout(timeoutId);
+        console.error('❌ Promise.race error:', {
+          message: raceError?.message,
+          name: raceError?.name,
+          stack: raceError?.stack
+        });
         throw raceError;
       } finally {
         if (timeoutId) clearTimeout(timeoutId);
       }
       
-      const { data, error: rpcError } = result as any;
+      const { data, error: rpcError } = result || {};
       const duration = Date.now() - startTime;
       
       console.log('🔵 Unified RPC Response received:', {
