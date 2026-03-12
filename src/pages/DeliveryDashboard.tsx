@@ -545,6 +545,7 @@ const DeliveryDashboard = () => {
 
   // Single source of truth (legacy fallback when unified returns empty): categorize each delivery so badge counts and tab content always match
   // CRITICAL: Delivered orders are EXCLUDED from scheduled list - they should not appear in schedule
+  // CRITICAL: Also filter out orders that are not in "Awaiting Dispatch" status (have dispatched items)
   const deliveryCategories = useMemo(() => {
     const getCategory = (d: any): 'scheduled' | 'in_transit' | 'delivered' => {
       const cat = String(d._categorized_status || d.status || '').toLowerCase();
@@ -557,6 +558,22 @@ const DeliveryDashboard = () => {
       // Check if status indicates in transit
       const inTransitList = ['in_transit', 'picked_up', 'on_the_way', 'near_destination', 'dispatched', 'shipped', 'out_for_delivery', 'delivery_arrived'];
       if (inTransitList.includes(cat)) return 'in_transit';
+      // CRITICAL: Check if any items are dispatched (not in Awaiting Dispatch)
+      // If _dispatched_count > 0, this order is NOT in Awaiting Dispatch and should NOT appear in scheduled
+      if (d._items_count != null && d._dispatched_count != null && d._dispatched_count > 0) {
+        // Some items are dispatched - this order is NOT in Awaiting Dispatch
+        const isProblematic = d.order_number === 'QR-1773125455597-K3447';
+        if (isProblematic) {
+          console.warn('🚫 PROBLEMATIC ORDER DETECTED IN CATEGORIZATION:', {
+            order_number: d.order_number,
+            dispatched_count: d._dispatched_count,
+            total_items: d._items_count,
+            status: d.status,
+            _categorized_status: d._categorized_status
+          });
+        }
+        return 'in_transit'; // Treat as in_transit so it doesn't appear in scheduled
+      }
       // Everything else is scheduled (accepted, assigned, pending_pickup, etc.)
       return 'scheduled';
     };
@@ -569,12 +586,18 @@ const DeliveryDashboard = () => {
       else if (c === 'in_transit') inTransit.push(d);
       else deliveredFromActive.push(d); // Delivered orders go here (excluded from schedule)
     });
+    
+    // Check if problematic order is in scheduled list
+    const problematicInScheduled = scheduled.some(d => d.order_number === 'QR-1773125455597-K3447');
+    
     console.log('📊 Delivery categorization:', {
       total: activeDeliveries.length,
       scheduled: scheduled.length,
       inTransit: inTransit.length,
-      delivered: deliveredFromActive.length
+      delivered: deliveredFromActive.length,
+      problematic_order_in_scheduled: problematicInScheduled ? '⚠️ PROBLEMATIC ORDER FOUND IN SCHEDULED!' : 'OK'
     });
+    
     return { scheduled, inTransit, deliveredFromActive };
   }, [activeDeliveries]);
 
