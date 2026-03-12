@@ -1425,15 +1425,60 @@ export const useDeliveryProviderData = () => {
         }
       });
       
-      // Remove entries without valid order_number (matching supplier dashboard behavior)
-      const beforeFilter = allActiveDeliveries.length;
-      const filteredDeliveries = allActiveDeliveries.filter((d: any) => d.order_number && d.order_number.trim() !== '');
-      if (filteredDeliveries.length < beforeFilter) {
-        console.warn('⚠️ Removed', beforeFilter - filteredDeliveries.length, 'orders without valid po_number (matching supplier dashboard)');
+      // CRITICAL: Don't filter out orders without po_number - they're assigned to the provider
+      // If po_number is missing, it might be due to RLS/timeout, not because the order shouldn't appear
+      // Log warnings but keep all orders assigned to provider
+      const ordersWithoutPONumber = allActiveDeliveries.filter((d: any) => !d.order_number || !d.order_number.trim());
+      if (ordersWithoutPONumber.length > 0) {
+        console.warn('⚠️ Found', ordersWithoutPONumber.length, 'orders without po_number (will retry fetch or show with purchase_order_id)');
+        // Try to fetch po_number for these orders one more time
+        const missingPOIds = ordersWithoutPONumber
+          .map((d: any) => d.purchase_order_id)
+          .filter(Boolean);
+        
+        if (missingPOIds.length > 0 && missingPOIds.length <= 50) {
+          // Retry fetch for missing po_numbers (only if reasonable number)
+          try {
+            const retryIdsParam = missingPOIds.join(',');
+            const retryUrl = `${SUPABASE_URL}/rest/v1/purchase_orders?id=in.(${retryIdsParam})&select=id,po_number&limit=100`;
+            const retryResponse = await fetch(retryUrl, {
+              headers: {
+                'apikey': SUPABASE_ANON_KEY,
+                'Authorization': `Bearer ${accessToken}`,
+                'Content-Type': 'application/json'
+              },
+              cache: 'no-store'
+            });
+            
+            if (retryResponse.ok) {
+              const retryData = await retryResponse.json();
+              let retryCount = 0;
+              retryData.forEach((po: any) => {
+                if (po.id && po.po_number && po.po_number.trim() !== '') {
+                  const delivery = allActiveDeliveries.find((d: any) => d.purchase_order_id === po.id);
+                  if (delivery && !delivery.order_number) {
+                    delivery.order_number = po.po_number;
+                    retryCount++;
+                  }
+                }
+              });
+              if (retryCount > 0) {
+                console.log('✅ Retry fetch: Found po_number for', retryCount, 'orders');
+              }
+            }
+          } catch (e) {
+            console.warn('⚠️ Retry fetch failed:', e);
+          }
+        }
       }
-      // Replace allActiveDeliveries with filtered version
-      allActiveDeliveries.length = 0;
-      allActiveDeliveries.push(...filteredDeliveries);
+      
+      // Log final count
+      const finalWithPONumber = allActiveDeliveries.filter((d: any) => d.order_number && d.order_number.trim()).length;
+      console.log('📊 Final count:', {
+        total: allActiveDeliveries.length,
+        with_po_number: finalWithPONumber,
+        without_po_number: allActiveDeliveries.length - finalWithPONumber
+      });
       
       // Log order numbers for debugging
       const withOrderNumbers = allActiveDeliveries.filter((d: any) => d.order_number).length;
