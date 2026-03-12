@@ -242,6 +242,43 @@ export function useDeliveriesUnified(): UseDeliveriesUnifiedResult {
         stack: e?.stack,
         fullError: e
       });
+      
+      // FALLBACK: Try alternative RPC function
+      console.log('🔄 Trying alternative RPC: get_active_deliveries_for_provider()');
+      try {
+        const { data: altData, error: altError } = await supabase.rpc('get_active_deliveries_for_provider');
+        
+        if (!altError && altData && Array.isArray(altData) && altData.length > 0) {
+          console.log('✅ Alternative RPC succeeded:', { count: altData.length });
+          const rows = parseUnifiedRows(altData);
+          const scheduledList: UnifiedDeliveryRow[] = [];
+          const inTransitList: UnifiedDeliveryRow[] = [];
+          const deliveredList: UnifiedDeliveryRow[] = [];
+          
+          rows.forEach((r) => {
+            if (r._categorized_status === 'scheduled' || r._categorized_status === 'in_transit') {
+              scheduledList.push(r);
+            }
+            if (r._categorized_status === 'in_transit') {
+              inTransitList.push(r);
+            }
+            if (r._categorized_status === 'delivered') {
+              deliveredList.push(r);
+            }
+          });
+          
+          setScheduled(scheduledList);
+          setInTransit(inTransitList);
+          setDelivered(deliveredList);
+          setError(null);
+          return;
+        } else {
+          console.warn('⚠️ Alternative RPC also failed or returned empty:', altError);
+        }
+      } catch (altErr: any) {
+        console.error('❌ Alternative RPC also failed:', altErr);
+      }
+      
       setError(e?.message ?? 'Failed to load deliveries');
       setScheduled([]);
       setInTransit([]);
