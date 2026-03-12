@@ -395,6 +395,10 @@ const DeliveryDashboard = () => {
               const validDeliveries = ordersThatExist.filter((d: any) => {
                 if (!d.purchase_order_id) {
                   // No purchase_order_id - exclude it
+                  console.warn('🚫 Removing order with no purchase_order_id:', {
+                    order_number: d.order_number,
+                    reason: 'No purchase_order_id - cannot validate'
+                  });
                   return false;
                 }
                 
@@ -416,24 +420,33 @@ const DeliveryDashboard = () => {
                   const allItemsNotDispatched = items.every((item: any) => item.dispatch_scanned === false);
                   
                   if (!allItemsNotDispatched) {
+                    const dispatchedCount = items.filter((i: any) => i.dispatch_scanned === true).length;
                     console.warn('🚫 Removing order not in Awaiting Dispatch:', {
                       order_number: d.order_number,
                       purchase_order_id: d.purchase_order_id?.substring(0, 8),
                       reason: 'Order has dispatched items - not in Awaiting Dispatch status',
-                      dispatched_count: items.filter((i: any) => i.dispatch_scanned === true).length,
-                      total_items: items.length
+                      dispatched_count: dispatchedCount,
+                      total_items: items.length,
+                      order_number_match: d.order_number === 'QR-1773125455597-K3447' ? '⚠️ THIS IS THE PROBLEMATIC ORDER!' : 'OK'
                     });
                     return false;
                   }
                   
                   // All items are not dispatched - this is valid
+                  console.log('✅ Order passed Awaiting Dispatch validation:', {
+                    order_number: d.order_number,
+                    purchase_order_id: d.purchase_order_id?.substring(0, 8),
+                    total_items: items.length,
+                    all_not_dispatched: true
+                  });
                   return true;
                 } else {
                   // No material_items found for this order - exclude it
                   console.warn('🚫 Removing order with no material_items data:', {
                     order_number: d.order_number,
                     purchase_order_id: d.purchase_order_id?.substring(0, 8),
-                    reason: 'No material_items found - cannot verify Awaiting Dispatch status'
+                    reason: 'No material_items found - cannot verify Awaiting Dispatch status',
+                    order_number_match: d.order_number === 'QR-1773125455597-K3447' ? '⚠️ THIS IS THE PROBLEMATIC ORDER!' : 'OK'
                   });
                   return false;
                 }
