@@ -113,31 +113,26 @@ export const CartSidebar: React.FC = () => {
 
       if (!userId) return;
 
-      const response = await fetchWithTimeout(
-        `${SUPABASE_URL}/rest/v1/builder_projects?builder_id=eq.${userId}&select=id,name,location,latitude,longitude,address,status&order=created_at.desc`,
-        {
-          headers: {
-            'apikey': SUPABASE_ANON_KEY,
-            'Authorization': `Bearer ${accessToken || SUPABASE_ANON_KEY}`,
-          }
-        },
-        5000
-      );
+      const { data: raw, error } = await supabase
+        .from('builder_projects')
+        .select('id,name,location,latitude,longitude,address,status')
+        .eq('builder_id', userId)
+        .order('created_at', { ascending: false });
 
-      if (response.ok) {
-        const raw = await response.json();
+      if (!error && raw) {
         const projectsData = (Array.isArray(raw) ? raw : []).filter(
           (p: { status?: string }) => !p.status || p.status === 'active' || p.status === 'in_progress'
         );
         console.log('📁 Cart: Loaded projects for order association:', projectsData.length);
         setProjects(projectsData || []);
-        
-        // Pre-select project from localStorage if available
+
         const storedProjectId = localStorage.getItem('cart_project_id');
         if (storedProjectId && projectsData.some((p: BuilderProject) => p.id === storedProjectId)) {
           console.log('📁 Cart: Pre-selecting project from localStorage:', storedProjectId);
           setSelectedProjectId(storedProjectId);
         }
+      } else if (error) {
+        console.warn('Cart: builder_projects load failed:', error.message);
       }
     } catch (error) {
       console.error('Error loading projects:', error);
