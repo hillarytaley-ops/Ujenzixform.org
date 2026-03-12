@@ -407,13 +407,15 @@ export const useDeliveryProviderData = () => {
         console.log('⚡ FAST PATH: delivery_providers lookup skipped:', e);
       }
 
-      // Include all statuses that should appear in the schedule: scheduled, accepted, assigned, pending_pickup, delivery_assigned, ready_for_dispatch, provider_assigned, confirmed, pending (if assigned to provider), and in-transit statuses
-      const statusFilter = 'status=in.(accepted,assigned,picked_up,in_transit,dispatched,out_for_delivery,delivery_arrived,pending_pickup,delivery_assigned,ready_for_dispatch,provider_assigned,confirmed,scheduled,pending)';
+      // If provider_id is set, the delivery has been accepted - show ALL statuses except cancelled/delivered
+      // Only exclude cancelled and delivered/completed orders from the schedule
+      const statusFilter = 'status=not.in.(cancelled,delivered,completed)';
       const opts = { headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${accessToken}`, 'Accept': 'application/json' }, cache: 'no-store' as RequestCache };
 
       // Fetch by primary provider id (delivery_providers.id or userId)
+      // If provider_id matches, the delivery is accepted - show it regardless of status (except cancelled/delivered)
       const fastResponse = await fetch(
-        `${SUPABASE_URL}/rest/v1/delivery_requests?provider_id=eq.${providerIdToUse}&${statusFilter}&select=*&order=created_at.desc&limit=150`,
+        `${SUPABASE_URL}/rest/v1/delivery_requests?provider_id=eq.${providerIdToUse}&${statusFilter}&select=*&order=created_at.desc&limit=200`,
         opts
       );
 
@@ -425,7 +427,7 @@ export const useDeliveryProviderData = () => {
       // If we're using delivery_providers.id, also fetch by user id so we don't miss orders linked by auth.uid()
       if (userId && providerIdToUse !== userId) {
         const byUserResponse = await fetch(
-          `${SUPABASE_URL}/rest/v1/delivery_requests?provider_id=eq.${userId}&${statusFilter}&select=*&order=created_at.desc&limit=150`,
+          `${SUPABASE_URL}/rest/v1/delivery_requests?provider_id=eq.${userId}&${statusFilter}&select=*&order=created_at.desc&limit=200`,
           opts
         );
         if (byUserResponse.ok) {
@@ -441,6 +443,72 @@ export const useDeliveryProviderData = () => {
             }
           }
           if (added > 0) console.log('⚡ FAST PATH: Included', added, 'extra delivery_requests by user id (no duplicate)');
+        }
+      }
+
+      // ALSO fetch orders via purchase_orders.delivery_provider_id (some orders are linked via PO, not delivery_requests.provider_id)
+      // Get purchase_order_ids where delivery_provider_id matches
+      const poResponse = await fetch(
+        `${SUPABASE_URL}/rest/v1/purchase_orders?delivery_provider_id=eq.${providerIdToUse}&select=id&limit=200`,
+        opts
+      );
+      if (poResponse.ok) {
+        const poData = await poResponse.json();
+        const poIds = Array.isArray(poData) ? poData.map((po: any) => po.id).filter(Boolean) : [];
+        if (poIds.length > 0) {
+          // Fetch delivery_requests for these purchase_orders
+          const poIdsParam = poIds.join(',');
+          const drByPOResponse = await fetch(
+            `${SUPABASE_URL}/rest/v1/delivery_requests?purchase_order_id=in.(${poIdsParam})&${statusFilter}&select=*&order=created_at.desc&limit=200`,
+            opts
+          );
+          if (drByPOResponse.ok) {
+            const drByPOData = await drByPOResponse.json();
+            const seen = new Set((fastData || []).map((r: any) => r.id));
+            let added = 0;
+            for (const r of drByPOData || []) {
+              if (!seen.has(r.id)) {
+                fastData = fastData || [];
+                fastData.push(r);
+                seen.add(r.id);
+                added++;
+              }
+            }
+            if (added > 0) console.log('⚡ FAST PATH: Included', added, 'delivery_requests linked via purchase_orders.delivery_provider_id');
+          }
+        }
+      }
+
+      // Also check by userId in purchase_orders if different from providerIdToUse
+      if (userId && providerIdToUse !== userId) {
+        const poByUserResponse = await fetch(
+          `${SUPABASE_URL}/rest/v1/purchase_orders?delivery_provider_id=eq.${userId}&select=id&limit=200`,
+          opts
+        );
+        if (poByUserResponse.ok) {
+          const poByUserData = await poByUserResponse.json();
+          const poByUserIds = Array.isArray(poByUserData) ? poByUserData.map((po: any) => po.id).filter(Boolean) : [];
+          if (poByUserIds.length > 0) {
+            const poByUserIdsParam = poByUserIds.join(',');
+            const drByPOUserResponse = await fetch(
+              `${SUPABASE_URL}/rest/v1/delivery_requests?purchase_order_id=in.(${poByUserIdsParam})&${statusFilter}&select=*&order=created_at.desc&limit=200`,
+              opts
+            );
+            if (drByPOUserResponse.ok) {
+              const drByPOUserData = await drByPOUserResponse.json();
+              const seen = new Set((fastData || []).map((r: any) => r.id));
+              let added = 0;
+              for (const r of drByPOUserData || []) {
+                if (!seen.has(r.id)) {
+                  fastData = fastData || [];
+                  fastData.push(r);
+                  seen.add(r.id);
+                  added++;
+                }
+              }
+              if (added > 0) console.log('⚡ FAST PATH: Included', added, 'delivery_requests linked via purchase_orders.delivery_provider_id (by userId)');
+            }
+          }
         }
       }
 
@@ -665,7 +733,7 @@ export const useDeliveryProviderData = () => {
               const joinQueryPromise = supabase
                 .from('delivery_requests')
                 .select('*')
-                .in('status', ['accepted', 'assigned', 'picked_up', 'in_transit', 'dispatched', 'out_for_delivery', 'delivery_arrived', 'pending_pickup', 'delivery_assigned', 'ready_for_dispatch', 'provider_assigned', 'confirmed', 'scheduled', 'pending'])
+                .not('status', 'in', ['cancelled', 'delivered', 'completed'])
                 .order('created_at', { ascending: false })
                 .limit(100);
               
@@ -709,7 +777,7 @@ export const useDeliveryProviderData = () => {
               console.warn('⚠️ Join query failed, falling back to simple query:', joinError);
             // Fetch delivery_requests - simple query without joins
             const activeResponse = await fetch(
-                `${SUPABASE_URL}/rest/v1/delivery_requests?status=in.(accepted,assigned,picked_up,in_transit,dispatched,out_for_delivery,delivery_arrived,pending_pickup,delivery_assigned,ready_for_dispatch,provider_assigned,confirmed,scheduled,pending)&select=*&order=created_at.desc&limit=100`,
+                `${SUPABASE_URL}/rest/v1/delivery_requests?status=not.in.(cancelled,delivered,completed)&select=*&order=created_at.desc&limit=200`,
               {
                 headers: {
                   'apikey': SUPABASE_ANON_KEY,
@@ -1617,9 +1685,19 @@ export const useDeliveryProviderData = () => {
               const hasReceivedItems = rpcStats.received > 0;
               const allItemsDispatched = rpcStats.total > 0 && rpcStats.dispatched === rpcStats.total;
               const allItemsReceived = rpcStats.total > 0 && rpcStats.received === rpcStats.total;
+              
+              // CRITICAL: All accepted/assigned orders should be scheduled unless delivered
+              const isAcceptedStatus = ['accepted', 'assigned', 'pending_pickup', 'delivery_assigned', 'ready_for_dispatch', 'provider_assigned', 'confirmed', 'scheduled', 'pending'].includes(delivery.status);
+              const isDeliveredStatus = delivery.status === 'delivered' || delivery.status === 'completed' || 
+                                      delivery.po_status === 'delivered' || delivery.po_status === 'completed' ||
+                                      delivery.purchase_order_status === 'delivered' || delivery.purchase_order_status === 'completed';
+              
               let categorizedStatus = 'scheduled';
-              if (allItemsReceived) {
+              if (allItemsReceived || isDeliveredStatus) {
                 categorizedStatus = 'delivered';
+              } else if (isAcceptedStatus && !isDeliveredStatus) {
+                // Accepted/assigned orders that are not delivered = scheduled
+                categorizedStatus = 'scheduled';
               } else if (allItemsDispatched && hasReceivedItems) {
                 categorizedStatus = 'in_transit';
               } else if (hasDispatchedItems) {
@@ -1639,11 +1717,20 @@ export const useDeliveryProviderData = () => {
             const allItemsDispatched = items.every((item: any) => item.dispatch_scanned === true);
             const allItemsReceived = items.every((item: any) => item.receive_scanned === true);
             
+            // CRITICAL: All accepted/assigned orders should be scheduled unless delivered
+            const isAcceptedStatus = ['accepted', 'assigned', 'pending_pickup', 'delivery_assigned', 'ready_for_dispatch', 'provider_assigned', 'confirmed', 'scheduled', 'pending'].includes(delivery.status);
+            const isDeliveredStatus = delivery.status === 'delivered' || delivery.status === 'completed' || 
+                                    delivery.po_status === 'delivered' || delivery.po_status === 'completed' ||
+                                    delivery.purchase_order_status === 'delivered' || delivery.purchase_order_status === 'completed';
+            
             let categorizedStatus = delivery.status; // Default to original status
             
-            if (allItemsReceived) {
+            if (allItemsReceived || isDeliveredStatus) {
               // All items received = delivered
               categorizedStatus = 'delivered';
+            } else if (isAcceptedStatus && !isDeliveredStatus) {
+              // Accepted/assigned orders that are not delivered = scheduled
+              categorizedStatus = 'scheduled';
             } else if (allItemsDispatched && hasReceivedItems) {
               // All dispatched, some received = in transit (partially delivered)
               categorizedStatus = 'in_transit';
