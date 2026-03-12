@@ -292,9 +292,10 @@ export const CartSidebar: React.FC = () => {
         itemsBySupplier[supplierId].push(item);
       }
 
-      // Create quote requests using native fetch
+      // Create quote requests using Supabase client (avoids 500 from raw fetch and surfaces real errors)
       let successCount = 0;
       const supplierNames: string[] = [];
+      let lastInsertError: string | null = null;
 
       for (const [supplierId, supplierItems] of Object.entries(itemsBySupplier)) {
         const supplierTotal = supplierItems.reduce((sum, item) => sum + (item.unit_price * item.quantity), 0);
@@ -327,8 +328,7 @@ export const CartSidebar: React.FC = () => {
             unit: item.unit,
             unit_price: item.unit_price,
             supplier_name: item.supplier_name
-          })),
-          created_at: new Date().toISOString()
+          }))
         };
 
         // Link quote to project if selected
@@ -338,30 +338,23 @@ export const CartSidebar: React.FC = () => {
         }
 
         try {
-          const quoteResponse = await fetchWithTimeout(
-            `${SUPABASE_URL}/rest/v1/purchase_orders`,
-            {
-              method: 'POST',
-              headers: {
-                'apikey': SUPABASE_ANON_KEY,
-                'Authorization': `Bearer ${accessToken}`,
-                'Content-Type': 'application/json',
-                'Prefer': 'return=minimal'
-              },
-              body: JSON.stringify(quotePayload)
-            },
-            10000
-          );
+          const { error: insertError } = await supabase
+            .from('purchase_orders')
+            .insert(quotePayload)
+            .select('id')
+            .single();
 
-          if (quoteResponse.ok) {
+          if (!insertError) {
             successCount++;
             if (!supplierNames.includes(supplierName)) {
               supplierNames.push(supplierName);
             }
           } else {
-            console.error('Quote request error:', await quoteResponse.text());
+            lastInsertError = insertError.message || (insertError.details ? JSON.stringify(insertError.details) : null);
+            console.error('Quote request error:', insertError.message, insertError.details);
           }
         } catch (e) {
+          lastInsertError = e instanceof Error ? e.message : String(e);
           console.error('Quote request error for supplier:', supplierId, e);
         }
       }
@@ -374,7 +367,7 @@ export const CartSidebar: React.FC = () => {
         clearCart();
         setIsCartOpen(false);
       } else {
-        throw new Error('Failed to create any quote requests');
+        throw new Error(lastInsertError || 'Failed to create any quote requests');
       }
     } catch (error: any) {
       console.error('Error requesting quote:', error);
