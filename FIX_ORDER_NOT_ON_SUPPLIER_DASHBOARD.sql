@@ -54,6 +54,9 @@ BEGIN
     
     GET DIAGNOSTICS v_items_with_supplier_id = ROW_COUNT;
     RAISE NOTICE '✅ Updated % material_items to have correct supplier_id', v_items_with_supplier_id;
+  ELSIF v_material_items_count = 0 THEN
+    RAISE NOTICE '⚠️ No material_items found for this order - order cannot appear on supplier dashboard';
+    RAISE NOTICE '   Supplier dashboard requires material_items to display orders';
   END IF;
   
   -- Verify trigger updated purchase_orders correctly

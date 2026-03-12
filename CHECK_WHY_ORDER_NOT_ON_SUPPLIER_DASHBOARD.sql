@@ -64,7 +64,12 @@ WHERE po.po_number = 'QR-1773125455597-K3447'
 -- Step 4: Check material_items scan status (supplier dashboard uses this)
 SELECT 
   'Material Items Status' as check_type,
+  mi.purchase_order_id,
   COUNT(*) as total_items,
+  COUNT(DISTINCT mi.supplier_id) as unique_supplier_ids,
+  array_agg(DISTINCT mi.supplier_id) as supplier_ids,
+  po.supplier_id as po_supplier_id,
+  COUNT(*) FILTER (WHERE mi.supplier_id = po.supplier_id) as items_with_matching_supplier_id,
   COUNT(*) FILTER (WHERE dispatch_scanned = TRUE) as dispatched_count,
   COUNT(*) FILTER (WHERE receive_scanned = TRUE) as received_count,
   CASE 
@@ -76,12 +81,19 @@ SELECT
     WHEN COUNT(*) FILTER (WHERE dispatch_scanned = TRUE) = 0 
     THEN 'Awaiting Dispatch'
     ELSE 'Partially Dispatched'
-  END as expected_category
-FROM material_items
-WHERE purchase_order_id IN (
-  SELECT id FROM purchase_orders 
-  WHERE po_number = 'QR-1773125455597-K3447'
-);
+  END as expected_category,
+  CASE 
+    WHEN COUNT(*) FILTER (WHERE mi.supplier_id = po.supplier_id) = 0 
+    THEN '❌ NO ITEMS WITH MATCHING SUPPLIER_ID - WILL NOT APPEAR'
+    WHEN COUNT(*) FILTER (WHERE mi.supplier_id = po.supplier_id) > 0 
+    THEN '✅ HAS ITEMS WITH MATCHING SUPPLIER_ID - WILL APPEAR'
+    ELSE '⚠️ UNKNOWN'
+  END as supplier_match_status
+FROM material_items mi
+INNER JOIN purchase_orders po ON mi.purchase_order_id = po.id
+WHERE po.po_number = 'QR-1773125455597-K3447'
+   OR po.po_number LIKE '%1773125455597%'
+GROUP BY mi.purchase_order_id, po.supplier_id;
 
 -- Step 5: Check what supplier dashboard should show
 SELECT 
