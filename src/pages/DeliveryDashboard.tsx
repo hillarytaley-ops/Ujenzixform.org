@@ -1010,60 +1010,6 @@ const DeliveryDashboard = () => {
     }
   }, [unifiedScheduled, deliveryCategories.scheduled, activeTab, selectedScheduledOrderId]);
 
-  // Function to load notification counts
-  const loadNotificationCounts = useCallback(async () => {
-    try {
-      const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
-      const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
-      
-      let accessToken = SUPABASE_ANON_KEY;
-      try {
-        const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
-        if (storedSession) {
-          const parsed = JSON.parse(storedSession);
-          if (parsed.access_token) accessToken = parsed.access_token;
-        }
-      } catch (e) {}
-
-      const headers = {
-        'apikey': SUPABASE_ANON_KEY,
-        'Authorization': `Bearer ${accessToken}`
-      };
-
-      // Count only UNIQUE PENDING delivery requests (deduplicate by purchase_order_id)
-      const response = await fetch(
-        `${SUPABASE_URL}/rest/v1/delivery_requests?select=id,status,purchase_order_id&status=eq.pending`,
-        { headers, cache: 'no-store' }
-      );
-      
-      if (response.ok) {
-        const data = await response.json();
-        
-        // Deduplicate by purchase_order_id - count only unique purchase orders
-        const uniquePOIds = new Set<string>();
-        const nullPORequests = new Set<string>(); // Track NULL purchase_order_id requests by id
-        
-        data.forEach((dr: any) => {
-          if (dr.purchase_order_id) {
-            uniquePOIds.add(dr.purchase_order_id);
-          } else {
-            // For NULL purchase_order_id, count each unique request
-            nullPORequests.add(dr.id);
-          }
-        });
-        
-        const pendingCount = uniquePOIds.size + nullPORequests.size;
-        
-        console.log(`🔔 Notification counts: ${data.length} total → ${pendingCount} unique (${uniquePOIds.size} with PO, ${nullPORequests.size} without PO)`);
-        
-        setNotificationCount(pendingCount);
-        setPendingNotificationCount(pendingCount);
-      }
-    } catch (error) {
-      console.error('Error loading notification counts:', error);
-    }
-  }, []);
-
   // Load notification counts for the Alerts tab badge
   useEffect(() => {
     loadNotificationCounts();
