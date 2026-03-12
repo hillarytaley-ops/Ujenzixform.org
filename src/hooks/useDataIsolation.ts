@@ -522,32 +522,85 @@ export const useDeliveryProviderData = () => {
         
         // Process ALL orders assigned to provider (don't filter by order_number - match supplier dashboard logic)
         // Supplier dashboard shows all orders based on material_items scan status, not order_number format
+        // CRITICAL: Fetch po_number BEFORE setting state to avoid "Loading..." in UI
+        const quickDeliveriesWithPOIds = fastData
+          .filter((dr: any) => dr.purchase_order_id)
+          .map((dr: any) => dr.purchase_order_id);
+        
+        const uniqueQuickPOIds = [...new Set(quickDeliveriesWithPOIds)];
+        
+        // Fetch po_numbers for FAST PATH orders immediately
+        let fastPathPONumberMap = new Map<string, string>();
+        if (uniqueQuickPOIds.length > 0) {
+          try {
+            console.log('⚡ FAST PATH: Fetching po_numbers for', uniqueQuickPOIds.length, 'purchase orders...');
+            const idsParam = uniqueQuickPOIds.join(',');
+            const queryUrl = `${SUPABASE_URL}/rest/v1/purchase_orders?id=in.(${idsParam})&select=id,po_number&limit=200`;
+            
+            const poResponse = await fetch(queryUrl, {
+              headers: {
+                'apikey': SUPABASE_ANON_KEY,
+                'Authorization': `Bearer ${accessToken}`,
+                'Content-Type': 'application/json',
+                'Prefer': 'return=representation'
+              },
+              cache: 'no-store'
+            });
+            
+            if (poResponse.ok) {
+              const poNumbers = await poResponse.json();
+              poNumbers.forEach((po: any) => {
+                if (po.id && po.po_number && po.po_number.trim() !== '') {
+                  fastPathPONumberMap.set(po.id, po.po_number);
+                }
+              });
+              console.log('✅ FAST PATH: Fetched po_numbers for', fastPathPONumberMap.size, 'out of', uniqueQuickPOIds.length, 'purchase orders');
+            } else {
+              console.warn('⚠️ FAST PATH: Failed to fetch po_numbers:', poResponse.status);
+            }
+          } catch (e) {
+            console.warn('⚠️ FAST PATH: Error fetching po_numbers:', e);
+          }
+        }
+        
+        // Now process orders with po_numbers
         const quickDeliveries = fastData
           .map((dr: any) => {
             const po = Array.isArray(dr.purchase_orders) ? dr.purchase_orders[0] : dr.purchase_orders;
-            // Prefer real order numbers, but include all orders even if order_number is missing or temporary
             // CRITICAL: Use ONLY purchase_orders.po_number (same as supplier dashboard)
             // DO NOT use delivery_requests.order_number - it may be outdated/wrong
             // DO NOT create fallback formats - if po_number is missing, order shouldn't appear
             let orderNumber = null;
-            if (dr.purchase_order_id && po?.po_number && po.po_number.trim() !== '') {
-              orderNumber = po.po_number;
-            } else if (dr.purchase_order_id) {
-              // Try to get from poNumberMap if available
-              // (This will be populated later in the fetch process)
-              console.warn('⚠️ FAST PATH: Missing po_number for delivery_request', dr.id.slice(0, 8), '- will be fetched later');
+            if (dr.purchase_order_id) {
+              // Priority 1: po_number from join (if available)
+              if (po?.po_number && po.po_number.trim() !== '') {
+                orderNumber = po.po_number;
+              }
+              // Priority 2: po_number from fastPathPONumberMap
+              else {
+                const mapNumber = fastPathPONumberMap.get(dr.purchase_order_id);
+                if (mapNumber && mapNumber.trim() !== '') {
+                  orderNumber = mapNumber;
+                }
+              }
             }
+            
+            // Only include orders with valid po_number
+            if (!orderNumber) {
+              console.warn('⚠️ FAST PATH: Excluding delivery_request', dr.id.slice(0, 8), '- no valid po_number');
+              return null;
+            }
+            
             return {
               ...dr,
               order_number: orderNumber,
               source: 'delivery_requests'
             };
-          });
-          // REMOVED: .filter((d: any) => isRealOrder(d.order_number)) - This was removing 41 orders!
-          // All orders assigned to provider should appear, matching supplier dashboard behavior
+          })
+          .filter((d: any) => d !== null); // Remove null entries
         
         if (quickDeliveries.length > 0) {
-          console.log('⚡ FAST PATH: Found', quickDeliveries.length, 'accepted orders with real order numbers');
+          console.log('⚡ FAST PATH: Found', quickDeliveries.length, 'accepted orders with valid po_numbers');
           // Show data immediately so UI is not blocked by enrichment RPC (which can hang)
           // Use delivery_requests.status so In Transit shows correctly before enrichment (dispatched/in_transit etc.)
           const inTransitStatuses = ['dispatched', 'in_transit', 'picked_up', 'out_for_delivery', 'delivery_arrived', 'shipped', 'on_the_way'];
