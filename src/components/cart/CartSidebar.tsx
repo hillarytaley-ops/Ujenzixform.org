@@ -44,6 +44,20 @@ interface BuilderProject {
   status: string;
 }
 
+// Parse Supabase/PostgREST error response so we can show the real server error (e.g. trigger/DB message)
+const parseSupabaseError = (body: string, status: number): string => {
+  if (!body || !body.trim()) return `Server ${status}`;
+  try {
+    const parsed = JSON.parse(body) as Record<string, unknown>;
+    const msg = (parsed.message as string) || (parsed.error_description as string);
+    const details = parsed.details;
+    const detailsStr = typeof details === 'string' ? details : (Array.isArray(details) && details[0] ? String(details[0]) : null);
+    return (msg || detailsStr || body).slice(0, 400);
+  } catch {
+    return body.slice(0, 400);
+  }
+};
+
 // Helper for fetch with timeout
 const fetchWithTimeout = async (url: string, options: RequestInit, timeoutMs: number = 10000) => {
   const controller = new AbortController();
@@ -359,17 +373,10 @@ export const CartSidebar: React.FC = () => {
               supplierNames.push(supplierName);
             }
           } else {
-            let errMsg = `Server ${res.status}`;
-            try {
-              const parsed = JSON.parse(body);
-              errMsg = parsed.message || parsed.error_description || parsed.details || errMsg;
-            } catch {
-              if (body) errMsg = body.slice(0, 200);
-            }
-            if (res.status === 500) {
-              errMsg += '. Run supabase/RUN_THIS_IN_SUPABASE_TO_FIX_500.sql in Supabase SQL Editor if you haven’t.';
-            }
-            lastInsertError = errMsg;
+            const errMsg = parseSupabaseError(body, res.status);
+            lastInsertError = res.status === 500
+              ? `${errMsg} — Run supabase/RUN_THIS_IN_SUPABASE_TO_FIX_500.sql in Supabase SQL Editor if you haven’t.`
+              : errMsg;
             console.error('Quote request error:', res.status, body);
           }
         } catch (e) {
@@ -608,7 +615,10 @@ export const CartSidebar: React.FC = () => {
       if (!orderResponse.ok) {
         const errorText = await orderResponse.text();
         console.error('❌ Purchase order creation failed:', orderResponse.status, errorText);
-        throw new Error(`Order failed: ${errorText}`);
+        const errMsg = parseSupabaseError(errorText, orderResponse.status);
+        throw new Error(orderResponse.status === 500
+          ? `${errMsg} — Run supabase/RUN_THIS_IN_SUPABASE_TO_FIX_500.sql in Supabase SQL Editor if you haven’t.`
+          : errMsg);
       }
 
       const orderDataArray = await orderResponse.json();
