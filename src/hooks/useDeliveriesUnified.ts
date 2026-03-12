@@ -105,41 +105,61 @@ export function useDeliveriesUnified(): UseDeliveriesUnifiedResult {
       });
       
       console.log('🔵 Starting RPC promise...');
-      const rpcPromise = supabase.rpc('get_deliveries_for_provider_unified').then(
-        (response) => {
+      
+      // Add intermediate logging to track promise state
+      let promiseState = 'created';
+      const rpcPromise = supabase.rpc('get_deliveries_for_provider_unified')
+        .then((response) => {
+          promiseState = 'resolved';
           console.log('🔵 RPC promise resolved:', {
             hasData: !!response?.data,
             hasError: !!response?.error,
-            dataLength: Array.isArray(response?.data) ? response.data.length : 'not-array'
+            dataLength: Array.isArray(response?.data) ? response.data.length : 'not-array',
+            duration: `${Date.now() - startTime}ms`
           });
           return response;
-        },
-        (error) => {
-          console.error('🔵 RPC promise rejected:', error);
+        })
+        .catch((error) => {
+          promiseState = 'rejected';
+          console.error('🔵 RPC promise rejected:', {
+            message: error?.message,
+            name: error?.name,
+            stack: error?.stack,
+            duration: `${Date.now() - startTime}ms`
+          });
           throw error;
-        }
-      );
+        });
+      
       console.log('🔵 RPC promise created, racing with timeout...');
+      
+      // Log promise state periodically
+      const stateCheckInterval = setInterval(() => {
+        console.log(`⏳ RPC still pending... (${Date.now() - startTime}ms elapsed, state: ${promiseState})`);
+      }, 2000);
       
       let result: any;
       try {
         result = await Promise.race([rpcPromise, timeoutPromise]);
+        clearInterval(stateCheckInterval);
         console.log('🔵 Promise.race completed:', {
           hasResult: !!result,
           resultKeys: result ? Object.keys(result) : [],
           resultType: typeof result,
+          promiseState,
           duration: `${Date.now() - startTime}ms`
         });
       } catch (raceError: any) {
+        clearInterval(stateCheckInterval);
         if (timeoutId) clearTimeout(timeoutId);
         console.error('❌ Promise.race error:', {
           message: raceError?.message,
           name: raceError?.name,
-          stack: raceError?.stack,
+          promiseState,
           duration: `${Date.now() - startTime}ms`
         });
         throw raceError;
       } finally {
+        clearInterval(stateCheckInterval);
         if (timeoutId) clearTimeout(timeoutId);
       }
       
