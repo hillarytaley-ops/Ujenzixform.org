@@ -114,7 +114,7 @@ export const CartSidebar: React.FC = () => {
       if (!userId) return;
 
       const response = await fetchWithTimeout(
-        `${SUPABASE_URL}/rest/v1/builder_projects?builder_id=eq.${userId}&status=in.(active,in_progress)&select=id,name,location,latitude,longitude,address,status&order=created_at.desc`,
+        `${SUPABASE_URL}/rest/v1/builder_projects?builder_id=eq.${userId}&or=(status.eq.active,status.eq.in_progress)&select=id,name,location,latitude,longitude,address,status&order=created_at.desc`,
         {
           headers: {
             'apikey': SUPABASE_ANON_KEY,

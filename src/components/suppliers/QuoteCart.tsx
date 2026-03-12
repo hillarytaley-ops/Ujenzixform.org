@@ -94,7 +94,7 @@ export function QuoteCart({
       } catch {}
 
       const response = await fetch(
-        `${SUPABASE_URL}/rest/v1/builder_projects?builder_id=eq.${user.id}&status=in.(active,in_progress)&order=created_at.desc`,
+        `${SUPABASE_URL}/rest/v1/builder_projects?builder_id=eq.${user.id}&or=(status.eq.active,status.eq.in_progress)&order=created_at.desc`,
         {
           headers: {
             'apikey': SUPABASE_ANON_KEY,
