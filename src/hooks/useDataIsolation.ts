@@ -1380,31 +1380,35 @@ export const useDeliveryProviderData = () => {
         total_all: allActiveDeliveries.length
       });
       
-      // Final pass: Ensure all entries with purchase_order_id have order_number
-      // Prioritize actual po_number from database, only use fallback if truly missing
+      // Final pass: Update order_number from poNumberMap for entries that don't have it yet
+      // CRITICAL: Use ONLY purchase_orders.po_number (same as supplier dashboard)
+      // DO NOT create fallback formats - orders without po_number shouldn't appear
       allActiveDeliveries.forEach((delivery: any) => {
-        if (delivery.purchase_order_id && !delivery.order_number) {
-          // Try to get from poNumberMap first (this should have the actual po_number from database)
+        if (delivery.purchase_order_id) {
           const orderNum = poNumberMap.get(delivery.purchase_order_id);
           if (orderNum && orderNum.trim() !== '') {
-            // Use the actual po_number from database
+            // Always use the actual po_number from purchase_orders (same as supplier dashboard)
             delivery.order_number = orderNum;
-            console.log('✅ Final pass: Updated with actual po_number:', orderNum);
-          } else {
-            // Only use fallback if we truly don't have a po_number in the database
-            delivery.order_number = `PO-${delivery.purchase_order_id.slice(0, 8).toUpperCase()}`;
-            console.warn('⚠️ Final pass: No po_number in database for purchase_order_id:', delivery.purchase_order_id.slice(0, 8), '- using fallback');
-          }
-        } else if (delivery.purchase_order_id && delivery.order_number) {
-          // Check if we have a better po_number in the map (actual database value)
-          const orderNum = poNumberMap.get(delivery.purchase_order_id);
-          if (orderNum && orderNum.trim() !== '' && delivery.order_number.startsWith('PO-') && delivery.order_number.length === 11) {
-            // Replace fallback with actual po_number if available
-            delivery.order_number = orderNum;
-            console.log('✅ Final pass: Replaced fallback with actual po_number:', orderNum);
+            if (!delivery.order_number || delivery.order_number !== orderNum) {
+              console.log('✅ Final pass: Updated with actual po_number from purchase_orders:', orderNum);
+            }
+          } else if (!delivery.order_number) {
+            // CRITICAL: If po_number is missing, exclude this order (matching supplier dashboard)
+            // DO NOT create fallback formats - orders without po_number shouldn't appear
+            console.warn('⚠️ Final pass: No po_number in database for purchase_order_id:', delivery.purchase_order_id.slice(0, 8), '- order will be excluded');
           }
         }
       });
+      
+      // Remove entries without valid order_number (matching supplier dashboard behavior)
+      const beforeFilter = allActiveDeliveries.length;
+      const filteredDeliveries = allActiveDeliveries.filter((d: any) => d.order_number && d.order_number.trim() !== '');
+      if (filteredDeliveries.length < beforeFilter) {
+        console.warn('⚠️ Removed', beforeFilter - filteredDeliveries.length, 'orders without valid po_number (matching supplier dashboard)');
+      }
+      // Replace allActiveDeliveries with filtered version
+      allActiveDeliveries.length = 0;
+      allActiveDeliveries.push(...filteredDeliveries);
       
       // Log order numbers for debugging
       const withOrderNumbers = allActiveDeliveries.filter((d: any) => d.order_number).length;

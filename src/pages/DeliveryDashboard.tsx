@@ -1577,7 +1577,7 @@ const DeliveryDashboard = () => {
                               <SelectValue>
                                 {selectedDelivery ? (
                                   <div className="flex items-center gap-2">
-                                    <span>{selectedDelivery.order_number || selectedDelivery.purchase_order_id || 'Order'}</span>
+                                    <span>{selectedDelivery.order_number || 'Loading...'}</span>
                                     {selectedDelivery.material_type && (
                                       <span className="text-xs text-gray-500">- {selectedDelivery.material_type}</span>
                                     )}
@@ -1592,7 +1592,7 @@ const DeliveryDashboard = () => {
                                 <SelectItem key={delivery.id} value={delivery.id}>
                                   <div className="flex flex-col">
                                     <span className="font-medium">
-                                      {delivery.order_number || delivery.purchase_order_id || 'Order'}
+                                      {delivery.order_number || 'Loading...'}
                                     </span>
                                     {delivery.material_type && (
                                       <span className="text-xs text-gray-500">{delivery.material_type}</span>
