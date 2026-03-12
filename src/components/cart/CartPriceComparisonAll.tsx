@@ -319,6 +319,20 @@ export const CartPriceComparisonAll: React.FC<CartPriceComparisonAllProps> = ({
     }
 
     let successCount = 0;
+    let lastError: string | null = null;
+
+    const parseSupabaseError = (body: string, status: number): string => {
+      if (!body?.trim()) return `Server ${status}`;
+      try {
+        const parsed = JSON.parse(body) as Record<string, unknown>;
+        const msg = (parsed.message as string) || (parsed.error_description as string);
+        const details = parsed.details;
+        const detailsStr = typeof details === 'string' ? details : (Array.isArray(details) && details[0] ? String(details[0]) : null);
+        return (msg || detailsStr || body).slice(0, 400);
+      } catch {
+        return body.slice(0, 400);
+      }
+    };
 
     try {
       for (const supplierId of selectedSuppliers) {
@@ -362,9 +376,17 @@ export const CartPriceComparisonAll: React.FC<CartPriceComparisonAllProps> = ({
 
           if (response.ok) {
             successCount++;
+          } else {
+            const bodyText = await response.text();
+            lastError = parseSupabaseError(bodyText, response.status);
+            if (response.status === 500) {
+              lastError += ' — Run supabase/RUN_THIS_IN_SUPABASE_TO_FIX_500.sql in Supabase SQL Editor if you haven’t.';
+            }
+            console.error('Quote request error:', response.status, bodyText);
           }
         } catch (e) {
-          console.error('Quote request failed for supplier:', supplierId);
+          console.error('Quote request failed for supplier:', supplierId, e);
+          lastError = e instanceof Error ? e.message : String(e);
         }
       }
 
@@ -380,7 +402,7 @@ export const CartPriceComparisonAll: React.FC<CartPriceComparisonAllProps> = ({
       } else {
         toast({
           title: 'Failed to send quotes',
-          description: 'Please try again.',
+          description: lastError || 'Please try again.',
           variant: 'destructive',
         });
       }
@@ -388,7 +410,7 @@ export const CartPriceComparisonAll: React.FC<CartPriceComparisonAllProps> = ({
       console.error('Error sending quotes:', error);
       toast({
         title: 'Error',
-        description: 'Failed to send quote requests.',
+        description: (error instanceof Error ? error.message : 'Failed to send quote requests.') + (lastError ? ` ${lastError}` : ''),
         variant: 'destructive',
       });
     } finally {

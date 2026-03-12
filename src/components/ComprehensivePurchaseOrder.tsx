@@ -178,7 +178,8 @@ const ComprehensivePurchaseOrder = () => {
 
       if (error) {
         console.error('Purchase order creation error:', error);
-        toast.error("Failed to create purchase order");
+        const msg = (error as { message?: string; details?: string }).message || (error as { details?: string }).details || 'Failed to create purchase order';
+        toast.error(msg.length > 300 ? msg.slice(0, 300) + '…' : msg);
         return;
       }
       
@@ -232,7 +233,8 @@ const ComprehensivePurchaseOrder = () => {
       
     } catch (error) {
       console.error('Error creating purchase order:', error);
-      toast.error("Failed to create purchase order");
+      const msg = error instanceof Error ? error.message : (error as { message?: string })?.message || 'Failed to create purchase order. Please try again.';
+      toast.error(msg.length > 300 ? msg.slice(0, 300) + '…' : msg);
     }
   };
 
