@@ -199,7 +199,7 @@ const ProfessionalBuilderDashboardPage = () => {
 
       // Count purchase orders with supplier responses (statuses: quoted, quote_responded, quote_revised, quote_viewed_by_builder)
       const statusFilter = ['quote_responded', 'quote_revised', 'quote_viewed_by_builder', 'quoted'];
-      const statusParam = statusFilter.map(s => `"${s}"`).join(',');
+      const statusParam = statusFilter.join(','); // PostgREST in() expects unquoted values
       
       // Try buyer_id first
       const response = await fetch(

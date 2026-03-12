@@ -247,9 +247,9 @@ export const SupplierQuoteReview: React.FC<SupplierQuoteReviewProps> = ({
         ? ['quote_responded', 'quote_revised', 'quote_viewed_by_builder', 'quoted']
         : ['quote_created', 'quote_received_by_supplier', 'quote_responded', 'quote_revised', 'quote_viewed_by_builder', 'quote_accepted', 'quote_rejected', 'pending', 'quoted', 'confirmed', 'rejected'];
       
-      // Build query with proper PostgREST syntax for multiple status values
+      // Build query with proper PostgREST syntax for multiple status values (unquoted)
       // Also filter to only show quotes that have a supplier assigned (supplier_id IS NOT NULL)
-      const statusParam = statusFilter.map(s => `"${s}"`).join(',');
+      const statusParam = statusFilter.join(',');
       const queryUrl = `${SUPABASE_URL}/rest/v1/purchase_orders?buyer_id=eq.${effectiveBuilderId}&status=in.(${statusParam})&supplier_id=not.is.null&order=updated_at.desc`;
       console.log('🔗 SupplierQuoteReview query URL:', queryUrl, '(showOnlyQuoted:', showOnlyQuoted, ')');
       console.log('📊 Status filter:', statusFilter);
@@ -274,7 +274,7 @@ export const SupplierQuoteReview: React.FC<SupplierQuoteReviewProps> = ({
           const builderStatusFilter = showOnlyQuoted 
             ? ['quote_responded', 'quote_revised', 'quote_viewed_by_builder', 'quoted']
             : ['quote_created', 'quote_received_by_supplier', 'quote_responded', 'quote_revised', 'quote_viewed_by_builder', 'quote_accepted', 'quote_rejected', 'pending', 'quoted', 'confirmed', 'rejected'];
-          const builderStatusParam = builderStatusFilter.map(s => `"${s}"`).join(',');
+          const builderStatusParam = builderStatusFilter.join(',');
           const builderIdResponse = await fetch(
             `${SUPABASE_URL}/rest/v1/purchase_orders?builder_id=eq.${effectiveBuilderId}&status=in.(${builderStatusParam})&supplier_id=not.is.null&order=updated_at.desc`,
           { headers, signal: builderIdController.signal, cache: 'no-store' }
