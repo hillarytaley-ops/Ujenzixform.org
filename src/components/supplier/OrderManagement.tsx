@@ -653,7 +653,76 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, is
         }
       }
 
-      // Map orders to UI format
+      // Enrich from delivery_requests so provider-accepted status shows even if purchase_orders wasn't updated
+      const orderIds = purchaseOrders.map((po: any) => po.id);
+      const orderIdsParam = orderIds.join(',');
+      const deliveryRequestsByPO = new Map<string, { provider_id: string; status: string }>();
+      try {
+        const drResponse = await fetch(
+          `${SUPABASE_URL}/rest/v1/delivery_requests?purchase_order_id=in.(${orderIdsParam})&select=purchase_order_id,provider_id,status`,
+          { headers, cache: 'no-store' }
+        );
+        if (drResponse.ok) {
+          const drList = await drResponse.json();
+          (drList || []).forEach((dr: any) => {
+            if (dr.purchase_order_id && dr.provider_id) {
+              const status = dr.status || 'accepted';
+              const existing = deliveryRequestsByPO.get(dr.purchase_order_id);
+              if (!existing || ['accepted', 'assigned', 'picked_up', 'in_transit', 'delivered'].includes(status)) {
+                deliveryRequestsByPO.set(dr.purchase_order_id, { provider_id: dr.provider_id, status });
+              }
+            }
+          });
+          if (deliveryRequestsByPO.size > 0) {
+            console.log('✅ OrderManagement: Enriched orders from delivery_requests:', deliveryRequestsByPO.size, 'with accepted provider');
+          }
+        }
+      } catch (e) {
+        console.log('Delivery requests enrichment failed');
+      }
+      const providerIdsToResolve = new Set<string>();
+      purchaseOrders.forEach((po: any) => {
+        if (po.delivery_provider_id) providerIdsToResolve.add(po.delivery_provider_id);
+        const dr = deliveryRequestsByPO.get(po.id);
+        if (dr?.provider_id) providerIdsToResolve.add(dr.provider_id);
+      });
+      let providerNames: Record<string, string> = {};
+      let providerPhones: Record<string, string> = {};
+      if (providerIdsToResolve.size > 0) {
+        try {
+          const ids = Array.from(providerIdsToResolve);
+          const fromProviders = await fetch(
+            `${SUPABASE_URL}/rest/v1/delivery_providers?id=in.(${ids.join(',')})&select=id,provider_name,company_name,phone`,
+            { headers, cache: 'no-store' }
+          );
+          if (fromProviders.ok) {
+            const arr = await fromProviders.json();
+            (arr || []).forEach((p: any) => {
+              if (p.id) {
+                providerNames[p.id] = p.provider_name || p.company_name || 'Delivery Provider';
+                if (p.phone) providerPhones[p.id] = p.phone;
+              }
+            });
+          }
+          const fromProfiles = await fetch(
+            `${SUPABASE_URL}/rest/v1/profiles?user_id=in.(${ids.join(',')})&select=user_id,full_name,phone`,
+            { headers, cache: 'no-store' }
+          );
+          if (fromProfiles.ok) {
+            const arr = await fromProfiles.json();
+            (arr || []).forEach((p: any) => {
+              if (p.user_id && !providerNames[p.user_id]) {
+                providerNames[p.user_id] = p.full_name || 'Delivery Provider';
+                if (p.phone) providerPhones[p.user_id] = p.phone;
+              }
+            });
+          }
+        } catch (e) {
+          console.log('Provider names fetch failed');
+        }
+      }
+
+      // Map orders to UI format (use delivery_requests to fill provider when PO missing it)
       const realOrders: Order[] = purchaseOrders.map((po: any, index: number) => {
         const buyer = buyerProfiles[po.buyer_id] || {};
         const items = Array.isArray(po.items) ? po.items : [];
@@ -670,6 +739,12 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, is
           po.status === 'quote_viewed_by_builder' ||
           po.status === 'quote_rejected';
         
+        const dr = deliveryRequestsByPO.get(po.id);
+        const resolvedProviderId = po.delivery_provider_id || dr?.provider_id;
+        const resolvedStatus = po.delivery_status || (dr?.status && ['accepted', 'assigned', 'picked_up', 'in_transit', 'delivered'].includes(dr.status) ? dr.status : undefined);
+        const resolvedProviderName = po.delivery_provider_name || (resolvedProviderId ? providerNames[resolvedProviderId] : undefined);
+        const resolvedProviderPhone = po.delivery_provider_phone || (resolvedProviderId ? providerPhones[resolvedProviderId] : undefined);
+
         return {
           id: po.id,
           order_number: po.po_number || `ORD-${String(index + 1).padStart(4, '0')}`,
@@ -690,11 +765,11 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, is
           updated_at: po.updated_at || po.created_at,
           order_type: isQuoteRequest ? 'quote_request' : 'direct_purchase',
           buyer_role: po.buyer_role || 'unknown',
-          delivery_provider_id: po.delivery_provider_id || undefined,
-          delivery_provider_name: po.delivery_provider_name || undefined,
-          delivery_provider_phone: po.delivery_provider_phone || undefined,
+          delivery_provider_id: resolvedProviderId || undefined,
+          delivery_provider_name: resolvedProviderName || undefined,
+          delivery_provider_phone: resolvedProviderPhone || undefined,
           delivery_vehicle_info: po.delivery_vehicle_info || undefined,
-          delivery_status: po.delivery_status || undefined,
+          delivery_status: resolvedStatus || undefined,
           delivery_assigned_at: po.delivery_assigned_at || undefined,
           delivery_accepted_at: po.delivery_accepted_at || undefined,
           estimated_delivery_time: po.estimated_delivery_time || undefined,
