@@ -683,7 +683,12 @@ const DeliveryDashboard = () => {
   useEffect(() => {
     if (!user?.id) return;
 
-    console.log('🔔 Setting up real-time subscription for delivery requests, purchase orders, and material_items...');
+    // Get current provider ID (try multiple sources)
+    const currentProviderId = providerProfile?.id || isolatedProfile?.id || user?.id;
+    console.log('🔔 Setting up real-time subscription for delivery requests, purchase orders, and material_items...', {
+      providerId: currentProviderId?.substring(0, 8) || 'NULL',
+      userId: user?.id?.substring(0, 8) || 'NULL'
+    });
     
     let materialItemsDebounceTimer: ReturnType<typeof setTimeout> | null = null;
     const debouncedRefetchFromMaterialItems = () => {
@@ -765,8 +770,9 @@ const DeliveryDashboard = () => {
         {
           event: 'UPDATE',
           schema: 'public',
-          table: 'delivery_requests',
-          filter: `provider_id=eq.${providerProfile?.id || user?.id || ''}`
+          table: 'delivery_requests'
+          // NOTE: Removed filter - PostgREST filters don't work reliably in real-time subscriptions
+          // We'll do client-side filtering instead
         },
         (payload) => {
           console.log('📦 Delivery request updated:', payload);
@@ -774,11 +780,26 @@ const DeliveryDashboard = () => {
           const newStatus = payload.new?.status;
           const providerId = payload.new?.provider_id;
           
-          // Only process updates for this provider's deliveries
-          const currentProviderId = providerProfile?.id || user?.id;
-          if (providerId && currentProviderId && providerId !== currentProviderId) {
-            console.log('⚠️ Ignoring update - not for this provider');
+          // CLIENT-SIDE FILTER: Only process updates for this provider's deliveries
+          // Get current provider ID (try multiple sources)
+          const currentProviderId = providerProfile?.id || isolatedProfile?.id || user?.id;
+          if (!currentProviderId) {
+            console.log('⚠️ No provider ID available - skipping update');
             return;
+          }
+          
+          // Check if this update is for our provider
+          // provider_id in delivery_requests is the delivery_provider.id (UUID), not user_id
+          if (providerId && providerId !== currentProviderId) {
+            // Also check if it matches user_id (fallback)
+            if (providerId !== user?.id) {
+              console.log('⚠️ Ignoring update - not for this provider', {
+                payloadProviderId: providerId?.substring(0, 8),
+                currentProviderId: currentProviderId?.substring(0, 8),
+                userId: user?.id?.substring(0, 8)
+              });
+              return;
+            }
           }
           
           // IMMEDIATE: When status changes to 'accepted', refresh schedule immediately
@@ -917,7 +938,7 @@ const DeliveryDashboard = () => {
       console.log('🔔 Cleaning up delivery requests subscription');
       supabase.removeChannel(channel);
     };
-  }, [user?.id, refetchData, toast, activeTab]);
+  }, [user?.id, providerProfile, isolatedProfile, refetchData, refetchUnified, loadNotificationCounts, toast, activeTab]);
 
   // Update selected scheduled order when scheduled orders change
   useEffect(() => {
