@@ -678,13 +678,63 @@ const DeliveryDashboard = () => {
     }
   }, [user?.id]);
 
+  // Function to load notification counts (declared before subscription to avoid initialization error)
+  const loadNotificationCounts = useCallback(async () => {
+    try {
+      const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
+      const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
+      
+      let accessToken = SUPABASE_ANON_KEY;
+      try {
+        const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+        if (storedSession) {
+          const parsed = JSON.parse(storedSession);
+          if (parsed.access_token) accessToken = parsed.access_token;
+        }
+      } catch (e) {}
+
+      const headers = {
+        'apikey': SUPABASE_ANON_KEY,
+        'Authorization': `Bearer ${accessToken}`
+      };
+
+      // Count only UNIQUE PENDING delivery requests (deduplicate by purchase_order_id)
+      const response = await fetch(
+        `${SUPABASE_URL}/rest/v1/delivery_requests?select=id,status,purchase_order_id&status=eq.pending`,
+        { headers, cache: 'no-store' }
+      );
+      
+      if (response.ok) {
+        const data = await response.json();
+        
+        // Deduplicate by purchase_order_id - count only unique purchase orders
+        const uniquePOIds = new Set<string>();
+        const nullPORequests = new Set<string>(); // Track NULL purchase_order_id requests by id
+        
+        data.forEach((dr: any) => {
+          if (dr.purchase_order_id) {
+            uniquePOIds.add(dr.purchase_order_id);
+          } else {
+            nullPORequests.add(dr.id);
+          }
+        });
+        
+        const uniqueCount = uniquePOIds.size + nullPORequests.size;
+        setNotificationCount(uniqueCount);
+      }
+    } catch (error) {
+      console.error('Error loading notification counts:', error);
+    }
+  }, []);
+
   // Real-time subscription for delivery updates - including material_items (receive scans)
   // CRITICAL: material_items subscription catches receive_scanned updates so orders move to Delivered tab
   useEffect(() => {
     if (!user?.id) return;
 
-    // Get current provider ID (try multiple sources)
-    const currentProviderId = providerProfile?.id || isolatedProfile?.id || user?.id;
+    // Get current provider ID (try multiple sources) - use safe access
+    const currentProvider = providerProfile || isolatedProfile || null;
+    const currentProviderId = currentProvider?.id || user?.id;
     console.log('🔔 Setting up real-time subscription for delivery requests, purchase orders, and material_items...', {
       providerId: currentProviderId?.substring(0, 8) || 'NULL',
       userId: user?.id?.substring(0, 8) || 'NULL'
@@ -781,8 +831,9 @@ const DeliveryDashboard = () => {
           const providerId = payload.new?.provider_id;
           
           // CLIENT-SIDE FILTER: Only process updates for this provider's deliveries
-          // Get current provider ID (try multiple sources)
-          const currentProviderId = providerProfile?.id || isolatedProfile?.id || user?.id;
+          // Get current provider ID (try multiple sources) - use safe access
+          const currentProvider = providerProfile || isolatedProfile || null;
+          const currentProviderId = currentProvider?.id || user?.id;
           if (!currentProviderId) {
             console.log('⚠️ No provider ID available - skipping update');
             return;
@@ -938,7 +989,7 @@ const DeliveryDashboard = () => {
       console.log('🔔 Cleaning up delivery requests subscription');
       supabase.removeChannel(channel);
     };
-  }, [user?.id, providerProfile, isolatedProfile, refetchData, refetchUnified, loadNotificationCounts, toast, activeTab]);
+  }, [user?.id, refetchData, refetchUnified, loadNotificationCounts, toast, activeTab]);
 
   // Update selected scheduled order when scheduled orders change
   useEffect(() => {
