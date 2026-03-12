@@ -48,8 +48,13 @@ END;
 $$;
 
 -- 2. sync_po_to_delivery_request_order_number (runs on INSERT/UPDATE when po_number set)
+-- SECURITY DEFINER so the UPDATE on delivery_requests is not blocked by RLS.
 CREATE OR REPLACE FUNCTION sync_po_to_delivery_request_order_number()
-RETURNS TRIGGER AS $$
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
 BEGIN
   IF NEW.po_number IS NULL OR NEW.po_number = '' THEN
     RETURN NEW;
@@ -65,7 +70,7 @@ BEGIN
   END;
   RETURN NEW;
 END;
-$$ LANGUAGE plpgsql;
+$$;
 
 -- Done. Try "Request Quote" from the cart again.
 SELECT 'Triggers updated. Try Request Quote again.' AS result;
