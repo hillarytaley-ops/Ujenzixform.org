@@ -407,7 +407,8 @@ export const useDeliveryProviderData = () => {
         console.log('⚡ FAST PATH: delivery_providers lookup skipped:', e);
       }
 
-      const statusFilter = 'status=in.(accepted,assigned,picked_up,in_transit,dispatched,out_for_delivery,delivery_arrived)';
+      // Include all statuses that should appear in the schedule: scheduled, accepted, assigned, pending_pickup, delivery_assigned, ready_for_dispatch, provider_assigned, confirmed, pending (if assigned to provider), and in-transit statuses
+      const statusFilter = 'status=in.(accepted,assigned,picked_up,in_transit,dispatched,out_for_delivery,delivery_arrived,pending_pickup,delivery_assigned,ready_for_dispatch,provider_assigned,confirmed,scheduled,pending)';
       const opts = { headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${accessToken}`, 'Accept': 'application/json' }, cache: 'no-store' as RequestCache };
 
       // Fetch by primary provider id (delivery_providers.id or userId)
@@ -664,7 +665,7 @@ export const useDeliveryProviderData = () => {
               const joinQueryPromise = supabase
                 .from('delivery_requests')
                 .select('*')
-                .in('status', ['accepted', 'assigned', 'picked_up', 'in_transit', 'dispatched', 'out_for_delivery', 'delivery_arrived'])
+                .in('status', ['accepted', 'assigned', 'picked_up', 'in_transit', 'dispatched', 'out_for_delivery', 'delivery_arrived', 'pending_pickup', 'delivery_assigned', 'ready_for_dispatch', 'provider_assigned', 'confirmed', 'scheduled', 'pending'])
                 .order('created_at', { ascending: false })
                 .limit(100);
               
@@ -708,7 +709,7 @@ export const useDeliveryProviderData = () => {
               console.warn('⚠️ Join query failed, falling back to simple query:', joinError);
             // Fetch delivery_requests - simple query without joins
             const activeResponse = await fetch(
-                `${SUPABASE_URL}/rest/v1/delivery_requests?status=in.(accepted,assigned,picked_up,in_transit,dispatched,out_for_delivery,delivery_arrived)&select=*&order=created_at.desc&limit=100`,
+                `${SUPABASE_URL}/rest/v1/delivery_requests?status=in.(accepted,assigned,picked_up,in_transit,dispatched,out_for_delivery,delivery_arrived,pending_pickup,delivery_assigned,ready_for_dispatch,provider_assigned,confirmed,scheduled,pending)&select=*&order=created_at.desc&limit=100`,
               {
                 headers: {
                   'apikey': SUPABASE_ANON_KEY,
