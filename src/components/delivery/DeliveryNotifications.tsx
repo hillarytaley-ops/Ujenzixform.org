@@ -681,7 +681,7 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
     return date.toLocaleDateString();
   };
 
-  // FINAL RENDER-LEVEL DEDUPLICATION: ONE notification per purchase_order_id (single Accept per professional builder request)
+  // FINAL RENDER-LEVEL DEDUPLICATION: ONE notification per request (single Accept per professional builder request)
   const uniqueNotifications = useMemo(() => {
     const renderedByPO = new Map<string, Notification>(); // One per purchase_order_id; prefer entry with delivery_request_id so Accept works
     const renderedByDR = new Map<string, Notification>();
@@ -705,9 +705,9 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
       }
     });
 
-    // Build unique list: one per PO (from renderedByPO), then one per DR not already covered, then by id
+    // Build list: one per PO, then DRs not already covered, then no-PO/no-DR
     const seenIds = new Set<string>();
-    const result: Notification[] = [];
+    let result: Notification[] = [];
     renderedByPO.forEach((n) => {
       if (!seenIds.has(n.id)) {
         seenIds.add(n.id);
@@ -730,10 +730,48 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
     // Sort by timestamp (most recent first)
     result.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
 
-    if (result.length < notifications.length) {
-      console.log(`✅ RENDER: One per request - ${notifications.length} → ${result.length} (single Accept per professional builder request)`);
+    // Second pass: collapse duplicates that look like the same request (same pickup + same placeholder delivery e.g. "To be provided")
+    const norm = (s: string | undefined) => (s || '').toLowerCase().trim();
+    const isPlaceholderDelivery = (s: string | undefined) =>
+      !norm(s) || norm(s).includes('to be provided') || norm(s) === 'provided';
+    const contentKey = (n: Notification) =>
+      `${norm(n.pickupAddress)}|${norm(n.deliveryAddress)}|${norm(n.materialType)}`;
+    const collapsed: Notification[] = [];
+    const seenContent = new Map<string, Notification>();
+    result.forEach((n) => {
+      const key = contentKey(n);
+      const existing = seenContent.get(key);
+      const bothPlaceholder =
+        isPlaceholderDelivery(n.deliveryAddress) &&
+        (!existing || isPlaceholderDelivery(existing.deliveryAddress));
+      if (existing && bothPlaceholder && key !== '||') {
+        // Same logical request: keep one. Prefer the one with delivery_request_id so Accept works.
+        const keep = n.delivery_request_id && !existing.delivery_request_id
+          ? n
+          : existing.delivery_request_id && !n.delivery_request_id
+            ? existing
+            : existing;
+        if (keep === n) {
+          const idx = collapsed.indexOf(existing);
+          if (idx >= 0) collapsed.splice(idx, 1);
+          seenContent.set(key, n);
+          collapsed.push(n);
+        }
+        return;
+      }
+      if (!existing) {
+        seenContent.set(key, n);
+        collapsed.push(n);
+      } else {
+        collapsed.push(n);
+      }
+    });
+
+    const final = collapsed.length < result.length ? collapsed : result;
+    if (final.length < notifications.length) {
+      console.log(`✅ RENDER: Single Accept per request - ${notifications.length} → ${final.length}`);
     }
-    return result;
+    return final;
   }, [notifications]);
 
   return (
