@@ -391,11 +391,28 @@ const DeliveryDashboard = () => {
               });
               
               // Second filter: Only orders in "Awaiting Dispatch" status
+              // CRITICAL: If order has NO material_items OR has dispatched items, it should NOT appear
               const validDeliveries = ordersThatExist.filter((d: any) => {
+                if (!d.purchase_order_id) {
+                  // No purchase_order_id - exclude it
+                  return false;
+                }
+                
                 // Check if order is in "Awaiting Dispatch" status
                 // (all material_items must have dispatch_scanned = FALSE)
-                if (d.purchase_order_id && itemsByOrder[d.purchase_order_id]) {
+                if (itemsByOrder[d.purchase_order_id]) {
                   const items = itemsByOrder[d.purchase_order_id];
+                  
+                  if (items.length === 0) {
+                    // No material_items - exclude it
+                    console.warn('🚫 Removing order with no material_items:', {
+                      order_number: d.order_number,
+                      purchase_order_id: d.purchase_order_id?.substring(0, 8),
+                      reason: 'Order has no material_items - not in Awaiting Dispatch'
+                    });
+                    return false;
+                  }
+                  
                   const allItemsNotDispatched = items.every((item: any) => item.dispatch_scanned === false);
                   
                   if (!allItemsNotDispatched) {
@@ -408,9 +425,18 @@ const DeliveryDashboard = () => {
                     });
                     return false;
                   }
+                  
+                  // All items are not dispatched - this is valid
+                  return true;
+                } else {
+                  // No material_items found for this order - exclude it
+                  console.warn('🚫 Removing order with no material_items data:', {
+                    order_number: d.order_number,
+                    purchase_order_id: d.purchase_order_id?.substring(0, 8),
+                    reason: 'No material_items found - cannot verify Awaiting Dispatch status'
+                  });
+                  return false;
                 }
-                
-                return true;
               });
               
               console.log('✅ VALIDATION: Removed', isolatedActiveDeliveries.length - validDeliveries.length, 'non-existent orders');

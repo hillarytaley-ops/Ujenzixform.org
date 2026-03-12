@@ -53,15 +53,28 @@ SELECT
   COUNT(mi.id) as total_material_items,
   COUNT(*) FILTER (WHERE mi.dispatch_scanned = FALSE) as awaiting_dispatch_count,
   COUNT(*) FILTER (WHERE mi.dispatch_scanned = TRUE) as dispatched_count,
+  COUNT(*) FILTER (WHERE mi.receive_scanned = TRUE) as received_count,
   CASE 
-    WHEN COUNT(*) FILTER (WHERE mi.dispatch_scanned = FALSE) > 0 THEN '✅ SHOULD APPEAR IN AWAITING DISPATCH'
+    WHEN COUNT(mi.id) = 0 THEN '❌ NO MATERIAL_ITEMS - WILL NOT APPEAR'
+    WHEN COUNT(*) FILTER (WHERE mi.dispatch_scanned = FALSE) = COUNT(mi.id) 
+     AND COUNT(*) FILTER (WHERE mi.dispatch_scanned = FALSE) > 0 
+    THEN '✅ SHOULD APPEAR IN AWAITING DISPATCH (ALL items not dispatched)'
     WHEN COUNT(*) FILTER (WHERE mi.dispatch_scanned = TRUE) > 0 
+     AND COUNT(*) FILTER (WHERE mi.dispatch_scanned = TRUE) < COUNT(mi.id)
+    THEN '❌ SOME ITEMS DISPATCHED - WILL APPEAR IN DISPATCHED (NOT AWAITING DISPATCH)'
+    WHEN COUNT(*) FILTER (WHERE mi.dispatch_scanned = TRUE) = COUNT(mi.id)
      AND COUNT(*) FILTER (WHERE mi.receive_scanned = FALSE) > 0 
-    THEN '✅ SHOULD APPEAR IN DISPATCHED/IN TRANSIT'
-    WHEN COUNT(*) FILTER (WHERE mi.receive_scanned = TRUE) = COUNT(*) 
-    THEN '✅ SHOULD APPEAR IN DELIVERED'
-    ELSE '❌ NO MATERIAL_ITEMS - WILL NOT APPEAR'
-  END as supplier_dashboard_status
+    THEN '❌ ALL ITEMS DISPATCHED - WILL APPEAR IN IN TRANSIT (NOT AWAITING DISPATCH)'
+    WHEN COUNT(*) FILTER (WHERE mi.receive_scanned = TRUE) = COUNT(mi.id) 
+    THEN '❌ ALL ITEMS RECEIVED - WILL APPEAR IN DELIVERED (NOT AWAITING DISPATCH)'
+    ELSE '⚠️ UNKNOWN STATUS'
+  END as supplier_dashboard_status,
+  CASE 
+    WHEN COUNT(*) FILTER (WHERE mi.dispatch_scanned = FALSE) = COUNT(mi.id) 
+     AND COUNT(mi.id) > 0
+    THEN '✅ IS IN AWAITING DISPATCH - CAN SHOW TO DELIVERY PROVIDER'
+    ELSE '❌ NOT IN AWAITING DISPATCH - MUST NOT SHOW TO DELIVERY PROVIDER'
+  END as delivery_provider_visibility
 FROM purchase_orders po
 LEFT JOIN material_items mi ON mi.purchase_order_id = po.id
 WHERE po.po_number = 'QR-1773125455597-K3447'

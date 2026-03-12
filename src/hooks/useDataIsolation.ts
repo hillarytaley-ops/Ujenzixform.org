@@ -1583,10 +1583,26 @@ export const useDeliveryProviderData = () => {
                   continue;
                 }
                 
+                if (!item.purchase_order_id) {
+                  // No purchase_order_id - exclude it
+                  continue;
+                }
+                
                 // Check if order is in "Awaiting Dispatch" status
                 // (all material_items must have dispatch_scanned = FALSE)
-                if (item.purchase_order_id && itemsByOrder[item.purchase_order_id]) {
+                if (itemsByOrder[item.purchase_order_id]) {
                   const items = itemsByOrder[item.purchase_order_id];
+                  
+                  if (items.length === 0) {
+                    // No material_items - exclude it
+                    console.warn('🚫 Removing order with no material_items:', {
+                      order_number: item.order_number,
+                      purchase_order_id: item.purchase_order_id?.substring(0, 8),
+                      reason: 'Order has no material_items - not in Awaiting Dispatch'
+                    });
+                    continue;
+                  }
+                  
                   const allItemsNotDispatched = items.every((item: any) => item.dispatch_scanned === false);
                   
                   if (!allItemsNotDispatched) {
@@ -1599,9 +1615,18 @@ export const useDeliveryProviderData = () => {
                     });
                     continue;
                   }
+                  
+                  // All items are not dispatched - this is valid
+                  validatedDeliveries.push(item);
+                } else {
+                  // No material_items found for this order - exclude it
+                  console.warn('🚫 Removing order with no material_items data:', {
+                    order_number: item.order_number,
+                    purchase_order_id: item.purchase_order_id?.substring(0, 8),
+                    reason: 'No material_items found - cannot verify Awaiting Dispatch status'
+                  });
+                  continue;
                 }
-                
-                validatedDeliveries.push(item);
               }
               
               console.log('✅ VALIDATION: Removed', filteredRealDeliveries.length - validatedDeliveries.length, 'non-existent orders. Showing', validatedDeliveries.length, 'valid orders');
