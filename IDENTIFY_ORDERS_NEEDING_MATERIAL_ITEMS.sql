@@ -56,18 +56,24 @@ SELECT
   po.status,
   po.delivery_status,
   po.total_amount,
-  po.items_summary,
-  po.material_types,
-  po.quantity,
+  po.items,
+  CASE 
+    WHEN po.items IS NOT NULL AND jsonb_typeof(po.items) = 'array' AND jsonb_array_length(po.items) > 0 THEN '✅ Has items (JSONB array) - can create material_items from this'
+    WHEN po.items IS NOT NULL AND jsonb_typeof(po.items) = 'object' THEN '✅ Has items (JSONB object) - can create material_items from this'
+    ELSE '⚠️ No items data or empty'
+  END as items_status,
   po.created_at,
   dr.id as delivery_request_id,
   dr.material_type as delivery_request_material_type,
   dr.quantity as delivery_request_quantity,
   dr.item_description,
   CASE 
-    WHEN po.items_summary IS NOT NULL AND jsonb_array_length(po.items_summary) > 0 THEN '✅ Has items_summary - can create material_items from this'
-    WHEN po.material_types IS NOT NULL THEN '✅ Has material_types - can create material_items from this'
+    WHEN (po.items IS NOT NULL AND (
+      (jsonb_typeof(po.items) = 'array' AND jsonb_array_length(po.items) > 0) OR
+      jsonb_typeof(po.items) = 'object'
+    )) THEN '✅ Has items data - can create material_items from this'
     WHEN dr.item_description IS NOT NULL THEN '✅ Has item_description in delivery_request - can use as reference'
+    WHEN dr.material_type IS NOT NULL THEN '✅ Has material_type in delivery_request - can use as reference'
     ELSE '⚠️ No item details available - manual intervention needed'
   END as can_create_material_items
 FROM purchase_orders po
@@ -85,18 +91,29 @@ ORDER BY po.created_at DESC;
 SELECT 
   'Action Required Summary' as check_type,
   COUNT(*) as total_orders_needing_material_items,
-  COUNT(*) FILTER (WHERE po.items_summary IS NOT NULL AND jsonb_array_length(po.items_summary) > 0) as orders_with_items_summary,
-  COUNT(*) FILTER (WHERE po.material_types IS NOT NULL) as orders_with_material_types,
-  COUNT(*) FILTER (WHERE dr.item_description IS NOT NULL) as orders_with_delivery_request_description,
   COUNT(*) FILTER (
-    WHERE (po.items_summary IS NOT NULL AND jsonb_array_length(po.items_summary) > 0)
-       OR po.material_types IS NOT NULL
+    WHERE po.items IS NOT NULL AND (
+      (jsonb_typeof(po.items) = 'array' AND jsonb_array_length(po.items) > 0) OR
+      jsonb_typeof(po.items) = 'object'
+    )
+  ) as orders_with_items_data,
+  COUNT(*) FILTER (WHERE dr.item_description IS NOT NULL) as orders_with_delivery_request_description,
+  COUNT(*) FILTER (WHERE dr.material_type IS NOT NULL) as orders_with_delivery_request_material_type,
+  COUNT(*) FILTER (
+    WHERE (po.items IS NOT NULL AND (
+      (jsonb_typeof(po.items) = 'array' AND jsonb_array_length(po.items) > 0) OR
+      jsonb_typeof(po.items) = 'object'
+    ))
        OR dr.item_description IS NOT NULL
+       OR dr.material_type IS NOT NULL
   ) as orders_with_available_data_for_creation,
   COUNT(*) FILTER (
-    WHERE (po.items_summary IS NULL OR jsonb_array_length(po.items_summary) = 0)
-      AND po.material_types IS NULL
+    WHERE (po.items IS NULL OR (
+      (jsonb_typeof(po.items) = 'array' AND jsonb_array_length(po.items) = 0) OR
+      jsonb_typeof(po.items) = 'null'
+    ))
       AND dr.item_description IS NULL
+      AND dr.material_type IS NULL
   ) as orders_needing_manual_creation
 FROM purchase_orders po
 INNER JOIN delivery_requests dr ON dr.purchase_order_id = po.id
