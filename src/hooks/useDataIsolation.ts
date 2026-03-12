@@ -526,11 +526,17 @@ export const useDeliveryProviderData = () => {
           .map((dr: any) => {
             const po = Array.isArray(dr.purchase_orders) ? dr.purchase_orders[0] : dr.purchase_orders;
             // Prefer real order numbers, but include all orders even if order_number is missing or temporary
-            const orderNumber = dr.order_number && isRealOrder(dr.order_number) 
-              ? dr.order_number 
-              : (po?.po_number && isRealOrder(po.po_number) 
-                ? po.po_number 
-                : (dr.order_number || po?.po_number || `PO-${dr.purchase_order_id?.slice(0, 8)?.toUpperCase() || 'UNKNOWN'}`));
+            // CRITICAL: Use ONLY purchase_orders.po_number (same as supplier dashboard)
+            // DO NOT use delivery_requests.order_number - it may be outdated/wrong
+            // DO NOT create fallback formats - if po_number is missing, order shouldn't appear
+            let orderNumber = null;
+            if (dr.purchase_order_id && po?.po_number && po.po_number.trim() !== '') {
+              orderNumber = po.po_number;
+            } else if (dr.purchase_order_id) {
+              // Try to get from poNumberMap if available
+              // (This will be populated later in the fetch process)
+              console.warn('⚠️ FAST PATH: Missing po_number for delivery_request', dr.id.slice(0, 8), '- will be fetched later');
+            }
             return {
               ...dr,
               order_number: orderNumber,
@@ -1242,52 +1248,45 @@ export const useDeliveryProviderData = () => {
       // Add delivery_requests
       if (activeData) {
         activeData.forEach((dr: any) => {
-          // Get order number - PRIORITY ORDER:
-          // 1. dr.order_number (stored directly in delivery_requests table)
-          // 2. po_number_from_join (from join query with purchase_orders)
-          // 3. poNumberMap (separately fetched)
-          // 4. Fallback (PO-xxxxxxxx) - ONLY as last resort
+          // CRITICAL: Use ONLY purchase_orders.po_number (same as supplier dashboard)
+          // Supplier dashboard uses purchase_orders.po_number directly - we must match this exactly
+          // DO NOT use delivery_requests.order_number (it may be outdated/wrong)
+          // DO NOT create fallback formats (PO-{id}) - if po_number is missing, the order shouldn't appear
           let orderNumber = null;
           
-          // Check if it's a real order number (not a fallback format like PO-12345678)
-          const isRealOrderNumber = (num: string | null) => {
-            if (!num || !num.trim()) return false;
-            // Fallback format is exactly "PO-" + 8 hex chars (uppercase)
-            // Real order numbers are longer or have different format (e.g., PO-1772776419681-YMFXN)
-            return !num.match(/^PO-[A-F0-9]{8}$/i);
-          };
-          
-          // 1. Check dr.order_number first (stored in delivery_requests table)
-          if (dr.order_number && isRealOrderNumber(dr.order_number)) {
-            orderNumber = dr.order_number;
-            console.log('✅ Using order_number from delivery_requests table for', dr.id.slice(0, 8), ':', orderNumber);
-          }
-          // 2. Check po_number_from_join (from join query)
-          else if (dr.po_number_from_join && isRealOrderNumber(dr.po_number_from_join)) {
-            orderNumber = dr.po_number_from_join;
-            console.log('✅ Using po_number from join query for delivery_request', dr.id.slice(0, 8), ':', orderNumber);
-          }
-          // 3. Check poNumberMap (separately fetched)
-          else if (dr.purchase_order_id) {
+          if (dr.purchase_order_id) {
+            // Priority 1: poNumberMap (from purchase_orders query - most reliable)
             const mapNumber = poNumberMap.get(dr.purchase_order_id);
-            if (mapNumber && isRealOrderNumber(mapNumber)) {
+            if (mapNumber && mapNumber.trim() !== '') {
               orderNumber = mapNumber;
-              console.log('✅ Using po_number from map for delivery_request', dr.id.slice(0, 8), ':', orderNumber);
-            } else {
-              // 4. Last resort: generate fallback
-              orderNumber = `PO-${dr.purchase_order_id.slice(0, 8).toUpperCase()}`;
-              console.warn('⚠️ No real po_number found for delivery_request', dr.id.slice(0, 8), 'purchase_order_id:', dr.purchase_order_id?.slice(0, 8), '- using fallback:', orderNumber);
+              console.log('✅ Using po_number from purchase_orders for delivery_request', dr.id.slice(0, 8), ':', orderNumber);
             }
+            // Priority 2: po_number_from_join (from join query with purchase_orders)
+            else if (dr.po_number_from_join && dr.po_number_from_join.trim() !== '') {
+              orderNumber = dr.po_number_from_join;
+              console.log('✅ Using po_number from join query for delivery_request', dr.id.slice(0, 8), ':', orderNumber);
+            }
+            // If po_number is missing, log warning but don't create fallback - this order shouldn't appear
+            else {
+              console.warn('⚠️ Missing po_number for delivery_request', dr.id.slice(0, 8), 'purchase_order_id:', dr.purchase_order_id?.slice(0, 8), '- order will be excluded (matching supplier dashboard behavior)');
+            }
+          } else {
+            console.warn('⚠️ Delivery request', dr.id.slice(0, 8), 'has no purchase_order_id - cannot get po_number');
           }
           
-          allActiveDeliveries.push({
-            ...dr,
-            source: 'delivery_requests',
-            purchase_order_id: dr.purchase_order_id || null,
-            order_number: orderNumber,
-            po_status: null, // Will be populated when purchase_orders are merged
-            purchase_order_status: null // Alias for po_status
-          });
+          // Only include orders with valid po_number from purchase_orders (matching supplier dashboard)
+          if (orderNumber && orderNumber.trim() !== '') {
+            allActiveDeliveries.push({
+              ...dr,
+              source: 'delivery_requests',
+              purchase_order_id: dr.purchase_order_id || null,
+              order_number: orderNumber,
+              po_status: null, // Will be populated when purchase_orders are merged
+              purchase_order_status: null // Alias for po_status
+            });
+          } else {
+            console.warn('⚠️ Excluding delivery_request', dr.id.slice(0, 8), '- no valid po_number from purchase_orders (matching supplier dashboard behavior)');
+          }
         });
         const withRealNumbers = allActiveDeliveries.filter((d: any) => d.order_number && (!d.order_number.startsWith('PO-') || (d.order_number.startsWith('PO-') && d.order_number.length > 11))).length;
         console.log('✅ Processed', activeData.length, 'delivery_requests,', allActiveDeliveries.filter((d: any) => d.order_number).length, 'with order_number,', withRealNumbers, 'with real po_number (not fallback)');
@@ -1303,14 +1302,13 @@ export const useDeliveryProviderData = () => {
           // Check if this purchase_order already exists in delivery_requests
           const existing = allActiveDeliveries.find(d => d.purchase_order_id === po.id);
           if (existing) {
-            // Update existing entry with order_number if missing (use actual po_number, not fallback)
+            // Update existing entry with po_number from purchase_orders (same as supplier dashboard)
             if (!existing.order_number && po.po_number && po.po_number.trim() !== '') {
               existing.order_number = po.po_number;
-              console.log('✅ Updated existing entry with po_number:', po.po_number);
+              console.log('✅ Updated existing entry with po_number from purchase_orders:', po.po_number);
             } else if (!existing.order_number) {
-              // Only use fallback if po_number is truly missing
-              existing.order_number = `PO-${po.id.slice(0, 8).toUpperCase()}`;
-              console.warn('⚠️ Using fallback order number for purchase_order:', po.id.slice(0, 8));
+              // DO NOT create fallback - if po_number is missing, log warning
+              console.warn('⚠️ purchase_order', po.id.slice(0, 8), 'has no po_number - order will be excluded (matching supplier dashboard behavior)');
             }
             
             // CRITICAL: Store purchase_order status for categorization
