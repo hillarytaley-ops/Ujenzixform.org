@@ -364,16 +364,11 @@ const DeliveryDashboard = () => {
       };
       
       // Run validation asynchronously
+      // Note: validateOrders() will call setActiveDeliveries() when complete
       validateOrders();
-      console.log('🚚 Active deliveries loaded:', formattedActive.length, 'Statuses:', formattedActive.map(d => d.status));
       
-      // Log order numbers for debugging
-      const withOrderNumbers = formattedActive.filter(d => d.order_number).length;
-      const orderNumbers = formattedActive.filter(d => d.order_number).map(d => ({ id: d.id.slice(0, 8), order_number: d.order_number }));
-      console.log('📋 Order numbers in active deliveries:', withOrderNumbers, 'out of', formattedActive.length);
-      if (orderNumbers.length > 0) {
-        console.log('📋 Sample order numbers:', orderNumbers.slice(0, 3));
-      }
+      // Log initial count (validation will update state asynchronously)
+      console.log('🚚 Processing', isolatedActiveDeliveries.length, 'active deliveries for validation');
     } else {
       // Ensure empty array if no data
       setActiveDeliveries([]);
