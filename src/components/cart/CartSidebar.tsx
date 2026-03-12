@@ -16,7 +16,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetFooter } from '@/components/ui/sheet';
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetFooter } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -662,6 +662,7 @@ export const CartSidebar: React.FC = () => {
     <Sheet open={isCartOpen} onOpenChange={setIsCartOpen}>
       <SheetContent className="w-full sm:max-w-lg flex flex-col">
         <SheetHeader className="space-y-2 pb-4 border-b">
+          <SheetDescription className="sr-only">View and manage cart items, request quotes or buy now</SheetDescription>
           <div className="flex items-center justify-between">
             <SheetTitle className="flex items-center gap-2">
               <ShoppingCart className="h-5 w-5 text-green-600" />
