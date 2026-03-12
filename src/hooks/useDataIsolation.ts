@@ -1530,20 +1530,78 @@ export const useDeliveryProviderData = () => {
               const existingOrderIds = new Set(existingOrders.map((po: any) => po.id));
               const existingOrderNumbers = new Set(existingOrders.map((po: any) => po.po_number).filter(Boolean));
               
+              // Additional validation: Check material_items scan status
+              // Only show orders that are in "Awaiting Dispatch" (all items have dispatch_scanned = FALSE)
+              // This enforces the rule: delivery providers can only accept orders from Awaiting Dispatch
+              let materialItemsData: any[] = [];
+              
+              if (poIdsToCheck.length > 0) {
+                try {
+                  const materialItemsResponse = await fetch(
+                    `${SUPABASE_URL}/rest/v1/material_items?purchase_order_id=in.(${poIdsToCheck.join(',')})&select=purchase_order_id,dispatch_scanned,receive_scanned&limit=1000`,
+                    {
+                      headers: {
+                        'apikey': SUPABASE_ANON_KEY,
+                        'Authorization': `Bearer ${accessToken}`,
+                        'Content-Type': 'application/json'
+                      },
+                      cache: 'no-store'
+                    }
+                  );
+                  
+                  if (materialItemsResponse.ok) {
+                    materialItemsData = await materialItemsResponse.json();
+                  }
+                } catch (e) {
+                  console.warn('⚠️ Could not fetch material_items for validation:', e);
+                }
+              }
+              
+              // Group material_items by purchase_order_id
+              const itemsByOrder: Record<string, any[]> = {};
+              materialItemsData.forEach((item: any) => {
+                if (item.purchase_order_id) {
+                  if (!itemsByOrder[item.purchase_order_id]) {
+                    itemsByOrder[item.purchase_order_id] = [];
+                  }
+                  itemsByOrder[item.purchase_order_id].push(item);
+                }
+              });
+              
               // Filter to only include deliveries where the purchase_order actually exists
+              // AND where all material_items have dispatch_scanned = FALSE (Awaiting Dispatch)
               for (const item of filteredRealDeliveries) {
                 const hasValidPO = item.purchase_order_id && existingOrderIds.has(item.purchase_order_id);
                 const hasValidOrderNumber = item.order_number && existingOrderNumbers.has(item.order_number);
                 
-                if (hasValidPO || hasValidOrderNumber) {
-                  validatedDeliveries.push(item);
-                } else {
+                if (!hasValidPO && !hasValidOrderNumber) {
                   console.warn('🚫 Removing order that does not exist:', {
                     order_number: item.order_number,
                     purchase_order_id: item.purchase_order_id?.substring(0, 8),
                     reason: 'Order not found in purchase_orders table'
                   });
+                  continue;
                 }
+                
+                // Check if order is in "Awaiting Dispatch" status
+                // (all material_items must have dispatch_scanned = FALSE)
+                if (item.purchase_order_id && itemsByOrder[item.purchase_order_id]) {
+                  const items = itemsByOrder[item.purchase_order_id];
+                  const allItemsNotDispatched = items.every((item: any) => item.dispatch_scanned === false);
+                  
+                  if (!allItemsNotDispatched) {
+                    console.warn('🚫 Removing order not in Awaiting Dispatch:', {
+                      order_number: item.order_number,
+                      purchase_order_id: item.purchase_order_id?.substring(0, 8),
+                      reason: 'Order has dispatched items - not in Awaiting Dispatch status',
+                      dispatched_count: items.filter((i: any) => i.dispatch_scanned === true).length,
+                      total_items: items.length
+                    });
+                    continue;
+                  }
+                }
+                
+                validatedDeliveries.push(item);
               }
               
               console.log('✅ VALIDATION: Removed', filteredRealDeliveries.length - validatedDeliveries.length, 'non-existent orders. Showing', validatedDeliveries.length, 'valid orders');
