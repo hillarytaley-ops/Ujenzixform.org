@@ -721,6 +721,7 @@ const DeliveryDashboard = () => {
         
         const uniqueCount = uniquePOIds.size + nullPORequests.size;
         setNotificationCount(uniqueCount);
+        setPendingNotificationCount(uniqueCount);
       }
     } catch (error) {
       console.error('Error loading notification counts:', error);
