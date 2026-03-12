@@ -1556,9 +1556,9 @@ const DeliveryDashboard = () => {
                             <h3 className={`text-lg font-semibold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
                               📅 Scheduled Orders ({scheduled.length})
                             </h3>
-                            {(useLegacyFallback ? deliveryCategories.scheduled.length : unifiedScheduled.length) > 0 && (
+                            {scheduled.length > 0 && (
                               <Badge className="ml-1 bg-blue-500 text-white text-xs">
-                                {useLegacyFallback ? deliveryCategories.scheduled.length : unifiedScheduled.length}
+                                {scheduled.length}
                               </Badge>
                             )}
                           </div>
