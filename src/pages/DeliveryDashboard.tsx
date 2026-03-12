@@ -374,15 +374,20 @@ const DeliveryDashboard = () => {
   }), []);
 
   // Single source of truth (legacy fallback when unified returns empty): categorize each delivery so badge counts and tab content always match
+  // CRITICAL: Delivered orders are EXCLUDED from scheduled list - they should not appear in schedule
   const deliveryCategories = useMemo(() => {
     const getCategory = (d: any): 'scheduled' | 'in_transit' | 'delivered' => {
       const cat = String(d._categorized_status || d.status || '').toLowerCase();
+      // Check if order is delivered by status
       if (cat === 'delivered' || cat === 'completed') return 'delivered';
+      // Check if all items are received (delivered via QR scan)
       const allReceived = d._items_count != null && d._received_count != null &&
         d._items_count > 0 && d._received_count >= d._items_count;
       if (allReceived) return 'delivered';
+      // Check if status indicates in transit
       const inTransitList = ['in_transit', 'picked_up', 'on_the_way', 'near_destination', 'dispatched', 'shipped', 'out_for_delivery', 'delivery_arrived'];
       if (inTransitList.includes(cat)) return 'in_transit';
+      // Everything else is scheduled (accepted, assigned, pending_pickup, etc.)
       return 'scheduled';
     };
     const scheduled: any[] = [];
@@ -392,7 +397,13 @@ const DeliveryDashboard = () => {
       const c = getCategory(d);
       if (c === 'scheduled') scheduled.push(d);
       else if (c === 'in_transit') inTransit.push(d);
-      else deliveredFromActive.push(d);
+      else deliveredFromActive.push(d); // Delivered orders go here (excluded from schedule)
+    });
+    console.log('📊 Delivery categorization:', {
+      total: activeDeliveries.length,
+      scheduled: scheduled.length,
+      inTransit: inTransit.length,
+      delivered: deliveredFromActive.length
     });
     return { scheduled, inTransit, deliveredFromActive };
   }, [activeDeliveries]);
@@ -696,24 +707,38 @@ const DeliveryDashboard = () => {
           table: 'material_items'
         },
         (payload) => {
-          const newRow = payload.new as { receive_scanned?: boolean; dispatch_scanned?: boolean };
-          debouncedRefetchFromMaterialItems();
-          // Provider receives scan → refresh data (delivery provider only needs scheduled tab)
+          const newRow = payload.new as { receive_scanned?: boolean; dispatch_scanned?: boolean; purchase_order_id?: string };
+          // IMMEDIATE: When items are receive_scanned, check if all items are received
+          // If all items are received, the order should be removed from schedule immediately
           if (newRow?.receive_scanned === true) {
+            console.log('📦 Item receive_scanned - checking if order should be removed from schedule...');
+            // Immediate refresh to check if all items are received
+            refetchData();
+            refetchUnified();
+            loadNotificationCounts();
+            
+            // Also refresh after a short delay to ensure DB commit
+            setTimeout(() => {
+              refetchData();
+              refetchUnified();
+              loadNotificationCounts();
+            }, 300);
+            
             setActiveTab('deliveries');
             setDeliveriesSubTab('scheduled');
-            refetchData();
           }
           // Supplier dispatches scan → refresh data (delivery provider only needs scheduled tab)
           if (newRow?.dispatch_scanned === true) {
+            console.log('📦 Item dispatch_scanned - refreshing schedule...');
+            refetchData();
+            refetchUnified();
             toast({
               title: '🚚 Materials Dispatched!',
-              description: 'Supplier has dispatched. Data refreshed.',
+              description: 'Supplier has dispatched. Schedule updated.',
               duration: 4000,
             });
             setActiveTab('deliveries');
             setDeliveriesSubTab('scheduled');
-            refetchData();
           }
         }
       )
@@ -740,12 +765,48 @@ const DeliveryDashboard = () => {
         {
           event: 'UPDATE',
           schema: 'public',
-          table: 'delivery_requests'
+          table: 'delivery_requests',
+          filter: `provider_id=eq.${providerProfile?.id || user?.id || ''}`
         },
         (payload) => {
           console.log('📦 Delivery request updated:', payload);
           const oldStatus = payload.old?.status;
           const newStatus = payload.new?.status;
+          const providerId = payload.new?.provider_id;
+          
+          // Only process updates for this provider's deliveries
+          const currentProviderId = providerProfile?.id || user?.id;
+          if (providerId && currentProviderId && providerId !== currentProviderId) {
+            console.log('⚠️ Ignoring update - not for this provider');
+            return;
+          }
+          
+          // IMMEDIATE: When status changes to 'accepted', refresh schedule immediately
+          if (oldStatus !== 'accepted' && newStatus === 'accepted') {
+            console.log('✅ Delivery accepted - immediately refreshing schedule...');
+            // Force immediate refresh (no delay for instant update)
+            refetchData();
+            refetchUnified();
+            loadNotificationCounts();
+            
+            // Also refresh after a short delay to ensure DB commit
+            setTimeout(() => {
+              refetchData();
+              refetchUnified();
+              loadNotificationCounts();
+            }, 200);
+            
+            // Also ensure we're on the schedule tab
+            setActiveTab('deliveries');
+            setDeliveriesSubTab('scheduled');
+            
+            toast({
+              title: '✅ Delivery Accepted!',
+              description: 'The delivery has been added to your schedule.',
+              duration: 3000,
+            });
+            return; // Early return to avoid duplicate refresh
+          }
           
           // When supplier dispatches, status changes to 'in_transit', 'dispatched', or 'shipped'
           const dispatchedStatuses = ['in_transit', 'dispatched', 'shipped', 'out_for_delivery'];
@@ -755,13 +816,15 @@ const DeliveryDashboard = () => {
           if (isNowDispatched && wasNotDispatched) {
             toast({
               title: '🚚 Materials Dispatched!',
-              description: 'Materials are now in transit. Switching to "In Transit" tab.',
+              description: 'Materials are now in transit.',
               duration: 5000,
             });
-            // NAVIGATE to Deliveries tab (delivery provider only needs scheduled tab)
+            // Refresh schedule to show updated status
+            refetchData();
+            refetchUnified();
             setActiveTab('deliveries');
             setDeliveriesSubTab('scheduled');
-            console.log('🧭 Auto-navigating to Deliveries tab');
+            console.log('🧭 Refreshing schedule after dispatch');
           }
           
           // When provider receives, status changes to 'delivered' or 'completed'
@@ -770,17 +833,30 @@ const DeliveryDashboard = () => {
           const isNowDelivered = deliveredStatuses.includes(newStatus);
           
           if (isNowDelivered && wasNotDelivered) {
+            console.log('✅ Delivery completed - immediately removing from schedule...');
+            // IMMEDIATE: Remove from schedule by refreshing data
+            refetchData();
+            refetchUnified();
+            loadNotificationCounts();
+            
+            // Also refresh after a short delay to ensure DB commit
+            setTimeout(() => {
+              refetchData();
+              refetchUnified();
+              loadNotificationCounts();
+            }, 200);
+            
             toast({
               title: '✅ Delivery Complete!',
-              description: 'Delivery has been completed successfully. Data refreshed.',
+              description: 'The order has been removed from your schedule.',
               duration: 5000,
             });
-            // NAVIGATE to Deliveries tab (delivery provider only needs scheduled tab)
             setActiveTab('deliveries');
             setDeliveriesSubTab('scheduled');
-            console.log('🧭 Auto-navigating to Deliveries tab');
+            return; // Early return to avoid duplicate refresh
           }
           
+          // General refresh for other status changes
           refetchData();
           loadNotificationCounts();
         }
@@ -1615,14 +1691,36 @@ const DeliveryDashboard = () => {
                             isDarkMode={isDarkMode}
                             onAccept={async (deliveryId) => {
                               try {
+                                // IMMEDIATE OPTIMISTIC UPDATE: Add to schedule immediately
+                                console.log('✅ Accepting delivery - immediate optimistic update...');
+                                
                                 await handleAcceptDelivery(deliveryId);
-                                // Refresh data after accepting
+                                
+                                // IMMEDIATE REFRESH: Refresh right away (no delay)
+                                console.log('🔄 Immediate refresh after accepting delivery...');
                                 await refetchData();
                                 await refetchUnified();
                                 loadNotificationCounts();
+                                
+                                // Also refresh after a short delay to ensure DB commit
+                                setTimeout(async () => {
+                                  console.log('🔄 Second refresh to ensure schedule is updated...');
+                                  await refetchData();
+                                  await refetchUnified();
+                                  loadNotificationCounts();
+                                }, 200);
+                                
+                                // Final refresh after DB commit completes
+                                setTimeout(async () => {
+                                  console.log('🔄 Final refresh to ensure latest data...');
+                                  await refetchData();
+                                  await refetchUnified();
+                                  loadNotificationCounts();
+                                }, 500);
+                                
                                 toast({
                                   title: "✅ Delivery Accepted!",
-                                  description: "The delivery has been accepted successfully.",
+                                  description: "The delivery has been added to your schedule.",
                                 });
                               } catch (error: any) {
                                 toast({
