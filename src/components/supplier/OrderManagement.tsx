@@ -154,11 +154,9 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, is
     });
   };
 
-  // Fresh load function (runs in background after prefetch display)
+  // Fresh load with enrichment (delivery_requests). Runs after prefetch so provider-assigned status shows.
   const loadOrdersFresh = async (SUPABASE_URL: string, SUPABASE_ANON_KEY: string) => {
-    console.log('🔄 OrderManagement: Loading fresh orders in background...');
-    // Continue with the rest of the original loadOrders logic...
-    // This is called after prefetched data is displayed
+    loadOrders(true);
   };
 
   useEffect(() => {
@@ -532,13 +530,13 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, is
   // Polling disabled - Real-time subscriptions handle delivery provider updates
   // Polling was causing continuous loading state issues
 
-  const loadOrders = async () => {
+  const loadOrders = async (forceFullLoad = false) => {
     // Use native fetch API (same as dashboard) for reliability
     const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
     const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
     
     try {
-      setLoading(true);
+      if (!forceFullLoad) setLoading(true);
       console.log('🔍 OrderManagement: Loading orders... supplierId prop:', supplierId);
       
       // Get auth token and user ID from localStorage first
@@ -560,15 +558,15 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, is
         userId = localStorage.getItem('user_id') || '';
       }
       
-      // Try to use prefetched data first (instant load)
-      const prefetchedOrders = getPrefetchedOrders(userId, 'supplier');
+      // Try to use prefetched data first (instant load) unless we're doing a full refresh (enriched from delivery_requests)
+      const prefetchedOrders = !forceFullLoad ? getPrefetchedOrders(userId, 'supplier') : null;
       if (prefetchedOrders && prefetchedOrders.length > 0) {
         console.log('⚡ OrderManagement: Using prefetched orders:', prefetchedOrders.length);
         // Quick transform and display prefetched data immediately
         const quickOrders = transformOrdersQuick(prefetchedOrders);
         setOrders(quickOrders);
         setLoading(false);
-        // Continue to fetch fresh data in background
+        // Fetch full data with delivery_requests enrichment so "Delivery assigned" shows
         loadOrdersFresh(SUPABASE_URL, SUPABASE_ANON_KEY);
         return;
       }
@@ -1258,7 +1256,7 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, is
               <SelectItem value="quote_request">📋 Quote</SelectItem>
             </SelectContent>
           </Select>
-          <Button variant="outline" size="sm" onClick={loadOrders}>
+          <Button variant="outline" size="sm" onClick={() => loadOrders(true)}>
             <RefreshCw className="h-4 w-4 mr-1" />
             Refresh
           </Button>
