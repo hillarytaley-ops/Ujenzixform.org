@@ -338,20 +338,36 @@ export const CartSidebar: React.FC = () => {
         }
 
         try {
-          const { error: insertError } = await supabase
-            .from('purchase_orders')
-            .insert(quotePayload)
-            .select('id')
-            .single();
-
-          if (!insertError) {
+          const res = await fetchWithTimeout(
+            `${SUPABASE_URL}/rest/v1/purchase_orders`,
+            {
+              method: 'POST',
+              headers: {
+                apikey: SUPABASE_ANON_KEY,
+                Authorization: `Bearer ${accessToken}`,
+                'Content-Type': 'application/json',
+                Prefer: 'return=representation',
+              },
+              body: JSON.stringify(quotePayload),
+            },
+            15000
+          );
+          const body = await res.text();
+          if (res.ok) {
             successCount++;
             if (!supplierNames.includes(supplierName)) {
               supplierNames.push(supplierName);
             }
           } else {
-            lastInsertError = insertError.message || (insertError.details ? JSON.stringify(insertError.details) : null);
-            console.error('Quote request error:', insertError.message, insertError.details);
+            let errMsg = `Server ${res.status}`;
+            try {
+              const parsed = JSON.parse(body);
+              errMsg = parsed.message || parsed.error_description || parsed.details || errMsg;
+            } catch {
+              if (body) errMsg = body.slice(0, 200);
+            }
+            lastInsertError = errMsg;
+            console.error('Quote request error:', res.status, body);
           }
         } catch (e) {
           lastInsertError = e instanceof Error ? e.message : String(e);
