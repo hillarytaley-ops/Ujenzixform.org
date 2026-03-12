@@ -23,7 +23,7 @@ AS $fn$
 DECLARE
   v_provider_id UUID;
   v_result JSONB := '[]'::JSONB;
-  v_row JSONB;
+  v_row RECORD;
 BEGIN
   -- Get provider ID
   SELECT id INTO v_provider_id 
