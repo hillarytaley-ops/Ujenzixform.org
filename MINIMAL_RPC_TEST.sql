@@ -31,37 +31,37 @@ BEGIN
   END IF;
 
   -- MINIMAL: Just return delivery_requests, no joins, no material_items
-  SELECT jsonb_agg(
-    jsonb_build_object(
-      'id', dr.id,
-      'purchase_order_id', dr.purchase_order_id,
-      'order_number', COALESCE(dr.order_number, 'DR-' || SUBSTRING(dr.id::text, 1, 8)),
-      'status', dr.status,
-      'po_status', dr.status,
-      'purchase_order_status', dr.status,
-      'created_at', dr.created_at,
-      'updated_at', dr.updated_at,
-      'delivery_address', dr.delivery_address,
-      'pickup_location', dr.pickup_location,
-      'dropoff_location', dr.dropoff_location,
-      'delivery_provider_id', dr.provider_id,
-      'provider_id', dr.provider_id,
-      '_items_count', 0,
-      '_dispatched_count', 0,
-      '_received_count', 0,
-      '_categorized_status', CASE 
+  SELECT jsonb_agg(row_to_json(dr_data)::jsonb) INTO v_result
+  FROM (
+    SELECT
+      dr.id,
+      dr.purchase_order_id,
+      COALESCE(dr.order_number, 'DR-' || SUBSTRING(dr.id::text, 1, 8)) AS order_number,
+      dr.status,
+      dr.status AS po_status,
+      dr.status AS purchase_order_status,
+      dr.created_at,
+      dr.updated_at,
+      dr.delivery_address,
+      dr.pickup_location,
+      dr.dropoff_location,
+      dr.provider_id AS delivery_provider_id,
+      dr.provider_id,
+      0 AS _items_count,
+      0 AS _dispatched_count,
+      0 AS _received_count,
+      CASE 
         WHEN dr.status IN ('delivered', 'completed') THEN 'delivered'
         WHEN dr.status IN ('dispatched', 'shipped', 'in_transit') THEN 'in_transit'
         ELSE 'scheduled'
-      END,
-      'source', 'unified'
-    )
+      END AS _categorized_status,
+      'unified' AS source
+    FROM delivery_requests dr
+    WHERE dr.provider_id = v_provider_id
+      AND dr.status != 'cancelled'
     ORDER BY dr.updated_at DESC NULLS LAST
-  ) INTO v_result
-  FROM delivery_requests dr
-  WHERE dr.provider_id = v_provider_id
-    AND dr.status != 'cancelled'
-  LIMIT 250;
+    LIMIT 250
+  ) dr_data;
 
   RETURN COALESCE(v_result, '[]'::JSONB);
 END;
