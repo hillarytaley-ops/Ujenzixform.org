@@ -453,6 +453,7 @@ const DeliveryDashboard = () => {
               });
               
               console.log('✅ VALIDATION: Removed', isolatedActiveDeliveries.length - validDeliveries.length, 'non-existent orders');
+              console.log('✅ VALIDATION: Valid orders count:', validDeliveries.length);
               setActiveDeliveries(validDeliveries.map((d: any) => formatDelivery(d)));
               return;
             }
