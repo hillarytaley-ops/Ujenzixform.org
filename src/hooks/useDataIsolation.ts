@@ -520,20 +520,25 @@ export const useDeliveryProviderData = () => {
           return !/^PO-[A-F0-9]{8}$/i.test(orderNum);
         };
         
-        // Process and filter to only show real orders
+        // Process ALL orders assigned to provider (don't filter by order_number - match supplier dashboard logic)
+        // Supplier dashboard shows all orders based on material_items scan status, not order_number format
         const quickDeliveries = fastData
           .map((dr: any) => {
             const po = Array.isArray(dr.purchase_orders) ? dr.purchase_orders[0] : dr.purchase_orders;
+            // Prefer real order numbers, but include all orders even if order_number is missing or temporary
             const orderNumber = dr.order_number && isRealOrder(dr.order_number) 
               ? dr.order_number 
-              : (po?.po_number && isRealOrder(po.po_number) ? po.po_number : null);
+              : (po?.po_number && isRealOrder(po.po_number) 
+                ? po.po_number 
+                : (dr.order_number || po?.po_number || `PO-${dr.purchase_order_id?.slice(0, 8)?.toUpperCase() || 'UNKNOWN'}`));
             return {
               ...dr,
               order_number: orderNumber,
               source: 'delivery_requests'
             };
-          })
-          .filter((d: any) => isRealOrder(d.order_number));
+          });
+          // REMOVED: .filter((d: any) => isRealOrder(d.order_number)) - This was removing 41 orders!
+          // All orders assigned to provider should appear, matching supplier dashboard behavior
         
         if (quickDeliveries.length > 0) {
           console.log('⚡ FAST PATH: Found', quickDeliveries.length, 'accepted orders with real order numbers');
@@ -1082,22 +1087,24 @@ export const useDeliveryProviderData = () => {
           source: 'delivery_requests'
         }));
         
-        // FILTER OUT fake orders - only show those with real order numbers
-        const realDeliveries = mappedDeliveries.filter((d: any) => isRealOrder(d.order_number));
+        // Include ALL orders assigned to provider (don't filter by order_number - match supplier dashboard)
+        // Supplier dashboard shows all orders based on material_items scan status, not order_number format
+        // REMOVED: Filter that was removing 41 orders without "real" order numbers
+        const allDeliveries = mappedDeliveries; // Include all, not just those with "real" order numbers
         
-        console.log('📦 Setting ONLY REAL deliveries:', realDeliveries.length, 'out of', activeData.length, 'total');
-        console.log('🚨 Filtered out', activeData.length - realDeliveries.length, 'fake orders');
+        console.log('📦 Setting ALL deliveries assigned to provider:', allDeliveries.length, 'out of', activeData.length, 'total');
+        console.log('✅ Including all orders (matching supplier dashboard logic)');
         // Don't overwrite with empty if we already have data (REST returns 0 when provider lookup fails)
-        if (realDeliveries.length === 0 && fastPathCountRef.current > 0) {
+        if (allDeliveries.length === 0 && fastPathCountRef.current > 0) {
           console.log('📦 REST fallback: Keeping', fastPathCountRef.current, 'deliveries (avoid overwrite with empty)');
         } else {
-          console.log('📋 Sample real deliveries:', realDeliveries.slice(0, 3).map((d: any) => ({
+          console.log('📋 Sample deliveries:', allDeliveries.slice(0, 3).map((d: any) => ({
             id: d.id?.substring(0, 8),
             status: d.status,
             order_number: d.order_number
           })));
-          setActiveDeliveries(realDeliveries);
-          fastPathCountRef.current = realDeliveries.length;
+          setActiveDeliveries(allDeliveries);
+          fastPathCountRef.current = allDeliveries.length;
         }
         setLoading(false); // Clear loading state so UI updates immediately
         clearTimeout(safetyTimeout); // Clear safety timeout since we've set the data
