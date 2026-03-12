@@ -730,22 +730,29 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
     // Sort by timestamp (most recent first)
     result.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
 
-    // Second pass: collapse duplicates that look like the same request (same pickup + same placeholder delivery e.g. "To be provided")
+    // Second pass: collapse duplicates that look like the same request
+    // - Same pickup + same placeholder delivery, OR
+    // - Both have placeholder delivery ("To be provided") and within same 30-min window (handles one card with no pickup, one with full details)
     const norm = (s: string | undefined) => (s || '').toLowerCase().trim();
     const isPlaceholderDelivery = (s: string | undefined) =>
       !norm(s) || norm(s).includes('to be provided') || norm(s) === 'provided';
+    const PLACEHOLDER_WINDOW_MS = 30 * 60 * 1000; // 30 min
     const contentKey = (n: Notification) =>
       `${norm(n.pickupAddress)}|${norm(n.deliveryAddress)}|${norm(n.materialType)}`;
+    const placeholderTimeKey = (n: Notification) =>
+      `placeholder_${Math.floor(n.timestamp.getTime() / PLACEHOLDER_WINDOW_MS)}`;
     const collapsed: Notification[] = [];
     const seenContent = new Map<string, Notification>();
+    const seenPlaceholderByTime = new Map<string, Notification>();
     result.forEach((n) => {
       const key = contentKey(n);
       const existing = seenContent.get(key);
       const bothPlaceholder =
         isPlaceholderDelivery(n.deliveryAddress) &&
         (!existing || isPlaceholderDelivery(existing.deliveryAddress));
+
+      // Collapse when same content key and both placeholder
       if (existing && bothPlaceholder && key !== '||') {
-        // Same logical request: keep one. Prefer the one with delivery_request_id so Accept works.
         const keep = n.delivery_request_id && !existing.delivery_request_id
           ? n
           : existing.delivery_request_id && !n.delivery_request_id
@@ -759,6 +766,31 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
         }
         return;
       }
+
+      // Collapse when both have placeholder delivery and same 30-min window (catches one card with empty pickup, one with "Nairobi, Kenya")
+      if (isPlaceholderDelivery(n.deliveryAddress)) {
+        const timeKey = placeholderTimeKey(n);
+        const existingInWindow = seenPlaceholderByTime.get(timeKey);
+        if (existingInWindow && existingInWindow.id !== n.id) {
+          // Keep the one with delivery_request_id so Accept works
+          const keep = n.delivery_request_id && !existingInWindow.delivery_request_id
+            ? n
+            : existingInWindow.delivery_request_id && !n.delivery_request_id
+              ? existingInWindow
+              : existingInWindow;
+          if (keep === n) {
+            const idx = collapsed.indexOf(existingInWindow);
+            if (idx >= 0) collapsed.splice(idx, 1);
+            seenPlaceholderByTime.set(timeKey, n);
+            collapsed.push(n);
+          }
+          return;
+        }
+        if (!existingInWindow) {
+          seenPlaceholderByTime.set(timeKey, n);
+        }
+      }
+
       if (!existing) {
         seenContent.set(key, n);
         collapsed.push(n);
