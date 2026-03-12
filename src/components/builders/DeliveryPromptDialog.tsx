@@ -632,6 +632,7 @@ export const DeliveryPromptDialog: React.FC<DeliveryPromptDialogProps> = ({
                 <MapPinned className="h-4 w-4 text-blue-600" />
                 Delivery Location
               </DialogTitle>
+              <DialogDescription className="sr-only">Enter delivery address and preferences</DialogDescription>
             </DialogHeader>
 
             <div className="py-2 space-y-3 max-h-[55vh] overflow-y-auto">
@@ -846,6 +847,8 @@ export const DeliveryPromptDialog: React.FC<DeliveryPromptDialogProps> = ({
         )}
 
         {step === 'success' && (
+          <>
+            <DialogDescription className="sr-only">Delivery request submitted successfully</DialogDescription>
           <div className="py-8 text-center">
             <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
               <CheckCircle className="h-8 w-8 text-green-600" />
@@ -860,6 +863,7 @@ export const DeliveryPromptDialog: React.FC<DeliveryPromptDialogProps> = ({
               First-come-first-served matching active
             </Badge>
           </div>
+          </>
         )}
       </DialogContent>
     </Dialog>

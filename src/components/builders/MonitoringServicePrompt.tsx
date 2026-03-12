@@ -953,6 +953,7 @@ export const MonitoringServicePrompt: React.FC<MonitoringServicePromptProps> = (
                 <CheckCircle className="h-6 w-6" />
                 Request Submitted!
               </DialogTitle>
+              <DialogDescription className="sr-only">Monitoring service request submitted successfully</DialogDescription>
             </DialogHeader>
 
             <div className="py-8 text-center space-y-4">

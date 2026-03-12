@@ -366,6 +366,9 @@ export const CartSidebar: React.FC = () => {
             } catch {
               if (body) errMsg = body.slice(0, 200);
             }
+            if (res.status === 500) {
+              errMsg += '. Run supabase/RUN_THIS_IN_SUPABASE_TO_FIX_500.sql in Supabase SQL Editor if you haven’t.';
+            }
             lastInsertError = errMsg;
             console.error('Quote request error:', res.status, body);
           }
