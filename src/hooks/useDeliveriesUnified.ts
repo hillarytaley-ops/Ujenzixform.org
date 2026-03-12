@@ -95,17 +95,30 @@ export function useDeliveriesUnified(): UseDeliveriesUnifiedResult {
       console.log('🔵 Calling unified RPC function...', { userId });
       const startTime = Date.now();
       
-      // Add timeout to RPC call (30 seconds)
+      // Shorter timeout (15 seconds) to fail faster
       let timeoutId: NodeJS.Timeout | null = null;
       const timeoutPromise = new Promise<never>((_, reject) => {
         timeoutId = setTimeout(() => {
-          console.error('⏱️ RPC timeout triggered after 30 seconds');
-          reject(new Error('RPC call timed out after 30 seconds'));
-        }, 30000);
+          console.error('⏱️ RPC timeout triggered after 15 seconds');
+          reject(new Error('RPC call timed out after 15 seconds'));
+        }, 15000);
       });
       
       console.log('🔵 Starting RPC promise...');
-      const rpcPromise = supabase.rpc('get_deliveries_for_provider_unified');
+      const rpcPromise = supabase.rpc('get_deliveries_for_provider_unified').then(
+        (response) => {
+          console.log('🔵 RPC promise resolved:', {
+            hasData: !!response?.data,
+            hasError: !!response?.error,
+            dataLength: Array.isArray(response?.data) ? response.data.length : 'not-array'
+          });
+          return response;
+        },
+        (error) => {
+          console.error('🔵 RPC promise rejected:', error);
+          throw error;
+        }
+      );
       console.log('🔵 RPC promise created, racing with timeout...');
       
       let result: any;
@@ -114,14 +127,16 @@ export function useDeliveriesUnified(): UseDeliveriesUnifiedResult {
         console.log('🔵 Promise.race completed:', {
           hasResult: !!result,
           resultKeys: result ? Object.keys(result) : [],
-          resultType: typeof result
+          resultType: typeof result,
+          duration: `${Date.now() - startTime}ms`
         });
       } catch (raceError: any) {
         if (timeoutId) clearTimeout(timeoutId);
         console.error('❌ Promise.race error:', {
           message: raceError?.message,
           name: raceError?.name,
-          stack: raceError?.stack
+          stack: raceError?.stack,
+          duration: `${Date.now() - startTime}ms`
         });
         throw raceError;
       } finally {
