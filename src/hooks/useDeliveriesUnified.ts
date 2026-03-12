@@ -97,62 +97,63 @@ export function useDeliveriesUnified(): UseDeliveriesUnifiedResult {
       
       // Add timeout to RPC call (30 seconds)
       let timeoutId: NodeJS.Timeout | null = null;
-      const timeoutPromise = new Promise<{ data: null; error: { message: string } }>((_, reject) => {
+      const timeoutPromise = new Promise<never>((_, reject) => {
         timeoutId = setTimeout(() => {
           reject(new Error('RPC call timed out after 30 seconds'));
         }, 30000);
       });
       
+      const rpcPromise = (supabase as any).rpc('get_deliveries_for_provider_unified');
+      let result: any;
       try {
-        const rpcPromise = (supabase as any).rpc('get_deliveries_for_provider_unified');
-        const result = await Promise.race([rpcPromise, timeoutPromise]);
+        result = await Promise.race([rpcPromise, timeoutPromise]);
+      } catch (raceError: any) {
         if (timeoutId) clearTimeout(timeoutId);
-        
-        // Check if result is from timeout
-        if (result && 'error' in result && result.error?.message === 'RPC call timed out after 30 seconds') {
-          throw new Error('RPC call timed out after 30 seconds');
-        }
-        
-        const { data, error: rpcError } = result as any;
-        const duration = Date.now() - startTime;
+        throw raceError;
+      } finally {
+        if (timeoutId) clearTimeout(timeoutId);
+      }
       
-        console.log('🔵 Unified RPC Response received:', {
-          duration: `${duration}ms`,
-          hasError: !!rpcError,
-          hasData: !!data,
-          dataType: typeof data,
-          dataIsArray: Array.isArray(data),
-          dataLength: Array.isArray(data) ? data.length : (data ? 'not-array' : 'null/undefined')
+      const { data, error: rpcError } = result as any;
+      const duration = Date.now() - startTime;
+      
+      console.log('🔵 Unified RPC Response received:', {
+        duration: `${duration}ms`,
+        hasError: !!rpcError,
+        hasData: !!data,
+        dataType: typeof data,
+        dataIsArray: Array.isArray(data),
+        dataLength: Array.isArray(data) ? data.length : (data ? 'not-array' : 'null/undefined')
+      });
+      
+      if (rpcError) {
+        console.error('❌ Unified RPC Error:', {
+          message: rpcError.message,
+          details: rpcError.details,
+          hint: rpcError.hint,
+          code: rpcError.code,
+          fullError: rpcError
         });
-        
-        if (rpcError) {
-          console.error('❌ Unified RPC Error:', {
-            message: rpcError.message,
-            details: rpcError.details,
-            hint: rpcError.hint,
-            code: rpcError.code,
-            fullError: rpcError
-          });
-          setError(rpcError.message ?? 'Failed to load deliveries');
-          setScheduled([]);
-          setInTransit([]);
-          setDelivered([]);
-          return;
-        }
-        
-        if (!data) {
-          console.warn('⚠️ Unified RPC returned null/undefined data');
-          setScheduled([]);
-          setInTransit([]);
-          setDelivered([]);
-          return;
-        }
-        
-        console.log('🔵 Unified RPC Success - Raw response:', {
-          data,
-          isArray: Array.isArray(data),
-          length: Array.isArray(data) ? data.length : 'N/A'
-        });
+        setError(rpcError.message ?? 'Failed to load deliveries');
+        setScheduled([]);
+        setInTransit([]);
+        setDelivered([]);
+        return;
+      }
+      
+      if (!data) {
+        console.warn('⚠️ Unified RPC returned null/undefined data');
+        setScheduled([]);
+        setInTransit([]);
+        setDelivered([]);
+        return;
+      }
+      
+      console.log('🔵 Unified RPC Success - Raw response:', {
+        data,
+        isArray: Array.isArray(data),
+        length: Array.isArray(data) ? data.length : 'N/A'
+      });
       const rows = parseUnifiedRows(data);
       console.log('🔵 Unified RPC Response:', {
         rawDataLength: Array.isArray(data) ? data.length : (data ? 1 : 0),
@@ -182,13 +183,9 @@ export function useDeliveriesUnified(): UseDeliveriesUnifiedResult {
         total: scheduledList.length + inTransitList.length + deliveredList.length
       });
       poIdsRef.current = poIds;
-        setScheduled(scheduledList);
-        setInTransit(inTransitList);
-        setDelivered(deliveredList);
-      } catch (raceError: any) {
-        if (timeoutId) clearTimeout(timeoutId);
-        throw raceError;
-      }
+      setScheduled(scheduledList);
+      setInTransit(inTransitList);
+      setDelivered(deliveredList);
     } catch (e: any) {
       console.error('❌ Unified RPC Exception:', {
         message: e?.message,
