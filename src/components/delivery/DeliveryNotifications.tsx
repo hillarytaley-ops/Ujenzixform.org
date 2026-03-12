@@ -681,72 +681,59 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
     return date.toLocaleDateString();
   };
 
-  // FINAL RENDER-LEVEL DEDUPLICATION using useMemo - ABSOLUTE STRICT
+  // FINAL RENDER-LEVEL DEDUPLICATION: ONE notification per purchase_order_id (single Accept per professional builder request)
   const uniqueNotifications = useMemo(() => {
-    // AGGRESSIVE DEDUPLICATION: Check by purchase_order_id, delivery_request_id, AND notification id
-    const renderedKeys = new Set<string>();
-    const renderedByPO = new Map<string, Notification>(); // Track by purchase_order_id
-    const renderedByDR = new Map<string, Notification>(); // Track by delivery_request_id
-    const renderedById = new Set<string>(); // Track by notification id
-    
-    const unique = notifications.filter((notification) => {
-      // PRIORITY 0: Check by notification id first (most specific)
-      if (renderedById.has(notification.id)) {
-        console.error(`🚫 RENDER DELETE: Duplicate notification id ${notification.id}`);
-        return false; // DELETE IT
-      }
-      renderedById.add(notification.id);
-      
-      // PRIORITY 1: Check by purchase_order_id (most reliable)
+    const renderedByPO = new Map<string, Notification>(); // One per purchase_order_id; prefer entry with delivery_request_id so Accept works
+    const renderedByDR = new Map<string, Notification>();
+
+    // First pass: one entry per purchase_order_id (prefer the one with delivery_request_id for Accept button)
+    notifications.forEach((notification) => {
       if (notification.purchase_order_id) {
         const existing = renderedByPO.get(notification.purchase_order_id);
-        if (existing) {
-          console.error(`🚫 RENDER DELETE: Duplicate purchase_order_id ${notification.purchase_order_id} (removed: ${notification.id}, kept: ${existing.id})`);
-          return false; // DELETE IT
+        const preferNew = existing
+          ? Boolean(notification.delivery_request_id && !existing.delivery_request_id)
+          : true;
+        if (!existing || preferNew) {
+          renderedByPO.set(notification.purchase_order_id, notification);
         }
-        renderedByPO.set(notification.purchase_order_id, notification);
-        renderedKeys.add(`po-${notification.purchase_order_id}`);
-        return true;
+        return;
       }
-      
-      // PRIORITY 2: Check by delivery_request_id
       if (notification.delivery_request_id) {
-        const existing = renderedByDR.get(notification.delivery_request_id);
-        if (existing) {
-          console.error(`🚫 RENDER DELETE: Duplicate delivery_request_id ${notification.delivery_request_id} (removed: ${notification.id}, kept: ${existing.id})`);
-          return false; // DELETE IT
-        }
-        renderedByDR.set(notification.delivery_request_id, notification);
-        renderedKeys.add(`dr-${notification.delivery_request_id}`);
-        return true;
-      }
-      
-      // PRIORITY 3: Check by content similarity (pickup + delivery + material + timestamp within 5 minutes)
-      const contentKey = `${(notification.pickupAddress || '').toLowerCase().trim()}|${(notification.deliveryAddress || '').toLowerCase().trim()}|${(notification.materialType || '').toLowerCase().trim()}|${Math.floor(notification.timestamp.getTime() / 300000)}`; // 5-minute buckets
-      
-      const existing = renderedByContent.get(contentKey);
-      if (existing) {
-        // Check if timestamps are very close (within 5 minutes) - likely duplicates
-        const timeDiff = Math.abs(notification.timestamp.getTime() - existing.timestamp.getTime());
-        if (timeDiff < 300000) { // 5 minutes
-          console.error(`🚫 RENDER DELETE: Duplicate by content similarity (removed: ${notification.id}, existing: ${existing.id}, timeDiff: ${Math.round(timeDiff/1000)}s)`);
-          return false; // DELETE IT
+        if (!renderedByDR.has(notification.delivery_request_id)) {
+          renderedByDR.set(notification.delivery_request_id, notification);
         }
       }
-      
-      renderedByContent.set(contentKey, notification);
-      renderedKeys.add(`notif-${notification.id}`);
-      return true;
     });
-    
-    const removed = notifications.length - unique.length;
-    if (removed > 0) {
-      console.error(`🚫 RENDER DELETED ${removed} duplicate notifications - showing only ${unique.length} unique (was ${notifications.length})`);
-    } else {
-      console.log(`✅ RENDER: All ${notifications.length} notifications are unique`);
+
+    // Build unique list: one per PO (from renderedByPO), then one per DR not already covered, then by id
+    const seenIds = new Set<string>();
+    const result: Notification[] = [];
+    renderedByPO.forEach((n) => {
+      if (!seenIds.has(n.id)) {
+        seenIds.add(n.id);
+        result.push(n);
+      }
+    });
+    renderedByDR.forEach((n) => {
+      if (seenIds.has(n.id)) return;
+      if (n.purchase_order_id && renderedByPO.has(n.purchase_order_id)) return;
+      seenIds.add(n.id);
+      result.push(n);
+    });
+    notifications.forEach((notification) => {
+      if (notification.purchase_order_id || notification.delivery_request_id) return;
+      if (seenIds.has(notification.id)) return;
+      seenIds.add(notification.id);
+      result.push(notification);
+    });
+
+    // Sort by timestamp (most recent first)
+    result.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
+
+    if (result.length < notifications.length) {
+      console.log(`✅ RENDER: One per request - ${notifications.length} → ${result.length} (single Accept per professional builder request)`);
     }
-    
-    return unique;
+    return result;
   }, [notifications]);
 
   return (
