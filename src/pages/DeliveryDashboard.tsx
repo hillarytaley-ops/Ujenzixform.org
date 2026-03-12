@@ -268,6 +268,31 @@ const DeliveryDashboard = () => {
     // Transform active deliveries - ONLY THIS PROVIDER'S DELIVERIES
     console.log('📋 Dashboard sync: isolatedActiveDeliveries.length =', isolatedActiveDeliveries?.length ?? 0);
     if (isolatedActiveDeliveries && isolatedActiveDeliveries.length > 0) {
+      // Helper function to format delivery
+      const formatDelivery = (d: any): ActiveDelivery => ({
+        id: d.id,
+        pickup_location: d.pickup_location || d.pickup_address || 'N/A',
+        delivery_location: d.delivery_location || d.delivery_address || 'N/A',
+        material_type: d.material_type || d.item_description || 'Materials',
+        quantity: d.quantity || d.estimated_weight || 'N/A',
+        customer_name: d.builder_name || d.builder_email?.split('@')[0] || 'Customer',
+        customer_phone: d.builder_phone || '+254 700 000 000',
+        status: d.status || d.display_status || 'pending',
+        estimated_time: d.estimated_time || '30 mins',
+        price: d.price || d.delivery_fee || d.estimated_cost || 0,
+        distance: d.distance || 0,
+        urgency: d.urgency || d.priority_level || 'normal',
+        special_instructions: d.special_instructions,
+        created_at: d.created_at,
+        purchase_order_id: d.purchase_order_id,
+        order_number: d.order_number, // Include order number from the hook
+        // CRITICAL: Preserve categorization fields for tab filtering
+        _categorized_status: d._categorized_status,
+        _items_count: d._items_count,
+        _dispatched_count: d._dispatched_count,
+        _received_count: d._received_count
+      });
+      
       // VALIDATE: Filter out orders that don't exist in purchase_orders
       // This ensures we only show orders that actually exist in the database
       const validateOrders = async () => {
@@ -337,30 +362,6 @@ const DeliveryDashboard = () => {
         // Fallback: show all if validation fails
         setActiveDeliveries(isolatedActiveDeliveries.map((d: any) => formatDelivery(d)));
       };
-      
-      const formatDelivery = (d: any): ActiveDelivery => ({
-        id: d.id,
-        pickup_location: d.pickup_location || d.pickup_address || 'N/A',
-        delivery_location: d.delivery_location || d.delivery_address || 'N/A',
-        material_type: d.material_type || d.item_description || 'Materials',
-        quantity: d.quantity || d.estimated_weight || 'N/A',
-        customer_name: d.builder_name || d.builder_email?.split('@')[0] || 'Customer',
-        customer_phone: d.builder_phone || '+254 700 000 000',
-        status: d.status || d.display_status || 'pending',
-        estimated_time: d.estimated_time || '30 mins',
-        price: d.price || d.delivery_fee || d.estimated_cost || 0,
-        distance: d.distance || 0,
-        urgency: d.urgency || d.priority_level || 'normal',
-        special_instructions: d.special_instructions,
-        created_at: d.created_at,
-        purchase_order_id: d.purchase_order_id,
-        order_number: d.order_number, // Include order number from the hook
-        // CRITICAL: Preserve categorization fields for tab filtering
-        _categorized_status: d._categorized_status,
-        _items_count: d._items_count,
-        _dispatched_count: d._dispatched_count,
-        _received_count: d._received_count
-      });
       
       // Run validation asynchronously
       validateOrders();
