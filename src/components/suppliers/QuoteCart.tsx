@@ -94,7 +94,7 @@ export function QuoteCart({
       } catch {}
 
       const response = await fetch(
-        `${SUPABASE_URL}/rest/v1/builder_projects?builder_id=eq.${user.id}&or=(status.eq.active,status.eq.in_progress)&order=created_at.desc`,
+        `${SUPABASE_URL}/rest/v1/builder_projects?builder_id=eq.${user.id}&select=id,name,location,status&order=created_at.desc`,
         {
           headers: {
             'apikey': SUPABASE_ANON_KEY,
@@ -104,7 +104,10 @@ export function QuoteCart({
       );
 
       if (response.ok) {
-        const data = await response.json();
+        const raw = await response.json();
+        const data = (Array.isArray(raw) ? raw : []).filter(
+          (p: { status?: string }) => !p.status || p.status === 'active' || p.status === 'in_progress'
+        );
         setProjects(data);
         console.log('📁 Loaded', data.length, 'projects for quote cart');
       }

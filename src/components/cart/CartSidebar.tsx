@@ -114,7 +114,7 @@ export const CartSidebar: React.FC = () => {
       if (!userId) return;
 
       const response = await fetchWithTimeout(
-        `${SUPABASE_URL}/rest/v1/builder_projects?builder_id=eq.${userId}&or=(status.eq.active,status.eq.in_progress)&select=id,name,location,latitude,longitude,address,status&order=created_at.desc`,
+        `${SUPABASE_URL}/rest/v1/builder_projects?builder_id=eq.${userId}&select=id,name,location,latitude,longitude,address,status&order=created_at.desc`,
         {
           headers: {
             'apikey': SUPABASE_ANON_KEY,
@@ -125,7 +125,10 @@ export const CartSidebar: React.FC = () => {
       );
 
       if (response.ok) {
-        const projectsData = await response.json();
+        const raw = await response.json();
+        const projectsData = (Array.isArray(raw) ? raw : []).filter(
+          (p: { status?: string }) => !p.status || p.status === 'active' || p.status === 'in_progress'
+        );
         console.log('📁 Cart: Loaded projects for order association:', projectsData.length);
         setProjects(projectsData || []);
         
