@@ -334,10 +334,27 @@ const DeliveryDashboard = () => {
               const existingOrderIds = new Set(existingOrders.map((po: any) => po.id));
               const existingOrderNumbers = new Set(existingOrders.map((po: any) => po.po_number).filter(Boolean));
               
+              // First filter: Only orders that exist in purchase_orders
+              const ordersThatExist = isolatedActiveDeliveries.filter((d: any) => {
+                const hasValidPO = d.purchase_order_id && existingOrderIds.has(d.purchase_order_id);
+                const hasValidOrderNumber = d.order_number && existingOrderNumbers.has(d.order_number);
+                const orderExists = hasValidPO || hasValidOrderNumber;
+                
+                if (!orderExists && d.order_number) {
+                  console.warn('🚫 Removing order that does not exist:', {
+                    order_number: d.order_number,
+                    purchase_order_id: d.purchase_order_id?.substring(0, 8),
+                    reason: 'Order not found in purchase_orders table'
+                  });
+                }
+                
+                return orderExists;
+              });
+              
               // Additional validation: Check material_items scan status
               // Only show orders that are in "Awaiting Dispatch" (all items have dispatch_scanned = FALSE)
               // This enforces the rule: delivery providers can only accept orders from Awaiting Dispatch
-              const poIdsForMaterialCheck = [...new Set(validatedDeliveries.map((d: any) => d.purchase_order_id).filter(Boolean))];
+              const poIdsForMaterialCheck = [...new Set(ordersThatExist.map((d: any) => d.purchase_order_id).filter(Boolean))];
               let materialItemsData: any[] = [];
               
               if (poIdsForMaterialCheck.length > 0) {
@@ -373,24 +390,9 @@ const DeliveryDashboard = () => {
                 }
               });
               
-              const validDeliveries = isolatedActiveDeliveries.filter((d: any) => {
-                // First check: Order must exist in purchase_orders
-                const hasValidPO = d.purchase_order_id && existingOrderIds.has(d.purchase_order_id);
-                const hasValidOrderNumber = d.order_number && existingOrderNumbers.has(d.order_number);
-                const orderExists = hasValidPO || hasValidOrderNumber;
-                
-                if (!orderExists) {
-                  if (d.order_number) {
-                    console.warn('🚫 Removing order that does not exist:', {
-                      order_number: d.order_number,
-                      purchase_order_id: d.purchase_order_id?.substring(0, 8),
-                      reason: 'Order not found in purchase_orders table'
-                    });
-                  }
-                  return false;
-                }
-                
-                // Second check: Order must be in "Awaiting Dispatch" status
+              // Second filter: Only orders in "Awaiting Dispatch" status
+              const validDeliveries = ordersThatExist.filter((d: any) => {
+                // Check if order is in "Awaiting Dispatch" status
                 // (all material_items must have dispatch_scanned = FALSE)
                 if (d.purchase_order_id && itemsByOrder[d.purchase_order_id]) {
                   const items = itemsByOrder[d.purchase_order_id];
