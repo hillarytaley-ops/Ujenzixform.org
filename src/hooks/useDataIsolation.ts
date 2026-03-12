@@ -1501,9 +1501,73 @@ export const useDeliveryProviderData = () => {
       const filteredRealDeliveries = allActiveDeliveries.filter(hasRealOrderNumber);
       console.log('🚨 FILTERING: Removed', allActiveDeliveries.length - filteredRealDeliveries.length, 'fake orders. Showing only', filteredRealDeliveries.length, 'REAL orders');
       
-      // Replace allActiveDeliveries with only real orders
+      // VALIDATE: Remove orders that don't exist in purchase_orders table
+      // This ensures we only show orders that actually exist in the database
+      const validatedDeliveries: any[] = [];
+      const orderNumbersToValidate = filteredRealDeliveries
+        .filter(d => d.order_number && d.purchase_order_id)
+        .map(d => ({ order_number: d.order_number, purchase_order_id: d.purchase_order_id, delivery: d }));
+      
+      if (orderNumbersToValidate.length > 0) {
+        try {
+          // Batch validate orders exist in purchase_orders
+          const poIdsToCheck = [...new Set(orderNumbersToValidate.map(o => o.purchase_order_id).filter(Boolean))];
+          if (poIdsToCheck.length > 0) {
+            const validationResponse = await fetch(
+              `${SUPABASE_URL}/rest/v1/purchase_orders?id=in.(${poIdsToCheck.join(',')})&select=id,po_number&limit=500`,
+              {
+                headers: {
+                  'apikey': SUPABASE_ANON_KEY,
+                  'Authorization': `Bearer ${accessToken}`,
+                  'Content-Type': 'application/json'
+                },
+                cache: 'no-store'
+              }
+            );
+            
+            if (validationResponse.ok) {
+              const existingOrders = await validationResponse.json();
+              const existingOrderIds = new Set(existingOrders.map((po: any) => po.id));
+              const existingOrderNumbers = new Set(existingOrders.map((po: any) => po.po_number).filter(Boolean));
+              
+              // Filter to only include deliveries where the purchase_order actually exists
+              for (const item of filteredRealDeliveries) {
+                const hasValidPO = item.purchase_order_id && existingOrderIds.has(item.purchase_order_id);
+                const hasValidOrderNumber = item.order_number && existingOrderNumbers.has(item.order_number);
+                
+                if (hasValidPO || hasValidOrderNumber) {
+                  validatedDeliveries.push(item);
+                } else {
+                  console.warn('🚫 Removing order that does not exist:', {
+                    order_number: item.order_number,
+                    purchase_order_id: item.purchase_order_id?.substring(0, 8),
+                    reason: 'Order not found in purchase_orders table'
+                  });
+                }
+              }
+              
+              console.log('✅ VALIDATION: Removed', filteredRealDeliveries.length - validatedDeliveries.length, 'non-existent orders. Showing', validatedDeliveries.length, 'valid orders');
+            } else {
+              console.warn('⚠️ Could not validate orders, showing all filtered orders');
+              validatedDeliveries.push(...filteredRealDeliveries);
+            }
+          } else {
+            // No purchase_order_ids to validate, include all
+            validatedDeliveries.push(...filteredRealDeliveries);
+          }
+        } catch (validationError) {
+          console.warn('⚠️ Error validating orders:', validationError);
+          // On error, include all filtered orders (better to show than hide)
+          validatedDeliveries.push(...filteredRealDeliveries);
+        }
+      } else {
+        // No orders to validate, include all
+        validatedDeliveries.push(...filteredRealDeliveries);
+      }
+      
+      // Replace allActiveDeliveries with only validated orders
       allActiveDeliveries.length = 0;
-      filteredRealDeliveries.forEach(d => allActiveDeliveries.push(d));
+      validatedDeliveries.forEach(d => allActiveDeliveries.push(d));
       
       console.log('📦 Active deliveries loaded:', {
         from_delivery_requests: activeData?.length || 0,

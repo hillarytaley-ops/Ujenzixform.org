@@ -268,7 +268,72 @@ const DeliveryDashboard = () => {
     // Transform active deliveries - ONLY THIS PROVIDER'S DELIVERIES
     console.log('📋 Dashboard sync: isolatedActiveDeliveries.length =', isolatedActiveDeliveries?.length ?? 0);
     if (isolatedActiveDeliveries && isolatedActiveDeliveries.length > 0) {
-      const formattedActive: ActiveDelivery[] = isolatedActiveDeliveries.map((d: any) => ({
+      // VALIDATE: Filter out orders that don't exist in purchase_orders
+      // This ensures we only show orders that actually exist in the database
+      const validatedDeliveries = await (async () => {
+        const deliveriesWithPO = isolatedActiveDeliveries.filter((d: any) => d.purchase_order_id);
+        if (deliveriesWithPO.length === 0) return isolatedActiveDeliveries;
+        
+        try {
+          const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
+          const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
+          
+          let accessToken = SUPABASE_ANON_KEY;
+          try {
+            const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+            if (storedSession) {
+              const parsed = JSON.parse(storedSession);
+              if (parsed.access_token) accessToken = parsed.access_token;
+            }
+          } catch (e) {}
+          
+          const poIds = [...new Set(deliveriesWithPO.map((d: any) => d.purchase_order_id).filter(Boolean))];
+          if (poIds.length > 0) {
+            const validationResponse = await fetch(
+              `${SUPABASE_URL}/rest/v1/purchase_orders?id=in.(${poIds.join(',')})&select=id,po_number&limit=500`,
+              {
+                headers: {
+                  'apikey': SUPABASE_ANON_KEY,
+                  'Authorization': `Bearer ${accessToken}`,
+                  'Content-Type': 'application/json'
+                },
+                cache: 'no-store'
+              }
+            );
+            
+            if (validationResponse.ok) {
+              const existingOrders = await validationResponse.json();
+              const existingOrderIds = new Set(existingOrders.map((po: any) => po.id));
+              const existingOrderNumbers = new Set(existingOrders.map((po: any) => po.po_number).filter(Boolean));
+              
+              const validDeliveries = isolatedActiveDeliveries.filter((d: any) => {
+                const hasValidPO = d.purchase_order_id && existingOrderIds.has(d.purchase_order_id);
+                const hasValidOrderNumber = d.order_number && existingOrderNumbers.has(d.order_number);
+                const isValid = hasValidPO || hasValidOrderNumber || !d.purchase_order_id; // Include deliveries without PO for now
+                
+                if (!isValid && d.order_number) {
+                  console.warn('🚫 Removing order that does not exist:', {
+                    order_number: d.order_number,
+                    purchase_order_id: d.purchase_order_id?.substring(0, 8),
+                    reason: 'Order not found in purchase_orders table'
+                  });
+                }
+                
+                return isValid;
+              });
+              
+              console.log('✅ VALIDATION: Removed', isolatedActiveDeliveries.length - validDeliveries.length, 'non-existent orders');
+              return validDeliveries;
+            }
+          }
+        } catch (validationError) {
+          console.warn('⚠️ Error validating orders:', validationError);
+        }
+        
+        return isolatedActiveDeliveries;
+      })();
+      
+      const formattedActive: ActiveDelivery[] = validatedDeliveries.map((d: any) => ({
         id: d.id,
         pickup_location: d.pickup_location || d.pickup_address || 'N/A',
         delivery_location: d.delivery_location || d.delivery_address || 'N/A',
