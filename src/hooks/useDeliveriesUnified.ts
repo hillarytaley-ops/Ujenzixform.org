@@ -91,6 +91,17 @@ export function useDeliveriesUnified(): UseDeliveriesUnifiedResult {
 
     setLoading(true);
     setError(null);
+    
+    // TEMPORARILY DISABLED: RPC is timing out. Using REST API instead which works.
+    // TODO: Re-enable after fixing database indexes and RPC function
+    console.log('⚠️ RPC disabled - using REST API fallback (RPC was timing out)');
+    setScheduled([]);
+    setInTransit([]);
+    setDelivered([]);
+    setLoading(false);
+    return;
+    
+    /* DISABLED RPC CODE - Re-enable after fixing
     try {
       console.log('🔵 Calling unified RPC function...', { userId });
       const startTime = Date.now();
