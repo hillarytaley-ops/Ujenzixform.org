@@ -59,6 +59,13 @@ BEGIN
     RAISE NOTICE '✅ Fixed supplier_id mismatch in % material_items', v_fixed_count;
   END IF;
   
+  -- Note: Scenario 2 (no material_items) cannot be automatically fixed
+  -- because we need actual material data to create material_items.
+  -- These orders require manual intervention or supplier action to generate QR codes.
+  RAISE NOTICE '⚠️ Note: Orders without material_items cannot be auto-fixed';
+  RAISE NOTICE '   These orders need material_items to be created (typically via QR code generation)';
+  RAISE NOTICE '   Run IDENTIFY_ORDERS_NEEDING_MATERIAL_ITEMS.sql to see which orders need this';
+  
   RAISE NOTICE '✅ Fix complete!';
   
 END $$;
