@@ -243,13 +243,25 @@ export function useDeliveriesUnified(): UseDeliveriesUnifiedResult {
         fullError: e
       });
       
-      // FALLBACK: Try alternative RPC function
+      // FALLBACK: Try alternative RPC function with timeout
       console.log('🔄 Trying alternative RPC: get_active_deliveries_for_provider()');
       try {
-        const { data: altData, error: altError } = await supabase.rpc('get_active_deliveries_for_provider');
+        const altStartTime = Date.now();
+        const altTimeoutPromise = new Promise<never>((_, reject) => {
+          setTimeout(() => reject(new Error('Alternative RPC timeout after 10 seconds')), 10000);
+        });
+        
+        const altRpcPromise = supabase.rpc('get_active_deliveries_for_provider');
+        const altResult = await Promise.race([altRpcPromise, altTimeoutPromise]);
+        const altDuration = Date.now() - altStartTime;
+        
+        const { data: altData, error: altError } = altResult as any;
         
         if (!altError && altData && Array.isArray(altData) && altData.length > 0) {
-          console.log('✅ Alternative RPC succeeded:', { count: altData.length });
+          console.log('✅ Alternative RPC succeeded:', { 
+            count: altData.length, 
+            duration: `${altDuration}ms` 
+          });
           const rows = parseUnifiedRows(altData);
           const scheduledList: UnifiedDeliveryRow[] = [];
           const inTransitList: UnifiedDeliveryRow[] = [];
@@ -273,11 +285,22 @@ export function useDeliveriesUnified(): UseDeliveriesUnifiedResult {
           setError(null);
           return;
         } else {
-          console.warn('⚠️ Alternative RPC also failed or returned empty:', altError);
+          console.warn('⚠️ Alternative RPC returned empty or error:', {
+            hasData: !!altData,
+            dataLength: Array.isArray(altData) ? altData.length : 'not-array',
+            error: altError,
+            duration: `${altDuration}ms`
+          });
         }
       } catch (altErr: any) {
-        console.error('❌ Alternative RPC also failed:', altErr);
+        console.error('❌ Alternative RPC also failed:', {
+          message: altErr?.message,
+          duration: `${Date.now() - startTime}ms`
+        });
       }
+      
+      // FINAL FALLBACK: Since both RPCs failed, return empty and let the REST API handle it
+      console.log('⚠️ Both RPCs failed - dashboard will use REST API fallback');
       
       setError(e?.message ?? 'Failed to load deliveries');
       setScheduled([]);
