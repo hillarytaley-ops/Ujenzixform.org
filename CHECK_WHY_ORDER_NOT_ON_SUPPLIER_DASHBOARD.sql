@@ -61,15 +61,16 @@ LEFT JOIN delivery_requests dr ON dr.purchase_order_id = po.id
 WHERE po.po_number = 'QR-1773125455597-K3447'
    OR dr.order_number LIKE '%1773125455597%';
 
--- Step 4: Check material_items scan status (supplier dashboard uses this)
+-- Step 4: Check material_items scan status and supplier_id matching (CRITICAL)
 SELECT 
-  'Material Items Status' as check_type,
+  'Material Items Status & Supplier ID Check' as check_type,
   mi.purchase_order_id,
   COUNT(*) as total_items,
   COUNT(DISTINCT mi.supplier_id) as unique_supplier_ids,
-  array_agg(DISTINCT mi.supplier_id) as supplier_ids,
+  array_agg(DISTINCT mi.supplier_id) as supplier_ids_in_items,
   po.supplier_id as po_supplier_id,
   COUNT(*) FILTER (WHERE mi.supplier_id = po.supplier_id) as items_with_matching_supplier_id,
+  COUNT(*) FILTER (WHERE mi.supplier_id IS NULL) as items_with_null_supplier_id,
   COUNT(*) FILTER (WHERE dispatch_scanned = TRUE) as dispatched_count,
   COUNT(*) FILTER (WHERE receive_scanned = TRUE) as received_count,
   CASE 
@@ -83,10 +84,12 @@ SELECT
     ELSE 'Partially Dispatched'
   END as expected_category,
   CASE 
+    WHEN COUNT(*) = 0 
+    THEN '❌ NO MATERIAL_ITEMS - WILL NOT APPEAR'
     WHEN COUNT(*) FILTER (WHERE mi.supplier_id = po.supplier_id) = 0 
     THEN '❌ NO ITEMS WITH MATCHING SUPPLIER_ID - WILL NOT APPEAR'
     WHEN COUNT(*) FILTER (WHERE mi.supplier_id = po.supplier_id) > 0 
-    THEN '✅ HAS ITEMS WITH MATCHING SUPPLIER_ID - WILL APPEAR'
+    THEN '✅ HAS ITEMS WITH MATCHING SUPPLIER_ID - WILL APPEAR IN AWAITING DISPATCH'
     ELSE '⚠️ UNKNOWN'
   END as supplier_match_status
 FROM material_items mi
