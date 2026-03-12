@@ -61,7 +61,7 @@ BEGIN
     ORDER BY dr.updated_at DESC NULLS LAST
     LIMIT 250
   LOOP
-    v_result := v_result || v_row;
+    v_result := v_result || jsonb_build_array(v_row.row_data);
   END LOOP;
 
   RETURN v_result;
