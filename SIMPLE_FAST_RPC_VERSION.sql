@@ -88,7 +88,20 @@ BEGIN
   -- Simple categorization
   categorized AS (
     SELECT
-      do.*,
+      delivery_orders.id,
+      delivery_orders.purchase_order_id,
+      delivery_orders.order_number,
+      delivery_orders.status,
+      delivery_orders.po_status,
+      delivery_orders.created_at,
+      delivery_orders.updated_at,
+      delivery_orders.delivery_address,
+      delivery_orders.pickup_location,
+      delivery_orders.dropoff_location,
+      delivery_orders.delivery_provider_id,
+      delivery_orders.delivery_provider_name,
+      delivery_orders.provider_id,
+      delivery_orders.delivered_at,
       COALESCE(ms.total, 0)::int AS _items_count,
       COALESCE(ms.dispatched, 0)::int AS _dispatched_count,
       COALESCE(ms.received, 0)::int AS _received_count,
@@ -96,15 +109,15 @@ BEGIN
         WHEN COALESCE(ms.received, 0) > 0 AND ms.received = ms.total AND ms.total > 0 THEN 'delivered'
         WHEN COALESCE(ms.dispatched, 0) > 0 AND ms.dispatched = ms.total AND ms.received < ms.total THEN 'scheduled'
         WHEN COALESCE(ms.dispatched, 0) > 0 THEN 'scheduled'
-        WHEN do.status IN ('dispatched', 'shipped', 'in_transit', 'out_for_delivery', 'delivery_arrived', 'picked_up')
-          OR do.po_status IN ('dispatched', 'shipped', 'in_transit', 'out_for_delivery', 'delivery_arrived')
+        WHEN delivery_orders.status IN ('dispatched', 'shipped', 'in_transit', 'out_for_delivery', 'delivery_arrived', 'picked_up')
+          OR delivery_orders.po_status IN ('dispatched', 'shipped', 'in_transit', 'out_for_delivery', 'delivery_arrived')
         THEN 'in_transit'
-        WHEN do.status IN ('delivered', 'completed') OR do.po_status IN ('delivered', 'completed')
+        WHEN delivery_orders.status IN ('delivered', 'completed') OR delivery_orders.po_status IN ('delivered', 'completed')
         THEN 'delivered'
         ELSE 'scheduled'
       END AS _categorized_status
-    FROM delivery_orders do
-    LEFT JOIN mi_stats ms ON ms.purchase_order_id = do.purchase_order_id
+    FROM delivery_orders
+    LEFT JOIN mi_stats ms ON ms.purchase_order_id = delivery_orders.purchase_order_id
   )
   SELECT jsonb_agg(row_to_json(c)::jsonb) INTO v_result
   FROM (
