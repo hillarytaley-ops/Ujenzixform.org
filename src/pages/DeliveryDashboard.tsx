@@ -270,9 +270,12 @@ const DeliveryDashboard = () => {
     if (isolatedActiveDeliveries && isolatedActiveDeliveries.length > 0) {
       // VALIDATE: Filter out orders that don't exist in purchase_orders
       // This ensures we only show orders that actually exist in the database
-      const validatedDeliveries = await (async () => {
+      const validateOrders = async () => {
         const deliveriesWithPO = isolatedActiveDeliveries.filter((d: any) => d.purchase_order_id);
-        if (deliveriesWithPO.length === 0) return isolatedActiveDeliveries;
+        if (deliveriesWithPO.length === 0) {
+          setActiveDeliveries(isolatedActiveDeliveries.map((d: any) => formatDelivery(d)));
+          return;
+        }
         
         try {
           const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
@@ -323,17 +326,19 @@ const DeliveryDashboard = () => {
               });
               
               console.log('✅ VALIDATION: Removed', isolatedActiveDeliveries.length - validDeliveries.length, 'non-existent orders');
-              return validDeliveries;
+              setActiveDeliveries(validDeliveries.map((d: any) => formatDelivery(d)));
+              return;
             }
           }
         } catch (validationError) {
           console.warn('⚠️ Error validating orders:', validationError);
         }
         
-        return isolatedActiveDeliveries;
-      })();
+        // Fallback: show all if validation fails
+        setActiveDeliveries(isolatedActiveDeliveries.map((d: any) => formatDelivery(d)));
+      };
       
-      const formattedActive: ActiveDelivery[] = validatedDeliveries.map((d: any) => ({
+      const formatDelivery = (d: any): ActiveDelivery => ({
         id: d.id,
         pickup_location: d.pickup_location || d.pickup_address || 'N/A',
         delivery_location: d.delivery_location || d.delivery_address || 'N/A',
@@ -355,8 +360,10 @@ const DeliveryDashboard = () => {
         _items_count: d._items_count,
         _dispatched_count: d._dispatched_count,
         _received_count: d._received_count
-      }));
-      setActiveDeliveries(formattedActive);
+      });
+      
+      // Run validation asynchronously
+      validateOrders();
       console.log('🚚 Active deliveries loaded:', formattedActive.length, 'Statuses:', formattedActive.map(d => d.status));
       
       // Log order numbers for debugging
