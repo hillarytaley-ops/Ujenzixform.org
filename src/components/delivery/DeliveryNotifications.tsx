@@ -577,19 +577,8 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
           return false;
         }
         
-        // Must have valid delivery address (not empty or placeholder)
-        const deliveryAddr = notif.deliveryAddress || '';
-        if (!deliveryAddr || deliveryAddr.trim() === '' || deliveryAddr.toLowerCase().includes('to be provided')) {
-          console.log(`🚫 FINAL FILTER: Removing notification ${notif.id} - invalid delivery address: "${deliveryAddr}"`);
-          return false;
-        }
-        
-        // Must have valid material type
-        const materialType = notif.materialType || '';
-        if (!materialType || materialType.trim() === '') {
-          console.log(`🚫 FINAL FILTER: Removing notification ${notif.id} - no material type`);
-          return false;
-        }
+        // RELAXED: Allow notifications even if delivery address or material type is missing
+        // These are valid delivery requests that can be updated later
         
         // Must have valid title
         if (!notif.title || notif.title.trim() === '') {
