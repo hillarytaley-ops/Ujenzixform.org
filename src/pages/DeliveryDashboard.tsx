@@ -951,30 +951,99 @@ const DeliveryDashboard = () => {
         'Authorization': `Bearer ${accessToken}`
       };
 
-      // Count only UNIQUE PENDING delivery requests (deduplicate by purchase_order_id)
+      // CRITICAL: Count only valid, actionable delivery requests (same logic as DeliveryNotifications.tsx)
+      // Filter out: delivered/completed/cancelled, NULL purchase_order_id, already accepted by this provider
       const response = await fetch(
-        `${SUPABASE_URL}/rest/v1/delivery_requests?select=id,status,purchase_order_id&status=eq.pending`,
+        `${SUPABASE_URL}/rest/v1/delivery_requests?status=in.(pending,accepted,assigned,in_transit)&select=id,status,purchase_order_id,provider_id&order=created_at.desc&limit=100`,
         { headers, cache: 'no-store' }
       );
       
       if (response.ok) {
         const data = await response.json();
         
-        // Deduplicate by purchase_order_id - count only unique purchase orders
-        const uniquePOIds = new Set<string>();
-        const nullPORequests = new Set<string>(); // Track NULL purchase_order_id requests by id
+        // STEP 1: Filter out delivered/completed/cancelled (shouldn't be in query, but double-check)
+        const activeRequests = data.filter((dr: any) => 
+          !['delivered', 'completed', 'cancelled'].includes(dr.status)
+        );
         
-        data.forEach((dr: any) => {
-          if (dr.purchase_order_id) {
-            uniquePOIds.add(dr.purchase_order_id);
-          } else {
-            nullPORequests.add(dr.id);
+        // STEP 2: Filter out requests without purchase_order_id (placeholder/default requests)
+        const requestsWithPO = activeRequests.filter((dr: any) => 
+          dr.purchase_order_id && 
+          dr.purchase_order_id.trim() !== '' && 
+          dr.purchase_order_id !== 'null' && 
+          dr.purchase_order_id !== 'undefined'
+        );
+        
+        // STEP 3: Get unique purchase_order_ids
+        const uniquePOIds = Array.from(new Set(requestsWithPO.map((dr: any) => dr.purchase_order_id)));
+        
+        // STEP 4: Verify purchase_orders exist (filter out orphaned requests)
+        if (uniquePOIds.length > 0) {
+          try {
+            const poResponse = await fetch(
+              `${SUPABASE_URL}/rest/v1/purchase_orders?id=in.(${uniquePOIds.join(',')})&select=id,status,delivery_status&limit=1000`,
+              { headers, cache: 'no-store' }
+            );
+            
+            if (poResponse.ok) {
+              const validPOs = await poResponse.json();
+              const validPOIds = new Set(validPOs
+                .filter((po: any) => 
+                  // Only count purchase_orders that are not delivered/completed/cancelled
+                  !['delivered', 'completed', 'cancelled'].includes(po.status) &&
+                  (!po.delivery_status || !['delivered', 'completed', 'cancelled'].includes(po.delivery_status))
+                )
+                .map((po: any) => po.id)
+              );
+              
+              // Count only delivery_requests with valid, non-delivered purchase_orders
+              const validRequests = requestsWithPO.filter((dr: any) => 
+                validPOIds.has(dr.purchase_order_id)
+              );
+              
+              // STEP 5: Deduplicate by purchase_order_id (one notification per purchase_order)
+              const seenPOIds = new Set<string>();
+              const uniqueCount = validRequests.filter((dr: any) => {
+                if (seenPOIds.has(dr.purchase_order_id)) {
+                  return false; // Duplicate purchase_order_id
+                }
+                seenPOIds.add(dr.purchase_order_id);
+                return true;
+              }).length;
+              
+              console.log(`📊 Notification count: ${data.length} total → ${activeRequests.length} active → ${requestsWithPO.length} with PO → ${uniqueCount} unique valid`);
+              setNotificationCount(uniqueCount);
+              setPendingNotificationCount(uniqueCount);
+            } else {
+              console.warn('⚠️ Failed to verify purchase_orders for notification count');
+              // Fallback: count unique purchase_order_ids without validation
+              const seenPOIds = new Set<string>();
+              const uniqueCount = requestsWithPO.filter((dr: any) => {
+                if (seenPOIds.has(dr.purchase_order_id)) return false;
+                seenPOIds.add(dr.purchase_order_id);
+                return true;
+              }).length;
+              setNotificationCount(uniqueCount);
+              setPendingNotificationCount(uniqueCount);
+            }
+          } catch (verifyError) {
+            console.warn('⚠️ Error verifying purchase_orders:', verifyError);
+            // Fallback: count unique purchase_order_ids without validation
+            const seenPOIds = new Set<string>();
+            const uniqueCount = requestsWithPO.filter((dr: any) => {
+              if (seenPOIds.has(dr.purchase_order_id)) return false;
+              seenPOIds.add(dr.purchase_order_id);
+              return true;
+            }).length;
+            setNotificationCount(uniqueCount);
+            setPendingNotificationCount(uniqueCount);
           }
-        });
-        
-        const uniqueCount = uniquePOIds.size + nullPORequests.size;
-        setNotificationCount(uniqueCount);
-        setPendingNotificationCount(uniqueCount);
+        } else {
+          // No valid requests
+          console.log('📊 Notification count: 0 (no valid delivery requests)');
+          setNotificationCount(0);
+          setPendingNotificationCount(0);
+        }
       }
     } catch (error) {
       console.error('Error loading notification counts:', error);
@@ -1740,11 +1809,24 @@ const DeliveryDashboard = () => {
           >
             <Truck className="h-5 w-5" />
             <span className="text-xs font-medium">Deliveries</span>
-            {(pendingRequests.length > 0 || activeDeliveries.length > 0) && (
-              <Badge className="text-[10px] px-1 py-0 bg-yellow-500 text-white">
-                {pendingRequests.length + activeDeliveries.length}
-              </Badge>
-            )}
+            {(() => {
+              // CRITICAL: Only count valid, actionable deliveries (same logic as notifications)
+              // Filter out: delivered/completed/cancelled, orders without purchase_order_id
+              const validActiveDeliveries = activeDeliveries.filter(d => 
+                d.purchase_order_id && 
+                !['delivered', 'completed', 'cancelled'].includes(d.status || '')
+              );
+              const validPendingRequests = pendingRequests.filter(r => 
+                r.purchase_order_id && 
+                !['delivered', 'completed', 'cancelled'].includes(r.status || '')
+              );
+              const totalValid = validActiveDeliveries.length + validPendingRequests.length;
+              return totalValid > 0 ? (
+                <Badge className="text-[10px] px-1 py-0 bg-yellow-500 text-white">
+                  {totalValid}
+                </Badge>
+              ) : null;
+            })()}
           </Button>
           <Button 
             variant="ghost"
