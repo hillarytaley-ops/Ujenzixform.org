@@ -723,8 +723,9 @@ export const DispatchScanner: React.FC = () => {
       );
       console.log('✅ Material items response status:', itemsResponse.status);
       
-      // FIRST: Fetch purchase_orders for this supplier that have delivery_requests with accepted/assigned status
-      // We'll fetch purchase_orders first, then check which ones have delivery_requests
+      // Fetch purchase_orders for this supplier
+      // Orders are shown for dispatch if they have material_items that need to be dispatched
+      // Delivery_requests are fetched for info only (to show delivery provider details if available)
       console.log('📦 Fetching purchase_orders for supplier:', supplierId);
       let allOrdersData: any[] = [];
       
@@ -769,7 +770,8 @@ export const DispatchScanner: React.FC = () => {
       
       console.log('✅ Purchase orders fetched for supplier:', allOrdersData.length);
       
-      // NOW fetch delivery_requests for these purchase_orders to see which ones have accepted delivery
+      // Fetch delivery_requests for these purchase_orders (optional - for info only, not required)
+      // This helps show delivery provider info if available, but we don't filter orders based on this
       const purchaseOrderIds = allOrdersData.map((po: any) => po.id).filter(Boolean);
       let deliveryRequestsData: any[] = [];
       
@@ -782,10 +784,11 @@ export const DispatchScanner: React.FC = () => {
         
         console.log('📦 Fetching delivery_requests for', purchaseOrderIds.length, 'purchase orders in', chunks.length, 'chunk(s)...');
         
+        // Fetch ALL delivery_requests (not just accepted/assigned) to get delivery info if available
         const drPromises = chunks.map((chunk) => {
           const idsList = chunk.join(',');
           return fetch(
-            `${SUPABASE_URL}/rest/v1/delivery_requests?purchase_order_id=in.(${idsList})&status=in.(accepted,assigned)&select=id,purchase_order_id,status,provider_id,accepted_at&order=created_at.desc&limit=1000`,
+            `${SUPABASE_URL}/rest/v1/delivery_requests?purchase_order_id=in.(${idsList})&select=id,purchase_order_id,status,provider_id,accepted_at&order=created_at.desc&limit=1000`,
             { headers, signal: controller.signal, cache: 'no-store' }
           );
         });
@@ -799,12 +802,8 @@ export const DispatchScanner: React.FC = () => {
           }
         }
         
-        console.log('✅ Delivery requests with accepted/assigned status:', deliveryRequestsData.length);
-        
-        // Filter purchase_orders to only those with accepted/assigned delivery_requests
-        const confirmedOrderIds = new Set(deliveryRequestsData.map((dr: any) => dr.purchase_order_id).filter(Boolean));
-        allOrdersData = allOrdersData.filter((order: any) => confirmedOrderIds.has(order.id));
-        console.log('✅ Purchase orders with confirmed delivery:', allOrdersData.length);
+        console.log('✅ Delivery requests fetched (for info):', deliveryRequestsData.length);
+        // NOTE: We don't filter orders based on delivery_requests - all orders with material_items can be dispatched
       } else {
         console.warn('⚠️ No purchase orders found for supplier, cannot fetch delivery_requests');
       }
