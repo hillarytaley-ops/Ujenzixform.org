@@ -493,25 +493,14 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
       });
       
       finalNotifications.forEach((notif) => {
-        // CRITICAL: Filter out empty/invalid notifications
+        // CRITICAL: Filter out empty/invalid notifications (must have at least purchase_order_id OR delivery_request_id)
         if (!notif.purchase_order_id && !notif.delivery_request_id) {
           console.log(`🚫 FILTERING OUT: Notification ${notif.id} has no purchase_order_id or delivery_request_id (invalid)`);
           return;
         }
         
-        // CRITICAL: Filter out notifications with empty/placeholder delivery addresses
-        const deliveryAddr = notif.deliveryAddress || '';
-        if (!deliveryAddr || deliveryAddr.trim() === '' || deliveryAddr.toLowerCase().includes('to be provided')) {
-          console.log(`🚫 FILTERING OUT: Notification ${notif.id} has invalid delivery address: "${deliveryAddr}"`);
-          return;
-        }
-        
-        // CRITICAL: Filter out notifications with empty material types
-        const materialType = notif.materialType || '';
-        if (!materialType || materialType.trim() === '') {
-          console.log(`🚫 FILTERING OUT: Notification ${notif.id} has no material type`);
-          return;
-        }
+        // RELAXED: Allow notifications even if delivery address or material type is missing
+        // These are valid delivery requests that can be updated later
         
         // RULE 0: If it has delivery_request_id, check for duplicates by delivery_request_id FIRST
         // This catches cases where the same delivery_request creates multiple notifications
