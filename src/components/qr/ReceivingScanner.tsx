@@ -1078,7 +1078,7 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
           is_invalidated: isInvalidated
         };
         
-        const restApiElapsed = Date.now() - rpcStartTime;
+        const restApiElapsed = Date.now() - scanStartTime;
         console.log(`✅ REST API: Scan completed successfully in ${restApiElapsed}ms`);
         deliveryRequestUpdated = true; // Mark as updated so success flow knows
         
@@ -1090,36 +1090,34 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
           });
         }
         
-        } catch (restApiError: any) {
-            console.error('❌ REST API fallback also failed:', restApiError);
-            const restApiElapsed = Date.now() - rpcStartTime;
-            console.error(`⏱️ REST API fallback failed after ${restApiElapsed}ms`);
-            lastError = restApiError; // Update last error
-            
-            // All methods failed - show error to user
-            const errorMessage = lastError?.message || 'Unknown error';
-            if (errorMessage.includes('QR_NOT_FOUND') || errorMessage.includes('not found')) {
-              toast.error('❓ QR Code Not Found', {
-                description: `"${cleanQRCode.substring(0, 30)}..." not in system. Please verify the QR code is correct.`,
-                duration: 8000
-              });
-            } else if (errorMessage.includes('timeout') || errorMessage.includes('Timeout')) {
-              toast.error('Request Timeout', {
-                description: 'The scan request took too long. Please check your connection and try again.',
-                duration: 5000
-              });
-            } else {
-              toast.error('Failed to process scan', {
-                description: 'All scan methods failed. Please try again or contact support.',
-                duration: 5000
-              });
-            }
-            return;
-          }
-      } // End of rpcError catch block (REST API fallback)
-      } // End of simpleRpcSucceeded else block (complex RPC + REST API fallback)
+      } catch (restApiError: any) {
+        console.error('❌ REST API failed:', restApiError);
+        const restApiElapsed = Date.now() - scanStartTime;
+        console.error(`⏱️ REST API failed after ${restApiElapsed}ms`);
+        lastError = restApiError;
+        
+        // Show error to user
+        const errorMessage = lastError?.message || 'Unknown error';
+        if (errorMessage.includes('QR_NOT_FOUND') || errorMessage.includes('not found')) {
+          toast.error('❓ QR Code Not Found', {
+            description: `"${cleanQRCode.substring(0, 30)}..." not in system. Please verify the QR code is correct.`,
+            duration: 8000
+          });
+        } else if (errorMessage.includes('timeout') || errorMessage.includes('Timeout')) {
+          toast.error('Request Timeout', {
+            description: 'The scan request took too long. Please check your connection and try again.',
+            duration: 5000
+          });
+        } else {
+          toast.error('Failed to process scan', {
+            description: errorMessage,
+            duration: 5000
+          });
+        }
+        return;
+      }
       
-      // Success flow - use scanResult from either RPC or REST API
+      // Success flow - use scanResult from REST API
       if (!scanResult || scanResult.success !== true) {
         console.error('❌ Scan did not succeed, cannot continue with success flow');
         return;
