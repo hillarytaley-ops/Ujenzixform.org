@@ -210,10 +210,10 @@ class TrackingNumberService {
       let activeError: any = null;
       
       try {
-        // CRITICAL: Only check for TRULY active deliveries (not delivered/completed)
-        // Also exclude cancelled deliveries
+        // CRITICAL: Only check for TRULY active deliveries (not delivered/completed/cancelled)
+        // Query: status must be in (accepted, picked_up, in_transit, assigned) AND not delivered/completed/cancelled
         const response = await fetch(
-          `${SUPABASE_URL}/rest/v1/delivery_requests?provider_id=eq.${providerId}&id=neq.${deliveryRequestId}&status=in.(accepted,picked_up,in_transit,assigned)&status=neq.delivered&status=neq.completed&status=neq.cancelled&select=id,status,tracking_number,pickup_date,preferred_date,purchase_order_id`,
+          `${SUPABASE_URL}/rest/v1/delivery_requests?provider_id=eq.${providerId}&id=neq.${deliveryRequestId}&status=in.(accepted,picked_up,in_transit,assigned)&select=id,status,tracking_number,pickup_date,preferred_date,purchase_order_id`,
           {
             headers: {
               'apikey': SUPABASE_ANON_KEY,
