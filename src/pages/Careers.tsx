@@ -386,36 +386,65 @@ const Careers = () => {
         applicationData.resume_url = resumeUrl;
       }
       
-      // Add timeout for database insert (15 seconds - faster feedback)
+      // Use direct fetch with AbortController for reliable timeout (10 seconds)
       console.log('⏳ Inserting into database...');
-      const insertPromise = supabase
-        .from('job_applications')
-        .insert(applicationData)
-        .select(); // Add select to get response data
       
-      const insertTimeout = new Promise<{ error: { message: string }, data: null }>((resolve) => {
-        setTimeout(() => {
-          console.warn('⏱️ Database insert timeout after 15 seconds');
-          resolve({ error: { message: 'Database insert timeout after 15 seconds' }, data: null });
-        }, 15000);
-      });
+      // Get access token
+      let accessToken = SUPABASE_ANON_KEY;
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.access_token) {
+          accessToken = session.access_token;
+        }
+      } catch (e) {
+        console.log('⚠️ Could not get session token, using anon key');
+      }
       
-      const insertResult = await Promise.race([insertPromise, insertTimeout]);
+      const controller = new AbortController();
+      const insertTimeout = setTimeout(() => {
+        console.warn('⏱️ Database insert timeout after 10 seconds - aborting');
+        controller.abort();
+      }, 10000); // 10 second timeout
       
-      if (insertResult.error) {
-        console.error('❌ Database insert error:', insertResult.error);
-        // If it's a timeout, still try to show success (application might have been saved)
-        if (insertResult.error.message?.includes('timeout')) {
+      try {
+        const response = await fetch(
+          `${SUPABASE_URL}/rest/v1/job_applications`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'apikey': SUPABASE_ANON_KEY,
+              'Authorization': `Bearer ${accessToken}`,
+              'Prefer': 'return=representation'
+            },
+            body: JSON.stringify(applicationData),
+            signal: controller.signal
+          }
+        );
+        
+        clearTimeout(insertTimeout);
+        
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          console.error('❌ Database insert error:', response.status, errorData);
+          throw new Error(errorData.message || `Insert failed: ${response.status}`);
+        }
+        
+        const insertedData = await response.json();
+        console.log('✅ General application submitted successfully to database:', insertedData?.[0]?.id || 'unknown');
+      } catch (fetchError: any) {
+        clearTimeout(insertTimeout);
+        if (fetchError.name === 'AbortError') {
           console.warn('⚠️ Database insert timed out, but application may have been saved');
           toast({
             title: '⚠️ Submission Timeout',
             description: 'Your application may have been submitted. Please check your email for confirmation or try again.',
           });
+          // Don't throw - allow submission to complete
         } else {
-          throw insertResult.error;
+          console.error('❌ Database insert error:', fetchError);
+          throw fetchError;
         }
-      } else {
-        console.log('✅ General application submitted successfully to database');
       }
       setApplicationSuccess(true);
       toast({
