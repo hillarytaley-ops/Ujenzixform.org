@@ -390,8 +390,9 @@ const DeliveryDashboard = () => {
                 }
               });
               
-              // Second filter: Only orders in "Awaiting Dispatch" status
-              // CRITICAL: If order has NO material_items OR has dispatched items, it should NOT appear
+              // Second filter: Only validate that orders exist - don't filter by dispatch status
+              // Orders with dispatched items should appear in "In Transit", not be removed
+              // Let getCategory() handle categorization into Scheduled/In Transit/Delivered
               const validDeliveries = ordersThatExist.filter((d: any) => {
                 if (!d.purchase_order_id) {
                   // No purchase_order_id - exclude it
@@ -402,51 +403,28 @@ const DeliveryDashboard = () => {
                   return false;
                 }
                 
-                // Check if order is in "Awaiting Dispatch" status
-                // (all material_items must have dispatch_scanned = FALSE)
+                // Only validate that the order exists - don't filter by dispatch status
                 if (itemsByOrder[d.purchase_order_id]) {
                   const items = itemsByOrder[d.purchase_order_id];
                   
                   if (items.length === 0) {
-                    // No material_items - exclude it
+                    // No material_items - exclude it (order doesn't exist)
                     console.warn('🚫 Removing order with no material_items:', {
                       order_number: d.order_number,
                       purchase_order_id: d.purchase_order_id?.substring(0, 8),
-                      reason: 'Order has no material_items - not in Awaiting Dispatch'
+                      reason: 'Order has no material_items'
                     });
                     return false;
                   }
                   
-                  const allItemsNotDispatched = items.every((item: any) => item.dispatch_scanned === false);
-                  
-                  if (!allItemsNotDispatched) {
-                    const dispatchedCount = items.filter((i: any) => i.dispatch_scanned === true).length;
-                    console.warn('🚫 Removing order not in Awaiting Dispatch:', {
-                      order_number: d.order_number,
-                      purchase_order_id: d.purchase_order_id?.substring(0, 8),
-                      reason: 'Order has dispatched items - not in Awaiting Dispatch status',
-                      dispatched_count: dispatchedCount,
-                      total_items: items.length,
-                      order_number_match: d.order_number === 'QR-1773125455597-K3447' ? '⚠️ THIS IS THE PROBLEMATIC ORDER!' : 'OK'
-                    });
-                    return false;
-                  }
-                  
-                  // All items are not dispatched - this is valid
-                  console.log('✅ Order passed Awaiting Dispatch validation:', {
-                    order_number: d.order_number,
-                    purchase_order_id: d.purchase_order_id?.substring(0, 8),
-                    total_items: items.length,
-                    all_not_dispatched: true
-                  });
+                  // Order exists and has items - keep it (categorization will handle dispatch status)
                   return true;
                 } else {
                   // No material_items found for this order - exclude it
                   console.warn('🚫 Removing order with no material_items data:', {
                     order_number: d.order_number,
                     purchase_order_id: d.purchase_order_id?.substring(0, 8),
-                    reason: 'No material_items found - cannot verify Awaiting Dispatch status',
-                    order_number_match: d.order_number === 'QR-1773125455597-K3447' ? '⚠️ THIS IS THE PROBLEMATIC ORDER!' : 'OK'
+                    reason: 'No material_items found'
                   });
                   return false;
                 }
