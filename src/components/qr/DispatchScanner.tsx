@@ -908,6 +908,22 @@ export const DispatchScanner: React.FC = () => {
         purchaseOrderMap[order.id] = order;
       });
 
+      // Create a map of delivery_requests by purchase_order_id for provider info
+      // Use the most recent delivery_request with a provider_id
+      const deliveryRequestMap: Record<string, any> = {};
+      (deliveryRequestsData || []).forEach((dr: any) => {
+        if (dr.purchase_order_id && dr.provider_id) {
+          // If we already have a delivery_request for this order, keep the one with accepted/assigned status
+          const existing = deliveryRequestMap[dr.purchase_order_id];
+          if (!existing || 
+              (dr.status === 'accepted' || dr.status === 'assigned') && 
+              (existing.status !== 'accepted' && existing.status !== 'assigned')) {
+            deliveryRequestMap[dr.purchase_order_id] = dr;
+          }
+        }
+      });
+      console.log('📦 Delivery requests mapped to orders:', Object.keys(deliveryRequestMap).length);
+
       // Group items by purchase_order_id
       const orderMap: Record<string, Order> = {};
       
@@ -916,6 +932,11 @@ export const DispatchScanner: React.FC = () => {
       (itemsData || []).forEach((item: any) => {
         const orderId = item.purchase_order_id || 'unknown';
         const purchaseOrder = purchaseOrderMap[orderId];
+        const deliveryRequest = deliveryRequestMap[orderId];
+        
+        // Get delivery_provider_id from purchase_order first, fallback to delivery_request
+        const deliveryProviderId = purchaseOrder?.delivery_provider_id || deliveryRequest?.provider_id || null;
+        const deliveryProviderName = purchaseOrder?.delivery_provider_name || null; // Name comes from purchase_order (set by trigger)
         
         if (!orderMap[orderId]) {
           orderMap[orderId] = {
@@ -930,8 +951,8 @@ export const DispatchScanner: React.FC = () => {
             pending_items: 0,
             created_at: item.created_at || purchaseOrder?.created_at || '',
             items: [],
-            delivery_provider_id: purchaseOrder?.delivery_provider_id || null,
-            delivery_provider_name: purchaseOrder?.delivery_provider_name || null,
+            delivery_provider_id: deliveryProviderId,
+            delivery_provider_name: deliveryProviderName,
             delivery_required: purchaseOrder?.delivery_required !== false // Default to true if not explicitly false
           };
         }
@@ -1240,9 +1261,53 @@ export const DispatchScanner: React.FC = () => {
 
     // ═══════════════════════════════════════════════════════════════════════════
     // VALIDATE: Delivery provider required before dispatch
+    // Check both purchase_order.delivery_provider_id and delivery_requests.provider_id
     // ═══════════════════════════════════════════════════════════════════════════
     const deliveryRequired = selectedOrder.delivery_required !== false; // Default to true if not explicitly false
-    const hasDeliveryProvider = selectedOrder.delivery_provider_id && selectedOrder.delivery_provider_id.trim() !== '';
+    let hasDeliveryProvider = selectedOrder.delivery_provider_id && selectedOrder.delivery_provider_id.trim() !== '';
+    
+    // If order doesn't have provider_id, check delivery_requests directly
+    // (trigger only fires on 'accepted', but delivery can be 'assigned' too)
+    if (deliveryRequired && !hasDeliveryProvider && selectedOrder.id) {
+      try {
+        const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
+        const ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
+        
+        // Get access token
+        let accessToken = ANON_KEY;
+        try {
+          const stored = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+          if (stored) {
+            const parsed = JSON.parse(stored);
+            accessToken = parsed.access_token || ANON_KEY;
+          }
+        } catch (e) {}
+        
+        // Check delivery_requests for this order
+        const drResponse = await fetch(
+          `${SUPABASE_URL}/rest/v1/delivery_requests?purchase_order_id=eq.${selectedOrder.id}&provider_id=not.is.null&select=provider_id,status&limit=1`,
+          {
+            headers: {
+              'apikey': ANON_KEY,
+              'Authorization': `Bearer ${accessToken}`,
+            }
+          }
+        );
+        
+        if (drResponse.ok) {
+          const drData = await drResponse.json();
+          if (drData && drData.length > 0 && drData[0].provider_id) {
+            // Found provider in delivery_request - update the order object and allow dispatch
+            selectedOrder.delivery_provider_id = drData[0].provider_id;
+            hasDeliveryProvider = true;
+            console.log('✅ Found delivery provider in delivery_requests:', drData[0].provider_id);
+          }
+        }
+      } catch (error) {
+        console.warn('⚠️ Could not check delivery_requests for provider:', error);
+        // Continue with validation - if no provider found, will show error below
+      }
+    }
     
     if (deliveryRequired && !hasDeliveryProvider) {
       toast.error('❌ Cannot Dispatch: No Delivery Provider Assigned', {
