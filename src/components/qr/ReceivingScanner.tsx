@@ -647,7 +647,7 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
       console.log('🔄 Using REST API directly (no RPC) to process scan...');
       
       // REST API implementation (existing REST API logic)
-          try {
+      try {
           // Try different QR code formats to find the item
           // Extract various parts of the QR code for flexible matching
           const numericPart = cleanQRCode.match(/\d{13,}/)?.[0] || '';
