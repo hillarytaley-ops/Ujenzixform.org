@@ -1029,29 +1029,63 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
             <p className="text-gray-500">No active delivery requests</p>
           </div>
         ) : (
-          uniqueNotifications.map((notification) => {
-            // React key: Use purchase_order_id as primary key (each PO is unique)
-            // CRITICAL: Must match the key used in deduplication logic
-            // DO NOT USE INDEX - this causes duplicates to render!
-            let uniqueKey: string;
-            if (notification.purchase_order_id) {
-              // Each purchase_order_id is unique - use it directly
-              uniqueKey = `po-${notification.purchase_order_id}`;
-            } else if (notification.delivery_request_id) {
-              // Use delivery_request_id as fallback
-              uniqueKey = `dr-${notification.delivery_request_id}`;
-            } else {
-              // No purchase_order_id or delivery_request_id - use notification id
-              uniqueKey = `notif-${notification.id}`;
+          (() => {
+            // FINAL RENDER-LEVEL DEDUPLICATION: Use a Map to absolutely guarantee uniqueness
+            const renderMap = new Map<string, Notification>();
+            uniqueNotifications.forEach((notification) => {
+              let uniqueKey: string;
+              if (notification.purchase_order_id) {
+                uniqueKey = `po-${notification.purchase_order_id}`;
+              } else if (notification.delivery_request_id) {
+                uniqueKey = `dr-${notification.delivery_request_id}`;
+              } else {
+                uniqueKey = `notif-${notification.id}`;
+              }
+              
+              // If we already have this key, log it and skip
+              if (renderMap.has(uniqueKey)) {
+                console.error(`🚨🚨🚨 RENDER DUPLICATE DETECTED: Key ${uniqueKey} already exists! Existing: ${renderMap.get(uniqueKey)?.id}, New: ${notification.id}`);
+                // Prefer the one with delivery_request_id
+                const existing = renderMap.get(uniqueKey)!;
+                if (notification.delivery_request_id && !existing.delivery_request_id) {
+                  console.error(`🔄 RENDER: Replacing ${uniqueKey} with notification that has delivery_request_id`);
+                  renderMap.set(uniqueKey, notification);
+                }
+                return; // Skip duplicate
+              }
+              
+              renderMap.set(uniqueKey, notification);
+            });
+            
+            const finalRenderNotifications = Array.from(renderMap.values());
+            
+            if (finalRenderNotifications.length < uniqueNotifications.length) {
+              console.error(`🚨🚨🚨 RENDER: Removed ${uniqueNotifications.length - finalRenderNotifications.length} duplicates at render time!`);
             }
             
-            // ABSOLUTE GUARANTEE: Use ONLY the unique key (no index!)
-            // If deduplication worked, each key should be unique
-            const finalKey = uniqueKey;
-            
-            return (
-              <div
-                key={finalKey}
+            return finalRenderNotifications.map((notification) => {
+              // React key: Use purchase_order_id as primary key (each PO is unique)
+              // CRITICAL: Must match the key used in deduplication logic
+              // DO NOT USE INDEX - this causes duplicates to render!
+              let uniqueKey: string;
+              if (notification.purchase_order_id) {
+                // Each purchase_order_id is unique - use it directly
+                uniqueKey = `po-${notification.purchase_order_id}`;
+              } else if (notification.delivery_request_id) {
+                // Use delivery_request_id as fallback
+                uniqueKey = `dr-${notification.delivery_request_id}`;
+              } else {
+                // No purchase_order_id or delivery_request_id - use notification id
+                uniqueKey = `notif-${notification.id}`;
+              }
+              
+              // ABSOLUTE GUARANTEE: Use ONLY the unique key (no index!)
+              // If deduplication worked, each key should be unique
+              const finalKey = uniqueKey;
+              
+              return (
+                <div
+                  key={finalKey}
                 className={`p-3 rounded-lg border ${
                   notification.read 
                     ? 'bg-white border-gray-200' 
