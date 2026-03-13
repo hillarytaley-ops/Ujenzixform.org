@@ -333,21 +333,41 @@ const Careers = () => {
       }
 
       console.log('💾 Submitting general application to database...');
-      const { error } = await supabase
+      
+      // Prepare application data - ensure cover_letter is not null (required field)
+      const applicationData: any = {
+        job_id: 'general-application',
+        job_title: generalApplication.position || 'General Application',
+        full_name: generalApplication.name,
+        email: generalApplication.email,
+        phone: generalApplication.phone,
+        cover_letter: generalApplication.coverLetter || 'No cover letter provided',
+        status: 'new'
+      };
+      
+      // Add optional fields only if they have values
+      if (generalApplication.linkedin) {
+        applicationData.linkedin_url = generalApplication.linkedin;
+      }
+      if (resumeUrl) {
+        applicationData.resume_url = resumeUrl;
+      }
+      
+      // Add timeout for database insert (20 seconds)
+      const insertPromise = supabase
         .from('job_applications')
-        .insert({
-          job_id: 'general-application',
-          job_title: generalApplication.position || 'General Application',
-          full_name: generalApplication.name,
-          email: generalApplication.email,
-          phone: generalApplication.phone,
-          linkedin_url: generalApplication.linkedin || null,
-          cover_letter: generalApplication.coverLetter || null,
-          resume_url: resumeUrl,
-          cover_letter_file_url: coverLetterUrl,
-          status: 'new',
-          created_at: new Date().toISOString()
-        } as any);
+        .insert(applicationData);
+      
+      const insertTimeout = new Promise<{ error: { message: string } }>((resolve) => {
+        setTimeout(() => resolve({ error: { message: 'Database insert timeout after 20 seconds' } }), 20000);
+      });
+      
+      const insertResult = await Promise.race([insertPromise, insertTimeout]);
+      
+      if (insertResult.error) {
+        console.error('❌ Database insert error:', insertResult.error);
+        throw insertResult.error;
+      }
 
       if (error) {
         console.error('❌ Database insert error:', error);
@@ -442,22 +462,41 @@ const Careers = () => {
       }
 
       console.log('💾 Submitting application to database...');
-      const { error } = await supabase
+      
+      // Prepare application data - ensure cover_letter is not null (required field)
+      const applicationData: any = {
+        job_id: selectedJob.id,
+        job_title: selectedJob.title,
+        full_name: applicationForm.name,
+        email: applicationForm.email,
+        phone: applicationForm.phone,
+        cover_letter: applicationForm.coverLetter || 'No cover letter provided',
+        status: 'new'
+      };
+      
+      // Add optional fields only if they have values
+      if (applicationForm.linkedin) {
+        applicationData.linkedin_url = applicationForm.linkedin;
+      }
+      if (resumeUrl) {
+        applicationData.resume_url = resumeUrl;
+      }
+      
+      // Add timeout for database insert (20 seconds)
+      const insertPromise = supabase
         .from('job_applications')
-        .insert({
-          job_id: selectedJob.id,
-          job_title: selectedJob.title,
-          full_name: applicationForm.name,
-          email: applicationForm.email,
-          phone: applicationForm.phone,
-          linkedin_url: applicationForm.linkedin || null,
-          portfolio_url: applicationForm.portfolio || null,
-          cover_letter: applicationForm.coverLetter || null,
-          resume_url: resumeUrl,
-          cover_letter_file_url: coverLetterUrl,
-          status: 'new',
-          created_at: new Date().toISOString()
-        } as any);
+        .insert(applicationData);
+      
+      const insertTimeout = new Promise<{ error: { message: string } }>((resolve) => {
+        setTimeout(() => resolve({ error: { message: 'Database insert timeout after 20 seconds' } }), 20000);
+      });
+      
+      const insertResult = await Promise.race([insertPromise, insertTimeout]);
+      
+      if (insertResult.error) {
+        console.error('❌ Database insert error:', insertResult.error);
+        throw insertResult.error;
+      }
 
       if (error) {
         console.error('❌ Database insert error:', error);
