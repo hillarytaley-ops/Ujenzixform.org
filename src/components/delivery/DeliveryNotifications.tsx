@@ -682,47 +682,93 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
   };
 
   // FINAL RENDER-LEVEL DEDUPLICATION: ONE notification per request (single Accept per professional builder request)
+  // ABSOLUTE GUARANTEE: Only ONE notification per purchase_order_id, NO EXCEPTIONS
   const uniqueNotifications = useMemo(() => {
     const renderedByPO = new Map<string, Notification>(); // One per purchase_order_id; prefer entry with delivery_request_id so Accept works
-    const renderedByDR = new Map<string, Notification>();
+    const renderedByDR = new Map<string, Notification>(); // One per delivery_request_id
+    const seenNotificationIds = new Set<string>(); // Track all notification IDs we've seen
 
     // First pass: one entry per purchase_order_id (prefer the one with delivery_request_id for Accept button)
     notifications.forEach((notification) => {
+      // CRITICAL: Check if we've already seen this notification ID
+      if (seenNotificationIds.has(notification.id)) {
+        console.error(`🚫 DUPLICATE NOTIFICATION ID: ${notification.id} - skipping`);
+        return;
+      }
+      seenNotificationIds.add(notification.id);
+      
       if (notification.purchase_order_id) {
         const existing = renderedByPO.get(notification.purchase_order_id);
-        const preferNew = existing
-          ? Boolean(notification.delivery_request_id && !existing.delivery_request_id)
-          : true;
-        if (!existing || preferNew) {
+        if (existing) {
+          // We already have a notification for this purchase_order_id
+          // Prefer the one with delivery_request_id (so Accept button works)
+          const preferNew = Boolean(notification.delivery_request_id && !existing.delivery_request_id);
+          if (preferNew) {
+            console.log(`🔄 REPLACING: PO ${notification.purchase_order_id} - keeping notification with delivery_request_id (ID: ${notification.id})`);
+            renderedByPO.set(notification.purchase_order_id, notification);
+          } else {
+            console.log(`🗑️ SKIPPING: PO ${notification.purchase_order_id} - keeping existing (ID: ${existing.id}), skipping duplicate (ID: ${notification.id})`);
+          }
+        } else {
+          // First time seeing this purchase_order_id
           renderedByPO.set(notification.purchase_order_id, notification);
         }
         return;
       }
+      
+      // No purchase_order_id - deduplicate by delivery_request_id
       if (notification.delivery_request_id) {
         if (!renderedByDR.has(notification.delivery_request_id)) {
           renderedByDR.set(notification.delivery_request_id, notification);
+        } else {
+          console.log(`🗑️ SKIPPING: Duplicate delivery_request_id ${notification.delivery_request_id} (ID: ${notification.id})`);
         }
       }
     });
 
     // Build list: one per PO, then DRs not already covered, then no-PO/no-DR
+    // ABSOLUTE GUARANTEE: No duplicates in final result
     const seenIds = new Set<string>();
+    const seenPOIds = new Set<string>();
     let result: Notification[] = [];
+    
+    // Add notifications with purchase_order_id (ONE per purchase_order_id)
     renderedByPO.forEach((n) => {
-      if (!seenIds.has(n.id)) {
-        seenIds.add(n.id);
-        result.push(n);
+      if (seenIds.has(n.id)) {
+        console.error(`🚫 DUPLICATE: Notification ID ${n.id} already in result`);
+        return;
       }
+      if (seenPOIds.has(n.purchase_order_id!)) {
+        console.error(`🚫 DUPLICATE: Purchase order ${n.purchase_order_id} already in result`);
+        return;
+      }
+      seenIds.add(n.id);
+      seenPOIds.add(n.purchase_order_id!);
+      result.push(n);
     });
+    
+    // Add notifications with delivery_request_id but no purchase_order_id (ONE per delivery_request_id)
     renderedByDR.forEach((n) => {
-      if (seenIds.has(n.id)) return;
-      if (n.purchase_order_id && renderedByPO.has(n.purchase_order_id)) return;
+      if (seenIds.has(n.id)) {
+        console.log(`🗑️ SKIPPING: Notification ID ${n.id} already in result`);
+        return;
+      }
+      // Skip if this delivery_request_id is already covered by a purchase_order notification
+      if (n.purchase_order_id && renderedByPO.has(n.purchase_order_id)) {
+        console.log(`🗑️ SKIPPING: Delivery request ${n.delivery_request_id} already covered by PO ${n.purchase_order_id}`);
+        return;
+      }
       seenIds.add(n.id);
       result.push(n);
     });
+    
+    // Add notifications with no purchase_order_id and no delivery_request_id (ONE per notification ID)
     notifications.forEach((notification) => {
       if (notification.purchase_order_id || notification.delivery_request_id) return;
-      if (seenIds.has(notification.id)) return;
+      if (seenIds.has(notification.id)) {
+        console.log(`🗑️ SKIPPING: Notification ID ${notification.id} already in result`);
+        return;
+      }
       seenIds.add(notification.id);
       result.push(notification);
     });
