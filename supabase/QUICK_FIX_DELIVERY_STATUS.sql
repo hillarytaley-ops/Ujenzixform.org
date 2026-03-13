@@ -1,0 +1,164 @@
+-- ============================================================
+-- QUICK FIX: Make delivery scanner update order status
+-- Run this NOW in Supabase SQL Editor
+-- ============================================================
+
+-- This fixes the record_qr_scan_simple function to ALWAYS update orders to 'delivered'
+-- when all items are received, regardless of current status
+
+CREATE OR REPLACE FUNCTION public.record_qr_scan_simple(
+  _qr_code TEXT,
+  _scan_type TEXT,
+  _scanner_device_id TEXT DEFAULT NULL,
+  _scanner_type TEXT DEFAULT 'web_scanner',
+  _scan_location JSONB DEFAULT NULL,
+  _material_condition TEXT DEFAULT 'good',
+  _quantity_scanned INTEGER DEFAULT NULL,
+  _notes TEXT DEFAULT NULL,
+  _photo_url TEXT DEFAULT NULL
+)
+RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  scan_event_id UUID;
+  item_record RECORD;
+  current_user_id UUID;
+  order_id UUID;
+  po_number_match TEXT;
+  item_number_match TEXT;
+  v_all_items_received BOOLEAN;
+  v_all_items_dispatched BOOLEAN;
+  v_delivery_request_provider_id UUID;
+  v_delivery_request_status TEXT;
+BEGIN
+  current_user_id := auth.uid();
+  
+  -- Find item by QR code
+  SELECT * INTO item_record FROM material_items WHERE qr_code = _qr_code LIMIT 1;
+  
+  -- If not found, try PO number + item sequence lookup
+  IF NOT FOUND THEN
+    po_number_match := (regexp_match(_qr_code, 'PO-(\d{13,})'))[1];
+    item_number_match := (regexp_match(_qr_code, 'ITEM(\d+)'))[1];
+    IF po_number_match IS NOT NULL AND item_number_match IS NOT NULL THEN
+      SELECT mi.* INTO item_record
+      FROM material_items mi
+      JOIN purchase_orders po ON po.id = mi.purchase_order_id
+      WHERE po.po_number LIKE '%' || po_number_match || '%'
+        AND mi.item_sequence = (item_number_match::INTEGER)
+      LIMIT 1;
+    END IF;
+  END IF;
+  
+  IF NOT FOUND THEN
+    RETURN jsonb_build_object('success', false, 'error', 'QR code not found', 'error_code', 'QR_NOT_FOUND');
+  END IF;
+  
+  order_id := item_record.purchase_order_id;
+  
+  -- Insert scan event
+  INSERT INTO qr_scan_events (
+    qr_code, scan_type, scanned_by, scanner_device_id, scanner_type,
+    scan_location, material_condition, quantity_scanned, notes, photo_url
+  ) VALUES (
+    item_record.qr_code, _scan_type, current_user_id, _scanner_device_id, _scanner_type,
+    _scan_location, _material_condition, _quantity_scanned, _notes, _photo_url
+  ) RETURNING id INTO scan_event_id;
+  
+  -- Handle receiving scan
+  IF _scan_type = 'receiving' THEN
+    IF item_record.receive_scanned = TRUE THEN
+      RETURN jsonb_build_object('success', false, 'error', 'Already scanned', 'error_code', 'ALREADY_RECEIVED');
+    END IF;
+    
+    -- Update material item
+    UPDATE material_items
+    SET status = 'received',
+        receiving_scan_id = scan_event_id,
+        receive_scanned = TRUE,
+        receive_scanned_at = NOW(),
+        receive_scanned_by = current_user_id,
+        updated_at = NOW()
+    WHERE id = item_record.id;
+    
+    -- CRITICAL: Check if all items received - UPDATE ORDER TO DELIVERED
+    IF order_id IS NOT NULL THEN
+      SELECT COUNT(*) = COUNT(*) FILTER (WHERE receive_scanned = TRUE)
+      INTO v_all_items_received
+      FROM material_items
+      WHERE purchase_order_id = order_id;
+      
+      IF v_all_items_received = TRUE THEN
+        -- FIX: Remove WHERE condition - always update when all items received
+        UPDATE purchase_orders
+        SET status = 'delivered',
+            delivery_status = 'delivered',
+            delivered_at = COALESCE(delivered_at, NOW()),
+            updated_at = NOW()
+        WHERE id = order_id;  -- NO RESTRICTIVE WHERE CLAUSE!
+        
+        UPDATE delivery_requests
+        SET status = 'delivered',
+            delivered_at = COALESCE(delivered_at, NOW()),
+            updated_at = NOW()
+        WHERE purchase_order_id = order_id
+          AND status NOT IN ('delivered', 'completed', 'cancelled');
+        
+        RAISE NOTICE '✅ FIXED: Order % updated to delivered', order_id;
+      END IF;
+    END IF;
+  END IF;
+  
+  -- Handle dispatch scan
+  IF _scan_type = 'dispatch' THEN
+    IF item_record.dispatch_scanned = TRUE THEN
+      RETURN jsonb_build_object('success', false, 'error', 'Already dispatched', 'error_code', 'ALREADY_DISPATCHED');
+    END IF;
+    
+    UPDATE material_items
+    SET status = 'dispatched',
+        dispatch_scan_id = scan_event_id,
+        dispatch_scanned = TRUE,
+        dispatch_scanned_at = NOW(),
+        dispatch_scanned_by = current_user_id,
+        updated_at = NOW()
+    WHERE id = item_record.id;
+    
+    IF order_id IS NOT NULL THEN
+      SELECT COUNT(*) = COUNT(*) FILTER (WHERE dispatch_scanned = TRUE)
+      INTO v_all_items_dispatched
+      FROM material_items
+      WHERE purchase_order_id = order_id;
+      
+      IF v_all_items_dispatched = TRUE THEN
+        SELECT provider_id, status INTO v_delivery_request_provider_id, v_delivery_request_status
+        FROM delivery_requests
+        WHERE purchase_order_id = order_id AND provider_id IS NOT NULL
+        ORDER BY created_at DESC LIMIT 1;
+        
+        UPDATE purchase_orders
+        SET status = 'shipped',
+            delivery_provider_id = COALESCE(delivery_provider_id, v_delivery_request_provider_id),
+            delivery_status = CASE WHEN v_delivery_request_status = 'accepted' THEN 'in_transit' ELSE delivery_status END,
+            updated_at = NOW()
+        WHERE id = order_id
+          AND status IN ('confirmed', 'processing', 'pending', 'quote_accepted', 'order_created');
+      END IF;
+    END IF;
+  END IF;
+  
+  RETURN jsonb_build_object(
+    'success', true,
+    'scan_event_id', scan_event_id,
+    'qr_code', item_record.qr_code,
+    'material_type', item_record.material_type,
+    'status', CASE WHEN _scan_type = 'receiving' THEN 'received' ELSE 'dispatched' END,
+    'order_completed', COALESCE(v_all_items_received, FALSE)
+  );
+END;
+$$;
+
+SELECT '✅ FIX APPLIED: record_qr_scan_simple now updates orders to delivered when all items are received!' AS result;
