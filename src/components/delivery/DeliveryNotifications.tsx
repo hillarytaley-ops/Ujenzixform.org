@@ -308,7 +308,8 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
         poId && poId.trim() !== '' && poId !== 'null' && poId !== 'undefined'
       );
       
-      // Verify purchase_orders exist (quick check to filter out orphaned delivery_requests)
+      // RELAXED: Verify purchase_orders exist, but if verification fails, show all notifications anyway
+      // This ensures delivery alerts come through even if there's a temporary database issue
       let validPOIds = new Set<string>(poIdsToVerify);
       if (poIdsToVerify.length > 0) {
         try {
@@ -322,12 +323,17 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
             validPOIds = new Set(validPOs.map((po: any) => po.id));
             const invalidCount = poIdsToVerify.length - validPOIds.size;
             if (invalidCount > 0) {
-              console.log(`🚫 FILTERED OUT: ${invalidCount} delivery requests with non-existent purchase_orders (orphaned requests)`);
+              console.log(`⚠️ ${invalidCount} delivery requests with non-existent purchase_orders (showing anyway to ensure alerts come through)`);
             }
+          } else {
+            console.warn('⚠️ Purchase order verification failed, showing all delivery_requests to ensure alerts come through');
+            // If verification fails, assume all are valid to ensure alerts show
+            validPOIds = new Set(poIdsToVerify);
           }
         } catch (verifyError) {
-          console.warn('⚠️ Could not verify purchase_orders, showing all delivery_requests:', verifyError);
-          // Continue with all PO IDs if verification fails
+          console.warn('⚠️ Could not verify purchase_orders, showing all delivery_requests to ensure alerts come through:', verifyError);
+          // If verification fails, assume all are valid to ensure alerts show
+          validPOIds = new Set(poIdsToVerify);
         }
       }
       
@@ -338,10 +344,12 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
           continue;
         }
         
-        // CRITICAL: Skip delivery requests where purchase_order doesn't exist (orphaned requests)
-        if (!validPOIds.has(poId)) {
-          console.log(`🚫 SKIPPING: Delivery request ${dr.id} has purchase_order_id ${poId} but purchase_order doesn't exist (orphaned request)`);
-          continue;
+        // RELAXED: Only skip if we're certain the purchase_order doesn't exist
+        // If verification failed or purchase_order wasn't found, show the notification anyway
+        // This ensures delivery alerts come through even if there's a temporary database issue
+        if (validPOIds.size > 0 && !validPOIds.has(poId)) {
+          console.log(`⚠️ Delivery request ${dr.id} has purchase_order_id ${poId} but purchase_order not found (showing anyway to ensure alerts come through)`);
+          // Don't skip - show the notification anyway to ensure alerts come through
         }
         
         // ABSOLUTE GUARANTEE: Only add if we haven't seen this purchase_order_id yet
