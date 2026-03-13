@@ -210,8 +210,10 @@ class TrackingNumberService {
       let activeError: any = null;
       
       try {
+        // CRITICAL: Only check for TRULY active deliveries (not delivered/completed)
+        // Also exclude cancelled deliveries
         const response = await fetch(
-          `${SUPABASE_URL}/rest/v1/delivery_requests?provider_id=eq.${providerId}&id=neq.${deliveryRequestId}&status=in.(accepted,picked_up,in_transit,assigned)&select=id,status,tracking_number,pickup_date,preferred_date`,
+          `${SUPABASE_URL}/rest/v1/delivery_requests?provider_id=eq.${providerId}&id=neq.${deliveryRequestId}&status=in.(accepted,picked_up,in_transit,assigned)&status=neq.delivered&status=neq.completed&status=neq.cancelled&select=id,status,tracking_number,pickup_date,preferred_date,purchase_order_id`,
           {
             headers: {
               'apikey': SUPABASE_ANON_KEY,
@@ -227,6 +229,51 @@ class TrackingNumberService {
         
         if (response.ok) {
           activeDeliveries = await response.json();
+          console.log(`📦 Found ${activeDeliveries.length} potentially active deliveries`);
+          
+          // ADDITIONAL CHECK: Verify these deliveries are truly active by checking purchase_order status
+          // If purchase_order status is 'delivered', the delivery is complete even if delivery_request status is 'accepted'
+          if (activeDeliveries.length > 0) {
+            const poIds = activeDeliveries.map((d: any) => d.purchase_order_id).filter(Boolean);
+            if (poIds.length > 0) {
+              try {
+                const poResponse = await fetch(
+                  `${SUPABASE_URL}/rest/v1/purchase_orders?id=in.(${poIds.join(',')})&select=id,status,delivery_status`,
+                  {
+                    headers: {
+                      'apikey': SUPABASE_ANON_KEY,
+                      'Authorization': `Bearer ${accessToken}`,
+                      'Content-Type': 'application/json'
+                    },
+                    signal: controller2.signal,
+                    cache: 'no-store'
+                  }
+                );
+                
+                if (poResponse.ok) {
+                  const purchaseOrders = await poResponse.json();
+                  const deliveredPOIds = new Set(
+                    purchaseOrders
+                      .filter((po: any) => po.status === 'delivered' || po.delivery_status === 'delivered')
+                      .map((po: any) => po.id)
+                  );
+                  
+                  // Remove deliveries where the purchase_order is already delivered
+                  activeDeliveries = activeDeliveries.filter((d: any) => {
+                    if (d.purchase_order_id && deliveredPOIds.has(d.purchase_order_id)) {
+                      console.log(`✅ Filtering out completed delivery ${d.id} - purchase_order ${d.purchase_order_id} is delivered`);
+                      return false;
+                    }
+                    return true;
+                  });
+                  
+                  console.log(`📦 After filtering completed orders: ${activeDeliveries.length} truly active deliveries`);
+                }
+              } catch (poError) {
+                console.warn('⚠️ Could not verify purchase_order status, using delivery_request status only:', poError);
+              }
+            }
+          }
         } else {
           activeError = { message: `HTTP ${response.status}`, code: response.status.toString() };
         }
