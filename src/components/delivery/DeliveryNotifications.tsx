@@ -374,8 +374,8 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
         }
         
         // CRITICAL: Skip if already accepted by THIS provider (those should be in Scheduled tab, not notifications)
-        if (dr.provider_id === userId && dr.status === 'accepted') {
-          console.log(`🚫 SKIPPING: Delivery request ${dr.id} already accepted by this provider - should be in Scheduled tab`);
+        if (dr.provider_id === userId && ['accepted', 'assigned', 'picked_up', 'in_transit'].includes(dr.status)) {
+          console.log(`🚫 SKIPPING: Delivery request ${dr.id} already accepted by this provider (status: ${dr.status}) - should be in Scheduled tab`);
           continue;
         }
         
