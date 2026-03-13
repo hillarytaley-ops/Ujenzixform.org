@@ -348,6 +348,13 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
           continue;
         }
         
+        // CRITICAL: Skip delivered/completed/cancelled deliveries - these shouldn't show in notifications
+        // Only show pending, accepted, assigned, in_transit deliveries that need action
+        if (['delivered', 'completed', 'cancelled'].includes(dr.status)) {
+          console.log(`🚫 SKIPPING: Delivery request ${dr.id} has status ${dr.status} - already completed/cancelled`);
+          continue;
+        }
+        
         addedPOIds.add(poId);
         finalNotifications.push({
           id: `dr-${dr.id}`, // Use delivery_request id as notification id
@@ -355,7 +362,7 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
           title: dr.status === 'pending' ? '🚚 New Delivery Request!' : `Delivery ${dr.status}`,
           message: `${dr.material_type || 'Materials'} delivery to ${dr.delivery_address || 'Unknown location'}`,
           timestamp: new Date(dr.created_at),
-          read: dr.status !== 'pending',
+          read: dr.status !== 'pending', // Only pending deliveries are unread
           priority: dr.priority_level === 'urgent' || dr.status === 'pending' ? 'high' : 'medium',
           actionUrl: `/delivery-dashboard?request=${dr.id}`,
           status: dr.status,
