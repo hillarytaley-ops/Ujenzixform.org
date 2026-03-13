@@ -776,79 +776,52 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
     // Sort by timestamp (most recent first)
     result.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
 
-    // Second pass: collapse duplicates that look like the same request
-    // - Same pickup + same placeholder delivery, OR
-    // - Both have placeholder delivery ("To be provided") and within same 30-min window (handles one card with no pickup, one with full details)
-    const norm = (s: string | undefined) => (s || '').toLowerCase().trim();
-    const isPlaceholderDelivery = (s: string | undefined) =>
-      !norm(s) || norm(s).includes('to be provided') || norm(s) === 'provided';
-    const PLACEHOLDER_WINDOW_MS = 30 * 60 * 1000; // 30 min
-    const contentKey = (n: Notification) =>
-      `${norm(n.pickupAddress)}|${norm(n.deliveryAddress)}|${norm(n.materialType)}`;
-    const placeholderTimeKey = (n: Notification) =>
-      `placeholder_${Math.floor(n.timestamp.getTime() / PLACEHOLDER_WINDOW_MS)}`;
-    const collapsed: Notification[] = [];
-    const seenContent = new Map<string, Notification>();
-    const seenPlaceholderByTime = new Map<string, Notification>();
+    // FINAL VERIFICATION: Ensure absolutely no duplicates by purchase_order_id
+    const finalSeenPOIds = new Set<string>();
+    const finalSeenDRIds = new Set<string>();
+    const finalSeenIds = new Set<string>();
+    const final: Notification[] = [];
+    
     result.forEach((n) => {
-      const key = contentKey(n);
-      const existing = seenContent.get(key);
-      const bothPlaceholder =
-        isPlaceholderDelivery(n.deliveryAddress) &&
-        (!existing || isPlaceholderDelivery(existing.deliveryAddress));
-
-      // Collapse when same content key and both placeholder
-      if (existing && bothPlaceholder && key !== '||') {
-        const keep = n.delivery_request_id && !existing.delivery_request_id
-          ? n
-          : existing.delivery_request_id && !n.delivery_request_id
-            ? existing
-            : existing;
-        if (keep === n) {
-          const idx = collapsed.indexOf(existing);
-          if (idx >= 0) collapsed.splice(idx, 1);
-          seenContent.set(key, n);
-          collapsed.push(n);
+      // CRITICAL: If it has a purchase_order_id, ensure we only have ONE per purchase_order_id
+      if (n.purchase_order_id) {
+        if (finalSeenPOIds.has(n.purchase_order_id)) {
+          console.error(`🚫 FINAL FILTER: Duplicate purchase_order_id ${n.purchase_order_id} - removing notification ${n.id}`);
+          return; // Skip duplicate
         }
-        return;
+        finalSeenPOIds.add(n.purchase_order_id);
       }
-
-      // Collapse when both have placeholder delivery and same 30-min window (catches one card with empty pickup, one with "Nairobi, Kenya")
-      if (isPlaceholderDelivery(n.deliveryAddress)) {
-        const timeKey = placeholderTimeKey(n);
-        const existingInWindow = seenPlaceholderByTime.get(timeKey);
-        if (existingInWindow && existingInWindow.id !== n.id) {
-          // Keep the one with delivery_request_id so Accept works
-          const keep = n.delivery_request_id && !existingInWindow.delivery_request_id
-            ? n
-            : existingInWindow.delivery_request_id && !n.delivery_request_id
-              ? existingInWindow
-              : existingInWindow;
-          if (keep === n) {
-            const idx = collapsed.indexOf(existingInWindow);
-            if (idx >= 0) collapsed.splice(idx, 1);
-            seenPlaceholderByTime.set(timeKey, n);
-            collapsed.push(n);
-          }
-          return;
+      
+      // CRITICAL: If it has a delivery_request_id, ensure we only have ONE per delivery_request_id
+      if (n.delivery_request_id) {
+        if (finalSeenDRIds.has(n.delivery_request_id)) {
+          console.error(`🚫 FINAL FILTER: Duplicate delivery_request_id ${n.delivery_request_id} - removing notification ${n.id}`);
+          return; // Skip duplicate
         }
-        if (!existingInWindow) {
-          seenPlaceholderByTime.set(timeKey, n);
-        }
+        finalSeenDRIds.add(n.delivery_request_id);
       }
-
-      if (!existing) {
-        seenContent.set(key, n);
-        collapsed.push(n);
-      } else {
-        collapsed.push(n);
+      
+      // CRITICAL: Ensure notification ID is unique
+      if (finalSeenIds.has(n.id)) {
+        console.error(`🚫 FINAL FILTER: Duplicate notification ID ${n.id} - removing`);
+        return; // Skip duplicate
       }
+      finalSeenIds.add(n.id);
+      
+      final.push(n);
     });
 
-    const final = collapsed.length < result.length ? collapsed : result;
     if (final.length < notifications.length) {
-      console.log(`✅ RENDER: Single Accept per request - ${notifications.length} → ${final.length}`);
+      console.log(`✅ RENDER: Single Accept per request - ${notifications.length} → ${final.length} (removed ${notifications.length - final.length} duplicates)`);
     }
+    
+    // Final check: Log any remaining duplicates (should be zero)
+    const poIdsInFinal = final.map(n => n.purchase_order_id).filter(Boolean);
+    const duplicatePOIds = poIdsInFinal.filter((id, index) => poIdsInFinal.indexOf(id) !== index);
+    if (duplicatePOIds.length > 0) {
+      console.error(`🚨 CRITICAL: Still found ${duplicatePOIds.length} duplicate purchase_order_ids after all filtering:`, duplicatePOIds);
+    }
+    
     return final;
   }, [notifications]);
 
