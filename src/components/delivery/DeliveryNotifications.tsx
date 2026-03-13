@@ -301,10 +301,44 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
       // CRITICAL: Use a Set to track purchase_order_ids we've already added
       const addedPOIds = new Set<string>();
       
+      // First, collect all purchase_order_ids to verify they exist
+      const poIdsToVerify = Array.from(deliveryRequestsByPO.keys()).filter(poId => 
+        poId && poId.trim() !== '' && poId !== 'null' && poId !== 'undefined'
+      );
+      
+      // Verify purchase_orders exist (quick check to filter out orphaned delivery_requests)
+      let validPOIds = new Set<string>(poIdsToVerify);
+      if (poIdsToVerify.length > 0) {
+        try {
+          const verifyResponse = await fetch(
+            `${url}/rest/v1/purchase_orders?id=in.(${poIdsToVerify.join(',')})&select=id&limit=1000`,
+            { headers, cache: 'no-store' }
+          );
+          
+          if (verifyResponse.ok) {
+            const validPOs = await verifyResponse.json();
+            validPOIds = new Set(validPOs.map((po: any) => po.id));
+            const invalidCount = poIdsToVerify.length - validPOIds.size;
+            if (invalidCount > 0) {
+              console.log(`🚫 FILTERED OUT: ${invalidCount} delivery requests with non-existent purchase_orders (orphaned requests)`);
+            }
+          }
+        } catch (verifyError) {
+          console.warn('⚠️ Could not verify purchase_orders, showing all delivery_requests:', verifyError);
+          // Continue with all PO IDs if verification fails
+        }
+      }
+      
       for (const [poId, dr] of deliveryRequestsByPO.entries()) {
         // CRITICAL: Skip delivery requests without purchase_order_id (these are placeholder/default requests)
         if (!poId || poId.trim() === '' || poId === 'null' || poId === 'undefined') {
           console.log(`🚫 SKIPPING: Delivery request ${dr.id} has no valid purchase_order_id (placeholder/default request)`);
+          continue;
+        }
+        
+        // CRITICAL: Skip delivery requests where purchase_order doesn't exist (orphaned requests)
+        if (!validPOIds.has(poId)) {
+          console.log(`🚫 SKIPPING: Delivery request ${dr.id} has purchase_order_id ${poId} but purchase_order doesn't exist (orphaned request)`);
           continue;
         }
         
@@ -313,11 +347,6 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
           console.error(`🚫 BLOCKED: Already added notification for purchase_order_id ${poId}, skipping delivery_request ${dr.id}`);
           continue;
         }
-        
-        // VERIFY: Check if purchase_order actually exists (prevent showing notifications for deleted/non-existent orders)
-        // We'll do a quick check by trying to verify the purchase_order exists
-        // For now, we'll trust the purchase_order_id exists if it's in the deduplicated list
-        // (The deduplication already filtered out invalid ones)
         
         addedPOIds.add(poId);
         finalNotifications.push({
