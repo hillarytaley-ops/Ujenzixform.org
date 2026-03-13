@@ -301,7 +301,9 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
       // STEP 3: Create notifications from unique delivery_requests
       // CRITICAL: Only show delivery requests with valid purchase_order_id (no placeholder/default requests)
       // CRITICAL: Use a Set to track purchase_order_ids we've already added
+      // ABSOLUTE GUARANTEE: Only ONE notification per purchase_order_id
       const addedPOIds = new Set<string>();
+      const addedDRIds = new Set<string>(); // Also track delivery_request_ids to prevent duplicates
       
       // First, collect all purchase_order_ids to verify they exist
       const poIdsToVerify = Array.from(deliveryRequestsByPO.keys()).filter(poId => 
@@ -358,6 +360,12 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
           continue;
         }
         
+        // ABSOLUTE GUARANTEE: Also check delivery_request_id to prevent duplicates
+        if (dr.id && addedDRIds.has(dr.id)) {
+          console.error(`🚫 BLOCKED: Already added notification for delivery_request_id ${dr.id}, skipping`);
+          continue;
+        }
+        
         // CRITICAL: Skip delivered/completed/cancelled deliveries - these shouldn't show in notifications
         // Only show pending, accepted, assigned, in_transit deliveries that need action
         if (['delivered', 'completed', 'cancelled'].includes(dr.status)) {
@@ -366,6 +374,7 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
         }
         
         addedPOIds.add(poId);
+        if (dr.id) addedDRIds.add(dr.id);
         finalNotifications.push({
           id: `dr-${dr.id}`, // Use delivery_request id as notification id
           type: 'new_delivery',
@@ -454,6 +463,12 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
             }
             
             addedPOIds.add(po.id); // Mark as added
+            // CRITICAL: Double-check before adding to prevent any duplicates
+            const duplicateCheck = finalNotifications.find(n => n.purchase_order_id === po.id);
+            if (duplicateCheck) {
+              console.error(`🚫 BLOCKED: Purchase order ${po.id} duplicate detected right before adding, skipping`);
+              return;
+            }
             finalNotifications.push({
               id: `po-${po.id}`,
               type: 'new_delivery',
