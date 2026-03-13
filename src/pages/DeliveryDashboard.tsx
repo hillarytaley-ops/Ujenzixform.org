@@ -1062,6 +1062,28 @@ const DeliveryDashboard = () => {
             return; // Early return to avoid duplicate refresh
           }
           
+          // IMMEDIATE: When status changes to 'delivered', refresh to move order to history
+          if (oldStatus !== 'delivered' && newStatus === 'delivered') {
+            console.log('✅ Delivery completed - immediately refreshing to move to history...');
+            refetchData();
+            refetchUnified();
+            loadNotificationCounts();
+            
+            toast({
+              title: '✅ Delivery Completed!',
+              description: 'Order has been delivered and moved to delivery history.',
+              duration: 4000,
+            });
+            
+            // Also refresh after a short delay to ensure DB commit
+            setTimeout(() => {
+              refetchData();
+              refetchUnified();
+              loadNotificationCounts();
+            }, 200);
+            return; // Early return to avoid duplicate refresh
+          }
+          
           // When supplier dispatches, status changes to 'in_transit', 'dispatched', or 'shipped'
           const dispatchedStatuses = ['in_transit', 'dispatched', 'shipped', 'out_for_delivery'];
           const wasNotDispatched = !dispatchedStatuses.includes(oldStatus);

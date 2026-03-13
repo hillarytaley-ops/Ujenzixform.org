@@ -671,12 +671,21 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
             qr_code: simpleRpcData.qr_code || cleanQRCode,
             material_type: simpleRpcData.material_type || 'Unknown',
             status: simpleRpcData.status || 'received',
-            scan_event_id: simpleRpcData.scan_event_id
+            scan_event_id: simpleRpcData.scan_event_id,
+            order_completed: simpleRpcData.order_completed || false // Track if all items are received
           };
           deliveryRequestUpdated = true;
           simpleRpcSucceeded = true;
           const simpleRpcElapsed = Date.now() - rpcStartTime;
           console.log(`✅ Simplified RPC: Scan completed successfully in ${simpleRpcElapsed}ms`);
+          console.log(`📦 Order completed: ${simpleRpcData.order_completed ? 'YES - All items received' : 'NO - More items pending'}`);
+          
+          // If order is completed, the RPC function has already updated purchase_orders and delivery_requests
+          // Real-time subscriptions should catch these updates, but we'll add a small delay to ensure DB commit
+          if (simpleRpcData.order_completed === true) {
+            console.log('🎉 All items received! Order status updated to delivered by RPC function.');
+            console.log('📡 Real-time subscriptions should update supplier and provider dashboards automatically.');
+          }
         } else if (simpleRpcError) {
           console.log('⚠️ Simplified RPC failed:', simpleRpcError.message);
           // Continue to complex RPC fallback
@@ -777,8 +786,18 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
               throw rpcError; // Re-throw other errors
           }
           } else if (rpcResult?.success === true) {
-            scanResult = rpcResult;
+            scanResult = {
+              ...rpcResult,
+              order_completed: rpcResult.order_completed || false // Ensure order_completed is included
+            };
             console.log('✅ RPC: Scan successful');
+            console.log(`📦 Order completed: ${rpcResult.order_completed ? 'YES - All items received' : 'NO - More items pending'}`);
+            
+            // If order is completed, the RPC function has already updated purchase_orders and delivery_requests
+            if (rpcResult.order_completed === true) {
+              console.log('🎉 All items received! Order status updated to delivered by RPC function.');
+              console.log('📡 Real-time subscriptions should update supplier and provider dashboards automatically.');
+            }
         } else {
             throw new Error('RPC returned unsuccessful result');
           }
@@ -1278,10 +1297,12 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
         return;
       }
       
-      // Step 3: Notify callback - pass orderCompleted so UI can show correct feedback
+      // Step 3: Check if order is completed (all items received)
+      const orderCompleted = scanResult?.order_completed === true;
+      
+      // Step 4: Notify callback - pass orderCompleted so UI can show correct feedback
       // (order_completed = true when all items in the order were scanned)
       if (onDeliveryComplete) {
-        const orderCompleted = scanResult?.order_completed === true;
         console.log('🔄 Triggering onDeliveryComplete callback, orderCompleted:', orderCompleted);
         console.log('   Scan result:', scanResult);
         try {
@@ -1307,10 +1328,20 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
 
       setScanResults(prev => [scanResultForUI, ...prev.slice(0, 9)]);
       
-      toast.success('✅ Item Received!', {
-        description: `${scanResult?.material_type || 'Material'} confirmed${scanResult?.is_invalidated ? ' (QR code invalidated)' : ''}`,
-        duration: 5000
-      });
+      // Show appropriate success message based on order completion status
+      if (orderCompleted) {
+        console.log('🎉 ORDER COMPLETED: All items received! Order status updated to delivered.');
+        console.log('📡 Real-time subscriptions should update supplier and provider dashboards automatically.');
+        toast.success('🎉 Delivery Complete!', {
+          description: `All items received! Order status updated to delivered. Supplier and provider dashboards will update automatically.`,
+          duration: 8000
+        });
+      } else {
+        toast.success('✅ Item Received!', {
+          description: `${scanResult?.material_type || 'Material'} confirmed${scanResult?.is_invalidated ? ' (QR code invalidated)' : ''}. More items pending.`,
+          duration: 5000
+        });
+      }
 
       // Reset form
       setManualQRCode('');
