@@ -581,24 +581,24 @@ const DeliveryDashboard = () => {
       !['delivered', 'completed', 'cancelled'].includes(r.status || '')
     );
     
-    // CRITICAL: Deduplicate by purchase_order_id - use Map to ensure uniqueness
-    const uniqueDeliveriesMap = new Map<string, any>();
+    // CRITICAL: Deduplicate by purchase_order_id - use Set to ensure uniqueness (avoid Map bundling issues)
+    const seenPOIds = new Set<string>();
     
     // Add active deliveries first (they take priority)
     validActiveDeliveries.forEach(d => {
       if (d.purchase_order_id) {
-        uniqueDeliveriesMap.set(d.purchase_order_id, d);
+        seenPOIds.add(d.purchase_order_id);
       }
     });
     
     // Add pending requests only if they don't already exist
     validPendingRequests.forEach(r => {
-      if (r.purchase_order_id && !uniqueDeliveriesMap.has(r.purchase_order_id)) {
-        uniqueDeliveriesMap.set(r.purchase_order_id, r);
+      if (r.purchase_order_id && !seenPOIds.has(r.purchase_order_id)) {
+        seenPOIds.add(r.purchase_order_id);
       }
     });
     
-    return uniqueDeliveriesMap.size;
+    return seenPOIds.size;
   }, [activeDeliveries, pendingRequests]);
 
   // When unified RPC returns empty or legacy has more data (FAST PATH/REST wins), use legacy so dashboard always shows something
