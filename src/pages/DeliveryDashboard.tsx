@@ -624,40 +624,54 @@ const DeliveryDashboard = () => {
             // Use anon key
           }
           
-          // Query each missing order directly
-          const aggressiveQueries = missingAggressiveOrders.map(orderNum => {
+          // Query each missing order directly - try multiple patterns
+          const aggressiveQueries = missingAggressiveOrders.map(async (orderNum) => {
             const numericPart = orderNum.split('-')[1];
-            console.log('🚨 COMPONENT AGGRESSIVE: Querying for', orderNum);
+            console.log('🚨 COMPONENT AGGRESSIVE: Querying for', orderNum, '(numeric:', numericPart, ')');
             
-            // Try exact match first
-            return fetch(
-              `${SUPABASE_URL_AGGRESSIVE}/rest/v1/purchase_orders?po_number=eq.${encodeURIComponent(orderNum)}&select=*`,
-              {
-                headers: {
-                  'apikey': SUPABASE_ANON_KEY_AGGRESSIVE,
-                  'Authorization': `Bearer ${accessTokenAggressive}`,
-                  'Content-Type': 'application/json'
-                },
-                cache: 'no-store'
-              }
-            ).then(res => {
-              if (res.ok) {
-                return res.json();
-              } else {
-                // Fallback to ilike
-                return fetch(
-                  `${SUPABASE_URL_AGGRESSIVE}/rest/v1/purchase_orders?po_number=ilike.*${numericPart}*&select=*&limit=5`,
-                  {
-                    headers: {
-                      'apikey': SUPABASE_ANON_KEY_AGGRESSIVE,
-                      'Authorization': `Bearer ${accessTokenAggressive}`,
-                      'Content-Type': 'application/json'
-                    },
-                    cache: 'no-store'
+            const queryPatterns = [
+              // Pattern 1: Exact match
+              `po_number=eq.${encodeURIComponent(orderNum)}`,
+              // Pattern 2: Contains numeric part
+              `po_number=ilike.%${numericPart}%`,
+              // Pattern 3: Starts with numeric part
+              `po_number=ilike.${numericPart}%`,
+              // Pattern 4: Ends with numeric part
+              `po_number=ilike.%${numericPart}`,
+              // Pattern 5: Just the numeric part (in case format is different)
+              `po_number=cs.{${numericPart}}`
+            ];
+            
+            // Try each pattern until we find results
+            for (const pattern of queryPatterns) {
+              try {
+                const url = `${SUPABASE_URL_AGGRESSIVE}/rest/v1/purchase_orders?${pattern}&select=*&limit=5`;
+                const res = await fetch(url, {
+                  headers: {
+                    'apikey': SUPABASE_ANON_KEY_AGGRESSIVE,
+                    'Authorization': `Bearer ${accessTokenAggressive}`,
+                    'Content-Type': 'application/json'
+                  },
+                  cache: 'no-store'
+                });
+                
+                if (res.ok) {
+                  const data = await res.json();
+                  if (Array.isArray(data) && data.length > 0) {
+                    console.log(`✅ COMPONENT AGGRESSIVE: Found order ${orderNum} using pattern: ${pattern}`);
+                    return data;
                   }
-                ).then(res2 => res2.ok ? res2.json() : []).catch(() => []);
+                } else {
+                  const errorText = await res.text();
+                  console.warn(`⚠️ COMPONENT AGGRESSIVE: Pattern ${pattern} failed:`, res.status, errorText.substring(0, 100));
+                }
+              } catch (err: any) {
+                console.warn(`⚠️ COMPONENT AGGRESSIVE: Pattern ${pattern} error:`, err?.message || err);
               }
-            }).catch(() => []);
+            }
+            
+            console.warn(`⚠️ COMPONENT AGGRESSIVE: No result for ${orderNum} after trying all patterns`);
+            return [];
           });
           
           const aggressiveResults = await Promise.allSettled(aggressiveQueries);
