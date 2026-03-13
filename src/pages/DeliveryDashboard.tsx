@@ -659,27 +659,66 @@ const DeliveryDashboard = () => {
             return;
           }
           
-          // Query delivery_requests with status='delivered' for this provider
-          const deliveredRequestsRes = await fetch(
-            `${SUPABASE_URL_AGGRESSIVE}/rest/v1/delivery_requests?provider_id=eq.${providerIdToQuery}&status=eq.delivered&select=id,purchase_order_id,delivered_at,created_at&order=delivered_at.desc&limit=50`,
-            {
-              headers: {
-                'apikey': SUPABASE_ANON_KEY_AGGRESSIVE,
-                'Authorization': `Bearer ${accessTokenAggressive}`,
-                'Content-Type': 'application/json'
-              },
-              cache: 'no-store'
-            }
-          );
+          // Query delivery_requests with status='delivered' or 'completed' for this provider
+          // Try both provider_id and user_id (in case provider_id is actually user_id)
+          let deliveredRequests: any[] = [];
           
-          if (!deliveredRequestsRes.ok) {
-            const errorText = await deliveredRequestsRes.text();
-            console.error('❌ COMPONENT AGGRESSIVE: Failed to query delivery_requests:', deliveredRequestsRes.status, errorText.substring(0, 200));
-            return;
+          // Try querying by provider_id first
+          try {
+            const deliveredRequestsRes = await fetch(
+              `${SUPABASE_URL_AGGRESSIVE}/rest/v1/delivery_requests?provider_id=eq.${providerIdToQuery}&status=in.(delivered,completed)&select=id,purchase_order_id,delivered_at,created_at,status&order=delivered_at.desc&limit=50`,
+              {
+                headers: {
+                  'apikey': SUPABASE_ANON_KEY_AGGRESSIVE,
+                  'Authorization': `Bearer ${accessTokenAggressive}`,
+                  'Content-Type': 'application/json'
+                },
+                cache: 'no-store'
+              }
+            );
+            
+            if (deliveredRequestsRes.ok) {
+              const data = await deliveredRequestsRes.json();
+              if (Array.isArray(data)) {
+                deliveredRequests = data;
+                console.log('✅ COMPONENT AGGRESSIVE: Found', deliveredRequests.length, 'delivered delivery_requests (by provider_id)');
+              }
+            } else {
+              const errorText = await deliveredRequestsRes.text();
+              console.warn('⚠️ COMPONENT AGGRESSIVE: Query by provider_id failed:', deliveredRequestsRes.status, errorText.substring(0, 200));
+            }
+          } catch (e) {
+            console.warn('⚠️ COMPONENT AGGRESSIVE: Error querying by provider_id:', e);
           }
           
-          const deliveredRequests = await deliveredRequestsRes.json();
-          console.log('✅ COMPONENT AGGRESSIVE: Found', deliveredRequests?.length || 0, 'delivered delivery_requests');
+          // If no results, try querying by user_id (fallback)
+          if (deliveredRequests.length === 0 && user?.id) {
+            try {
+              const deliveredRequestsRes2 = await fetch(
+                `${SUPABASE_URL_AGGRESSIVE}/rest/v1/delivery_requests?provider_id=eq.${user.id}&status=in.(delivered,completed)&select=id,purchase_order_id,delivered_at,created_at,status&order=delivered_at.desc&limit=50`,
+                {
+                  headers: {
+                    'apikey': SUPABASE_ANON_KEY_AGGRESSIVE,
+                    'Authorization': `Bearer ${accessTokenAggressive}`,
+                    'Content-Type': 'application/json'
+                  },
+                  cache: 'no-store'
+                }
+              );
+              
+              if (deliveredRequestsRes2.ok) {
+                const data = await deliveredRequestsRes2.json();
+                if (Array.isArray(data)) {
+                  deliveredRequests = data;
+                  console.log('✅ COMPONENT AGGRESSIVE: Found', deliveredRequests.length, 'delivered delivery_requests (by user_id fallback)');
+                }
+              }
+            } catch (e) {
+              console.warn('⚠️ COMPONENT AGGRESSIVE: Error querying by user_id:', e);
+            }
+          }
+          
+          console.log('✅ COMPONENT AGGRESSIVE: Total delivered delivery_requests found:', deliveredRequests.length);
           
           if (!deliveredRequests || deliveredRequests.length === 0) {
             console.log('⏭️ COMPONENT AGGRESSIVE: No delivered delivery_requests found');
