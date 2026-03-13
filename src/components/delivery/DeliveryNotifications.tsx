@@ -540,32 +540,12 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
           // Each purchase_order_id is unique and should have its own notification
           absolutelyFinal.push(notif);
         } 
-        // Strategy 2: No purchase_order_id - ONLY THEN deduplicate by delivery_address + material_type
-        // This catches cases where delivery_requests were created without linking to purchase_orders
+        // CRITICAL: DO NOT show notifications without purchase_order_id
+        // These are placeholder/default requests that don't have actual orders
+        // We've already filtered these out earlier, but this is a final safety check
         else {
-          const addressMaterialKey = `${(notif.deliveryAddress || '').toLowerCase().trim()}|${(notif.materialType || '').toLowerCase().trim()}`;
-          
-          // Only deduplicate if address is NOT a placeholder
-          // "to be provided" is a placeholder - don't group those together
-          const isPlaceholder = (notif.deliveryAddress || '').toLowerCase().includes('to be provided') || 
-                               (notif.deliveryAddress || '').trim() === '';
-          
-          if (!isPlaceholder && addressMaterialKey !== '|') {
-            // Has real address and material - deduplicate by this key
-            if (!finalSeenByAddress.has(addressMaterialKey)) {
-              finalSeenByAddress.set(addressMaterialKey, notif);
-              absolutelyFinal.push(notif);
-            } else {
-              console.error(`🚫 FINAL FILTER: Removed duplicate by address+material: ${addressMaterialKey} (ID: ${notif.id})`);
-            }
-          } 
-          // Strategy 3: Placeholder address or no address - deduplicate by notification id only
-          else if (!finalSeenIds.has(notif.id)) {
-            finalSeenIds.add(notif.id);
-            absolutelyFinal.push(notif);
-          } else {
-            console.error(`🚫 FINAL FILTER: Removed duplicate notification (ID: ${notif.id})`);
-          }
+          console.log(`🚫 FINAL FILTER: Removing notification ${notif.id} - no purchase_order_id (placeholder/default request)`);
+          return; // Skip notifications without purchase_order_id
         }
       });
       
