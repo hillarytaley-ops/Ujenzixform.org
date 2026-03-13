@@ -118,11 +118,11 @@ const DeliveryTrackingInput: React.FC = () => {
             data: trackingNumberData[0]
           };
           setTrackingResult(result);
-          // Automatically open GPS map for real-time tracking
+          // Always automatically open GPS map for real-time tracking
           setShowGPSMap(true);
           toast({
             title: "✅ Delivery Found",
-            description: "Opening real-time GPS map..."
+            description: "Opening real-time GPS map to track delivery provider..."
           });
           setTracking(false);
           return;
@@ -148,11 +148,11 @@ const DeliveryTrackingInput: React.FC = () => {
             data: trackingNumberDataIlike[0]
           };
           setTrackingResult(result);
-          // Automatically open GPS map for real-time tracking
+          // Always automatically open GPS map for real-time tracking
           setShowGPSMap(true);
           toast({
             title: "✅ Delivery Found",
-            description: "Opening real-time GPS map..."
+            description: "Opening real-time GPS map to track delivery provider..."
           });
           setTracking(false);
           return;
@@ -181,19 +181,12 @@ const DeliveryTrackingInput: React.FC = () => {
           data: trackingData
         };
         setTrackingResult(result);
-        // Automatically open GPS map if delivery is in progress
-        if (trackingData.status === 'accepted' || trackingData.status === 'picked_up' || trackingData.status === 'in_transit') {
-          setShowGPSMap(true);
-          toast({
-            title: "✅ Delivery Found",
-            description: "Opening real-time GPS map..."
-          });
-        } else {
-          toast({
-            title: "✅ Delivery Found",
-            description: "View delivery details below"
-          });
-        }
+        // Always automatically open GPS map to show delivery provider location
+        setShowGPSMap(true);
+        toast({
+          title: "✅ Delivery Found",
+          description: "Opening real-time GPS map to track delivery provider..."
+        });
         setTracking(false);
         return;
       }
@@ -214,19 +207,12 @@ const DeliveryTrackingInput: React.FC = () => {
             data: emailData
           };
           setTrackingResult(result);
-          // Automatically open GPS map if delivery is in progress
-          if (emailData.status === 'accepted' || emailData.status === 'picked_up' || emailData.status === 'in_transit') {
-            setShowGPSMap(true);
-            toast({
-              title: "✅ Delivery Found",
-              description: "Opening real-time GPS map..."
-            });
-          } else {
-            toast({
-              title: "✅ Delivery Found",
-              description: "Found delivery for this email"
-            });
-          }
+          // Always automatically open GPS map to show delivery provider location
+          setShowGPSMap(true);
+          toast({
+            title: "✅ Delivery Found",
+            description: "Opening real-time GPS map to track delivery provider..."
+          });
           setTracking(false);
           return;
         }
@@ -251,19 +237,12 @@ const DeliveryTrackingInput: React.FC = () => {
             data: data
           };
           setTrackingResult(result);
-          // Automatically open GPS map if delivery is in progress
-          if (data.status === 'accepted' || data.status === 'picked_up' || data.status === 'in_transit') {
-            setShowGPSMap(true);
-            toast({
-              title: "✅ Delivery Found",
-              description: "Opening real-time GPS map..."
-            });
-          } else {
-            toast({
-              title: "✅ Delivery Found",
-              description: "View delivery details below"
-            });
-          }
+          // Always automatically open GPS map to show delivery provider location
+          setShowGPSMap(true);
+          toast({
+            title: "✅ Delivery Found",
+            description: "Opening real-time GPS map to track delivery provider..."
+          });
           setTracking(false);
           return;
         }
@@ -283,19 +262,12 @@ const DeliveryTrackingInput: React.FC = () => {
             data: legacyData
           };
           setTrackingResult(result);
-          // Automatically open GPS map if delivery is in progress
-          if (legacyData.status === 'accepted' || legacyData.status === 'picked_up' || legacyData.status === 'in_transit') {
-            setShowGPSMap(true);
-            toast({
-              title: "✅ Delivery Found",
-              description: "Opening real-time GPS map..."
-            });
-          } else {
-            toast({
-              title: "✅ Delivery Found",
-              description: "View delivery details below"
-            });
-          }
+          // Always automatically open GPS map to show delivery provider location
+          setShowGPSMap(true);
+          toast({
+            title: "✅ Delivery Found",
+            description: "Opening real-time GPS map to track delivery provider..."
+          });
           setTracking(false);
           return;
         }
