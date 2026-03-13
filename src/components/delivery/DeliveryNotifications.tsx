@@ -753,51 +753,72 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
   };
 
   // IMMEDIATE CLEANUP: Remove duplicates from notifications state whenever it changes
+  // This runs AFTER uniqueNotifications useMemo, so it's a final safety net
   useEffect(() => {
-    setNotifications(prev => {
-      if (prev.length === 0) return prev;
-      
-      // Use the SAME simple Map approach as uniqueNotifications
-      const uniqueMap = new Map<string, Notification>();
-      
-      prev.forEach((notif) => {
-        // Determine the unique key (same logic as uniqueNotifications)
-        let key: string;
-        if (notif.purchase_order_id) {
-          key = `po-${notif.purchase_order_id}`;
-        } else if (notif.delivery_request_id) {
-          key = `dr-${notif.delivery_request_id}`;
-        } else {
-          key = `id-${notif.id}`;
-        }
-        
-        const existing = uniqueMap.get(key);
-        if (existing) {
-          // Prefer the one with delivery_request_id (so Accept button works)
-          const preferNew = Boolean(
-            notif.delivery_request_id && 
-            !existing.delivery_request_id &&
-            notif.purchase_order_id === existing.purchase_order_id
-          );
-          
-          if (preferNew) {
-            console.error(`🚨 IMMEDIATE CLEANUP: Replacing ${key} - keeping notification with delivery_request_id (ID: ${notif.id})`);
-            uniqueMap.set(key, notif);
-          } else {
-            console.error(`🚨 IMMEDIATE CLEANUP: Removing duplicate ${key} - keeping existing (ID: ${existing.id}), removing ${notif.id}`);
-          }
-        } else {
-          uniqueMap.set(key, notif);
-        }
-      });
-      
-      const cleaned = Array.from(uniqueMap.values());
-      if (cleaned.length < prev.length) {
-        console.error(`🚨 IMMEDIATE CLEANUP: Removed ${prev.length - cleaned.length} duplicate notifications from state`);
-        setUnreadCount(cleaned.filter(n => !n.read).length);
+    // Only run cleanup if we have notifications
+    if (notifications.length === 0) return;
+    
+    // Use the SAME simple Map approach as uniqueNotifications
+    const uniqueMap = new Map<string, Notification>();
+    
+    notifications.forEach((notif) => {
+      // Determine the unique key (same logic as uniqueNotifications)
+      let key: string;
+      if (notif.purchase_order_id) {
+        key = `po-${notif.purchase_order_id}`;
+      } else if (notif.delivery_request_id) {
+        key = `dr-${notif.delivery_request_id}`;
+      } else {
+        key = `id-${notif.id}`;
       }
-      return cleaned;
+      
+      const existing = uniqueMap.get(key);
+      if (existing) {
+        // Prefer the one with delivery_request_id (so Accept button works)
+        const preferNew = Boolean(
+          notif.delivery_request_id && 
+          !existing.delivery_request_id &&
+          notif.purchase_order_id === existing.purchase_order_id
+        );
+        
+        if (preferNew) {
+          console.error(`🚨 IMMEDIATE CLEANUP: Replacing ${key} - keeping notification with delivery_request_id (ID: ${notif.id})`);
+          uniqueMap.set(key, notif);
+        } else {
+          console.error(`🚨 IMMEDIATE CLEANUP: Removing duplicate ${key} - keeping existing (ID: ${existing.id}), removing ${notif.id}`);
+        }
+      } else {
+        uniqueMap.set(key, notif);
+      }
     });
+    
+    const cleaned = Array.from(uniqueMap.values());
+    
+    // Only update state if we actually removed duplicates (prevent infinite loop)
+    if (cleaned.length < notifications.length) {
+      console.error(`🚨 IMMEDIATE CLEANUP: Removed ${notifications.length - cleaned.length} duplicate notifications from state`);
+      setNotifications(cleaned);
+      setUnreadCount(cleaned.filter(n => !n.read).length);
+    } else if (cleaned.length === notifications.length) {
+      // Check if the arrays are actually different (same length but different order/content)
+      const prevKeys = new Set(notifications.map(n => 
+        n.purchase_order_id ? `po-${n.purchase_order_id}` : 
+        n.delivery_request_id ? `dr-${n.delivery_request_id}` : 
+        `id-${n.id}`
+      ));
+      const cleanedKeys = new Set(cleaned.map(n => 
+        n.purchase_order_id ? `po-${n.purchase_order_id}` : 
+        n.delivery_request_id ? `dr-${n.delivery_request_id}` : 
+        `id-${n.id}`
+      ));
+      
+      // If keys are different, update state
+      if (prevKeys.size !== cleanedKeys.size || 
+          Array.from(prevKeys).some(k => !cleanedKeys.has(k))) {
+        console.error(`🚨 IMMEDIATE CLEANUP: Reordering notifications (same count but different order)`);
+        setNotifications(cleaned);
+      }
+    }
   }, [notifications]); // Run whenever notifications change
   
   // Load on mount and set up real-time
