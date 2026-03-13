@@ -1812,6 +1812,7 @@ const DeliveryDashboard = () => {
             {(() => {
               // CRITICAL: Only count valid, actionable deliveries (same logic as notifications)
               // Filter out: delivered/completed/cancelled, orders without purchase_order_id
+              // CRITICAL: Deduplicate by purchase_order_id to avoid double-counting
               const validActiveDeliveries = activeDeliveries.filter(d => 
                 d.purchase_order_id && 
                 !['delivered', 'completed', 'cancelled'].includes(d.status || '')
@@ -1820,7 +1821,25 @@ const DeliveryDashboard = () => {
                 r.purchase_order_id && 
                 !['delivered', 'completed', 'cancelled'].includes(r.status || '')
               );
-              const totalValid = validActiveDeliveries.length + validPendingRequests.length;
+              
+              // CRITICAL: Deduplicate by purchase_order_id - use Map to ensure uniqueness
+              const uniqueDeliveries = new Map<string, any>();
+              
+              // Add active deliveries first (they take priority)
+              validActiveDeliveries.forEach(d => {
+                if (d.purchase_order_id) {
+                  uniqueDeliveries.set(d.purchase_order_id, d);
+                }
+              });
+              
+              // Add pending requests only if they don't already exist
+              validPendingRequests.forEach(r => {
+                if (r.purchase_order_id && !uniqueDeliveries.has(r.purchase_order_id)) {
+                  uniqueDeliveries.set(r.purchase_order_id, r);
+                }
+              });
+              
+              const totalValid = uniqueDeliveries.size;
               return totalValid > 0 ? (
                 <Badge className="text-[10px] px-1 py-0 bg-yellow-500 text-white">
                   {totalValid}
