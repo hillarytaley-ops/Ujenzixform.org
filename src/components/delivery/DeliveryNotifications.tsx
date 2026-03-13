@@ -661,6 +661,72 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
     }
   }, []);
 
+  // Reject delivery handler
+  const handleRejectDelivery = async (requestId: string) => {
+    if (!requestId) {
+      console.error('❌ No delivery request ID provided for rejection');
+      return;
+    }
+    
+    // Ask for rejection reason
+    const rejectReason = window.prompt('Please provide a reason for rejecting this delivery request:');
+    if (!rejectReason || rejectReason.trim() === '') {
+      toast({
+        title: "Reason Required",
+        description: "Please provide a reason for rejecting this delivery.",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    setRejectingId(requestId);
+    
+    try {
+      const { url, headers } = getAuthHeaders();
+      
+      // Update delivery_request status to rejected
+      const response = await fetch(
+        `${url}/rest/v1/delivery_requests?id=eq.${requestId}`,
+        {
+          method: 'PATCH',
+          headers: {
+            ...headers,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            status: 'rejected',
+            rejection_reason: rejectReason.trim(),
+            rejected_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          })
+        }
+      );
+      
+      if (response.ok) {
+        toast({
+          title: "✅ Delivery Rejected",
+          description: "The delivery request has been rejected. The builder will be notified.",
+        });
+        loadNotifications();
+        if (onRejectDelivery) {
+          onRejectDelivery(requestId);
+        }
+      } else {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || 'Failed to reject delivery');
+      }
+    } catch (error: any) {
+      console.error('❌ Error rejecting delivery:', error);
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to reject delivery. Please try again.',
+        variant: 'destructive'
+      });
+    } finally {
+      setRejectingId(null);
+    }
+  };
+
   // Accept delivery handler
   const handleAcceptDelivery = async (requestId: string) => {
     if (acceptingRef.current === requestId || acceptingId === requestId) {
@@ -1086,95 +1152,177 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
               return (
                 <div
                   key={finalKey}
-                className={`p-3 rounded-lg border ${
-                  notification.read 
-                    ? 'bg-white border-gray-200' 
-                    : 'bg-teal-50 border-teal-200'
-                }`}
-              >
-              <div className="flex items-start justify-between mb-2">
-                <div className="flex-1">
-                  <p className="font-medium text-sm">{notification.title}</p>
-                  {notification.materialType && (
-                    <p className="text-xs text-gray-600 mt-1">
-                      {notification.materialType} {notification.quantity && `(${notification.quantity})`}
-                    </p>
-                  )}
-                </div>
-                <Badge variant="outline" className="text-xs">
-                  {notification.priority}
-                </Badge>
-              </div>
-
-              {notification.pickupAddress && (
-                <div className="bg-green-50 rounded p-2 mb-2">
-                  <p className="text-xs font-semibold text-green-700">📦 PICKUP</p>
-                  <p className="text-xs text-green-800">{notification.pickupAddress}</p>
-                </div>
-              )}
-
-              {notification.deliveryAddress && (
-                <div className="bg-orange-50 rounded p-2 mb-2">
-                  <p className="text-xs font-semibold text-orange-700">🚚 DELIVERY</p>
-                  <p className="text-xs text-orange-800">{notification.deliveryAddress}</p>
-                </div>
-              )}
-
-              <div className="flex gap-2 mt-3">
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => {
-                    if (notification.pickupAddress && notification.deliveryAddress) {
-                      window.open(`https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(notification.pickupAddress)}&destination=${encodeURIComponent(notification.deliveryAddress)}`, '_blank');
-                    }
-                  }}
-                  className="flex-1"
+                  className={`p-4 rounded-xl border-2 shadow-lg transition-all hover:shadow-xl ${
+                    notification.read 
+                      ? 'bg-gradient-to-br from-white to-gray-50 border-gray-300' 
+                      : 'bg-gradient-to-br from-teal-50 via-blue-50 to-indigo-50 border-teal-400 animate-pulse'
+                  }`}
                 >
-                  <Navigation className="h-4 w-4 mr-1" />
-                  Start Navigation
-                </Button>
-                {notification.status === 'pending' && notification.delivery_request_id && (
-                  <>
-                    {/* Show if already accepted by another provider */}
-                    {notification.provider_id && notification.provider_id !== userId ? (
-                      <div className="flex-1 bg-amber-50 border border-amber-200 rounded p-2 text-center">
-                        <p className="text-xs font-semibold text-amber-700 flex items-center justify-center gap-1">
-                          <AlertTriangle className="h-3 w-3" />
-                          Already Accepted
-                        </p>
-                        <p className="text-xs text-amber-600 mt-1">
-                          {notification.provider_name ? `By: ${notification.provider_name}` : 'By another provider'}
-                        </p>
-                      </div>
-                    ) : (
-                      <Button
-                        size="sm"
-                        onClick={() => handleAcceptDelivery(notification.delivery_request_id!)}
-                        disabled={acceptingId === notification.delivery_request_id || (notification.provider_id && notification.provider_id !== userId)}
-                        className="flex-1 bg-green-600 hover:bg-green-700"
-                      >
-                        {acceptingId === notification.delivery_request_id ? (
-                          <>
-                            <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-                            Accepting...
-                          </>
-                        ) : (
-                          <>
-                            <Check className="h-4 w-4 mr-1" />
-                            Accept
-                          </>
+                  {/* Enhanced Header with Professional Builder Badge */}
+                  <div className="flex items-start justify-between mb-3">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        <Truck className="h-5 w-5 text-teal-600" />
+                        <p className="font-bold text-base text-gray-900">{notification.title}</p>
+                        {notification.status === 'pending' && (
+                          <Badge className="bg-orange-500 text-white text-xs px-2 py-0.5 animate-pulse">
+                            NEW
+                          </Badge>
                         )}
-                      </Button>
-                    )}
-                  </>
-                )}
-              </div>
+                      </div>
+                      {notification.materialType && (
+                        <p className="text-sm text-gray-700 font-medium mt-1">
+                          📦 {notification.materialType} {notification.quantity && `(${notification.quantity} items)`}
+                        </p>
+                      )}
+                      {notification.estimatedCost && notification.estimatedCost > 0 && (
+                        <p className="text-xs text-gray-600 mt-1">
+                          💰 Estimated: Ksh {notification.estimatedCost.toLocaleString()}
+                        </p>
+                      )}
+                    </div>
+                    <Badge 
+                      variant={notification.priority === 'high' ? 'destructive' : 'outline'} 
+                      className="text-xs font-semibold"
+                    >
+                      {notification.priority}
+                    </Badge>
+                  </div>
 
-              <p className="text-xs text-gray-400 mt-2 text-right">
-                {formatTime(notification.timestamp)}
-              </p>
-            </div>
+                  {/* Enhanced Location Cards */}
+                  {notification.pickupAddress && (
+                    <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg p-3 mb-2 border border-green-200">
+                      <div className="flex items-center gap-2">
+                        <MapPin className="h-4 w-4 text-green-600" />
+                        <p className="text-xs font-bold text-green-800 uppercase tracking-wide">📦 PICKUP LOCATION</p>
+                      </div>
+                      <p className="text-sm text-green-900 font-medium mt-1 ml-6">{notification.pickupAddress}</p>
+                    </div>
+                  )}
+
+                  {notification.deliveryAddress && (
+                    <div className="bg-gradient-to-r from-orange-50 to-amber-50 rounded-lg p-3 mb-3 border border-orange-200">
+                      <div className="flex items-center gap-2">
+                        <MapPin className="h-4 w-4 text-orange-600" />
+                        <p className="text-xs font-bold text-orange-800 uppercase tracking-wide">🚚 DELIVERY LOCATION</p>
+                      </div>
+                      <p className="text-sm text-orange-900 font-medium mt-1 ml-6">{notification.deliveryAddress}</p>
+                    </div>
+                  )}
+
+                  {/* Enhanced Action Buttons - Always show Navigation, Accept, and Reject for pending requests */}
+                  {notification.status === 'pending' && notification.delivery_request_id ? (
+                    <>
+                      {/* Show if already accepted by another provider */}
+                      {notification.provider_id && notification.provider_id !== userId ? (
+                        <div className="bg-amber-50 border-2 border-amber-300 rounded-lg p-3 text-center">
+                          <p className="text-sm font-semibold text-amber-800 flex items-center justify-center gap-2">
+                            <AlertTriangle className="h-4 w-4" />
+                            Already Accepted by Another Provider
+                          </p>
+                          <p className="text-xs text-amber-700 mt-1">
+                            {notification.provider_name ? `Provider: ${notification.provider_name}` : 'Another provider has accepted this delivery'}
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="space-y-2">
+                          {/* Navigation Button - Always visible */}
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => {
+                              if (notification.pickupAddress && notification.deliveryAddress) {
+                                window.open(`https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(notification.pickupAddress)}&destination=${encodeURIComponent(notification.deliveryAddress)}`, '_blank');
+                              } else {
+                                toast({
+                                  title: "Location Missing",
+                                  description: "Pickup or delivery address is not available yet.",
+                                  variant: "destructive"
+                                });
+                              }
+                            }}
+                            className="w-full border-2 border-blue-500 text-blue-700 hover:bg-blue-50 font-semibold"
+                            disabled={!notification.pickupAddress || !notification.deliveryAddress}
+                          >
+                            <Navigation className="h-4 w-4 mr-2" />
+                            Start Navigation
+                          </Button>
+                          
+                          {/* Accept and Reject Buttons */}
+                          <div className="flex gap-2">
+                            <Button
+                              size="sm"
+                              onClick={() => handleAcceptDelivery(notification.delivery_request_id!)}
+                              disabled={acceptingId === notification.delivery_request_id || rejectingId === notification.delivery_request_id}
+                              className="flex-1 bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white font-bold shadow-md"
+                            >
+                              {acceptingId === notification.delivery_request_id ? (
+                                <>
+                                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                  Accepting...
+                                </>
+                              ) : (
+                                <>
+                                  <Check className="h-4 w-4 mr-2" />
+                                  Accept Delivery
+                                </>
+                              )}
+                            </Button>
+                            
+                            <Button
+                              size="sm"
+                              variant="destructive"
+                              onClick={() => handleRejectDelivery(notification.delivery_request_id!)}
+                              disabled={acceptingId === notification.delivery_request_id || rejectingId === notification.delivery_request_id}
+                              className="flex-1 bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white font-bold shadow-md"
+                            >
+                              {rejectingId === notification.delivery_request_id ? (
+                                <>
+                                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                  Rejecting...
+                                </>
+                              ) : (
+                                <>
+                                  <XCircle className="h-4 w-4 mr-2" />
+                                  Reject
+                                </>
+                              )}
+                            </Button>
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    /* For non-pending status, show navigation only */
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => {
+                        if (notification.pickupAddress && notification.deliveryAddress) {
+                          window.open(`https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(notification.pickupAddress)}&destination=${encodeURIComponent(notification.deliveryAddress)}`, '_blank');
+                        }
+                      }}
+                      className="w-full border-2 border-blue-500 text-blue-700 hover:bg-blue-50 font-semibold"
+                      disabled={!notification.pickupAddress || !notification.deliveryAddress}
+                    >
+                      <Navigation className="h-4 w-4 mr-2" />
+                      Start Navigation
+                    </Button>
+                  )}
+
+                  {/* Timestamp */}
+                  <div className="flex items-center justify-between mt-3 pt-2 border-t border-gray-200">
+                    <p className="text-xs text-gray-500 flex items-center gap-1">
+                      <Clock className="h-3 w-3" />
+                      {formatTime(notification.timestamp)}
+                    </p>
+                    {notification.delivery_request_id && (
+                      <p className="text-xs text-gray-400">
+                        ID: {notification.delivery_request_id.substring(0, 8)}...
+                      </p>
+                    )}
+                  </div>
+                </div>
             );
             });
           })()
