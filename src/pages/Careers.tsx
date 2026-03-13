@@ -295,42 +295,66 @@ const Careers = () => {
     }
 
     setIsSubmittingGeneral(true);
+    
+    // Add overall timeout for entire submission (60 seconds max)
+    const submissionTimeout = setTimeout(() => {
+      console.error('⏱️ Submission timeout - forcing completion');
+      setIsSubmittingGeneral(false);
+      toast({
+        variant: "destructive",
+        title: "Submission Timeout",
+        description: "The submission took too long. Please try again or contact support.",
+      });
+    }, 60000);
 
     try {
       let resumeUrl = null;
       let coverLetterUrl = null;
 
-      // Upload resume if provided (with timeout protection)
+      // Upload files in parallel (faster) with timeout protection
+      const uploadPromises: Promise<void>[] = [];
+      
       if (resumeFile) {
         console.log('📤 Uploading resume...');
-        try {
-          resumeUrl = await handleFileUpload(resumeFile, 'resume');
-          if (resumeUrl) {
-            console.log('✅ Resume upload successful');
-          } else {
-            console.warn('⚠️ Resume upload failed or timed out - continuing without file URL');
-          }
-        } catch (uploadError) {
-          console.error('❌ Resume upload error:', uploadError);
-          // Continue without resume URL
-        }
+        uploadPromises.push(
+          handleFileUpload(resumeFile, 'resume')
+            .then(url => {
+              resumeUrl = url;
+              if (url) {
+                console.log('✅ Resume upload successful');
+              } else {
+                console.warn('⚠️ Resume upload failed or timed out - continuing without file URL');
+              }
+            })
+            .catch(uploadError => {
+              console.error('❌ Resume upload error:', uploadError);
+              // Continue without resume URL
+            })
+        );
       }
 
-      // Upload cover letter if provided (with timeout protection)
       if (coverLetterFile) {
         console.log('📤 Uploading cover letter...');
-        try {
-          coverLetterUrl = await handleFileUpload(coverLetterFile, 'cover_letter');
-          if (coverLetterUrl) {
-            console.log('✅ Cover letter upload successful');
-          } else {
-            console.warn('⚠️ Cover letter upload failed or timed out - continuing without file URL');
-          }
-        } catch (uploadError) {
-          console.error('❌ Cover letter upload error:', uploadError);
-          // Continue without cover letter URL
-        }
+        uploadPromises.push(
+          handleFileUpload(coverLetterFile, 'cover_letter')
+            .then(url => {
+              coverLetterUrl = url;
+              if (url) {
+                console.log('✅ Cover letter upload successful');
+              } else {
+                console.warn('⚠️ Cover letter upload failed or timed out - continuing without file URL');
+              }
+            })
+            .catch(uploadError => {
+              console.error('❌ Cover letter upload error:', uploadError);
+              // Continue without cover letter URL
+            })
+        );
       }
+
+      // Wait for all uploads to complete (or timeout)
+      await Promise.allSettled(uploadPromises);
+      console.log('✅ All file uploads completed (or timed out)');
 
       console.log('💾 Submitting general application to database...');
       
@@ -405,6 +429,7 @@ const Careers = () => {
       // Still show success state so user knows we received their attempt
       setApplicationSuccess(true);
     } finally {
+      clearTimeout(submissionTimeout);
       setIsSubmittingGeneral(false);
       console.log('✅ General application submission process completed');
     }
@@ -425,41 +450,66 @@ const Careers = () => {
     }
 
     setIsApplying(true);
+    
+    // Add overall timeout for entire submission (60 seconds max)
+    const submissionTimeout = setTimeout(() => {
+      console.error('⏱️ Submission timeout - forcing completion');
+      setIsApplying(false);
+      toast({
+        variant: "destructive",
+        title: "Submission Timeout",
+        description: "The submission took too long. Please try again or contact support.",
+      });
+    }, 60000);
+    
     try {
       let resumeUrl = null;
       let coverLetterUrl = null;
 
-      // Upload resume if provided (with timeout protection)
+      // Upload files in parallel (faster) with timeout protection
+      const uploadPromises: Promise<void>[] = [];
+      
       if (jobResumeFile) {
         console.log('📤 Uploading resume...');
-        try {
-          resumeUrl = await handleFileUpload(jobResumeFile, 'resume');
-          if (resumeUrl) {
-            console.log('✅ Resume upload successful');
-          } else {
-            console.warn('⚠️ Resume upload failed or timed out - continuing without file URL');
-          }
-        } catch (uploadError) {
-          console.error('❌ Resume upload error:', uploadError);
-          // Continue without resume URL
-        }
+        uploadPromises.push(
+          handleFileUpload(jobResumeFile, 'resume')
+            .then(url => {
+              resumeUrl = url;
+              if (url) {
+                console.log('✅ Resume upload successful');
+              } else {
+                console.warn('⚠️ Resume upload failed or timed out - continuing without file URL');
+              }
+            })
+            .catch(uploadError => {
+              console.error('❌ Resume upload error:', uploadError);
+              // Continue without resume URL
+            })
+        );
       }
 
-      // Upload cover letter file if provided (with timeout protection)
       if (jobCoverLetterFile) {
         console.log('📤 Uploading cover letter...');
-        try {
-          coverLetterUrl = await handleFileUpload(jobCoverLetterFile, 'cover_letter');
-          if (coverLetterUrl) {
-            console.log('✅ Cover letter upload successful');
-          } else {
-            console.warn('⚠️ Cover letter upload failed or timed out - continuing without file URL');
-          }
-        } catch (uploadError) {
-          console.error('❌ Cover letter upload error:', uploadError);
-          // Continue without cover letter URL
-        }
+        uploadPromises.push(
+          handleFileUpload(jobCoverLetterFile, 'cover_letter')
+            .then(url => {
+              coverLetterUrl = url;
+              if (url) {
+                console.log('✅ Cover letter upload successful');
+              } else {
+                console.warn('⚠️ Cover letter upload failed or timed out - continuing without file URL');
+              }
+            })
+            .catch(uploadError => {
+              console.error('❌ Cover letter upload error:', uploadError);
+              // Continue without cover letter URL
+            })
+        );
       }
+
+      // Wait for all uploads to complete (or timeout)
+      await Promise.allSettled(uploadPromises);
+      console.log('✅ All file uploads completed (or timed out)');
 
       console.log('💾 Submitting application to database...');
       
@@ -531,6 +581,7 @@ const Careers = () => {
       });
       // Don't close modal on error so user can retry
     } finally {
+      clearTimeout(submissionTimeout);
       setIsApplying(false);
       console.log('✅ Application submission process completed');
     }
