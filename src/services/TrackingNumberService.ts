@@ -237,6 +237,10 @@ class TrackingNumberService {
             const poIds = activeDeliveries.map((d: any) => d.purchase_order_id).filter(Boolean);
             if (poIds.length > 0) {
               try {
+                // Use separate controller for purchase_order query (don't reuse controller2 which might be aborted)
+                const poController = new AbortController();
+                const poTimeout = setTimeout(() => poController.abort(), 3000);
+                
                 const poResponse = await fetch(
                   `${SUPABASE_URL}/rest/v1/purchase_orders?id=in.(${poIds.join(',')})&select=id,status,delivery_status`,
                   {
@@ -245,10 +249,12 @@ class TrackingNumberService {
                       'Authorization': `Bearer ${accessToken}`,
                       'Content-Type': 'application/json'
                     },
-                    signal: controller2.signal,
+                    signal: poController.signal,
                     cache: 'no-store'
                   }
                 );
+                
+                clearTimeout(poTimeout);
                 
                 if (poResponse.ok) {
                   const purchaseOrders = await poResponse.json();
@@ -259,18 +265,23 @@ class TrackingNumberService {
                   );
                   
                   // Remove deliveries where the purchase_order is already delivered
+                  const beforeCount = activeDeliveries.length;
                   activeDeliveries = activeDeliveries.filter((d: any) => {
                     if (d.purchase_order_id && deliveredPOIds.has(d.purchase_order_id)) {
-                      console.log(`✅ Filtering out completed delivery ${d.id} - purchase_order ${d.purchase_order_id} is delivered`);
+                      console.log(`✅ Filtering out completed delivery ${d.id} (${d.tracking_number || 'no tracking'}) - purchase_order ${d.purchase_order_id} is delivered`);
                       return false;
                     }
                     return true;
                   });
                   
-                  console.log(`📦 After filtering completed orders: ${activeDeliveries.length} truly active deliveries`);
+                  if (activeDeliveries.length < beforeCount) {
+                    console.log(`📦 After filtering completed orders: ${beforeCount} → ${activeDeliveries.length} truly active deliveries`);
+                  }
                 }
-              } catch (poError) {
-                console.warn('⚠️ Could not verify purchase_order status, using delivery_request status only:', poError);
+              } catch (poError: any) {
+                if (poError.name !== 'AbortError') {
+                  console.warn('⚠️ Could not verify purchase_order status, using delivery_request status only:', poError);
+                }
               }
             }
           }
