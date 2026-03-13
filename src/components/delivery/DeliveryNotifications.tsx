@@ -905,22 +905,26 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
 
     // Build list: one per PO, then DRs not already covered, then no-PO/no-DR
     // ABSOLUTE GUARANTEE: No duplicates in final result
-    // Reuse seenPOIds and seenDRIds from above - don't redeclare
-    const seenIds = new Set<string>();
+    // CRITICAL: Create fresh Sets for the result building phase
+    // renderedByPO already guarantees uniqueness, so we just need to track what we've added to result
+    const resultSeenIds = new Set<string>();
+    const resultSeenPOIds = new Set<string>();
+    const resultSeenDRIds = new Set<string>();
     let result: Notification[] = [];
     
     // Add notifications with purchase_order_id (ONE per purchase_order_id)
+    // renderedByPO already ensures only one per purchase_order_id, so we just need to check resultSeenPOIds
     renderedByPO.forEach((n) => {
-      if (seenIds.has(n.id)) {
+      if (resultSeenIds.has(n.id)) {
         console.error(`🚫 DUPLICATE: Notification ID ${n.id} already in result`);
         return;
       }
-      if (seenPOIds.has(n.purchase_order_id!)) {
+      if (resultSeenPOIds.has(n.purchase_order_id!)) {
         console.error(`🚫 DUPLICATE: Purchase order ${n.purchase_order_id} already in result`);
         return;
       }
-      seenIds.add(n.id);
-      seenPOIds.add(n.purchase_order_id!);
+      resultSeenIds.add(n.id);
+      resultSeenPOIds.add(n.purchase_order_id!);
       result.push(n);
     });
     
