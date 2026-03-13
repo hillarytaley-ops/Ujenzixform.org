@@ -754,6 +754,46 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
 
   // Load on mount and set up real-time
   useEffect(() => {
+    // IMMEDIATE CLEANUP: Remove duplicates from current notifications state FIRST
+    setNotifications(prev => {
+      if (prev.length === 0) return prev;
+      
+      const cleanup = new Map<string, Notification>();
+      prev.forEach((notif) => {
+        if (notif.purchase_order_id) {
+          // Use purchase_order_id as key - only one per purchase_order_id
+          if (!cleanup.has(notif.purchase_order_id)) {
+            cleanup.set(notif.purchase_order_id, notif);
+          } else {
+            console.error(`🚨 IMMEDIATE CLEANUP: Removing duplicate purchase_order_id ${notif.purchase_order_id} from existing notifications (keeping first, removing ${notif.id})`);
+          }
+        } else if (notif.delivery_request_id) {
+          // Use delivery_request_id as key - only one per delivery_request_id
+          const key = `dr-${notif.delivery_request_id}`;
+          if (!cleanup.has(key)) {
+            cleanup.set(key, notif);
+          } else {
+            console.error(`🚨 IMMEDIATE CLEANUP: Removing duplicate delivery_request_id ${notif.delivery_request_id} from existing notifications (keeping first, removing ${notif.id})`);
+          }
+        } else {
+          // Use notification id as key - only one per notification id
+          if (!cleanup.has(notif.id)) {
+            cleanup.set(notif.id, notif);
+          } else {
+            console.error(`🚨 IMMEDIATE CLEANUP: Removing duplicate notification id ${notif.id}`);
+          }
+        }
+      });
+      
+      const cleaned = Array.from(cleanup.values());
+      if (cleaned.length < prev.length) {
+        console.error(`🚨 IMMEDIATE CLEANUP: Removed ${prev.length - cleaned.length} duplicate notifications from existing state`);
+        setUnreadCount(cleaned.filter(n => !n.read).length);
+      }
+      return cleaned;
+    });
+    
+    // Then load fresh notifications
     loadNotifications();
     
     // Debounce real-time updates to prevent rapid reloads
