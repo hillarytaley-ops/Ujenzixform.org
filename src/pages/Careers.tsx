@@ -354,10 +354,18 @@ const Careers = () => {
 
       // Wait for all uploads to complete (or timeout) - max 20 seconds total
       console.log('⏳ Waiting for file uploads to complete...');
+      let uploadTimeoutId: NodeJS.Timeout | null = null;
       const uploadsResult = await Promise.race([
-        Promise.allSettled(uploadPromises),
+        Promise.allSettled(uploadPromises).then(() => {
+          // Clear timeout if uploads complete before timeout
+          if (uploadTimeoutId) {
+            clearTimeout(uploadTimeoutId);
+            uploadTimeoutId = null;
+          }
+          return;
+        }),
         new Promise<void>((resolve) => {
-          setTimeout(() => {
+          uploadTimeoutId = setTimeout(() => {
             console.warn('⏱️ File uploads taking too long, proceeding with database insert');
             resolve();
           }, 20000); // Max 20 seconds for all uploads
@@ -572,10 +580,18 @@ const Careers = () => {
 
       // Wait for all uploads to complete (or timeout) - max 20 seconds total
       console.log('⏳ Waiting for file uploads to complete...');
+      let uploadTimeoutId: NodeJS.Timeout | null = null;
       const uploadsResult = await Promise.race([
-        Promise.allSettled(uploadPromises),
+        Promise.allSettled(uploadPromises).then(() => {
+          // Clear timeout if uploads complete before timeout
+          if (uploadTimeoutId) {
+            clearTimeout(uploadTimeoutId);
+            uploadTimeoutId = null;
+          }
+          return;
+        }),
         new Promise<void>((resolve) => {
-          setTimeout(() => {
+          uploadTimeoutId = setTimeout(() => {
             console.warn('⏱️ File uploads taking too long, proceeding with database insert');
             resolve();
           }, 20000); // Max 20 seconds for all uploads
