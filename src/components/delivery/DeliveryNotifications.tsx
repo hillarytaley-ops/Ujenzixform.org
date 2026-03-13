@@ -615,8 +615,44 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
       console.log(`✅ FINAL: ${finalNotifications.length} → ${absolutelyFinal.length} → ${validatedFinal.length} validated notifications (removed ${absolutelyFinal.length - validatedFinal.length} invalid/empty)`);
       console.log(`📊 Final notification breakdown: ${validatedFinal.filter(n => n.purchase_order_id).length} with purchase_order_id`);
       
-      setNotifications(validatedFinal);
-      setUnreadCount(validatedFinal.filter(n => !n.read).length);
+      // ABSOLUTE FINAL CLEANUP: Remove any remaining duplicates using Map (guarantees uniqueness)
+      const finalCleanup = new Map<string, Notification>();
+      validatedFinal.forEach((notif) => {
+        if (notif.purchase_order_id) {
+          // Use purchase_order_id as key - only one per purchase_order_id
+          if (!finalCleanup.has(notif.purchase_order_id)) {
+            finalCleanup.set(notif.purchase_order_id, notif);
+          } else {
+            console.error(`🚨 FINAL CLEANUP: Removing duplicate purchase_order_id ${notif.purchase_order_id} (keeping first, removing ${notif.id})`);
+          }
+        } else if (notif.delivery_request_id) {
+          // Use delivery_request_id as key - only one per delivery_request_id
+          const key = `dr-${notif.delivery_request_id}`;
+          if (!finalCleanup.has(key)) {
+            finalCleanup.set(key, notif);
+          } else {
+            console.error(`🚨 FINAL CLEANUP: Removing duplicate delivery_request_id ${notif.delivery_request_id} (keeping first, removing ${notif.id})`);
+          }
+        } else {
+          // Use notification id as key - only one per notification id
+          if (!finalCleanup.has(notif.id)) {
+            finalCleanup.set(notif.id, notif);
+          } else {
+            console.error(`🚨 FINAL CLEANUP: Removing duplicate notification id ${notif.id}`);
+          }
+        }
+      });
+      
+      const absolutelyUnique = Array.from(finalCleanup.values());
+      const duplicatesRemoved = validatedFinal.length - absolutelyUnique.length;
+      if (duplicatesRemoved > 0) {
+        console.error(`🚨 FINAL CLEANUP: Removed ${duplicatesRemoved} duplicate notifications`);
+      }
+      
+      console.log(`✅ ABSOLUTELY UNIQUE: ${absolutelyUnique.length} notifications (removed ${duplicatesRemoved} duplicates in final cleanup)`);
+      
+      setNotifications(absolutelyUnique);
+      setUnreadCount(absolutelyUnique.filter(n => !n.read).length);
       
     } catch (error: any) {
       console.error('❌ Error loading notifications:', error.message || error);
