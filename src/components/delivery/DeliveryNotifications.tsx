@@ -1176,7 +1176,8 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
               </p>
             </div>
             );
-          })
+            });
+          })()
         )}
       </div>
     </div>
