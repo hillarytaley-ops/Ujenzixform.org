@@ -352,9 +352,18 @@ const Careers = () => {
         );
       }
 
-      // Wait for all uploads to complete (or timeout)
-      await Promise.allSettled(uploadPromises);
-      console.log('✅ All file uploads completed (or timed out)');
+      // Wait for all uploads to complete (or timeout) - max 20 seconds total
+      console.log('⏳ Waiting for file uploads to complete...');
+      const uploadsResult = await Promise.race([
+        Promise.allSettled(uploadPromises),
+        new Promise<void>((resolve) => {
+          setTimeout(() => {
+            console.warn('⏱️ File uploads taking too long, proceeding with database insert');
+            resolve();
+          }, 20000); // Max 20 seconds for all uploads
+        })
+      ]);
+      console.log('✅ File upload phase completed');
 
       console.log('💾 Submitting general application to database...');
       
@@ -507,9 +516,18 @@ const Careers = () => {
         );
       }
 
-      // Wait for all uploads to complete (or timeout)
-      await Promise.allSettled(uploadPromises);
-      console.log('✅ All file uploads completed (or timed out)');
+      // Wait for all uploads to complete (or timeout) - max 20 seconds total
+      console.log('⏳ Waiting for file uploads to complete...');
+      const uploadsResult = await Promise.race([
+        Promise.allSettled(uploadPromises),
+        new Promise<void>((resolve) => {
+          setTimeout(() => {
+            console.warn('⏱️ File uploads taking too long, proceeding with database insert');
+            resolve();
+          }, 20000); // Max 20 seconds for all uploads
+        })
+      ]);
+      console.log('✅ File upload phase completed');
 
       console.log('💾 Submitting application to database...');
       
@@ -548,12 +566,12 @@ const Careers = () => {
         throw insertResult.error;
       }
 
-      if (error) {
-        console.error('❌ Database insert error:', error);
-        throw error;
+      // Check if insert was successful (no error means success)
+      if (insertResult.data !== undefined || !insertResult.error) {
+        console.log('✅ Application submitted successfully to database');
+      } else {
+        console.warn('⚠️ Database insert result unclear, but no error thrown');
       }
-
-      console.log('✅ Application submitted successfully');
       toast({
         title: '🎉 Application Submitted!',
         description: `Thank you for applying for ${selectedJob.title}. We'll review your application and get back to you within 5 business days.`,
