@@ -556,26 +556,13 @@ const DeliveryDashboard = () => {
       const allReceived = d._items_count != null && d._received_count != null &&
         d._items_count > 0 && d._received_count >= d._items_count;
       if (allReceived) return 'delivered';
-      // Check if status indicates in transit
-      const inTransitList = ['in_transit', 'picked_up', 'on_the_way', 'near_destination', 'dispatched', 'shipped', 'out_for_delivery', 'delivery_arrived'];
+      // CRITICAL: Orders should remain in "scheduled" after dispatch until delivered
+      // Only move to 'in_transit' if explicitly marked as in_transit status
+      // After dispatch, orders stay in scheduled until all items are delivered
+      const inTransitList = ['in_transit', 'picked_up', 'on_the_way', 'near_destination', 'out_for_delivery', 'delivery_arrived'];
       if (inTransitList.includes(cat)) return 'in_transit';
-      // CRITICAL: Check if any items are dispatched (not in Awaiting Dispatch)
-      // If _dispatched_count > 0, this order is NOT in Awaiting Dispatch and should NOT appear in scheduled
-      if (d._items_count != null && d._dispatched_count != null && d._dispatched_count > 0) {
-        // Some items are dispatched - this order is NOT in Awaiting Dispatch
-        const isProblematic = d.order_number === 'QR-1773125455597-K3447';
-        if (isProblematic) {
-          console.warn('🚫 PROBLEMATIC ORDER DETECTED IN CATEGORIZATION:', {
-            order_number: d.order_number,
-            dispatched_count: d._dispatched_count,
-            total_items: d._items_count,
-            status: d.status,
-            _categorized_status: d._categorized_status
-          });
-        }
-        return 'in_transit'; // Treat as in_transit so it doesn't appear in scheduled
-      }
-      // Everything else is scheduled (accepted, assigned, pending_pickup, etc.)
+      // Everything else (including dispatched/shipped) stays in scheduled until delivered
+      // This ensures orders remain visible in schedule after dispatch until delivery is complete
       return 'scheduled';
     };
     const scheduled: any[] = [];

@@ -333,6 +333,8 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, is
                 return {
                   ...order,
                   status: newStatus as Order['status'],
+                  // Also update delivery_status if status is delivered
+                  delivery_status: newStatus === 'delivered' ? 'delivered' : (payload.new.delivery_status || order.delivery_status),
                   updated_at: payload.new.updated_at || order.updated_at
                 };
               }
