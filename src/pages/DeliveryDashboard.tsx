@@ -632,14 +632,16 @@ const DeliveryDashboard = () => {
             const queryPatterns = [
               // Pattern 1: Exact match
               `po_number=eq.${encodeURIComponent(orderNum)}`,
-              // Pattern 2: Contains numeric part
-              `po_number=ilike.%${numericPart}%`,
+              // Pattern 2: Contains numeric part (PostgREST uses * for wildcards, not %)
+              `po_number=ilike.*${encodeURIComponent(numericPart)}*`,
               // Pattern 3: Starts with numeric part
-              `po_number=ilike.${numericPart}%`,
+              `po_number=ilike.${encodeURIComponent(numericPart)}*`,
               // Pattern 4: Ends with numeric part
-              `po_number=ilike.%${numericPart}`,
-              // Pattern 5: Just the numeric part (in case format is different)
-              `po_number=cs.{${numericPart}}`
+              `po_number=ilike.*${encodeURIComponent(numericPart)}`,
+              // Pattern 5: Try with PO- prefix
+              `po_number=ilike.*PO-${encodeURIComponent(numericPart)}*`,
+              // Pattern 6: Try with QR- prefix (some orders might have QR- prefix)
+              `po_number=ilike.*QR-${encodeURIComponent(numericPart)}*`
             ];
             
             // Try each pattern until we find results
