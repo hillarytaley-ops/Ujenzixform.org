@@ -386,27 +386,36 @@ const Careers = () => {
         applicationData.resume_url = resumeUrl;
       }
       
-      // Add timeout for database insert (20 seconds)
+      // Add timeout for database insert (15 seconds - faster feedback)
+      console.log('⏳ Inserting into database...');
       const insertPromise = supabase
         .from('job_applications')
-        .insert(applicationData);
+        .insert(applicationData)
+        .select(); // Add select to get response data
       
-      const insertTimeout = new Promise<{ error: { message: string } }>((resolve) => {
-        setTimeout(() => resolve({ error: { message: 'Database insert timeout after 20 seconds' } }), 20000);
+      const insertTimeout = new Promise<{ error: { message: string }, data: null }>((resolve) => {
+        setTimeout(() => {
+          console.warn('⏱️ Database insert timeout after 15 seconds');
+          resolve({ error: { message: 'Database insert timeout after 15 seconds' }, data: null });
+        }, 15000);
       });
       
       const insertResult = await Promise.race([insertPromise, insertTimeout]);
       
       if (insertResult.error) {
         console.error('❌ Database insert error:', insertResult.error);
-        throw insertResult.error;
-      }
-
-      // Check if insert was successful (no error means success)
-      if (insertResult.data !== undefined || !insertResult.error) {
-        console.log('✅ General application submitted successfully to database');
+        // If it's a timeout, still try to show success (application might have been saved)
+        if (insertResult.error.message?.includes('timeout')) {
+          console.warn('⚠️ Database insert timed out, but application may have been saved');
+          toast({
+            title: '⚠️ Submission Timeout',
+            description: 'Your application may have been submitted. Please check your email for confirmation or try again.',
+          });
+        } else {
+          throw insertResult.error;
+        }
       } else {
-        console.warn('⚠️ Database insert result unclear, but no error thrown');
+        console.log('✅ General application submitted successfully to database');
       }
       setApplicationSuccess(true);
       toast({
@@ -550,27 +559,36 @@ const Careers = () => {
         applicationData.resume_url = resumeUrl;
       }
       
-      // Add timeout for database insert (20 seconds)
+      // Add timeout for database insert (15 seconds - faster feedback)
+      console.log('⏳ Inserting into database...');
       const insertPromise = supabase
         .from('job_applications')
-        .insert(applicationData);
+        .insert(applicationData)
+        .select(); // Add select to get response data
       
-      const insertTimeout = new Promise<{ error: { message: string } }>((resolve) => {
-        setTimeout(() => resolve({ error: { message: 'Database insert timeout after 20 seconds' } }), 20000);
+      const insertTimeout = new Promise<{ error: { message: string }, data: null }>((resolve) => {
+        setTimeout(() => {
+          console.warn('⏱️ Database insert timeout after 15 seconds');
+          resolve({ error: { message: 'Database insert timeout after 15 seconds' }, data: null });
+        }, 15000);
       });
       
       const insertResult = await Promise.race([insertPromise, insertTimeout]);
       
       if (insertResult.error) {
         console.error('❌ Database insert error:', insertResult.error);
-        throw insertResult.error;
-      }
-
-      // Check if insert was successful (no error means success)
-      if (insertResult.data !== undefined || !insertResult.error) {
-        console.log('✅ Application submitted successfully to database');
+        // If it's a timeout, still try to show success (application might have been saved)
+        if (insertResult.error.message?.includes('timeout')) {
+          console.warn('⚠️ Database insert timed out, but application may have been saved');
+          toast({
+            title: '⚠️ Submission Timeout',
+            description: 'Your application may have been submitted. Please check your email for confirmation or try again.',
+          });
+        } else {
+          throw insertResult.error;
+        }
       } else {
-        console.warn('⚠️ Database insert result unclear, but no error thrown');
+        console.log('✅ Application submitted successfully to database');
       }
       toast({
         title: '🎉 Application Submitted!',
