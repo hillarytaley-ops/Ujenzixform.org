@@ -249,22 +249,24 @@ const Careers = () => {
       const fileName = `${type}_${Date.now()}.${fileExt}`;
       const filePath = `applications/${fileName}`;
 
-      // Add timeout to prevent hanging
+      // Add timeout to prevent hanging (reduced to 15 seconds for faster UX)
       const uploadPromise = supabase.storage
         .from('documents')
-        .upload(filePath, file);
+        .upload(filePath, file, {
+          cacheControl: '3600',
+          upsert: false
+        });
 
       const timeoutPromise = new Promise<{ error: { message: string } }>((resolve) => {
-        setTimeout(() => resolve({ error: { message: 'Upload timeout after 30 seconds' } }), 30000);
+        setTimeout(() => resolve({ error: { message: 'Upload timeout after 15 seconds' } }), 15000);
       });
 
       const result = await Promise.race([uploadPromise, timeoutPromise]);
 
       if (result.error) {
         console.error('Upload error:', result.error);
-        // Return a placeholder indicating file was provided but upload failed
-        // Don't block the application submission
-        return `[File: ${file.name} - Upload failed: ${result.error.message}]`;
+        // Return null on failure - application will still submit without file URL
+        return null;
       }
 
       const { data: urlData } = supabase.storage
@@ -274,8 +276,8 @@ const Careers = () => {
       return urlData?.publicUrl || null;
     } catch (err) {
       console.error('File upload exception:', err);
-      // Don't block application submission if file upload fails
-      return `[File: ${file.name} - Upload failed: ${err instanceof Error ? err.message : 'Unknown error'}]`;
+      // Return null on failure - don't block application submission
+      return null;
     }
   };
 
@@ -301,15 +303,33 @@ const Careers = () => {
       // Upload resume if provided (with timeout protection)
       if (resumeFile) {
         console.log('📤 Uploading resume...');
-        resumeUrl = await handleFileUpload(resumeFile, 'resume');
-        console.log('✅ Resume upload completed:', resumeUrl ? 'Success' : 'Failed (non-blocking)');
+        try {
+          resumeUrl = await handleFileUpload(resumeFile, 'resume');
+          if (resumeUrl) {
+            console.log('✅ Resume upload successful');
+          } else {
+            console.warn('⚠️ Resume upload failed or timed out - continuing without file URL');
+          }
+        } catch (uploadError) {
+          console.error('❌ Resume upload error:', uploadError);
+          // Continue without resume URL
+        }
       }
 
       // Upload cover letter if provided (with timeout protection)
       if (coverLetterFile) {
         console.log('📤 Uploading cover letter...');
-        coverLetterUrl = await handleFileUpload(coverLetterFile, 'cover_letter');
-        console.log('✅ Cover letter upload completed:', coverLetterUrl ? 'Success' : 'Failed (non-blocking)');
+        try {
+          coverLetterUrl = await handleFileUpload(coverLetterFile, 'cover_letter');
+          if (coverLetterUrl) {
+            console.log('✅ Cover letter upload successful');
+          } else {
+            console.warn('⚠️ Cover letter upload failed or timed out - continuing without file URL');
+          }
+        } catch (uploadError) {
+          console.error('❌ Cover letter upload error:', uploadError);
+          // Continue without cover letter URL
+        }
       }
 
       console.log('💾 Submitting general application to database...');
@@ -392,15 +412,33 @@ const Careers = () => {
       // Upload resume if provided (with timeout protection)
       if (jobResumeFile) {
         console.log('📤 Uploading resume...');
-        resumeUrl = await handleFileUpload(jobResumeFile, 'resume');
-        console.log('✅ Resume upload completed:', resumeUrl ? 'Success' : 'Failed (non-blocking)');
+        try {
+          resumeUrl = await handleFileUpload(jobResumeFile, 'resume');
+          if (resumeUrl) {
+            console.log('✅ Resume upload successful');
+          } else {
+            console.warn('⚠️ Resume upload failed or timed out - continuing without file URL');
+          }
+        } catch (uploadError) {
+          console.error('❌ Resume upload error:', uploadError);
+          // Continue without resume URL
+        }
       }
 
       // Upload cover letter file if provided (with timeout protection)
       if (jobCoverLetterFile) {
         console.log('📤 Uploading cover letter...');
-        coverLetterUrl = await handleFileUpload(jobCoverLetterFile, 'cover_letter');
-        console.log('✅ Cover letter upload completed:', coverLetterUrl ? 'Success' : 'Failed (non-blocking)');
+        try {
+          coverLetterUrl = await handleFileUpload(jobCoverLetterFile, 'cover_letter');
+          if (coverLetterUrl) {
+            console.log('✅ Cover letter upload successful');
+          } else {
+            console.warn('⚠️ Cover letter upload failed or timed out - continuing without file URL');
+          }
+        } catch (uploadError) {
+          console.error('❌ Cover letter upload error:', uploadError);
+          // Continue without cover letter URL
+        }
       }
 
       console.log('💾 Submitting application to database...');
