@@ -624,67 +624,106 @@ const DeliveryDashboard = () => {
             // Use anon key
           }
           
-          // Query each missing order directly - try multiple patterns
-          const aggressiveQueries = missingAggressiveOrders.map(async (orderNum) => {
-            const numericPart = orderNum.split('-')[1];
-            console.log('🚨 COMPONENT AGGRESSIVE: Querying for', orderNum, '(numeric:', numericPart, ')');
-            
-            const queryPatterns = [
-              // Pattern 1: Exact match
-              `po_number=eq.${encodeURIComponent(orderNum)}`,
-              // Pattern 2: Contains numeric part (PostgREST uses * for wildcards, not %)
-              `po_number=ilike.*${encodeURIComponent(numericPart)}*`,
-              // Pattern 3: Starts with numeric part
-              `po_number=ilike.${encodeURIComponent(numericPart)}*`,
-              // Pattern 4: Ends with numeric part
-              `po_number=ilike.*${encodeURIComponent(numericPart)}`,
-              // Pattern 5: Try with PO- prefix
-              `po_number=ilike.*PO-${encodeURIComponent(numericPart)}*`,
-              // Pattern 6: Try with QR- prefix (some orders might have QR- prefix)
-              `po_number=ilike.*QR-${encodeURIComponent(numericPart)}*`
-            ];
-            
-            // Try each pattern until we find results
-            for (const pattern of queryPatterns) {
-              try {
-                const url = `${SUPABASE_URL_AGGRESSIVE}/rest/v1/purchase_orders?${pattern}&select=*&limit=5`;
-                const res = await fetch(url, {
-                  headers: {
-                    'apikey': SUPABASE_ANON_KEY_AGGRESSIVE,
-                    'Authorization': `Bearer ${accessTokenAggressive}`,
-                    'Content-Type': 'application/json'
-                  },
-                  cache: 'no-store'
-                });
-                
-                if (res.ok) {
-                  const data = await res.json();
-                  if (Array.isArray(data) && data.length > 0) {
-                    console.log(`✅ COMPONENT AGGRESSIVE: Found order ${orderNum} using pattern: ${pattern}`);
-                    return data;
-                  }
-                } else {
-                  const errorText = await res.text();
-                  console.warn(`⚠️ COMPONENT AGGRESSIVE: Pattern ${pattern} failed:`, res.status, errorText.substring(0, 100));
-                }
-              } catch (err: any) {
-                console.warn(`⚠️ COMPONENT AGGRESSIVE: Pattern ${pattern} error:`, err?.message || err);
+          // Better approach: Query delivery_requests with status='delivered' for this provider
+          // This is more reliable than searching by PO number
+          console.log('🚨 COMPONENT AGGRESSIVE: Querying delivery_requests with status=delivered for provider...');
+          
+          // First, get provider ID (try user.id first, then lookup delivery_provider)
+          let providerIdToQuery = user?.id;
+          try {
+            // Try to get delivery_provider.id from user_id
+            const providerRes = await fetch(
+              `${SUPABASE_URL_AGGRESSIVE}/rest/v1/delivery_providers?user_id=eq.${user?.id}&select=id&limit=1`,
+              {
+                headers: {
+                  'apikey': SUPABASE_ANON_KEY_AGGRESSIVE,
+                  'Authorization': `Bearer ${accessTokenAggressive}`,
+                  'Content-Type': 'application/json'
+                },
+                cache: 'no-store'
+              }
+            );
+            if (providerRes.ok) {
+              const providerData = await providerRes.json();
+              if (providerData && providerData.length > 0 && providerData[0].id) {
+                providerIdToQuery = providerData[0].id;
+                console.log('✅ COMPONENT AGGRESSIVE: Found provider ID:', providerIdToQuery?.substring(0, 8));
               }
             }
-            
-            console.warn(`⚠️ COMPONENT AGGRESSIVE: No result for ${orderNum} after trying all patterns`);
-            return [];
-          });
+          } catch (e) {
+            console.warn('⚠️ COMPONENT AGGRESSIVE: Could not lookup provider ID, using user.id');
+          }
           
-          const aggressiveResults = await Promise.allSettled(aggressiveQueries);
-          const aggressiveOrders: any[] = [];
+          if (!providerIdToQuery) {
+            console.error('❌ COMPONENT AGGRESSIVE: No provider ID available');
+            return;
+          }
           
-          aggressiveResults.forEach((result, index) => {
-            if (result.status === 'fulfilled' && Array.isArray(result.value) && result.value.length > 0) {
-              aggressiveOrders.push(...result.value);
-              console.log('✅ COMPONENT AGGRESSIVE: Found order:', missingAggressiveOrders[index]);
+          // Query delivery_requests with status='delivered' for this provider
+          const deliveredRequestsRes = await fetch(
+            `${SUPABASE_URL_AGGRESSIVE}/rest/v1/delivery_requests?provider_id=eq.${providerIdToQuery}&status=eq.delivered&select=id,purchase_order_id,delivered_at,created_at&order=delivered_at.desc&limit=50`,
+            {
+              headers: {
+                'apikey': SUPABASE_ANON_KEY_AGGRESSIVE,
+                'Authorization': `Bearer ${accessTokenAggressive}`,
+                'Content-Type': 'application/json'
+              },
+              cache: 'no-store'
             }
-          });
+          );
+          
+          if (!deliveredRequestsRes.ok) {
+            const errorText = await deliveredRequestsRes.text();
+            console.error('❌ COMPONENT AGGRESSIVE: Failed to query delivery_requests:', deliveredRequestsRes.status, errorText.substring(0, 200));
+            return;
+          }
+          
+          const deliveredRequests = await deliveredRequestsRes.json();
+          console.log('✅ COMPONENT AGGRESSIVE: Found', deliveredRequests?.length || 0, 'delivered delivery_requests');
+          
+          if (!deliveredRequests || deliveredRequests.length === 0) {
+            console.log('⏭️ COMPONENT AGGRESSIVE: No delivered delivery_requests found');
+            return;
+          }
+          
+          // Get unique purchase_order_ids
+          const poIds: string[] = [];
+          const seenPoIds: Record<string, boolean> = {};
+          for (let i = 0; i < deliveredRequests.length; i++) {
+            const poId = deliveredRequests[i].purchase_order_id;
+            if (poId && !seenPoIds[poId]) {
+              seenPoIds[poId] = true;
+              poIds.push(poId);
+            }
+          }
+          
+          if (poIds.length === 0) {
+            console.log('⏭️ COMPONENT AGGRESSIVE: No purchase_order_ids found in delivered requests');
+            return;
+          }
+          
+          // Query purchase_orders by IDs
+          const poIdsFilter = poIds.join(',');
+          const purchaseOrdersRes = await fetch(
+            `${SUPABASE_URL_AGGRESSIVE}/rest/v1/purchase_orders?id=in.(${poIdsFilter})&select=*&limit=50`,
+            {
+              headers: {
+                'apikey': SUPABASE_ANON_KEY_AGGRESSIVE,
+                'Authorization': `Bearer ${accessTokenAggressive}`,
+                'Content-Type': 'application/json'
+              },
+              cache: 'no-store'
+            }
+          );
+          
+          if (!purchaseOrdersRes.ok) {
+            const errorText = await purchaseOrdersRes.text();
+            console.error('❌ COMPONENT AGGRESSIVE: Failed to query purchase_orders:', purchaseOrdersRes.status, errorText.substring(0, 200));
+            return;
+          }
+          
+          const aggressiveOrders = await purchaseOrdersRes.json();
+          console.log('✅ COMPONENT AGGRESSIVE: Found', aggressiveOrders?.length || 0, 'purchase orders');
           
           // Remove duplicates - NO Map constructor to avoid minification errors
           const seenIds: Record<string, boolean> = {};
