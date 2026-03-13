@@ -455,8 +455,19 @@ const Careers = () => {
         
         const insertedData = await response.json();
         console.log('✅ General application submitted successfully to database:', insertedData?.[0]?.id || 'unknown');
+        
+        // Clear upload timeout if it's still pending (prevent late timeout message)
+        if (uploadTimeoutId) {
+          clearTimeout(uploadTimeoutId);
+          uploadTimeoutId = null;
+        }
       } catch (fetchError: any) {
         clearTimeout(insertTimeout);
+        // Clear upload timeout on error too
+        if (uploadTimeoutId) {
+          clearTimeout(uploadTimeoutId);
+          uploadTimeoutId = null;
+        }
         console.error('❌ Fetch error:', fetchError.name, fetchError.message);
         if (fetchError.name === 'AbortError') {
           console.warn('⚠️ Database insert timed out, but application may have been saved');
