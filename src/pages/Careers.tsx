@@ -402,12 +402,12 @@ const Careers = () => {
         throw insertResult.error;
       }
 
-      if (error) {
-        console.error('❌ Database insert error:', error);
-        throw error;
+      // Check if insert was successful (no error means success)
+      if (insertResult.data !== undefined || !insertResult.error) {
+        console.log('✅ General application submitted successfully to database');
+      } else {
+        console.warn('⚠️ Database insert result unclear, but no error thrown');
       }
-
-      console.log('✅ General application submitted successfully');
       setApplicationSuccess(true);
       toast({
         title: '🎉 Application Submitted!',
