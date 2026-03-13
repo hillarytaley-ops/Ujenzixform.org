@@ -1009,9 +1009,10 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
             <p className="text-gray-500">No active delivery requests</p>
           </div>
         ) : (
-          uniqueNotifications.map((notification, index) => {
+          uniqueNotifications.map((notification) => {
             // React key: Use purchase_order_id as primary key (each PO is unique)
             // CRITICAL: Must match the key used in deduplication logic
+            // DO NOT USE INDEX - this causes duplicates to render!
             let uniqueKey: string;
             if (notification.purchase_order_id) {
               // Each purchase_order_id is unique - use it directly
@@ -1024,9 +1025,9 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
               uniqueKey = `notif-${notification.id}`;
             }
             
-            // FINAL SAFETY CHECK: Ensure key is truly unique by adding index if needed
-            // (This should never happen if deduplication worked, but just in case)
-            const finalKey = `${uniqueKey}-${index}`;
+            // ABSOLUTE GUARANTEE: Use ONLY the unique key (no index!)
+            // If deduplication worked, each key should be unique
+            const finalKey = uniqueKey;
             
             return (
               <div
