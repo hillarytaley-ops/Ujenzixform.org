@@ -895,15 +895,19 @@ export const useDeliveryProviderData = () => {
                                       d.status !== 'completed' && 
                                       d.status !== 'cancelled';
                   
-                  // CRITICAL: delivery_requests.provider_id stores delivery_provider.id (UUID), NOT user_id
-                  // So we MUST use providerIdToMatch (delivery_provider.id), not userId
-                  // If providerIdToMatch is null (lookup failed), EXCLUDE all - never show unfiltered data
-                  // (Previously we used providerMatch=true which caused 330→22 schedule count flakiness)
+                  // CRITICAL: delivery_requests.provider_id can be either:
+                  // 1. delivery_provider.id (UUID) - preferred
+                  // 2. user_id (UUID) - fallback if provider lookup failed
+                  // So we match against BOTH providerIdToMatch AND userId as fallback
                   let providerMatch = false;
                   if (providerIdToMatch) {
                     providerMatch = d.provider_id === providerIdToMatch;
                   }
-                  // else: providerMatch stays false - exclude to prevent wrong count on first load
+                  // FALLBACK: If provider lookup failed, try matching by user_id directly
+                  // This handles cases where delivery_requests.provider_id = user_id
+                  if (!providerMatch && userId) {
+                    providerMatch = d.provider_id === userId;
+                  }
                   
                   if (!providerMatch && statusMatch) {
                     console.warn('🚫 Filtered out delivery_request (wrong provider):', {
@@ -1606,17 +1610,20 @@ export const useDeliveryProviderData = () => {
                   const allItemsNotDispatched = items.every((item: any) => item.dispatch_scanned === false);
                   
                   if (!allItemsNotDispatched) {
-                    console.warn('🚫 Removing order not in Awaiting Dispatch:', {
+                    // Order has dispatched items - it's not in "Awaiting Dispatch" but should still appear in other categories
+                    // Don't remove it - let it be categorized as "In Transit" or "Scheduled"
+                    console.log('ℹ️ Order has dispatched items - will be categorized as In Transit/Scheduled:', {
                       order_number: item.order_number,
                       purchase_order_id: item.purchase_order_id?.substring(0, 8),
-                      reason: 'Order has dispatched items - not in Awaiting Dispatch status',
                       dispatched_count: items.filter((i: any) => i.dispatch_scanned === true).length,
                       total_items: items.length
                     });
+                    // Keep the order - it will be filtered out of "Awaiting Dispatch" by the categorization logic
+                    validatedDeliveries.push(item);
                     continue;
                   }
                   
-                  // All items are not dispatched - this is valid
+                  // All items are not dispatched - this is valid for Awaiting Dispatch
                   validatedDeliveries.push(item);
                 } else {
                   // No material_items found for this order - exclude it
