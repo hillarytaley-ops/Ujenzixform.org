@@ -644,12 +644,12 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
       });
       
       const absolutelyUnique = Array.from(finalCleanup.values());
-      const duplicatesRemoved = validatedFinal.length - absolutelyUnique.length;
-      if (duplicatesRemoved > 0) {
-        console.error(`🚨 FINAL CLEANUP: Removed ${duplicatesRemoved} duplicate notifications`);
+      const finalDuplicatesRemoved = validatedFinal.length - absolutelyUnique.length;
+      if (finalDuplicatesRemoved > 0) {
+        console.error(`🚨 FINAL CLEANUP: Removed ${finalDuplicatesRemoved} duplicate notifications`);
       }
       
-      console.log(`✅ ABSOLUTELY UNIQUE: ${absolutelyUnique.length} notifications (removed ${duplicatesRemoved} duplicates in final cleanup)`);
+      console.log(`✅ ABSOLUTELY UNIQUE: ${absolutelyUnique.length} notifications (removed ${finalDuplicatesRemoved} duplicates in final cleanup)`);
       
       setNotifications(absolutelyUnique);
       setUnreadCount(absolutelyUnique.filter(n => !n.read).length);
