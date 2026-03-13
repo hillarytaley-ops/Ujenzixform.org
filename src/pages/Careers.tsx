@@ -249,14 +249,22 @@ const Careers = () => {
       const fileName = `${type}_${Date.now()}.${fileExt}`;
       const filePath = `applications/${fileName}`;
 
-      const { error } = await supabase.storage
+      // Add timeout to prevent hanging
+      const uploadPromise = supabase.storage
         .from('documents')
         .upload(filePath, file);
 
-      if (error) {
-        console.error('Upload error:', error);
+      const timeoutPromise = new Promise<{ error: { message: string } }>((resolve) => {
+        setTimeout(() => resolve({ error: { message: 'Upload timeout after 30 seconds' } }), 30000);
+      });
+
+      const result = await Promise.race([uploadPromise, timeoutPromise]);
+
+      if (result.error) {
+        console.error('Upload error:', result.error);
         // Return a placeholder indicating file was provided but upload failed
-        return `[File: ${file.name} - Upload pending: Storage bucket not configured]`;
+        // Don't block the application submission
+        return `[File: ${file.name} - Upload failed: ${result.error.message}]`;
       }
 
       const { data: urlData } = supabase.storage
@@ -266,28 +274,45 @@ const Careers = () => {
       return urlData?.publicUrl || null;
     } catch (err) {
       console.error('File upload exception:', err);
-      return `[File: ${file.name} - Upload failed]`;
+      // Don't block application submission if file upload fails
+      return `[File: ${file.name} - Upload failed: ${err instanceof Error ? err.message : 'Unknown error'}]`;
     }
   };
 
   const handleGeneralApplication = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Validate required fields
+    if (!generalApplication.name || !generalApplication.email || !generalApplication.phone) {
+      toast({
+        variant: "destructive",
+        title: "Missing Information",
+        description: "Please fill in all required fields (Name, Email, Phone).",
+      });
+      return;
+    }
+
     setIsSubmittingGeneral(true);
 
     try {
       let resumeUrl = null;
       let coverLetterUrl = null;
 
-      // Upload resume if provided
+      // Upload resume if provided (with timeout protection)
       if (resumeFile) {
+        console.log('📤 Uploading resume...');
         resumeUrl = await handleFileUpload(resumeFile, 'resume');
+        console.log('✅ Resume upload completed:', resumeUrl ? 'Success' : 'Failed (non-blocking)');
       }
 
-      // Upload cover letter if provided
+      // Upload cover letter if provided (with timeout protection)
       if (coverLetterFile) {
+        console.log('📤 Uploading cover letter...');
         coverLetterUrl = await handleFileUpload(coverLetterFile, 'cover_letter');
+        console.log('✅ Cover letter upload completed:', coverLetterUrl ? 'Success' : 'Failed (non-blocking)');
       }
 
+      console.log('💾 Submitting general application to database...');
       const { error } = await supabase
         .from('job_applications')
         .insert({
@@ -296,16 +321,20 @@ const Careers = () => {
           full_name: generalApplication.name,
           email: generalApplication.email,
           phone: generalApplication.phone,
-          linkedin_url: generalApplication.linkedin,
-          cover_letter: generalApplication.coverLetter,
+          linkedin_url: generalApplication.linkedin || null,
+          cover_letter: generalApplication.coverLetter || null,
           resume_url: resumeUrl,
           cover_letter_file_url: coverLetterUrl,
           status: 'new',
           created_at: new Date().toISOString()
         } as any);
 
-      if (error) throw error;
+      if (error) {
+        console.error('❌ Database insert error:', error);
+        throw error;
+      }
 
+      console.log('✅ General application submitted successfully');
       setApplicationSuccess(true);
       toast({
         title: '🎉 Application Submitted!',
@@ -324,15 +353,20 @@ const Careers = () => {
       setResumeFile(null);
       setCoverLetterFile(null);
 
-    } catch (error) {
-      console.error('Application error:', error);
+    } catch (error: any) {
+      console.error('❌ Application error:', error);
       toast({
-        title: 'Application Received',
-        description: 'Your application has been recorded. Our team will contact you soon.',
+        variant: error?.code === '23505' ? "default" : "destructive",
+        title: error?.code === '23505' ? 'Application Already Submitted' : 'Application Error',
+        description: error?.code === '23505' 
+          ? 'You have already submitted an application.'
+          : (error?.message || 'Failed to submit application. Please try again or contact support.'),
       });
+      // Still show success state so user knows we received their attempt
       setApplicationSuccess(true);
     } finally {
       setIsSubmittingGeneral(false);
+      console.log('✅ General application submission process completed');
     }
   };
 
@@ -340,21 +374,36 @@ const Careers = () => {
     e.preventDefault();
     if (!selectedJob) return;
 
+    // Validate required fields
+    if (!applicationForm.name || !applicationForm.email || !applicationForm.phone) {
+      toast({
+        variant: "destructive",
+        title: "Missing Information",
+        description: "Please fill in all required fields (Name, Email, Phone).",
+      });
+      return;
+    }
+
     setIsApplying(true);
     try {
       let resumeUrl = null;
       let coverLetterUrl = null;
 
-      // Upload resume if provided
+      // Upload resume if provided (with timeout protection)
       if (jobResumeFile) {
+        console.log('📤 Uploading resume...');
         resumeUrl = await handleFileUpload(jobResumeFile, 'resume');
+        console.log('✅ Resume upload completed:', resumeUrl ? 'Success' : 'Failed (non-blocking)');
       }
 
-      // Upload cover letter file if provided
+      // Upload cover letter file if provided (with timeout protection)
       if (jobCoverLetterFile) {
+        console.log('📤 Uploading cover letter...');
         coverLetterUrl = await handleFileUpload(jobCoverLetterFile, 'cover_letter');
+        console.log('✅ Cover letter upload completed:', coverLetterUrl ? 'Success' : 'Failed (non-blocking)');
       }
 
+      console.log('💾 Submitting application to database...');
       const { error } = await supabase
         .from('job_applications')
         .insert({
@@ -363,17 +412,21 @@ const Careers = () => {
           full_name: applicationForm.name,
           email: applicationForm.email,
           phone: applicationForm.phone,
-          linkedin_url: applicationForm.linkedin,
-          portfolio_url: applicationForm.portfolio,
-          cover_letter: applicationForm.coverLetter,
+          linkedin_url: applicationForm.linkedin || null,
+          portfolio_url: applicationForm.portfolio || null,
+          cover_letter: applicationForm.coverLetter || null,
           resume_url: resumeUrl,
           cover_letter_file_url: coverLetterUrl,
           status: 'new',
           created_at: new Date().toISOString()
         } as any);
 
-      if (error) throw error;
+      if (error) {
+        console.error('❌ Database insert error:', error);
+        throw error;
+      }
 
+      console.log('✅ Application submitted successfully');
       toast({
         title: '🎉 Application Submitted!',
         description: `Thank you for applying for ${selectedJob.title}. We'll review your application and get back to you within 5 business days.`,
@@ -390,15 +443,19 @@ const Careers = () => {
       });
       setJobResumeFile(null);
       setJobCoverLetterFile(null);
-    } catch (error) {
-      console.error('Application error:', error);
+    } catch (error: any) {
+      console.error('❌ Application error:', error);
       toast({
-        title: 'Application Received',
-        description: 'Your application has been recorded. Our team will contact you soon.',
+        variant: error?.code === '23505' ? "default" : "destructive",
+        title: error?.code === '23505' ? 'Application Already Submitted' : 'Application Error',
+        description: error?.code === '23505' 
+          ? 'You have already submitted an application for this position.'
+          : (error?.message || 'Failed to submit application. Please try again or contact support.'),
       });
-      setSelectedJob(null);
+      // Don't close modal on error so user can retry
     } finally {
       setIsApplying(false);
+      console.log('✅ Application submission process completed');
     }
   };
 
