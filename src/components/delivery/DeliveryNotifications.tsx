@@ -366,10 +366,16 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
           continue;
         }
         
-        // CRITICAL: Skip delivered/completed/cancelled deliveries - these shouldn't show in notifications
+        // CRITICAL: Skip delivered/completed/cancelled/rejected deliveries - these shouldn't show in notifications
         // Only show pending, accepted, assigned, in_transit deliveries that need action
-        if (['delivered', 'completed', 'cancelled'].includes(dr.status)) {
-          console.log(`🚫 SKIPPING: Delivery request ${dr.id} has status ${dr.status} - already completed/cancelled`);
+        if (['delivered', 'completed', 'cancelled', 'rejected'].includes(dr.status)) {
+          console.log(`🚫 SKIPPING: Delivery request ${dr.id} has status ${dr.status} - already completed/cancelled/rejected`);
+          continue;
+        }
+        
+        // CRITICAL: Skip if already accepted by THIS provider (those should be in Scheduled tab, not notifications)
+        if (dr.provider_id === userId && dr.status === 'accepted') {
+          console.log(`🚫 SKIPPING: Delivery request ${dr.id} already accepted by this provider - should be in Scheduled tab`);
           continue;
         }
         
