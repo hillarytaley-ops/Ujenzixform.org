@@ -600,11 +600,42 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
         return;
       }
       
-      console.log(`✅ FINAL: ${finalNotifications.length} → ${absolutelyFinal.length} absolutely unique notifications (removed ${finalNotifications.length - absolutelyFinal.length} final duplicates)`);
-      console.log(`📊 Final notification breakdown: ${poIds.length} with purchase_order_id, ${absolutelyFinal.length - poIds.length} without`);
+      // FINAL VALIDATION: Remove any remaining empty/invalid notifications
+      const validatedFinal = absolutelyFinal.filter((notif) => {
+        // Must have either purchase_order_id or delivery_request_id
+        if (!notif.purchase_order_id && !notif.delivery_request_id) {
+          console.log(`🚫 FINAL FILTER: Removing notification ${notif.id} - no purchase_order_id or delivery_request_id`);
+          return false;
+        }
+        
+        // Must have valid delivery address (not empty or placeholder)
+        const deliveryAddr = notif.deliveryAddress || '';
+        if (!deliveryAddr || deliveryAddr.trim() === '' || deliveryAddr.toLowerCase().includes('to be provided')) {
+          console.log(`🚫 FINAL FILTER: Removing notification ${notif.id} - invalid delivery address: "${deliveryAddr}"`);
+          return false;
+        }
+        
+        // Must have valid material type
+        const materialType = notif.materialType || '';
+        if (!materialType || materialType.trim() === '') {
+          console.log(`🚫 FINAL FILTER: Removing notification ${notif.id} - no material type`);
+          return false;
+        }
+        
+        // Must have valid title
+        if (!notif.title || notif.title.trim() === '') {
+          console.log(`🚫 FINAL FILTER: Removing notification ${notif.id} - no title`);
+          return false;
+        }
+        
+        return true;
+      });
       
-      setNotifications(absolutelyFinal);
-      setUnreadCount(absolutelyFinal.filter(n => !n.read).length);
+      console.log(`✅ FINAL: ${finalNotifications.length} → ${absolutelyFinal.length} → ${validatedFinal.length} validated notifications (removed ${absolutelyFinal.length - validatedFinal.length} invalid/empty)`);
+      console.log(`📊 Final notification breakdown: ${validatedFinal.filter(n => n.purchase_order_id).length} with purchase_order_id`);
+      
+      setNotifications(validatedFinal);
+      setUnreadCount(validatedFinal.filter(n => !n.read).length);
       
     } catch (error: any) {
       console.error('❌ Error loading notifications:', error.message || error);
