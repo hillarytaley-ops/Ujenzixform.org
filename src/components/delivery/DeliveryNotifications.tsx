@@ -402,6 +402,7 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
         
         let skippedCount = 0;
         // Only add purchase_orders that DON'T have a delivery_request AND haven't been added yet
+        // CRITICAL: Also filter out delivered/completed/cancelled purchase_orders
         purchaseOrders.forEach((po: any) => {
           // ABSOLUTE CHECK: If we already added a notification for this purchase_order_id, SKIP IT
           if (addedPOIds.has(po.id)) {
@@ -410,10 +411,39 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
             return;
           }
           
+          // CRITICAL: Skip delivered/completed/cancelled purchase_orders
+          if (['delivered', 'completed', 'cancelled'].includes(po.status)) {
+            skippedCount++;
+            console.log(`🚫 SKIPPED: Purchase order ${po.id} has status ${po.status} - already completed/cancelled`);
+            return;
+          }
+          
+          // CRITICAL: Skip if delivery_status is delivered/completed
+          if (po.delivery_status && ['delivered', 'completed', 'cancelled'].includes(po.delivery_status)) {
+            skippedCount++;
+            console.log(`🚫 SKIPPED: Purchase order ${po.id} has delivery_status ${po.delivery_status} - already completed`);
+            return;
+          }
+          
+          // CRITICAL: Only show if delivery is actually required and has valid data
           if (!seenPurchaseOrderIds.has(po.id) && (po.delivery_required || po.delivery_address)) {
+            // CRITICAL: Validate that purchase_order has valid data
+            if (!po.id || !po.delivery_address || po.delivery_address.trim() === '' || po.delivery_address.toLowerCase().includes('to be provided')) {
+              skippedCount++;
+              console.log(`🚫 SKIPPED: Purchase order ${po.id} has invalid or placeholder delivery address`);
+              return;
+            }
+            
             const materialType = po.items && po.items.length > 0
               ? po.items.map((item: any) => item.material_name || item.name).join(', ')
               : 'Construction Materials';
+            
+            // CRITICAL: Ensure materialType is not empty
+            if (!materialType || materialType.trim() === '') {
+              skippedCount++;
+              console.log(`🚫 SKIPPED: Purchase order ${po.id} has no material type`);
+              return;
+            }
             
             addedPOIds.add(po.id); // Mark as added
             finalNotifications.push({
@@ -463,6 +493,26 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
       });
       
       finalNotifications.forEach((notif) => {
+        // CRITICAL: Filter out empty/invalid notifications
+        if (!notif.purchase_order_id && !notif.delivery_request_id) {
+          console.log(`🚫 FILTERING OUT: Notification ${notif.id} has no purchase_order_id or delivery_request_id (invalid)`);
+          return;
+        }
+        
+        // CRITICAL: Filter out notifications with empty/placeholder delivery addresses
+        const deliveryAddr = notif.deliveryAddress || '';
+        if (!deliveryAddr || deliveryAddr.trim() === '' || deliveryAddr.toLowerCase().includes('to be provided')) {
+          console.log(`🚫 FILTERING OUT: Notification ${notif.id} has invalid delivery address: "${deliveryAddr}"`);
+          return;
+        }
+        
+        // CRITICAL: Filter out notifications with empty material types
+        const materialType = notif.materialType || '';
+        if (!materialType || materialType.trim() === '') {
+          console.log(`🚫 FILTERING OUT: Notification ${notif.id} has no material type`);
+          return;
+        }
+        
         // RULE 0: If it has delivery_request_id, check for duplicates by delivery_request_id FIRST
         // This catches cases where the same delivery_request creates multiple notifications
         if (notif.delivery_request_id) {
