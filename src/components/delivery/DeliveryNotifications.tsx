@@ -931,42 +931,62 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
     const absolutelyFinal: Notification[] = [];
     
     result.forEach((n) => {
+      // Check purchase_order_id FIRST (highest priority)
       if (n.purchase_order_id) {
         if (finalSeenPOIds.has(n.purchase_order_id)) {
-          console.error(`🚨 CRITICAL: Found duplicate purchase_order_id ${n.purchase_order_id} in final result - removing ${n.id}`);
-          return;
+          console.error(`🚨 CRITICAL: Found duplicate purchase_order_id ${n.purchase_order_id} in final result - REMOVING ${n.id}`);
+          return; // Skip this duplicate
         }
         finalSeenPOIds.add(n.purchase_order_id);
+        absolutelyFinal.push(n);
+        return; // Added, move to next
       }
       
+      // Check delivery_request_id SECOND
       if (n.delivery_request_id) {
         if (finalSeenDRIds.has(n.delivery_request_id)) {
-          console.error(`🚨 CRITICAL: Found duplicate delivery_request_id ${n.delivery_request_id} in final result - removing ${n.id}`);
-          return;
+          console.error(`🚨 CRITICAL: Found duplicate delivery_request_id ${n.delivery_request_id} in final result - REMOVING ${n.id}`);
+          return; // Skip this duplicate
         }
         finalSeenDRIds.add(n.delivery_request_id);
+        absolutelyFinal.push(n);
+        return; // Added, move to next
       }
       
+      // Check notification id LAST (fallback)
       if (finalSeenIds.has(n.id)) {
-        console.error(`🚨 CRITICAL: Found duplicate notification id ${n.id} in final result - removing`);
-        return;
+        console.error(`🚨 CRITICAL: Found duplicate notification id ${n.id} in final result - REMOVING`);
+        return; // Skip this duplicate
       }
       finalSeenIds.add(n.id);
-      
       absolutelyFinal.push(n);
     });
     
-    if (absolutelyFinal.length < notifications.length) {
-      console.log(`✅ DEDUPLICATION COMPLETE: ${notifications.length} → ${absolutelyFinal.length} (removed ${notifications.length - absolutelyFinal.length} duplicates)`);
-    } else {
-      console.log(`✅ DEDUPLICATION COMPLETE: ${notifications.length} notifications (no duplicates found)`);
+    // CRITICAL: Log if we found duplicates in the final pass
+    if (result.length !== absolutelyFinal.length) {
+      console.error(`🚨🚨🚨 CRITICAL DEDUPLICATION FAILURE: Map had ${result.length} items but final check found ${absolutelyFinal.length} unique items - REMOVED ${result.length - absolutelyFinal.length} duplicates!`);
     }
+    
+    // Log the final count
+    if (absolutelyFinal.length < notifications.length) {
+      console.log(`✅ RENDER: Single Accept per request - ${notifications.length} → ${absolutelyFinal.length} (removed ${notifications.length - absolutelyFinal.length} duplicates)`);
+    } else if (absolutelyFinal.length === notifications.length) {
+      console.log(`✅ RENDER: All ${absolutelyFinal.length} notifications are unique`);
+    }
+    
+    // CRITICAL: Log each notification's key for debugging
+    console.log(`🔍 FINAL NOTIFICATIONS (${absolutelyFinal.length}):`, absolutelyFinal.map(n => ({
+      id: n.id,
+      po_id: n.purchase_order_id?.substring(0, 8) || 'N/A',
+      dr_id: n.delivery_request_id?.substring(0, 8) || 'N/A',
+      title: n.title
+    })));
     
     // Final check: Log any remaining duplicates (should be zero)
     const poIdsInFinal = absolutelyFinal.map(n => n.purchase_order_id).filter(Boolean);
     const duplicatePOIds = poIdsInFinal.filter((id, index) => poIdsInFinal.indexOf(id) !== index);
     if (duplicatePOIds.length > 0) {
-      console.error(`🚨 CRITICAL ERROR: Still found ${duplicatePOIds.length} duplicate purchase_order_ids after all filtering:`, duplicatePOIds);
+      console.error(`🚨🚨🚨 CRITICAL ERROR: Still found ${duplicatePOIds.length} duplicate purchase_order_ids after all filtering:`, duplicatePOIds);
     } else {
       console.log(`✅ VERIFICATION: No duplicate purchase_order_ids found in final result`);
     }
