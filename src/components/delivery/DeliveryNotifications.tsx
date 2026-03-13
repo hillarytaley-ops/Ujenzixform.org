@@ -1178,7 +1178,8 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
             );
             });
           })()
-        )}
+        )
+        }
       </div>
     </div>
   );
