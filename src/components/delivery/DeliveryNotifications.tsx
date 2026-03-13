@@ -905,8 +905,8 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
 
     // Build list: one per PO, then DRs not already covered, then no-PO/no-DR
     // ABSOLUTE GUARANTEE: No duplicates in final result
+    // Reuse seenPOIds and seenDRIds from above - don't redeclare
     const seenIds = new Set<string>();
-    const seenPOIds = new Set<string>();
     let result: Notification[] = [];
     
     // Add notifications with purchase_order_id (ONE per purchase_order_id)
