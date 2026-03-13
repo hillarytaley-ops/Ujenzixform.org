@@ -196,14 +196,15 @@ BEGIN
       
       IF v_all_items_received = TRUE THEN
         -- Update purchase_orders status AND delivery_status to 'delivered'
-        -- CRITICAL: Remove any status restrictions so it updates even if already 'shipped' or 'in_transit'
+        -- CRITICAL: Always update when all items are received, regardless of current status
+        -- This ensures orders move from 'in_transit' or 'shipped' to 'delivered'
+        -- We check v_all_items_received above, so we know delivery is complete
         UPDATE purchase_orders
         SET status = 'delivered',
             delivery_status = 'delivered',
             delivered_at = COALESCE(delivered_at, NOW()),
             updated_at = NOW()
-        WHERE id = order_id
-          AND status != 'delivered';  -- Only update if not already delivered
+        WHERE id = order_id;
         
         -- Also update delivery_requests that are in transit (exclude cancelled/completed)
         UPDATE delivery_requests
