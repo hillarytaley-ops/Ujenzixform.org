@@ -297,15 +297,27 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
       console.log(`🔍 Deduplicated delivery_requests: ${deliveryRequests.length} → ${totalUnique} unique (removed ${duplicatesRemoved} duplicates, ${nullPORequests} had NULL purchase_order_id)`);
       
       // STEP 3: Create notifications from unique delivery_requests
+      // CRITICAL: Only show delivery requests with valid purchase_order_id (no placeholder/default requests)
       // CRITICAL: Use a Set to track purchase_order_ids we've already added
       const addedPOIds = new Set<string>();
       
       for (const [poId, dr] of deliveryRequestsByPO.entries()) {
+        // CRITICAL: Skip delivery requests without purchase_order_id (these are placeholder/default requests)
+        if (!poId || poId.trim() === '' || poId === 'null' || poId === 'undefined') {
+          console.log(`🚫 SKIPPING: Delivery request ${dr.id} has no valid purchase_order_id (placeholder/default request)`);
+          continue;
+        }
+        
         // ABSOLUTE GUARANTEE: Only add if we haven't seen this purchase_order_id yet
         if (addedPOIds.has(poId)) {
           console.error(`🚫 BLOCKED: Already added notification for purchase_order_id ${poId}, skipping delivery_request ${dr.id}`);
           continue;
         }
+        
+        // VERIFY: Check if purchase_order actually exists (prevent showing notifications for deleted/non-existent orders)
+        // We'll do a quick check by trying to verify the purchase_order exists
+        // For now, we'll trust the purchase_order_id exists if it's in the deduplicated list
+        // (The deduplication already filtered out invalid ones)
         
         addedPOIds.add(poId);
         finalNotifications.push({
@@ -330,42 +342,14 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
         });
       }
       
-      // Also add notifications from NULL purchase_order_id requests (deduplicated)
-      const addedNullPOIds = new Set<string>();
-      for (const [key, dr] of deliveryRequestsByKey.entries()) {
-        if (addedNullPOIds.has(dr.id)) {
-          console.error(`🚫 BLOCKED: Already added notification for NULL PO delivery_request ${dr.id}`);
-          continue;
-        }
-        
-        // FILTER: Skip deliveries already accepted by THIS provider (they're in Scheduled tab)
-        if (dr.provider_id && dr.provider_id === userId) {
-          console.log(`📋 Skipping NULL PO delivery ${dr.id} - already accepted by this provider (should be in Scheduled tab)`);
-          continue;
-        }
-        
-        addedNullPOIds.add(dr.id);
-        finalNotifications.push({
-          id: `dr-${dr.id}`,
-          type: 'new_delivery',
-          title: dr.status === 'pending' ? '🚚 New Delivery Request!' : `Delivery ${dr.status}`,
-          message: `${dr.material_type || 'Materials'} delivery to ${dr.delivery_address || 'Unknown location'}`,
-          timestamp: new Date(dr.created_at),
-          read: dr.status !== 'pending',
-          priority: dr.priority_level === 'urgent' || dr.status === 'pending' ? 'high' : 'medium',
-          actionUrl: `/delivery-dashboard?request=${dr.id}`,
-          status: dr.status,
-          pickupAddress: dr.pickup_address || dr.pickup_location || '',
-          deliveryAddress: dr.delivery_address || dr.delivery_location || '',
-          materialType: dr.material_type || '',
-          quantity: dr.quantity || '',
-          estimatedCost: dr.estimated_cost || dr.budget_range || 0,
-          purchase_order_id: undefined, // NULL purchase_order_id
-          delivery_request_id: dr.id, // For accepting
-          provider_id: dr.provider_id || null, // Provider who accepted (null = unaccepted)
-          provider_name: dr.provider_name || dr.delivery_provider_name || undefined // Provider name if available
-        });
-      }
+      // CRITICAL: DO NOT show notifications for NULL purchase_order_id requests
+      // These are placeholder/default delivery requests that don't have actual orders
+      // Only show delivery requests with valid purchase_order_id
+      console.log(`🚫 FILTERED OUT: ${deliveryRequestsByKey.size} delivery requests without purchase_order_id (placeholder/default requests - not showing to providers)`);
+      
+      // REMOVED: We no longer show NULL purchase_order_id requests to providers
+      // These are likely placeholder/default requests that were created without actual orders
+      // Providers should only see delivery requests linked to real purchase orders
       
       // STEP 4: Fetch purchase_orders that DON'T have a delivery_request yet
       // CRITICAL: Only add if purchase_order_id is NOT already in addedPOIds
