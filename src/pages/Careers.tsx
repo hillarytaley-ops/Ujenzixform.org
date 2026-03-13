@@ -591,17 +591,30 @@ const Careers = () => {
       // Use direct fetch with AbortController for reliable timeout (10 seconds)
       console.log('⏳ Inserting into database...');
       
-      // Get access token
+      // Get access token with timeout (3 seconds max)
       let accessToken = SUPABASE_ANON_KEY;
       try {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (session?.access_token) {
-          accessToken = session.access_token;
+        console.log('🔑 Getting session token...');
+        const sessionPromise = supabase.auth.getSession();
+        const sessionTimeout = new Promise<{ data: { session: null } }>((resolve) => {
+          setTimeout(() => {
+            console.warn('⏱️ Session retrieval timeout after 3 seconds, using anon key');
+            resolve({ data: { session: null } });
+          }, 3000);
+        });
+        
+        const sessionResult = await Promise.race([sessionPromise, sessionTimeout]);
+        if (sessionResult?.data?.session?.access_token) {
+          accessToken = sessionResult.data.session.access_token;
+          console.log('✅ Got session token');
+        } else {
+          console.log('⚠️ No session token, using anon key');
         }
       } catch (e) {
-        console.log('⚠️ Could not get session token, using anon key');
+        console.log('⚠️ Could not get session token, using anon key:', e);
       }
       
+      console.log('📤 Starting database insert fetch...');
       const controller = new AbortController();
       const insertTimeout = setTimeout(() => {
         console.warn('⏱️ Database insert timeout after 10 seconds - aborting');
@@ -609,6 +622,7 @@ const Careers = () => {
       }, 10000); // 10 second timeout
       
       try {
+        console.log('🌐 Fetching:', `${SUPABASE_URL}/rest/v1/job_applications`);
         const response = await fetch(
           `${SUPABASE_URL}/rest/v1/job_applications`,
           {
@@ -625,6 +639,7 @@ const Careers = () => {
         );
         
         clearTimeout(insertTimeout);
+        console.log('📥 Got response:', response.status, response.statusText);
         
         if (!response.ok) {
           const errorData = await response.json().catch(() => ({}));
@@ -636,6 +651,7 @@ const Careers = () => {
         console.log('✅ Application submitted successfully to database:', insertedData?.[0]?.id || 'unknown');
       } catch (fetchError: any) {
         clearTimeout(insertTimeout);
+        console.error('❌ Fetch error:', fetchError.name, fetchError.message);
         if (fetchError.name === 'AbortError') {
           console.warn('⚠️ Database insert timed out, but application may have been saved');
           toast({
