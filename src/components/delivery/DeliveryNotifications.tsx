@@ -930,7 +930,7 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
     
     // Add notifications with delivery_request_id but no purchase_order_id (ONE per delivery_request_id)
     renderedByDR.forEach((n) => {
-      if (seenIds.has(n.id)) {
+      if (resultSeenIds.has(n.id)) {
         console.log(`🗑️ SKIPPING: Notification ID ${n.id} already in result`);
         return;
       }
@@ -939,18 +939,23 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
         console.log(`🗑️ SKIPPING: Delivery request ${n.delivery_request_id} already covered by PO ${n.purchase_order_id}`);
         return;
       }
-      seenIds.add(n.id);
+      if (n.delivery_request_id && resultSeenDRIds.has(n.delivery_request_id)) {
+        console.log(`🗑️ SKIPPING: Delivery request ID ${n.delivery_request_id} already in result`);
+        return;
+      }
+      resultSeenIds.add(n.id);
+      if (n.delivery_request_id) resultSeenDRIds.add(n.delivery_request_id);
       result.push(n);
     });
     
     // Add notifications with no purchase_order_id and no delivery_request_id (ONE per notification ID)
     notifications.forEach((notification) => {
       if (notification.purchase_order_id || notification.delivery_request_id) return;
-      if (seenIds.has(notification.id)) {
+      if (resultSeenIds.has(notification.id)) {
         console.log(`🗑️ SKIPPING: Notification ID ${notification.id} already in result`);
         return;
       }
-      seenIds.add(notification.id);
+      resultSeenIds.add(notification.id);
       result.push(notification);
     });
 
