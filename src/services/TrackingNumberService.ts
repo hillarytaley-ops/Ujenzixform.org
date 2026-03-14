@@ -647,20 +647,30 @@ class TrackingNumberService {
           let isDuplicate = false;
           let reason = '';
           
+          // CRITICAL: Check purchase_order_id FIRST - if they're different, they're NOT duplicates
           // Check 1: Same purchase_order_id
           if (purchaseOrderId && dr.purchase_order_id === purchaseOrderId) {
             isDuplicate = true;
             reason = 'same purchase_order_id';
           }
-          // Check 2: Same composite key (deliveryAddress + materialType)
-          else if (deliveryAddress && materialType && dr.delivery_address && dr.material_type) {
-            const normalizedDRAddress = String(dr.delivery_address).trim().toLowerCase();
-            const normalizedDRMaterial = normalizeMaterialType(dr.material_type);
-            
-            if (normalizedAcceptedAddress === normalizedDRAddress && normalizedAcceptedMaterial === normalizedDRMaterial) {
-              isDuplicate = true;
-              reason = 'same composite key (address + material)';
+          // Check 2: Same composite key (deliveryAddress + materialType) - ONLY if purchase_order_id is missing/NULL
+          // CRITICAL: If purchase_order_id exists and is different, they are NOT duplicates even if composite key matches
+          else if (!purchaseOrderId || !dr.purchase_order_id) {
+            // Only check composite key if purchase_order_id is missing for BOTH
+            if (deliveryAddress && materialType && dr.delivery_address && dr.material_type) {
+              const normalizedDRAddress = String(dr.delivery_address).trim().toLowerCase();
+              const normalizedDRMaterial = normalizeMaterialType(dr.material_type);
+              
+              if (normalizedAcceptedAddress === normalizedDRAddress && normalizedAcceptedMaterial === normalizedDRMaterial) {
+                isDuplicate = true;
+                reason = 'same composite key (address + material, both have NULL purchase_order_id)';
+              }
             }
+          }
+          // If purchase_order_id exists and is different, they are NOT duplicates
+          else if (purchaseOrderId && dr.purchase_order_id && purchaseOrderId !== dr.purchase_order_id) {
+            isDuplicate = false; // Explicitly NOT a duplicate
+            console.log(`   ✅ NOT A DUPLICATE: Different purchase_order_ids - accepted: ${purchaseOrderId.slice(0, 8)}, pending: ${dr.purchase_order_id.slice(0, 8)}`);
           }
           
           if (isDuplicate) {
