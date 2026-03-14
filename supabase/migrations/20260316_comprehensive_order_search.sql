@@ -5,9 +5,12 @@
 -- ============================================================
 
 -- First, let's see ALL recent purchase_orders to understand what's in the database
-RAISE NOTICE '========================================';
-RAISE NOTICE 'STEP 1: Listing ALL recent purchase_orders (last 24 hours)';
-RAISE NOTICE '========================================';
+DO $$
+BEGIN
+  RAISE NOTICE '========================================';
+  RAISE NOTICE 'STEP 1: Listing ALL recent purchase_orders (last 24 hours)';
+  RAISE NOTICE '========================================';
+END $$;
 
 SELECT 
   id,
@@ -124,10 +127,13 @@ BEGIN
 END $$;
 
 -- Check ALL pending delivery_requests to see what's actually there
-RAISE NOTICE '';
-RAISE NOTICE '========================================';
-RAISE NOTICE 'STEP 4: Listing ALL pending delivery_requests (last 24 hours)';
-RAISE NOTICE '========================================';
+DO $$
+BEGIN
+  RAISE NOTICE '';
+  RAISE NOTICE '========================================';
+  RAISE NOTICE 'STEP 4: Listing ALL pending delivery_requests (last 24 hours)';
+  RAISE NOTICE '========================================';
+END $$;
 
 SELECT 
   dr.id,
