@@ -16,6 +16,85 @@ export interface CleanupResult {
  * Clean up duplicate delivery requests for the same purchase_order_id
  * Keeps the most recent/active one and cancels the rest
  */
+/**
+ * Clean up duplicate purchase_orders with same po_number
+ * Keeps the most recent one, cancels the rest
+ */
+export async function cleanupDuplicatePurchaseOrders(): Promise<CleanupResult> {
+  const result: CleanupResult = {
+    success: false,
+    duplicatesFound: 0,
+    duplicatesCancelled: 0,
+    errors: []
+  };
+
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      result.errors.push('User not authenticated');
+      return result;
+    }
+
+    // Find all po_numbers with multiple purchase_orders
+    const { data: purchaseOrders, error: poError } = await supabase
+      .from('purchase_orders')
+      .select('id, po_number, status, created_at')
+      .not('po_number', 'is', null)
+      .neq('po_number', '')
+      .not('status', 'in', '(cancelled,rejected,completed)');
+
+    if (poError) {
+      result.errors.push(`Failed to fetch purchase_orders: ${poError.message}`);
+      return result;
+    }
+
+    // Group by normalized po_number
+    const poNumberMap = new Map<string, typeof purchaseOrders>();
+    purchaseOrders?.forEach(po => {
+      const normalized = String(po.po_number).trim().toLowerCase();
+      if (!poNumberMap.has(normalized)) {
+        poNumberMap.set(normalized, []);
+      }
+      poNumberMap.get(normalized)!.push(po);
+    });
+
+    // Find duplicates
+    for (const [normalizedPO, pos] of poNumberMap.entries()) {
+      if (pos.length > 1) {
+        result.duplicatesFound += pos.length - 1;
+
+        // Sort to find the "best" one to keep (most recent)
+        pos.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+        const keptId = pos[0].id;
+        const toCancelIds = pos.slice(1).map(po => po.id);
+
+        if (toCancelIds.length > 0) {
+          const { error: updateError } = await supabase
+            .from('purchase_orders')
+            .update({
+              status: 'cancelled',
+              updated_at: new Date().toISOString()
+            })
+            .in('id', toCancelIds);
+
+          if (updateError) {
+            result.errors.push(`Failed to cancel duplicate purchase_orders for po_number ${normalizedPO}: ${updateError.message}`);
+          } else {
+            result.duplicatesCancelled += toCancelIds.length;
+            console.log(`✅ Cancelled ${toCancelIds.length} duplicate purchase_orders for po_number ${normalizedPO}, kept: ${keptId}`);
+          }
+        }
+      }
+    }
+
+    result.success = result.errors.length === 0;
+    return result;
+  } catch (error: any) {
+    result.errors.push(`Unexpected error: ${error.message}`);
+    return result;
+  }
+}
+
 export async function cleanupDuplicateDeliveryRequests(): Promise<CleanupResult> {
   const result: CleanupResult = {
     success: false,

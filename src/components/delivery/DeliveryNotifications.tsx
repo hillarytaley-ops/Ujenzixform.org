@@ -17,7 +17,7 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { trackingNumberService } from '@/services/TrackingNumberService';
-import { cleanupDuplicateDeliveryRequests, checkForDuplicateDeliveryRequests } from '@/utils/cleanupDuplicateDeliveryRequests';
+import { cleanupDuplicateDeliveryRequests, cleanupDuplicatePurchaseOrders, checkForDuplicateDeliveryRequests } from '@/utils/cleanupDuplicateDeliveryRequests';
 
 interface Notification {
   id: string;
@@ -1412,19 +1412,32 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
                     description: `Found ${checkResult.duplicateCount} duplicate delivery requests. Cleaning up...`,
                   });
                   
-                  // Clean up duplicates
-                  const cleanupResult = await cleanupDuplicateDeliveryRequests();
-                  if (cleanupResult.success) {
+                  // Clean up duplicates - BOTH purchase_orders and delivery_requests
+                  const [poCleanupResult, drCleanupResult] = await Promise.all([
+                    cleanupDuplicatePurchaseOrders(),
+                    cleanupDuplicateDeliveryRequests()
+                  ]);
+                  
+                  const totalCancelled = (poCleanupResult.duplicatesCancelled || 0) + (drCleanupResult.duplicatesCancelled || 0);
+                  const allSuccess = poCleanupResult.success && drCleanupResult.success;
+                  
+                  if (allSuccess && totalCancelled > 0) {
                     toast({
                       title: '✅ Cleanup Complete',
-                      description: `Cancelled ${cleanupResult.duplicatesCancelled} duplicate delivery requests.`,
+                      description: `Cancelled ${poCleanupResult.duplicatesCancelled || 0} duplicate purchase orders and ${drCleanupResult.duplicatesCancelled || 0} duplicate delivery requests.`,
                     });
                     // Reload notifications after cleanup
                     setTimeout(() => loadNotifications(), 1000);
+                  } else if (allSuccess) {
+                    toast({
+                      title: '✅ No Duplicates',
+                      description: 'No duplicates found. Everything looks good!',
+                    });
                   } else {
+                    const allErrors = [...(poCleanupResult.errors || []), ...(drCleanupResult.errors || [])];
                     toast({
                       title: '⚠️ Cleanup Issues',
-                      description: `Cleaned up ${cleanupResult.duplicatesCancelled} duplicates, but encountered ${cleanupResult.errors.length} errors.`,
+                      description: `Cleaned up ${totalCancelled} duplicates, but encountered ${allErrors.length} errors.`,
                       variant: 'destructive'
                     });
                   }
