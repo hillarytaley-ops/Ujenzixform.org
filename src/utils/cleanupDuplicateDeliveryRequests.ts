@@ -302,3 +302,119 @@ export async function checkForDuplicateDeliveryRequests(): Promise<{
     throw error;
   }
 }
+
+/**
+ * CRITICAL: Delete all delivery_requests without valid delivery_address
+ * This ensures only delivery requests with actual addresses are shown to providers
+ */
+export async function deleteDeliveryRequestsWithoutAddress(): Promise<{ success: boolean; deleted: number; error?: string }> {
+  const result = { success: false, deleted: 0, error: undefined as string | undefined };
+  
+  try {
+    console.log('🗑️ Starting deletion of delivery_requests without valid delivery_address...');
+    
+    const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+    const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
+    
+    if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+      throw new Error('Missing Supabase environment variables');
+    }
+    
+    // Get access token
+    const { data: { session } } = await supabase.auth.getSession();
+    const accessToken = session?.access_token || SUPABASE_ANON_KEY;
+    
+    // First, count how many will be deleted
+    const countResponse = await fetch(
+      `${SUPABASE_URL}/rest/v1/delivery_requests?select=id,delivery_address,delivery_location&limit=1000`,
+      {
+        headers: {
+          'apikey': SUPABASE_ANON_KEY,
+          'Authorization': `Bearer ${accessToken}`,
+          'Content-Type': 'application/json'
+        },
+        cache: 'no-store'
+      }
+    );
+    
+    if (!countResponse.ok) {
+      throw new Error(`Failed to fetch delivery_requests: ${countResponse.status}`);
+    }
+    
+    const allRequests = await countResponse.json();
+    
+    // Filter to find requests without valid delivery_address
+    const toDelete: string[] = [];
+    
+    allRequests.forEach((dr: any) => {
+      const deliveryAddr = (dr.delivery_address || dr.delivery_location || '').trim().toLowerCase();
+      const isValid = deliveryAddr && 
+                      deliveryAddr !== '' && 
+                      deliveryAddr !== 'to be provided' && 
+                      deliveryAddr !== 'tbd' && 
+                      deliveryAddr !== 'n/a' && 
+                      deliveryAddr !== 'na' && 
+                      deliveryAddr !== 'tba' && 
+                      deliveryAddr !== 'to be determined';
+      
+      if (!isValid) {
+        toDelete.push(dr.id);
+      }
+    });
+    
+    console.log(`🗑️ Found ${toDelete.length} delivery_requests without valid delivery_address to delete`);
+    
+    if (toDelete.length === 0) {
+      result.success = true;
+      result.deleted = 0;
+      return result;
+    }
+    
+    // Delete them one by one (more reliable than batch)
+    let deletedCount = 0;
+    let failedCount = 0;
+    
+    for (const id of toDelete) {
+      try {
+        const deleteResponse = await fetch(
+          `${SUPABASE_URL}/rest/v1/delivery_requests?id=eq.${id}`,
+          {
+            method: 'DELETE',
+            headers: {
+              'apikey': SUPABASE_ANON_KEY,
+              'Authorization': `Bearer ${accessToken}`,
+              'Content-Type': 'application/json'
+            },
+            cache: 'no-store'
+          }
+        );
+        
+        if (deleteResponse.ok) {
+          deletedCount++;
+        } else {
+          failedCount++;
+          const errorText = await deleteResponse.text();
+          console.error(`❌ Failed to delete ${id.slice(0, 8)}: ${deleteResponse.status} - ${errorText}`);
+        }
+      } catch (cancelError: any) {
+        failedCount++;
+        console.error(`❌ Error deleting ${id.slice(0, 8)}:`, cancelError.message);
+      }
+    }
+    
+    console.log(`✅ Deleted ${deletedCount} delivery_requests, ${failedCount} failed`);
+    
+    result.success = true;
+    result.deleted = deletedCount;
+    
+    if (failedCount > 0) {
+      result.error = `${failedCount} deletions failed`;
+    }
+    
+  } catch (error: any) {
+    console.error('❌ Error deleting delivery_requests without address:', error);
+    result.error = error.message || 'Unknown error';
+  }
+  
+  return result;
+}
