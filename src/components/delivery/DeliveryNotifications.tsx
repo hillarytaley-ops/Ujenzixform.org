@@ -296,7 +296,7 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
         deliveryRequests.forEach((dr: any) => {
           if (dr.purchase_order_id) {
             // Strategy 1: Deduplicate by purchase_order_id (PRIMARY)
-          if (!finalDeliveryRequestsByPO.has(dr.purchase_order_id)) {
+            if (!finalDeliveryRequestsByPO.has(dr.purchase_order_id)) {
             finalDeliveryRequestsByPO.set(dr.purchase_order_id, dr);
           } else {
             // Duplicate found! Keep the best one (shouldn't happen after STEP 1, but safety check)
