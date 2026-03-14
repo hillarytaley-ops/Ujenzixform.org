@@ -30,6 +30,7 @@ DECLARE
   po_record RECORD;
   dr_record RECORD;
   dr_count INTEGER;
+  partial_count INTEGER;
   search_patterns TEXT[] := ARRAY[
     'QR-1773490484717-QHDSE',
     '1773490484717',
