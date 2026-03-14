@@ -292,10 +292,10 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
         let duplicatesRemoved = 0;
         let nullPORequests = 0;
         
-      // Process each delivery request (already deduplicated, but do final check)
-      deliveryRequests.forEach((dr: any) => {
-        if (dr.purchase_order_id) {
-          // Strategy 1: Deduplicate by purchase_order_id (PRIMARY)
+        // Process each delivery request (already deduplicated, but do final check)
+        deliveryRequests.forEach((dr: any) => {
+          if (dr.purchase_order_id) {
+            // Strategy 1: Deduplicate by purchase_order_id (PRIMARY)
           if (!finalDeliveryRequestsByPO.has(dr.purchase_order_id)) {
             finalDeliveryRequestsByPO.set(dr.purchase_order_id, dr);
           } else {
