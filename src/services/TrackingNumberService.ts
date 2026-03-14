@@ -233,6 +233,7 @@ class TrackingNumberService {
           
           // ADDITIONAL CHECK: Verify these deliveries are truly active by checking purchase_order status
           // If purchase_order status is 'delivered', the delivery is complete even if delivery_request status is 'accepted'
+          // CRITICAL: Also filter out deliveries where purchase_order doesn't exist (orphaned delivery_requests)
           if (activeDeliveries.length > 0) {
             const poIds = activeDeliveries.map((d: any) => d.purchase_order_id).filter(Boolean);
             if (poIds.length > 0) {
@@ -258,16 +259,30 @@ class TrackingNumberService {
                 
                 if (poResponse.ok) {
                   const purchaseOrders = await poResponse.json();
+                  const existingPOIds = new Set(purchaseOrders.map((po: any) => po.id));
                   const deliveredPOIds = new Set(
                     purchaseOrders
                       .filter((po: any) => po.status === 'delivered' || po.delivery_status === 'delivered')
                       .map((po: any) => po.id)
                   );
                   
-                  // Remove deliveries where the purchase_order is already delivered
+                  // Remove deliveries where:
+                  // 1. purchase_order is already delivered
+                  // 2. purchase_order doesn't exist (orphaned delivery_request)
                   const beforeCount = activeDeliveries.length;
                   activeDeliveries = activeDeliveries.filter((d: any) => {
-                    if (d.purchase_order_id && deliveredPOIds.has(d.purchase_order_id)) {
+                    if (!d.purchase_order_id) {
+                      // No purchase_order_id - filter it out (orphaned)
+                      console.log(`✅ Filtering out orphaned delivery ${d.id} (${d.tracking_number || 'no tracking'}) - no purchase_order_id`);
+                      return false;
+                    }
+                    if (!existingPOIds.has(d.purchase_order_id)) {
+                      // purchase_order doesn't exist - filter it out (orphaned)
+                      console.log(`✅ Filtering out orphaned delivery ${d.id} (${d.tracking_number || 'no tracking'}) - purchase_order ${d.purchase_order_id} does not exist`);
+                      return false;
+                    }
+                    if (deliveredPOIds.has(d.purchase_order_id)) {
+                      // purchase_order is delivered - filter it out (completed)
                       console.log(`✅ Filtering out completed delivery ${d.id} (${d.tracking_number || 'no tracking'}) - purchase_order ${d.purchase_order_id} is delivered`);
                       return false;
                     }
@@ -275,14 +290,32 @@ class TrackingNumberService {
                   });
                   
                   if (activeDeliveries.length < beforeCount) {
-                    console.log(`📦 After filtering completed orders: ${beforeCount} → ${activeDeliveries.length} truly active deliveries`);
+                    console.log(`📦 After filtering completed/orphaned orders: ${beforeCount} → ${activeDeliveries.length} truly active deliveries`);
+                  }
+                } else {
+                  // If purchase_order query fails, filter out all deliveries with purchase_order_id (safer to be conservative)
+                  console.warn(`⚠️ Could not verify purchase_order status (HTTP ${poResponse.status}), filtering out deliveries with purchase_order_id`);
+                  const beforeCount = activeDeliveries.length;
+                  activeDeliveries = activeDeliveries.filter((d: any) => !d.purchase_order_id);
+                  if (activeDeliveries.length < beforeCount) {
+                    console.log(`📦 After filtering (purchase_order query failed): ${beforeCount} → ${activeDeliveries.length} truly active deliveries`);
                   }
                 }
               } catch (poError: any) {
                 if (poError.name !== 'AbortError') {
-                  console.warn('⚠️ Could not verify purchase_order status, using delivery_request status only:', poError);
+                  console.warn('⚠️ Could not verify purchase_order status, filtering out deliveries with purchase_order_id:', poError);
+                  // Filter out deliveries with purchase_order_id if we can't verify (safer to be conservative)
+                  const beforeCount = activeDeliveries.length;
+                  activeDeliveries = activeDeliveries.filter((d: any) => !d.purchase_order_id);
+                  if (activeDeliveries.length < beforeCount) {
+                    console.log(`📦 After filtering (purchase_order query error): ${beforeCount} → ${activeDeliveries.length} truly active deliveries`);
+                  }
                 }
               }
+            } else {
+              // No purchase_order_ids - filter out all (all are orphaned)
+              console.log(`✅ Filtering out all ${activeDeliveries.length} deliveries - none have purchase_order_id (all orphaned)`);
+              activeDeliveries = [];
             }
           }
         } else {
