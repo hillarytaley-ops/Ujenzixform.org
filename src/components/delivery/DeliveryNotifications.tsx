@@ -1361,12 +1361,24 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
         }
       }
       
-      // SECONDARY KEY: purchase_order_id (normalized) - only if po_number not available
+      // SECONDARY KEY: When po_number is missing, use composite key (deliveryAddress + materialType + same hour)
+      // This handles cases where multiple purchase_orders exist for the same logical order but have no po_number
+      if (!key && notification.deliveryAddress && notification.materialType && notification.timestamp) {
+        const normalizedAddress = String(notification.deliveryAddress).trim().toLowerCase();
+        const normalizedMaterial = String(notification.materialType).trim().toLowerCase();
+        // Group by same hour (YYYY-MM-DD-HH) to catch duplicates created within the same hour
+        const hourKey = new Date(notification.timestamp).toISOString().slice(0, 13); // "2026-03-14T12"
+        const compositeKey = `${normalizedAddress}|${normalizedMaterial}|${hourKey}`;
+        key = `composite-${compositeKey}`;
+        console.log(`🔑 FALLBACK KEY (no po_number): Using composite key "${compositeKey}" for notification ${notification.id}`);
+      }
+      
+      // TERTIARY KEY: purchase_order_id (normalized) - only if po_number and composite key not available
       if (!key && notification.purchase_order_id) {
         const normalizedPOId = normalizePOId(notification.purchase_order_id);
         key = `po-${normalizedPOId}`;
       } else if (!key && notification.delivery_request_id) {
-        // TERTIARY KEY: delivery_request_id - only ONE notification per delivery_request_id
+        // QUATERNARY KEY: delivery_request_id - only ONE notification per delivery_request_id
         key = `dr-${notification.delivery_request_id}`;
       } else if (!key) {
         // FALLBACK KEY: notification id - only ONE notification per id
@@ -1423,6 +1435,21 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
         return; // Added, move to next
       }
       
+      // FALLBACK: If no po_number, check composite key (deliveryAddress + materialType + same hour)
+      if (n.deliveryAddress && n.materialType && n.timestamp) {
+        const normalizedAddress = String(n.deliveryAddress).trim().toLowerCase();
+        const normalizedMaterial = String(n.materialType).trim().toLowerCase();
+        const hourKey = new Date(n.timestamp).toISOString().slice(0, 13);
+        const compositeKey = `${normalizedAddress}|${normalizedMaterial}|${hourKey}`;
+        if (finalSeenPONumbers.has(`composite-${compositeKey}`)) {
+          console.error(`🚨🚨🚨 CRITICAL: Found duplicate composite key "${compositeKey}" in final result - REMOVING ${n.id} (purchase_order_id: ${n.purchase_order_id})`);
+          return; // Skip this duplicate
+        }
+        finalSeenPONumbers.add(`composite-${compositeKey}`);
+        absolutelyFinal.push(n);
+        return; // Added, move to next
+      }
+      
       // Check purchase_order_id SECOND (if no po_number)
       if (n.purchase_order_id) {
         if (finalSeenPOIds.has(n.purchase_order_id)) {
@@ -1459,9 +1486,10 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
       console.error(`🚨🚨🚨 CRITICAL DEDUPLICATION FAILURE: Map had ${result.length} items but final check found ${absolutelyFinal.length} unique items - REMOVED ${result.length - absolutelyFinal.length} duplicates!`);
     }
     
-    // ABSOLUTE FINAL CHECK: Force remove duplicates by po_number - this is the LAST line of defense
+    // ABSOLUTE FINAL CHECK: Force remove duplicates by po_number OR composite key - this is the LAST line of defense
     const absolutelyFinalByPONumber = new Map<string, Notification>();
-    const absolutelyFinalWithoutPONumber: Notification[] = [];
+    const absolutelyFinalByComposite = new Map<string, Notification>();
+    const absolutelyFinalWithoutKey: Notification[] = [];
     
     absolutelyFinal.forEach(n => {
       if (n.po_number) {
@@ -1471,12 +1499,23 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
         } else if (normalized) {
           console.error(`🚨🚨🚨🚨🚨 ABSOLUTE FINAL FORCE REMOVAL: Duplicate po_number "${n.po_number}" - removing ${n.id}, keeping ${absolutelyFinalByPONumber.get(normalized)?.id}`);
         }
+      } else if (n.deliveryAddress && n.materialType && n.timestamp) {
+        // FALLBACK: Use composite key when po_number is missing
+        const normalizedAddress = String(n.deliveryAddress).trim().toLowerCase();
+        const normalizedMaterial = String(n.materialType).trim().toLowerCase();
+        const hourKey = new Date(n.timestamp).toISOString().slice(0, 13);
+        const compositeKey = `${normalizedAddress}|${normalizedMaterial}|${hourKey}`;
+        if (!absolutelyFinalByComposite.has(compositeKey)) {
+          absolutelyFinalByComposite.set(compositeKey, n);
+        } else {
+          console.error(`🚨🚨🚨🚨🚨 ABSOLUTE FINAL FORCE REMOVAL: Duplicate composite key "${compositeKey}" - removing ${n.id}, keeping ${absolutelyFinalByComposite.get(compositeKey)?.id}`);
+        }
       } else {
-        absolutelyFinalWithoutPONumber.push(n);
+        absolutelyFinalWithoutKey.push(n);
       }
     });
     
-    const finalResult = [...absolutelyFinalByPONumber.values(), ...absolutelyFinalWithoutPONumber];
+    const finalResult = [...absolutelyFinalByPONumber.values(), ...absolutelyFinalByComposite.values(), ...absolutelyFinalWithoutKey];
     
     if (finalResult.length < absolutelyFinal.length) {
       console.error(`🚨🚨🚨 ABSOLUTE FINAL: Force removed ${absolutelyFinal.length - finalResult.length} duplicates by po_number!`);
@@ -1844,6 +1883,12 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
               if (notification.po_number) {
                 const normalizedPONumber = String(notification.po_number).trim().toLowerCase();
                 uniqueKey = `ponum-${normalizedPONumber}`;
+              } else if (notification.deliveryAddress && notification.materialType && notification.timestamp) {
+                // FALLBACK: Use composite key when po_number is missing
+                const normalizedAddress = String(notification.deliveryAddress).trim().toLowerCase();
+                const normalizedMaterial = String(notification.materialType).trim().toLowerCase();
+                const hourKey = new Date(notification.timestamp).toISOString().slice(0, 13);
+                uniqueKey = `composite-${normalizedAddress}|${normalizedMaterial}|${hourKey}`;
               } else if (notification.purchase_order_id) {
                 // Each purchase_order_id is unique - use it directly
                 uniqueKey = `po-${notification.purchase_order_id}`;
