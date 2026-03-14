@@ -35,6 +35,7 @@ interface Notification {
   quantity?: string;
   estimatedCost?: number;
   purchase_order_id?: string; // CRITICAL for deduplication
+  po_number?: string; // CRITICAL: po_number for deduplication (multiple purchase_order_ids can have same po_number)
   delivery_request_id?: string; // The actual delivery_request ID for accepting
   provider_id?: string | null; // Provider who accepted this delivery (null = unaccepted)
   provider_name?: string; // Name of provider who accepted (if available)
@@ -548,6 +549,8 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
         }
         
         // Create notification - this purchase_order_id is guaranteed to be unique
+        // CRITICAL: Include po_number for deduplication
+        const poNumber = poIdToPONumber.get(poId);
         finalNotifications.push({
           id: `dr-${dr.id}`, // Use delivery_request id as notification id
           type: 'new_delivery',
@@ -564,6 +567,7 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
           quantity: dr.quantity || '',
           estimatedCost: dr.estimated_cost || dr.budget_range || 0,
           purchase_order_id: poId, // CRITICAL
+          po_number: poNumber || undefined, // CRITICAL: Include po_number for deduplication
           delivery_request_id: dr.id, // For accepting
           provider_id: dr.provider_id || null, // Provider who accepted (null = unaccepted)
           provider_name: dr.provider_name || dr.delivery_provider_name || undefined // Provider name if available
@@ -1253,34 +1257,62 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
   };
 
   // FINAL RENDER-LEVEL DEDUPLICATION: ONE notification per request (single Accept per professional builder request)
-  // ABSOLUTE GUARANTEE: Only ONE notification per purchase_order_id, NO EXCEPTIONS
-  // SIMPLIFIED APPROACH: Use a single Map keyed by purchase_order_id, then delivery_request_id, then notification id
+  // ABSOLUTE GUARANTEE: Only ONE notification per po_number (if available), then purchase_order_id, NO EXCEPTIONS
+  // CRITICAL: Use po_number as PRIMARY key since multiple purchase_order_ids can have same po_number
   const uniqueNotifications = useMemo(() => {
     console.log(`🔍 DEDUPLICATION START: ${notifications.length} notifications to process`);
     
-    // CRITICAL: Normalize purchase_order_ids to handle whitespace/case differences
+    // CRITICAL: Normalize purchase_order_ids and po_numbers to handle whitespace/case differences
     const normalizePOId = (poId: string | undefined | null): string => {
       if (!poId) return '';
-      return poId.trim().toLowerCase();
+      return String(poId).trim().toLowerCase();
     };
     
-    // SIMPLE APPROACH: Use a Map keyed by purchase_order_id (if exists) or delivery_request_id (if exists) or notification id
+    const normalizePONumber = (poNumber: string | undefined | null): string => {
+      if (!poNumber) return '';
+      return String(poNumber).trim().toLowerCase();
+    };
+    
+    // STEP 1: Fetch po_numbers for all purchase_order_ids to enable po_number-based deduplication
+    // We'll do this in a separate step, but for now, use purchase_order_id as fallback
+    
+    // SIMPLE APPROACH: Use a Map keyed by po_number (if available), then purchase_order_id, then delivery_request_id, then notification id
     // This guarantees only ONE entry per key
     const uniqueMap = new Map<string, Notification>();
+    const seenPONumbers = new Set<string>(); // Track po_numbers we've seen
     
     notifications.forEach((notification) => {
       // Determine the unique key for this notification
-      // CRITICAL: Normalize purchase_order_id to handle any whitespace/case differences
+      // CRITICAL: Use po_number as PRIMARY key if available (multiple purchase_order_ids can have same po_number)
       let key: string;
       
-      if (notification.purchase_order_id) {
-        // PRIMARY KEY: purchase_order_id (normalized) - only ONE notification per purchase_order_id
+      // PRIMARY KEY: po_number (if available) - this is the MOST IMPORTANT deduplication
+      // Multiple purchase_order_ids can have the same po_number, so we MUST deduplicate by po_number first
+      if (notification.po_number) {
+        const normalizedPONumber = normalizePONumber(notification.po_number);
+        if (normalizedPONumber) {
+          key = `ponum-${normalizedPONumber}`;
+          
+          // CRITICAL: If we've already seen this po_number, SKIP IT IMMEDIATELY
+          if (seenPONumbers.has(normalizedPONumber)) {
+            console.error(`🚨🚨🚨 CRITICAL: Duplicate po_number "${notification.po_number}" detected! Skipping notification ${notification.id} (purchase_order_id: ${notification.purchase_order_id})`);
+            return; // SKIP THIS NOTIFICATION - we already have one for this po_number
+          }
+          seenPONumbers.add(normalizedPONumber);
+        } else {
+          // po_number is empty/null, fall through to purchase_order_id
+          key = '';
+        }
+      }
+      
+      // SECONDARY KEY: purchase_order_id (normalized) - only if po_number not available
+      if (!key && notification.purchase_order_id) {
         const normalizedPOId = normalizePOId(notification.purchase_order_id);
         key = `po-${normalizedPOId}`;
-      } else if (notification.delivery_request_id) {
-        // SECONDARY KEY: delivery_request_id - only ONE notification per delivery_request_id
+      } else if (!key && notification.delivery_request_id) {
+        // TERTIARY KEY: delivery_request_id - only ONE notification per delivery_request_id
         key = `dr-${notification.delivery_request_id}`;
-      } else {
+      } else if (!key) {
         // FALLBACK KEY: notification id - only ONE notification per id
         key = `id-${notification.id}`;
       }
