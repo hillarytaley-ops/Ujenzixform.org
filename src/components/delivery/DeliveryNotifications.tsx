@@ -177,27 +177,66 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
             console.log(`📊 Provider ID breakdown:`, providerCounts);
             
             // DEBUG: Check for specific order mentioned by user (QR-1773487443217-4GJMG)
-            // This order number contains timestamp 1773487443217
-            const userOrderTimestamp = '1773487443217';
-            const userOrder = rawData.find((dr: any) => {
-              // Check if purchase_order_id matches or if we can find it via po_number lookup
-              return dr.purchase_order_id && (
-                dr.purchase_order_id.toString().includes(userOrderTimestamp) ||
-                dr.id.toString().includes(userOrderTimestamp)
-              );
+            // Search by multiple methods: timestamp, po_number pattern, order number
+            const userOrderPatterns = ['1773487443217', 'QR-1773487443217', '4GJMG'];
+            let userOrder = null;
+            let searchMethod = '';
+            
+            // Method 1: Search by purchase_order_id containing timestamp
+            userOrder = rawData.find((dr: any) => {
+              if (!dr.purchase_order_id) return false;
+              const poIdStr = dr.purchase_order_id.toString();
+              return userOrderPatterns.some(pattern => poIdStr.includes(pattern));
             });
+            if (userOrder) searchMethod = 'purchase_order_id';
+            
+            // Method 2: Search by delivery_request id
+            if (!userOrder) {
+              userOrder = rawData.find((dr: any) => {
+                return userOrderPatterns.some(pattern => dr.id.toString().includes(pattern));
+              });
+              if (userOrder) searchMethod = 'delivery_request_id';
+            }
+            
+            // Method 3: Try to fetch purchase_order by po_number and then find delivery_request
+            if (!userOrder) {
+              try {
+                const poSearchResponse = await fetch(
+                  `${url}/rest/v1/purchase_orders?po_number=ilike.%1773487443217%&select=id,po_number&limit=5`,
+                  { headers, cache: 'no-store' }
+                );
+                if (poSearchResponse.ok) {
+                  const matchingPOs = await poSearchResponse.json();
+                  console.log(`🔍 DEBUG: Found ${matchingPOs.length} purchase_orders matching po_number pattern`);
+                  if (matchingPOs.length > 0) {
+                    const poIds = matchingPOs.map((po: any) => po.id);
+                    userOrder = rawData.find((dr: any) => poIds.includes(dr.purchase_order_id));
+                    if (userOrder) {
+                      searchMethod = 'po_number_lookup';
+                      console.log(`✅ DEBUG: Found order via po_number lookup!`);
+                    }
+                  }
+                }
+              } catch (e) {
+                console.warn('⚠️ DEBUG: Error searching by po_number:', e);
+              }
+            }
+            
             if (userOrder) {
-              console.log(`🔍 DEBUG: Found user's order in raw data:`, {
+              console.log(`✅ DEBUG: Found user's order in raw data (via ${searchMethod}):`, {
                 id: userOrder.id,
                 status: userOrder.status,
                 provider_id: userOrder.provider_id || 'NULL',
                 po_id: userOrder.purchase_order_id,
                 address: userOrder.delivery_address || 'MISSING',
-                builder_id: userOrder.builder_id?.slice(0, 8) || 'NULL'
+                builder_id: userOrder.builder_id?.slice(0, 8) || 'NULL',
+                created_at: userOrder.created_at
               });
             } else {
-              console.warn(`⚠️ DEBUG: User's order (timestamp: ${userOrderTimestamp}) NOT found in raw data!`);
-              console.warn(`⚠️ DEBUG: This could mean: 1) RLS policy is blocking it, 2) Order doesn't exist, 3) Status is filtered out`);
+              console.warn(`⚠️ DEBUG: User's order (QR-1773487443217-4GJMG) NOT found in raw data!`);
+              console.warn(`⚠️ DEBUG: Searched ${rawData.length} delivery_requests`);
+              console.warn(`⚠️ DEBUG: Possible reasons: 1) RLS policy blocking, 2) Delivery request not created, 3) Different status, 4) Different purchase_order_id`);
+              console.warn(`⚠️ DEBUG: Status breakdown shows: ${JSON.stringify(statusCounts)}`);
             }
           } else {
             console.warn(`⚠️ No delivery_requests returned from database!`);
