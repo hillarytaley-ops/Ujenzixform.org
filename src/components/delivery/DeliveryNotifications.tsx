@@ -554,11 +554,17 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
           continue;
         }
         
-        // CRITICAL: Skip if already accepted by THIS provider (those should be in Scheduled tab, not notifications)
-        // BUT: Only skip if provider_id is set AND matches current user
-        // For NEW requests, provider_id should be NULL, so they should show
-        if (dr.provider_id && dr.provider_id === userId && ['accepted', 'assigned', 'picked_up', 'in_transit'].includes(dr.status)) {
-          console.log(`🚫 SKIPPING: Delivery request ${dr.id.slice(0, 8)} already accepted by this provider (status: ${dr.status}, provider_id: ${dr.provider_id?.slice(0, 8)}) - should be in Scheduled tab`);
+        // CRITICAL: Only show PENDING requests that haven't been accepted by ANY provider
+        // Skip if already accepted by ANY provider (including this one or others)
+        // Only show requests with status='pending' and provider_id IS NULL
+        if (dr.provider_id) {
+          console.log(`🚫 SKIPPING: Delivery request ${dr.id.slice(0, 8)} already accepted by provider ${dr.provider_id.slice(0, 8)} (status: ${dr.status}) - should not appear in Alerts tab`);
+          continue;
+        }
+        
+        // Only show pending requests (not accepted, assigned, etc.)
+        if (dr.status !== 'pending') {
+          console.log(`🚫 SKIPPING: Delivery request ${dr.id.slice(0, 8)} has status ${dr.status} (not pending) - should not appear in Alerts tab`);
           continue;
         }
         
@@ -596,9 +602,7 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
         
         if (!isValidAddress) {
           console.log(`🚫 FILTERED OUT: Delivery request ${dr.id.slice(0, 8)} has no valid delivery address - Address: "${deliveryAddr || 'empty'}", isPlaceholder: ${isPlaceholder}, isGPS: ${isGPSCoordinate}, length: ${deliveryAddr?.length || 0}`);
-          // TEMPORARILY: Don't filter out - show anyway to debug
-          // return;
-          console.warn(`⚠️ WARNING: Showing delivery request ${dr.id.slice(0, 8)} even though address validation failed - DEBUG MODE`);
+          return; // Filter out requests without valid delivery addresses
         } else {
           console.log(`✅ VALID ADDRESS: Delivery request ${dr.id.slice(0, 8)} has valid address: "${deliveryAddr.substring(0, 50)}${deliveryAddr.length > 50 ? '...' : ''}"`);
         }
