@@ -137,7 +137,7 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
       // CRITICAL: MUST include delivery_address field - this is the address filled by builder in delivery request form
       // NOTE: RLS policy should allow pending/requested/assigned, but fetch all to be safe
       const drResponse = await fetch(
-        `${url}/rest/v1/delivery_requests?order=created_at.desc&limit=200&select=id,status,purchase_order_id,provider_id,delivery_address,pickup_address,material_type,quantity,created_at,builder_id,rejection_reason,priority_level,estimated_cost,budget_range`,
+        `${url}/rest/v1/delivery_requests?order=created_at.desc&limit=200&select=id,status,purchase_order_id,provider_id,delivery_address,pickup_address,material_type,quantity,created_at,builder_id,rejection_reason,estimated_cost,budget_range`,
         { headers, cache: 'no-store' }
       );
       
@@ -730,7 +730,7 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
           message: `${dr.material_type || 'Materials'} delivery to ${deliveryAddr}`,
           timestamp: new Date(dr.created_at),
           read: dr.status !== 'pending', // Only pending deliveries are unread
-          priority: dr.priority_level === 'urgent' || dr.status === 'pending' ? 'high' : 'medium',
+          priority: dr.status === 'pending' ? 'high' : 'medium',
           actionUrl: `/delivery-dashboard?request=${dr.id}`,
           status: dr.status,
           pickupAddress: dr.pickup_address || dr.pickup_location || '',
