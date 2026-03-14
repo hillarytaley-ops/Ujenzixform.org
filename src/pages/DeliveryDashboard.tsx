@@ -987,8 +987,9 @@ const DeliveryDashboard = () => {
 
       // CRITICAL: Count only valid, actionable delivery requests (same logic as DeliveryNotifications.tsx)
       // Filter out: delivered/completed/cancelled, NULL purchase_order_id, already accepted by this provider
+      // CRITICAL: Also fetch delivery_address and material_type for composite key deduplication
       const response = await fetch(
-        `${SUPABASE_URL}/rest/v1/delivery_requests?status=in.(pending,accepted,assigned,in_transit)&select=id,status,purchase_order_id,provider_id&order=created_at.desc&limit=100`,
+        `${SUPABASE_URL}/rest/v1/delivery_requests?status=in.(pending,accepted,assigned,in_transit)&select=id,status,purchase_order_id,provider_id,delivery_address,material_type,created_at&order=created_at.desc&limit=100`,
         { headers, cache: 'no-store' }
       );
       
@@ -1011,11 +1012,11 @@ const DeliveryDashboard = () => {
         // STEP 3: Get unique purchase_order_ids
         const uniquePOIds = Array.from(new Set(requestsWithPO.map((dr: any) => dr.purchase_order_id)));
         
-        // STEP 4: Verify purchase_orders exist (filter out orphaned requests)
+        // STEP 4: Verify purchase_orders exist (filter out orphaned requests) and get po_numbers
         if (uniquePOIds.length > 0) {
           try {
             const poResponse = await fetch(
-              `${SUPABASE_URL}/rest/v1/purchase_orders?id=in.(${uniquePOIds.join(',')})&select=id,status,delivery_status&limit=1000`,
+              `${SUPABASE_URL}/rest/v1/purchase_orders?id=in.(${uniquePOIds.join(',')})&select=id,status,delivery_status,po_number&limit=1000`,
               { headers, cache: 'no-store' }
             );
             
@@ -1035,9 +1036,54 @@ const DeliveryDashboard = () => {
                 validPOIds.has(dr.purchase_order_id)
               );
               
-              // STEP 5: Deduplicate by purchase_order_id (one notification per purchase_order)
+              // STEP 5: Deduplicate using same logic as DeliveryNotifications.tsx
+              // PRIMARY: po_number (if available), SECONDARY: composite key (deliveryAddress + materialType), TERTIARY: purchase_order_id
+              const poIdToPONumber = new Map<string, string>();
+              validPOs.forEach((po: any) => {
+                if (po.id && po.po_number) {
+                  poIdToPONumber.set(po.id, po.po_number);
+                }
+              });
+              
+              // Helper to normalize material types (same as DeliveryNotifications.tsx)
+              const normalizeMaterialType = (materialType: string | undefined | null): string => {
+                if (!materialType) return '';
+                const normalized = String(materialType).trim().toLowerCase();
+                if (normalized.includes('steel') || normalized.includes('construction') || normalized.includes('material')) {
+                  return 'construction_materials';
+                }
+                return normalized;
+              };
+              
+              const seenPONumbers = new Set<string>();
+              const seenCompositeKeys = new Set<string>();
               const seenPOIds = new Set<string>();
+              
               const uniqueCount = validRequests.filter((dr: any) => {
+                // PRIMARY: Check po_number first
+                const poNumber = poIdToPONumber.get(dr.purchase_order_id);
+                if (poNumber) {
+                  const normalizedPONumber = String(poNumber).trim().toLowerCase();
+                  if (seenPONumbers.has(normalizedPONumber)) {
+                    return false; // Duplicate po_number
+                  }
+                  seenPONumbers.add(normalizedPONumber);
+                  return true;
+                }
+                
+                // SECONDARY: Use composite key (deliveryAddress + materialType) when po_number is missing
+                if (dr.delivery_address && dr.material_type) {
+                  const normalizedAddress = String(dr.delivery_address).trim().toLowerCase();
+                  const normalizedMaterial = normalizeMaterialType(dr.material_type);
+                  const compositeKey = `${normalizedAddress}|${normalizedMaterial}`;
+                  if (seenCompositeKeys.has(compositeKey)) {
+                    return false; // Duplicate composite key
+                  }
+                  seenCompositeKeys.add(compositeKey);
+                  return true;
+                }
+                
+                // TERTIARY: Fallback to purchase_order_id
                 if (seenPOIds.has(dr.purchase_order_id)) {
                   return false; // Duplicate purchase_order_id
                 }
@@ -1050,9 +1096,29 @@ const DeliveryDashboard = () => {
               setPendingNotificationCount(uniqueCount);
             } else {
               console.warn('⚠️ Failed to verify purchase_orders for notification count');
-              // Fallback: count unique purchase_order_ids without validation
+              // Fallback: count using composite key deduplication (same logic as above)
+              const normalizeMaterialType = (materialType: string | undefined | null): string => {
+                if (!materialType) return '';
+                const normalized = String(materialType).trim().toLowerCase();
+                if (normalized.includes('steel') || normalized.includes('construction') || normalized.includes('material')) {
+                  return 'construction_materials';
+                }
+                return normalized;
+              };
+              
+              const seenCompositeKeys = new Set<string>();
               const seenPOIds = new Set<string>();
               const uniqueCount = requestsWithPO.filter((dr: any) => {
+                // Use composite key (deliveryAddress + materialType) when available
+                if (dr.delivery_address && dr.material_type) {
+                  const normalizedAddress = String(dr.delivery_address).trim().toLowerCase();
+                  const normalizedMaterial = normalizeMaterialType(dr.material_type);
+                  const compositeKey = `${normalizedAddress}|${normalizedMaterial}`;
+                  if (seenCompositeKeys.has(compositeKey)) return false;
+                  seenCompositeKeys.add(compositeKey);
+                  return true;
+                }
+                // Fallback to purchase_order_id
                 if (seenPOIds.has(dr.purchase_order_id)) return false;
                 seenPOIds.add(dr.purchase_order_id);
                 return true;
@@ -1062,9 +1128,29 @@ const DeliveryDashboard = () => {
             }
           } catch (verifyError) {
             console.warn('⚠️ Error verifying purchase_orders:', verifyError);
-            // Fallback: count unique purchase_order_ids without validation
+            // Fallback: count using composite key deduplication (same logic as above)
+            const normalizeMaterialType = (materialType: string | undefined | null): string => {
+              if (!materialType) return '';
+              const normalized = String(materialType).trim().toLowerCase();
+              if (normalized.includes('steel') || normalized.includes('construction') || normalized.includes('material')) {
+                return 'construction_materials';
+              }
+              return normalized;
+            };
+            
+            const seenCompositeKeys = new Set<string>();
             const seenPOIds = new Set<string>();
             const uniqueCount = requestsWithPO.filter((dr: any) => {
+              // Use composite key (deliveryAddress + materialType) when available
+              if (dr.delivery_address && dr.material_type) {
+                const normalizedAddress = String(dr.delivery_address).trim().toLowerCase();
+                const normalizedMaterial = normalizeMaterialType(dr.material_type);
+                const compositeKey = `${normalizedAddress}|${normalizedMaterial}`;
+                if (seenCompositeKeys.has(compositeKey)) return false;
+                seenCompositeKeys.add(compositeKey);
+                return true;
+              }
+              // Fallback to purchase_order_id
               if (seenPOIds.has(dr.purchase_order_id)) return false;
               seenPOIds.add(dr.purchase_order_id);
               return true;
