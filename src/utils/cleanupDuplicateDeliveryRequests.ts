@@ -124,9 +124,18 @@ export async function cleanupDuplicateDeliveryRequests(): Promise<CleanupResult>
       return result;
     }
 
+    // Type assertion - Supabase types may not match actual schema
+    type DeliveryRequest = {
+      purchase_order_id: string;
+      id: string;
+      status: string;
+      created_at: string;
+    };
+    const typedDuplicates = duplicates as unknown as DeliveryRequest[];
+
     // Group by purchase_order_id
-    const groupedByPO = new Map<string, typeof duplicates>();
-    duplicates.forEach(dr => {
+    const groupedByPO = new Map<string, DeliveryRequest[]>();
+    typedDuplicates.forEach(dr => {
       const poId = dr.purchase_order_id;
       if (!groupedByPO.has(poId)) {
         groupedByPO.set(poId, []);
@@ -263,9 +272,19 @@ export async function checkForDuplicateDeliveryRequests(): Promise<{
 
     if (error) throw error;
 
+    // Type assertion - Supabase types may not match actual schema
+    type DeliveryRequestWithReason = {
+      purchase_order_id: string;
+      id: string;
+      status: string;
+      created_at: string;
+      rejection_reason: string | null;
+    };
+    const typedRequests = requests as unknown as DeliveryRequestWithReason[];
+
     // Group by purchase_order_id
     const grouped = new Map<string, Array<{ id: string; status: string; created_at: string; rejection_reason?: string }>>();
-    requests?.forEach(dr => {
+    typedRequests?.forEach(dr => {
       const poId = dr.purchase_order_id;
       if (!grouped.has(poId)) {
         grouped.set(poId, []);
@@ -274,7 +293,7 @@ export async function checkForDuplicateDeliveryRequests(): Promise<{
         id: dr.id,
         status: dr.status,
         created_at: dr.created_at,
-        rejection_reason: dr.rejection_reason
+        rejection_reason: dr.rejection_reason || undefined
       });
     });
 
