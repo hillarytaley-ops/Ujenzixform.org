@@ -1282,6 +1282,19 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
     return date.toLocaleDateString();
   };
 
+  // Helper to normalize material types for composite key deduplication
+  // "steel", "construction materials", "materials" should be treated as the same
+  // Defined outside useMemo so it's accessible in render code too
+  const normalizeMaterialType = (materialType: string | undefined | null): string => {
+    if (!materialType) return '';
+    const normalized = String(materialType).trim().toLowerCase();
+    // Normalize common variations to the same value
+    if (normalized.includes('steel') || normalized.includes('construction') || normalized.includes('material')) {
+      return 'construction_materials';
+    }
+    return normalized;
+  };
+
   // FINAL RENDER-LEVEL DEDUPLICATION: ONE notification per request (single Accept per professional builder request)
   // ABSOLUTE GUARANTEE: Only ONE notification per po_number (if available), then purchase_order_id, NO EXCEPTIONS
   // CRITICAL: Use po_number as PRIMARY key since multiple purchase_order_ids can have same po_number
@@ -1308,18 +1321,6 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
     const normalizePONumber = (poNumber: string | undefined | null): string => {
       if (!poNumber) return '';
       return String(poNumber).trim().toLowerCase();
-    };
-    
-    // Helper to normalize material types for composite key deduplication
-    // "steel", "construction materials", "materials" should be treated as the same
-    const normalizeMaterialType = (materialType: string | undefined | null): string => {
-      if (!materialType) return '';
-      const normalized = String(materialType).trim().toLowerCase();
-      // Normalize common variations to the same value
-      if (normalized.includes('steel') || normalized.includes('construction') || normalized.includes('material')) {
-        return 'construction_materials';
-      }
-      return normalized;
     };
     
     // CRITICAL: Group notifications by po_number to see if there are duplicates
