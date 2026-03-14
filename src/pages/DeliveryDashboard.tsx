@@ -1110,6 +1110,14 @@ const DeliveryDashboard = () => {
             } else {
               console.warn('⚠️ Failed to verify purchase_orders for notification count');
               // Fallback: count using composite key deduplication (same logic as above)
+              // Add null check to prevent "is not a constructor" errors
+              if (!requestsWithPO || !Array.isArray(requestsWithPO)) {
+                console.warn('⚠️ requestsWithPO is invalid:', requestsWithPO);
+                setNotificationCount(0);
+                setPendingNotificationCount(0);
+                return;
+              }
+              
               const normalizeMaterialType = (materialType: string | undefined | null): string => {
                 if (!materialType) return '';
                 const normalized = String(materialType).trim().toLowerCase();
@@ -1132,8 +1140,8 @@ const DeliveryDashboard = () => {
                   return true;
                 }
                 // Fallback to purchase_order_id
-                if (seenPOIds.has(dr.purchase_order_id)) return false;
-                seenPOIds.add(dr.purchase_order_id);
+                if (dr.purchase_order_id && seenPOIds.has(dr.purchase_order_id)) return false;
+                if (dr.purchase_order_id) seenPOIds.add(dr.purchase_order_id);
                 return true;
               }).length;
               setNotificationCount(uniqueCount);
@@ -1142,6 +1150,14 @@ const DeliveryDashboard = () => {
           } catch (verifyError) {
             console.warn('⚠️ Error verifying purchase_orders:', verifyError);
             // Fallback: count using composite key deduplication (same logic as above)
+            // Add null check to prevent "is not a constructor" errors
+            if (!requestsWithPO || !Array.isArray(requestsWithPO)) {
+              console.warn('⚠️ requestsWithPO is invalid:', requestsWithPO);
+              setNotificationCount(0);
+              setPendingNotificationCount(0);
+              return;
+            }
+            
             const normalizeMaterialType = (materialType: string | undefined | null): string => {
               if (!materialType) return '';
               const normalized = String(materialType).trim().toLowerCase();
@@ -1164,8 +1180,8 @@ const DeliveryDashboard = () => {
                 return true;
               }
               // Fallback to purchase_order_id
-              if (seenPOIds.has(dr.purchase_order_id)) return false;
-              seenPOIds.add(dr.purchase_order_id);
+              if (dr.purchase_order_id && seenPOIds.has(dr.purchase_order_id)) return false;
+              if (dr.purchase_order_id) seenPOIds.add(dr.purchase_order_id);
               return true;
             }).length;
             setNotificationCount(uniqueCount);
