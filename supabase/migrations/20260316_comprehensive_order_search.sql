@@ -29,6 +29,7 @@ DO $$
 DECLARE
   po_record RECORD;
   dr_record RECORD;
+  dr_count INTEGER;
   search_patterns TEXT[] := ARRAY[
     'QR-1773490484717-QHDSE',
     '1773490484717',
@@ -66,13 +67,13 @@ BEGIN
       RAISE NOTICE '   delivery_address: %', po_record.delivery_address;
       
       -- Check for delivery_requests
-      SELECT COUNT(*) INTO dr_record.id
+      SELECT COUNT(*) INTO dr_count
       FROM delivery_requests
       WHERE purchase_order_id = po_record.id;
       
-      RAISE NOTICE '   delivery_requests count: %', dr_record.id;
+      RAISE NOTICE '   delivery_requests count: %', dr_count;
       
-      IF dr_record.id > 0 THEN
+      IF dr_count > 0 THEN
         SELECT id, status, provider_id, delivery_address, created_at
         INTO dr_record
         FROM delivery_requests
