@@ -307,6 +307,12 @@ BEGIN
             DELETE FROM notifications WHERE delivery_request_id IN (
                 SELECT id FROM delivery_requests WHERE purchase_order_id = order_id
             );
+        ELSIF EXISTS (
+            SELECT 1 FROM information_schema.columns 
+            WHERE table_name = 'notifications' AND column_name = 'data'
+        ) THEN
+            -- Try to delete from data JSONB column (order info might be stored there)
+            DELETE FROM notifications WHERE data::TEXT LIKE '%' || order_id::TEXT || '%';
         END IF;
     EXCEPTION WHEN undefined_table THEN
         NULL;
