@@ -700,10 +700,41 @@ class TrackingNumberService {
               }
             }
           }
-          // If purchase_order_id exists and is different, they are NOT duplicates
+          // Check 3: CRITICAL FIX - Also cancel by composite key if UI would deduplicate them
+          // This handles the case where both have purchase_order_id but UI uses composite key deduplication
+          // (because po_number is missing, so UI falls back to composite key)
+          // We need to fetch po_number to check if UI would deduplicate, but for now, if composite key matches
+          // AND both have placeholder addresses ("To be provided"), they're likely duplicates
           else if (purchaseOrderId && dr.purchase_order_id && purchaseOrderId !== dr.purchase_order_id) {
-            isDuplicate = false; // Explicitly NOT a duplicate
-            console.log(`   ✅ NOT A DUPLICATE: Different purchase_order_ids - accepted: ${purchaseOrderId.slice(0, 8)}, pending: ${dr.purchase_order_id.slice(0, 8)}`);
+            // Check if both have the same composite key AND both have placeholder addresses
+            // This indicates they would be deduplicated by the UI (which uses composite key when po_number is missing)
+            if (deliveryAddress && materialType && dr.delivery_address && dr.material_type) {
+              const normalizedDRAddress = String(dr.delivery_address).trim().toLowerCase();
+              const normalizedDRMaterial = normalizeMaterialType(dr.material_type);
+              
+              // If composite key matches AND both have placeholder addresses, they're duplicates
+              // (UI would deduplicate them because po_number is likely missing)
+              const isPlaceholder = (addr: string) => {
+                const normalized = String(addr).trim().toLowerCase();
+                return normalized === 'to be provided' || normalized === 'tbd' || normalized === 'n/a' || 
+                       normalized === 'na' || normalized === 'tba' || normalized === 'to be determined';
+              };
+              
+              if (normalizedAcceptedAddress === normalizedDRAddress && 
+                  normalizedAcceptedMaterial === normalizedDRMaterial &&
+                  isPlaceholder(deliveryAddress) && isPlaceholder(dr.delivery_address)) {
+                // These would be deduplicated by UI (same composite key, placeholder addresses)
+                // Cancel the duplicate to prevent it from appearing after acceptance
+                isDuplicate = true;
+                reason = 'same composite key with placeholder addresses (UI would deduplicate)';
+              } else {
+                isDuplicate = false; // Explicitly NOT a duplicate
+                console.log(`   ✅ NOT A DUPLICATE: Different purchase_order_ids - accepted: ${purchaseOrderId.slice(0, 8)}, pending: ${dr.purchase_order_id.slice(0, 8)}`);
+              }
+            } else {
+              isDuplicate = false; // Explicitly NOT a duplicate
+              console.log(`   ✅ NOT A DUPLICATE: Different purchase_order_ids - accepted: ${purchaseOrderId.slice(0, 8)}, pending: ${dr.purchase_order_id.slice(0, 8)}`);
+            }
           }
           
           if (isDuplicate) {
