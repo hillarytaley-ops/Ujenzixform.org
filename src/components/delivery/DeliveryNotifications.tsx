@@ -697,6 +697,7 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
               quantity: po.items?.length || 1,
               estimatedCost: po.total_amount || 0,
               purchase_order_id: po.id, // CRITICAL
+              po_number: po.po_number || undefined, // CRITICAL: Include po_number for deduplication
               delivery_request_id: undefined // No delivery_request yet
             });
             
@@ -1691,11 +1692,15 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
             console.log(`✅ FINAL RENDER: Rendering ${finalUniqueList.length} unique notifications (was ${absolutelyUniqueNotifications.length})`);
             
             return finalUniqueList.map((notification) => {
-              // React key: Use purchase_order_id as primary key (each PO is unique)
+              // React key: Use po_number as PRIMARY key (if available), then purchase_order_id
               // CRITICAL: Must match the key used in deduplication logic
               // DO NOT USE INDEX - this causes duplicates to render!
               let uniqueKey: string;
-              if (notification.purchase_order_id) {
+              // CRITICAL: Use po_number as PRIMARY key - this ensures only ONE card per po_number
+              if (notification.po_number) {
+                const normalizedPONumber = String(notification.po_number).trim().toLowerCase();
+                uniqueKey = `ponum-${normalizedPONumber}`;
+              } else if (notification.purchase_order_id) {
                 // Each purchase_order_id is unique - use it directly
                 uniqueKey = `po-${notification.purchase_order_id}`;
               } else if (notification.delivery_request_id) {
@@ -1711,7 +1716,7 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
               const finalKey = uniqueKey;
               
               // DEBUG: Log each notification being rendered
-              console.log(`🎨 RENDERING: ${finalKey} - PO: ${notification.purchase_order_id?.substring(0, 8) || 'N/A'}, DR: ${notification.delivery_request_id?.substring(0, 8) || 'N/A'}`);
+              console.log(`🎨 RENDERING: ${finalKey} - PO Number: ${notification.po_number || 'N/A'}, PO ID: ${notification.purchase_order_id?.substring(0, 8) || 'N/A'}, DR: ${notification.delivery_request_id?.substring(0, 8) || 'N/A'}`);
               
               return (
                 <div
