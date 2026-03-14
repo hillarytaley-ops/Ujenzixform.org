@@ -1528,7 +1528,7 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
       console.log(`✅ RENDER: All ${finalResult.length} notifications are unique`);
     }
     
-    console.log(`📊 FINAL BREAKDOWN: ${absolutelyFinalByPONumber.size} unique po_numbers, ${absolutelyFinalWithoutPONumber.length} without po_number`);
+    console.log(`📊 FINAL BREAKDOWN: ${absolutelyFinalByPONumber.size} unique po_numbers, ${absolutelyFinalByComposite.size} unique composite keys, ${absolutelyFinalWithoutKey.length} without key`);
     
     // CRITICAL: Log each notification's key for debugging
     console.log(`🔍 FINAL NOTIFICATIONS (${finalResult.length}):`, finalResult.map(n => ({
