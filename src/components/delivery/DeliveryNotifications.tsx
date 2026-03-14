@@ -826,7 +826,7 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
         
         console.error(`🚨 EMERGENCY CLEANUP: ${absolutelyFinal.length} → ${emergencyFinal.length} (removed ${absolutelyFinal.length - emergencyFinal.length} duplicates)`);
         setNotifications(emergencyFinal);
-        setUnreadCount(emergencyFinal.filter(n => !n.read).length);
+        // Don't set unreadCount here - it will be set from uniqueNotifications
         return;
       }
       
@@ -890,7 +890,7 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
       console.log(`✅ ABSOLUTELY UNIQUE: ${absolutelyUnique.length} notifications (removed ${finalDuplicatesRemoved} duplicates in final cleanup)`);
       
       setNotifications(absolutelyUnique);
-      setUnreadCount(absolutelyUnique.filter(n => !n.read).length);
+      // Don't set unreadCount here - it will be set from uniqueNotifications
       
     } catch (error: any) {
       console.error('❌ Error loading notifications:', error.message || error);
@@ -1102,7 +1102,7 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
     if (cleaned.length < notifications.length) {
       console.error(`🚨 IMMEDIATE CLEANUP: Removed ${notifications.length - cleaned.length} duplicate notifications from state`);
       setNotifications(cleaned);
-      setUnreadCount(cleaned.filter(n => !n.read).length);
+      // Don't set unreadCount here - it will be set from uniqueNotifications
     } else if (cleaned.length === notifications.length) {
       // Check if the arrays are actually different (same length but different order/content)
       const prevKeys = new Set(notifications.map(n => 
