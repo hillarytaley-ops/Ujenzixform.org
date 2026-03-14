@@ -242,6 +242,111 @@ export const DeliveryPromptDialog: React.FC<DeliveryPromptDialogProps> = ({
     return 'mixed';
   };
 
+  // Helper to normalize material types (same as DeliveryNotifications.tsx)
+  const normalizeMaterialType = (materialType: string | undefined | null): string => {
+    if (!materialType) return '';
+    const normalized = String(materialType).trim().toLowerCase();
+    if (normalized.includes('steel') || normalized.includes('construction') || normalized.includes('material')) {
+      return 'construction_materials';
+    }
+    return normalized;
+  };
+
+  // CRITICAL: Cancel all duplicate delivery requests when one is created/updated
+  const cancelDuplicateDeliveryRequests = async (
+    currentDeliveryRequestId: string,
+    purchaseOrderId: string,
+    deliveryAddress: string,
+    materialType: string,
+    accessToken: string
+  ) => {
+    try {
+      console.log('🗑️ Cancelling duplicate delivery requests for order:', purchaseOrderId);
+      
+      // Fetch all pending/assigned delivery_requests for this purchase_order or with same composite key
+      const duplicateResponse = await fetchWithTimeout(
+        `${SUPABASE_URL}/rest/v1/delivery_requests?status=in.(pending,assigned)&id=neq.${currentDeliveryRequestId}&select=id,purchase_order_id,delivery_address,material_type&limit=100`,
+        {
+          method: 'GET',
+          headers: {
+            'apikey': SUPABASE_ANON_KEY,
+            'Authorization': `Bearer ${accessToken}`,
+            'Content-Type': 'application/json'
+          }
+        },
+        5000
+      );
+      
+      if (duplicateResponse.ok) {
+        const allPending = await duplicateResponse.json();
+        
+        // Filter to find actual duplicates using same logic as DeliveryNotifications
+        const duplicatesToCancel: string[] = [];
+        const normalizedAddress = String(deliveryAddress).trim().toLowerCase();
+        const normalizedMaterial = normalizeMaterialType(materialType);
+        
+        allPending.forEach((dr: any) => {
+          let isDuplicate = false;
+          
+          // Check 1: Same purchase_order_id
+          if (purchaseOrderId && dr.purchase_order_id === purchaseOrderId) {
+            isDuplicate = true;
+          }
+          // Check 2: Same composite key (deliveryAddress + materialType)
+          else if (deliveryAddress && materialType && dr.delivery_address && dr.material_type) {
+            const normalizedDRAddress = String(dr.delivery_address).trim().toLowerCase();
+            const normalizedDRMaterial = normalizeMaterialType(dr.material_type);
+            
+            if (normalizedAddress === normalizedDRAddress && normalizedMaterial === normalizedDRMaterial) {
+              isDuplicate = true;
+            }
+          }
+          
+          if (isDuplicate) {
+            duplicatesToCancel.push(dr.id);
+          }
+        });
+        
+        // Cancel all duplicates
+        if (duplicatesToCancel.length > 0) {
+          console.log(`🗑️ Found ${duplicatesToCancel.length} duplicate delivery requests to cancel:`, duplicatesToCancel);
+          
+          const cancelResponse = await fetchWithTimeout(
+            `${SUPABASE_URL}/rest/v1/delivery_requests?id=in.(${duplicatesToCancel.join(',')})`,
+            {
+              method: 'PATCH',
+              headers: {
+                'apikey': SUPABASE_ANON_KEY,
+                'Authorization': `Bearer ${accessToken}`,
+                'Content-Type': 'application/json',
+                'Prefer': 'return=representation'
+              },
+              body: JSON.stringify({
+                status: 'cancelled',
+                rejection_reason: `Duplicate delivery request - another delivery for this order was created (ID: ${currentDeliveryRequestId})`,
+                rejected_at: new Date().toISOString(),
+                updated_at: new Date().toISOString()
+              })
+            },
+            10000
+          );
+          
+          if (cancelResponse.ok) {
+            const cancelled = await cancelResponse.json();
+            console.log(`✅ Cancelled ${Array.isArray(cancelled) ? cancelled.length : 1} duplicate delivery requests`);
+          } else {
+            console.warn(`⚠️ Failed to cancel duplicates: ${cancelResponse.status}`);
+          }
+        } else {
+          console.log('✅ No duplicate delivery requests found to cancel');
+        }
+      }
+    } catch (error: any) {
+      console.warn('⚠️ Error cancelling duplicates (non-critical):', error.message);
+      // Don't throw - this is cleanup, not critical to creation
+    }
+  };
+
   const handleRequestDelivery = async () => {
     if (!purchaseOrder) return;
 
@@ -400,6 +505,8 @@ export const DeliveryPromptDialog: React.FC<DeliveryPromptDialogProps> = ({
             
             if (updateResponse.ok) {
               console.log('✅ Updated existing delivery request:', deliveryRequestId);
+              // CRITICAL: Cancel all other duplicate delivery requests for this order
+              await cancelDuplicateDeliveryRequests(deliveryRequestId, purchaseOrder.id, deliveryPayload.delivery_address, deliveryPayload.material_type, accessToken);
             } else {
               console.warn('⚠️ Failed to update existing delivery request');
             }
@@ -431,6 +538,8 @@ export const DeliveryPromptDialog: React.FC<DeliveryPromptDialogProps> = ({
             const deliveryData = await deliveryResponse.json();
             deliveryRequestId = Array.isArray(deliveryData) ? deliveryData[0]?.id : deliveryData?.id;
             console.log('✅ Delivery request created:', deliveryRequestId);
+            // CRITICAL: Cancel all other duplicate delivery requests for this order
+            await cancelDuplicateDeliveryRequests(deliveryRequestId, purchaseOrder.id, deliveryPayload.delivery_address, deliveryPayload.material_type, accessToken);
           } else {
             const errorText = await deliveryResponse.text();
             console.warn('⚠️ Delivery insert failed:', errorText);
