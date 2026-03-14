@@ -143,8 +143,9 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
       console.log(`🔑 Using headers:`, { 'apikey': headers.apikey ? 'present' : 'missing', 'Authorization': headers.Authorization ? 'present' : 'missing' });
       
         let deliveryRequests: any[] = [];
+        let rawData: any[] = [];
         if (drResponse.ok) {
-          const rawData = await drResponse.json();
+          rawData = await drResponse.json();
           console.log(`📦 Raw delivery_requests from DB: ${rawData.length}`);
           console.log(`📊 Response status: ${drResponse.status} ${drResponse.statusText}`);
           if (rawData.length > 0) {
