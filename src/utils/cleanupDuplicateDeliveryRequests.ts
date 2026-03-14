@@ -102,15 +102,56 @@ export async function cleanupDuplicateDeliveryRequests(): Promise<CleanupResult>
 
       console.log(`🔄 PO ${poId}: Keeping ${keepId}, cancelling ${cancelIds.length} duplicates`);
 
-      // Cancel all duplicates
-      const { error: cancelError } = await supabase
-        .from('delivery_requests')
-        .update({
-          status: 'cancelled',
-          rejection_reason: `Duplicate delivery request - cleaned up automatically. Kept request: ${keepId}`,
-          updated_at: new Date().toISOString()
-        })
-        .in('id', cancelIds);
+      // Cancel all duplicates - use native fetch for better reliability
+      try {
+        const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
+        
+        const stored = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+        let accessToken = '';
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          accessToken = parsed.access_token || '';
+        }
+        
+        const headers: Record<string, string> = {
+          'apikey': SUPABASE_ANON_KEY,
+          'Content-Type': 'application/json'
+        };
+        if (accessToken) {
+          headers['Authorization'] = `Bearer ${accessToken}`;
+        }
+        
+        // Cancel duplicates using PATCH with multiple IDs
+        for (const cancelId of cancelIds) {
+          const cancelResponse = await fetch(
+            `${SUPABASE_URL}/rest/v1/delivery_requests?id=eq.${cancelId}`,
+            {
+              method: 'PATCH',
+              headers: {
+                ...headers,
+                'Prefer': 'return=minimal'
+              },
+              body: JSON.stringify({
+                status: 'cancelled',
+                rejection_reason: `Duplicate delivery request - cleaned up automatically. Kept request: ${keepId}`,
+                updated_at: new Date().toISOString()
+              })
+            }
+          );
+          
+          if (!cancelResponse.ok) {
+            const errorText = await cancelResponse.text();
+            console.error(`❌ Failed to cancel duplicate ${cancelId}:`, errorText);
+            result.errors.push(`Failed to cancel ${cancelId}: ${errorText}`);
+          } else {
+            result.duplicatesCancelled++;
+          }
+        }
+      } catch (cancelError: any) {
+        console.error(`❌ Error cancelling duplicates for PO ${poId}:`, cancelError);
+        result.errors.push(`Failed to cancel duplicates for PO ${poId}: ${cancelError.message}`);
+      }
 
       if (cancelError) {
         console.error(`❌ Error cancelling duplicates for PO ${poId}:`, cancelError);
@@ -139,36 +180,43 @@ export async function cleanupDuplicateDeliveryRequests(): Promise<CleanupResult>
 export async function checkForDuplicateDeliveryRequests(): Promise<{
   hasDuplicates: boolean;
   duplicateCount: number;
-  details: Array<{ purchase_order_id: string; count: number; request_ids: string[] }>;
+  details: Array<{ purchase_order_id: string; count: number; request_ids: string[]; statuses: string[] }>;
 }> {
   try {
     const { data: requests, error } = await supabase
       .from('delivery_requests')
-      .select('purchase_order_id, id, status')
+      .select('purchase_order_id, id, status, created_at, rejection_reason')
       .not('purchase_order_id', 'is', null)
       .in('status', ['pending', 'assigned', 'accepted', 'in_transit', 'picked_up', 'out_for_delivery', 'scheduled']);
 
     if (error) throw error;
 
     // Group by purchase_order_id
-    const grouped = new Map<string, string[]>();
+    const grouped = new Map<string, Array<{ id: string; status: string; created_at: string; rejection_reason?: string }>>();
     requests?.forEach(dr => {
       const poId = dr.purchase_order_id;
       if (!grouped.has(poId)) {
         grouped.set(poId, []);
       }
-      grouped.get(poId)!.push(dr.id);
+      grouped.get(poId)!.push({
+        id: dr.id,
+        status: dr.status,
+        created_at: dr.created_at,
+        rejection_reason: dr.rejection_reason
+      });
     });
 
     // Find duplicates
-    const duplicates: Array<{ purchase_order_id: string; count: number; request_ids: string[] }> = [];
-    grouped.forEach((ids, poId) => {
-      if (ids.length > 1) {
+    const duplicates: Array<{ purchase_order_id: string; count: number; request_ids: string[]; statuses: string[] }> = [];
+    grouped.forEach((items, poId) => {
+      if (items.length > 1) {
         duplicates.push({
           purchase_order_id: poId,
-          count: ids.length,
-          request_ids: ids
+          count: items.length,
+          request_ids: items.map(i => i.id),
+          statuses: items.map(i => i.status)
         });
+        console.error(`🚨 DUPLICATE FOUND: PO ${poId} has ${items.length} delivery_requests:`, items);
       }
     });
 

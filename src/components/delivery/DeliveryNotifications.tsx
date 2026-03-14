@@ -133,9 +133,10 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
       // - provider_id IS NOT NULL AND provider_id != userId (accepted by another) - show as "Already Accepted"
       // CRITICAL: Only fetch actionable delivery requests (exclude delivered/completed/cancelled)
       // CRITICAL: Exclude cancelled requests to prevent duplicates from showing
+      // CRITICAL: Also exclude requests marked as duplicates in rejection_reason
       // These are the only ones that should show in notifications
       const drResponse = await fetch(
-        `${url}/rest/v1/delivery_requests?order=created_at.desc&limit=100&status=not.in.(delivered,completed,cancelled)&select=*`,
+        `${url}/rest/v1/delivery_requests?order=created_at.desc&limit=100&status=not.in.(delivered,completed,cancelled,rejected)&rejection_reason=is.null&select=*`,
         { headers, cache: 'no-store' }
       );
       
