@@ -409,7 +409,8 @@ export const useDeliveryProviderData = () => {
 
       // If provider_id is set, the delivery has been accepted - show ALL statuses except cancelled/delivered
       // Only exclude cancelled and delivered/completed orders from the schedule
-      const statusFilter = 'status=not.in.(cancelled,delivered,completed)';
+      // Use URL-encoded parentheses for PostgREST not.in.() syntax
+      const statusFilter = 'status=not.in.%28cancelled%2Cdelivered%2Ccompleted%29';
       const opts = { headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${accessToken}`, 'Accept': 'application/json' }, cache: 'no-store' as RequestCache };
 
       // Fetch by primary provider id (delivery_providers.id or userId)
@@ -812,8 +813,9 @@ export const useDeliveryProviderData = () => {
               // Filter by status to exclude pending requests (RLS policy will handle provider_id matching)
               console.warn('⚠️ Join query failed, falling back to simple query:', joinError);
             // Fetch delivery_requests - simple query without joins
+            // Use URL-encoded parentheses for PostgREST not.in.() syntax
             const activeResponse = await fetch(
-                `${SUPABASE_URL}/rest/v1/delivery_requests?status=not.in.(cancelled,delivered,completed)&select=*&order=created_at.desc&limit=200`,
+                `${SUPABASE_URL}/rest/v1/delivery_requests?status=not.in.%28cancelled%2Cdelivered%2Ccompleted%29&select=*&order=created_at.desc&limit=200`,
               {
                 headers: {
                   'apikey': SUPABASE_ANON_KEY,
