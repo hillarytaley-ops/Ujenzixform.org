@@ -333,6 +333,7 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
       // ABSOLUTE GUARANTEE: Only ONE notification per purchase_order_id
       const addedPOIds = new Set<string>();
       const addedDRIds = new Set<string>(); // Also track delivery_request_ids to prevent duplicates
+      const addedPONumbers = new Set<string>(); // Track which po_numbers we've already added (CRITICAL for deduplication)
       
       // CRITICAL: Pre-filter deliveryRequestsByPO to ensure ONLY ONE per purchase_order_id
       // This is the FIRST and MOST IMPORTANT deduplication step
