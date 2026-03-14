@@ -1472,15 +1472,22 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
     console.log(`📊 FINAL BREAKDOWN: ${absolutelyFinalByPONumber.size} unique po_numbers, ${absolutelyFinalWithoutPONumber.length} without po_number`);
     
     // CRITICAL: Log each notification's key for debugging
-    console.log(`🔍 FINAL NOTIFICATIONS (${absolutelyFinal.length}):`, absolutelyFinal.map(n => ({
+    console.log(`🔍 FINAL NOTIFICATIONS (${finalResult.length}):`, finalResult.map(n => ({
       id: n.id,
+      po_number: n.po_number || 'MISSING',
       po_id: n.purchase_order_id?.substring(0, 8) || 'N/A',
       dr_id: n.delivery_request_id?.substring(0, 8) || 'N/A',
       title: n.title
     })));
     
-    // Final check: Log any remaining duplicates (should be zero)
-    const poIdsInFinal = absolutelyFinal.map(n => n.purchase_order_id).filter(Boolean);
+    // Final check: Log any remaining duplicates by po_number FIRST, then purchase_order_id
+    const poNumbersInFinal = finalResult.map(n => n.po_number).filter(Boolean);
+    const duplicatePONumbers = poNumbersInFinal.filter((num, index) => poNumbersInFinal.indexOf(num) !== index);
+    if (duplicatePONumbers.length > 0) {
+      console.error(`🚨🚨🚨🚨🚨 CRITICAL ERROR: Still found ${duplicatePONumbers.length} duplicate po_numbers after all filtering:`, duplicatePONumbers);
+    }
+    
+    const poIdsInFinal = finalResult.map(n => n.purchase_order_id).filter(Boolean);
     const duplicatePOIdsMemo = poIdsInFinal.filter((id, index) => poIdsInFinal.indexOf(id) !== index);
     if (duplicatePOIdsMemo.length > 0) {
       console.error(`🚨🚨🚨 CRITICAL ERROR: Still found ${duplicatePOIdsMemo.length} duplicate purchase_order_ids after all filtering:`, duplicatePOIdsMemo);
@@ -1488,7 +1495,11 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
       console.log(`✅ VERIFICATION: No duplicate purchase_order_ids found in final result`);
     }
     
-    return absolutelyFinal;
+    if (duplicatePONumbers.length === 0 && duplicatePOIdsMemo.length === 0) {
+      console.log(`✅ VERIFICATION: No duplicates found in final result`);
+    }
+    
+    return finalResult;
   }, [notifications]);
 
   return (
