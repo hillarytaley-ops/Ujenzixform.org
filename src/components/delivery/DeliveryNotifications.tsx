@@ -693,7 +693,7 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
       // CRITICAL: DO NOT show notifications for NULL purchase_order_id requests
       // These are placeholder/default delivery requests that don't have actual orders
       // Only show delivery requests with valid purchase_order_id
-      console.log(`🚫 FILTERED OUT: ${deliveryRequestsByKey.size} delivery requests without purchase_order_id (placeholder/default requests - not showing to providers)`);
+      console.log(`🚫 FILTERED OUT: delivery requests without purchase_order_id (placeholder/default requests - not showing to providers)`);
       
       // REMOVED: We no longer show NULL purchase_order_id requests to providers
       // These are likely placeholder/default requests that were created without actual orders
