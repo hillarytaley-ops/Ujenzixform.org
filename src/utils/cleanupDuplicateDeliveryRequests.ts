@@ -418,3 +418,162 @@ export async function deleteDeliveryRequestsWithoutAddress(): Promise<{ success:
   
   return result;
 }
+
+/**
+ * Delete duplicate delivery requests based on composite key (delivery_address + material_type)
+ * Keeps only ONE delivery request per unique combination
+ * Prioritizes: accepted > assigned > pending (by creation date)
+ */
+export async function deleteDuplicateDeliveryRequestsByCompositeKey(): Promise<{ success: boolean; deleted: number; error?: string }> {
+  const result = { success: false, deleted: 0, error: undefined as string | undefined };
+  
+  try {
+    console.log('🗑️ Starting deletion of duplicate delivery_requests by composite key...');
+    
+    const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+    const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
+    
+    if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+      throw new Error('Missing Supabase environment variables');
+    }
+    
+    const { data: { session } } = await supabase.auth.getSession();
+    const accessToken = session?.access_token || SUPABASE_ANON_KEY;
+    
+    // Fetch all pending/assigned/accepted delivery requests
+    const response = await fetch(
+      `${SUPABASE_URL}/rest/v1/delivery_requests?status=in.(pending,assigned,accepted)&select=id,delivery_address,material_type,status,created_at,purchase_order_id&limit=1000&order=created_at.desc`,
+      { headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' }, cache: 'no-store' }
+    );
+    
+    if (!response.ok) {
+      throw new Error(`Failed to fetch delivery_requests: ${response.status}`);
+    }
+    
+    const allRequests = await response.json();
+    console.log(`📦 Fetched ${allRequests.length} delivery requests to check for duplicates`);
+    
+    // Normalize material type (same as in DeliveryNotifications.tsx)
+    const normalizeMaterialType = (mt: string | undefined | null): string => {
+      if (!mt) return 'unknown';
+      const normalized = String(mt).trim().toLowerCase();
+      // Normalize common variations
+      if (normalized.includes('steel') || normalized.includes('metal')) return 'construction_materials';
+      if (normalized.includes('construction') || normalized.includes('building')) return 'construction_materials';
+      if (normalized.includes('cement') || normalized.includes('concrete')) return 'construction_materials';
+      return normalized.replace(/\s+/g, '_');
+    };
+    
+    // Group by composite key
+    const compositeKeyMap = new Map<string, any[]>();
+    
+    allRequests.forEach((dr: any) => {
+      const deliveryAddr = (dr.delivery_address || '').trim().toLowerCase();
+      const materialType = normalizeMaterialType(dr.material_type);
+      
+      // Skip if address is invalid/placeholder
+      if (!deliveryAddr || 
+          deliveryAddr === '' || 
+          deliveryAddr === 'to be provided' || 
+          deliveryAddr === 'tbd' || 
+          deliveryAddr === 'n/a' || 
+          deliveryAddr === 'na' || 
+          deliveryAddr === 'tba' || 
+          deliveryAddr === 'to be determined') {
+        return; // Skip invalid addresses
+      }
+      
+      const compositeKey = `${deliveryAddr}|${materialType}`;
+      
+      if (!compositeKeyMap.has(compositeKey)) {
+        compositeKeyMap.set(compositeKey, []);
+      }
+      compositeKeyMap.get(compositeKey)!.push(dr);
+    });
+    
+    // Find duplicates (groups with more than 1 request)
+    const duplicatesToDelete: string[] = [];
+    
+    compositeKeyMap.forEach((requests, compositeKey) => {
+      if (requests.length > 1) {
+        console.log(`🔍 Found ${requests.length} duplicates for composite key: ${compositeKey}`);
+        
+        // Sort by priority: accepted > assigned > pending, then by creation date (newest first)
+        requests.sort((a, b) => {
+          const statusPriority = { 'accepted': 3, 'assigned': 2, 'pending': 1 };
+          const aPriority = statusPriority[a.status as keyof typeof statusPriority] || 0;
+          const bPriority = statusPriority[b.status as keyof typeof statusPriority] || 0;
+          
+          if (aPriority !== bPriority) {
+            return bPriority - aPriority; // Higher priority first
+          }
+          
+          // Same priority, sort by creation date (newest first)
+          return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+        });
+        
+        // Keep the first one (highest priority/newest), delete the rest
+        const toKeep = requests[0];
+        const toDelete = requests.slice(1);
+        
+        console.log(`✅ Keeping: ${toKeep.id.slice(0, 8)} (status: ${toKeep.status}, created: ${toKeep.created_at})`);
+        toDelete.forEach((dr: any) => {
+          console.log(`🗑️ Marking for deletion: ${dr.id.slice(0, 8)} (status: ${dr.status}, created: ${dr.created_at})`);
+          duplicatesToDelete.push(dr.id);
+        });
+      }
+    });
+    
+    console.log(`🗑️ Found ${duplicatesToDelete.length} duplicate delivery_requests to delete`);
+    
+    if (duplicatesToDelete.length === 0) {
+      result.success = true;
+      result.deleted = 0;
+      return result;
+    }
+    
+    // Delete duplicates one by one
+    let deletedCount = 0;
+    let failedCount = 0;
+    
+    for (const id of duplicatesToDelete) {
+      try {
+        const deleteResponse = await fetch(
+          `${SUPABASE_URL}/rest/v1/delivery_requests?id=eq.${id}`,
+          {
+            method: 'DELETE',
+            headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+            cache: 'no-store'
+          }
+        );
+        
+        if (deleteResponse.ok) {
+          deletedCount++;
+          console.log(`✅ Deleted duplicate: ${id.slice(0, 8)}`);
+        } else {
+          failedCount++;
+          const errorText = await deleteResponse.text();
+          console.error(`❌ Failed to delete ${id.slice(0, 8)}: ${deleteResponse.status} - ${errorText}`);
+        }
+      } catch (deleteError: any) {
+        failedCount++;
+        console.error(`❌ Error deleting ${id.slice(0, 8)}:`, deleteError.message);
+      }
+    }
+    
+    console.log(`✅ Deleted ${deletedCount} duplicate delivery_requests, ${failedCount} failed`);
+    
+    result.success = true;
+    result.deleted = deletedCount;
+    
+    if (failedCount > 0) {
+      result.error = `${failedCount} deletions failed`;
+    }
+    
+  } catch (error: any) {
+    console.error('❌ Error deleting duplicate delivery_requests:', error);
+    result.error = error.message || 'Unknown error';
+  }
+  
+  return result;
+}
