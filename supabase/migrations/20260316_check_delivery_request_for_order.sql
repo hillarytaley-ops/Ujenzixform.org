@@ -10,18 +10,17 @@ DECLARE
   dr_record RECORD;
 BEGIN
   -- Find purchase_order by po_number
-  SELECT id, po_number, order_number, status, delivery_required, delivery_address
+  SELECT id, po_number, status, delivery_required, delivery_address
   INTO po_record
   FROM purchase_orders
   WHERE po_number ILIKE '%1773487443217%' 
      OR po_number ILIKE '%QR-1773487443217%'
-     OR order_number ILIKE '%1773487443217%'
-     OR order_number ILIKE '%QR-1773487443217%'
+     OR po_number ILIKE '%4GJMG%'
   LIMIT 1;
   
   IF po_record.id IS NOT NULL THEN
-    RAISE NOTICE '✅ Found purchase_order: ID=%, po_number=%, order_number=%, status=%, delivery_required=%', 
-      po_record.id, po_record.po_number, po_record.order_number, po_record.status, po_record.delivery_required;
+    RAISE NOTICE '✅ Found purchase_order: ID=%, po_number=%, status=%, delivery_required=%', 
+      po_record.id, po_record.po_number, po_record.status, po_record.delivery_required;
     RAISE NOTICE '   Delivery address: %', po_record.delivery_address;
     
     -- Check for delivery_requests for this purchase_order
@@ -47,7 +46,7 @@ BEGIN
     -- Try broader search
     SELECT COUNT(*) INTO po_record.id
     FROM purchase_orders
-    WHERE po_number ILIKE '%4GJMG%' OR order_number ILIKE '%4GJMG%';
+    WHERE po_number ILIKE '%4GJMG%';
     
     RAISE NOTICE '   Found % purchase_orders with pattern 4GJMG', po_record.id;
   END IF;
