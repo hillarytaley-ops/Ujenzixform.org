@@ -1774,12 +1774,25 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
             }
             
             // FINAL FINAL CHECK: Use a Set to absolutely guarantee uniqueness
+            // CRITICAL: Use po_number as PRIMARY key - this is the LAST line of defense
             const finalSet = new Set<string>();
+            const finalSeenPONumbers = new Set<string>();
             const finalUniqueList: Notification[] = [];
             
             absolutelyUniqueNotifications.forEach((notification) => {
               let uniqueKey: string;
-              if (notification.purchase_order_id) {
+              // CRITICAL: Use po_number as PRIMARY key - this ensures only ONE card per po_number
+              if (notification.po_number) {
+                const normalizedPONumber = String(notification.po_number).trim().toLowerCase();
+                uniqueKey = `ponum-${normalizedPONumber}`;
+                
+                // If we've already seen this po_number, SKIP IT IMMEDIATELY
+                if (finalSeenPONumbers.has(normalizedPONumber)) {
+                  console.error(`🚨🚨🚨 FINAL SET CHECK: Duplicate po_number "${notification.po_number}" detected! Removing ${notification.id} (purchase_order_id: ${notification.purchase_order_id})`);
+                  return; // Skip duplicate
+                }
+                finalSeenPONumbers.add(normalizedPONumber);
+              } else if (notification.purchase_order_id) {
                 uniqueKey = `po-${notification.purchase_order_id}`;
               } else if (notification.delivery_request_id) {
                 uniqueKey = `dr-${notification.delivery_request_id}`;
