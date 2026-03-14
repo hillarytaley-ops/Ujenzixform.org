@@ -134,10 +134,13 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
       // Fetch all delivery_requests, then filter in JavaScript to show:
       // - status IN ('pending', 'requested', 'assigned') AND provider_id IS NULL or != userId
       // CRITICAL: Fetch ALL delivery_requests to ensure we see all valid requests
+      // NOTE: RLS policy should allow pending/requested/assigned, but fetch all to be safe
       const drResponse = await fetch(
         `${url}/rest/v1/delivery_requests?order=created_at.desc&limit=200&select=*`,
         { headers, cache: 'no-store' }
       );
+      
+      console.log(`🔍 DEBUG: Fetching delivery_requests - Response status: ${drResponse.status}`);
       
       console.log(`🔍 Fetching delivery_requests from: ${url}/rest/v1/delivery_requests`);
       console.log(`🔑 Using headers:`, { 'apikey': headers.apikey ? 'present' : 'missing', 'Authorization': headers.Authorization ? 'present' : 'missing' });
