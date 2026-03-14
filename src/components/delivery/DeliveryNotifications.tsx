@@ -693,16 +693,23 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
         );
         
         // Valid if: has content, not a placeholder, and either GPS coords OR actual address (min 3 chars for short addresses)
+        // RELAXED: For pending/requested/assigned status, show even if address is "To be provided" (builder will provide later)
+        // This ensures delivery providers can see and accept requests even if address isn't finalized yet
+        const isPendingStatus = ['pending', 'requested', 'assigned'].includes(dr.status);
         const isValidAddress = deliveryAddr && 
                                deliveryAddr !== '' && 
-                               !isPlaceholder &&
+                               (!isPlaceholder || isPendingStatus) && // Allow placeholder for pending requests
                                (isGPSCoordinate || deliveryAddr.length >= 3); // GPS coords or actual address (min 3 chars)
         
         if (!isValidAddress) {
-          console.log(`🚫 FILTERED OUT: Delivery request ${dr.id.slice(0, 8)} has no valid delivery address - Address: "${deliveryAddr || 'empty'}", isPlaceholder: ${isPlaceholder}, isGPS: ${isGPSCoordinate}, length: ${deliveryAddr?.length || 0}`);
-          return; // Filter out requests without valid delivery addresses
+          console.log(`🚫 FILTERED OUT: Delivery request ${dr.id.slice(0, 8)} has no valid delivery address - Address: "${deliveryAddr || 'empty'}", isPlaceholder: ${isPlaceholder}, isGPS: ${isGPSCoordinate}, length: ${deliveryAddr?.length || 0}, status: ${dr.status}`);
+          return; // Filter out requests without valid delivery addresses (unless pending)
         } else {
-          console.log(`✅ VALID ADDRESS: Delivery request ${dr.id.slice(0, 8)} has valid address: "${deliveryAddr.substring(0, 50)}${deliveryAddr.length > 50 ? '...' : ''}"`);
+          if (isPlaceholder && isPendingStatus) {
+            console.log(`⚠️ SHOWING WITH PLACEHOLDER: Delivery request ${dr.id.slice(0, 8)} has placeholder address but is pending - Address: "${deliveryAddr || 'empty'}", status: ${dr.status}`);
+          } else {
+            console.log(`✅ VALID ADDRESS: Delivery request ${dr.id.slice(0, 8)} has valid address: "${deliveryAddr.substring(0, 50)}${deliveryAddr.length > 50 ? '...' : ''}"`);
+          }
         }
         
         const poNumber = poIdToPONumber.get(poId);
