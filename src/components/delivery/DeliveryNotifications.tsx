@@ -17,7 +17,7 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { trackingNumberService } from '@/services/TrackingNumberService';
-import { cleanupDuplicateDeliveryRequests, cleanupDuplicatePurchaseOrders, checkForDuplicateDeliveryRequests } from '@/utils/cleanupDuplicateDeliveryRequests';
+import { cleanupDuplicateDeliveryRequests, cleanupDuplicatePurchaseOrders, checkForDuplicateDeliveryRequests, deleteDeliveryRequestsWithoutAddress } from '@/utils/cleanupDuplicateDeliveryRequests';
 
 interface Notification {
   id: string;
@@ -670,10 +670,20 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
           
           // CRITICAL: Only show if delivery is actually required and has valid data
           if (!seenPurchaseOrderIds.has(po.id) && (po.delivery_required || po.delivery_address)) {
-            // CRITICAL: Validate that purchase_order has valid data
-            if (!po.id || !po.delivery_address || po.delivery_address.trim() === '' || po.delivery_address.toLowerCase().includes('to be provided')) {
+            // CRITICAL: Validate that purchase_order has valid delivery_address - MUST have address keyed in by builder
+            const deliveryAddr = (po.delivery_address || '').trim();
+            const isValidAddress = deliveryAddr && 
+                                   deliveryAddr !== '' && 
+                                   deliveryAddr.toLowerCase() !== 'to be provided' && 
+                                   deliveryAddr.toLowerCase() !== 'tbd' && 
+                                   deliveryAddr.toLowerCase() !== 'n/a' && 
+                                   deliveryAddr.toLowerCase() !== 'na' && 
+                                   deliveryAddr.toLowerCase() !== 'tba' && 
+                                   deliveryAddr.toLowerCase() !== 'to be determined';
+            
+            if (!po.id || !isValidAddress) {
               skippedCount++;
-              console.log(`🚫 SKIPPED: Purchase order ${po.id} has invalid or placeholder delivery address`);
+              console.log(`🚫 SKIPPED: Purchase order ${po.id} has invalid or placeholder delivery address (${deliveryAddr || 'empty'})`);
               return;
             }
             
@@ -1609,18 +1619,26 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
                   });
                   
                   // Clean up duplicates - BOTH purchase_orders and delivery_requests
-                  const [poCleanupResult, drCleanupResult] = await Promise.all([
+                  // ALSO delete delivery requests without valid delivery_address
+                  const [poCleanupResult, drCleanupResult, addressCleanupResult] = await Promise.all([
                     cleanupDuplicatePurchaseOrders(),
-                    cleanupDuplicateDeliveryRequests()
+                    cleanupDuplicateDeliveryRequests(),
+                    deleteDeliveryRequestsWithoutAddress()
                   ]);
                   
                   const totalCancelled = (poCleanupResult.duplicatesCancelled || 0) + (drCleanupResult.duplicatesCancelled || 0);
-                  const allSuccess = poCleanupResult.success && drCleanupResult.success;
+                  const totalDeleted = (addressCleanupResult?.deleted || 0);
+                  const allSuccess = poCleanupResult.success && drCleanupResult.success && (addressCleanupResult?.success !== false);
                   
-                  if (allSuccess && totalCancelled > 0) {
+                  if (allSuccess && (totalCancelled > 0 || totalDeleted > 0)) {
+                    const messages = [];
+                    if (poCleanupResult.duplicatesCancelled > 0) messages.push(`${poCleanupResult.duplicatesCancelled} duplicate purchase orders`);
+                    if (drCleanupResult.duplicatesCancelled > 0) messages.push(`${drCleanupResult.duplicatesCancelled} duplicate delivery requests`);
+                    if (totalDeleted > 0) messages.push(`${totalDeleted} delivery requests without address`);
+                    
                     toast({
                       title: '✅ Cleanup Complete',
-                      description: `Cancelled ${poCleanupResult.duplicatesCancelled || 0} duplicate purchase orders and ${drCleanupResult.duplicatesCancelled || 0} duplicate delivery requests.`,
+                      description: `Cancelled/deleted: ${messages.join(', ')}.`,
                     });
                     // Reload notifications after cleanup
                     setTimeout(() => loadNotifications(), 1000);
