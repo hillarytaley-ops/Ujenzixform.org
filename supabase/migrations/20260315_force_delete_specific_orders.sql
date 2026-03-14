@@ -284,8 +284,30 @@ BEGIN
     END;
     
     BEGIN
-        DELETE FROM notifications WHERE related_id = order_id::TEXT 
-            OR related_id LIKE '%' || order_id::TEXT || '%';
+        -- Try to delete notifications, checking for different column names
+        IF EXISTS (
+            SELECT 1 FROM information_schema.columns 
+            WHERE table_name = 'notifications' AND column_name = 'related_id'
+        ) THEN
+            DELETE FROM notifications WHERE related_id = order_id::TEXT;
+        ELSIF EXISTS (
+            SELECT 1 FROM information_schema.columns 
+            WHERE table_name = 'notifications' AND column_name = 'order_id'
+        ) THEN
+            DELETE FROM notifications WHERE order_id = order_id;
+        ELSIF EXISTS (
+            SELECT 1 FROM information_schema.columns 
+            WHERE table_name = 'notifications' AND column_name = 'purchase_order_id'
+        ) THEN
+            DELETE FROM notifications WHERE purchase_order_id = order_id;
+        ELSIF EXISTS (
+            SELECT 1 FROM information_schema.columns 
+            WHERE table_name = 'notifications' AND column_name = 'delivery_request_id'
+        ) THEN
+            DELETE FROM notifications WHERE delivery_request_id IN (
+                SELECT id FROM delivery_requests WHERE purchase_order_id = order_id
+            );
+        END IF;
     EXCEPTION WHEN undefined_table THEN
         NULL;
     END;
