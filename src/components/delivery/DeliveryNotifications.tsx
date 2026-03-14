@@ -476,17 +476,25 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
       let validPOIds = new Set<string>(poIdsToVerify);
       const poIdToPONumber = new Map<string, string>(); // Map purchase_order_id -> po_number
       const poNumberToPOId = new Map<string, string>(); // Map po_number -> first purchase_order_id (for deduplication)
+      const poMap = new Map<string, any>(); // Map purchase_order_id -> purchase_order (for address fallback)
       
       if (poIdsToVerify.length > 0) {
         try {
           const verifyResponse = await fetch(
-            `${url}/rest/v1/purchase_orders?id=in.(${poIdsToVerify.join(',')})&select=id,po_number&limit=1000`,
+            `${url}/rest/v1/purchase_orders?id=in.(${poIdsToVerify.join(',')})&select=id,po_number,delivery_address&limit=1000`,
             { headers, cache: 'no-store' }
           );
           
           if (verifyResponse.ok) {
             const validPOs = await verifyResponse.json();
             validPOIds = new Set(validPOs.map((po: any) => po.id));
+            
+            // Store purchase orders for address fallback
+            validPOs.forEach((po: any) => {
+              if (po.id) {
+                poMap.set(po.id, po);
+              }
+            });
             
             // Build maps for po_number deduplication
             validPOs.forEach((po: any) => {
@@ -654,7 +662,18 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
         // CRITICAL: Include po_number for deduplication
         // CRITICAL: Skip if no valid delivery_address - MUST have address keyed in by builder
         // BUT: Allow GPS coordinates as valid addresses (they start with numbers/lat,lng format)
-        const deliveryAddr = (dr.delivery_address || '').trim();
+        // FALLBACK: Use purchase_order's delivery_address if delivery_request doesn't have one
+        let deliveryAddr = (dr.delivery_address || '').trim();
+        
+        // If delivery_request has no address, try to get it from purchase_order
+        if (!deliveryAddr || deliveryAddr === '') {
+          // Try to find purchase_order in the fetched data (from validPOs)
+          const po = poMap?.get(poId);
+          if (po && po.delivery_address) {
+            deliveryAddr = String(po.delivery_address).trim();
+            console.log(`🔄 Using purchase_order delivery_address as fallback for DR ${dr.id.slice(0, 8)}: "${deliveryAddr.substring(0, 50)}"`);
+          }
+        }
         
         // Check if it's a placeholder (exact matches only, not partial)
         const isPlaceholder = deliveryAddr && (
