@@ -308,8 +308,51 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
       const addedPOIds = new Set<string>();
       const addedDRIds = new Set<string>(); // Also track delivery_request_ids to prevent duplicates
       
+      // CRITICAL: Pre-filter deliveryRequestsByPO to ensure ONLY ONE per purchase_order_id
+      // This is the FIRST and MOST IMPORTANT deduplication step
+      const preFilteredPO = new Map<string, any>();
+      deliveryRequestsByPO.forEach((dr, poId) => {
+        // Skip cancelled/rejected duplicates immediately
+        if (dr.status === 'cancelled' || dr.status === 'rejected') {
+          if (dr.rejection_reason && (
+            dr.rejection_reason.includes('Duplicate') || 
+            dr.rejection_reason.includes('duplicate') ||
+            dr.rejection_reason.includes('cleaned up')
+          )) {
+            console.log(`🚫 PRE-FILTER: Skipping cancelled duplicate ${dr.id} for PO ${poId}`);
+            return;
+          }
+        }
+        
+        // If we already have one for this PO, keep the better one
+        if (preFilteredPO.has(poId)) {
+          const existing = preFilteredPO.get(poId);
+          const statusPriority: Record<string, number> = {
+            'accepted': 5, 'assigned': 4, 'in_transit': 3, 'picked_up': 2,
+            'out_for_delivery': 2, 'scheduled': 1, 'pending': 1,
+            'completed': 0, 'cancelled': -1, 'rejected': -1
+          };
+          const existingPriority = statusPriority[existing.status] || 0;
+          const newPriority = statusPriority[dr.status] || 0;
+          
+          if (newPriority > existingPriority) {
+            console.log(`🔄 PRE-FILTER: Replacing PO ${poId} - ${existing.status} → ${dr.status}`);
+            preFilteredPO.set(poId, dr);
+          } else {
+            console.log(`🗑️ PRE-FILTER: Keeping existing PO ${poId} - ${existing.status} over ${dr.status}`);
+          }
+        } else {
+          preFilteredPO.set(poId, dr);
+        }
+      });
+      
+      console.log(`✅ PRE-FILTER: ${deliveryRequestsByPO.size} → ${preFilteredPO.size} unique purchase orders`);
+      
+      // Use the pre-filtered map instead of the original
+      const finalDeliveryRequestsByPO = preFilteredPO;
+      
       // First, collect all purchase_order_ids to verify they exist
-      const poIdsToVerify = Array.from(deliveryRequestsByPO.keys()).filter(poId => 
+      const poIdsToVerify = Array.from(finalDeliveryRequestsByPO.keys()).filter(poId => 
         poId && poId.trim() !== '' && poId !== 'null' && poId !== 'undefined'
       );
       
@@ -346,7 +389,7 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
       // This is the ABSOLUTE FINAL check before creating notifications
       const finalNotificationMap = new Map<string, any>();
       
-      for (const [poId, dr] of deliveryRequestsByPO.entries()) {
+      for (const [poId, dr] of finalDeliveryRequestsByPO.entries()) {
         // CRITICAL: Skip delivery requests without purchase_order_id (these are placeholder/default requests)
         if (!poId || poId.trim() === '' || poId === 'null' || poId === 'undefined') {
           console.log(`🚫 SKIPPING: Delivery request ${dr.id} has no valid purchase_order_id (placeholder/default request)`);
@@ -426,9 +469,9 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
       
       // CRITICAL VERIFICATION: Ensure we only have ONE notification per purchase_order_id
       const finalPOIds = finalNotifications.map(n => n.purchase_order_id).filter(Boolean);
-      const duplicatePOIds = finalPOIds.filter((id, index) => finalPOIds.indexOf(id) !== index);
-      if (duplicatePOIds.length > 0) {
-        console.error(`🚨🚨🚨 CRITICAL: Found ${duplicatePOIds.length} duplicate purchase_order_ids in finalNotifications! Removing duplicates...`);
+      const duplicatePOIdsCheck = finalPOIds.filter((id, index) => finalPOIds.indexOf(id) !== index);
+      if (duplicatePOIdsCheck.length > 0) {
+        console.error(`🚨🚨🚨 CRITICAL: Found ${duplicatePOIdsCheck.length} duplicate purchase_order_ids in finalNotifications! Removing duplicates...`);
         // Emergency cleanup - keep only first occurrence
         const emergencyMap = new Map<string, Notification>();
         finalNotifications.forEach(notif => {
@@ -443,8 +486,11 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
           }
         });
         const beforeCount = finalNotifications.length;
-        finalNotifications = Array.from(emergencyMap.values());
-        console.error(`🚨 EMERGENCY CLEANUP: Reduced finalNotifications from ${beforeCount} to ${finalNotifications.length} (removed ${beforeCount - finalNotifications.length} duplicates)`);
+        const cleanedNotifications = Array.from(emergencyMap.values());
+        // Clear and repopulate finalNotifications
+        finalNotifications.length = 0;
+        finalNotifications.push(...cleanedNotifications);
+        console.error(`🚨 EMERGENCY CLEANUP: Reduced finalNotifications from ${beforeCount} to ${cleanedNotifications.length} (removed ${beforeCount - cleanedNotifications.length} duplicates)`);
       }
       
       // CRITICAL: DO NOT show notifications for NULL purchase_order_id requests
@@ -613,9 +659,9 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
       
       // Final verification: Check for any remaining duplicates
       const poIds = absolutelyFinal.map(n => n.purchase_order_id).filter(Boolean);
-      const duplicatePOIds = poIds.filter((id, index) => poIds.indexOf(id) !== index);
-      if (duplicatePOIds.length > 0) {
-        console.error(`🚨 CRITICAL ERROR: Still found duplicate purchase_order_ids after all deduplication:`, duplicatePOIds);
+      const duplicatePOIdsFinal = poIds.filter((id, index) => poIds.indexOf(id) !== index);
+      if (duplicatePOIdsFinal.length > 0) {
+        console.error(`🚨 CRITICAL ERROR: Still found duplicate purchase_order_ids after all deduplication:`, duplicatePOIdsFinal);
         // Emergency cleanup - remove duplicates manually using a Map to ensure uniqueness
         const emergencyFinal: Notification[] = [];
         const emergencySeenPO = new Map<string, Notification>();
@@ -1207,9 +1253,9 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
     
     // Final check: Log any remaining duplicates (should be zero)
     const poIdsInFinal = absolutelyFinal.map(n => n.purchase_order_id).filter(Boolean);
-    const duplicatePOIds = poIdsInFinal.filter((id, index) => poIdsInFinal.indexOf(id) !== index);
-    if (duplicatePOIds.length > 0) {
-      console.error(`🚨🚨🚨 CRITICAL ERROR: Still found ${duplicatePOIds.length} duplicate purchase_order_ids after all filtering:`, duplicatePOIds);
+    const duplicatePOIdsMemo = poIdsInFinal.filter((id, index) => poIdsInFinal.indexOf(id) !== index);
+    if (duplicatePOIdsMemo.length > 0) {
+      console.error(`🚨🚨🚨 CRITICAL ERROR: Still found ${duplicatePOIdsMemo.length} duplicate purchase_order_ids after all filtering:`, duplicatePOIdsMemo);
     } else {
       console.log(`✅ VERIFICATION: No duplicate purchase_order_ids found in final result`);
     }
@@ -1450,7 +1496,36 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
               console.error(`🚨🚨🚨 ABSOLUTE FINAL: Removed ${finalRenderNotifications.length - absolutelyUniqueNotifications.length} duplicates in absolute final check!`);
             }
             
-            return absolutelyUniqueNotifications.map((notification) => {
+            // FINAL FINAL CHECK: Use a Set to absolutely guarantee uniqueness
+            const finalSet = new Set<string>();
+            const finalUniqueList: Notification[] = [];
+            
+            absolutelyUniqueNotifications.forEach((notification) => {
+              let uniqueKey: string;
+              if (notification.purchase_order_id) {
+                uniqueKey = `po-${notification.purchase_order_id}`;
+              } else if (notification.delivery_request_id) {
+                uniqueKey = `dr-${notification.delivery_request_id}`;
+              } else {
+                uniqueKey = `notif-${notification.id}`;
+              }
+              
+              if (finalSet.has(uniqueKey)) {
+                console.error(`🚨🚨🚨 FINAL SET CHECK: Duplicate ${uniqueKey} detected! Removing ${notification.id}`);
+                return; // Skip duplicate
+              }
+              
+              finalSet.add(uniqueKey);
+              finalUniqueList.push(notification);
+            });
+            
+            if (finalUniqueList.length < absolutelyUniqueNotifications.length) {
+              console.error(`🚨🚨🚨 FINAL SET: Removed ${absolutelyUniqueNotifications.length - finalUniqueList.length} duplicates using Set!`);
+            }
+            
+            console.log(`✅ FINAL RENDER: Rendering ${finalUniqueList.length} unique notifications (was ${absolutelyUniqueNotifications.length})`);
+            
+            return finalUniqueList.map((notification) => {
               // React key: Use purchase_order_id as primary key (each PO is unique)
               // CRITICAL: Must match the key used in deduplication logic
               // DO NOT USE INDEX - this causes duplicates to render!
@@ -1469,6 +1544,9 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
               // ABSOLUTE GUARANTEE: Use ONLY the unique key (no index!)
               // If deduplication worked, each key should be unique
               const finalKey = uniqueKey;
+              
+              // DEBUG: Log each notification being rendered
+              console.log(`🎨 RENDERING: ${finalKey} - PO: ${notification.purchase_order_id?.substring(0, 8) || 'N/A'}, DR: ${notification.delivery_request_id?.substring(0, 8) || 'N/A'}`);
               
               return (
                 <div
