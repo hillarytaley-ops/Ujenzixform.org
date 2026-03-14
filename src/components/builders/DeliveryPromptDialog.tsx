@@ -288,18 +288,28 @@ export const DeliveryPromptDialog: React.FC<DeliveryPromptDialogProps> = ({
         allPending.forEach((dr: any) => {
           let isDuplicate = false;
           
+          // CRITICAL: Check purchase_order_id FIRST - if they're different, they're NOT duplicates
           // Check 1: Same purchase_order_id
           if (purchaseOrderId && dr.purchase_order_id === purchaseOrderId) {
             isDuplicate = true;
           }
-          // Check 2: Same composite key (deliveryAddress + materialType)
-          else if (deliveryAddress && materialType && dr.delivery_address && dr.material_type) {
-            const normalizedDRAddress = String(dr.delivery_address).trim().toLowerCase();
-            const normalizedDRMaterial = normalizeMaterialType(dr.material_type);
-            
-            if (normalizedAddress === normalizedDRAddress && normalizedMaterial === normalizedDRMaterial) {
-              isDuplicate = true;
+          // Check 2: Same composite key (deliveryAddress + materialType) - ONLY if purchase_order_id is missing/NULL
+          // CRITICAL: If purchase_order_id exists and is different, they are NOT duplicates even if composite key matches
+          else if (!purchaseOrderId || !dr.purchase_order_id) {
+            // Only check composite key if purchase_order_id is missing for BOTH
+            if (deliveryAddress && materialType && dr.delivery_address && dr.material_type) {
+              const normalizedDRAddress = String(dr.delivery_address).trim().toLowerCase();
+              const normalizedDRMaterial = normalizeMaterialType(dr.material_type);
+              
+              if (normalizedAddress === normalizedDRAddress && normalizedMaterial === normalizedDRMaterial) {
+                isDuplicate = true;
+              }
             }
+          }
+          // If purchase_order_id exists and is different, they are NOT duplicates
+          else if (purchaseOrderId && dr.purchase_order_id && purchaseOrderId !== dr.purchase_order_id) {
+            isDuplicate = false; // Explicitly NOT a duplicate
+            console.log(`   ✅ NOT A DUPLICATE: Different purchase_order_ids - current: ${purchaseOrderId.slice(0, 8)}, pending: ${dr.purchase_order_id.slice(0, 8)}`);
           }
           
           if (isDuplicate) {
