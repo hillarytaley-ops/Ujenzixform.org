@@ -1,5 +1,6 @@
 // COMPLETELY RESTRUCTURED: Simple, clear approach - ONE notification per purchase_order_id
 // This replaces the complex deduplication logic with a straightforward approach
+// UPDATED: 2026-03-14 - Fixed duplicate variable declarations and ensured only ONE card per order
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
