@@ -284,16 +284,16 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
         if (removed > 0 && duplicateCount === 0) {
           console.warn(`⚠️ WARNING: Removed ${removed} duplicates but duplicate check found 0. This might indicate a logic issue.`);
         }
-      
-      // STEP 2: Additional deduplication pass (deliveryRequests already deduplicated in STEP 1)
-      // This step ensures we only process unique requests
-      const finalDeliveryRequestsByPO = new Map<string, any>();
-      const finalDeliveryRequestsByKey = new Map<string, any>(); // For NULL purchase_order_id cases
-      let duplicatesRemoved = 0;
-      let nullPORequests = 0;
-      
-      // Process each delivery request (already deduplicated, but do final check)
-      deliveryRequests.forEach((dr: any) => {
+        
+        // STEP 2: Additional deduplication pass (deliveryRequests already deduplicated in STEP 1)
+        // This step ensures we only process unique requests
+        const finalDeliveryRequestsByPO = new Map<string, any>();
+        const finalDeliveryRequestsByKey = new Map<string, any>(); // For NULL purchase_order_id cases
+        let duplicatesRemoved = 0;
+        let nullPORequests = 0;
+        
+        // Process each delivery request (already deduplicated, but do final check)
+        deliveryRequests.forEach((dr: any) => {
         if (dr.purchase_order_id) {
           // Strategy 1: Deduplicate by purchase_order_id (PRIMARY)
           if (!finalDeliveryRequestsByPO.has(dr.purchase_order_id)) {
@@ -336,14 +336,14 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
             }
           }
         }
-      });
-      
-      // Combine both maps into final array
-      deliveryRequests = [...finalDeliveryRequestsByPO.values(), ...finalDeliveryRequestsByKey.values()];
-      const totalUnique = finalDeliveryRequestsByPO.size + finalDeliveryRequestsByKey.size;
-      console.log(`🔍 Final deduplicated delivery_requests: ${deliveryRequests.length} → ${totalUnique} unique (removed ${duplicatesRemoved} duplicates, ${nullPORequests} had NULL purchase_order_id)`);
-      
-      // STEP 3: Create notifications from unique delivery_requests
+        });
+        
+        // Combine both maps into final array
+        deliveryRequests = [...finalDeliveryRequestsByPO.values(), ...finalDeliveryRequestsByKey.values()];
+        const totalUnique = finalDeliveryRequestsByPO.size + finalDeliveryRequestsByKey.size;
+        console.log(`🔍 Final deduplicated delivery_requests: ${deliveryRequests.length} → ${totalUnique} unique (removed ${duplicatesRemoved} duplicates, ${nullPORequests} had NULL purchase_order_id)`);
+        
+        // STEP 3: Create notifications from unique delivery_requests
       // CRITICAL: Only show delivery requests with valid purchase_order_id (no placeholder/default requests)
       // CRITICAL: Use a Set to track purchase_order_ids we've already added
       // ABSOLUTE GUARANTEE: Only ONE notification per purchase_order_id
