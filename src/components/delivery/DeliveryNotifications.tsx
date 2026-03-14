@@ -147,28 +147,43 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
         console.log(`📦 Raw delivery_requests from DB: ${rawData.length}`);
         
         // FIRST: Check for duplicates in raw data BEFORE deduplication
+        // CRITICAL: Normalize purchase_order_ids to catch duplicates with whitespace/case differences
+        const normalizePOId = (poId: string | null | undefined): string => {
+          if (!poId) return '';
+          return String(poId).trim().toLowerCase();
+        };
+        
         const poIdCounts = new Map<string, number>();
         const poIdToRequests = new Map<string, any[]>();
         rawData.forEach((dr: any) => {
           if (dr.purchase_order_id) {
-            const count = poIdCounts.get(dr.purchase_order_id) || 0;
-            poIdCounts.set(dr.purchase_order_id, count + 1);
-            
-            if (!poIdToRequests.has(dr.purchase_order_id)) {
-              poIdToRequests.set(dr.purchase_order_id, []);
+            const normalizedPOId = normalizePOId(dr.purchase_order_id);
+            if (normalizedPOId) {
+              const count = poIdCounts.get(normalizedPOId) || 0;
+              poIdCounts.set(normalizedPOId, count + 1);
+              
+              if (!poIdToRequests.has(normalizedPOId)) {
+                poIdToRequests.set(normalizedPOId, []);
+              }
+              poIdToRequests.get(normalizedPOId)!.push(dr);
             }
-            poIdToRequests.get(dr.purchase_order_id)!.push(dr);
           }
         });
         
         // Log duplicates found in raw data
         let duplicateCount = 0;
-        poIdCounts.forEach((count, poId) => {
+        poIdCounts.forEach((count, normalizedPOId) => {
           if (count > 1) {
             duplicateCount += count - 1; // Number of duplicates (total - 1)
-            const requests = poIdToRequests.get(poId)!;
-            console.error(`🚨 DUPLICATE FOUND: purchase_order_id ${poId} has ${count} delivery_requests:`, 
-              requests.map(r => ({ id: r.id, status: r.status, created_at: r.created_at })));
+            const requests = poIdToRequests.get(normalizedPOId)!;
+            console.error(`🚨 DUPLICATE FOUND: purchase_order_id ${normalizedPOId} (normalized) has ${count} delivery_requests:`, 
+              requests.map(r => ({ 
+                id: r.id, 
+                purchase_order_id: r.purchase_order_id, 
+                normalized: normalizePOId(r.purchase_order_id),
+                status: r.status, 
+                created_at: r.created_at 
+              })));
           }
         });
         
@@ -185,7 +200,14 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
         
         rawData.forEach((dr: any) => {
           if (dr.purchase_order_id) {
-            const existing = deliveryRequestsByPO.get(dr.purchase_order_id);
+            // CRITICAL: Normalize purchase_order_id for deduplication
+            const normalizedPOId = normalizePOId(dr.purchase_order_id);
+            if (!normalizedPOId) {
+              // Skip if normalization results in empty string
+              return;
+            }
+            
+            const existing = deliveryRequestsByPO.get(normalizedPOId);
             
             // Priority: accepted > assigned > in_transit > pending > others
             const statusPriority = {
@@ -204,11 +226,11 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
             if (!existing || currentPriority > existingPriority || 
                 (currentPriority === existingPriority && new Date(dr.created_at) > new Date(existing.created_at))) {
               if (existing) {
-                console.log(`🔄 REPLACING: PO ${dr.purchase_order_id} - keeping ${dr.status} (ID: ${dr.id}) over ${existing.status} (ID: ${existing.id})`);
+                console.log(`🔄 REPLACING: PO ${normalizedPOId} (original: ${dr.purchase_order_id}) - keeping ${dr.status} (ID: ${dr.id}) over ${existing.status} (ID: ${existing.id})`);
               }
-              deliveryRequestsByPO.set(dr.purchase_order_id, dr);
+              deliveryRequestsByPO.set(normalizedPOId, dr);
             } else {
-              console.log(`🗑️ SKIPPING: PO ${dr.purchase_order_id} - keeping ${existing.status} (ID: ${existing.id}) over ${dr.status} (ID: ${dr.id})`);
+              console.log(`🗑️ SKIPPING: PO ${normalizedPOId} (original: ${dr.purchase_order_id}) - keeping ${existing.status} (ID: ${existing.id}) over ${dr.status} (ID: ${dr.id})`);
             }
           } else {
             // For NULL purchase_order_id, keep by ID (shouldn't have duplicates, but just in case)
@@ -392,12 +414,27 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
       // SIMPLIFIED: Keep ONLY the FIRST delivery_request per purchase_order_id - no complex logic
       const finalNotificationMap = new Map<string, any>();
       
-      // FIRST PASS: Collect all delivery_requests by purchase_order_id
+      // CRITICAL: Before creating notifications, check if finalDeliveryRequestsByPO has duplicates
+      // This can happen if the earlier deduplication steps didn't work correctly
       const allDRsByPO = new Map<string, any[]>();
+      const seenPOIds = new Set<string>();
+      
+      // FIRST PASS: Collect all delivery_requests by purchase_order_id
+      // Also detect if the same purchase_order_id appears multiple times in finalDeliveryRequestsByPO
       for (const [poId, dr] of finalDeliveryRequestsByPO.entries()) {
         if (!poId || poId.trim() === '' || poId === 'null' || poId === 'undefined') {
           continue;
         }
+        
+        // CRITICAL: Check if we've already seen this purchase_order_id
+        if (seenPOIds.has(poId)) {
+          console.error(`🚨🚨🚨 CRITICAL DUPLICATE DETECTED: purchase_order_id ${poId} appears MULTIPLE times in finalDeliveryRequestsByPO!`);
+          console.error(`   Existing delivery request: ${allDRsByPO.get(poId)?.[0]?.id}`);
+          console.error(`   Duplicate delivery request: ${dr.id}`);
+        }
+        
+        seenPOIds.add(poId);
+        
         if (!allDRsByPO.has(poId)) {
           allDRsByPO.set(poId, []);
         }
@@ -410,10 +447,14 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
         if (drs.length > 1) {
           console.error(`🚨🚨🚨 FOUND ${drs.length} delivery_requests for purchase_order_id ${poId}! Keeping ONLY the first one.`);
           console.error(`   Delivery request IDs: ${drs.map(dr => dr.id).join(', ')}`);
+          console.error(`   Delivery request statuses: ${drs.map(dr => dr.status).join(', ')}`);
+          console.error(`   Delivery request created_at: ${drs.map(dr => dr.created_at).join(', ')}`);
         }
         // Keep ONLY the first one - simplest possible approach
         finalNotificationMap.set(poId, drs[0]);
       }
+      
+      console.log(`✅ FINAL NOTIFICATION MAP: ${finalNotificationMap.size} unique purchase_order_ids (was ${finalDeliveryRequestsByPO.size} in finalDeliveryRequestsByPO)`);
       
       // THIRD PASS: Create notifications from the deduplicated map
       for (const [poId, dr] of finalNotificationMap.entries()) {
@@ -497,7 +538,16 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
       const finalPOIds = finalNotifications.map(n => n.purchase_order_id).filter(Boolean);
       const duplicatePOIdsCheck = finalPOIds.filter((id, index) => finalPOIds.indexOf(id) !== index);
       if (duplicatePOIdsCheck.length > 0) {
-        console.error(`🚨🚨🚨 CRITICAL: Found ${duplicatePOIdsCheck.length} duplicate purchase_order_ids in finalNotifications! Removing duplicates...`);
+        console.error(`🚨🚨🚨 CRITICAL: Found ${duplicatePOIdsCheck.length} duplicate purchase_order_ids in finalNotifications!`);
+        console.error(`   Duplicate purchase_order_ids: ${[...new Set(duplicatePOIdsCheck)].join(', ')}`);
+        // Log all notifications with duplicate purchase_order_ids
+        duplicatePOIdsCheck.forEach(dupPOId => {
+          const dupNotifications = finalNotifications.filter(n => n.purchase_order_id === dupPOId);
+          console.error(`   Purchase order ${dupPOId} has ${dupNotifications.length} notifications:`, 
+            dupNotifications.map(n => ({ id: n.id, delivery_request_id: n.delivery_request_id })));
+        });
+        console.error(`   Removing duplicates...`);
+        
         // Emergency cleanup - keep only first occurrence
         const emergencyMap = new Map<string, Notification>();
         finalNotifications.forEach(notif => {
@@ -505,7 +555,7 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
             if (!emergencyMap.has(notif.purchase_order_id)) {
               emergencyMap.set(notif.purchase_order_id, notif);
             } else {
-              console.error(`🚨 EMERGENCY REMOVAL: Duplicate notification for PO ${notif.purchase_order_id} - removing ${notif.id}`);
+              console.error(`🚨 EMERGENCY REMOVAL: Duplicate notification for PO ${notif.purchase_order_id} - removing ${notif.id} (keeping ${emergencyMap.get(notif.purchase_order_id)?.id})`);
             }
           } else {
             emergencyMap.set(notif.id, notif);
@@ -1172,17 +1222,25 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
   const uniqueNotifications = useMemo(() => {
     console.log(`🔍 DEDUPLICATION START: ${notifications.length} notifications to process`);
     
+    // CRITICAL: Normalize purchase_order_ids to handle whitespace/case differences
+    const normalizePOId = (poId: string | undefined | null): string => {
+      if (!poId) return '';
+      return poId.trim().toLowerCase();
+    };
+    
     // SIMPLE APPROACH: Use a Map keyed by purchase_order_id (if exists) or delivery_request_id (if exists) or notification id
     // This guarantees only ONE entry per key
     const uniqueMap = new Map<string, Notification>();
     
     notifications.forEach((notification) => {
       // Determine the unique key for this notification
+      // CRITICAL: Normalize purchase_order_id to handle any whitespace/case differences
       let key: string;
       
       if (notification.purchase_order_id) {
-        // PRIMARY KEY: purchase_order_id - only ONE notification per purchase_order_id
-        key = `po-${notification.purchase_order_id}`;
+        // PRIMARY KEY: purchase_order_id (normalized) - only ONE notification per purchase_order_id
+        const normalizedPOId = normalizePOId(notification.purchase_order_id);
+        key = `po-${normalizedPOId}`;
       } else if (notification.delivery_request_id) {
         // SECONDARY KEY: delivery_request_id - only ONE notification per delivery_request_id
         key = `dr-${notification.delivery_request_id}`;
