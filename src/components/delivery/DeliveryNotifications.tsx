@@ -16,6 +16,7 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { trackingNumberService } from '@/services/TrackingNumberService';
+import { cleanupDuplicateDeliveryRequests, checkForDuplicateDeliveryRequests } from '@/utils/cleanupDuplicateDeliveryRequests';
 
 interface Notification {
   id: string;
@@ -79,6 +80,7 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
   const [showSettings, setShowSettings] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [cleaningUp, setCleaningUp] = useState(false);
   const { toast } = useToast();
 
   // Helper to get auth headers
@@ -130,6 +132,7 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
       // - provider_id IS NULL (unaccepted) - can accept
       // - provider_id IS NOT NULL AND provider_id != userId (accepted by another) - show as "Already Accepted"
       // CRITICAL: Only fetch actionable delivery requests (exclude delivered/completed/cancelled)
+      // CRITICAL: Exclude cancelled requests to prevent duplicates from showing
       // These are the only ones that should show in notifications
       const drResponse = await fetch(
         `${url}/rest/v1/delivery_requests?order=created_at.desc&limit=100&status=not.in.(delivered,completed,cancelled)&select=*`,
@@ -370,6 +373,16 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
         // Only show pending, accepted, assigned, in_transit deliveries that need action
         if (['delivered', 'completed', 'cancelled', 'rejected'].includes(dr.status)) {
           console.log(`🚫 SKIPPING: Delivery request ${dr.id} has status ${dr.status} - already completed/cancelled/rejected`);
+          continue;
+        }
+        
+        // CRITICAL: Skip if rejection_reason indicates this was a duplicate that was cleaned up
+        if (dr.rejection_reason && (
+          dr.rejection_reason.includes('Duplicate delivery request') || 
+          dr.rejection_reason.includes('duplicate') ||
+          dr.rejection_reason.includes('cleaned up')
+        )) {
+          console.log(`🚫 SKIPPING: Delivery request ${dr.id} was marked as duplicate: ${dr.rejection_reason}`);
           continue;
         }
         
@@ -1187,6 +1200,65 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
           <Button variant="ghost" size="sm" onClick={() => setShowSettings(!showSettings)}>
             {showSettings ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
             {showSettings ? 'Hide Settings' : 'Settings'}
+          </Button>
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            onClick={async () => {
+              setCleaningUp(true);
+              try {
+                // First check for duplicates
+                const checkResult = await checkForDuplicateDeliveryRequests();
+                if (checkResult.hasDuplicates) {
+                  toast({
+                    title: '🔍 Duplicates Found',
+                    description: `Found ${checkResult.duplicateCount} duplicate delivery requests. Cleaning up...`,
+                  });
+                  
+                  // Clean up duplicates
+                  const cleanupResult = await cleanupDuplicateDeliveryRequests();
+                  if (cleanupResult.success) {
+                    toast({
+                      title: '✅ Cleanup Complete',
+                      description: `Cancelled ${cleanupResult.duplicatesCancelled} duplicate delivery requests.`,
+                    });
+                    // Reload notifications after cleanup
+                    setTimeout(() => loadNotifications(), 1000);
+                  } else {
+                    toast({
+                      title: '⚠️ Cleanup Issues',
+                      description: `Cleaned up ${cleanupResult.duplicatesCancelled} duplicates, but encountered ${cleanupResult.errors.length} errors.`,
+                      variant: 'destructive'
+                    });
+                  }
+                } else {
+                  toast({
+                    title: '✅ No Duplicates',
+                    description: 'No duplicate delivery requests found. Everything looks good!',
+                  });
+                }
+              } catch (error: any) {
+                toast({
+                  title: '❌ Cleanup Failed',
+                  description: error.message || 'Failed to clean up duplicates',
+                  variant: 'destructive'
+                });
+              } finally {
+                setCleaningUp(false);
+              }
+            }}
+            disabled={cleaningUp}
+            title="Check and clean up duplicate delivery requests"
+          >
+            {cleaningUp ? (
+              <>
+                <RefreshCw className="h-4 w-4 mr-1 animate-spin" /> Cleaning...
+              </>
+            ) : (
+              <>
+                <AlertTriangle className="h-4 w-4 mr-1" /> Fix Duplicates
+              </>
+            )}
           </Button>
           <Button variant="ghost" size="sm" onClick={loadNotifications}>
             <RefreshCw className="h-4 w-4" /> Refresh
