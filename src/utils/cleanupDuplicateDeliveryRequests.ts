@@ -168,8 +168,8 @@ export async function cleanupDuplicateDeliveryRequests(): Promise<CleanupResult>
       
       // Sort to find the best one to keep
       requests.sort((a, b) => {
-        const priorityA = statusPriority[a.status] || 0;
-        const priorityB = statusPriority[b.status] || 0;
+      const priorityA = statusPriority[a.status as keyof typeof statusPriority] || 0;
+      const priorityB = statusPriority[b.status as keyof typeof statusPriority] || 0;
         if (priorityB !== priorityA) {
           return priorityB - priorityA; // Higher priority first
         }

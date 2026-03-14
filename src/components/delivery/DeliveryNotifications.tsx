@@ -1749,46 +1749,46 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
             ) : (
               <>
                 <AlertTriangle className="h-4 w-4 mr-1" /> Fix Duplicates
-              </Button>
-              
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                onClick={async () => {
-                  setCleaningUp(true);
-                  try {
-                    const deleteResult = await deleteDuplicateDeliveryRequestsByCompositeKey();
-                    if (deleteResult.success && deleteResult.deleted > 0) {
-                      toast({
-                        title: '🗑️ Deleted Duplicates',
-                        description: `Permanently deleted ${deleteResult.deleted} duplicate delivery requests (same address + material type).`,
-                      });
-                      loadNotifications(); // Refresh notifications after deletion
-                    } else if (deleteResult.deleted === 0) {
-                      toast({
-                        title: '✅ No Duplicates Found',
-                        description: 'No duplicate delivery requests found to delete.',
-                      });
-                    } else {
-                      throw new Error(deleteResult.error || 'Failed to delete duplicates');
-                    }
-                  } catch (error: any) {
-                    console.error('Error deleting duplicates:', error);
-                    toast({
-                      variant: 'destructive',
-                      title: 'Error Deleting Duplicates',
-                      description: error.message || 'Failed to delete duplicate delivery requests.',
-                    });
-                  } finally {
-                    setCleaningUp(false);
-                  }
-                }}
-                disabled={cleaningUp}
-              >
-                {cleaningUp ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <XCircle className="h-4 w-4 mr-1" />}
-                Delete Duplicates
               </>
             )}
+          </Button>
+          
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            onClick={async () => {
+              setCleaningUp(true);
+              try {
+                const deleteResult = await deleteDuplicateDeliveryRequestsByCompositeKey();
+                if (deleteResult.success && deleteResult.deleted > 0) {
+                  toast({
+                    title: '🗑️ Deleted Duplicates',
+                    description: `Permanently deleted ${deleteResult.deleted} duplicate delivery requests (same address + material type).`,
+                  });
+                  loadNotifications(); // Refresh notifications after deletion
+                } else if (deleteResult.deleted === 0) {
+                  toast({
+                    title: '✅ No Duplicates Found',
+                    description: 'No duplicate delivery requests found to delete.',
+                  });
+                } else {
+                  throw new Error(deleteResult.error || 'Failed to delete duplicates');
+                }
+              } catch (error: any) {
+                console.error('Error deleting duplicates:', error);
+                toast({
+                  variant: 'destructive',
+                  title: 'Error Deleting Duplicates',
+                  description: error.message || 'Failed to delete duplicate delivery requests.',
+                });
+              } finally {
+                setCleaningUp(false);
+              }
+            }}
+            disabled={cleaningUp}
+          >
+            {cleaningUp ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <XCircle className="h-4 w-4 mr-1" />}
+            Delete Duplicates
           </Button>
           <Button variant="ghost" size="sm" onClick={loadNotifications}>
             <RefreshCw className="h-4 w-4" /> Refresh
