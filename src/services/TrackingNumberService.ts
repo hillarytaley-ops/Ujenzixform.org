@@ -304,17 +304,120 @@ class TrackingNumberService {
       }
 
       // Check if any active delivery conflicts with the same date
+      // CRITICAL: If the pending request is a duplicate of an already-accepted delivery, cancel it instead of blocking
       if (activeDeliveries && activeDeliveries.length > 0) {
+        // Get the delivery request details to check for duplicates
+        const requestToAccept = await fetch(
+          `${SUPABASE_URL}/rest/v1/delivery_requests?id=eq.${deliveryRequestId}&select=id,purchase_order_id,delivery_address,material_type&limit=1`,
+          {
+            headers: {
+              'apikey': SUPABASE_ANON_KEY,
+              'Authorization': `Bearer ${accessToken}`,
+              'Content-Type': 'application/json'
+            },
+            cache: 'no-store'
+          }
+        ).then(r => r.ok ? r.json() : []).catch(() => []);
+        
+        const requestData = Array.isArray(requestToAccept) && requestToAccept.length > 0 ? requestToAccept[0] : null;
+        
+        // Helper to normalize material types
+        const normalizeMaterialType = (mt: string | undefined | null): string => {
+          if (!mt) return '';
+          const normalized = String(mt).trim().toLowerCase();
+          if (normalized.includes('steel') || normalized.includes('construction') || normalized.includes('material')) {
+            return 'construction_materials';
+          }
+          return normalized;
+        };
+        
         for (const activeDelivery of activeDeliveries) {
           const activeDeliveryDate = activeDelivery.preferred_date 
             || activeDelivery.pickup_date 
             || todayStr;
           const activeDateStr = new Date(activeDeliveryDate).toISOString().split('T')[0];
           
-          // Only block if the dates are the same
+          // Only check if the dates are the same
           if (activeDateStr === requestDateStr) {
-            console.log(`Provider ${providerId} already has active delivery for ${requestDateStr}: ${activeDelivery.id}`);
-            throw new Error(`You already have an active delivery scheduled for ${requestDateStr} (${activeDelivery.tracking_number || 'ID: ' + activeDelivery.id.slice(0, 8)}). Complete it first or accept deliveries for a different date.`);
+            // CRITICAL: Check if this is a duplicate of the already-accepted delivery
+            let isDuplicate = false;
+            
+            if (requestData) {
+              // Check 1: Same purchase_order_id
+              if (requestData.purchase_order_id && activeDelivery.purchase_order_id && 
+                  requestData.purchase_order_id === activeDelivery.purchase_order_id) {
+                isDuplicate = true;
+                console.log(`🔄 DUPLICATE DETECTED: Pending request ${deliveryRequestId} is a duplicate of already-accepted delivery ${activeDelivery.id} (same purchase_order_id)`);
+              }
+              // Check 2: Same composite key (deliveryAddress + materialType) - need to fetch active delivery details
+              else if (requestData.delivery_address && requestData.material_type) {
+                const activeDRResponse = await fetch(
+                  `${SUPABASE_URL}/rest/v1/delivery_requests?id=eq.${activeDelivery.id}&select=id,delivery_address,material_type&limit=1`,
+                  {
+                    headers: {
+                      'apikey': SUPABASE_ANON_KEY,
+                      'Authorization': `Bearer ${accessToken}`,
+                      'Content-Type': 'application/json'
+                    },
+                    cache: 'no-store'
+                  }
+                ).then(r => r.ok ? r.json() : []).catch(() => []);
+                
+                const activeDRData = Array.isArray(activeDRResponse) && activeDRResponse.length > 0 ? activeDRResponse[0] : null;
+                
+                if (activeDRData && activeDRData.delivery_address && activeDRData.material_type) {
+                  const normalizedPendingAddress = String(requestData.delivery_address).trim().toLowerCase();
+                  const normalizedPendingMaterial = normalizeMaterialType(requestData.material_type);
+                  const normalizedActiveAddress = String(activeDRData.delivery_address).trim().toLowerCase();
+                  const normalizedActiveMaterial = normalizeMaterialType(activeDRData.material_type);
+                  
+                  if (normalizedPendingAddress === normalizedActiveAddress && normalizedPendingMaterial === normalizedActiveMaterial) {
+                    isDuplicate = true;
+                    console.log(`🔄 DUPLICATE DETECTED: Pending request ${deliveryRequestId} is a duplicate of already-accepted delivery ${activeDelivery.id} (same composite key)`);
+                  }
+                }
+              }
+            }
+            
+            if (isDuplicate) {
+              // This is a duplicate - cancel it instead of blocking
+              console.log(`🗑️ Cancelling duplicate delivery request ${deliveryRequestId} - already accepted delivery ${activeDelivery.id} exists`);
+              try {
+                const cancelResponse = await fetch(
+                  `${SUPABASE_URL}/rest/v1/delivery_requests?id=eq.${deliveryRequestId}`,
+                  {
+                    method: 'PATCH',
+                    headers: {
+                      'apikey': SUPABASE_ANON_KEY,
+                      'Authorization': `Bearer ${accessToken}`,
+                      'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                      status: 'cancelled',
+                      rejection_reason: `Duplicate delivery request - another delivery for this order was already accepted (ID: ${activeDelivery.id})`,
+                      rejected_at: new Date().toISOString(),
+                      updated_at: new Date().toISOString()
+                    }),
+                    cache: 'no-store'
+                  }
+                );
+                
+                if (cancelResponse.ok) {
+                  console.log(`✅ Cancelled duplicate delivery request ${deliveryRequestId}`);
+                  throw new Error(`This delivery request is a duplicate of an order you already accepted (${activeDelivery.tracking_number || 'ID: ' + activeDelivery.id.slice(0, 8)}). The duplicate has been cancelled.`);
+                }
+              } catch (cancelError: any) {
+                if (cancelError.message && cancelError.message.includes('duplicate')) {
+                  throw cancelError; // Re-throw our custom error
+                }
+                console.warn('⚠️ Failed to cancel duplicate:', cancelError);
+                throw new Error(`This delivery request is a duplicate of an order you already accepted. Please refresh the page.`);
+              }
+            } else {
+              // NOT a duplicate - this is a different order, block it
+              console.log(`Provider ${providerId} already has active delivery for ${requestDateStr}: ${activeDelivery.id}`);
+              throw new Error(`You already have an active delivery scheduled for ${requestDateStr} (${activeDelivery.tracking_number || 'ID: ' + activeDelivery.id.slice(0, 8)}). Complete it first or accept deliveries for a different date.`);
+            }
           }
         }
         
