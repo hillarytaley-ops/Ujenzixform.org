@@ -181,7 +181,7 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
           console.error(`❌ Error details:`, errorText);
         }
         
-        // FIRST: Check for duplicates in raw data BEFORE deduplication
+        // Process rawData (even if empty) - FIRST: Check for duplicates in raw data BEFORE deduplication
         // CRITICAL: Normalize purchase_order_ids to catch duplicates with whitespace/case differences
         const normalizePOId = (poId: string | null | undefined): string => {
           if (!poId) return '';
@@ -284,7 +284,6 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
         if (removed > 0 && duplicateCount === 0) {
           console.warn(`⚠️ WARNING: Removed ${removed} duplicates but duplicate check found 0. This might indicate a logic issue.`);
         }
-      }
       
       // STEP 2: Additional deduplication pass (deliveryRequests already deduplicated in STEP 1)
       // This step ensures we only process unique requests
