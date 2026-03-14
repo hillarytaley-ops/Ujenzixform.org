@@ -343,37 +343,49 @@ class TrackingNumberService {
             let isDuplicate = false;
             
             if (requestData) {
-              // Check 1: Same purchase_order_id
-              if (requestData.purchase_order_id && activeDelivery.purchase_order_id && 
-                  requestData.purchase_order_id === activeDelivery.purchase_order_id) {
-                isDuplicate = true;
-                console.log(`🔄 DUPLICATE DETECTED: Pending request ${deliveryRequestId} is a duplicate of already-accepted delivery ${activeDelivery.id} (same purchase_order_id)`);
+              // CRITICAL: Check purchase_order_id FIRST - if they're different, they're NOT duplicates
+              // Only use composite key if purchase_order_id is missing/NULL
+              if (requestData.purchase_order_id && activeDelivery.purchase_order_id) {
+                if (requestData.purchase_order_id === activeDelivery.purchase_order_id) {
+                  isDuplicate = true;
+                  console.log(`🔄 DUPLICATE DETECTED: Pending request ${deliveryRequestId} is a duplicate of already-accepted delivery ${activeDelivery.id} (same purchase_order_id)`);
+                } else {
+                  // Different purchase_order_id = different orders, NOT duplicates
+                  console.log(`✅ NOT A DUPLICATE: Different purchase_order_ids - pending: ${requestData.purchase_order_id.slice(0, 8)}, accepted: ${activeDelivery.purchase_order_id.slice(0, 8)}`);
+                  isDuplicate = false; // Explicitly set to false
+                }
               }
-              // Check 2: Same composite key (deliveryAddress + materialType) - need to fetch active delivery details
-              else if (requestData.delivery_address && requestData.material_type) {
-                const activeDRResponse = await fetch(
-                  `${SUPABASE_URL}/rest/v1/delivery_requests?id=eq.${activeDelivery.id}&select=id,delivery_address,material_type&limit=1`,
-                  {
-                    headers: {
-                      'apikey': SUPABASE_ANON_KEY,
-                      'Authorization': `Bearer ${accessToken}`,
-                      'Content-Type': 'application/json'
-                    },
-                    cache: 'no-store'
-                  }
-                ).then(r => r.ok ? r.json() : []).catch(() => []);
-                
-                const activeDRData = Array.isArray(activeDRResponse) && activeDRResponse.length > 0 ? activeDRResponse[0] : null;
-                
-                if (activeDRData && activeDRData.delivery_address && activeDRData.material_type) {
-                  const normalizedPendingAddress = String(requestData.delivery_address).trim().toLowerCase();
-                  const normalizedPendingMaterial = normalizeMaterialType(requestData.material_type);
-                  const normalizedActiveAddress = String(activeDRData.delivery_address).trim().toLowerCase();
-                  const normalizedActiveMaterial = normalizeMaterialType(activeDRData.material_type);
+              // Check 2: Same composite key (deliveryAddress + materialType) - ONLY if purchase_order_id is missing/NULL
+              // CRITICAL: If purchase_order_id exists and is different, they are NOT duplicates even if composite key matches
+              else if (!requestData.purchase_order_id || !activeDelivery.purchase_order_id) {
+                // Only check composite key if purchase_order_id is missing
+                if (requestData.delivery_address && requestData.material_type) {
+                  const activeDRResponse = await fetch(
+                    `${SUPABASE_URL}/rest/v1/delivery_requests?id=eq.${activeDelivery.id}&select=id,delivery_address,material_type,purchase_order_id&limit=1`,
+                    {
+                      headers: {
+                        'apikey': SUPABASE_ANON_KEY,
+                        'Authorization': `Bearer ${accessToken}`,
+                        'Content-Type': 'application/json'
+                      },
+                      cache: 'no-store'
+                    }
+                  ).then(r => r.ok ? r.json() : []).catch(() => []);
                   
-                  if (normalizedPendingAddress === normalizedActiveAddress && normalizedPendingMaterial === normalizedActiveMaterial) {
-                    isDuplicate = true;
-                    console.log(`🔄 DUPLICATE DETECTED: Pending request ${deliveryRequestId} is a duplicate of already-accepted delivery ${activeDelivery.id} (same composite key)`);
+                  const activeDRData = Array.isArray(activeDRResponse) && activeDRResponse.length > 0 ? activeDRResponse[0] : null;
+                  
+                  // CRITICAL: Only use composite key if BOTH have NULL purchase_order_id
+                  if (activeDRData && !activeDRData.purchase_order_id && !requestData.purchase_order_id && 
+                      activeDRData.delivery_address && activeDRData.material_type) {
+                    const normalizedPendingAddress = String(requestData.delivery_address).trim().toLowerCase();
+                    const normalizedPendingMaterial = normalizeMaterialType(requestData.material_type);
+                    const normalizedActiveAddress = String(activeDRData.delivery_address).trim().toLowerCase();
+                    const normalizedActiveMaterial = normalizeMaterialType(activeDRData.material_type);
+                    
+                    if (normalizedPendingAddress === normalizedActiveAddress && normalizedPendingMaterial === normalizedActiveMaterial) {
+                      isDuplicate = true;
+                      console.log(`🔄 DUPLICATE DETECTED: Pending request ${deliveryRequestId} is a duplicate of already-accepted delivery ${activeDelivery.id} (same composite key, both have NULL purchase_order_id)`);
+                    }
                   }
                 }
               }
