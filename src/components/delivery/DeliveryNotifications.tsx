@@ -127,6 +127,7 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
       const { url, headers } = getAuthHeaders();
       const finalNotifications: Notification[] = [];
       const seenPurchaseOrderIds = new Set<string>(); // Track which purchase_orders we've already added
+      const seenPONumbers = new Set<string>(); // Track which po_numbers we've already added (CRITICAL for deduplication)
       
       // STEP 1: Fetch delivery_requests - only show unaccepted OR accepted by others
       // Don't show deliveries already accepted by THIS provider (those are in Scheduled tab)
