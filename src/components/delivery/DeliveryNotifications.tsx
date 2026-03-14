@@ -135,11 +135,11 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
       // - provider_id IS NULL (unaccepted) - can accept
       // - provider_id IS NOT NULL AND provider_id != userId (accepted by another) - show as "Already Accepted"
       // CRITICAL: Only fetch actionable delivery requests (exclude delivered/completed/cancelled)
-      // CRITICAL: Exclude cancelled requests to prevent duplicates from showing
-      // CRITICAL: Also exclude requests marked as duplicates in rejection_reason
-      // These are the only ones that should show in notifications
+      // CRITICAL: Fetch ALL pending/assigned/accepted delivery_requests (not filtering by rejection_reason at SQL level)
+      // We'll filter cancelled/duplicate requests in JavaScript to ensure we see all valid requests
+      // This ensures we can properly deduplicate and validate addresses
       const drResponse = await fetch(
-        `${url}/rest/v1/delivery_requests?order=created_at.desc&limit=100&status=not.in.(delivered,completed,cancelled,rejected)&rejection_reason=is.null&select=*`,
+        `${url}/rest/v1/delivery_requests?order=created_at.desc&limit=100&status=not.in.(delivered,completed)&select=*`,
         { headers, cache: 'no-store' }
       );
       
@@ -535,12 +535,13 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
         }
         
         // CRITICAL: Skip if rejection_reason indicates this was a duplicate that was cleaned up
-        if (dr.rejection_reason && (
+        // BUT: Only skip if status is also cancelled/rejected (not if it's still pending/assigned)
+        if ((dr.status === 'cancelled' || dr.status === 'rejected') && dr.rejection_reason && (
           dr.rejection_reason.includes('Duplicate delivery request') || 
           dr.rejection_reason.includes('duplicate') ||
           dr.rejection_reason.includes('cleaned up')
         )) {
-          console.log(`🚫 SKIPPING: Delivery request ${dr.id} was marked as duplicate: ${dr.rejection_reason}`);
+          console.log(`🚫 SKIPPING: Delivery request ${dr.id.slice(0, 8)} was marked as duplicate (status: ${dr.status}): ${dr.rejection_reason.substring(0, 50)}`);
           continue;
         }
         
@@ -553,20 +554,38 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
         // Create notification - this purchase_order_id is guaranteed to be unique
         // CRITICAL: Include po_number for deduplication
         // CRITICAL: Skip if no valid delivery_address - MUST have address keyed in by builder
-        const deliveryAddr = (dr.delivery_address || dr.delivery_location || '').trim();
+        // BUT: Allow GPS coordinates as valid addresses (they start with numbers/lat,lng format)
+        const deliveryAddr = (dr.delivery_address || '').trim();
+        
+        // Check if it's a placeholder (exact matches only, not partial)
+        const isPlaceholder = deliveryAddr && (
+          deliveryAddr.toLowerCase() === 'to be provided' || 
+          deliveryAddr.toLowerCase() === 'tbd' || 
+          deliveryAddr.toLowerCase() === 'n/a' || 
+          deliveryAddr.toLowerCase() === 'na' || 
+          deliveryAddr.toLowerCase() === 'tba' || 
+          deliveryAddr.toLowerCase() === 'to be determined'
+        );
+        
+        // Check if it's a GPS coordinate (contains numbers and comma, or starts with GPS:)
+        const isGPSCoordinate = deliveryAddr && (
+          /^-?\d+\.?\d*,\s*-?\d+\.?\d*/.test(deliveryAddr) || // lat,lng format (e.g., -1.2921,36.8219)
+          deliveryAddr.toLowerCase().startsWith('gps:') ||
+          /^\d+\.?\d*\s*[|,]\s*\d+\.?\d*/.test(deliveryAddr) // GPS with | separator (e.g., "1.2921 | 36.8219")
+        );
+        
+        // Valid if: has content, not a placeholder, and either GPS coords OR actual address (min 3 chars for short addresses)
         const isValidAddress = deliveryAddr && 
                                deliveryAddr !== '' && 
-                               deliveryAddr.toLowerCase() !== 'to be provided' && 
-                               deliveryAddr.toLowerCase() !== 'tbd' && 
-                               deliveryAddr.toLowerCase() !== 'n/a' && 
-                               deliveryAddr.toLowerCase() !== 'na' && 
-                               deliveryAddr.toLowerCase() !== 'tba' && 
-                               deliveryAddr.toLowerCase() !== 'to be determined';
+                               !isPlaceholder &&
+                               (isGPSCoordinate || deliveryAddr.length >= 3); // GPS coords or actual address (min 3 chars)
         
         if (!isValidAddress) {
-          console.log(`🚫 FILTERED OUT: Delivery request ${dr.id.slice(0, 8)} has no valid delivery address (${deliveryAddr || 'empty'}) - NOT showing to providers`);
+          console.log(`🚫 FILTERED OUT: Delivery request ${dr.id.slice(0, 8)} has no valid delivery address - Address: "${deliveryAddr || 'empty'}", isPlaceholder: ${isPlaceholder}, isGPS: ${isGPSCoordinate}, length: ${deliveryAddr?.length || 0}`);
           return;
         }
+        
+        console.log(`✅ VALID ADDRESS: Delivery request ${dr.id.slice(0, 8)} has valid address: "${deliveryAddr.substring(0, 50)}${deliveryAddr.length > 50 ? '...' : ''}"`);
         
         const poNumber = poIdToPONumber.get(poId);
         if (!poNumber) {
@@ -688,20 +707,37 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
           if (!seenPurchaseOrderIds.has(po.id) && (po.delivery_required || po.delivery_address)) {
             // CRITICAL: Validate that purchase_order has valid delivery_address - MUST have address keyed in by builder
             const deliveryAddr = (po.delivery_address || '').trim();
+            
+            // Check if it's a placeholder (exact matches only)
+            const isPlaceholder = deliveryAddr && (
+              deliveryAddr.toLowerCase() === 'to be provided' || 
+              deliveryAddr.toLowerCase() === 'tbd' || 
+              deliveryAddr.toLowerCase() === 'n/a' || 
+              deliveryAddr.toLowerCase() === 'na' || 
+              deliveryAddr.toLowerCase() === 'tba' || 
+              deliveryAddr.toLowerCase() === 'to be determined'
+            );
+            
+            // Check if it's a GPS coordinate
+            const isGPSCoordinate = deliveryAddr && (
+              /^-?\d+\.?\d*,\s*-?\d+\.?\d*/.test(deliveryAddr) || // lat,lng format
+              deliveryAddr.toLowerCase().startsWith('gps:') ||
+              /^\d+\.?\d*\s*[|,]\s*\d+\.?\d*/.test(deliveryAddr) // GPS with | separator
+            );
+            
+            // Valid if: has content, not a placeholder, and either GPS coords OR actual address (min 3 chars)
             const isValidAddress = deliveryAddr && 
                                    deliveryAddr !== '' && 
-                                   deliveryAddr.toLowerCase() !== 'to be provided' && 
-                                   deliveryAddr.toLowerCase() !== 'tbd' && 
-                                   deliveryAddr.toLowerCase() !== 'n/a' && 
-                                   deliveryAddr.toLowerCase() !== 'na' && 
-                                   deliveryAddr.toLowerCase() !== 'tba' && 
-                                   deliveryAddr.toLowerCase() !== 'to be determined';
+                                   !isPlaceholder &&
+                                   (isGPSCoordinate || deliveryAddr.length >= 3);
             
             if (!po.id || !isValidAddress) {
               skippedCount++;
-              console.log(`🚫 SKIPPED: Purchase order ${po.id} has invalid or placeholder delivery address (${deliveryAddr || 'empty'})`);
+              console.log(`🚫 SKIPPED: Purchase order ${po.id.slice(0, 8)} has invalid or placeholder delivery address - Address: "${deliveryAddr || 'empty'}", isPlaceholder: ${isPlaceholder}, isGPS: ${isGPSCoordinate}, length: ${deliveryAddr?.length || 0}`);
               return;
             }
+            
+            console.log(`✅ VALID PO ADDRESS: Purchase order ${po.id.slice(0, 8)} has valid address: "${deliveryAddr.substring(0, 50)}${deliveryAddr.length > 50 ? '...' : ''}"`);
             
             const materialType = po.items && po.items.length > 0
               ? po.items.map((item: any) => item.material_name || item.name).join(', ')
