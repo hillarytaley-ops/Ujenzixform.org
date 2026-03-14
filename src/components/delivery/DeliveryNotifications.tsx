@@ -555,10 +555,15 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
         }
         
         // CRITICAL: Skip if already accepted by THIS provider (those should be in Scheduled tab, not notifications)
-        if (dr.provider_id === userId && ['accepted', 'assigned', 'picked_up', 'in_transit'].includes(dr.status)) {
-          console.log(`🚫 SKIPPING: Delivery request ${dr.id} already accepted by this provider (status: ${dr.status}) - should be in Scheduled tab`);
+        // BUT: Only skip if provider_id is set AND matches current user
+        // For NEW requests, provider_id should be NULL, so they should show
+        if (dr.provider_id && dr.provider_id === userId && ['accepted', 'assigned', 'picked_up', 'in_transit'].includes(dr.status)) {
+          console.log(`🚫 SKIPPING: Delivery request ${dr.id.slice(0, 8)} already accepted by this provider (status: ${dr.status}, provider_id: ${dr.provider_id?.slice(0, 8)}) - should be in Scheduled tab`);
           continue;
         }
+        
+        // DEBUG: Log all requests that pass the provider_id check
+        console.log(`✅ PASSED PROVIDER CHECK: Delivery request ${dr.id.slice(0, 8)} - status: ${dr.status}, provider_id: ${dr.provider_id?.slice(0, 8) || 'NULL'}, userId: ${userId?.slice(0, 8) || 'NULL'}`);
         
         // Create notification - this purchase_order_id is guaranteed to be unique
         // CRITICAL: Include po_number for deduplication
@@ -591,10 +596,12 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
         
         if (!isValidAddress) {
           console.log(`🚫 FILTERED OUT: Delivery request ${dr.id.slice(0, 8)} has no valid delivery address - Address: "${deliveryAddr || 'empty'}", isPlaceholder: ${isPlaceholder}, isGPS: ${isGPSCoordinate}, length: ${deliveryAddr?.length || 0}`);
-          return;
+          // TEMPORARILY: Don't filter out - show anyway to debug
+          // return;
+          console.warn(`⚠️ WARNING: Showing delivery request ${dr.id.slice(0, 8)} even though address validation failed - DEBUG MODE`);
+        } else {
+          console.log(`✅ VALID ADDRESS: Delivery request ${dr.id.slice(0, 8)} has valid address: "${deliveryAddr.substring(0, 50)}${deliveryAddr.length > 50 ? '...' : ''}"`);
         }
-        
-        console.log(`✅ VALID ADDRESS: Delivery request ${dr.id.slice(0, 8)} has valid address: "${deliveryAddr.substring(0, 50)}${deliveryAddr.length > 50 ? '...' : ''}"`);
         
         const poNumber = poIdToPONumber.get(poId);
         if (!poNumber) {
@@ -1302,7 +1309,7 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
     prevNotificationCountRef.current = notifications.length;
     notifications.forEach(n => prevNotificationIdsRef.current.add(n.id));
   }, [notifications, settings.newDeliveryAlerts, playNotificationSound, vibrateDevice, showBrowserNotification, toast]);
-
+  
   // Load on mount and set up real-time
   useEffect(() => {
     // Load fresh notifications
@@ -1439,7 +1446,7 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
             return; // SKIP THIS NOTIFICATION - we already have one for this po_number
           }
           seenPONumbers.add(normalizedPONumber);
-        } else {
+      } else {
           // po_number is empty/null, fall through to purchase_order_id
           key = '';
         }
