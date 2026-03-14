@@ -129,32 +129,55 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
       const seenPurchaseOrderIds = new Set<string>(); // Track which purchase_orders we've already added
       const seenPONumbers = new Set<string>(); // Track which po_numbers we've already added (CRITICAL for deduplication)
       
-      // STEP 1: Fetch delivery_requests - only show unaccepted OR accepted by others
+      // STEP 1: Fetch delivery_requests - show all pending/requested/assigned requests
       // Don't show deliveries already accepted by THIS provider (those are in Scheduled tab)
       // Fetch all delivery_requests, then filter in JavaScript to show:
-      // - provider_id IS NULL (unaccepted) - can accept
-      // - provider_id IS NOT NULL AND provider_id != userId (accepted by another) - show as "Already Accepted"
-      // CRITICAL: Only fetch actionable delivery requests (exclude delivered/completed/cancelled)
-      // CRITICAL: Fetch ALL delivery_requests (including pending, assigned, accepted, etc.)
-      // We'll filter cancelled/duplicate requests in JavaScript to ensure we see all valid requests
-      // TEMPORARILY: Fetch ALL statuses to debug why requests aren't appearing
+      // - status IN ('pending', 'requested', 'assigned') AND provider_id IS NULL or != userId
+      // CRITICAL: Fetch ALL delivery_requests to ensure we see all valid requests
       const drResponse = await fetch(
         `${url}/rest/v1/delivery_requests?order=created_at.desc&limit=200&select=*`,
         { headers, cache: 'no-store' }
       );
       
-      let deliveryRequests: any[] = [];
-      if (drResponse.ok) {
-        const rawData = await drResponse.json();
-        console.log(`📦 Raw delivery_requests from DB: ${rawData.length}`);
-        if (rawData.length > 0) {
-          console.log(`📦 Delivery request details:`, rawData.map((dr: any) => ({
-            id: dr.id.slice(0, 8),
-            status: dr.status,
-            po_id: dr.purchase_order_id?.slice(0, 8) || 'NULL',
-            address: (dr.delivery_address || '').substring(0, 40),
-            rejection_reason: dr.rejection_reason?.substring(0, 50) || null
-          })));
+      console.log(`🔍 Fetching delivery_requests from: ${url}/rest/v1/delivery_requests`);
+      console.log(`🔑 Using headers:`, { 'apikey': headers.apikey ? 'present' : 'missing', 'Authorization': headers.Authorization ? 'present' : 'missing' });
+      
+        let deliveryRequests: any[] = [];
+        if (drResponse.ok) {
+          const rawData = await drResponse.json();
+          console.log(`📦 Raw delivery_requests from DB: ${rawData.length}`);
+          console.log(`📊 Response status: ${drResponse.status} ${drResponse.statusText}`);
+          if (rawData.length > 0) {
+            console.log(`📦 Delivery request details:`, rawData.map((dr: any) => ({
+              id: dr.id.slice(0, 8),
+              status: dr.status,
+              provider_id: dr.provider_id?.slice(0, 8) || 'NULL',
+              po_id: dr.purchase_order_id?.slice(0, 8) || 'NULL',
+              address: (dr.delivery_address || '').substring(0, 40),
+              rejection_reason: dr.rejection_reason?.substring(0, 50) || null
+            })));
+            
+            // Count by status
+            const statusCounts = rawData.reduce((acc: any, dr: any) => {
+              acc[dr.status] = (acc[dr.status] || 0) + 1;
+              return acc;
+            }, {});
+            console.log(`📊 Status breakdown:`, statusCounts);
+            
+            // Count by provider_id
+            const providerCounts = rawData.reduce((acc: any, dr: any) => {
+              const key = dr.provider_id ? dr.provider_id.slice(0, 8) : 'NULL';
+              acc[key] = (acc[key] || 0) + 1;
+              return acc;
+            }, {});
+            console.log(`📊 Provider ID breakdown:`, providerCounts);
+          } else {
+            console.warn(`⚠️ No delivery_requests returned from database!`);
+          }
+        } else {
+          const errorText = await drResponse.text();
+          console.error(`❌ Failed to fetch delivery_requests: ${drResponse.status} ${drResponse.statusText}`);
+          console.error(`❌ Error details:`, errorText);
         }
         
         // FIRST: Check for duplicates in raw data BEFORE deduplication
@@ -555,16 +578,17 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
         }
         
         // CRITICAL: Only show PENDING requests that haven't been accepted by ANY provider
-        // Skip if already accepted by ANY provider (including this one or others)
-        // Only show requests with status='pending' and provider_id IS NULL
-        if (dr.provider_id) {
-          console.log(`🚫 SKIPPING: Delivery request ${dr.id.slice(0, 8)} already accepted by provider ${dr.provider_id.slice(0, 8)} (status: ${dr.status}) - should not appear in Alerts tab`);
+        // Skip if already accepted by THIS provider (those should be in Scheduled tab)
+        // BUT: Show pending requests even if they have a provider_id (might be assigned but not yet accepted)
+        if (dr.provider_id && dr.provider_id === userId && ['accepted', 'assigned', 'picked_up', 'in_transit'].includes(dr.status)) {
+          console.log(`🚫 SKIPPING: Delivery request ${dr.id.slice(0, 8)} already accepted by this provider (status: ${dr.status}, provider_id: ${dr.provider_id?.slice(0, 8)}) - should be in Scheduled tab`);
           continue;
         }
         
-        // Only show pending requests (not accepted, assigned, etc.)
-        if (dr.status !== 'pending') {
-          console.log(`🚫 SKIPPING: Delivery request ${dr.id.slice(0, 8)} has status ${dr.status} (not pending) - should not appear in Alerts tab`);
+        // Only show pending requests (not delivered, completed, cancelled, rejected)
+        // Allow 'pending', 'assigned' (if not assigned to this provider), 'requested' statuses
+        if (!['pending', 'assigned', 'requested'].includes(dr.status)) {
+          console.log(`🚫 SKIPPING: Delivery request ${dr.id.slice(0, 8)} has status ${dr.status} (not pending/assigned/requested) - should not appear in Alerts tab`);
           continue;
         }
         
