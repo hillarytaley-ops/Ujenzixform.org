@@ -472,6 +472,36 @@ export const DeliveryPromptDialog: React.FC<DeliveryPromptDialogProps> = ({
 
       console.log('📦 Creating delivery request with payload:', deliveryPayload);
 
+      // CRITICAL: Validate purchase_order_id is NOT a delivery_request.id (prevent circular references)
+      // This is a frontend safeguard - the database trigger will also catch this, but we want to prevent the error
+      if (purchaseOrder.id) {
+        try {
+          const validationResponse = await fetchWithTimeout(
+            `${SUPABASE_URL}/rest/v1/delivery_requests?id=eq.${purchaseOrder.id}&select=id&limit=1`,
+            {
+              method: 'GET',
+              headers: {
+                'apikey': SUPABASE_ANON_KEY,
+                'Authorization': `Bearer ${accessToken}`,
+                'Content-Type': 'application/json'
+              }
+            },
+            3000
+          );
+          
+          if (validationResponse.ok) {
+            const validationData = await validationResponse.json();
+            if (Array.isArray(validationData) && validationData.length > 0) {
+              console.error('🚨 CRITICAL ERROR: purchase_order_id is actually a delivery_request.id! This would create a circular reference!');
+              throw new Error('Invalid purchase_order_id: The provided ID is actually a delivery_request ID, not a purchase_order ID. This would create a circular reference and is not allowed.');
+            }
+          }
+        } catch (validationError: any) {
+          // If validation fails (e.g., network error), log but continue - database trigger will catch it
+          console.warn('⚠️ Could not validate purchase_order_id (database trigger will catch invalid IDs):', validationError.message);
+        }
+      }
+
       // CRITICAL: Check if delivery request already exists for this purchase_order_id
       let deliveryRequestId = null;
       try {
