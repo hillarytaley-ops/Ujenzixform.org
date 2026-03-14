@@ -464,7 +464,9 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
       }
       
       // SECOND PASS: For each purchase_order_id, keep ONLY THE FIRST delivery_request
-      // This is the SIMPLEST possible deduplication - just keep the first one we see
+      // BUT ALSO: If multiple purchase_order_ids have the same po_number, keep only ONE of them
+      const usedPONumbers = new Set<string>();
+      
       for (const [poId, drs] of allDRsByPO.entries()) {
         if (drs.length > 1) {
           console.error(`🚨🚨🚨 FOUND ${drs.length} delivery_requests for purchase_order_id ${poId}! Keeping ONLY the first one.`);
@@ -472,6 +474,18 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
           console.error(`   Delivery request statuses: ${drs.map(dr => dr.status).join(', ')}`);
           console.error(`   Delivery request created_at: ${drs.map(dr => dr.created_at).join(', ')}`);
         }
+        
+        // Check if this purchase_order_id's po_number has already been used
+        const poNumber = poIdToPONumber.get(poId);
+        if (poNumber) {
+          const normalizedPONumber = String(poNumber).trim().toLowerCase();
+          if (usedPONumbers.has(normalizedPONumber)) {
+            console.error(`🚫 SKIPPING: purchase_order_id ${poId} has po_number "${poNumber}" which was already used. Keeping only the first purchase_order with this po_number.`);
+            continue; // Skip this one - we already have a notification for this po_number
+          }
+          usedPONumbers.add(normalizedPONumber);
+        }
+        
         // Keep ONLY the first one - simplest possible approach
         finalNotificationMap.set(poId, drs[0]);
       }
