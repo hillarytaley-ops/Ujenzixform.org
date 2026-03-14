@@ -286,38 +286,23 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
         }
       }
       
-      // STEP 2: AGGRESSIVE DEDUPLICATION - Multiple strategies
-      const deliveryRequestsByPO = new Map<string, any>();
-      const deliveryRequestsByKey = new Map<string, any>(); // For NULL purchase_order_id cases
-      const deliveryRequestsByAddress = new Map<string, any>(); // Also deduplicate by address+material
+      // STEP 2: Additional deduplication pass (deliveryRequests already deduplicated in STEP 1)
+      // This step ensures we only process unique requests
+      const finalDeliveryRequestsByPO = new Map<string, any>();
+      const finalDeliveryRequestsByKey = new Map<string, any>(); // For NULL purchase_order_id cases
       let duplicatesRemoved = 0;
       let nullPORequests = 0;
-      const poIdCounts = new Map<string, number>(); // Track how many times each PO ID appears
       
-      // First pass: count occurrences of each purchase_order_id
-      deliveryRequests.forEach((dr: any) => {
-        if (dr.purchase_order_id) {
-          poIdCounts.set(dr.purchase_order_id, (poIdCounts.get(dr.purchase_order_id) || 0) + 1);
-        }
-      });
-      
-      // Log any purchase_order_ids that appear multiple times
-      poIdCounts.forEach((count, poId) => {
-        if (count > 1) {
-          console.error(`🚨 CRITICAL DUPLICATE: purchase_order_id ${poId} appears ${count} times in database!`);
-        }
-      });
-      
+      // Process each delivery request (already deduplicated, but do final check)
       deliveryRequests.forEach((dr: any) => {
         if (dr.purchase_order_id) {
           // Strategy 1: Deduplicate by purchase_order_id (PRIMARY)
-          if (!deliveryRequestsByPO.has(dr.purchase_order_id)) {
-            deliveryRequestsByPO.set(dr.purchase_order_id, dr);
-            seenPurchaseOrderIds.add(dr.purchase_order_id);
+          if (!finalDeliveryRequestsByPO.has(dr.purchase_order_id)) {
+            finalDeliveryRequestsByPO.set(dr.purchase_order_id, dr);
           } else {
-            // Duplicate found! Keep the best one
+            // Duplicate found! Keep the best one (shouldn't happen after STEP 1, but safety check)
             duplicatesRemoved++;
-            const existing = deliveryRequestsByPO.get(dr.purchase_order_id);
+            const existing = finalDeliveryRequestsByPO.get(dr.purchase_order_id);
             const existingScore = (existing.status === 'accepted' || existing.status === 'assigned' || existing.status === 'in_transit' ? 10 : 0) +
                                  (existing.provider_id ? 5 : 0) +
                                  (new Date(existing.created_at).getTime() / 1000000);
@@ -325,30 +310,27 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
                             (dr.provider_id ? 5 : 0) +
                             (new Date(dr.created_at).getTime() / 1000000);
             if (newScore > existingScore) {
-              deliveryRequestsByPO.set(dr.purchase_order_id, dr);
+              finalDeliveryRequestsByPO.set(dr.purchase_order_id, dr);
               console.error(`🔄 Replaced duplicate for PO ${dr.purchase_order_id} (better score) - DR IDs: ${existing.id} → ${dr.id}`);
             } else {
               console.error(`🗑️ Removed duplicate for PO ${dr.purchase_order_id} (keeping existing) - DR ID: ${dr.id}`);
             }
           }
-          
-          // NOTE: We do NOT deduplicate by address+material when purchase_order_id exists
-          // Different purchase orders can have the same placeholder "to be provided" - they're still unique!
         } else {
-          // NULL purchase_order_id - deduplicate by builder_id + delivery_address + material_type + same hour
+          // NULL purchase_order_id - deduplicate by builder_id + delivery_address + material_type
           nullPORequests++;
-          const key = `${dr.builder_id || 'no-builder'}|${(dr.delivery_address || '').toLowerCase().trim()}|${(dr.material_type || '').toLowerCase().trim()}|${dr.created_at ? new Date(dr.created_at).toISOString().slice(0, 13) : 'no-date'}`;
+          const key = `${dr.builder_id || 'no-builder'}|${(dr.delivery_address || '').toLowerCase().trim()}|${(dr.material_type || '').toLowerCase().trim()}`;
           
-          if (!deliveryRequestsByKey.has(key)) {
-            deliveryRequestsByKey.set(key, dr);
+          if (!finalDeliveryRequestsByKey.has(key)) {
+            finalDeliveryRequestsByKey.set(key, dr);
           } else {
             // Duplicate found for NULL PO case
             duplicatesRemoved++;
-            const existing = deliveryRequestsByKey.get(key);
+            const existing = finalDeliveryRequestsByKey.get(key);
             const existingTime = new Date(existing.created_at).getTime();
             const newTime = new Date(dr.created_at).getTime();
             if (newTime > existingTime) {
-              deliveryRequestsByKey.set(key, dr);
+              finalDeliveryRequestsByKey.set(key, dr);
               console.log(`🔄 Replaced duplicate NULL PO request (newer): ${key} - DR IDs: ${existing.id} → ${dr.id}`);
             } else {
               console.log(`🗑️ Removed duplicate NULL PO request (keeping older): ${key} - DR ID: ${dr.id}`);
@@ -357,8 +339,10 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
         }
       });
       
-      const totalUnique = deliveryRequestsByPO.size + deliveryRequestsByKey.size;
-      console.log(`🔍 Deduplicated delivery_requests: ${deliveryRequests.length} → ${totalUnique} unique (removed ${duplicatesRemoved} duplicates, ${nullPORequests} had NULL purchase_order_id)`);
+      // Combine both maps into final array
+      deliveryRequests = [...finalDeliveryRequestsByPO.values(), ...finalDeliveryRequestsByKey.values()];
+      const totalUnique = finalDeliveryRequestsByPO.size + finalDeliveryRequestsByKey.size;
+      console.log(`🔍 Final deduplicated delivery_requests: ${deliveryRequests.length} → ${totalUnique} unique (removed ${duplicatesRemoved} duplicates, ${nullPORequests} had NULL purchase_order_id)`);
       
       // STEP 3: Create notifications from unique delivery_requests
       // CRITICAL: Only show delivery requests with valid purchase_order_id (no placeholder/default requests)
@@ -368,10 +352,10 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
       const addedDRIds = new Set<string>(); // Also track delivery_request_ids to prevent duplicates
       const addedPONumbers = new Set<string>(); // Track which po_numbers we've already added (CRITICAL for deduplication)
       
-      // CRITICAL: Pre-filter deliveryRequestsByPO to ensure ONLY ONE per purchase_order_id
+      // CRITICAL: Pre-filter finalDeliveryRequestsByPO to ensure ONLY ONE per purchase_order_id
       // This is the FIRST and MOST IMPORTANT deduplication step
       const preFilteredPO = new Map<string, any>();
-      deliveryRequestsByPO.forEach((dr, poId) => {
+      finalDeliveryRequestsByPO.forEach((dr, poId) => {
         // Skip cancelled/rejected duplicates immediately
         if (dr.status === 'cancelled' || dr.status === 'rejected') {
           if (dr.rejection_reason && (
@@ -406,10 +390,14 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
         }
       });
       
-      console.log(`✅ PRE-FILTER: ${deliveryRequestsByPO.size} → ${preFilteredPO.size} unique purchase orders`);
+      console.log(`✅ PRE-FILTER: ${finalDeliveryRequestsByPO.size} → ${preFilteredPO.size} unique purchase orders`);
       
-      // Use the pre-filtered map instead of the original
-      const finalDeliveryRequestsByPO = preFilteredPO;
+      // Use the pre-filtered map instead of the original (update the existing map)
+      // Clear and repopulate finalDeliveryRequestsByPO with pre-filtered data
+      finalDeliveryRequestsByPO.clear();
+      preFilteredPO.forEach((dr, poId) => {
+        finalDeliveryRequestsByPO.set(poId, dr);
+      });
       
       // First, collect all purchase_order_ids to verify they exist
       const poIdsToVerify = Array.from(finalDeliveryRequestsByPO.keys()).filter(poId => 
