@@ -1346,14 +1346,29 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
     // Sort by timestamp (most recent first)
     result.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
     
-    // FINAL VERIFICATION: Double-check for any remaining duplicates
+    // FINAL VERIFICATION: Double-check for any remaining duplicates by po_number FIRST, then purchase_order_id
+    const finalSeenPONumbers = new Set<string>();
     const finalSeenPOIds = new Set<string>();
     const finalSeenDRIds = new Set<string>();
     const finalSeenIds = new Set<string>();
     const absolutelyFinal: Notification[] = [];
     
     result.forEach((n) => {
-      // Check purchase_order_id FIRST (highest priority)
+      // Check po_number FIRST (highest priority - multiple purchase_order_ids can have same po_number)
+      if (n.po_number) {
+        const normalizedPONumber = normalizePONumber(n.po_number);
+        if (normalizedPONumber && finalSeenPONumbers.has(normalizedPONumber)) {
+          console.error(`🚨🚨🚨 CRITICAL: Found duplicate po_number "${n.po_number}" in final result - REMOVING ${n.id} (purchase_order_id: ${n.purchase_order_id})`);
+          return; // Skip this duplicate
+        }
+        if (normalizedPONumber) {
+          finalSeenPONumbers.add(normalizedPONumber);
+        }
+        absolutelyFinal.push(n);
+        return; // Added, move to next
+      }
+      
+      // Check purchase_order_id SECOND (if no po_number)
       if (n.purchase_order_id) {
         if (finalSeenPOIds.has(n.purchase_order_id)) {
           console.error(`🚨 CRITICAL: Found duplicate purchase_order_id ${n.purchase_order_id} in final result - REMOVING ${n.id}`);
@@ -1603,10 +1618,23 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
         ) : (
           (() => {
             // FINAL RENDER-LEVEL DEDUPLICATION: Use a Map to absolutely guarantee uniqueness
+            // CRITICAL: Use po_number as PRIMARY key if available
             const renderMap = new Map<string, Notification>();
+            const renderSeenPONumbers = new Set<string>();
             uniqueNotifications.forEach((notification) => {
               let uniqueKey: string;
-              if (notification.purchase_order_id) {
+              // CRITICAL: Use po_number as PRIMARY key - this ensures only ONE card per po_number
+              if (notification.po_number) {
+                const normalizedPONumber = String(notification.po_number).trim().toLowerCase();
+                uniqueKey = `ponum-${normalizedPONumber}`;
+                
+                // If we've already seen this po_number, SKIP IT IMMEDIATELY
+                if (renderSeenPONumbers.has(normalizedPONumber)) {
+                  console.error(`🚨🚨🚨 RENDER: Duplicate po_number "${notification.po_number}" detected! Skipping notification ${notification.id} (purchase_order_id: ${notification.purchase_order_id})`);
+                  return; // SKIP THIS NOTIFICATION
+                }
+                renderSeenPONumbers.add(normalizedPONumber);
+              } else if (notification.purchase_order_id) {
                 uniqueKey = `po-${notification.purchase_order_id}`;
               } else if (notification.delivery_request_id) {
                 uniqueKey = `dr-${notification.delivery_request_id}`;
@@ -1635,11 +1663,23 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
               console.error(`🚨🚨🚨 RENDER: Removed ${uniqueNotifications.length - finalRenderNotifications.length} duplicates at render time!`);
             }
             
-            // ABSOLUTE FINAL CHECK: Remove any remaining duplicates by purchase_order_id
+            // ABSOLUTE FINAL CHECK: Remove any remaining duplicates by po_number FIRST, then purchase_order_id
             const absolutelyFinalRender = new Map<string, Notification>();
+            const absolutelyFinalSeenPONumbers = new Set<string>();
             finalRenderNotifications.forEach((notification) => {
               let uniqueKey: string;
-              if (notification.purchase_order_id) {
+              // CRITICAL: Use po_number as PRIMARY key
+              if (notification.po_number) {
+                const normalizedPONumber = String(notification.po_number).trim().toLowerCase();
+                uniqueKey = `ponum-${normalizedPONumber}`;
+                
+                // If we've already seen this po_number, SKIP IT IMMEDIATELY
+                if (absolutelyFinalSeenPONumbers.has(normalizedPONumber)) {
+                  console.error(`🚨🚨🚨 ABSOLUTE FINAL: Duplicate po_number "${notification.po_number}" detected! Keeping first, removing: ${notification.id}`);
+                  return;
+                }
+                absolutelyFinalSeenPONumbers.add(normalizedPONumber);
+              } else if (notification.purchase_order_id) {
                 uniqueKey = `po-${notification.purchase_order_id}`;
               } else if (notification.delivery_request_id) {
                 uniqueKey = `dr-${notification.delivery_request_id}`;
