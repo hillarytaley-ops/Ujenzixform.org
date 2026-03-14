@@ -331,6 +331,11 @@ const DeliveryDashboard = () => {
             
             if (validationResponse.ok) {
               const existingOrders = await validationResponse.json();
+              // Add null check to prevent "is not a constructor" errors
+              if (!existingOrders || !Array.isArray(existingOrders)) {
+                console.warn('⚠️ Invalid validation response:', existingOrders);
+                return;
+              }
               const existingOrderIds = new Set(existingOrders.map((po: any) => po.id));
               const existingOrderNumbers = new Set(existingOrders.map((po: any) => po.po_number).filter(Boolean));
               
