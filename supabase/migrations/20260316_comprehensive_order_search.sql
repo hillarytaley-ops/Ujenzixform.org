@@ -89,12 +89,12 @@ BEGIN
       END IF;
     ELSE
       -- Try partial match
-      SELECT COUNT(*) INTO po_record.id
+      SELECT COUNT(*) INTO partial_count
       FROM purchase_orders
       WHERE po_number ILIKE '%' || pattern || '%';
       
-      IF po_record.id > 0 THEN
-        RAISE NOTICE '   Found % purchase_orders with pattern "%" (partial match)', po_record.id, pattern;
+      IF partial_count > 0 THEN
+        RAISE NOTICE '   Found % purchase_orders with pattern "%" (partial match)', partial_count, pattern;
         
         -- Show the matches
         FOR po_record IN 
