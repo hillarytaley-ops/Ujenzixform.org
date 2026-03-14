@@ -556,6 +556,13 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
           console.warn(`⚠️⚠️⚠️ WARNING: purchase_order_id ${poId} has NO po_number! This will cause deduplication to fail if there are multiple purchase_orders with same po_number.`);
         } else {
           console.log(`✅ Found po_number "${poNumber}" for purchase_order_id ${poId}`);
+          // CRITICAL: Check if we've already added a notification for this po_number
+          const normalizedPONumber = String(poNumber).trim().toLowerCase();
+          if (addedPONumbers.has(normalizedPONumber)) {
+            console.error(`🚨🚨🚨 BLOCKED: po_number "${poNumber}" already has a notification! Skipping purchase_order_id ${poId} to prevent duplicate cards.`);
+            return; // SKIP THIS - we already have a notification for this po_number
+          }
+          addedPONumbers.add(normalizedPONumber);
         }
         finalNotifications.push({
           id: `dr-${dr.id}`, // Use delivery_request id as notification id
@@ -678,6 +685,17 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
               skippedCount++;
               console.log(`🚫 SKIPPED: Purchase order ${po.id} has no material type`);
               return;
+            }
+            
+            // CRITICAL: Check po_number FIRST - if we've already added a notification for this po_number, SKIP IT
+            if (po.po_number) {
+              const normalizedPONumber = String(po.po_number).trim().toLowerCase();
+              if (addedPONumbers.has(normalizedPONumber)) {
+                console.error(`🚨🚨🚨 BLOCKED: po_number "${po.po_number}" already has a notification! Skipping purchase_order_id ${po.id} to prevent duplicate cards.`);
+                skippedCount++;
+                return; // SKIP THIS - we already have a notification for this po_number
+              }
+              addedPONumbers.add(normalizedPONumber);
             }
             
             addedPOIds.add(po.id); // Mark as added
