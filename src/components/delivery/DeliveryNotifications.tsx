@@ -382,17 +382,39 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
       
       // RELAXED: Verify purchase_orders exist, but if verification fails, show all notifications anyway
       // This ensures delivery alerts come through even if there's a temporary database issue
+      // CRITICAL: Also fetch po_number to deduplicate by po_number (multiple purchase_order_ids can have same po_number)
       let validPOIds = new Set<string>(poIdsToVerify);
+      const poIdToPONumber = new Map<string, string>(); // Map purchase_order_id -> po_number
+      const poNumberToPOId = new Map<string, string>(); // Map po_number -> first purchase_order_id (for deduplication)
+      
       if (poIdsToVerify.length > 0) {
         try {
           const verifyResponse = await fetch(
-            `${url}/rest/v1/purchase_orders?id=in.(${poIdsToVerify.join(',')})&select=id&limit=1000`,
+            `${url}/rest/v1/purchase_orders?id=in.(${poIdsToVerify.join(',')})&select=id,po_number&limit=1000`,
             { headers, cache: 'no-store' }
           );
           
           if (verifyResponse.ok) {
             const validPOs = await verifyResponse.json();
             validPOIds = new Set(validPOs.map((po: any) => po.id));
+            
+            // Build maps for po_number deduplication
+            validPOs.forEach((po: any) => {
+              if (po.id && po.po_number) {
+                poIdToPONumber.set(po.id, po.po_number);
+                
+                // If we haven't seen this po_number before, map it to this purchase_order_id
+                const normalizedPONumber = String(po.po_number).trim().toLowerCase();
+                if (!poNumberToPOId.has(normalizedPONumber)) {
+                  poNumberToPOId.set(normalizedPONumber, po.id);
+                } else {
+                  // Duplicate po_number found! Log it
+                  const existingPOId = poNumberToPOId.get(normalizedPONumber)!;
+                  console.error(`🚨🚨🚨 DUPLICATE PO_NUMBER DETECTED: po_number "${po.po_number}" has multiple purchase_order_ids: ${existingPOId} and ${po.id}`);
+                }
+              }
+            });
+            
             const invalidCount = poIdsToVerify.length - validPOIds.size;
             if (invalidCount > 0) {
               console.log(`⚠️ ${invalidCount} delivery requests with non-existent purchase_orders (showing anyway to ensure alerts come through)`);
