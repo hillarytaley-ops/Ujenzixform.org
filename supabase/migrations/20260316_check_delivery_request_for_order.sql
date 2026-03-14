@@ -54,19 +54,21 @@ END $$;
 
 -- Also check RLS policies
 DO $$
+DECLARE
+  policy_rec RECORD;
 BEGIN
   RAISE NOTICE '========================================';
   RAISE NOTICE 'Checking RLS policies for delivery_requests...';
   RAISE NOTICE '========================================';
   
   -- List all policies
-  FOR po IN 
+  FOR policy_rec IN 
     SELECT policyname, cmd, qual 
     FROM pg_policies 
     WHERE tablename = 'delivery_requests' AND schemaname = 'public'
   LOOP
-    RAISE NOTICE 'Policy: % (Command: %)', po.policyname, po.cmd;
-    RAISE NOTICE '  Condition: %', po.qual;
+    RAISE NOTICE 'Policy: % (Command: %)', policy_rec.policyname, policy_rec.cmd;
+    RAISE NOTICE '  Condition: %', policy_rec.qual;
   END LOOP;
 END $$;
 
