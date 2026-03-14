@@ -147,6 +147,15 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
       if (drResponse.ok) {
         const rawData = await drResponse.json();
         console.log(`📦 Raw delivery_requests from DB: ${rawData.length}`);
+        if (rawData.length > 0) {
+          console.log(`📦 Delivery request details:`, rawData.map((dr: any) => ({
+            id: dr.id.slice(0, 8),
+            status: dr.status,
+            po_id: dr.purchase_order_id?.slice(0, 8) || 'NULL',
+            address: (dr.delivery_address || '').substring(0, 40),
+            rejection_reason: dr.rejection_reason?.substring(0, 50) || null
+          })));
+        }
         
         // FIRST: Check for duplicates in raw data BEFORE deduplication
         // CRITICAL: Normalize purchase_order_ids to catch duplicates with whitespace/case differences
