@@ -175,6 +175,30 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
               return acc;
             }, {});
             console.log(`📊 Provider ID breakdown:`, providerCounts);
+            
+            // DEBUG: Check for specific order mentioned by user (QR-1773487443217-4GJMG)
+            // This order number contains timestamp 1773487443217
+            const userOrderTimestamp = '1773487443217';
+            const userOrder = rawData.find((dr: any) => {
+              // Check if purchase_order_id matches or if we can find it via po_number lookup
+              return dr.purchase_order_id && (
+                dr.purchase_order_id.toString().includes(userOrderTimestamp) ||
+                dr.id.toString().includes(userOrderTimestamp)
+              );
+            });
+            if (userOrder) {
+              console.log(`🔍 DEBUG: Found user's order in raw data:`, {
+                id: userOrder.id,
+                status: userOrder.status,
+                provider_id: userOrder.provider_id || 'NULL',
+                po_id: userOrder.purchase_order_id,
+                address: userOrder.delivery_address || 'MISSING',
+                builder_id: userOrder.builder_id?.slice(0, 8) || 'NULL'
+              });
+            } else {
+              console.warn(`⚠️ DEBUG: User's order (timestamp: ${userOrderTimestamp}) NOT found in raw data!`);
+              console.warn(`⚠️ DEBUG: This could mean: 1) RLS policy is blocking it, 2) Order doesn't exist, 3) Status is filtered out`);
+            }
           } else {
             console.warn(`⚠️ No delivery_requests returned from database!`);
           }
