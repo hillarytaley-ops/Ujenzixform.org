@@ -1,6 +1,7 @@
 /**
  * Utility function to clean up duplicate delivery requests
  * This can be called from the admin panel or manually
+ * Updated: 2026-03-15 - Fixed syntax errors and added purchase_order cleanup
  */
 
 import { supabase } from '@/integrations/supabase/client';
