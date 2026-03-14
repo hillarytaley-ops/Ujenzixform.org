@@ -1822,6 +1822,19 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
                   return;
                 }
                 absolutelyFinalSeenPONumbers.add(normalizedPONumber);
+              } else if (notification.deliveryAddress && notification.materialType && notification.timestamp) {
+                // FALLBACK: Use composite key when po_number is missing
+                const normalizedAddress = String(notification.deliveryAddress).trim().toLowerCase();
+                const normalizedMaterial = String(notification.materialType).trim().toLowerCase();
+                const hourKey = new Date(notification.timestamp).toISOString().slice(0, 13);
+                uniqueKey = `composite-${normalizedAddress}|${normalizedMaterial}|${hourKey}`;
+                
+                // If we've already seen this composite key, SKIP IT IMMEDIATELY
+                if (absolutelyFinalSeenPONumbers.has(uniqueKey)) {
+                  console.error(`🚨🚨🚨 ABSOLUTE FINAL: Duplicate composite key "${uniqueKey}" detected! Keeping first, removing: ${notification.id}`);
+                  return;
+                }
+                absolutelyFinalSeenPONumbers.add(uniqueKey);
               } else if (notification.purchase_order_id) {
                 uniqueKey = `po-${notification.purchase_order_id}`;
               } else if (notification.delivery_request_id) {
