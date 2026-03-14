@@ -851,14 +851,17 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
             );
             
             // Valid if: has content, not a placeholder, and either GPS coords OR actual address (min 3 chars)
+            // RELAXED: For pending/requested/assigned status, show even if address is "To be provided"
+            // This ensures delivery providers can see and accept requests even if address isn't finalized yet
+            const isPendingStatus = po.status && ['pending', 'requested', 'assigned'].includes(po.status);
             const isValidAddress = deliveryAddr && 
                                    deliveryAddr !== '' && 
-                                   !isPlaceholder &&
+                                   (!isPlaceholder || isPendingStatus) && // Allow placeholder for pending requests
                                    (isGPSCoordinate || deliveryAddr.length >= 3);
             
             if (!po.id || !isValidAddress) {
               skippedCount++;
-              console.log(`🚫 SKIPPED: Purchase order ${po.id.slice(0, 8)} has invalid or placeholder delivery address - Address: "${deliveryAddr || 'empty'}", isPlaceholder: ${isPlaceholder}, isGPS: ${isGPSCoordinate}, length: ${deliveryAddr?.length || 0}`);
+              console.log(`🚫 SKIPPED: Purchase order ${po.id.slice(0, 8)} has invalid or placeholder delivery address - Address: "${deliveryAddr || 'empty'}", isPlaceholder: ${isPlaceholder}, isGPS: ${isGPSCoordinate}, length: ${deliveryAddr?.length || 0}, status: ${po.status}`);
               return;
             }
             
