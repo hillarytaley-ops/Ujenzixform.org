@@ -231,12 +231,6 @@ export async function cleanupDuplicateDeliveryRequests(): Promise<CleanupResult>
         console.error(`❌ Error cancelling duplicates for PO ${poId}:`, cancelError);
         result.errors.push(`Failed to cancel duplicates for PO ${poId}: ${cancelError.message}`);
       }
-
-      if (cancelError) {
-        console.error(`❌ Error cancelling duplicates for PO ${poId}:`, cancelError);
-        result.errors.push(`Failed to cancel duplicates for PO ${poId}: ${cancelError.message}`);
-      } else {
-        result.duplicatesCancelled += cancelIds.length;
         console.log(`✅ Cancelled ${cancelIds.length} duplicates for PO ${poId}`);
       }
     }
