@@ -666,11 +666,19 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
         // DO NOT use purchase_order.delivery_address as fallback - the builder may have entered a different address
         let deliveryAddr = (dr.delivery_address || '').trim();
         
-        // CRITICAL: If delivery_request has no address, this means the builder didn't fill it in the form
-        // In this case, we should NOT show the request (builder must provide address in delivery request form)
+        // CRITICAL: For pending/requested/assigned status, show even if address is placeholder
+        // This ensures delivery providers can see and accept requests even if address isn't finalized yet
+        // Only filter out if address is completely empty AND status is not pending/requested/assigned
+        const isPendingStatus = ['pending', 'requested', 'assigned'].includes(dr.status);
         if (!deliveryAddr || deliveryAddr === '') {
-          console.log(`🚫 FILTERED OUT: Delivery request ${dr.id.slice(0, 8)} has NO delivery_address - builder did not fill address in delivery request form`);
-          return; // Filter out - builder must provide address in delivery request form
+          if (isPendingStatus) {
+            // For pending requests, allow placeholder address - builder will provide later
+            deliveryAddr = 'To be provided';
+            console.log(`⚠️ SHOWING WITH EMPTY ADDRESS: Delivery request ${dr.id.slice(0, 8)} has no address but is pending - will show with placeholder`);
+          } else {
+            console.log(`🚫 FILTERED OUT: Delivery request ${dr.id.slice(0, 8)} has NO delivery_address and status is ${dr.status} (not pending/requested/assigned)`);
+            return; // Filter out - only pending/requested/assigned can have empty address
+          }
         }
         
         // Check if it's a placeholder (exact matches only, not partial)
