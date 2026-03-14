@@ -134,9 +134,10 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
       // Fetch all delivery_requests, then filter in JavaScript to show:
       // - status IN ('pending', 'requested', 'assigned') AND provider_id IS NULL or != userId
       // CRITICAL: Fetch ALL delivery_requests to ensure we see all valid requests
+      // CRITICAL: MUST include delivery_address field - this is the address filled by builder in delivery request form
       // NOTE: RLS policy should allow pending/requested/assigned, but fetch all to be safe
       const drResponse = await fetch(
-        `${url}/rest/v1/delivery_requests?order=created_at.desc&limit=200&select=*`,
+        `${url}/rest/v1/delivery_requests?order=created_at.desc&limit=200&select=id,status,purchase_order_id,provider_id,delivery_address,pickup_address,material_type,quantity,created_at,builder_id,rejection_reason,priority_level,estimated_cost,budget_range`,
         { headers, cache: 'no-store' }
       );
       
@@ -660,19 +661,16 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
         
         // Create notification - this purchase_order_id is guaranteed to be unique
         // CRITICAL: Include po_number for deduplication
-        // CRITICAL: Skip if no valid delivery_address - MUST have address keyed in by builder
-        // BUT: Allow GPS coordinates as valid addresses (they start with numbers/lat,lng format)
-        // FALLBACK: Use purchase_order's delivery_address if delivery_request doesn't have one
+        // CRITICAL: Use ONLY delivery_request.delivery_address - this is the address filled by builder in delivery request form
+        // The delivery_request.delivery_address is the SOURCE OF TRUTH - it comes from the form the builder filled
+        // DO NOT use purchase_order.delivery_address as fallback - the builder may have entered a different address
         let deliveryAddr = (dr.delivery_address || '').trim();
         
-        // If delivery_request has no address, try to get it from purchase_order
+        // CRITICAL: If delivery_request has no address, this means the builder didn't fill it in the form
+        // In this case, we should NOT show the request (builder must provide address in delivery request form)
         if (!deliveryAddr || deliveryAddr === '') {
-          // Try to find purchase_order in the fetched data (from validPOs)
-          const po = poMap?.get(poId);
-          if (po && po.delivery_address) {
-            deliveryAddr = String(po.delivery_address).trim();
-            console.log(`🔄 Using purchase_order delivery_address as fallback for DR ${dr.id.slice(0, 8)}: "${deliveryAddr.substring(0, 50)}"`);
-          }
+          console.log(`🚫 FILTERED OUT: Delivery request ${dr.id.slice(0, 8)} has NO delivery_address - builder did not fill address in delivery request form`);
+          return; // Filter out - builder must provide address in delivery request form
         }
         
         // Check if it's a placeholder (exact matches only, not partial)
