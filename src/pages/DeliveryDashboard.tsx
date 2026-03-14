@@ -1022,9 +1022,17 @@ const DeliveryDashboard = () => {
             
             if (poResponse.ok) {
               const validPOs = await poResponse.json();
+              // Add null check to prevent "is not a constructor" errors
+              if (!validPOs || !Array.isArray(validPOs)) {
+                console.warn('⚠️ Invalid purchase_orders response:', validPOs);
+                setNotificationCount(0);
+                setPendingNotificationCount(0);
+                return;
+              }
               const validPOIds = new Set(validPOs
                 .filter((po: any) => 
                   // Only count purchase_orders that are not delivered/completed/cancelled
+                  po && po.id && 
                   !['delivered', 'completed', 'cancelled'].includes(po.status) &&
                   (!po.delivery_status || !['delivered', 'completed', 'cancelled'].includes(po.delivery_status))
                 )

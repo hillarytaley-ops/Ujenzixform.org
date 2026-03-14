@@ -201,8 +201,9 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
             // Method 3: Try to fetch purchase_order by po_number and then find delivery_request
             if (!userOrder) {
               try {
+                // Use correct PostgREST syntax: ilike.*pattern* (not ilike.%pattern%)
                 const poSearchResponse = await fetch(
-                  `${url}/rest/v1/purchase_orders?po_number=ilike.%1773487443217%&select=id,po_number&limit=5`,
+                  `${url}/rest/v1/purchase_orders?po_number=ilike.*1773487443217*&select=id,po_number&limit=5`,
                   { headers, cache: 'no-store' }
                 );
                 if (poSearchResponse.ok) {
