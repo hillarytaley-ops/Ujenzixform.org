@@ -74,29 +74,61 @@ export const QuoteComparison: React.FC<QuoteComparisonProps> = ({ orderId, build
         }
       }
 
-      // Create delivery request
-      const { data: deliveryRequest, error: deliveryError } = await supabase
+      // CRITICAL: Check if delivery request already exists for this purchase_order_id
+      let deliveryRequest = null;
+      
+      // First, check for existing active delivery request
+      const { data: existingRequest } = await supabase
         .from('delivery_requests')
-        .insert({
-          builder_id: builderId,
-          purchase_order_id: acceptedPurchaseOrder.id,
-          pickup_address: pickupAddress,
-          delivery_address: acceptedPurchaseOrder.delivery_address,
-          pickup_date: acceptedPurchaseOrder.delivery_date,
-          material_type: 'mixed',
-          quantity: acceptedPurchaseOrder.items?.length || 1,
-          weight_kg: (acceptedPurchaseOrder.items?.reduce((sum: number, item: any) => sum + (item.quantity || 1), 0) || 1) * 50,
-          special_instructions: null,
-          budget_range: '10000-20000',
-          status: 'pending',
-          max_rotation_attempts: 5,
-          created_at: new Date().toISOString()
-        })
-        .select()
-        .single();
+        .select('id, status')
+        .eq('purchase_order_id', acceptedPurchaseOrder.id)
+        .in('status', ['pending', 'assigned', 'accepted', 'in_transit', 'picked_up', 'out_for_delivery', 'scheduled'])
+        .limit(1)
+        .maybeSingle();
 
-      if (deliveryError) {
-        console.error('Error creating delivery request:', deliveryError);
+      if (existingRequest) {
+        console.log('⚠️ Active delivery request already exists for this order:', existingRequest.id, 'Status:', existingRequest.status);
+        deliveryRequest = existingRequest;
+      } else {
+        // Create delivery request only if one doesn't exist
+        const { data: newRequest, error: deliveryError } = await supabase
+          .from('delivery_requests')
+          .insert({
+            builder_id: builderId,
+            purchase_order_id: acceptedPurchaseOrder.id,
+            pickup_address: pickupAddress,
+            delivery_address: acceptedPurchaseOrder.delivery_address,
+            pickup_date: acceptedPurchaseOrder.delivery_date,
+            material_type: 'mixed',
+            quantity: acceptedPurchaseOrder.items?.length || 1,
+            weight_kg: (acceptedPurchaseOrder.items?.reduce((sum: number, item: any) => sum + (item.quantity || 1), 0) || 1) * 50,
+            special_instructions: null,
+            budget_range: '10000-20000',
+            status: 'pending',
+            max_rotation_attempts: 5,
+            created_at: new Date().toISOString()
+          })
+          .select()
+          .single();
+
+        if (deliveryError) {
+          console.error('Error creating delivery request:', deliveryError);
+          // If duplicate error, try to find existing one
+          if (deliveryError.message.includes('duplicate') || deliveryError.message.includes('Duplicate')) {
+            const { data: foundRequest } = await supabase
+              .from('delivery_requests')
+              .select('id, status')
+              .eq('purchase_order_id', acceptedPurchaseOrder.id)
+              .limit(1)
+              .maybeSingle();
+            if (foundRequest) {
+              deliveryRequest = foundRequest;
+              console.log('✅ Found existing delivery request after duplicate error:', foundRequest.id);
+            }
+          }
+        } else {
+          deliveryRequest = newRequest;
+        }
       }
 
       // Notify delivery providers

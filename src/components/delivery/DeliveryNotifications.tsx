@@ -1320,7 +1320,34 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
               console.error(`🚨🚨🚨 RENDER: Removed ${uniqueNotifications.length - finalRenderNotifications.length} duplicates at render time!`);
             }
             
-            return finalRenderNotifications.map((notification) => {
+            // ABSOLUTE FINAL CHECK: Remove any remaining duplicates by purchase_order_id
+            const absolutelyFinalRender = new Map<string, Notification>();
+            finalRenderNotifications.forEach((notification) => {
+              let uniqueKey: string;
+              if (notification.purchase_order_id) {
+                uniqueKey = `po-${notification.purchase_order_id}`;
+              } else if (notification.delivery_request_id) {
+                uniqueKey = `dr-${notification.delivery_request_id}`;
+              } else {
+                uniqueKey = `notif-${notification.id}`;
+              }
+              
+              // If we already have this key, skip it (this should never happen, but safety check)
+              if (absolutelyFinalRender.has(uniqueKey)) {
+                console.error(`🚨🚨🚨 ABSOLUTE FINAL: Duplicate key ${uniqueKey} detected! Keeping first, removing: ${notification.id}`);
+                return;
+              }
+              
+              absolutelyFinalRender.set(uniqueKey, notification);
+            });
+            
+            const absolutelyUniqueNotifications = Array.from(absolutelyFinalRender.values());
+            
+            if (absolutelyUniqueNotifications.length < finalRenderNotifications.length) {
+              console.error(`🚨🚨🚨 ABSOLUTE FINAL: Removed ${finalRenderNotifications.length - absolutelyUniqueNotifications.length} duplicates in absolute final check!`);
+            }
+            
+            return absolutelyUniqueNotifications.map((notification) => {
               // React key: Use purchase_order_id as primary key (each PO is unique)
               // CRITICAL: Must match the key used in deduplication logic
               // DO NOT USE INDEX - this causes duplicates to render!
