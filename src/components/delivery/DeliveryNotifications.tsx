@@ -1572,6 +1572,13 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
     return finalResult;
   }, [notifications]);
 
+  // CRITICAL: Update unreadCount based on uniqueNotifications (deduplicated), not raw notifications
+  useEffect(() => {
+    const unreadUnique = uniqueNotifications.filter(n => !n.read).length;
+    setUnreadCount(unreadUnique);
+    console.log(`📊 UNREAD COUNT: ${unreadUnique} unread notifications (from ${uniqueNotifications.length} unique notifications, was ${notifications.length} raw)`);
+  }, [uniqueNotifications, notifications.length]);
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
