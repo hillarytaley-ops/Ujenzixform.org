@@ -1439,12 +1439,37 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
       console.error(`🚨🚨🚨 CRITICAL DEDUPLICATION FAILURE: Map had ${result.length} items but final check found ${absolutelyFinal.length} unique items - REMOVED ${result.length - absolutelyFinal.length} duplicates!`);
     }
     
-    // Log the final count
-    if (absolutelyFinal.length < notifications.length) {
-      console.log(`✅ RENDER: Single Accept per request - ${notifications.length} → ${absolutelyFinal.length} (removed ${notifications.length - absolutelyFinal.length} duplicates)`);
-    } else if (absolutelyFinal.length === notifications.length) {
-      console.log(`✅ RENDER: All ${absolutelyFinal.length} notifications are unique`);
+    // ABSOLUTE FINAL CHECK: Force remove duplicates by po_number - this is the LAST line of defense
+    const absolutelyFinalByPONumber = new Map<string, Notification>();
+    const absolutelyFinalWithoutPONumber: Notification[] = [];
+    
+    absolutelyFinal.forEach(n => {
+      if (n.po_number) {
+        const normalized = normalizePONumber(n.po_number);
+        if (normalized && !absolutelyFinalByPONumber.has(normalized)) {
+          absolutelyFinalByPONumber.set(normalized, n);
+        } else if (normalized) {
+          console.error(`🚨🚨🚨🚨🚨 ABSOLUTE FINAL FORCE REMOVAL: Duplicate po_number "${n.po_number}" - removing ${n.id}, keeping ${absolutelyFinalByPONumber.get(normalized)?.id}`);
+        }
+      } else {
+        absolutelyFinalWithoutPONumber.push(n);
+      }
+    });
+    
+    const finalResult = [...absolutelyFinalByPONumber.values(), ...absolutelyFinalWithoutPONumber];
+    
+    if (finalResult.length < absolutelyFinal.length) {
+      console.error(`🚨🚨🚨 ABSOLUTE FINAL: Force removed ${absolutelyFinal.length - finalResult.length} duplicates by po_number!`);
     }
+    
+    // Log the final count
+    if (finalResult.length < notifications.length) {
+      console.log(`✅ RENDER: Single Accept per request - ${notifications.length} → ${finalResult.length} (removed ${notifications.length - finalResult.length} duplicates)`);
+    } else if (finalResult.length === notifications.length) {
+      console.log(`✅ RENDER: All ${finalResult.length} notifications are unique`);
+    }
+    
+    console.log(`📊 FINAL BREAKDOWN: ${absolutelyFinalByPONumber.size} unique po_numbers, ${absolutelyFinalWithoutPONumber.length} without po_number`);
     
     // CRITICAL: Log each notification's key for debugging
     console.log(`🔍 FINAL NOTIFICATIONS (${absolutelyFinal.length}):`, absolutelyFinal.map(n => ({
