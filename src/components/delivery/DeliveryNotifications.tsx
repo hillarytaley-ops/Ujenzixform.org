@@ -893,6 +893,113 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
     }
   }, [notifications]); // Run whenever notifications change
   
+  // Play notification sound
+  const playNotificationSound = useCallback(() => {
+    if (settings.soundEnabled) {
+      try {
+        const audio = new Audio('/notification.mp3');
+        audio.volume = 0.8;
+        audio.play().catch(e => console.log('Audio play prevented:', e));
+      } catch (e) {
+        console.log('Could not play notification sound:', e);
+      }
+    }
+  }, [settings.soundEnabled]);
+
+  // Show browser push notification
+  const showBrowserNotification = useCallback((notification: Notification) => {
+    if (settings.pushEnabled && 'Notification' in window) {
+      if (Notification.permission === 'granted') {
+        try {
+          const notificationOptions: NotificationOptions & { vibrate?: number[] } = {
+            body: `${notification.materialType || 'Construction Materials'} - ${notification.estimatedCost ? `KES ${notification.estimatedCost.toLocaleString()}` : 'New delivery available'}`,
+            icon: '/ujenzixform-logo.png',
+            badge: '/badge.png',
+            tag: notification.delivery_request_id || notification.id,
+            requireInteraction: true
+          };
+          
+          // Add vibration if enabled (may not be supported in all browsers)
+          if (settings.vibrationEnabled && 'vibrate' in navigator) {
+            (notificationOptions as any).vibrate = [200, 100, 200];
+          }
+          
+          new Notification('🚚 New Delivery Request - UjenziPro', notificationOptions);
+        } catch (e) {
+          console.log('Could not show browser notification:', e);
+        }
+      } else if (Notification.permission === 'default') {
+        Notification.requestPermission().then(permission => {
+          if (permission === 'granted') {
+            showBrowserNotification(notification);
+          }
+        });
+      }
+    }
+  }, [settings.pushEnabled, settings.vibrationEnabled]);
+
+  // Vibrate device
+  const vibrateDevice = useCallback(() => {
+    if (settings.vibrationEnabled && 'vibrate' in navigator) {
+      try {
+        navigator.vibrate([200, 100, 200]);
+      } catch (e) {
+        console.log('Could not vibrate device:', e);
+      }
+    }
+  }, [settings.vibrationEnabled]);
+
+  // Track previous notification count to detect new ones
+  const prevNotificationCountRef = useRef<number>(0);
+  const prevNotificationIdsRef = useRef<Set<string>>(new Set());
+
+  // Alert when new notifications arrive
+  useEffect(() => {
+    if (notifications.length === 0) {
+      prevNotificationCountRef.current = 0;
+      prevNotificationIdsRef.current.clear();
+      return;
+    }
+
+    // Find new notifications (ones we haven't seen before)
+    const currentIds = new Set(notifications.map(n => n.id));
+    const newNotifications = notifications.filter(n => !prevNotificationIdsRef.current.has(n.id));
+    
+    // Only alert for NEW notifications (not on initial load)
+    if (prevNotificationIdsRef.current.size > 0 && newNotifications.length > 0) {
+      // Filter to only pending/unread notifications
+      const actionableNotifications = newNotifications.filter(n => 
+        !n.read && 
+        (n.status === 'pending' || !n.status) &&
+        n.delivery_request_id
+      );
+
+      if (actionableNotifications.length > 0 && settings.newDeliveryAlerts) {
+        const latestNotification = actionableNotifications[0];
+        
+        // Play sound
+        playNotificationSound();
+        
+        // Vibrate device
+        vibrateDevice();
+        
+        // Show browser notification
+        showBrowserNotification(latestNotification);
+        
+        // Show toast notification
+        toast({
+          title: '🚚 New Delivery Request!',
+          description: `${latestNotification.materialType || 'Construction Materials'}${latestNotification.estimatedCost ? ` - KES ${latestNotification.estimatedCost.toLocaleString()}` : ''}`,
+          duration: 10000,
+        });
+      }
+    }
+
+    // Update refs
+    prevNotificationCountRef.current = notifications.length;
+    notifications.forEach(n => prevNotificationIdsRef.current.add(n.id));
+  }, [notifications, settings.newDeliveryAlerts, playNotificationSound, vibrateDevice, showBrowserNotification, toast]);
+
   // Load on mount and set up real-time
   useEffect(() => {
     // Load fresh notifications
@@ -1073,10 +1180,14 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
           <Bell className="h-5 w-5" />
           <h3 className="font-semibold">Notifications</h3>
           {unreadCount > 0 && (
-            <Badge className="bg-red-500 text-white">{unreadCount}</Badge>
+            <Badge className="bg-red-500 text-white animate-pulse">{unreadCount}</Badge>
           )}
         </div>
         <div className="flex gap-2">
+          <Button variant="ghost" size="sm" onClick={() => setShowSettings(!showSettings)}>
+            {showSettings ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
+            {showSettings ? 'Hide Settings' : 'Settings'}
+          </Button>
           <Button variant="ghost" size="sm" onClick={loadNotifications}>
             <RefreshCw className="h-4 w-4" /> Refresh
           </Button>
@@ -1088,6 +1199,80 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
           </Button>
         </div>
       </div>
+
+      {/* Notification Settings Panel */}
+      {showSettings && (
+        <Card className="border-2 border-teal-200 bg-teal-50/50">
+          <CardHeader>
+            <CardTitle className="text-sm flex items-center gap-2">
+              <Bell className="h-4 w-4" />
+              Alert Settings
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="flex items-center justify-between p-3 bg-white rounded-lg border">
+                <div className="flex items-center gap-2">
+                  <Volume2 className="h-4 w-4 text-teal-600" />
+                  <Label htmlFor="sound" className="text-sm font-medium">Sound Alerts</Label>
+                </div>
+                <Switch
+                  id="sound"
+                  checked={settings.soundEnabled}
+                  onCheckedChange={(checked) => setSettings(prev => ({ ...prev, soundEnabled: checked }))}
+                />
+              </div>
+
+              <div className="flex items-center justify-between p-3 bg-white rounded-lg border">
+                <div className="flex items-center gap-2">
+                  <Bell className="h-4 w-4 text-blue-600" />
+                  <Label htmlFor="push" className="text-sm font-medium">Browser Notifications</Label>
+                </div>
+                <Switch
+                  id="push"
+                  checked={settings.pushEnabled}
+                  onCheckedChange={(checked) => {
+                    setSettings(prev => ({ ...prev, pushEnabled: checked }));
+                    if (checked && 'Notification' in window && Notification.permission === 'default') {
+                      Notification.requestPermission();
+                    }
+                  }}
+                />
+              </div>
+
+              <div className="flex items-center justify-between p-3 bg-white rounded-lg border">
+                <div className="flex items-center gap-2">
+                  <Vibrate className="h-4 w-4 text-purple-600" />
+                  <Label htmlFor="vibration" className="text-sm font-medium">Vibration</Label>
+                </div>
+                <Switch
+                  id="vibration"
+                  checked={settings.vibrationEnabled}
+                  onCheckedChange={(checked) => setSettings(prev => ({ ...prev, vibrationEnabled: checked }))}
+                />
+              </div>
+
+              <div className="flex items-center justify-between p-3 bg-white rounded-lg border">
+                <div className="flex items-center gap-2">
+                  <Truck className="h-4 w-4 text-green-600" />
+                  <Label htmlFor="newDelivery" className="text-sm font-medium">New Delivery Alerts</Label>
+                </div>
+                <Switch
+                  id="newDelivery"
+                  checked={settings.newDeliveryAlerts}
+                  onCheckedChange={(checked) => setSettings(prev => ({ ...prev, newDeliveryAlerts: checked }))}
+                />
+              </div>
+            </div>
+
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+              <p className="text-xs text-blue-800">
+                <strong>💡 Tip:</strong> Enable all alerts to never miss a delivery request! You'll get instant notifications with sound, vibration, and browser alerts when a new delivery is available.
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <div className="space-y-2 max-h-96 overflow-y-auto">
         {loading ? (
