@@ -116,10 +116,29 @@ BEGIN
   RAISE NOTICE '  Total deleted in STEP 3: %', deleted_count;
   RAISE NOTICE '';
   
-  -- STEP 4: Delete delivery_requests where id is used as purchase_order_id by another delivery_request
-  RAISE NOTICE 'STEP 4: Deleting delivery_requests where id is used as purchase_order_id by another delivery_request...';
+  -- STEP 4: Delete delivery_requests where id is used as purchase_order_id by another delivery_request (circular references)
+  RAISE NOTICE 'STEP 4: Deleting delivery_requests where id is used as purchase_order_id by another delivery_request (circular references)...';
   deleted_count := 0;
   
+  -- First, delete the delivery_requests that reference other delivery_request IDs as purchase_order_id
+  FOR duplicate_rec IN
+    SELECT dr2.id, dr2.purchase_order_id, dr2.status, dr2.created_at, dr1.id as referenced_dr_id
+    FROM delivery_requests dr1
+    INNER JOIN delivery_requests dr2 ON dr2.purchase_order_id = dr1.id
+    WHERE dr2.id != dr1.id
+      AND dr1.id != dr1.purchase_order_id
+  LOOP
+    -- Delete the referencing delivery_request (the one that uses another delivery_request.id as purchase_order_id)
+    DELETE FROM delivery_requests WHERE id = duplicate_rec.id;
+    deleted_count := deleted_count + 1;
+    RAISE NOTICE '  ✅ Deleted circular reference: ID=% uses delivery_request.id % as purchase_order_id, status=%, created=%', 
+      duplicate_rec.id, duplicate_rec.referenced_dr_id, duplicate_rec.status, duplicate_rec.created_at;
+    
+    -- Also delete associated tracking_numbers
+    DELETE FROM tracking_numbers WHERE delivery_request_id = duplicate_rec.id;
+  END LOOP;
+  
+  -- Then, delete the delivery_requests whose IDs are being used as purchase_order_id (if they're corrupted)
   FOR duplicate_rec IN
     SELECT dr1.id, dr1.purchase_order_id, dr1.status, dr1.created_at
     FROM delivery_requests dr1
@@ -130,11 +149,15 @@ BEGIN
         AND dr2.id != dr1.id
     )
     AND dr1.id != dr1.purchase_order_id
+    AND dr1.status IN ('pending', 'assigned', 'requested') -- Only delete if still active
   LOOP
     DELETE FROM delivery_requests WHERE id = duplicate_rec.id;
     deleted_count := deleted_count + 1;
-    RAISE NOTICE '  ✅ Deleted corrupted record: ID=%, purchase_order_id=%, status=%, created=%', 
+    RAISE NOTICE '  ✅ Deleted corrupted record (ID used as purchase_order_id): ID=%, purchase_order_id=%, status=%, created=%', 
       duplicate_rec.id, duplicate_rec.purchase_order_id, duplicate_rec.status, duplicate_rec.created_at;
+    
+    -- Also delete associated tracking_numbers
+    DELETE FROM tracking_numbers WHERE delivery_request_id = duplicate_rec.id;
   END LOOP;
   
   total_deleted := total_deleted + deleted_count;
