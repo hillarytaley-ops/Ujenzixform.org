@@ -162,22 +162,72 @@ BEGIN
             RAISE NOTICE 'delivery_notes table does not exist';
         END;
         
-        -- Delete notifications
+        -- Delete notifications (check column existence first)
         BEGIN
-            IF order1_id IS NOT NULL THEN
-                DELETE FROM notifications 
-                WHERE related_id = order1_id::TEXT 
-                   OR related_id LIKE '%' || order1_id::TEXT || '%';
-                GET DIAGNOSTICS deleted_count = ROW_COUNT;
-                RAISE NOTICE 'Deleted % notifications for order 1', deleted_count;
-            END IF;
-            
-            IF order2_id IS NOT NULL THEN
-                DELETE FROM notifications 
-                WHERE related_id = order2_id::TEXT 
-                   OR related_id LIKE '%' || order2_id::TEXT || '%';
-                GET DIAGNOSTICS deleted_count = ROW_COUNT;
-                RAISE NOTICE 'Deleted % notifications for order 2', deleted_count;
+            -- Check if notifications table exists and has the expected columns
+            IF EXISTS (
+                SELECT 1 FROM information_schema.columns 
+                WHERE table_name = 'notifications' 
+                AND column_name IN ('related_id', 'order_id', 'purchase_order_id', 'delivery_request_id', 'data')
+            ) THEN
+                IF order1_id IS NOT NULL THEN
+                    -- Try different possible column names
+                    BEGIN
+                        DELETE FROM notifications WHERE related_id = order1_id::TEXT;
+                    EXCEPTION WHEN undefined_column THEN
+                        BEGIN
+                            DELETE FROM notifications WHERE order_id = order1_id;
+                        EXCEPTION WHEN undefined_column THEN
+                            BEGIN
+                                DELETE FROM notifications WHERE purchase_order_id = order1_id;
+                            EXCEPTION WHEN undefined_column THEN
+                                BEGIN
+                                    DELETE FROM notifications WHERE delivery_request_id IN (
+                                        SELECT id FROM delivery_requests WHERE purchase_order_id = order1_id
+                                    );
+                                EXCEPTION WHEN undefined_column THEN
+                                    BEGIN
+                                        DELETE FROM notifications WHERE data::TEXT LIKE '%' || order1_id::TEXT || '%';
+                                    EXCEPTION WHEN undefined_column THEN
+                                        NULL;
+                                    END;
+                                END;
+                            END;
+                        END;
+                    END;
+                    GET DIAGNOSTICS deleted_count = ROW_COUNT;
+                    RAISE NOTICE 'Deleted % notifications for order 1', deleted_count;
+                END IF;
+                
+                IF order2_id IS NOT NULL THEN
+                    BEGIN
+                        DELETE FROM notifications WHERE related_id = order2_id::TEXT;
+                    EXCEPTION WHEN undefined_column THEN
+                        BEGIN
+                            DELETE FROM notifications WHERE order_id = order2_id;
+                        EXCEPTION WHEN undefined_column THEN
+                            BEGIN
+                                DELETE FROM notifications WHERE purchase_order_id = order2_id;
+                            EXCEPTION WHEN undefined_column THEN
+                                BEGIN
+                                    DELETE FROM notifications WHERE delivery_request_id IN (
+                                        SELECT id FROM delivery_requests WHERE purchase_order_id = order2_id
+                                    );
+                                EXCEPTION WHEN undefined_column THEN
+                                    BEGIN
+                                        DELETE FROM notifications WHERE data::TEXT LIKE '%' || order2_id::TEXT || '%';
+                                    EXCEPTION WHEN undefined_column THEN
+                                        NULL;
+                                    END;
+                                END;
+                            END;
+                        END;
+                    END;
+                    GET DIAGNOSTICS deleted_count = ROW_COUNT;
+                    RAISE NOTICE 'Deleted % notifications for order 2', deleted_count;
+                END IF;
+            ELSE
+                RAISE NOTICE 'notifications table does not have expected columns, skipping';
             END IF;
         EXCEPTION WHEN undefined_table THEN
             RAISE NOTICE 'notifications table does not exist';
