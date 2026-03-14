@@ -526,6 +526,58 @@ export const DeliveryPromptDialog: React.FC<DeliveryPromptDialogProps> = ({
         console.warn('⚠️ Error checking for existing delivery request:', checkError.message);
       }
 
+      // CRITICAL: Double-check for duplicates before creating (database constraint will also catch this, but we want to prevent the error)
+      if (!deliveryRequestId) {
+        try {
+          // Check by purchase_order_id first
+          const finalCheckResponse = await fetchWithTimeout(
+            `${SUPABASE_URL}/rest/v1/delivery_requests?purchase_order_id=eq.${purchaseOrder.id}&status=in.(pending,assigned,requested)&select=id,status&limit=1`,
+            {
+              method: 'GET',
+              headers: {
+                'apikey': SUPABASE_ANON_KEY,
+                'Authorization': `Bearer ${accessToken}`,
+                'Content-Type': 'application/json'
+              }
+            },
+            5000
+          );
+
+          if (finalCheckResponse.ok) {
+            const finalCheckData = await finalCheckResponse.json();
+            if (Array.isArray(finalCheckData) && finalCheckData.length > 0) {
+              deliveryRequestId = finalCheckData[0].id;
+              console.log('⚠️ Found existing delivery request in final check, updating instead:', deliveryRequestId);
+              // Update existing instead of creating duplicate
+              const updateResponse = await fetchWithTimeout(
+                `${SUPABASE_URL}/rest/v1/delivery_requests?id=eq.${deliveryRequestId}`,
+                {
+                  method: 'PATCH',
+                  headers: {
+                    'apikey': SUPABASE_ANON_KEY,
+                    'Authorization': `Bearer ${accessToken}`,
+                    'Content-Type': 'application/json',
+                    'Prefer': 'return=representation'
+                  },
+                  body: JSON.stringify({
+                    ...deliveryPayload,
+                    updated_at: new Date().toISOString()
+                  })
+                },
+                10000
+              );
+              
+              if (updateResponse.ok) {
+                console.log('✅ Updated existing delivery request:', deliveryRequestId);
+                await cancelDuplicateDeliveryRequests(deliveryRequestId, purchaseOrder.id, deliveryPayload.delivery_address, deliveryPayload.material_type, accessToken);
+              }
+            }
+          }
+        } catch (finalCheckError: any) {
+          console.warn('⚠️ Error in final duplicate check (non-critical):', finalCheckError.message);
+        }
+      }
+
       // Only create new delivery request if one doesn't exist
       if (!deliveryRequestId) {
         try {
@@ -553,11 +605,11 @@ export const DeliveryPromptDialog: React.FC<DeliveryPromptDialogProps> = ({
           } else {
             const errorText = await deliveryResponse.text();
             console.warn('⚠️ Delivery insert failed:', errorText);
-            // Check if it's a duplicate error
-            if (errorText.includes('duplicate') || errorText.includes('Duplicate')) {
+            // Check if it's a duplicate error (database constraint violation)
+            if (errorText.includes('duplicate') || errorText.includes('Duplicate') || errorText.includes('unique') || errorText.includes('violates')) {
               // Try to find the existing one
               const findResponse = await fetchWithTimeout(
-                `${SUPABASE_URL}/rest/v1/delivery_requests?purchase_order_id=eq.${purchaseOrder.id}&select=id&limit=1`,
+                `${SUPABASE_URL}/rest/v1/delivery_requests?purchase_order_id=eq.${purchaseOrder.id}&status=in.(pending,assigned,requested)&select=id&limit=1`,
                 {
                   method: 'GET',
                   headers: {
@@ -572,7 +624,28 @@ export const DeliveryPromptDialog: React.FC<DeliveryPromptDialogProps> = ({
                 const findData = await findResponse.json();
                 if (Array.isArray(findData) && findData.length > 0) {
                   deliveryRequestId = findData[0].id;
-                  console.log('✅ Found existing delivery request after duplicate error:', deliveryRequestId);
+                  console.log('✅ Found existing delivery request after duplicate error, updating:', deliveryRequestId);
+                  // Update the existing one
+                  const updateResponse = await fetchWithTimeout(
+                    `${SUPABASE_URL}/rest/v1/delivery_requests?id=eq.${deliveryRequestId}`,
+                    {
+                      method: 'PATCH',
+                      headers: {
+                        'apikey': SUPABASE_ANON_KEY,
+                        'Authorization': `Bearer ${accessToken}`,
+                        'Content-Type': 'application/json',
+                        'Prefer': 'return=representation'
+                      },
+                      body: JSON.stringify({
+                        ...deliveryPayload,
+                        updated_at: new Date().toISOString()
+                      })
+                    },
+                    10000
+                  );
+                  if (updateResponse.ok) {
+                    await cancelDuplicateDeliveryRequests(deliveryRequestId, purchaseOrder.id, deliveryPayload.delivery_address, deliveryPayload.material_type, accessToken);
+                  }
                 }
               }
             }
