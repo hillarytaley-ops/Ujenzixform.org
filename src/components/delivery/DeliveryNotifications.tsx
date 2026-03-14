@@ -551,6 +551,11 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
         // Create notification - this purchase_order_id is guaranteed to be unique
         // CRITICAL: Include po_number for deduplication
         const poNumber = poIdToPONumber.get(poId);
+        if (!poNumber) {
+          console.warn(`⚠️⚠️⚠️ WARNING: purchase_order_id ${poId} has NO po_number! This will cause deduplication to fail if there are multiple purchase_orders with same po_number.`);
+        } else {
+          console.log(`✅ Found po_number "${poNumber}" for purchase_order_id ${poId}`);
+        }
         finalNotifications.push({
           id: `dr-${dr.id}`, // Use delivery_request id as notification id
           type: 'new_delivery',
@@ -1263,6 +1268,17 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
   const uniqueNotifications = useMemo(() => {
     console.log(`🔍 DEDUPLICATION START: ${notifications.length} notifications to process`);
     
+    // CRITICAL: Log all notifications with their po_numbers to debug
+    const notificationsWithPONumber = notifications.filter(n => n.po_number);
+    const notificationsWithoutPONumber = notifications.filter(n => !n.po_number);
+    console.log(`📊 NOTIFICATIONS BREAKDOWN: ${notificationsWithPONumber.length} with po_number, ${notificationsWithoutPONumber.length} without po_number`);
+    if (notificationsWithPONumber.length > 0) {
+      console.log(`📊 PO_NUMBERS FOUND:`, notificationsWithPONumber.map(n => ({ id: n.id, po_number: n.po_number, purchase_order_id: n.purchase_order_id?.substring(0, 8) })));
+    }
+    if (notificationsWithoutPONumber.length > 0) {
+      console.warn(`⚠️ NOTIFICATIONS WITHOUT PO_NUMBER:`, notificationsWithoutPONumber.map(n => ({ id: n.id, purchase_order_id: n.purchase_order_id?.substring(0, 8) })));
+    }
+    
     // CRITICAL: Normalize purchase_order_ids and po_numbers to handle whitespace/case differences
     const normalizePOId = (poId: string | undefined | null): string => {
       if (!poId) return '';
@@ -1273,6 +1289,25 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
       if (!poNumber) return '';
       return String(poNumber).trim().toLowerCase();
     };
+    
+    // CRITICAL: Group notifications by po_number to see if there are duplicates
+    const byPONumber = new Map<string, Notification[]>();
+    notifications.forEach(n => {
+      if (n.po_number) {
+        const normalized = normalizePONumber(n.po_number);
+        if (!byPONumber.has(normalized)) {
+          byPONumber.set(normalized, []);
+        }
+        byPONumber.get(normalized)!.push(n);
+      }
+    });
+    
+    byPONumber.forEach((notifs, poNum) => {
+      if (notifs.length > 1) {
+        console.error(`🚨🚨🚨 FOUND ${notifs.length} NOTIFICATIONS WITH SAME PO_NUMBER "${poNum}":`, 
+          notifs.map(n => ({ id: n.id, purchase_order_id: n.purchase_order_id?.substring(0, 8), delivery_request_id: n.delivery_request_id?.substring(0, 8) })));
+      }
+    });
     
     // STEP 1: Fetch po_numbers for all purchase_order_ids to enable po_number-based deduplication
     // We'll do this in a separate step, but for now, use purchase_order_id as fallback
