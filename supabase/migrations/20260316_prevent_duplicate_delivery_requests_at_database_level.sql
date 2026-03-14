@@ -30,18 +30,30 @@ BEGIN
   RAISE NOTICE '✅ Created unique index on purchase_order_id for active statuses';
 END $$;
 
--- STEP 2: Create unique partial index on composite key (delivery_address + material_type) when purchase_order_id is NULL
+-- STEP 2: Create a function to normalize material types (required for index)
+CREATE OR REPLACE FUNCTION normalize_material_type_for_index(material_type TEXT)
+RETURNS TEXT AS $$
+BEGIN
+  IF material_type IS NULL THEN
+    RETURN '';
+  END IF;
+  
+  IF LOWER(TRIM(material_type)) LIKE '%steel%' OR 
+     LOWER(TRIM(material_type)) LIKE '%construction%' OR 
+     LOWER(TRIM(material_type)) LIKE '%material%' THEN
+    RETURN 'construction_materials';
+  END IF;
+  
+  RETURN LOWER(TRIM(material_type));
+END;
+$$ LANGUAGE plpgsql IMMUTABLE;
+
+-- STEP 3: Create unique partial index on composite key (delivery_address + material_type) when purchase_order_id is NULL
 -- This prevents multiple pending/assigned/requested delivery_requests with the same address + material when purchase_order_id is missing
 CREATE UNIQUE INDEX idx_unique_delivery_request_by_composite_key
 ON delivery_requests (
   LOWER(TRIM(delivery_address)),
-  CASE 
-    WHEN LOWER(TRIM(material_type)) LIKE '%steel%' OR 
-         LOWER(TRIM(material_type)) LIKE '%construction%' OR 
-         LOWER(TRIM(material_type)) LIKE '%material%' 
-    THEN 'construction_materials'
-    ELSE LOWER(TRIM(material_type))
-  END
+  normalize_material_type_for_index(material_type)
 )
 WHERE purchase_order_id IS NULL
   AND status IN ('pending', 'assigned', 'requested')
@@ -53,7 +65,7 @@ BEGIN
   RAISE NOTICE '✅ Created unique index on composite key (address + material_type) for active statuses when purchase_order_id is NULL';
 END $$;
 
--- STEP 3: Create trigger function to prevent duplicates with better error messages
+-- STEP 4: Create trigger function to prevent duplicates with better error messages
 CREATE OR REPLACE FUNCTION prevent_duplicate_delivery_requests()
 RETURNS TRIGGER AS $$
 DECLARE
@@ -63,13 +75,7 @@ DECLARE
 BEGIN
   -- Normalize address and material type (same logic as frontend)
   normalized_address := LOWER(TRIM(NEW.delivery_address));
-  normalized_material := CASE 
-    WHEN LOWER(TRIM(NEW.material_type)) LIKE '%steel%' OR 
-         LOWER(TRIM(NEW.material_type)) LIKE '%construction%' OR 
-         LOWER(TRIM(NEW.material_type)) LIKE '%material%' 
-    THEN 'construction_materials'
-    ELSE LOWER(TRIM(NEW.material_type))
-  END;
+  normalized_material := normalize_material_type_for_index(NEW.material_type);
   
   -- Only check for duplicates if status is active
   IF NEW.status IN ('pending', 'assigned', 'requested') THEN
@@ -93,13 +99,7 @@ BEGIN
       WHERE purchase_order_id IS NULL
         AND status IN ('pending', 'assigned', 'requested')
         AND LOWER(TRIM(delivery_address)) = normalized_address
-        AND CASE 
-          WHEN LOWER(TRIM(material_type)) LIKE '%steel%' OR 
-               LOWER(TRIM(material_type)) LIKE '%construction%' OR 
-               LOWER(TRIM(material_type)) LIKE '%material%' 
-          THEN 'construction_materials'
-          ELSE LOWER(TRIM(material_type))
-        END = normalized_material
+        AND normalize_material_type_for_index(material_type) = normalized_material
         AND id != COALESCE(NEW.id, '00000000-0000-0000-0000-000000000000'::UUID);
       
       IF existing_count > 0 THEN
