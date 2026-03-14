@@ -581,13 +581,18 @@ class TrackingNumberService {
 
       // Step 4.25: CRITICAL - Cancel ALL duplicate delivery requests for the same order
       // This ensures that when one delivery is accepted, all duplicates are PERMANENTLY DELETED from the database
-      console.log('🗑️ Step 4.25: Cancelling all duplicate delivery requests...');
+      console.log('🗑️🗑️🗑️ Step 4.25: CRITICAL - Cancelling all duplicate delivery requests...');
       try {
         // Get the accepted delivery request details to find duplicates
         const acceptedDR = updateResult[0];
         const purchaseOrderId = acceptedDR.purchase_order_id;
         const deliveryAddress = acceptedDR.delivery_address || acceptedDR.delivery_location || '';
         const materialType = acceptedDR.material_type || '';
+        
+        console.log(`🔍 Step 4.25: Looking for duplicates of delivery ${deliveryRequestId.slice(0, 8)}...`);
+        console.log(`   Purchase Order ID: ${purchaseOrderId || 'N/A'}`);
+        console.log(`   Delivery Address: ${deliveryAddress || 'N/A'}`);
+        console.log(`   Material Type: ${materialType || 'N/A'}`);
         
         // Helper to normalize material types (same as DeliveryNotifications.tsx)
         const normalizeMaterialType = (mt: string | undefined | null): string => {
@@ -599,27 +604,9 @@ class TrackingNumberService {
           return normalized;
         };
         
-        // Find all other pending/assigned delivery_requests that are duplicates
-        // Duplicates are identified by:
-        // 1. Same purchase_order_id (if available)
-        // 2. Same composite key (deliveryAddress + materialType) when po_number is missing
-        const duplicateQuery = [];
-        
-        if (purchaseOrderId) {
-          // Find by purchase_order_id
-          duplicateQuery.push(`purchase_order_id=eq.${purchaseOrderId}`);
-        }
-        
-        // Also find by composite key (deliveryAddress + materialType) if we have those fields
-        if (deliveryAddress && materialType) {
-          const normalizedAddress = String(deliveryAddress).trim().toLowerCase();
-          const normalizedMaterial = normalizeMaterialType(materialType);
-          // We'll filter these in JavaScript since Supabase doesn't support composite key queries directly
-        }
-        
-        // Fetch all potential duplicates (pending/assigned status, not already accepted by this provider)
+        // Fetch ALL pending/assigned delivery_requests (not just for this provider, to catch all duplicates)
         const duplicateResponse = await fetch(
-          `${SUPABASE_URL}/rest/v1/delivery_requests?status=in.(pending,assigned)&id=neq.${deliveryRequestId}&select=id,purchase_order_id,delivery_address,material_type,status&limit=100`,
+          `${SUPABASE_URL}/rest/v1/delivery_requests?status=in.(pending,assigned)&id=neq.${deliveryRequestId}&select=id,purchase_order_id,delivery_address,material_type,status&limit=1000`,
           {
             headers: {
               'apikey': SUPABASE_ANON_KEY,
@@ -630,75 +617,98 @@ class TrackingNumberService {
           }
         );
         
-        if (duplicateResponse.ok) {
-          const allPending = await duplicateResponse.json();
+        if (!duplicateResponse.ok) {
+          const errorText = await duplicateResponse.text();
+          console.error(`❌ Step 4.25: Failed to fetch potential duplicates: ${duplicateResponse.status} - ${errorText}`);
+          throw new Error(`Failed to fetch duplicates: ${duplicateResponse.status}`);
+        }
+        
+        const allPending = await duplicateResponse.json();
+        console.log(`🔍 Step 4.25: Found ${allPending.length} pending/assigned delivery requests to check`);
+        
+        // Filter to find actual duplicates using same logic as DeliveryNotifications
+        const duplicatesToCancel: string[] = [];
+        const normalizedAcceptedAddress = String(deliveryAddress).trim().toLowerCase();
+        const normalizedAcceptedMaterial = normalizeMaterialType(materialType);
+        
+        allPending.forEach((dr: any) => {
+          let isDuplicate = false;
+          let reason = '';
           
-          // Filter to find actual duplicates using same logic as DeliveryNotifications
-          const duplicatesToCancel: string[] = [];
-          
-          allPending.forEach((dr: any) => {
-            let isDuplicate = false;
-            
-            // Check 1: Same purchase_order_id
-            if (purchaseOrderId && dr.purchase_order_id === purchaseOrderId) {
-              isDuplicate = true;
-            }
-            // Check 2: Same composite key (deliveryAddress + materialType)
-            else if (deliveryAddress && materialType && dr.delivery_address && dr.material_type) {
-              const normalizedAcceptedAddress = String(deliveryAddress).trim().toLowerCase();
-              const normalizedAcceptedMaterial = normalizeMaterialType(materialType);
-              const normalizedDRAddress = String(dr.delivery_address).trim().toLowerCase();
-              const normalizedDRMaterial = normalizeMaterialType(dr.material_type);
-              
-              if (normalizedAcceptedAddress === normalizedDRAddress && normalizedAcceptedMaterial === normalizedDRMaterial) {
-                isDuplicate = true;
-              }
-            }
-            
-            if (isDuplicate) {
-              duplicatesToCancel.push(dr.id);
-            }
-          });
-          
-          // Cancel all duplicates
-          if (duplicatesToCancel.length > 0) {
-            console.log(`🗑️ Found ${duplicatesToCancel.length} duplicate delivery requests to cancel:`, duplicatesToCancel);
-            
-            const cancelResponse = await fetch(
-              `${SUPABASE_URL}/rest/v1/delivery_requests?id=in.(${duplicatesToCancel.join(',')})`,
-              {
-                method: 'PATCH',
-                headers: {
-                  'apikey': SUPABASE_ANON_KEY,
-                  'Authorization': `Bearer ${accessToken}`,
-                  'Content-Type': 'application/json',
-                  'Prefer': 'return=representation'
-                },
-                body: JSON.stringify({
-                  status: 'cancelled',
-                  rejection_reason: `Duplicate delivery request - another delivery for this order was accepted (ID: ${deliveryRequestId})`,
-                  rejected_at: new Date().toISOString(),
-                  updated_at: new Date().toISOString()
-                }),
-                cache: 'no-store'
-              }
-            );
-            
-            if (cancelResponse.ok) {
-              const cancelled = await cancelResponse.json();
-              console.log(`✅ Step 4.25 complete: Cancelled ${cancelled.length} duplicate delivery requests`);
-            } else {
-              console.warn(`⚠️ Step 4.25: Failed to cancel duplicates: ${cancelResponse.status}`);
-            }
-          } else {
-            console.log('✅ Step 4.25: No duplicate delivery requests found to cancel');
+          // Check 1: Same purchase_order_id
+          if (purchaseOrderId && dr.purchase_order_id === purchaseOrderId) {
+            isDuplicate = true;
+            reason = 'same purchase_order_id';
           }
+          // Check 2: Same composite key (deliveryAddress + materialType)
+          else if (deliveryAddress && materialType && dr.delivery_address && dr.material_type) {
+            const normalizedDRAddress = String(dr.delivery_address).trim().toLowerCase();
+            const normalizedDRMaterial = normalizeMaterialType(dr.material_type);
+            
+            if (normalizedAcceptedAddress === normalizedDRAddress && normalizedAcceptedMaterial === normalizedDRMaterial) {
+              isDuplicate = true;
+              reason = 'same composite key (address + material)';
+            }
+          }
+          
+          if (isDuplicate) {
+            duplicatesToCancel.push(dr.id);
+            console.log(`   🗑️ DUPLICATE FOUND: ${dr.id.slice(0, 8)} - ${reason}`);
+          }
+        });
+        
+        // Cancel all duplicates
+        if (duplicatesToCancel.length > 0) {
+          console.log(`🗑️🗑️🗑️ Step 4.25: Found ${duplicatesToCancel.length} duplicate delivery requests to cancel:`, duplicatesToCancel.map(id => id.slice(0, 8)));
+          
+          // Cancel them one by one to ensure all are cancelled (more reliable than batch)
+          let cancelledCount = 0;
+          let failedCount = 0;
+          
+          for (const duplicateId of duplicatesToCancel) {
+            try {
+              const cancelResponse = await fetch(
+                `${SUPABASE_URL}/rest/v1/delivery_requests?id=eq.${duplicateId}`,
+                {
+                  method: 'PATCH',
+                  headers: {
+                    'apikey': SUPABASE_ANON_KEY,
+                    'Authorization': `Bearer ${accessToken}`,
+                    'Content-Type': 'application/json',
+                    'Prefer': 'return=representation'
+                  },
+                  body: JSON.stringify({
+                    status: 'cancelled',
+                    rejection_reason: `Duplicate delivery request - another delivery for this order was accepted (ID: ${deliveryRequestId.slice(0, 8)})`,
+                    rejected_at: new Date().toISOString(),
+                    updated_at: new Date().toISOString()
+                  }),
+                  cache: 'no-store'
+                }
+              );
+              
+              if (cancelResponse.ok) {
+                cancelledCount++;
+                console.log(`   ✅ Cancelled duplicate: ${duplicateId.slice(0, 8)}`);
+              } else {
+                failedCount++;
+                const errorText = await cancelResponse.text();
+                console.error(`   ❌ Failed to cancel ${duplicateId.slice(0, 8)}: ${cancelResponse.status} - ${errorText}`);
+              }
+            } catch (cancelError: any) {
+              failedCount++;
+              console.error(`   ❌ Error cancelling ${duplicateId.slice(0, 8)}:`, cancelError.message);
+            }
+          }
+          
+          console.log(`✅✅✅ Step 4.25 COMPLETE: Cancelled ${cancelledCount} duplicates, ${failedCount} failed`);
         } else {
-          console.warn(`⚠️ Step 4.25: Failed to fetch potential duplicates: ${duplicateResponse.status}`);
+          console.log('✅ Step 4.25: No duplicate delivery requests found to cancel');
         }
       } catch (duplicateError: any) {
-        console.warn('⚠️ Step 4.25: Error cancelling duplicates (non-critical):', duplicateError);
-        // Don't throw - this is cleanup, not critical to acceptance
+        console.error('❌❌❌ Step 4.25: CRITICAL ERROR cancelling duplicates:', duplicateError);
+        console.error('   Error details:', duplicateError.message, duplicateError.stack);
+        // Don't throw - this is cleanup, not critical to acceptance, but log it prominently
       }
 
       // Step 4.5: Update purchase_order with delivery provider information (if purchase_order_id exists)
