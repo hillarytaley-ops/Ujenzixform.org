@@ -701,7 +701,7 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
         // Valid if: has content, not a placeholder, and either GPS coords OR actual address (min 3 chars for short addresses)
         // RELAXED: For pending/requested/assigned status, show even if address is "To be provided" (builder will provide later)
         // This ensures delivery providers can see and accept requests even if address isn't finalized yet
-        const isPendingStatus = ['pending', 'requested', 'assigned'].includes(dr.status);
+        // Note: isPendingStatus is already declared above (line 672)
         const isValidAddress = deliveryAddr && 
                                deliveryAddr !== '' && 
                                (!isPlaceholder || isPendingStatus) && // Allow placeholder for pending requests
