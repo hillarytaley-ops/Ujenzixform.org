@@ -342,10 +342,20 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
         }
       }
       
+      // CRITICAL FIX: Use a Map to ensure ONLY ONE notification per purchase_order_id
+      // This is the ABSOLUTE FINAL check before creating notifications
+      const finalNotificationMap = new Map<string, any>();
+      
       for (const [poId, dr] of deliveryRequestsByPO.entries()) {
         // CRITICAL: Skip delivery requests without purchase_order_id (these are placeholder/default requests)
         if (!poId || poId.trim() === '' || poId === 'null' || poId === 'undefined') {
           console.log(`🚫 SKIPPING: Delivery request ${dr.id} has no valid purchase_order_id (placeholder/default request)`);
+          continue;
+        }
+        
+        // ABSOLUTE GUARANTEE: If we already have a notification for this purchase_order_id, SKIP IT
+        if (finalNotificationMap.has(poId)) {
+          console.error(`🚫🚫🚫 ABSOLUTE BLOCK: purchase_order_id ${poId} already has a notification! Skipping delivery_request ${dr.id}`);
           continue;
         }
         
@@ -357,17 +367,16 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
           // Don't skip - show the notification anyway to ensure alerts come through
         }
         
-        // ABSOLUTE GUARANTEE: Only add if we haven't seen this purchase_order_id yet
-        if (addedPOIds.has(poId)) {
-          console.error(`🚫 BLOCKED: Already added notification for purchase_order_id ${poId}, skipping delivery_request ${dr.id}`);
-          continue;
-        }
-        
         // ABSOLUTE GUARANTEE: Also check delivery_request_id to prevent duplicates
         if (dr.id && addedDRIds.has(dr.id)) {
           console.error(`🚫 BLOCKED: Already added notification for delivery_request_id ${dr.id}, skipping`);
           continue;
         }
+        
+        // Mark this purchase_order_id as used IMMEDIATELY
+        finalNotificationMap.set(poId, dr);
+        addedPOIds.add(poId);
+        if (dr.id) addedDRIds.add(dr.id);
         
         // CRITICAL: Skip delivered/completed/cancelled/rejected deliveries - these shouldn't show in notifications
         // Only show pending, accepted, assigned, in_transit deliveries that need action
@@ -392,8 +401,7 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
           continue;
         }
         
-        addedPOIds.add(poId);
-        if (dr.id) addedDRIds.add(dr.id);
+        // Create notification - this purchase_order_id is guaranteed to be unique
         finalNotifications.push({
           id: `dr-${dr.id}`, // Use delivery_request id as notification id
           type: 'new_delivery',
@@ -414,6 +422,29 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
           provider_id: dr.provider_id || null, // Provider who accepted (null = unaccepted)
           provider_name: dr.provider_name || dr.delivery_provider_name || undefined // Provider name if available
         });
+      }
+      
+      // CRITICAL VERIFICATION: Ensure we only have ONE notification per purchase_order_id
+      const finalPOIds = finalNotifications.map(n => n.purchase_order_id).filter(Boolean);
+      const duplicatePOIds = finalPOIds.filter((id, index) => finalPOIds.indexOf(id) !== index);
+      if (duplicatePOIds.length > 0) {
+        console.error(`🚨🚨🚨 CRITICAL: Found ${duplicatePOIds.length} duplicate purchase_order_ids in finalNotifications! Removing duplicates...`);
+        // Emergency cleanup - keep only first occurrence
+        const emergencyMap = new Map<string, Notification>();
+        finalNotifications.forEach(notif => {
+          if (notif.purchase_order_id) {
+            if (!emergencyMap.has(notif.purchase_order_id)) {
+              emergencyMap.set(notif.purchase_order_id, notif);
+            } else {
+              console.error(`🚨 EMERGENCY REMOVAL: Duplicate notification for PO ${notif.purchase_order_id} - removing ${notif.id}`);
+            }
+          } else {
+            emergencyMap.set(notif.id, notif);
+          }
+        });
+        const beforeCount = finalNotifications.length;
+        finalNotifications = Array.from(emergencyMap.values());
+        console.error(`🚨 EMERGENCY CLEANUP: Reduced finalNotifications from ${beforeCount} to ${finalNotifications.length} (removed ${beforeCount - finalNotifications.length} duplicates)`);
       }
       
       // CRITICAL: DO NOT show notifications for NULL purchase_order_id requests
