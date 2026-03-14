@@ -389,18 +389,43 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
       
       // CRITICAL FIX: Use a Map to ensure ONLY ONE notification per purchase_order_id
       // This is the ABSOLUTE FINAL check before creating notifications
+      // SIMPLIFIED: Keep ONLY the FIRST delivery_request per purchase_order_id - no complex logic
       const finalNotificationMap = new Map<string, any>();
       
+      // FIRST PASS: Collect all delivery_requests by purchase_order_id
+      const allDRsByPO = new Map<string, any[]>();
       for (const [poId, dr] of finalDeliveryRequestsByPO.entries()) {
+        if (!poId || poId.trim() === '' || poId === 'null' || poId === 'undefined') {
+          continue;
+        }
+        if (!allDRsByPO.has(poId)) {
+          allDRsByPO.set(poId, []);
+        }
+        allDRsByPO.get(poId)!.push(dr);
+      }
+      
+      // SECOND PASS: For each purchase_order_id, keep ONLY THE FIRST delivery_request
+      // This is the SIMPLEST possible deduplication - just keep the first one we see
+      for (const [poId, drs] of allDRsByPO.entries()) {
+        if (drs.length > 1) {
+          console.error(`🚨🚨🚨 FOUND ${drs.length} delivery_requests for purchase_order_id ${poId}! Keeping ONLY the first one.`);
+          console.error(`   Delivery request IDs: ${drs.map(dr => dr.id).join(', ')}`);
+        }
+        // Keep ONLY the first one - simplest possible approach
+        finalNotificationMap.set(poId, drs[0]);
+      }
+      
+      // THIRD PASS: Create notifications from the deduplicated map
+      for (const [poId, dr] of finalNotificationMap.entries()) {
         // CRITICAL: Skip delivery requests without purchase_order_id (these are placeholder/default requests)
         if (!poId || poId.trim() === '' || poId === 'null' || poId === 'undefined') {
           console.log(`🚫 SKIPPING: Delivery request ${dr.id} has no valid purchase_order_id (placeholder/default request)`);
           continue;
         }
         
-        // ABSOLUTE GUARANTEE: If we already have a notification for this purchase_order_id, SKIP IT
-        if (finalNotificationMap.has(poId)) {
-          console.error(`🚫🚫🚫 ABSOLUTE BLOCK: purchase_order_id ${poId} already has a notification! Skipping delivery_request ${dr.id}`);
+        // ABSOLUTE GUARANTEE: This should never happen now, but double-check
+        if (addedPOIds.has(poId)) {
+          console.error(`🚫🚫🚫 ABSOLUTE BLOCK: purchase_order_id ${poId} already added! This should never happen. Skipping delivery_request ${dr.id}`);
           continue;
         }
         
@@ -418,8 +443,7 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
           continue;
         }
         
-        // Mark this purchase_order_id as used IMMEDIATELY
-        finalNotificationMap.set(poId, dr);
+        // Mark this purchase_order_id as used IMMEDIATELY (already in finalNotificationMap from SECOND PASS)
         addedPOIds.add(poId);
         if (dr.id) addedDRIds.add(dr.id);
         
