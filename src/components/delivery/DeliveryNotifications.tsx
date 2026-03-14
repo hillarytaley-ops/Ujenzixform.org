@@ -552,6 +552,22 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
         
         // Create notification - this purchase_order_id is guaranteed to be unique
         // CRITICAL: Include po_number for deduplication
+        // CRITICAL: Skip if no valid delivery_address - MUST have address keyed in by builder
+        const deliveryAddr = (dr.delivery_address || dr.delivery_location || '').trim();
+        const isValidAddress = deliveryAddr && 
+                               deliveryAddr !== '' && 
+                               deliveryAddr.toLowerCase() !== 'to be provided' && 
+                               deliveryAddr.toLowerCase() !== 'tbd' && 
+                               deliveryAddr.toLowerCase() !== 'n/a' && 
+                               deliveryAddr.toLowerCase() !== 'na' && 
+                               deliveryAddr.toLowerCase() !== 'tba' && 
+                               deliveryAddr.toLowerCase() !== 'to be determined';
+        
+        if (!isValidAddress) {
+          console.log(`🚫 FILTERED OUT: Delivery request ${dr.id.slice(0, 8)} has no valid delivery address (${deliveryAddr || 'empty'}) - NOT showing to providers`);
+          return;
+        }
+        
         const poNumber = poIdToPONumber.get(poId);
         if (!poNumber) {
           console.warn(`⚠️⚠️⚠️ WARNING: purchase_order_id ${poId} has NO po_number! This will cause deduplication to fail if there are multiple purchase_orders with same po_number.`);
@@ -569,14 +585,14 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
           id: `dr-${dr.id}`, // Use delivery_request id as notification id
           type: 'new_delivery',
           title: dr.status === 'pending' ? '🚚 New Delivery Request!' : `Delivery ${dr.status}`,
-          message: `${dr.material_type || 'Materials'} delivery to ${dr.delivery_address || 'Unknown location'}`,
+          message: `${dr.material_type || 'Materials'} delivery to ${deliveryAddr}`,
           timestamp: new Date(dr.created_at),
           read: dr.status !== 'pending', // Only pending deliveries are unread
           priority: dr.priority_level === 'urgent' || dr.status === 'pending' ? 'high' : 'medium',
           actionUrl: `/delivery-dashboard?request=${dr.id}`,
           status: dr.status,
           pickupAddress: dr.pickup_address || dr.pickup_location || '',
-          deliveryAddress: dr.delivery_address || dr.delivery_location || '',
+          deliveryAddress: deliveryAddr,
           materialType: dr.material_type || '',
           quantity: dr.quantity || '',
           estimatedCost: dr.estimated_cost || dr.budget_range || 0,
