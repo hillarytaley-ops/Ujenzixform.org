@@ -666,10 +666,25 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
         // The delivery_request.delivery_address is the SOURCE OF TRUTH - it comes from the form the builder filled
         // DO NOT use purchase_order.delivery_address as fallback - the builder may have entered a different address
         // CRITICAL: Builder-provided address from delivery_requests table - this is what the builder typed during delivery request
+        // CRITICAL: Log the RAW value from database BEFORE any processing
+        console.log(`📍📍📍 RAW DB VALUE: Delivery request ${dr.id.slice(0, 8)} - delivery_address from DB (type: ${typeof dr.delivery_address}):`, {
+          raw: dr.delivery_address,
+          isNull: dr.delivery_address === null,
+          isUndefined: dr.delivery_address === undefined,
+          isEmpty: dr.delivery_address === '',
+          length: dr.delivery_address?.length || 0,
+          trimmed: (dr.delivery_address || '').trim(),
+          delivery_coordinates: dr.delivery_coordinates,
+          purchase_order_id: poId?.slice(0, 8) || 'NULL'
+        });
+        
         let deliveryAddr = (dr.delivery_address || '').trim();
         
-        // CRITICAL: Log the raw address from database for debugging
-        console.log(`📍 ADDRESS FETCH: Delivery request ${dr.id.slice(0, 8)} - Raw delivery_address from DB: "${deliveryAddr || 'NULL/EMPTY'}"`);
+        // CRITICAL: If delivery_address is NULL or empty, check delivery_coordinates FIRST
+        if (!deliveryAddr && dr.delivery_coordinates) {
+          deliveryAddr = dr.delivery_coordinates.trim();
+          console.log(`📍 USING COORDINATES: Delivery request ${dr.id.slice(0, 8)} has no address, using coordinates: "${deliveryAddr}"`);
+        }
         
         // CRITICAL: If delivery_address includes coordinates, use the full string (coordinates + address)
         // The builder may have entered coordinates with address like "1.2921, 36.8219 | Nairobi, Kenya"
@@ -677,26 +692,24 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
           // If coordinates exist but aren't in the address, prepend them
           deliveryAddr = `${dr.delivery_coordinates} | ${deliveryAddr}`;
           console.log(`📍 COORDINATES ADDED: Combined coordinates with address: "${deliveryAddr.substring(0, 60)}..."`);
-        } else if (dr.delivery_coordinates && !deliveryAddr) {
-          // If only coordinates exist, use them
-          deliveryAddr = dr.delivery_coordinates;
-          console.log(`📍 COORDINATES ONLY: Using coordinates as address: "${deliveryAddr}"`);
         }
         
-        // CRITICAL: Check for placeholder values BEFORE any other processing
-        // If the address is a placeholder, replace it with an error message
-        const isPlaceholder = deliveryAddr && (
-          deliveryAddr.toLowerCase() === 'to be provided' || 
-          deliveryAddr.toLowerCase() === 'tbd' || 
-          deliveryAddr.toLowerCase() === 't.b.d.' ||
-          deliveryAddr.toLowerCase() === 'n/a' || 
-          deliveryAddr.toLowerCase() === 'na' || 
-          deliveryAddr.toLowerCase() === 'tba' || 
-          deliveryAddr.toLowerCase() === 'to be determined' ||
-          deliveryAddr.toLowerCase() === 'delivery location' ||
-          deliveryAddr.toLowerCase() === 'address not found' ||
-          deliveryAddr.toLowerCase() === 'address not specified by builder'
+        // CRITICAL: Check for placeholder values - ONLY exact matches, case-insensitive
+        // DO NOT treat valid addresses as placeholders
+        const isPlaceholder = deliveryAddr && deliveryAddr.length > 0 && (
+          deliveryAddr.toLowerCase().trim() === 'to be provided' || 
+          deliveryAddr.toLowerCase().trim() === 'tbd' || 
+          deliveryAddr.toLowerCase().trim() === 't.b.d.' ||
+          deliveryAddr.toLowerCase().trim() === 'n/a' || 
+          deliveryAddr.toLowerCase().trim() === 'na' || 
+          deliveryAddr.toLowerCase().trim() === 'tba' || 
+          deliveryAddr.toLowerCase().trim() === 'to be determined' ||
+          deliveryAddr.toLowerCase().trim() === 'delivery location' ||
+          deliveryAddr.toLowerCase().trim() === 'address not found' ||
+          deliveryAddr.toLowerCase().trim() === 'address not specified by builder'
         );
+        
+        console.log(`📍 PLACEHOLDER CHECK: Delivery request ${dr.id.slice(0, 8)} - isPlaceholder: ${isPlaceholder}, address: "${deliveryAddr?.substring(0, 50) || 'EMPTY'}..."`);
         
         if (isPlaceholder) {
           console.warn(`⚠️ PLACEHOLDER DETECTED: Delivery request ${dr.id.slice(0, 8)} has placeholder address "${deliveryAddr}" - attempting fallback to purchase_order address`);
@@ -706,16 +719,18 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
             const po = poMap.get(poId);
             const poAddress = (po?.delivery_address || '').trim();
             
+            console.log(`📍 FALLBACK CHECK: Purchase order ${poId.slice(0, 8)} address: "${poAddress?.substring(0, 50) || 'EMPTY'}..."`);
+            
             // Check if purchase_order address is valid (not a placeholder)
             const isPOPlaceholder = poAddress && (
-              poAddress.toLowerCase() === 'to be provided' || 
-              poAddress.toLowerCase() === 'tbd' || 
-              poAddress.toLowerCase() === 'n/a' || 
-              poAddress.toLowerCase() === 'na' || 
-              poAddress.toLowerCase() === 'tba' || 
-              poAddress.toLowerCase() === 'to be determined' ||
-              poAddress.toLowerCase() === 'delivery location' ||
-              poAddress.toLowerCase() === 'address not found'
+              poAddress.toLowerCase().trim() === 'to be provided' || 
+              poAddress.toLowerCase().trim() === 'tbd' || 
+              poAddress.toLowerCase().trim() === 'n/a' || 
+              poAddress.toLowerCase().trim() === 'na' || 
+              poAddress.toLowerCase().trim() === 'tba' || 
+              poAddress.toLowerCase().trim() === 'to be determined' ||
+              poAddress.toLowerCase().trim() === 'delivery location' ||
+              poAddress.toLowerCase().trim() === 'address not found'
             );
             
             if (poAddress && !isPOPlaceholder && poAddress.length >= 3) {
@@ -724,12 +739,32 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
             } else {
               // Purchase order also has placeholder or invalid address
               deliveryAddr = 'Delivery address missing - contact builder';
-              console.warn(`⚠️ FALLBACK FAILED: Purchase order also has placeholder/invalid address - showing error message`);
+              console.warn(`⚠️ FALLBACK FAILED: Purchase order also has placeholder/invalid address (${isPOPlaceholder ? 'is placeholder' : 'invalid'}) - showing error message`);
             }
           } else {
             // No purchase_order found or not in map
             deliveryAddr = 'Delivery address missing - contact builder';
-            console.warn(`⚠️ NO FALLBACK: Purchase order not found for ${poId?.slice(0, 8) || 'NULL'} - showing error message`);
+            console.warn(`⚠️ NO FALLBACK: Purchase order not found for ${poId?.slice(0, 8) || 'NULL'} (poMap.has: ${poId ? poMap.has(poId) : false}) - showing error message`);
+          }
+        } else if (!deliveryAddr || deliveryAddr === '') {
+          // Address is empty (not a placeholder, just empty)
+          console.warn(`⚠️ EMPTY ADDRESS: Delivery request ${dr.id.slice(0, 8)} has empty address (not placeholder) - attempting fallback`);
+          
+          // Try fallback to purchase_order
+          if (poId && poMap.has(poId)) {
+            const po = poMap.get(poId);
+            const poAddress = (po?.delivery_address || '').trim();
+            
+            if (poAddress && poAddress.length >= 3) {
+              const isPOPlaceholder = poAddress.toLowerCase().trim() === 'to be provided' || 
+                                      poAddress.toLowerCase().trim() === 'tbd' ||
+                                      poAddress.toLowerCase().trim() === 'n/a';
+              
+              if (!isPOPlaceholder) {
+                deliveryAddr = poAddress;
+                console.log(`✅ FALLBACK SUCCESS (empty): Using purchase_order address: "${deliveryAddr.substring(0, 50)}..."`);
+              }
+            }
           }
         }
         
