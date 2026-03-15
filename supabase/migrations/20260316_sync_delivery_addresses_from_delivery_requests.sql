@@ -22,13 +22,14 @@ BEGIN
   
   -- Find purchase_orders with placeholder addresses that have delivery_requests with real addresses
   FOR po_record IN
-    SELECT DISTINCT
+    SELECT DISTINCT ON (po.id)
       po.id,
       po.po_number,
       po.delivery_address AS po_address,
       dr.delivery_address AS dr_address,
       dr.id AS dr_id,
-      dr.status AS dr_status
+      dr.status AS dr_status,
+      dr.created_at AS dr_created_at
     FROM purchase_orders po
     INNER JOIN delivery_requests dr ON dr.purchase_order_id = po.id
     WHERE 
@@ -45,7 +46,7 @@ BEGIN
       AND LENGTH(TRIM(dr.delivery_address)) > 10
       -- Only active delivery requests
       AND dr.status IN ('pending', 'requested', 'assigned', 'accepted', 'scheduled', 'in_transit', 'picked_up', 'out_for_delivery')
-    ORDER BY dr.created_at DESC
+    ORDER BY po.id, dr.created_at DESC
   LOOP
     RAISE NOTICE '----------------------------------------';
     RAISE NOTICE 'Processing purchase_order: % (PO: %)', po_record.id, po_record.po_number;
