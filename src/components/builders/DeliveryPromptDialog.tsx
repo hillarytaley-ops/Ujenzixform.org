@@ -536,8 +536,25 @@ export const DeliveryPromptDialog: React.FC<DeliveryPromptDialogProps> = ({
         addressLength: deliveryPayload.delivery_address?.length || 0,
         isPlaceholder: fullDeliveryAddress.toLowerCase() === 'to be provided' || 
                       fullDeliveryAddress.toLowerCase() === 'tbd' ||
-                      fullDeliveryAddress.toLowerCase() === 'n/a'
+                      fullDeliveryAddress.toLowerCase() === 'n/a',
+        willBeSaved: deliveryPayload.delivery_address
       });
+      
+      // CRITICAL VALIDATION: Ensure we're not saving a placeholder
+      if (deliveryPayload.delivery_address && (
+        deliveryPayload.delivery_address.toLowerCase().trim() === 'to be provided' ||
+        deliveryPayload.delivery_address.toLowerCase().trim() === 'tbd' ||
+        deliveryPayload.delivery_address.toLowerCase().trim() === 'n/a'
+      )) {
+        console.error('🚨🚨🚨 CRITICAL ERROR: Attempting to save placeholder address! Blocking save.');
+        toast({
+          title: 'Invalid Address',
+          description: 'Please provide a real delivery address, not a placeholder like "To be provided".',
+          variant: 'destructive'
+        });
+        setSubmitting(false);
+        return;
+      }
 
       // CRITICAL: Validate purchase_order_id is NOT a delivery_request.id (prevent circular references)
       // This is a frontend safeguard - the database trigger will also catch this, but we want to prevent the error

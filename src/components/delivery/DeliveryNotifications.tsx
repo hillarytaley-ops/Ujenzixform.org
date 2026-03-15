@@ -725,16 +725,23 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
                 `${url}/rest/v1/purchase_orders?id=eq.${poId}&select=id,po_number,delivery_address&limit=1`,
                 { headers, cache: 'no-store' }
               );
+              console.log(`📍 FALLBACK: Purchase order fetch response status: ${poFetchResponse.status}`);
               if (poFetchResponse.ok) {
                 const poData = await poFetchResponse.json();
+                console.log(`📍 FALLBACK: Purchase order fetch result:`, poData);
                 if (Array.isArray(poData) && poData.length > 0) {
                   po = poData[0];
                   poMap.set(poId, po); // Cache it for future use
-                  console.log(`✅ FALLBACK: Fetched purchase order ${poId.slice(0, 8)} directly`);
+                  console.log(`✅ FALLBACK: Fetched purchase order ${poId.slice(0, 8)} directly - address: "${po.delivery_address?.substring(0, 50) || 'NULL'}..."`);
+                } else {
+                  console.warn(`⚠️ FALLBACK: Purchase order ${poId.slice(0, 8)} not found in database (empty array)`);
                 }
+              } else {
+                const errorText = await poFetchResponse.text();
+                console.warn(`⚠️ FALLBACK: Purchase order fetch failed (${poFetchResponse.status}):`, errorText);
               }
-            } catch (fetchError) {
-              console.warn(`⚠️ FALLBACK: Failed to fetch purchase order ${poId.slice(0, 8)}:`, fetchError);
+            } catch (fetchError: any) {
+              console.warn(`⚠️ FALLBACK: Exception fetching purchase order ${poId.slice(0, 8)}:`, fetchError.message || fetchError);
             }
           }
           
