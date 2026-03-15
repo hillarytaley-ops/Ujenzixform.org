@@ -414,7 +414,13 @@ const DeliveryDashboard = () => {
             }
           } catch (e) {}
           
-          const poIds = [...new Set(deliveriesWithPO.map((d: any) => d.purchase_order_id).filter(Boolean))];
+          // Use object-based deduplication instead of Set to avoid minification errors
+          const poIdsObj: Record<string, boolean> = {};
+          deliveriesWithPO.forEach((d: any) => {
+            const poId = d.purchase_order_id;
+            if (poId) poIdsObj[poId] = true;
+          });
+          const poIds = Object.keys(poIdsObj);
           if (poIds.length > 0) {
             const validationResponse = await fetch(
               `${SUPABASE_URL}/rest/v1/purchase_orders?id=in.(${poIds.join(',')})&select=id,po_number&limit=500`,
@@ -435,13 +441,18 @@ const DeliveryDashboard = () => {
                 console.warn('⚠️ Invalid validation response:', existingOrders);
                 return;
               }
-              const existingOrderIds = new Set(existingOrders.map((po: any) => po.id));
-              const existingOrderNumbers = new Set(existingOrders.map((po: any) => po.po_number).filter(Boolean));
+              // Use object-based lookup instead of Set to avoid minification errors
+              const existingOrderIds: Record<string, boolean> = {};
+              const existingOrderNumbers: Record<string, boolean> = {};
+              existingOrders.forEach((po: any) => {
+                if (po.id) existingOrderIds[po.id] = true;
+                if (po.po_number) existingOrderNumbers[po.po_number] = true;
+              });
               
               // First filter: Only orders that exist in purchase_orders
               const ordersThatExist = isolatedActiveDeliveries.filter((d: any) => {
-                const hasValidPO = d.purchase_order_id && existingOrderIds.has(d.purchase_order_id);
-                const hasValidOrderNumber = d.order_number && existingOrderNumbers.has(d.order_number);
+                const hasValidPO = d.purchase_order_id && existingOrderIds[d.purchase_order_id];
+                const hasValidOrderNumber = d.order_number && existingOrderNumbers[d.order_number];
                 const orderExists = hasValidPO || hasValidOrderNumber;
                 
                 if (!orderExists && d.order_number) {
@@ -458,7 +469,13 @@ const DeliveryDashboard = () => {
               // Additional validation: Check material_items scan status
               // Only show orders that are in "Awaiting Dispatch" (all items have dispatch_scanned = FALSE)
               // This enforces the rule: delivery providers can only accept orders from Awaiting Dispatch
-              const poIdsForMaterialCheck = [...new Set(ordersThatExist.map((d: any) => d.purchase_order_id).filter(Boolean))];
+              // Use object-based deduplication instead of Set to avoid minification errors
+              const poIdsForMaterialCheckObj: Record<string, boolean> = {};
+              ordersThatExist.forEach((d: any) => {
+                const poId = d.purchase_order_id;
+                if (poId) poIdsForMaterialCheckObj[poId] = true;
+              });
+              const poIdsForMaterialCheck = Object.keys(poIdsForMaterialCheckObj);
               let materialItemsData: any[] = [];
               
               if (poIdsForMaterialCheck.length > 0) {
@@ -575,7 +592,8 @@ const DeliveryDashboard = () => {
       
       // Fetch delivery_requests asynchronously and then format history
       (async () => {
-        let deliveryRequestsMap = new Map<string, any>();
+        // Use object-based map instead of Map to avoid minification errors
+        let deliveryRequestsMap: Record<string, any> = {};
         
         if (purchaseOrderIds.length > 0) {
           try {
@@ -614,12 +632,12 @@ const DeliveryDashboard = () => {
               // CRITICAL: If multiple delivery_requests exist for same purchase_order_id, use the most recent one
               drData.forEach((dr: any) => {
                 if (dr.purchase_order_id) {
-                  const existing = deliveryRequestsMap.get(dr.purchase_order_id);
+                  const existing = deliveryRequestsMap[dr.purchase_order_id];
                   // Only update if this is newer or if existing doesn't have a valid address
                   if (!existing || 
                       (dr.delivery_address && dr.delivery_address.trim() && dr.delivery_address !== 'To be provided' && 
                        (!existing.delivery_address || existing.delivery_address === 'To be provided'))) {
-                    deliveryRequestsMap.set(dr.purchase_order_id, dr);
+                    deliveryRequestsMap[dr.purchase_order_id] = dr;
                     // Log each one to verify we're getting addresses
                     if (dr.delivery_address && dr.delivery_address.trim() && dr.delivery_address !== 'To be provided') {
                       console.log('✅ Found delivery_address for', dr.purchase_order_id?.substring(0, 8), 'status:', dr.status, 'address:', dr.delivery_address.substring(0, 60));
@@ -630,7 +648,7 @@ const DeliveryDashboard = () => {
                 }
               });
               console.log('✅ Fetched', drData.length, 'delivery_requests for history - builder-provided addresses available');
-              console.log('📋 Delivery requests map size:', deliveryRequestsMap.size);
+              console.log('📋 Delivery requests map size:', Object.keys(deliveryRequestsMap).length);
               console.log('📋 Sample delivery addresses:', drData.slice(0, 3).map((dr: any) => ({
                 po_id: dr.purchase_order_id?.substring(0, 8),
                 delivery_address: dr.delivery_address?.substring(0, 50) || 'N/A'
@@ -650,7 +668,7 @@ const DeliveryDashboard = () => {
         const missingPOIds: string[] = [];
         isolatedHistory.forEach((d: any) => {
           const poId = d.purchase_order_id || d.id;
-          if (poId && !deliveryRequestsMap.has(poId)) {
+          if (poId && !deliveryRequestsMap[poId]) {
             missingPOIds.push(poId);
           }
         });
@@ -685,7 +703,7 @@ const DeliveryDashboard = () => {
         // CRITICAL: Format history AFTER fetching delivery_requests (so map is populated)
         const formattedHistory: DeliveryHistory[] = isolatedHistory.map((d: any) => {
           const poId = d.purchase_order_id || d.id;
-          const deliveryRequest = deliveryRequestsMap.get(poId);
+          const deliveryRequest = deliveryRequestsMap[poId];
           
           // CRITICAL: Prioritize delivery_address from delivery_requests (builder-provided)
           // This is the address the builder filled in during delivery request form
@@ -870,8 +888,8 @@ const DeliveryDashboard = () => {
     
     // Add pending requests only if they don't already exist
     validPendingRequests.forEach(r => {
-      if (r.purchase_order_id && !seenPOIds.has(r.purchase_order_id)) {
-        seenPOIds.add(r.purchase_order_id);
+      if (r.purchase_order_id && !seenPOIds[r.purchase_order_id]) {
+        seenPOIds[r.purchase_order_id] = true;
       }
     });
     
@@ -1402,8 +1420,13 @@ const DeliveryDashboard = () => {
           dr.purchase_order_id !== 'undefined'
         );
         
-        // STEP 3: Get unique purchase_order_ids
-        const uniquePOIds = Array.from(new Set(requestsWithPO.map((dr: any) => dr.purchase_order_id)));
+        // STEP 3: Get unique purchase_order_ids (using object-based deduplication to avoid minification errors)
+        const uniquePOIdsObj: Record<string, boolean> = {};
+        requestsWithPO.forEach((dr: any) => {
+          const poId = dr.purchase_order_id;
+          if (poId) uniquePOIdsObj[poId] = true;
+        });
+        const uniquePOIds = Object.keys(uniquePOIdsObj);
         
         // STEP 4: Verify purchase_orders exist (filter out orphaned requests) and get po_numbers
         if (uniquePOIds.length > 0) {
@@ -1422,27 +1445,31 @@ const DeliveryDashboard = () => {
                 setPendingNotificationCount(0);
                 return;
               }
-              const validPOIds = new Set(validPOs
+              // Use object-based lookup instead of Set to avoid minification errors
+              const validPOIds: Record<string, boolean> = {};
+              validPOs
                 .filter((po: any) => 
                   // Only count purchase_orders that are not delivered/completed/cancelled
                   po && po.id && 
                   !['delivered', 'completed', 'cancelled'].includes(po.status) &&
                   (!po.delivery_status || !['delivered', 'completed', 'cancelled'].includes(po.delivery_status))
                 )
-                .map((po: any) => po.id)
-              );
+                .forEach((po: any) => {
+                  if (po.id) validPOIds[po.id] = true;
+                });
               
               // Count only delivery_requests with valid, non-delivered purchase_orders
               const validRequests = requestsWithPO.filter((dr: any) => 
-                validPOIds.has(dr.purchase_order_id)
+                validPOIds[dr.purchase_order_id]
               );
               
               // STEP 5: Deduplicate using same logic as DeliveryNotifications.tsx
               // PRIMARY: po_number (if available), SECONDARY: composite key (deliveryAddress + materialType), TERTIARY: purchase_order_id
-              const poIdToPONumber = new Map<string, string>();
+              // Use object-based map instead of Map to avoid minification errors
+              const poIdToPONumber: Record<string, string> = {};
               validPOs.forEach((po: any) => {
                 if (po.id && po.po_number) {
-                  poIdToPONumber.set(po.id, po.po_number);
+                  poIdToPONumber[po.id] = po.po_number;
                 }
               });
               
@@ -1456,19 +1483,20 @@ const DeliveryDashboard = () => {
                 return normalized;
               };
               
-              const seenPONumbers = new Set<string>();
-              const seenCompositeKeys = new Set<string>();
-              const seenPOIds = new Set<string>();
+              // Use object-based sets instead of Set to avoid minification errors
+              const seenPONumbers: Record<string, boolean> = {};
+              const seenCompositeKeys: Record<string, boolean> = {};
+              const seenPOIds: Record<string, boolean> = {};
               
               const uniqueCount = validRequests.filter((dr: any) => {
                 // PRIMARY: Check po_number first
-                const poNumber = poIdToPONumber.get(dr.purchase_order_id);
+                const poNumber = poIdToPONumber[dr.purchase_order_id];
                 if (poNumber) {
                   const normalizedPONumber = String(poNumber).trim().toLowerCase();
-                  if (seenPONumbers.has(normalizedPONumber)) {
+                  if (seenPONumbers[normalizedPONumber]) {
                     return false; // Duplicate po_number
                   }
-                  seenPONumbers.add(normalizedPONumber);
+                  seenPONumbers[normalizedPONumber] = true;
                   return true;
                 }
                 
@@ -1477,18 +1505,18 @@ const DeliveryDashboard = () => {
                   const normalizedAddress = String(dr.delivery_address).trim().toLowerCase();
                   const normalizedMaterial = normalizeMaterialType(dr.material_type);
                   const compositeKey = `${normalizedAddress}|${normalizedMaterial}`;
-                  if (seenCompositeKeys.has(compositeKey)) {
+                  if (seenCompositeKeys[compositeKey]) {
                     return false; // Duplicate composite key
                   }
-                  seenCompositeKeys.add(compositeKey);
+                  seenCompositeKeys[compositeKey] = true;
                   return true;
                 }
                 
                 // TERTIARY: Fallback to purchase_order_id
-                if (seenPOIds.has(dr.purchase_order_id)) {
+                if (seenPOIds[dr.purchase_order_id]) {
                   return false; // Duplicate purchase_order_id
                 }
-                seenPOIds.add(dr.purchase_order_id);
+                seenPOIds[dr.purchase_order_id] = true;
                 return true;
               }).length;
               
@@ -1882,7 +1910,12 @@ const DeliveryDashboard = () => {
     // Check both unified and legacy scheduled orders
     const unifiedIds = unifiedScheduled.map(d => d.id || d.purchase_order_id || '').filter(Boolean);
     const legacyIds = deliveryCategories.scheduled.map(d => d.id || d.purchase_order_id || '').filter(Boolean);
-    const allScheduledIds = [...new Set([...unifiedIds, ...legacyIds])];
+    // Use object-based deduplication instead of Set to avoid minification errors
+    const allScheduledIdsObj: Record<string, boolean> = {};
+    [...unifiedIds, ...legacyIds].forEach(id => {
+      if (id) allScheduledIdsObj[id] = true;
+    });
+    const allScheduledIds = Object.keys(allScheduledIdsObj);
     
     if (allScheduledIds.length > 0) {
       // If current selection is invalid or empty, select the first one
