@@ -79,6 +79,7 @@ import { MapLocationPicker } from "@/components/location/MapLocationPicker";
 import { DeliveryNoteWorkflow } from "@/components/delivery/DeliveryNoteWorkflow";
 import { GRNView } from "@/components/delivery/GRNView";
 import { InvoiceManagement } from "@/components/invoices/InvoiceManagement";
+import { MissingDeliveryAddressAlert } from "@/components/builders/MissingDeliveryAddressAlert";
 
 const ProfessionalBuilderDashboardPage = () => {
   // Use AuthContext for reliable user data
@@ -2328,6 +2329,26 @@ const ProfessionalBuilderDashboardPage = () => {
 
           {/* Deliveries Tab - Contains Request Delivery, Delivery Schedule, and Delivery History as sub-tabs */}
           <TabsContent value="deliveries" className="mt-0">
+            {/* Missing Address Alert - Show at top of deliveries tab */}
+            {(() => {
+              // Get builderId and userId for the alert component
+              let builderId = profile?.id || user?.id || '';
+              let userId = user?.id || '';
+              if (!builderId || !userId) {
+                try {
+                  const stored = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+                  if (stored) {
+                    const parsed = JSON.parse(stored);
+                    userId = parsed.user?.id || '';
+                    builderId = userId; // Fallback to userId if profile not found
+                  }
+                } catch (e) {}
+              }
+              return builderId && userId ? (
+                <MissingDeliveryAddressAlert builderId={builderId} userId={userId} />
+              ) : null;
+            })()}
+            
             <Card>
               <CardContent className="p-0">
                 <Tabs value={deliveriesSubTab} onValueChange={setDeliveriesSubTab} className="w-full">
