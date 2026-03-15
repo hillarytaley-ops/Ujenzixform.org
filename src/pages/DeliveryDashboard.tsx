@@ -511,14 +511,21 @@ const DeliveryDashboard = () => {
               console.log('📦 Raw delivery_requests data:', drData.length, 'items');
               
               // Map by purchase_order_id for quick lookup
+              // CRITICAL: If multiple delivery_requests exist for same purchase_order_id, use the most recent one
               drData.forEach((dr: any) => {
                 if (dr.purchase_order_id) {
-                  deliveryRequestsMap.set(dr.purchase_order_id, dr);
-                  // Log each one to verify we're getting addresses
-                  if (dr.delivery_address && dr.delivery_address.trim() && dr.delivery_address !== 'To be provided') {
-                    console.log('✅ Found delivery_address for', dr.purchase_order_id?.substring(0, 8), ':', dr.delivery_address.substring(0, 60));
-                  } else {
-                    console.warn('⚠️ delivery_request', dr.purchase_order_id?.substring(0, 8), 'has no valid delivery_address:', dr.delivery_address);
+                  const existing = deliveryRequestsMap.get(dr.purchase_order_id);
+                  // Only update if this is newer or if existing doesn't have a valid address
+                  if (!existing || 
+                      (dr.delivery_address && dr.delivery_address.trim() && dr.delivery_address !== 'To be provided' && 
+                       (!existing.delivery_address || existing.delivery_address === 'To be provided'))) {
+                    deliveryRequestsMap.set(dr.purchase_order_id, dr);
+                    // Log each one to verify we're getting addresses
+                    if (dr.delivery_address && dr.delivery_address.trim() && dr.delivery_address !== 'To be provided') {
+                      console.log('✅ Found delivery_address for', dr.purchase_order_id?.substring(0, 8), 'status:', dr.status, 'address:', dr.delivery_address.substring(0, 60));
+                    } else {
+                      console.warn('⚠️ delivery_request', dr.purchase_order_id?.substring(0, 8), 'status:', dr.status, 'has no valid delivery_address:', dr.delivery_address || 'null');
+                    }
                   }
                 }
               });
