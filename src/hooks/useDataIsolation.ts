@@ -3432,30 +3432,42 @@ export const useDeliveryProviderData = () => {
           if (missingPOs && missingPOs.length > 0) {
             console.log('✅ Found', missingPOs.length, 'missing delivered orders directly');
             
+            // CRITICAL: Fetch delivery_requests in batch to get builder-provided delivery_address
+            const missingPOIds = missingPOs.map((po: any) => po.id).filter(Boolean);
+            let deliveryRequestsMapForMissing = new Map<string, any>();
+            
+            if (missingPOIds.length > 0) {
+              try {
+                const { data: drData } = await supabase
+                  .from('delivery_requests')
+                  .select('id, purchase_order_id, delivery_address, pickup_address')
+                  .in('purchase_order_id', missingPOIds)
+                  .limit(500);
+                
+                if (drData && drData.length > 0) {
+                  // Map by purchase_order_id for quick lookup
+                  drData.forEach((dr: any) => {
+                    if (dr.purchase_order_id) {
+                      deliveryRequestsMapForMissing.set(dr.purchase_order_id, dr);
+                    }
+                  });
+                  console.log('✅ Fetched', drData.length, 'delivery_requests for missing orders - builder-provided addresses available');
+                }
+              } catch (e: any) {
+                console.warn('⚠️ Could not fetch delivery_requests for missing orders:', e?.message);
+              }
+            }
+            
             // Transform to delivery history format
             missingPOs.forEach(po => {
               const poNumber = po.po_number || '';
               const isKnown = knownDeliveredOrderNumbersForHistory.some(num => poNumber.includes(num));
               
               if (isKnown && !filteredHistory.some(h => (h.order_number || '').includes(poNumber.split('-')[1]))) {
-                // CRITICAL: Fetch delivery_request for this PO to get builder-provided delivery_address
-                let builderProvidedAddress = null;
-                let builderProvidedPickup = null;
-                try {
-                  const { data: drData } = await supabase
-                    .from('delivery_requests')
-                    .select('delivery_address, pickup_address')
-                    .eq('purchase_order_id', po.id)
-                    .limit(1)
-                    .maybeSingle();
-                  
-                  if (drData) {
-                    builderProvidedAddress = drData.delivery_address;
-                    builderProvidedPickup = drData.pickup_address;
-                  }
-                } catch (e: any) {
-                  console.warn('⚠️ Could not fetch delivery_request for missing order:', e?.message);
-                }
+                // CRITICAL: Get builder-provided delivery_address from delivery_requests map
+                const deliveryRequest = deliveryRequestsMapForMissing.get(po.id);
+                const builderProvidedAddress = deliveryRequest?.delivery_address;
+                const builderProvidedPickup = deliveryRequest?.pickup_address;
                 
                 const historyEntry = {
                   id: po.id,
