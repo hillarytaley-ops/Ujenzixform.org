@@ -3359,16 +3359,36 @@ export const useDeliveryProviderData = () => {
               const isKnown = knownDeliveredOrderNumbersForHistory.some(num => poNumber.includes(num));
               
               if (isKnown && !filteredHistory.some(h => (h.order_number || '').includes(poNumber.split('-')[1]))) {
+                // CRITICAL: Fetch delivery_request for this PO to get builder-provided delivery_address
+                let builderProvidedAddress = null;
+                let builderProvidedPickup = null;
+                try {
+                  const { data: drData } = await supabase
+                    .from('delivery_requests')
+                    .select('delivery_address, pickup_address')
+                    .eq('purchase_order_id', po.id)
+                    .limit(1)
+                    .maybeSingle();
+                  
+                  if (drData) {
+                    builderProvidedAddress = drData.delivery_address;
+                    builderProvidedPickup = drData.pickup_address;
+                  }
+                } catch (e: any) {
+                  console.warn('⚠️ Could not fetch delivery_request for missing order:', e?.message);
+                }
+                
                 const historyEntry = {
                   id: po.id,
                   purchase_order_id: po.id,
                   provider_id: userId,
                   status: 'delivered',
                   order_number: poNumber,
-                  pickup_location: 'Supplier location',
-                  pickup_address: 'Supplier location',
-                  delivery_location: po.delivery_address || 'Delivery location',
-                  delivery_address: po.delivery_address || 'Delivery location',
+                  pickup_location: builderProvidedPickup || 'Supplier location',
+                  pickup_address: builderProvidedPickup || 'Supplier location',
+                  // CRITICAL: Use builder-provided delivery_address from delivery_requests first
+                  delivery_location: builderProvidedAddress || po.delivery_address || 'Delivery location',
+                  delivery_address: builderProvidedAddress || po.delivery_address || 'Delivery location',
                   material_type: 'Materials',
                   quantity: 1,
                   builder_name: 'Builder',

@@ -469,18 +469,75 @@ const DeliveryDashboard = () => {
         purchase_order_id: d.purchase_order_id?.substring(0, 8)
       })));
       
-      const formattedHistory: DeliveryHistory[] = isolatedHistory.map((d: any) => ({
-        id: d.id,
-        pickup_location: d.pickup_location || d.pickup_address || 'N/A',
-        delivery_location: d.delivery_location || d.delivery_address || 'N/A',
-        material_type: d.material_type || d.item_description || 'Materials',
-        status: d.status,
-        completed_at: d.completed_at || d.delivered_at || d.updated_at || d.created_at,
-        price: d.price || d.delivery_fee || d.estimated_cost || 0,
-        rating: d.rating || 0,
-        // CRITICAL: Preserve order_number for display and matching
-        order_number: d.order_number || d.po_number || (d.purchase_order_id ? `PO-${d.purchase_order_id.slice(0, 8).toUpperCase()}` : 'N/A')
-      }));
+      // CRITICAL: Fetch delivery_requests to get the builder-provided delivery_address
+      // The builder fills in delivery_address in delivery_requests table during delivery request
+      const purchaseOrderIds = isolatedHistory.map((d: any) => d.purchase_order_id || d.id).filter(Boolean);
+      let deliveryRequestsMap = new Map<string, any>();
+      
+      if (purchaseOrderIds.length > 0) {
+        try {
+          const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
+          const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
+          
+          let accessToken = SUPABASE_ANON_KEY;
+          try {
+            const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+            if (storedSession) {
+              const parsed = JSON.parse(storedSession);
+              if (parsed.access_token) accessToken = parsed.access_token;
+            }
+          } catch (e) {}
+          
+          const headers = {
+            'apikey': SUPABASE_ANON_KEY,
+            'Authorization': `Bearer ${accessToken}`
+          };
+          
+          // Fetch delivery_requests for these purchase_orders to get builder-provided delivery_address
+          const drResponse = await fetch(
+            `${SUPABASE_URL}/rest/v1/delivery_requests?purchase_order_id=in.(${purchaseOrderIds.join(',')})&select=id,purchase_order_id,delivery_address,pickup_address&limit=500`,
+            { headers, cache: 'no-store' }
+          );
+          
+          if (drResponse.ok) {
+            const drData = await drResponse.json();
+            // Map by purchase_order_id for quick lookup
+            drData.forEach((dr: any) => {
+              if (dr.purchase_order_id) {
+                deliveryRequestsMap.set(dr.purchase_order_id, dr);
+              }
+            });
+            console.log('✅ Fetched', drData.length, 'delivery_requests for history - builder-provided addresses available');
+          }
+        } catch (e: any) {
+          console.warn('⚠️ Could not fetch delivery_requests for history:', e?.message);
+        }
+      }
+      
+      const formattedHistory: DeliveryHistory[] = isolatedHistory.map((d: any) => {
+        const poId = d.purchase_order_id || d.id;
+        const deliveryRequest = deliveryRequestsMap.get(poId);
+        
+        // CRITICAL: Prioritize delivery_address from delivery_requests (builder-provided)
+        // This is the address the builder filled in during delivery request form
+        const builderProvidedAddress = deliveryRequest?.delivery_address;
+        const builderProvidedPickup = deliveryRequest?.pickup_address;
+        
+        return {
+          id: d.id,
+          pickup_location: builderProvidedPickup || d.pickup_location || d.pickup_address || 'N/A',
+          // CRITICAL: Use builder-provided delivery_address from delivery_requests first
+          // This is the address the builder filled in during delivery request
+          delivery_location: builderProvidedAddress || d.delivery_location || d.delivery_address || 'N/A',
+          material_type: d.material_type || d.item_description || 'Materials',
+          status: d.status,
+          completed_at: d.completed_at || d.delivered_at || d.updated_at || d.created_at,
+          price: d.price || d.delivery_fee || d.estimated_cost || 0,
+          rating: d.rating || 0,
+          // CRITICAL: Preserve order_number for display and matching
+          order_number: d.order_number || d.po_number || (d.purchase_order_id ? `PO-${d.purchase_order_id.slice(0, 8).toUpperCase()}` : 'N/A')
+        };
+      });
       
       console.log('✅ Formatted delivery history:', formattedHistory.length, 'items');
       console.log('📋 Formatted history order numbers:', formattedHistory.map(d => d.order_number).filter(Boolean));
