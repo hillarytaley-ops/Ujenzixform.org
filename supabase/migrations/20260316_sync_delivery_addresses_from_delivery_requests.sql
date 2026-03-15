@@ -10,6 +10,7 @@ DECLARE
   po_record RECORD;
   dr_address TEXT;
   updated_count INTEGER := 0;
+  rows_updated INTEGER;
   placeholder_patterns TEXT[] := ARRAY[
     'to be provided', 'tbd', 't.b.d.', 'n/a', 'na', 'tba', 
     'to be determined', 'delivery location', 'address not found',
@@ -29,7 +30,7 @@ BEGIN
       dr.delivery_address AS dr_address,
       dr.id AS dr_id,
       dr.status AS dr_status,
-      dr.created_at AS dr_created_at
+      dr.created_at -- CRITICAL: Must be in SELECT list for ORDER BY
     FROM purchase_orders po
     INNER JOIN delivery_requests dr ON dr.purchase_order_id = po.id
     WHERE 
@@ -46,7 +47,7 @@ BEGIN
       AND LENGTH(TRIM(dr.delivery_address)) > 10
       -- Only active delivery requests
       AND dr.status IN ('pending', 'requested', 'assigned', 'accepted', 'scheduled', 'in_transit', 'picked_up', 'out_for_delivery')
-    ORDER BY po.id, dr.created_at DESC
+    ORDER BY po.id, dr.created_at DESC -- CRITICAL: dr.created_at must be in SELECT list above
   LOOP
     RAISE NOTICE '----------------------------------------';
     RAISE NOTICE 'Processing purchase_order: % (PO: %)', po_record.id, po_record.po_number;
@@ -61,11 +62,11 @@ BEGIN
       updated_at = NOW()
     WHERE id = po_record.id;
     
-    GET DIAGNOSTICS updated_count = ROW_COUNT;
+    GET DIAGNOSTICS rows_updated = ROW_COUNT;
+    updated_count := updated_count + rows_updated;
     
-    IF updated_count > 0 THEN
+    IF rows_updated > 0 THEN
       RAISE NOTICE '  ✅ SYNCED: Updated purchase_order % with address from delivery_request', po_record.id;
-      updated_count := updated_count + 1;
     ELSE
       RAISE NOTICE '  ⚠️ SKIPPED: Could not update purchase_order %', po_record.id;
     END IF;
