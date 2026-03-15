@@ -268,30 +268,129 @@ const DeliveryDashboard = () => {
     // Transform active deliveries - ONLY THIS PROVIDER'S DELIVERIES
     console.log('📋 Dashboard sync: isolatedActiveDeliveries.length =', isolatedActiveDeliveries?.length ?? 0);
     if (isolatedActiveDeliveries && isolatedActiveDeliveries.length > 0) {
-      // Helper function to format delivery
-      const formatDelivery = (d: any): ActiveDelivery => ({
-        id: d.id,
-        pickup_location: d.pickup_location || d.pickup_address || 'N/A',
-        delivery_location: d.delivery_location || d.delivery_address || 'N/A',
-        material_type: d.material_type || d.item_description || 'Materials',
-        quantity: d.quantity || d.estimated_weight || 'N/A',
-        customer_name: d.builder_name || d.builder_email?.split('@')[0] || 'Customer',
-        customer_phone: d.builder_phone || '+254 700 000 000',
-        status: d.status || d.display_status || 'pending',
-        estimated_time: d.estimated_time || '30 mins',
-        price: d.price || d.delivery_fee || d.estimated_cost || 0,
-        distance: d.distance || 0,
-        urgency: d.urgency || d.priority_level || 'normal',
-        special_instructions: d.special_instructions,
-        created_at: d.created_at,
-        purchase_order_id: d.purchase_order_id,
-        order_number: d.order_number, // Include order number from the hook
-        // CRITICAL: Preserve categorization fields for tab filtering
-        _categorized_status: d._categorized_status,
-        _items_count: d._items_count,
-        _dispatched_count: d._dispatched_count,
-        _received_count: d._received_count
-      });
+      // CRITICAL: Fetch delivery_requests to get builder-provided delivery_address
+      // The builder fills in delivery_address in delivery_requests table during delivery request
+      // This is the address that should appear on the delivery card, not "To be provided"
+      const purchaseOrderIds = isolatedActiveDeliveries
+        .map((d: any) => d.purchase_order_id || d.id)
+        .filter(Boolean);
+      
+      // Fetch delivery_requests asynchronously to get builder-provided addresses
+      (async () => {
+        let deliveryRequestsMap: Record<string, any> = {};
+        
+        if (purchaseOrderIds.length > 0) {
+          try {
+            const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
+            const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
+            
+            let accessToken = SUPABASE_ANON_KEY;
+            try {
+              const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+              if (storedSession) {
+                const parsed = JSON.parse(storedSession);
+                if (parsed.access_token) accessToken = parsed.access_token;
+              }
+            } catch (e) {}
+            
+            const headers = {
+              'apikey': SUPABASE_ANON_KEY,
+              'Authorization': `Bearer ${accessToken}`
+            };
+            
+            // Fetch delivery_requests for these purchase_orders - ALL statuses
+            const poIdsParam = purchaseOrderIds.join(',');
+            console.log('🔍 SCHEDULED: Fetching delivery_requests for', purchaseOrderIds.length, 'purchase_order_ids to get builder-provided addresses...');
+            const drResponse = await fetch(
+              `${SUPABASE_URL}/rest/v1/delivery_requests?purchase_order_id=in.(${poIdsParam})&select=id,purchase_order_id,delivery_address,pickup_address,delivery_coordinates,status&order=created_at.desc&limit=500`,
+              { headers, cache: 'no-store' }
+            );
+            
+            if (drResponse.ok) {
+              const drData = await drResponse.json();
+              console.log('✅ SCHEDULED: Fetched', drData.length, 'delivery_requests for scheduled orders');
+              
+              // Map by purchase_order_id - use most recent with valid address
+              drData.forEach((dr: any) => {
+                if (dr.purchase_order_id) {
+                  const existing = deliveryRequestsMap[dr.purchase_order_id];
+                  // Only update if this is newer or if existing doesn't have a valid address
+                  if (!existing || 
+                      (dr.delivery_address && dr.delivery_address.trim() && dr.delivery_address !== 'To be provided' && 
+                       (!existing.delivery_address || existing.delivery_address === 'To be provided'))) {
+                    deliveryRequestsMap[dr.purchase_order_id] = dr;
+                    if (dr.delivery_address && dr.delivery_address.trim() && dr.delivery_address !== 'To be provided') {
+                      console.log('✅✅✅ SCHEDULED: Found builder-provided address for', dr.purchase_order_id?.substring(0, 8), ':', dr.delivery_address.substring(0, 60));
+                    }
+                  }
+                }
+              });
+            } else {
+              console.warn('⚠️ SCHEDULED: Failed to fetch delivery_requests:', drResponse.status);
+            }
+          } catch (e: any) {
+            console.warn('⚠️ SCHEDULED: Error fetching delivery_requests:', e?.message);
+          }
+        }
+        
+        // Helper function to format delivery - NOW WITH BUILDER-PROVIDED ADDRESS
+        const formatDelivery = (d: any): ActiveDelivery => {
+          // CRITICAL: Get builder-provided address from delivery_requests
+          const poId = d.purchase_order_id || d.id;
+          const deliveryRequest = deliveryRequestsMap[poId];
+          const builderProvidedAddress = deliveryRequest?.delivery_address;
+          
+          // CRITICAL: Use builder-provided address from delivery_requests (highest priority)
+          // This is the address the builder filled in during delivery request form
+          let finalDeliveryAddress = 'Delivery address missing - contact builder';
+          if (builderProvidedAddress && builderProvidedAddress.trim() && 
+              builderProvidedAddress !== 'To be provided' && 
+              builderProvidedAddress !== 'Delivery location') {
+            // Include coordinates if available
+            if (deliveryRequest?.delivery_coordinates && !builderProvidedAddress.includes(deliveryRequest.delivery_coordinates)) {
+              finalDeliveryAddress = `${deliveryRequest.delivery_coordinates} | ${builderProvidedAddress}`;
+            } else {
+              finalDeliveryAddress = builderProvidedAddress;
+            }
+            console.log('✅✅✅ SCHEDULED: Using builder-provided address for', poId?.substring(0, 8), ':', finalDeliveryAddress.substring(0, 60));
+          } else if (d.delivery_location && d.delivery_location.trim() && 
+                     d.delivery_location !== 'To be provided' && 
+                     d.delivery_location !== 'Delivery location') {
+            finalDeliveryAddress = d.delivery_location;
+            console.log('✅ SCHEDULED: Using delivery_location from isolatedActiveDeliveries for', poId?.substring(0, 8));
+          } else if (d.delivery_address && d.delivery_address.trim() && 
+                     d.delivery_address !== 'To be provided' && 
+                     d.delivery_address !== 'Delivery location') {
+            finalDeliveryAddress = d.delivery_address;
+            console.log('✅ SCHEDULED: Using delivery_address from isolatedActiveDeliveries for', poId?.substring(0, 8));
+          } else {
+            console.warn('⚠️ SCHEDULED: No valid address found for', poId?.substring(0, 8), 'order', d.order_number || d.po_number);
+          }
+          
+          return {
+            id: d.id,
+            pickup_location: deliveryRequest?.pickup_address || d.pickup_location || d.pickup_address || 'N/A',
+            delivery_location: finalDeliveryAddress,
+            material_type: d.material_type || d.item_description || 'Materials',
+            quantity: d.quantity || d.estimated_weight || 'N/A',
+            customer_name: d.builder_name || d.builder_email?.split('@')[0] || 'Customer',
+            customer_phone: d.builder_phone || '+254 700 000 000',
+            status: d.status || d.display_status || 'pending',
+            estimated_time: d.estimated_time || '30 mins',
+            price: d.price || d.delivery_fee || d.estimated_cost || 0,
+            distance: d.distance || 0,
+            urgency: d.urgency || d.priority_level || 'normal',
+            special_instructions: d.special_instructions,
+            created_at: d.created_at,
+            purchase_order_id: d.purchase_order_id,
+            order_number: d.order_number, // Include order number from the hook
+            // CRITICAL: Preserve categorization fields for tab filtering
+            _categorized_status: d._categorized_status,
+            _items_count: d._items_count,
+            _dispatched_count: d._dispatched_count,
+            _received_count: d._received_count
+          };
+        };
       
       // VALIDATE: Filter out orders that don't exist in purchase_orders
       // This ensures we only show orders that actually exist in the database
