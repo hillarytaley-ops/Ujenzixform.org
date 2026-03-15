@@ -2399,74 +2399,125 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
                         <Button
                           size="sm"
                           variant="outline"
-                          className="text-xs h-7 bg-white hover:bg-gray-50 border-gray-300"
-                          disabled={checkingAddress === notification.delivery_request_id}
-                          onClick={async () => {
-                            if (notification.delivery_request_id) {
-                              setCheckingAddress(notification.delivery_request_id);
-                              try {
-                                console.log('🔍 Checking delivery address in database for:', notification.delivery_request_id);
-                                const addressCheck = await checkDeliveryAddress(notification.delivery_request_id);
-                                
-                                if (addressCheck) {
-                                  console.log('📍📍📍 DATABASE CHECK RESULT:', {
-                                    delivery_request_id: addressCheck.delivery_request_id,
-                                    delivery_address: addressCheck.delivery_address,
-                                    delivery_coordinates: addressCheck.delivery_coordinates,
-                                    purchase_order_id: addressCheck.purchase_order_id,
-                                    status: addressCheck.status,
-                                    created_at: addressCheck.created_at
-                                  });
-                                  
-                                  // Check if address is a placeholder
-                                  const isPlaceholder = addressCheck.delivery_address && (
-                                    addressCheck.delivery_address.toLowerCase().trim() === 'to be provided' ||
-                                    addressCheck.delivery_address.toLowerCase().trim() === 'tbd' ||
-                                    addressCheck.delivery_address.toLowerCase().trim() === 'n/a'
-                                  );
-                                  
-                                  if (addressCheck.delivery_address && !isPlaceholder) {
-                                    toast({
-                                      title: '✅ Address Found in Database!',
-                                      description: `Address: ${addressCheck.delivery_address.substring(0, 80)}${addressCheck.delivery_address.length > 80 ? '...' : ''}${addressCheck.delivery_coordinates ? `\nCoordinates: ${addressCheck.delivery_coordinates}` : ''}`,
-                                      variant: 'default',
-                                      duration: 10000
-                                    });
-                                  } else if (isPlaceholder) {
-                                    toast({
-                                      title: '⚠️ Placeholder Address in Database',
-                                      description: `The database contains a placeholder: "${addressCheck.delivery_address}". The builder needs to provide a real address.`,
-                                      variant: 'destructive',
-                                      duration: 10000
-                                    });
-                                  } else {
-                                    toast({
-                                      title: '❌ No Address in Database',
-                                      description: 'The address field is NULL or empty. The builder must provide a delivery address.',
-                                      variant: 'destructive',
-                                      duration: 10000
-                                    });
-                                  }
-                                } else {
-                                  console.error('❌ checkDeliveryAddress returned null');
-                                  toast({
-                                    title: 'Check Failed',
-                                    description: 'Could not retrieve data from database. Check console for details.',
-                                    variant: 'destructive',
-                                    duration: 5000
-                                  });
-                                }
-                              } catch (error: any) {
-                                console.error('❌ Error checking address:', error);
+                          className="text-xs h-7 bg-red-100 hover:bg-red-200 text-red-800 border-red-300"
+                          disabled={checkingAddress === notification.delivery_request_id || !notification.delivery_request_id}
+                          onClick={async (e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            
+                            const deliveryRequestId = notification.delivery_request_id;
+                            
+                            if (!deliveryRequestId) {
+                              console.error('❌ No delivery_request_id provided');
+                              toast({
+                                title: 'Error',
+                                description: 'No delivery request ID found. Cannot check address.',
+                                variant: 'destructive',
+                                duration: 5000
+                              });
+                              return;
+                            }
+                            
+                            console.log('🔍🔍🔍 CHECK ADDRESS BUTTON CLICKED:', {
+                              delivery_request_id: deliveryRequestId,
+                              notification_id: notification.id,
+                              timestamp: new Date().toISOString()
+                            });
+                            
+                            setCheckingAddress(deliveryRequestId);
+                            
+                            try {
+                              console.log('🔍 Calling checkDeliveryAddress with ID:', deliveryRequestId);
+                              const startTime = Date.now();
+                              const addressCheck = await checkDeliveryAddress(deliveryRequestId);
+                              const endTime = Date.now();
+                              
+                              console.log(`✅ checkDeliveryAddress completed in ${endTime - startTime}ms`);
+                              console.log('📍📍📍 DATABASE CHECK RESULT:', {
+                                delivery_request_id: addressCheck?.delivery_request_id,
+                                delivery_address: addressCheck?.delivery_address,
+                                delivery_coordinates: addressCheck?.delivery_coordinates,
+                                purchase_order_id: addressCheck?.purchase_order_id,
+                                status: addressCheck?.status,
+                                created_at: addressCheck?.created_at,
+                                builder_id: addressCheck?.builder_id,
+                                isNull: addressCheck === null,
+                                isUndefined: addressCheck === undefined
+                              });
+                              
+                              if (!addressCheck) {
+                                console.error('❌ checkDeliveryAddress returned null or undefined');
                                 toast({
-                                  title: 'Error',
-                                  description: error.message || 'An error occurred while checking the database. See console for details.',
+                                  title: '❌ Check Failed',
+                                  description: 'Could not retrieve data from database. The delivery request may not exist. Check console for details.',
                                   variant: 'destructive',
-                                  duration: 5000
+                                  duration: 8000
                                 });
-                              } finally {
-                                setCheckingAddress(null);
+                                return;
                               }
+                              
+                              // Check if address is a placeholder
+                              const addressValue = addressCheck.delivery_address || '';
+                              const isPlaceholder = addressValue && (
+                                addressValue.toLowerCase().trim() === 'to be provided' ||
+                                addressValue.toLowerCase().trim() === 'tbd' ||
+                                addressValue.toLowerCase().trim() === 't.b.d.' ||
+                                addressValue.toLowerCase().trim() === 'n/a' ||
+                                addressValue.toLowerCase().trim() === 'na' ||
+                                addressValue.toLowerCase().trim() === 'tba' ||
+                                addressValue.toLowerCase().trim() === 'to be determined' ||
+                                addressValue.toLowerCase().trim() === 'delivery location' ||
+                                addressValue.toLowerCase().trim() === 'address not found' ||
+                                addressValue.toLowerCase().trim() === 'address not specified by builder'
+                              );
+                              
+                              if (addressValue && !isPlaceholder) {
+                                const addressDisplay = addressValue.length > 100 
+                                  ? `${addressValue.substring(0, 100)}...` 
+                                  : addressValue;
+                                const coordsDisplay = addressCheck.delivery_coordinates 
+                                  ? `\n\n📍 Coordinates: ${addressCheck.delivery_coordinates}` 
+                                  : '';
+                                
+                                toast({
+                                  title: '✅ Address Found in Database!',
+                                  description: `Address: ${addressDisplay}${coordsDisplay}\n\nStatus: ${addressCheck.status}\nCreated: ${new Date(addressCheck.created_at).toLocaleString()}`,
+                                  variant: 'default',
+                                  duration: 12000
+                                });
+                              } else if (isPlaceholder) {
+                                toast({
+                                  title: '⚠️ Placeholder Address in Database',
+                                  description: `The database contains a placeholder: "${addressValue}".\n\nThe builder needs to provide a real address.\n\nStatus: ${addressCheck.status}`,
+                                  variant: 'destructive',
+                                  duration: 10000
+                                });
+                              } else {
+                                toast({
+                                  title: '❌ No Address in Database',
+                                  description: `The address field is NULL or empty.\n\nThe builder must provide a delivery address.\n\nStatus: ${addressCheck.status}\nPurchase Order ID: ${addressCheck.purchase_order_id || 'N/A'}`,
+                                  variant: 'destructive',
+                                  duration: 10000
+                                });
+                              }
+                            } catch (error: any) {
+                              console.error('❌❌❌ EXCEPTION in checkDeliveryAddress:', error);
+                              console.error('Error details:', {
+                                message: error?.message,
+                                stack: error?.stack,
+                                name: error?.name,
+                                code: error?.code
+                              });
+                              
+                              toast({
+                                title: '❌ Error Checking Address',
+                                description: error?.message || error?.toString() || 'An unexpected error occurred while checking the database. See console for details.',
+                                variant: 'destructive',
+                                duration: 8000
+                              });
+                            } finally {
+                              console.log('🔍 Clearing checkingAddress state');
+                              setCheckingAddress(null);
                             }
                           }}
                         >

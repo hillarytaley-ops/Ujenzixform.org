@@ -20,6 +20,13 @@ export interface DeliveryAddressCheck {
  */
 export async function checkDeliveryAddress(deliveryRequestId: string): Promise<DeliveryAddressCheck | null> {
   try {
+    if (!deliveryRequestId || typeof deliveryRequestId !== 'string' || deliveryRequestId.trim() === '') {
+      console.error('❌ Invalid deliveryRequestId:', deliveryRequestId);
+      throw new Error(`Invalid delivery request ID: ${deliveryRequestId}`);
+    }
+
+    console.log('🔍 checkDeliveryAddress: Querying database for delivery_request_id:', deliveryRequestId);
+    
     const { data, error } = await supabase
       .from('delivery_requests')
       .select('id, delivery_address, delivery_coordinates, purchase_order_id, status, created_at, builder_id')
@@ -27,9 +34,35 @@ export async function checkDeliveryAddress(deliveryRequestId: string): Promise<D
       .single();
 
     if (error) {
-      console.error('❌ Error checking delivery address:', error);
+      console.error('❌ Supabase error checking delivery address:', {
+        error,
+        code: error.code,
+        message: error.message,
+        details: error.details,
+        hint: error.hint,
+        deliveryRequestId
+      });
+      
+      // If it's a "not found" error, return null with a specific message
+      if (error.code === 'PGRST116') {
+        console.warn('⚠️ Delivery request not found in database:', deliveryRequestId);
+        throw new Error(`Delivery request with ID ${deliveryRequestId} not found in database.`);
+      }
+      
+      throw new Error(`Database error: ${error.message || 'Unknown error'}`);
+    }
+
+    if (!data) {
+      console.warn('⚠️ No data returned from database for delivery_request_id:', deliveryRequestId);
       return null;
     }
+
+    console.log('✅ checkDeliveryAddress: Successfully retrieved data:', {
+      id: data.id,
+      has_address: !!data.delivery_address,
+      has_coordinates: !!data.delivery_coordinates,
+      status: data.status
+    });
 
     return {
       delivery_request_id: data.id,
@@ -41,8 +74,15 @@ export async function checkDeliveryAddress(deliveryRequestId: string): Promise<D
       builder_id: data.builder_id
     };
   } catch (error: any) {
-    console.error('❌ Exception checking delivery address:', error);
-    return null;
+    console.error('❌ Exception in checkDeliveryAddress:', {
+      error,
+      message: error?.message,
+      stack: error?.stack,
+      deliveryRequestId
+    });
+    
+    // Re-throw the error so the calling code can handle it properly
+    throw error;
   }
 }
 
