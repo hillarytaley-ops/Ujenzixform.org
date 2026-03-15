@@ -590,8 +590,9 @@ export const DeliveryPromptDialog: React.FC<DeliveryPromptDialogProps> = ({
       let deliveryRequestId = null;
       try {
         // First, check for existing active delivery request
+        // CRITICAL: Also select delivery_address to check if we need to protect it
         const checkResponse = await fetchWithTimeout(
-          `${SUPABASE_URL}/rest/v1/delivery_requests?purchase_order_id=eq.${purchaseOrder.id}&status=in.(pending,assigned,accepted,in_transit,picked_up,out_for_delivery,scheduled)&select=id,status&limit=1`,
+          `${SUPABASE_URL}/rest/v1/delivery_requests?purchase_order_id=eq.${purchaseOrder.id}&status=in.(pending,assigned,accepted,in_transit,picked_up,out_for_delivery,scheduled)&select=id,status,delivery_address&limit=1`,
           {
             method: 'GET',
             headers: {
@@ -608,6 +609,61 @@ export const DeliveryPromptDialog: React.FC<DeliveryPromptDialogProps> = ({
           if (Array.isArray(existingData) && existingData.length > 0) {
             deliveryRequestId = existingData[0].id;
             console.log('⚠️ Active delivery request already exists for this order:', deliveryRequestId, 'Status:', existingData[0].status);
+            
+            // CRITICAL: Fetch full delivery_request data to get the existing address
+            let existingAddress = null;
+            try {
+              const fullCheckResponse = await fetchWithTimeout(
+                `${SUPABASE_URL}/rest/v1/delivery_requests?id=eq.${deliveryRequestId}&select=delivery_address&limit=1`,
+                {
+                  method: 'GET',
+                  headers: {
+                    'apikey': SUPABASE_ANON_KEY,
+                    'Authorization': `Bearer ${accessToken}`,
+                    'Content-Type': 'application/json'
+                  }
+                },
+                3000
+              );
+              
+              if (fullCheckResponse.ok) {
+                const fullCheckData = await fullCheckResponse.json();
+                if (Array.isArray(fullCheckData) && fullCheckData.length > 0) {
+                  existingAddress = fullCheckData[0].delivery_address;
+                }
+              }
+            } catch (fetchError: any) {
+              console.warn('⚠️ Could not fetch existing address (non-critical):', fetchError.message);
+            }
+            
+            // CRITICAL: Check existing delivery_request address before updating
+            // If it has a real address and we're trying to update with a placeholder, preserve the real address
+            const isExistingAddressPlaceholder = existingAddress && (
+              existingAddress.toLowerCase().trim() === 'to be provided' ||
+              existingAddress.toLowerCase().trim() === 'tbd' ||
+              existingAddress.toLowerCase().trim() === 'n/a' ||
+              existingAddress.toLowerCase().trim() === 'na' ||
+              existingAddress.toLowerCase().trim() === 'tba' ||
+              existingAddress.toLowerCase().trim() === 'to be determined' ||
+              existingAddress.toLowerCase().trim() === 'delivery location' ||
+              existingAddress.toLowerCase().trim() === 'address not found'
+            );
+            
+            // CRITICAL: If existing address is real (not placeholder) and new address is placeholder, keep the real one
+            if (!isExistingAddressPlaceholder && existingAddress && existingAddress.length > 10) {
+              if (deliveryPayload.delivery_address && (
+                deliveryPayload.delivery_address.toLowerCase().trim() === 'to be provided' ||
+                deliveryPayload.delivery_address.toLowerCase().trim() === 'tbd' ||
+                deliveryPayload.delivery_address.toLowerCase().trim() === 'n/a'
+              )) {
+                console.warn('⚠️⚠️⚠️ PROTECTING REAL ADDRESS: Existing delivery_request has real address, not overwriting with placeholder');
+                console.warn('   Existing address:', existingAddress.substring(0, 50));
+                console.warn('   Attempted placeholder:', deliveryPayload.delivery_address);
+                // Keep the existing real address
+                deliveryPayload.delivery_address = existingAddress;
+              }
+            }
+            
             // Update the existing request instead of creating duplicate
             const updateResponse = await fetchWithTimeout(
               `${SUPABASE_URL}/rest/v1/delivery_requests?id=eq.${deliveryRequestId}`,
@@ -662,6 +718,57 @@ export const DeliveryPromptDialog: React.FC<DeliveryPromptDialogProps> = ({
             if (Array.isArray(finalCheckData) && finalCheckData.length > 0) {
               deliveryRequestId = finalCheckData[0].id;
               console.log('⚠️ Found existing delivery request in final check, updating instead:', deliveryRequestId);
+              
+              // CRITICAL: Fetch existing delivery_request to check its address
+              try {
+                const existingCheckResponse = await fetchWithTimeout(
+                  `${SUPABASE_URL}/rest/v1/delivery_requests?id=eq.${deliveryRequestId}&select=delivery_address&limit=1`,
+                  {
+                    method: 'GET',
+                    headers: {
+                      'apikey': SUPABASE_ANON_KEY,
+                      'Authorization': `Bearer ${accessToken}`,
+                      'Content-Type': 'application/json'
+                    }
+                  },
+                  3000
+                );
+                
+                if (existingCheckResponse.ok) {
+                  const existingCheckData = await existingCheckResponse.json();
+                  if (Array.isArray(existingCheckData) && existingCheckData.length > 0) {
+                    const existingAddress = existingCheckData[0].delivery_address;
+                    const isExistingAddressPlaceholder = existingAddress && (
+                      existingAddress.toLowerCase().trim() === 'to be provided' ||
+                      existingAddress.toLowerCase().trim() === 'tbd' ||
+                      existingAddress.toLowerCase().trim() === 'n/a' ||
+                      existingAddress.toLowerCase().trim() === 'na' ||
+                      existingAddress.toLowerCase().trim() === 'tba' ||
+                      existingAddress.toLowerCase().trim() === 'to be determined' ||
+                      existingAddress.toLowerCase().trim() === 'delivery location' ||
+                      existingAddress.toLowerCase().trim() === 'address not found'
+                    );
+                    
+                    // CRITICAL: If existing address is real (not placeholder) and new address is placeholder, keep the real one
+                    if (!isExistingAddressPlaceholder && existingAddress && existingAddress.length > 10) {
+                      if (deliveryPayload.delivery_address && (
+                        deliveryPayload.delivery_address.toLowerCase().trim() === 'to be provided' ||
+                        deliveryPayload.delivery_address.toLowerCase().trim() === 'tbd' ||
+                        deliveryPayload.delivery_address.toLowerCase().trim() === 'n/a'
+                      )) {
+                        console.warn('⚠️⚠️⚠️ PROTECTING REAL ADDRESS: Existing delivery_request has real address, not overwriting with placeholder');
+                        console.warn('   Existing address:', existingAddress.substring(0, 50));
+                        console.warn('   Attempted placeholder:', deliveryPayload.delivery_address);
+                        // Keep the existing real address
+                        deliveryPayload.delivery_address = existingAddress;
+                      }
+                    }
+                  }
+                }
+              } catch (existingCheckError: any) {
+                console.warn('⚠️ Could not check existing address (non-critical):', existingCheckError.message);
+              }
+              
               // Update existing instead of creating duplicate
               const updateResponse = await fetchWithTimeout(
                 `${SUPABASE_URL}/rest/v1/delivery_requests?id=eq.${deliveryRequestId}`,
@@ -747,6 +854,57 @@ export const DeliveryPromptDialog: React.FC<DeliveryPromptDialogProps> = ({
                 if (Array.isArray(findData) && findData.length > 0) {
                   deliveryRequestId = findData[0].id;
                   console.log('✅ Found existing delivery request after duplicate error, updating:', deliveryRequestId);
+                  
+                  // CRITICAL: Fetch existing delivery_request to check its address
+                  try {
+                    const existingCheckResponse = await fetchWithTimeout(
+                      `${SUPABASE_URL}/rest/v1/delivery_requests?id=eq.${deliveryRequestId}&select=delivery_address&limit=1`,
+                      {
+                        method: 'GET',
+                        headers: {
+                          'apikey': SUPABASE_ANON_KEY,
+                          'Authorization': `Bearer ${accessToken}`,
+                          'Content-Type': 'application/json'
+                        }
+                      },
+                      3000
+                    );
+                    
+                    if (existingCheckResponse.ok) {
+                      const existingCheckData = await existingCheckResponse.json();
+                      if (Array.isArray(existingCheckData) && existingCheckData.length > 0) {
+                        const existingAddress = existingCheckData[0].delivery_address;
+                        const isExistingAddressPlaceholder = existingAddress && (
+                          existingAddress.toLowerCase().trim() === 'to be provided' ||
+                          existingAddress.toLowerCase().trim() === 'tbd' ||
+                          existingAddress.toLowerCase().trim() === 'n/a' ||
+                          existingAddress.toLowerCase().trim() === 'na' ||
+                          existingAddress.toLowerCase().trim() === 'tba' ||
+                          existingAddress.toLowerCase().trim() === 'to be determined' ||
+                          existingAddress.toLowerCase().trim() === 'delivery location' ||
+                          existingAddress.toLowerCase().trim() === 'address not found'
+                        );
+                        
+                        // CRITICAL: If existing address is real (not placeholder) and new address is placeholder, keep the real one
+                        if (!isExistingAddressPlaceholder && existingAddress && existingAddress.length > 10) {
+                          if (deliveryPayload.delivery_address && (
+                            deliveryPayload.delivery_address.toLowerCase().trim() === 'to be provided' ||
+                            deliveryPayload.delivery_address.toLowerCase().trim() === 'tbd' ||
+                            deliveryPayload.delivery_address.toLowerCase().trim() === 'n/a'
+                          )) {
+                            console.warn('⚠️⚠️⚠️ PROTECTING REAL ADDRESS: Existing delivery_request has real address, not overwriting with placeholder');
+                            console.warn('   Existing address:', existingAddress.substring(0, 50));
+                            console.warn('   Attempted placeholder:', deliveryPayload.delivery_address);
+                            // Keep the existing real address
+                            deliveryPayload.delivery_address = existingAddress;
+                          }
+                        }
+                      }
+                    }
+                  } catch (existingCheckError: any) {
+                    console.warn('⚠️ Could not check existing address (non-critical):', existingCheckError.message);
+                  }
+                  
                   // Update the existing one
                   const updateResponse = await fetchWithTimeout(
                     `${SUPABASE_URL}/rest/v1/delivery_requests?id=eq.${deliveryRequestId}`,
