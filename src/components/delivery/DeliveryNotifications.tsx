@@ -2363,9 +2363,48 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
                       <p className="text-sm text-red-900 font-medium mt-1 ml-6">
                         Delivery address missing - contact builder
                       </p>
-                      <p className="text-[10px] text-gray-500 mt-1 ml-6">
-                        Debug: Request ID {notification.delivery_request_id.slice(0, 8)}... - Check console for details
-                      </p>
+                      <div className="mt-2 flex items-center gap-2 ml-6">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="text-xs h-7"
+                          onClick={async () => {
+                            if (notification.delivery_request_id) {
+                              console.log('🔍 Checking delivery address in database for:', notification.delivery_request_id);
+                              const addressCheck = await checkDeliveryAddress(notification.delivery_request_id);
+                              if (addressCheck) {
+                                console.log('📍📍📍 DATABASE CHECK RESULT:', {
+                                  delivery_request_id: addressCheck.delivery_request_id,
+                                  delivery_address: addressCheck.delivery_address,
+                                  delivery_coordinates: addressCheck.delivery_coordinates,
+                                  purchase_order_id: addressCheck.purchase_order_id,
+                                  status: addressCheck.status,
+                                  created_at: addressCheck.created_at
+                                });
+                                toast({
+                                  title: addressCheck.delivery_address ? '✅ Address Found in Database!' : '❌ No Address in Database',
+                                  description: addressCheck.delivery_address 
+                                    ? `Address: ${addressCheck.delivery_address.substring(0, 60)}${addressCheck.delivery_address.length > 60 ? '...' : ''}` 
+                                    : 'The address is not saved in the database. Check console for full details.',
+                                  variant: addressCheck.delivery_address ? 'default' : 'destructive',
+                                  duration: 10000
+                                });
+                              } else {
+                                toast({
+                                  title: 'Check Failed',
+                                  description: 'Could not check database. See console for details.',
+                                  variant: 'destructive'
+                                });
+                              }
+                            }
+                          }}
+                        >
+                          🔍 Check Database
+                        </Button>
+                        <p className="text-[10px] text-gray-500">
+                          ID: {notification.delivery_request_id.slice(0, 8)}...
+                        </p>
+                      </div>
                     </div>
                   )}
 
