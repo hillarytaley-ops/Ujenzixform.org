@@ -124,14 +124,31 @@ export const FloatingSocialSidebar: React.FC = () => {
                 href={link.href}
                 target={link.href.startsWith('http') ? '_blank' : undefined}
                 rel={link.href.startsWith('http') ? 'noopener noreferrer' : undefined}
-                className={`group relative flex items-center justify-center w-11 h-11 ${link.bg} ${link.hoverBg} rounded-full shadow-lg hover:scale-110 transition-all duration-200`}
+                className={`group relative flex items-center justify-center w-11 h-11 ${link.bg} ${link.hoverBg} rounded-full shadow-lg hover:scale-110 transition-all duration-200 active:scale-95 touch-manipulation`}
                 style={{ 
                   transitionDelay: isOpen ? `${index * 40}ms` : '0ms',
                   transform: isOpen ? 'scale(1)' : 'scale(0.5)',
+                  touchAction: 'manipulation',
+                  WebkitTapHighlightColor: 'transparent',
+                  cursor: 'pointer',
                 }}
                 title={link.name}
+                onClick={(e) => {
+                  // Ensure click works on mobile
+                  e.stopPropagation();
+                }}
+                onTouchStart={(e) => {
+                  // Provide visual feedback on touch
+                  e.currentTarget.style.opacity = '0.8';
+                }}
+                onTouchEnd={(e) => {
+                  // Reset opacity after touch
+                  setTimeout(() => {
+                    e.currentTarget.style.opacity = '1';
+                  }, 100);
+                }}
               >
-                <IconComponent size={20} className="text-white" />
+                <IconComponent size={20} className="text-white pointer-events-none" />
                 {/* Tooltip - positioned to the right */}
                 <span className="absolute left-full ml-3 bg-gray-900 text-white text-xs px-2.5 py-1.5 rounded-md opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none shadow-lg">
                   {link.name}
@@ -144,11 +161,26 @@ export const FloatingSocialSidebar: React.FC = () => {
         {/* Main toggle button */}
         <button
           onClick={() => setIsOpen(!isOpen)}
-          className={`relative flex items-center justify-center w-14 h-14 rounded-full shadow-lg hover:shadow-xl hover:scale-110 transition-all duration-300 ${
+          onTouchStart={(e) => {
+            // Provide visual feedback on touch
+            e.currentTarget.style.opacity = '0.8';
+          }}
+          onTouchEnd={(e) => {
+            // Reset opacity after touch
+            setTimeout(() => {
+              e.currentTarget.style.opacity = '1';
+            }, 100);
+          }}
+          className={`relative flex items-center justify-center w-14 h-14 rounded-full shadow-lg hover:shadow-xl hover:scale-110 transition-all duration-300 active:scale-95 touch-manipulation ${
             isOpen 
               ? 'bg-gray-800 rotate-180' 
               : 'bg-gradient-to-br from-orange-500 to-red-600 hover:from-orange-600 hover:to-red-700'
           }`}
+          style={{
+            touchAction: 'manipulation',
+            WebkitTapHighlightColor: 'transparent',
+            cursor: 'pointer',
+          }}
           aria-label={isOpen ? 'Close social links' : 'Open social links'}
         >
           {isOpen ? (
@@ -204,16 +236,40 @@ export const FloatingSocialSidebar: React.FC = () => {
                 href={link.href}
                 target={link.href.startsWith('http') ? '_blank' : undefined}
                 rel={link.href.startsWith('http') ? 'noopener noreferrer' : undefined}
-                className={`flex items-center justify-center ${link.bg} ${link.hoverBg} rounded-full shadow-lg transition-all duration-200`}
+                className={`flex items-center justify-center ${link.bg} ${link.hoverBg} rounded-full shadow-lg transition-all duration-200 active:scale-95 touch-manipulation`}
                 style={{ 
                   width: '40px',
                   height: '40px',
                   transitionDelay: isOpen ? `${index * 30}ms` : '0ms',
                   transform: isOpen ? 'scale(1)' : 'scale(0.5)',
+                  touchAction: 'manipulation',
+                  WebkitTapHighlightColor: 'transparent',
+                  cursor: 'pointer',
+                  userSelect: 'none',
+                  WebkitUserSelect: 'none',
                 }}
                 title={link.name}
+                onClick={(e) => {
+                  // Ensure click works on mobile
+                  e.stopPropagation();
+                  if (link.href.startsWith('http')) {
+                    window.open(link.href, '_blank', 'noopener,noreferrer');
+                  } else {
+                    window.location.href = link.href;
+                  }
+                }}
+                onTouchStart={(e) => {
+                  // Provide visual feedback on touch
+                  e.currentTarget.style.opacity = '0.8';
+                }}
+                onTouchEnd={(e) => {
+                  // Reset opacity after touch
+                  setTimeout(() => {
+                    e.currentTarget.style.opacity = '1';
+                  }, 100);
+                }}
               >
-                <IconComponent size={18} className="text-white" />
+                <IconComponent size={18} className="text-white pointer-events-none" />
               </a>
             );
           })}
@@ -222,12 +278,26 @@ export const FloatingSocialSidebar: React.FC = () => {
         {/* Main toggle button - 44px same as chatbot */}
         <button
           onClick={() => setIsOpen(!isOpen)}
-          className={`relative flex items-center justify-center rounded-full shadow-lg hover:shadow-xl transition-all duration-300 ${
-            isOpen 
-              ? 'bg-gray-800' 
-              : 'bg-gradient-to-br from-orange-500 to-red-600'
-          }`}
-          style={{ width: '44px', height: '44px' }}
+          onTouchStart={(e) => {
+            // Provide visual feedback on touch
+            e.currentTarget.style.opacity = '0.8';
+          }}
+          onTouchEnd={(e) => {
+            // Reset opacity after touch
+            setTimeout(() => {
+              e.currentTarget.style.opacity = '1';
+            }, 100);
+          }}
+          className={`relative flex items-center justify-center rounded-full shadow-lg hover:shadow-xl transition-all duration-300 active:scale-95 touch-manipulation`}
+          style={{ 
+            width: '44px', 
+            height: '44px',
+            touchAction: 'manipulation',
+            WebkitTapHighlightColor: 'transparent',
+            cursor: 'pointer',
+            userSelect: 'none',
+            WebkitUserSelect: 'none',
+          }}
           aria-label={isOpen ? 'Close social links' : 'Open social links'}
         >
           {isOpen ? (
