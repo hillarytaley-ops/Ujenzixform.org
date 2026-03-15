@@ -472,49 +472,52 @@ const DeliveryDashboard = () => {
       // CRITICAL: Fetch delivery_requests to get the builder-provided delivery_address
       // The builder fills in delivery_address in delivery_requests table during delivery request
       const purchaseOrderIds = isolatedHistory.map((d: any) => d.purchase_order_id || d.id).filter(Boolean);
-      let deliveryRequestsMap = new Map<string, any>();
       
-      if (purchaseOrderIds.length > 0) {
-        try {
-          const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
-          const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
-          
-          let accessToken = SUPABASE_ANON_KEY;
+      // Fetch delivery_requests asynchronously and then format history
+      (async () => {
+        let deliveryRequestsMap = new Map<string, any>();
+        
+        if (purchaseOrderIds.length > 0) {
           try {
-            const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
-            if (storedSession) {
-              const parsed = JSON.parse(storedSession);
-              if (parsed.access_token) accessToken = parsed.access_token;
-            }
-          } catch (e) {}
-          
-          const headers = {
-            'apikey': SUPABASE_ANON_KEY,
-            'Authorization': `Bearer ${accessToken}`
-          };
-          
-          // Fetch delivery_requests for these purchase_orders to get builder-provided delivery_address
-          const drResponse = await fetch(
-            `${SUPABASE_URL}/rest/v1/delivery_requests?purchase_order_id=in.(${purchaseOrderIds.join(',')})&select=id,purchase_order_id,delivery_address,pickup_address&limit=500`,
-            { headers, cache: 'no-store' }
-          );
-          
-          if (drResponse.ok) {
-            const drData = await drResponse.json();
-            // Map by purchase_order_id for quick lookup
-            drData.forEach((dr: any) => {
-              if (dr.purchase_order_id) {
-                deliveryRequestsMap.set(dr.purchase_order_id, dr);
+            const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
+            const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
+            
+            let accessToken = SUPABASE_ANON_KEY;
+            try {
+              const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+              if (storedSession) {
+                const parsed = JSON.parse(storedSession);
+                if (parsed.access_token) accessToken = parsed.access_token;
               }
-            });
-            console.log('✅ Fetched', drData.length, 'delivery_requests for history - builder-provided addresses available');
+            } catch (e) {}
+            
+            const headers = {
+              'apikey': SUPABASE_ANON_KEY,
+              'Authorization': `Bearer ${accessToken}`
+            };
+            
+            // Fetch delivery_requests for these purchase_orders to get builder-provided delivery_address
+            const drResponse = await fetch(
+              `${SUPABASE_URL}/rest/v1/delivery_requests?purchase_order_id=in.(${purchaseOrderIds.join(',')})&select=id,purchase_order_id,delivery_address,pickup_address&limit=500`,
+              { headers, cache: 'no-store' }
+            );
+            
+            if (drResponse.ok) {
+              const drData = await drResponse.json();
+              // Map by purchase_order_id for quick lookup
+              drData.forEach((dr: any) => {
+                if (dr.purchase_order_id) {
+                  deliveryRequestsMap.set(dr.purchase_order_id, dr);
+                }
+              });
+              console.log('✅ Fetched', drData.length, 'delivery_requests for history - builder-provided addresses available');
+            }
+          } catch (e: any) {
+            console.warn('⚠️ Could not fetch delivery_requests for history:', e?.message);
           }
-        } catch (e: any) {
-          console.warn('⚠️ Could not fetch delivery_requests for history:', e?.message);
         }
-      }
-      
-      const formattedHistory: DeliveryHistory[] = isolatedHistory.map((d: any) => {
+        
+        const formattedHistory: DeliveryHistory[] = isolatedHistory.map((d: any) => {
         const poId = d.purchase_order_id || d.id;
         const deliveryRequest = deliveryRequestsMap.get(poId);
         
