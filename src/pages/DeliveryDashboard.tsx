@@ -551,6 +551,7 @@ const DeliveryDashboard = () => {
       // Run validation asynchronously
       // Note: validateOrders() will call setActiveDeliveries() when complete
       validateOrders();
+      })(); // End async IIFE for fetching delivery_requests
       
       // Log initial count (validation will update state asynchronously)
       console.log('🚚 Processing', isolatedActiveDeliveries.length, 'active deliveries for validation');
