@@ -686,7 +686,15 @@ export const DeliveryPromptDialog: React.FC<DeliveryPromptDialogProps> = ({
           if (deliveryResponse.ok) {
             const deliveryData = await deliveryResponse.json();
             deliveryRequestId = Array.isArray(deliveryData) ? deliveryData[0]?.id : deliveryData?.id;
+            const savedDelivery = Array.isArray(deliveryData) ? deliveryData[0] : deliveryData;
             console.log('✅ Delivery request created:', deliveryRequestId);
+            console.log('📍📍📍 SAVED ADDRESS VERIFICATION:', {
+              delivery_request_id: deliveryRequestId,
+              saved_delivery_address: savedDelivery?.delivery_address,
+              saved_address_length: savedDelivery?.delivery_address?.length || 0,
+              saved_coordinates: savedDelivery?.delivery_coordinates,
+              matches_payload: savedDelivery?.delivery_address === deliveryPayload.delivery_address
+            });
             // CRITICAL: Cancel all other duplicate delivery requests for this order
             await cancelDuplicateDeliveryRequests(deliveryRequestId, purchaseOrder.id, deliveryPayload.delivery_address, deliveryPayload.material_type, accessToken);
           } else {
