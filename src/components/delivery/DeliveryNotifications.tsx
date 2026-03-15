@@ -699,8 +699,38 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
         );
         
         if (isPlaceholder) {
-          console.warn(`⚠️ PLACEHOLDER DETECTED: Delivery request ${dr.id.slice(0, 8)} has placeholder address "${deliveryAddr}" - replacing with error message`);
-          deliveryAddr = 'Delivery address missing - contact builder';
+          console.warn(`⚠️ PLACEHOLDER DETECTED: Delivery request ${dr.id.slice(0, 8)} has placeholder address "${deliveryAddr}" - attempting fallback to purchase_order address`);
+          
+          // FALLBACK: Try to get address from purchase_order if delivery_request has placeholder
+          if (poId && poMap.has(poId)) {
+            const po = poMap.get(poId);
+            const poAddress = (po?.delivery_address || '').trim();
+            
+            // Check if purchase_order address is valid (not a placeholder)
+            const isPOPlaceholder = poAddress && (
+              poAddress.toLowerCase() === 'to be provided' || 
+              poAddress.toLowerCase() === 'tbd' || 
+              poAddress.toLowerCase() === 'n/a' || 
+              poAddress.toLowerCase() === 'na' || 
+              poAddress.toLowerCase() === 'tba' || 
+              poAddress.toLowerCase() === 'to be determined' ||
+              poAddress.toLowerCase() === 'delivery location' ||
+              poAddress.toLowerCase() === 'address not found'
+            );
+            
+            if (poAddress && !isPOPlaceholder && poAddress.length >= 3) {
+              deliveryAddr = poAddress;
+              console.log(`✅ FALLBACK SUCCESS: Using purchase_order address: "${deliveryAddr.substring(0, 50)}..."`);
+            } else {
+              // Purchase order also has placeholder or invalid address
+              deliveryAddr = 'Delivery address missing - contact builder';
+              console.warn(`⚠️ FALLBACK FAILED: Purchase order also has placeholder/invalid address - showing error message`);
+            }
+          } else {
+            // No purchase_order found or not in map
+            deliveryAddr = 'Delivery address missing - contact builder';
+            console.warn(`⚠️ NO FALLBACK: Purchase order not found for ${poId?.slice(0, 8) || 'NULL'} - showing error message`);
+          }
         }
         
         // CRITICAL: For pending/requested/assigned status, show even if address is placeholder
