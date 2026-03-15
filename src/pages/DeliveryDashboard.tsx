@@ -497,10 +497,12 @@ const DeliveryDashboard = () => {
             };
             
             // Fetch delivery_requests for these purchase_orders to get builder-provided delivery_address
+            // CRITICAL: Query ALL statuses (not just pending) because these are completed orders
             // CRITICAL: Use proper PostgREST syntax for IN query (no quotes around UUIDs)
             const poIdsParam = purchaseOrderIds.join(',');
+            console.log('🔍 Fetching delivery_requests for', purchaseOrderIds.length, 'purchase_order_ids:', purchaseOrderIds.slice(0, 3).map(id => id.substring(0, 8)));
             const drResponse = await fetch(
-              `${SUPABASE_URL}/rest/v1/delivery_requests?purchase_order_id=in.(${poIdsParam})&select=id,purchase_order_id,delivery_address,pickup_address&limit=500`,
+              `${SUPABASE_URL}/rest/v1/delivery_requests?purchase_order_id=in.(${poIdsParam})&select=id,purchase_order_id,delivery_address,pickup_address,status&order=created_at.desc&limit=500`,
               { headers, cache: 'no-store' }
             );
             
