@@ -84,6 +84,7 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
   const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [cleaningUp, setCleaningUp] = useState(false);
+  const [checkingAddress, setCheckingAddress] = useState<string | null>(null); // Track which address is being checked
   const { toast } = useToast();
 
   // Helper to get auth headers
