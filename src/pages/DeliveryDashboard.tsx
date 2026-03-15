@@ -1169,6 +1169,7 @@ const DeliveryDashboard = () => {
           } else {
             console.error('❌ COMPONENT AGGRESSIVE: Failed to find any of the 3 known delivered orders!');
           }
+        }
         } catch (aggressiveError: any) {
           console.error('❌ COMPONENT AGGRESSIVE: Error:', aggressiveError?.message || aggressiveError);
         }
