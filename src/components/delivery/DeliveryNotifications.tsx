@@ -668,14 +668,39 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
         // CRITICAL: Builder-provided address from delivery_requests table - this is what the builder typed during delivery request
         let deliveryAddr = (dr.delivery_address || '').trim();
         
+        // CRITICAL: Log the raw address from database for debugging
+        console.log(`📍 ADDRESS FETCH: Delivery request ${dr.id.slice(0, 8)} - Raw delivery_address from DB: "${deliveryAddr || 'NULL/EMPTY'}"`);
+        
         // CRITICAL: If delivery_address includes coordinates, use the full string (coordinates + address)
         // The builder may have entered coordinates with address like "1.2921, 36.8219 | Nairobi, Kenya"
         if (dr.delivery_coordinates && deliveryAddr && !deliveryAddr.includes(dr.delivery_coordinates)) {
           // If coordinates exist but aren't in the address, prepend them
           deliveryAddr = `${dr.delivery_coordinates} | ${deliveryAddr}`;
+          console.log(`📍 COORDINATES ADDED: Combined coordinates with address: "${deliveryAddr.substring(0, 60)}..."`);
         } else if (dr.delivery_coordinates && !deliveryAddr) {
           // If only coordinates exist, use them
           deliveryAddr = dr.delivery_coordinates;
+          console.log(`📍 COORDINATES ONLY: Using coordinates as address: "${deliveryAddr}"`);
+        }
+        
+        // CRITICAL: Check for placeholder values BEFORE any other processing
+        // If the address is a placeholder, replace it with an error message
+        const isPlaceholder = deliveryAddr && (
+          deliveryAddr.toLowerCase() === 'to be provided' || 
+          deliveryAddr.toLowerCase() === 'tbd' || 
+          deliveryAddr.toLowerCase() === 't.b.d.' ||
+          deliveryAddr.toLowerCase() === 'n/a' || 
+          deliveryAddr.toLowerCase() === 'na' || 
+          deliveryAddr.toLowerCase() === 'tba' || 
+          deliveryAddr.toLowerCase() === 'to be determined' ||
+          deliveryAddr.toLowerCase() === 'delivery location' ||
+          deliveryAddr.toLowerCase() === 'address not found' ||
+          deliveryAddr.toLowerCase() === 'address not specified by builder'
+        );
+        
+        if (isPlaceholder) {
+          console.warn(`⚠️ PLACEHOLDER DETECTED: Delivery request ${dr.id.slice(0, 8)} has placeholder address "${deliveryAddr}" - replacing with error message`);
+          deliveryAddr = 'Delivery address missing - contact builder';
         }
         
         // CRITICAL: For pending/requested/assigned status, show even if address is placeholder
@@ -692,19 +717,6 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
             return; // Filter out - only pending/requested/assigned can have empty address
           }
         }
-        
-        // Check if it's a placeholder (exact matches only, not partial)
-        // CRITICAL: Also check for our error message - don't treat it as placeholder
-        const isPlaceholder = deliveryAddr && (
-          deliveryAddr.toLowerCase() === 'to be provided' || 
-          deliveryAddr.toLowerCase() === 'tbd' || 
-          deliveryAddr.toLowerCase() === 'n/a' || 
-          deliveryAddr.toLowerCase() === 'na' || 
-          deliveryAddr.toLowerCase() === 'tba' || 
-          deliveryAddr.toLowerCase() === 'to be determined' ||
-          deliveryAddr.toLowerCase() === 'delivery location' ||
-          deliveryAddr.toLowerCase() === 'address not found'
-        ) && deliveryAddr.toLowerCase() !== 'delivery address missing - contact builder';
         
         // Check if it's a GPS coordinate (contains numbers and comma, or starts with GPS:)
         const isGPSCoordinate = deliveryAddr && (
