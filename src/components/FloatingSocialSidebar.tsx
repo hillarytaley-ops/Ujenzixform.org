@@ -333,12 +333,17 @@ export const FloatingSocialSidebar: React.FC = () => {
         
         {/* Main toggle button - 44px same as chatbot - ORANGE COLOR PRESERVED */}
         <button
-          onClick={() => setIsOpen(!isOpen)}
+          onClick={(e) => {
+            e.stopPropagation();
+            setIsOpen(!isOpen);
+          }}
           onTouchStart={(e) => {
+            e.stopPropagation();
             // Provide visual feedback on touch
             e.currentTarget.style.opacity = '0.8';
           }}
           onTouchEnd={(e) => {
+            e.stopPropagation();
             // Reset opacity after touch
             setTimeout(() => {
               e.currentTarget.style.opacity = '1';
