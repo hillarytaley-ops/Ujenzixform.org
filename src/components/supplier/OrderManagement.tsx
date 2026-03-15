@@ -462,7 +462,8 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, is
                   .single();
                 
                 if (providerData) {
-                  providerName = providerData.provider_name || providerData.company_name || 'Delivery Provider';
+                  // CRITICAL: Use provider_name (primary field) - this is what the provider filled in during registration
+                  providerName = providerData.provider_name || 'Delivery Provider';
                   providerPhone = providerData.phone || '';
                 } else {
                   // Try to get from profiles table
@@ -699,7 +700,8 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, is
             const arr = await fromProviders.json();
             (arr || []).forEach((p: any) => {
               if (p.id) {
-                providerNames[p.id] = p.provider_name || p.company_name || 'Delivery Provider';
+                // CRITICAL: Use provider_name (primary field) - this is what the provider filled in during registration
+                providerNames[p.id] = p.provider_name || 'Delivery Provider';
                 if (p.phone) providerPhones[p.id] = p.phone;
               }
             });

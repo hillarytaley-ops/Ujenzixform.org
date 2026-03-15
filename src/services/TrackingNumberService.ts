@@ -801,36 +801,83 @@ class TrackingNumberService {
       if (existingRequest.purchase_order_id) {
         console.log('📦 Step 4.5: Updating purchase_order with delivery provider info...');
         try {
-          // Get provider info first
+          // Get provider info first - try both id and user_id since providerId could be either
           let providerName = 'Delivery Provider';
           let providerPhone = null;
           
-          const providerInfoPromise = fetch(
-            `${SUPABASE_URL}/rest/v1/delivery_providers?user_id=eq.${providerId}&select=provider_name,phone,company_name&limit=1`,
-            {
-              headers: {
-                'apikey': SUPABASE_ANON_KEY,
-                'Authorization': `Bearer ${accessToken}`,
-                'Content-Type': 'application/json'
-              },
-              cache: 'no-store'
-            }
-          );
-          
-          const providerInfoTimeout = new Promise<never>((_, reject) => {
-            setTimeout(() => reject(new Error('Provider info timeout')), 3000);
-          });
+          // CRITICAL: providerId could be delivery_providers.id OR user_id
+          // Try querying by id first (if it's a delivery_providers.id)
+          let providerData: any = null;
           
           try {
-            const providerInfoResponse = await Promise.race([providerInfoPromise, providerInfoTimeout]);
-            if (providerInfoResponse.ok) {
-              const providerData = await providerInfoResponse.json();
-              if (Array.isArray(providerData) && providerData.length > 0) {
-                providerName = providerData[0].company_name || providerData[0].provider_name || 'Delivery Provider';
-                providerPhone = providerData[0].phone;
+            // First attempt: Query by id (delivery_providers.id)
+            const providerByIdPromise = fetch(
+              `${SUPABASE_URL}/rest/v1/delivery_providers?id=eq.${providerId}&select=id,provider_name,phone,user_id&limit=1`,
+              {
+                headers: {
+                  'apikey': SUPABASE_ANON_KEY,
+                  'Authorization': `Bearer ${accessToken}`,
+                  'Content-Type': 'application/json'
+                },
+                cache: 'no-store'
+              }
+            );
+            
+            const providerByIdTimeout = new Promise<never>((_, reject) => {
+              setTimeout(() => reject(new Error('Provider by id timeout')), 3000);
+            });
+            
+            const providerByIdResponse = await Promise.race([providerByIdPromise, providerByIdTimeout]);
+            if (providerByIdResponse.ok) {
+              const data = await providerByIdResponse.json();
+              if (Array.isArray(data) && data.length > 0) {
+                providerData = data[0];
+                console.log('✅ Found provider by id:', providerData.provider_name);
               }
             }
           } catch (e) {
+            console.log('⚠️ Provider lookup by id failed, trying user_id...');
+          }
+          
+          // Second attempt: Query by user_id (if first attempt failed or providerId is user_id)
+          if (!providerData) {
+            try {
+              const providerByUserIdPromise = fetch(
+                `${SUPABASE_URL}/rest/v1/delivery_providers?user_id=eq.${providerId}&select=id,provider_name,phone,user_id&limit=1`,
+                {
+                  headers: {
+                    'apikey': SUPABASE_ANON_KEY,
+                    'Authorization': `Bearer ${accessToken}`,
+                    'Content-Type': 'application/json'
+                  },
+                  cache: 'no-store'
+                }
+              );
+              
+              const providerByUserIdTimeout = new Promise<never>((_, reject) => {
+                setTimeout(() => reject(new Error('Provider by user_id timeout')), 3000);
+              });
+              
+              const providerByUserIdResponse = await Promise.race([providerByUserIdPromise, providerByUserIdTimeout]);
+              if (providerByUserIdResponse.ok) {
+                const data = await providerByUserIdResponse.json();
+                if (Array.isArray(data) && data.length > 0) {
+                  providerData = data[0];
+                  console.log('✅ Found provider by user_id:', providerData.provider_name);
+                }
+              }
+            } catch (e) {
+              console.log('⚠️ Provider lookup by user_id failed, trying profiles...');
+            }
+          }
+          
+          // Extract provider name and phone from delivery_providers
+          if (providerData) {
+            // CRITICAL: Use provider_name (primary field) - this is what the provider filled in during registration
+            providerName = providerData.provider_name || 'Delivery Provider';
+            providerPhone = providerData.phone || null;
+            console.log('✅ Using provider info from delivery_providers:', { name: providerName, phone: providerPhone });
+          } else {
             // Fallback: Try profiles table
             try {
               const profilePromise = fetch(
@@ -854,11 +901,12 @@ class TrackingNumberService {
                 const profiles = await profileResponse.json();
                 if (Array.isArray(profiles) && profiles.length > 0) {
                   providerName = profiles[0].full_name || 'Delivery Provider';
-                  providerPhone = profiles[0].phone;
+                  providerPhone = profiles[0].phone || null;
+                  console.log('✅ Using provider info from profiles:', { name: providerName, phone: providerPhone });
                 }
               }
             } catch (e2) {
-              // Use defaults
+              console.warn('⚠️ Could not fetch provider info from any source, using defaults');
             }
           }
           
@@ -990,8 +1038,10 @@ class TrackingNumberService {
               ).then(r => r.ok ? r.json() : []).then(d => Array.isArray(d) && d.length > 0 ? d[0] : null).catch(() => null)
             : Promise.resolve(null);
           
-          const providerPromise = fetch(
-            `${SUPABASE_URL}/rest/v1/delivery_providers?user_id=eq.${providerId}&select=provider_name,phone,company_name&limit=1`,
+          // CRITICAL: providerId could be delivery_providers.id OR user_id
+          // Try both queries and use the first successful result
+          const providerPromiseById = fetch(
+            `${SUPABASE_URL}/rest/v1/delivery_providers?id=eq.${providerId}&select=id,provider_name,phone,user_id&limit=1`,
             {
               headers: {
                 'apikey': SUPABASE_ANON_KEY,
@@ -1001,6 +1051,29 @@ class TrackingNumberService {
               cache: 'no-store'
             }
           ).then(r => r.ok ? r.json() : []).then(d => Array.isArray(d) && d.length > 0 ? d[0] : null).catch(() => null);
+          
+          const providerPromiseByUserId = fetch(
+            `${SUPABASE_URL}/rest/v1/delivery_providers?user_id=eq.${providerId}&select=id,provider_name,phone,user_id&limit=1`,
+            {
+              headers: {
+                'apikey': SUPABASE_ANON_KEY,
+                'Authorization': `Bearer ${accessToken}`,
+                'Content-Type': 'application/json'
+              },
+              cache: 'no-store'
+            }
+          ).then(r => r.ok ? r.json() : []).then(d => Array.isArray(d) && d.length > 0 ? d[0] : null).catch(() => null);
+          
+          // Try both and use the first successful result
+          const providerPromise = Promise.allSettled([providerPromiseById, providerPromiseByUserId])
+            .then(results => {
+              for (const result of results) {
+                if (result.status === 'fulfilled' && result.value) {
+                  return result.value;
+                }
+              }
+              return null;
+            });
           
           const [builderProfileResult, poResult, providerResult] = await Promise.allSettled([
             Promise.race([builderProfilePromise, lookupTimeout]),
@@ -1044,8 +1117,10 @@ class TrackingNumberService {
 
           // Process provider result
           if (providerResult.status === 'fulfilled' && providerResult.value) {
-            providerName = providerResult.value.company_name || providerResult.value.provider_name || 'Delivery Provider';
-            providerPhone = providerResult.value.phone;
+            // CRITICAL: Use provider_name (primary field) - this is what the provider filled in during registration
+            providerName = providerResult.value.provider_name || 'Delivery Provider';
+            providerPhone = providerResult.value.phone || null;
+            console.log('✅ Step 5: Using provider info from delivery_providers:', { name: providerName, phone: providerPhone });
           } else {
             // Fallback: Try profiles table if delivery_providers didn't work
             try {
