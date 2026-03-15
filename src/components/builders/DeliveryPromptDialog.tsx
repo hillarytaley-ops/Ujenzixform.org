@@ -366,15 +366,27 @@ export const DeliveryPromptDialog: React.FC<DeliveryPromptDialogProps> = ({
   const handleRequestDelivery = async () => {
     if (!purchaseOrder) return;
 
-    // Validate required fields - either address or coordinates
-    if (!deliveryData.deliveryAddress.trim() && !deliveryData.deliveryCoordinates.trim()) {
+    // CRITICAL: Validate required fields - either address or coordinates MUST be provided
+    // Delivery address is MANDATORY - builder must provide it before creating delivery request
+    const hasAddress = deliveryData.deliveryAddress.trim() && 
+                       deliveryData.deliveryAddress.toLowerCase() !== 'to be provided' &&
+                       deliveryData.deliveryAddress.toLowerCase() !== 'tbd' &&
+                       deliveryData.deliveryAddress.toLowerCase() !== 'n/a';
+    const hasCoordinates = deliveryData.deliveryCoordinates.trim();
+    
+    if (!hasAddress && !hasCoordinates) {
       toast({
-        title: 'Location Required',
-        description: 'Please provide either GPS coordinates or a delivery address.',
+        title: 'Delivery Address Required',
+        description: 'Please provide either a delivery address or GPS coordinates. This is mandatory for delivery service providers.',
         variant: 'destructive'
       });
+      setSubmitting(false);
       return;
     }
+    
+    // If only coordinates provided, that's acceptable (will be used as address)
+    // If only address provided, that's acceptable
+    // But we prefer both for better accuracy
 
     if (!deliveryData.preferredDate) {
       toast({
