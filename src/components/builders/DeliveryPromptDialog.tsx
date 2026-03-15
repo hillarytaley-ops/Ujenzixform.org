@@ -685,6 +685,68 @@ export const DeliveryPromptDialog: React.FC<DeliveryPromptDialogProps> = ({
             
             if (updateResponse.ok) {
               console.log('✅ Updated existing delivery request:', deliveryRequestId);
+              
+              // CRITICAL: Also update purchase_orders.delivery_address with the real address builder provided
+              // This ensures both tables stay in sync and the address doesn't disappear
+              // ONLY update if the new address is NOT a placeholder
+              const isNewAddressPlaceholder = deliveryPayload.delivery_address && (
+                deliveryPayload.delivery_address.toLowerCase().trim() === 'to be provided' ||
+                deliveryPayload.delivery_address.toLowerCase().trim() === 'tbd' ||
+                deliveryPayload.delivery_address.toLowerCase().trim() === 'n/a' ||
+                deliveryPayload.delivery_address.toLowerCase().trim() === 'na' ||
+                deliveryPayload.delivery_address.toLowerCase().trim() === 'tba' ||
+                deliveryPayload.delivery_address.toLowerCase().trim() === 'to be determined' ||
+                deliveryPayload.delivery_address.toLowerCase().trim() === 'delivery location' ||
+                deliveryPayload.delivery_address.toLowerCase().trim() === 'address not found'
+              );
+              
+              if (deliveryPayload.delivery_address && 
+                  !isNewAddressPlaceholder &&
+                  deliveryPayload.delivery_address.length > 10) {
+                try {
+                  // CRITICAL: Check existing purchase_order address before updating
+                  // Don't overwrite a real address with a placeholder
+                  const existingPOAddress = purchaseOrder.delivery_address;
+                  const isExistingPOAddressPlaceholder = existingPOAddress && (
+                    existingPOAddress.toLowerCase().trim() === 'to be provided' ||
+                    existingPOAddress.toLowerCase().trim() === 'tbd' ||
+                    existingPOAddress.toLowerCase().trim() === 'n/a'
+                  );
+                  
+                  // Only update if: new address is real AND (existing is placeholder OR doesn't exist)
+                  if (!isExistingPOAddressPlaceholder || !existingPOAddress || existingPOAddress.length <= 10) {
+                    const updatePOResponse = await fetchWithTimeout(
+                      `${SUPABASE_URL}/rest/v1/purchase_orders?id=eq.${purchaseOrder.id}`,
+                      {
+                        method: 'PATCH',
+                        headers: {
+                          'apikey': SUPABASE_ANON_KEY,
+                          'Authorization': `Bearer ${accessToken}`,
+                          'Content-Type': 'application/json',
+                          'Prefer': 'return=representation'
+                        },
+                        body: JSON.stringify({
+                          delivery_address: deliveryPayload.delivery_address,
+                          updated_at: new Date().toISOString()
+                        })
+                      },
+                      5000
+                    );
+                    
+                    if (updatePOResponse.ok) {
+                      console.log('✅✅✅ SYNCED: Updated purchase_orders.delivery_address with builder-provided address:', deliveryPayload.delivery_address.substring(0, 50));
+                    } else {
+                      const errorText = await updatePOResponse.text();
+                      console.warn('⚠️ Failed to update purchase_orders.delivery_address:', errorText);
+                    }
+                  } else {
+                    console.log('⚠️ Skipping purchase_order update - existing address is real, not overwriting');
+                  }
+                } catch (updatePOError: any) {
+                  console.warn('⚠️ Error updating purchase_orders.delivery_address (non-critical):', updatePOError.message);
+                }
+              }
+              
               // CRITICAL: Cancel all other duplicate delivery requests for this order
               await cancelDuplicateDeliveryRequests(deliveryRequestId, purchaseOrder.id, deliveryPayload.delivery_address, deliveryPayload.material_type, accessToken);
             } else {
@@ -790,6 +852,66 @@ export const DeliveryPromptDialog: React.FC<DeliveryPromptDialogProps> = ({
               
               if (updateResponse.ok) {
                 console.log('✅ Updated existing delivery request:', deliveryRequestId);
+                
+                // CRITICAL: Also update purchase_orders.delivery_address with the real address builder provided
+                // This ensures both tables stay in sync and the address doesn't disappear
+                const isNewAddressPlaceholder2 = deliveryPayload.delivery_address && (
+                  deliveryPayload.delivery_address.toLowerCase().trim() === 'to be provided' ||
+                  deliveryPayload.delivery_address.toLowerCase().trim() === 'tbd' ||
+                  deliveryPayload.delivery_address.toLowerCase().trim() === 'n/a' ||
+                  deliveryPayload.delivery_address.toLowerCase().trim() === 'na' ||
+                  deliveryPayload.delivery_address.toLowerCase().trim() === 'tba' ||
+                  deliveryPayload.delivery_address.toLowerCase().trim() === 'to be determined' ||
+                  deliveryPayload.delivery_address.toLowerCase().trim() === 'delivery location' ||
+                  deliveryPayload.delivery_address.toLowerCase().trim() === 'address not found'
+                );
+                
+                if (deliveryPayload.delivery_address && 
+                    !isNewAddressPlaceholder2 &&
+                    deliveryPayload.delivery_address.length > 10) {
+                  try {
+                    // Check existing purchase_order address before updating
+                    const existingPOAddress = purchaseOrder.delivery_address;
+                    const isExistingPOAddressPlaceholder = existingPOAddress && (
+                      existingPOAddress.toLowerCase().trim() === 'to be provided' ||
+                      existingPOAddress.toLowerCase().trim() === 'tbd' ||
+                      existingPOAddress.toLowerCase().trim() === 'n/a'
+                    );
+                    
+                    // Only update if: new address is real AND (existing is placeholder OR doesn't exist)
+                    if (isExistingPOAddressPlaceholder || !existingPOAddress || existingPOAddress.length <= 10) {
+                      const updatePOResponse = await fetchWithTimeout(
+                        `${SUPABASE_URL}/rest/v1/purchase_orders?id=eq.${purchaseOrder.id}`,
+                        {
+                          method: 'PATCH',
+                          headers: {
+                            'apikey': SUPABASE_ANON_KEY,
+                            'Authorization': `Bearer ${accessToken}`,
+                            'Content-Type': 'application/json',
+                            'Prefer': 'return=representation'
+                          },
+                          body: JSON.stringify({
+                            delivery_address: deliveryPayload.delivery_address,
+                            updated_at: new Date().toISOString()
+                          })
+                        },
+                        5000
+                      );
+                      
+                      if (updatePOResponse.ok) {
+                        console.log('✅✅✅ SYNCED: Updated purchase_orders.delivery_address with builder-provided address:', deliveryPayload.delivery_address.substring(0, 50));
+                      } else {
+                        const errorText = await updatePOResponse.text();
+                        console.warn('⚠️ Failed to update purchase_orders.delivery_address:', errorText);
+                      }
+                    } else {
+                      console.log('⚠️ Skipping purchase_order update - existing address is real, not overwriting');
+                    }
+                  } catch (updatePOError: any) {
+                    console.warn('⚠️ Error updating purchase_orders.delivery_address (non-critical):', updatePOError.message);
+                  }
+                }
+                
                 await cancelDuplicateDeliveryRequests(deliveryRequestId, purchaseOrder.id, deliveryPayload.delivery_address, deliveryPayload.material_type, accessToken);
               }
             }
@@ -829,6 +951,71 @@ export const DeliveryPromptDialog: React.FC<DeliveryPromptDialogProps> = ({
               saved_coordinates: savedDelivery?.delivery_coordinates,
               matches_payload: savedDelivery?.delivery_address === deliveryPayload.delivery_address
             });
+            
+            // CRITICAL: Also update purchase_orders.delivery_address with the real address builder provided
+            // This ensures both tables stay in sync and the address doesn't disappear
+            const isNewAddressPlaceholder3 = deliveryPayload.delivery_address && (
+              deliveryPayload.delivery_address.toLowerCase().trim() === 'to be provided' ||
+              deliveryPayload.delivery_address.toLowerCase().trim() === 'tbd' ||
+              deliveryPayload.delivery_address.toLowerCase().trim() === 'n/a' ||
+              deliveryPayload.delivery_address.toLowerCase().trim() === 'na' ||
+              deliveryPayload.delivery_address.toLowerCase().trim() === 'tba' ||
+              deliveryPayload.delivery_address.toLowerCase().trim() === 'to be determined' ||
+              deliveryPayload.delivery_address.toLowerCase().trim() === 'delivery location' ||
+              deliveryPayload.delivery_address.toLowerCase().trim() === 'address not found'
+            );
+            
+            if (deliveryPayload.delivery_address && 
+                !isNewAddressPlaceholder3 &&
+                deliveryPayload.delivery_address.length > 10) {
+              try {
+                // Check existing purchase_order address before updating
+                const existingPOAddress = purchaseOrder.delivery_address;
+                const isExistingPOAddressPlaceholder = existingPOAddress && (
+                  existingPOAddress.toLowerCase().trim() === 'to be provided' ||
+                  existingPOAddress.toLowerCase().trim() === 'tbd' ||
+                  existingPOAddress.toLowerCase().trim() === 'n/a'
+                );
+                
+                // Only update if: new address is real AND (existing is placeholder OR doesn't exist)
+                if (isExistingPOAddressPlaceholder || !existingPOAddress || existingPOAddress.length <= 10) {
+                  const updatePOResponse = await fetchWithTimeout(
+                    `${SUPABASE_URL}/rest/v1/purchase_orders?id=eq.${purchaseOrder.id}`,
+                    {
+                      method: 'PATCH',
+                      headers: {
+                        'apikey': SUPABASE_ANON_KEY,
+                        'Authorization': `Bearer ${accessToken}`,
+                        'Content-Type': 'application/json',
+                        'Prefer': 'return=representation'
+                      },
+                      body: JSON.stringify({
+                        delivery_address: deliveryPayload.delivery_address,
+                        updated_at: new Date().toISOString()
+                      })
+                    },
+                    5000
+                  );
+                  
+                  if (updatePOResponse.ok) {
+                    const updatedPO = await updatePOResponse.json();
+                    const poData = Array.isArray(updatedPO) ? updatedPO[0] : updatedPO;
+                    console.log('✅✅✅ SYNCED: Updated purchase_orders.delivery_address with builder-provided address');
+                    console.log('   Purchase Order ID:', purchaseOrder.id);
+                    console.log('   New address:', deliveryPayload.delivery_address.substring(0, 60));
+                    console.log('   Verified in DB:', poData?.delivery_address?.substring(0, 60));
+                  } else {
+                    const errorText = await updatePOResponse.text();
+                    console.warn('⚠️ Failed to update purchase_orders.delivery_address:', errorText);
+                  }
+                } else {
+                  console.log('⚠️ Skipping purchase_order update - existing address is real, not overwriting');
+                }
+              } catch (updatePOError: any) {
+                console.warn('⚠️ Error updating purchase_orders.delivery_address (non-critical):', updatePOError.message);
+              }
+            }
+            
             // CRITICAL: Cancel all other duplicate delivery requests for this order
             await cancelDuplicateDeliveryRequests(deliveryRequestId, purchaseOrder.id, deliveryPayload.delivery_address, deliveryPayload.material_type, accessToken);
           } else {
@@ -924,6 +1111,62 @@ export const DeliveryPromptDialog: React.FC<DeliveryPromptDialogProps> = ({
                     10000
                   );
                   if (updateResponse.ok) {
+                    // CRITICAL: Also update purchase_orders.delivery_address with the real address builder provided
+                    const isNewAddressPlaceholder4 = deliveryPayload.delivery_address && (
+                      deliveryPayload.delivery_address.toLowerCase().trim() === 'to be provided' ||
+                      deliveryPayload.delivery_address.toLowerCase().trim() === 'tbd' ||
+                      deliveryPayload.delivery_address.toLowerCase().trim() === 'n/a' ||
+                      deliveryPayload.delivery_address.toLowerCase().trim() === 'na' ||
+                      deliveryPayload.delivery_address.toLowerCase().trim() === 'tba' ||
+                      deliveryPayload.delivery_address.toLowerCase().trim() === 'to be determined' ||
+                      deliveryPayload.delivery_address.toLowerCase().trim() === 'delivery location' ||
+                      deliveryPayload.delivery_address.toLowerCase().trim() === 'address not found'
+                    );
+                    
+                    if (deliveryPayload.delivery_address && 
+                        !isNewAddressPlaceholder4 &&
+                        deliveryPayload.delivery_address.length > 10) {
+                      try {
+                        const existingPOAddress = purchaseOrder.delivery_address;
+                        const isExistingPOAddressPlaceholder = existingPOAddress && (
+                          existingPOAddress.toLowerCase().trim() === 'to be provided' ||
+                          existingPOAddress.toLowerCase().trim() === 'tbd' ||
+                          existingPOAddress.toLowerCase().trim() === 'n/a'
+                        );
+                        
+                        if (isExistingPOAddressPlaceholder || !existingPOAddress || existingPOAddress.length <= 10) {
+                          const updatePOResponse = await fetchWithTimeout(
+                            `${SUPABASE_URL}/rest/v1/purchase_orders?id=eq.${purchaseOrder.id}`,
+                            {
+                              method: 'PATCH',
+                              headers: {
+                                'apikey': SUPABASE_ANON_KEY,
+                                'Authorization': `Bearer ${accessToken}`,
+                                'Content-Type': 'application/json',
+                                'Prefer': 'return=representation'
+                              },
+                              body: JSON.stringify({
+                                delivery_address: deliveryPayload.delivery_address,
+                                updated_at: new Date().toISOString()
+                              })
+                            },
+                            5000
+                          );
+                          
+                          if (updatePOResponse.ok) {
+                            console.log('✅✅✅ SYNCED: Updated purchase_orders.delivery_address with builder-provided address:', deliveryPayload.delivery_address.substring(0, 50));
+                          } else {
+                            const errorText = await updatePOResponse.text();
+                            console.warn('⚠️ Failed to update purchase_orders.delivery_address:', errorText);
+                          }
+                        } else {
+                          console.log('⚠️ Skipping purchase_order update - existing address is real, not overwriting');
+                        }
+                      } catch (updatePOError: any) {
+                        console.warn('⚠️ Error updating purchase_orders.delivery_address (non-critical):', updatePOError.message);
+                      }
+                    }
+                    
                     await cancelDuplicateDeliveryRequests(deliveryRequestId, purchaseOrder.id, deliveryPayload.delivery_address, deliveryPayload.material_type, accessToken);
                   }
                 }
