@@ -124,31 +124,35 @@ export const FloatingSocialSidebar: React.FC = () => {
                 href={link.href}
                 target={link.href.startsWith('http') ? '_blank' : undefined}
                 rel={link.href.startsWith('http') ? 'noopener noreferrer' : undefined}
-                className={`group relative flex items-center justify-center w-11 h-11 ${link.bg} ${link.hoverBg} rounded-full shadow-lg hover:scale-110 transition-all duration-200 active:scale-95 touch-manipulation`}
+                className={`group relative flex items-center justify-center w-11 h-11 ${link.bg} ${link.hoverBg} rounded-full shadow-lg hover:scale-110 transition-all duration-200 active:scale-95`}
                 style={{ 
                   transitionDelay: isOpen ? `${index * 40}ms` : '0ms',
                   transform: isOpen ? 'scale(1)' : 'scale(0.5)',
                   touchAction: 'manipulation',
-                  WebkitTapHighlightColor: 'transparent',
+                  WebkitTapHighlightColor: 'rgba(0,0,0,0.1)',
                   cursor: 'pointer',
+                  zIndex: 9999,
                 }}
                 title={link.name}
-                onClick={(e) => {
-                  // Ensure click works on mobile
-                  e.stopPropagation();
-                }}
                 onTouchStart={(e) => {
                   // Provide visual feedback on touch
-                  e.currentTarget.style.opacity = '0.8';
+                  e.currentTarget.style.opacity = '0.7';
+                  e.currentTarget.style.transform = 'scale(0.9)';
                 }}
                 onTouchEnd={(e) => {
-                  // Reset opacity after touch
+                  // Reset after touch
                   setTimeout(() => {
                     e.currentTarget.style.opacity = '1';
-                  }, 100);
+                    e.currentTarget.style.transform = isOpen ? 'scale(1)' : 'scale(0.5)';
+                  }, 150);
+                }}
+                onTouchCancel={(e) => {
+                  // Reset if touch is cancelled
+                  e.currentTarget.style.opacity = '1';
+                  e.currentTarget.style.transform = isOpen ? 'scale(1)' : 'scale(0.5)';
                 }}
               >
-                <IconComponent size={20} className="text-white pointer-events-none" />
+                <IconComponent size={20} className="text-white" style={{ pointerEvents: 'none' }} />
                 {/* Tooltip - positioned to the right */}
                 <span className="absolute left-full ml-3 bg-gray-900 text-white text-xs px-2.5 py-1.5 rounded-md opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none shadow-lg">
                   {link.name}
@@ -236,40 +240,40 @@ export const FloatingSocialSidebar: React.FC = () => {
                 href={link.href}
                 target={link.href.startsWith('http') ? '_blank' : undefined}
                 rel={link.href.startsWith('http') ? 'noopener noreferrer' : undefined}
-                className={`flex items-center justify-center ${link.bg} ${link.hoverBg} rounded-full shadow-lg transition-all duration-200 active:scale-95 touch-manipulation`}
+                className={`flex items-center justify-center ${link.bg} ${link.hoverBg} rounded-full shadow-lg transition-all duration-200 active:scale-95`}
                 style={{ 
                   width: '40px',
                   height: '40px',
                   transitionDelay: isOpen ? `${index * 30}ms` : '0ms',
                   transform: isOpen ? 'scale(1)' : 'scale(0.5)',
                   touchAction: 'manipulation',
-                  WebkitTapHighlightColor: 'transparent',
+                  WebkitTapHighlightColor: 'rgba(0,0,0,0.1)',
                   cursor: 'pointer',
                   userSelect: 'none',
                   WebkitUserSelect: 'none',
+                  WebkitTouchCallout: 'none',
+                  zIndex: 9999,
                 }}
                 title={link.name}
-                onClick={(e) => {
-                  // Ensure click works on mobile
-                  e.stopPropagation();
-                  if (link.href.startsWith('http')) {
-                    window.open(link.href, '_blank', 'noopener,noreferrer');
-                  } else {
-                    window.location.href = link.href;
-                  }
-                }}
                 onTouchStart={(e) => {
                   // Provide visual feedback on touch
-                  e.currentTarget.style.opacity = '0.8';
+                  e.currentTarget.style.opacity = '0.7';
+                  e.currentTarget.style.transform = 'scale(0.9)';
                 }}
                 onTouchEnd={(e) => {
-                  // Reset opacity after touch
+                  // Reset after touch
                   setTimeout(() => {
                     e.currentTarget.style.opacity = '1';
-                  }, 100);
+                    e.currentTarget.style.transform = isOpen ? 'scale(1)' : 'scale(0.5)';
+                  }, 150);
+                }}
+                onTouchCancel={(e) => {
+                  // Reset if touch is cancelled
+                  e.currentTarget.style.opacity = '1';
+                  e.currentTarget.style.transform = isOpen ? 'scale(1)' : 'scale(0.5)';
                 }}
               >
-                <IconComponent size={18} className="text-white pointer-events-none" />
+                <IconComponent size={18} className="text-white" style={{ pointerEvents: 'none' }} />
               </a>
             );
           })}
