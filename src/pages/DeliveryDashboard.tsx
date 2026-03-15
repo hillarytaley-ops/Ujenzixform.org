@@ -537,6 +537,42 @@ const DeliveryDashboard = () => {
           }
         }
         
+        // CRITICAL FALLBACK: Fetch missing addresses individually for items not found in batch
+        const missingPOIds: string[] = [];
+        isolatedHistory.forEach((d: any) => {
+          const poId = d.purchase_order_id || d.id;
+          if (poId && !deliveryRequestsMap.has(poId)) {
+            missingPOIds.push(poId);
+          }
+        });
+        
+        // Fetch missing addresses individually
+        if (missingPOIds.length > 0) {
+          console.log('🔄 Fetching', missingPOIds.length, 'missing delivery_requests individually...');
+          const fallbackPromises = missingPOIds.map(async (poId) => {
+            try {
+              const fallbackResponse = await fetch(
+                `${SUPABASE_URL}/rest/v1/delivery_requests?purchase_order_id=eq.${poId}&select=id,purchase_order_id,delivery_address,pickup_address&limit=1`,
+                { headers, cache: 'no-store' }
+              );
+              if (fallbackResponse.ok) {
+                const fallbackData = await fallbackResponse.json();
+                if (fallbackData && fallbackData.length > 0 && fallbackData[0].delivery_address) {
+                  deliveryRequestsMap.set(poId, fallbackData[0]);
+                  console.log('✅ Fetched address individually for', poId?.substring(0, 8), ':', fallbackData[0].delivery_address.substring(0, 60));
+                  return fallbackData[0];
+                }
+              }
+            } catch (e: any) {
+              console.warn('⚠️ Fallback fetch failed for', poId?.substring(0, 8), ':', e?.message);
+            }
+            return null;
+          });
+          
+          await Promise.all(fallbackPromises);
+          console.log('✅ Completed individual fallback fetches');
+        }
+        
         // CRITICAL: Format history AFTER fetching delivery_requests (so map is populated)
         const formattedHistory: DeliveryHistory[] = isolatedHistory.map((d: any) => {
           const poId = d.purchase_order_id || d.id;
@@ -569,33 +605,7 @@ const DeliveryDashboard = () => {
             console.error('   - deliveryRequestsMap size:', deliveryRequestsMap.size);
             console.error('   - Looking for poId:', poId);
             console.error('   - Available keys in map:', Array.from(deliveryRequestsMap.keys()).map(k => k.substring(0, 8)).join(', '));
-            // CRITICAL: Try to fetch this specific delivery_request individually as fallback
-            // Don't show "To be provided" - fetch it directly if not in batch
-            finalDeliveryAddress = null; // Will fetch individually below
-          }
-          
-          // CRITICAL FALLBACK: If address not found in batch, fetch this specific delivery_request
-          if (!finalDeliveryAddress && poId) {
-            try {
-              const fallbackResponse = await fetch(
-                `${SUPABASE_URL}/rest/v1/delivery_requests?purchase_order_id=eq.${poId}&select=delivery_address&limit=1`,
-                { headers, cache: 'no-store' }
-              );
-              if (fallbackResponse.ok) {
-                const fallbackData = await fallbackResponse.json();
-                if (fallbackData && fallbackData.length > 0 && fallbackData[0].delivery_address) {
-                  finalDeliveryAddress = fallbackData[0].delivery_address;
-                  console.log('✅ Fetched address individually for', poId?.substring(0, 8), ':', finalDeliveryAddress.substring(0, 60));
-                }
-              }
-            } catch (e: any) {
-              console.warn('⚠️ Fallback fetch failed for', poId?.substring(0, 8), ':', e?.message);
-            }
-          }
-          
-          // FINAL FALLBACK: If still no address, show error message (NOT "To be provided")
-          if (!finalDeliveryAddress || !finalDeliveryAddress.trim()) {
-            console.error('❌❌❌ CRITICAL: Still no delivery address after all attempts for', poId?.substring(0, 8));
+            // FINAL FALLBACK: If still no address, show error message (NOT "To be provided")
             finalDeliveryAddress = 'Delivery address missing - contact support';
           }
           
@@ -603,7 +613,7 @@ const DeliveryDashboard = () => {
             id: d.id,
             pickup_location: builderProvidedPickup || d.pickup_location || d.pickup_address || 'N/A',
             // CRITICAL: Use the final delivery address (builder-provided from delivery_requests)
-            delivery_location: finalDeliveryAddress || 'Address not found',
+            delivery_location: finalDeliveryAddress,
             material_type: d.material_type || d.item_description || 'Materials',
             status: d.status,
             completed_at: d.completed_at || d.delivered_at || d.updated_at || d.created_at,
