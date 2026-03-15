@@ -518,6 +518,16 @@ export const DeliveryPromptDialog: React.FC<DeliveryPromptDialogProps> = ({
       }
 
       console.log('📦 Creating delivery request with payload:', deliveryPayload);
+      console.log('📍📍📍 ADDRESS SAVE DEBUG:', {
+        deliveryAddress: deliveryData.deliveryAddress,
+        deliveryCoordinates: deliveryData.deliveryCoordinates,
+        fullDeliveryAddress: fullDeliveryAddress,
+        finalPayloadAddress: deliveryPayload.delivery_address,
+        addressLength: deliveryPayload.delivery_address?.length || 0,
+        isPlaceholder: fullDeliveryAddress.toLowerCase() === 'to be provided' || 
+                      fullDeliveryAddress.toLowerCase() === 'tbd' ||
+                      fullDeliveryAddress.toLowerCase() === 'n/a'
+      });
 
       // CRITICAL: Validate purchase_order_id is NOT a delivery_request.id (prevent circular references)
       // This is a frontend safeguard - the database trigger will also catch this, but we want to prevent the error
