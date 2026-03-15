@@ -135,9 +135,10 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
       // - status IN ('pending', 'requested', 'assigned') AND provider_id IS NULL or != userId
       // CRITICAL: Fetch ALL delivery_requests to ensure we see all valid requests
       // CRITICAL: MUST include delivery_address field - this is the address filled by builder in delivery request form
+      // CRITICAL: Also fetch pickup_address and all address-related fields to ensure we get the builder-provided address
       // NOTE: RLS policy should allow pending/requested/assigned, but fetch all to be safe
       const drResponse = await fetch(
-        `${url}/rest/v1/delivery_requests?order=created_at.desc&limit=200&select=id,status,purchase_order_id,provider_id,delivery_address,pickup_address,material_type,quantity,created_at,builder_id,rejection_reason,estimated_cost,budget_range`,
+        `${url}/rest/v1/delivery_requests?order=created_at.desc&limit=200&select=id,status,purchase_order_id,provider_id,delivery_address,pickup_address,delivery_coordinates,material_type,quantity,created_at,builder_id,rejection_reason,estimated_cost,budget_range`,
         { headers, cache: 'no-store' }
       );
       
@@ -664,7 +665,18 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
         // CRITICAL: Use ONLY delivery_request.delivery_address - this is the address filled by builder in delivery request form
         // The delivery_request.delivery_address is the SOURCE OF TRUTH - it comes from the form the builder filled
         // DO NOT use purchase_order.delivery_address as fallback - the builder may have entered a different address
+        // CRITICAL: Builder-provided address from delivery_requests table - this is what the builder typed during delivery request
         let deliveryAddr = (dr.delivery_address || '').trim();
+        
+        // CRITICAL: If delivery_address includes coordinates, use the full string (coordinates + address)
+        // The builder may have entered coordinates with address like "1.2921, 36.8219 | Nairobi, Kenya"
+        if (dr.delivery_coordinates && deliveryAddr && !deliveryAddr.includes(dr.delivery_coordinates)) {
+          // If coordinates exist but aren't in the address, prepend them
+          deliveryAddr = `${dr.delivery_coordinates} | ${deliveryAddr}`;
+        } else if (dr.delivery_coordinates && !deliveryAddr) {
+          // If only coordinates exist, use them
+          deliveryAddr = dr.delivery_coordinates;
+        }
         
         // CRITICAL: For pending/requested/assigned status, show even if address is placeholder
         // This ensures delivery providers can see and accept requests even if address isn't finalized yet
@@ -672,9 +684,9 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
         const isPendingStatus = ['pending', 'requested', 'assigned'].includes(dr.status);
         if (!deliveryAddr || deliveryAddr === '') {
           if (isPendingStatus) {
-            // For pending requests, allow placeholder address - builder will provide later
-            deliveryAddr = 'To be provided';
-            console.log(`⚠️ SHOWING WITH EMPTY ADDRESS: Delivery request ${dr.id.slice(0, 8)} has no address but is pending - will show with placeholder`);
+            // For pending requests, show error message instead of "To be provided" - driver needs to know address is missing
+            deliveryAddr = 'Delivery address missing - contact builder';
+            console.warn(`⚠️ MISSING ADDRESS: Delivery request ${dr.id.slice(0, 8)} has no address but is pending - showing error message instead of placeholder`);
           } else {
             console.log(`🚫 FILTERED OUT: Delivery request ${dr.id.slice(0, 8)} has NO delivery_address and status is ${dr.status} (not pending/requested/assigned)`);
             return; // Filter out - only pending/requested/assigned can have empty address
@@ -682,14 +694,17 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
         }
         
         // Check if it's a placeholder (exact matches only, not partial)
+        // CRITICAL: Also check for our error message - don't treat it as placeholder
         const isPlaceholder = deliveryAddr && (
           deliveryAddr.toLowerCase() === 'to be provided' || 
           deliveryAddr.toLowerCase() === 'tbd' || 
           deliveryAddr.toLowerCase() === 'n/a' || 
           deliveryAddr.toLowerCase() === 'na' || 
           deliveryAddr.toLowerCase() === 'tba' || 
-          deliveryAddr.toLowerCase() === 'to be determined'
-        );
+          deliveryAddr.toLowerCase() === 'to be determined' ||
+          deliveryAddr.toLowerCase() === 'delivery location' ||
+          deliveryAddr.toLowerCase() === 'address not found'
+        ) && deliveryAddr.toLowerCase() !== 'delivery address missing - contact builder';
         
         // Check if it's a GPS coordinate (contains numbers and comma, or starts with GPS:)
         const isGPSCoordinate = deliveryAddr && (
