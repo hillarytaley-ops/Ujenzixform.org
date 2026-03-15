@@ -425,10 +425,39 @@ export const DeliveryPromptDialog: React.FC<DeliveryPromptDialogProps> = ({
       }
 
       // Build delivery address with coordinates
-      let fullDeliveryAddress = deliveryData.deliveryAddress;
+      // CRITICAL: Use the address the builder actually entered, NOT the purchase_order.delivery_address
+      // The purchase_order.delivery_address might be "To be provided" - we want the builder's actual input
+      let fullDeliveryAddress = deliveryData.deliveryAddress.trim();
+      
+      // CRITICAL: If the address is empty or "To be provided", use coordinates only
+      // Don't save "To be provided" - that's a placeholder, not a real address
+      if (!fullDeliveryAddress || 
+          fullDeliveryAddress.toLowerCase() === 'to be provided' || 
+          fullDeliveryAddress.toLowerCase() === 'tbd' ||
+          fullDeliveryAddress.toLowerCase() === 'n/a') {
+        fullDeliveryAddress = ''; // Clear placeholder values
+      }
+      
+      // If coordinates are provided, combine them with address
       if (deliveryData.deliveryCoordinates) {
-        fullDeliveryAddress = deliveryData.deliveryCoordinates + 
-          (deliveryData.deliveryAddress ? ` | ${deliveryData.deliveryAddress}` : '');
+        if (fullDeliveryAddress) {
+          // Both coordinates and address: "coords | address"
+          fullDeliveryAddress = `${deliveryData.deliveryCoordinates} | ${fullDeliveryAddress}`;
+        } else {
+          // Only coordinates: use coordinates as address
+          fullDeliveryAddress = deliveryData.deliveryCoordinates;
+        }
+      }
+      
+      // CRITICAL: Final validation - ensure we have either address or coordinates
+      if (!fullDeliveryAddress || fullDeliveryAddress.trim() === '') {
+        toast({
+          title: 'Delivery Address Required',
+          description: 'Please provide either a delivery address or GPS coordinates.',
+          variant: 'destructive'
+        });
+        setSubmitting(false);
+        return;
       }
 
       // Create delivery request payload
@@ -436,7 +465,7 @@ export const DeliveryPromptDialog: React.FC<DeliveryPromptDialogProps> = ({
         builder_id: userId,
         purchase_order_id: purchaseOrder.id,
         pickup_address: pickupAddress,
-        delivery_address: fullDeliveryAddress,
+        delivery_address: fullDeliveryAddress.trim(), // CRITICAL: Save the actual address builder entered
         pickup_date: deliveryData.preferredDate,
         material_type: deliveryData.materialType,
         quantity: purchaseOrder.items?.length || 1,
