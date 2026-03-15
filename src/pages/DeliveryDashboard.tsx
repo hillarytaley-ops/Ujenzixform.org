@@ -497,8 +497,8 @@ const DeliveryDashboard = () => {
             };
             
             // Fetch delivery_requests for these purchase_orders to get builder-provided delivery_address
-            // CRITICAL: Use proper PostgREST syntax for IN query
-            const poIdsParam = purchaseOrderIds.map(id => `"${id}"`).join(',');
+            // CRITICAL: Use proper PostgREST syntax for IN query (no quotes around UUIDs)
+            const poIdsParam = purchaseOrderIds.join(',');
             const drResponse = await fetch(
               `${SUPABASE_URL}/rest/v1/delivery_requests?purchase_order_id=in.(${poIdsParam})&select=id,purchase_order_id,delivery_address,pickup_address&limit=500`,
               { headers, cache: 'no-store' }
@@ -566,8 +566,37 @@ const DeliveryDashboard = () => {
             console.error('   - builderProvidedAddress:', builderProvidedAddress || 'null');
             console.error('   - d.delivery_address:', d.delivery_address || 'null');
             console.error('   - d.delivery_location:', d.delivery_location || 'null');
-            // Don't show "To be provided" - show an error message or fetch it differently
-            finalDeliveryAddress = 'Address not found - please check delivery request';
+            console.error('   - deliveryRequestsMap size:', deliveryRequestsMap.size);
+            console.error('   - Looking for poId:', poId);
+            console.error('   - Available keys in map:', Array.from(deliveryRequestsMap.keys()).map(k => k.substring(0, 8)).join(', '));
+            // CRITICAL: Try to fetch this specific delivery_request individually as fallback
+            // Don't show "To be provided" - fetch it directly if not in batch
+            finalDeliveryAddress = null; // Will fetch individually below
+          }
+          
+          // CRITICAL FALLBACK: If address not found in batch, fetch this specific delivery_request
+          if (!finalDeliveryAddress && poId) {
+            try {
+              const fallbackResponse = await fetch(
+                `${SUPABASE_URL}/rest/v1/delivery_requests?purchase_order_id=eq.${poId}&select=delivery_address&limit=1`,
+                { headers, cache: 'no-store' }
+              );
+              if (fallbackResponse.ok) {
+                const fallbackData = await fallbackResponse.json();
+                if (fallbackData && fallbackData.length > 0 && fallbackData[0].delivery_address) {
+                  finalDeliveryAddress = fallbackData[0].delivery_address;
+                  console.log('✅ Fetched address individually for', poId?.substring(0, 8), ':', finalDeliveryAddress.substring(0, 60));
+                }
+              }
+            } catch (e: any) {
+              console.warn('⚠️ Fallback fetch failed for', poId?.substring(0, 8), ':', e?.message);
+            }
+          }
+          
+          // FINAL FALLBACK: If still no address, show error message (NOT "To be provided")
+          if (!finalDeliveryAddress || !finalDeliveryAddress.trim()) {
+            console.error('❌❌❌ CRITICAL: Still no delivery address after all attempts for', poId?.substring(0, 8));
+            finalDeliveryAddress = 'Delivery address missing - contact support';
           }
           
           return {
