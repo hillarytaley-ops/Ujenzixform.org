@@ -1543,8 +1543,9 @@ const DeliveryDashboard = () => {
                 return normalized;
               };
               
-              const seenCompositeKeys = new Set<string>();
-              const seenPOIds = new Set<string>();
+              // Use object-based sets instead of Set to avoid minification errors
+              const seenCompositeKeys: Record<string, boolean> = {};
+              const seenPOIds: Record<string, boolean> = {};
               const uniqueCount = requestsWithPO.filter((dr: any) => {
                 // Use composite key (deliveryAddress + materialType) when available
                 if (dr.delivery_address && dr.material_type) {
