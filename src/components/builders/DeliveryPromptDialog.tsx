@@ -1084,15 +1084,24 @@ export const DeliveryPromptDialog: React.FC<DeliveryPromptDialogProps> = ({
                 <div className="relative flex justify-center text-xs"><span className="bg-white px-2 text-gray-400">or address</span></div>
               </div>
 
-              {/* Address field */}
+              {/* Address field - MANDATORY */}
               <div className="space-y-1">
-                <Label className="text-xs text-gray-500">Delivery Address</Label>
+                <Label className="text-xs text-gray-500">
+                  Delivery Address <span className="text-red-500">*</span>
+                </Label>
                 <Input
-                  placeholder="Street address, landmark..."
+                  placeholder="Street address, landmark... (Required)"
                   value={deliveryData.deliveryAddress}
                   onChange={(e) => setDeliveryData(prev => ({ ...prev, deliveryAddress: e.target.value }))}
                   className="text-xs h-8"
+                  required
+                  aria-required="true"
                 />
+                {!deliveryData.deliveryAddress.trim() && !deliveryData.deliveryCoordinates.trim() && (
+                  <p className="text-xs text-red-500 mt-1">
+                    Delivery address or GPS coordinates is required
+                  </p>
+                )}
               </div>
 
               {/* Date, Time, Budget - Compact Grid */}

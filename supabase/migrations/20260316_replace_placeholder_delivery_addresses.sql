@@ -107,43 +107,40 @@ BEGIN
       RAISE NOTICE '  ✅ UPDATED: Replaced placeholder with real address: "%"', real_address;
       updated_count := updated_count + 1;
     ELSE
-      -- No real address found - mark for deletion or set to NULL
-      -- CRITICAL: Only delete if status is pending/requested (not yet accepted)
-      -- For accepted/scheduled deliveries, we should keep them but mark as needing address
+      -- No real address found - DO NOT DELETE, but set to NULL and mark as needing address
+      -- CRITICAL: Keep all delivery requests (even pending/requested) - builder will be prompted to provide address
+      -- The frontend form will make delivery address mandatory, so builder must provide it
+      UPDATE delivery_requests
+      SET 
+        delivery_address = NULL,
+        updated_at = NOW()
+      WHERE id = dr_record.id;
+      
       IF dr_record.status IN ('pending', 'requested') THEN
-        -- Delete pending requests without addresses (they're invalid)
-        DELETE FROM delivery_requests WHERE id = dr_record.id;
-        GET DIAGNOSTICS deleted_count = ROW_COUNT;
-        RAISE NOTICE '  🗑️ DELETED: No real address found and status is pending/requested - deleted invalid delivery request';
-        deleted_count := deleted_count + 1;
+        RAISE NOTICE '  ⚠️ WARNING: No real address found for pending/requested delivery (ID: %) - set to NULL. Builder will be prompted to provide address when viewing/updating.', dr_record.id;
       ELSE
-        -- For accepted/scheduled deliveries, set to NULL and log warning
-        UPDATE delivery_requests
-        SET 
-          delivery_address = NULL,
-          updated_at = NOW()
-        WHERE id = dr_record.id;
-        
         RAISE NOTICE '  ⚠️ WARNING: No real address found for accepted delivery (ID: %) - set to NULL. Builder must provide address.', dr_record.id;
-        no_address_count := no_address_count + 1;
       END IF;
+      no_address_count := no_address_count + 1;
     END IF;
   END LOOP;
   
   RAISE NOTICE '========================================';
   RAISE NOTICE 'Replacement process completed:';
-  RAISE NOTICE '  ✅ Updated: % delivery requests', updated_count;
-  RAISE NOTICE '  🗑️ Deleted: % invalid delivery requests (pending without address)', deleted_count;
-  RAISE NOTICE '  ⚠️ Set to NULL: % accepted deliveries without address', no_address_count;
+  RAISE NOTICE '  ✅ Updated: % delivery requests with real addresses', updated_count;
+  RAISE NOTICE '  ⚠️ Set to NULL: % delivery requests without real addresses (builder will be prompted)', no_address_count;
+  RAISE NOTICE '  📝 Note: All delivery requests kept - no deletions. Builders will be prompted to provide addresses.';
   RAISE NOTICE '========================================';
 END $$;
 
 -- Also clean up any delivery_requests that have empty or whitespace-only addresses
+-- CRITICAL: Set to NULL (don't delete) so builder can update with proper address
 DO $$
 DECLARE
   cleaned_count INTEGER := 0;
 BEGIN
   -- Update empty/whitespace addresses to NULL for pending requests
+  -- Builder will be prompted to provide address when viewing/updating the delivery request
   UPDATE delivery_requests
   SET 
     delivery_address = NULL,
@@ -155,6 +152,6 @@ BEGIN
   GET DIAGNOSTICS cleaned_count = ROW_COUNT;
   
   IF cleaned_count > 0 THEN
-    RAISE NOTICE '✅ Cleaned up % delivery requests with empty addresses', cleaned_count;
+    RAISE NOTICE '✅ Cleaned up % delivery requests with empty addresses (set to NULL - builder will be prompted)', cleaned_count;
   END IF;
 END $$;
