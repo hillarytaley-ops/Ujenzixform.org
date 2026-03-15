@@ -1329,6 +1329,34 @@ export const useDeliveryProviderData = () => {
       
       if (purchaseOrdersToProcess && purchaseOrdersToProcess.length > 0) {
         console.log('📦 Processing', purchaseOrdersToProcess.length, 'purchase orders...');
+        
+        // CRITICAL: Fetch delivery_requests in batch to get builder-provided delivery_address
+        // The builder fills in delivery_address in delivery_requests table during delivery request
+        const poIdsForDR = purchaseOrdersToProcess.map((po: any) => po.id).filter(Boolean);
+        let deliveryRequestsMap = new Map<string, any>();
+        
+        if (poIdsForDR.length > 0) {
+          try {
+            const { data: drData } = await supabase
+              .from('delivery_requests')
+              .select('id, purchase_order_id, delivery_address, pickup_address')
+              .in('purchase_order_id', poIdsForDR)
+              .limit(500);
+            
+            if (drData && drData.length > 0) {
+              // Map by purchase_order_id for quick lookup
+              drData.forEach((dr: any) => {
+                if (dr.purchase_order_id) {
+                  deliveryRequestsMap.set(dr.purchase_order_id, dr);
+                }
+              });
+              console.log('✅ Fetched', drData.length, 'delivery_requests for purchase_orders - builder-provided addresses available');
+            }
+          } catch (e: any) {
+            console.warn('⚠️ Could not fetch delivery_requests for purchase_orders:', e?.message);
+          }
+        }
+        
         purchaseOrdersToProcess.forEach((po: any) => {
           // Check if this purchase_order already exists in delivery_requests
           const existing = allActiveDeliveries.find(d => d.purchase_order_id === po.id);
@@ -1367,53 +1395,38 @@ export const useDeliveryProviderData = () => {
           } else {
             // Only add as new entry if not delivered/completed (those should only sync existing delivery_requests)
             if (po.status !== 'delivered' && po.status !== 'completed') {
-            // CRITICAL: Fetch delivery_request to get builder-provided delivery_address
-            // The builder fills in delivery_address in delivery_requests table during delivery request
-            let builderProvidedAddress = null;
-            let builderProvidedPickup = null;
-            try {
-              const { data: drData } = await supabase
-                .from('delivery_requests')
-                .select('delivery_address, pickup_address')
-                .eq('purchase_order_id', po.id)
-                .limit(1)
-                .maybeSingle();
+              // CRITICAL: Get builder-provided delivery_address from delivery_requests map
+              const deliveryRequest = deliveryRequestsMap.get(po.id);
+              const builderProvidedAddress = deliveryRequest?.delivery_address;
+              const builderProvidedPickup = deliveryRequest?.pickup_address;
               
-              if (drData) {
-                builderProvidedAddress = drData.delivery_address;
-                builderProvidedPickup = drData.pickup_address;
-              }
-            } catch (e: any) {
-              console.warn('⚠️ Could not fetch delivery_request for purchase_order:', e?.message);
-            }
-            
-            allActiveDeliveries.push({
-              id: po.id,
-              purchase_order_id: po.id,
-              order_number: (po.po_number && po.po_number.trim() !== '') ? po.po_number : `PO-${po.id.slice(0, 8).toUpperCase()}`,
-              provider_id: userId,
-              status: po.status,
-              po_status: po.status, // Store purchase_order status for categorization
-              purchase_order_status: po.status, // Alias
-              pickup_location: builderProvidedPickup || po.supplier?.address || po.supplier?.location || po.pickup_address || 'Supplier location',
-              pickup_address: builderProvidedPickup || po.supplier?.address || po.supplier?.location || po.pickup_address || 'Supplier location',
-              // CRITICAL: Use builder-provided delivery_address from delivery_requests first
-              // This is the address the builder filled in during delivery request
-              delivery_location: builderProvidedAddress || po.delivery_address || 'Delivery location',
-              delivery_address: builderProvidedAddress || po.delivery_address || 'Delivery location',
-              material_type: Array.isArray(po.items) ? po.items.map((i: any) => i.name || i.material_type).join(', ') : 'Construction Materials',
-              quantity: Array.isArray(po.items) ? po.items.reduce((sum: number, i: any) => sum + (i.quantity || 1), 0) : 1,
-              builder_name: po.buyer?.full_name || po.builder_name || 'Builder',
-              builder_phone: po.buyer?.phone || po.builder_phone || '',
-              builder_email: po.buyer?.email || po.builder_email || '',
-              price: po.total_amount || 0,
-              estimated_cost: po.total_amount || 0,
-              created_at: po.created_at,
-              updated_at: po.updated_at,
-              source: 'purchase_orders',
-              delivery_provider_name: po.delivery_provider_name,
-              delivery_assigned_at: po.delivery_assigned_at
-            });
+              allActiveDeliveries.push({
+                id: po.id,
+                purchase_order_id: po.id,
+                order_number: (po.po_number && po.po_number.trim() !== '') ? po.po_number : `PO-${po.id.slice(0, 8).toUpperCase()}`,
+                provider_id: userId,
+                status: po.status,
+                po_status: po.status, // Store purchase_order status for categorization
+                purchase_order_status: po.status, // Alias
+                pickup_location: builderProvidedPickup || po.supplier?.address || po.supplier?.location || po.pickup_address || 'Supplier location',
+                pickup_address: builderProvidedPickup || po.supplier?.address || po.supplier?.location || po.pickup_address || 'Supplier location',
+                // CRITICAL: Use builder-provided delivery_address from delivery_requests first
+                // This is the address the builder filled in during delivery request
+                delivery_location: builderProvidedAddress || po.delivery_address || 'Delivery location',
+                delivery_address: builderProvidedAddress || po.delivery_address || 'Delivery location',
+                material_type: Array.isArray(po.items) ? po.items.map((i: any) => i.name || i.material_type).join(', ') : 'Construction Materials',
+                quantity: Array.isArray(po.items) ? po.items.reduce((sum: number, i: any) => sum + (i.quantity || 1), 0) : 1,
+                builder_name: po.buyer?.full_name || po.builder_name || 'Builder',
+                builder_phone: po.buyer?.phone || po.builder_phone || '',
+                builder_email: po.buyer?.email || po.builder_email || '',
+                price: po.total_amount || 0,
+                estimated_cost: po.total_amount || 0,
+                created_at: po.created_at,
+                updated_at: po.updated_at,
+                source: 'purchase_orders',
+                delivery_provider_name: po.delivery_provider_name,
+                delivery_assigned_at: po.delivery_assigned_at
+              });
             } else {
               console.log('⏭️ Skipping purchase_order', po.id.slice(0, 8), 'with status', po.status, '- will only sync existing delivery_requests');
             }
