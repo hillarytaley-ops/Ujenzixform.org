@@ -2450,19 +2450,6 @@ const DeliveryDashboard = () => {
                               </div>
                             )}
                           </div>
-
-                          {delivery.price && (
-                            <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
-                              <div className="flex items-center justify-between">
-                                <span className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-                                  Earnings
-                                </span>
-                                <span className={`text-lg font-bold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
-                                  {formatCurrency(delivery.price)}
-                                </span>
-                              </div>
-                            </div>
-                          )}
                         </CardContent>
                       </Card>
                     ))}
