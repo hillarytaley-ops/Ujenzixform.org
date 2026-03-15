@@ -594,20 +594,33 @@ const DeliveryDashboard = () => {
           
           // CRITICAL: Get the final delivery address - MUST use builder-provided address from delivery_requests
           // This is the address the builder filled in during delivery request form
+          // Priority order:
+          // 1. builderProvidedAddress from delivery_requests (highest priority - this is what builder typed)
+          // 2. d.delivery_address from isolatedHistory (may already have it from useDataIsolation)
+          // 3. d.delivery_location from isolatedHistory (fallback)
           let finalDeliveryAddress = null;
           
-          if (builderProvidedAddress && builderProvidedAddress.trim() && builderProvidedAddress !== 'To be provided' && builderProvidedAddress !== 'Delivery location') {
+          if (builderProvidedAddress && builderProvidedAddress.trim() && 
+              builderProvidedAddress !== 'To be provided' && 
+              builderProvidedAddress !== 'Delivery location' &&
+              builderProvidedAddress !== 'Address not found') {
             finalDeliveryAddress = builderProvidedAddress;
-            console.log('✅ Using builder-provided address from delivery_requests for', poId?.substring(0, 8), ':', finalDeliveryAddress.substring(0, 60));
-          } else if (d.delivery_address && d.delivery_address.trim() && d.delivery_address !== 'Delivery location' && d.delivery_address !== 'To be provided') {
+            console.log('✅✅✅ USING BUILDER-PROVIDED ADDRESS from delivery_requests for', poId?.substring(0, 8), 'order', d.order_number || d.po_number, ':', finalDeliveryAddress.substring(0, 80));
+          } else if (d.delivery_address && d.delivery_address.trim() && 
+                     d.delivery_address !== 'Delivery location' && 
+                     d.delivery_address !== 'To be provided' &&
+                     d.delivery_address !== 'Address not found') {
             finalDeliveryAddress = d.delivery_address;
             console.log('✅ Using delivery_address from isolatedHistory for', poId?.substring(0, 8), ':', finalDeliveryAddress.substring(0, 60));
-          } else if (d.delivery_location && d.delivery_location.trim() && d.delivery_location !== 'Delivery location' && d.delivery_location !== 'To be provided') {
+          } else if (d.delivery_location && d.delivery_location.trim() && 
+                     d.delivery_location !== 'Delivery location' && 
+                     d.delivery_location !== 'To be provided' &&
+                     d.delivery_location !== 'Address not found') {
             finalDeliveryAddress = d.delivery_location;
             console.log('✅ Using delivery_location from isolatedHistory for', poId?.substring(0, 8), ':', finalDeliveryAddress.substring(0, 60));
           } else {
-            console.error('❌ NO DELIVERY ADDRESS FOUND for', poId?.substring(0, 8), 'order', d.order_number || d.po_number);
-            console.error('   - deliveryRequest:', deliveryRequest ? 'found' : 'NOT FOUND');
+            console.error('❌❌❌ NO DELIVERY ADDRESS FOUND for', poId?.substring(0, 8), 'order', d.order_number || d.po_number);
+            console.error('   - deliveryRequest found:', deliveryRequest ? 'YES' : 'NO');
             console.error('   - builderProvidedAddress:', builderProvidedAddress || 'null');
             console.error('   - d.delivery_address:', d.delivery_address || 'null');
             console.error('   - d.delivery_location:', d.delivery_location || 'null');
