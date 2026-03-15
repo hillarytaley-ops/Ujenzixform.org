@@ -3194,30 +3194,74 @@ export const useDeliveryProviderData = () => {
       console.log('🔄 CRITICAL: Using ordersToTransform.length:', ordersToTransform?.length || 0);
       console.log('🔄 CRITICAL: ordersToTransform details:', ordersToTransform?.map((po: any) => ({ id: po.id?.substring(0, 8), po_number: po.po_number, status: po.status })));
       
+      // CRITICAL: Fetch delivery_requests to get builder-provided delivery_address
+      // The builder fills in delivery_address in delivery_requests table during delivery request
+      const poIdsForDR = (ordersToTransform || []).map((po: any) => po.id).filter(Boolean);
+      let deliveryRequestsMap = new Map<string, any>();
+      
+      if (poIdsForDR.length > 0) {
+        try {
+          const drQuery = supabase
+            .from('delivery_requests')
+            .select('id, purchase_order_id, delivery_address, pickup_address')
+            .in('purchase_order_id', poIdsForDR)
+            .limit(500);
+          
+          const { data: drData, error: drError } = await withTimeout(
+            drQuery,
+            5000,
+            { data: [], error: null } as any
+          );
+          
+          if (!drError && drData && drData.length > 0) {
+            // Map by purchase_order_id for quick lookup
+            drData.forEach((dr: any) => {
+              if (dr.purchase_order_id) {
+                deliveryRequestsMap.set(dr.purchase_order_id, dr);
+              }
+            });
+            console.log('✅ Fetched', drData.length, 'delivery_requests for history - builder-provided addresses available');
+          }
+        } catch (e: any) {
+          console.warn('⚠️ Could not fetch delivery_requests for history:', e?.message);
+        }
+      }
+      
       console.log('🔄 Transforming', ordersToTransform?.length || 0, 'delivered purchase orders to history format...');
-      const deliveredFromPOs = (ordersToTransform || []).map((po: any) => ({
-        id: po.id,
-        purchase_order_id: po.id,
-        provider_id: po.delivery_provider_id || userId, // Use actual provider_id from PO if available
-        status: 'delivered', // Always mark as delivered since all items are received
-        order_number: po.po_number || null, // CRITICAL: Include order_number for matching with supplier dashboard
-        pickup_location: po.supplier?.address || po.supplier?.location || 'Supplier location',
-        pickup_address: po.supplier?.address || po.supplier?.location || 'Supplier location',
-        delivery_location: po.delivery_address || 'Delivery location',
-        delivery_address: po.delivery_address || 'Delivery location',
-        material_type: Array.isArray(po.items) ? po.items.map((i: any) => i.name || i.material_type).join(', ') : 'Construction Materials',
-        quantity: Array.isArray(po.items) ? po.items.reduce((sum: number, i: any) => sum + (i.quantity || 1), 0) : 1,
-        builder_name: po.buyer?.full_name || 'Builder',
-        builder_phone: po.buyer?.phone || '',
-        builder_email: po.buyer?.email || '',
-        price: po.total_amount || 0,
-        estimated_cost: po.total_amount || 0,
-        completed_at: po.delivered_at || po.completed_at || po.updated_at,
-        delivered_at: po.delivered_at || po.completed_at || po.updated_at,
-        created_at: po.created_at,
-        updated_at: po.updated_at,
-        source: 'purchase_orders'
-      }));
+      // CRITICAL: Prioritize delivery_address from delivery_requests (builder-provided)
+      const deliveredFromPOs = (ordersToTransform || []).map((po: any) => {
+        const deliveryRequest = deliveryRequestsMap.get(po.id);
+        // CRITICAL: Use builder-provided delivery_address from delivery_requests first
+        // This is the address the builder filled in during delivery request form
+        const builderProvidedAddress = deliveryRequest?.delivery_address;
+        const builderProvidedPickup = deliveryRequest?.pickup_address;
+        
+        return {
+          id: po.id,
+          purchase_order_id: po.id,
+          provider_id: po.delivery_provider_id || userId, // Use actual provider_id from PO if available
+          status: 'delivered', // Always mark as delivered since all items are received
+          order_number: po.po_number || null, // CRITICAL: Include order_number for matching with supplier dashboard
+          pickup_location: builderProvidedPickup || po.supplier?.address || po.supplier?.location || 'Supplier location',
+          pickup_address: builderProvidedPickup || po.supplier?.address || po.supplier?.location || 'Supplier location',
+          // CRITICAL: Use builder-provided delivery_address from delivery_requests first
+          // This is the address the builder filled in during delivery request
+          delivery_location: builderProvidedAddress || po.delivery_address || 'Delivery location',
+          delivery_address: builderProvidedAddress || po.delivery_address || 'Delivery location',
+          material_type: Array.isArray(po.items) ? po.items.map((i: any) => i.name || i.material_type).join(', ') : 'Construction Materials',
+          quantity: Array.isArray(po.items) ? po.items.reduce((sum: number, i: any) => sum + (i.quantity || 1), 0) : 1,
+          builder_name: po.buyer?.full_name || 'Builder',
+          builder_phone: po.buyer?.phone || '',
+          builder_email: po.buyer?.email || '',
+          price: po.total_amount || 0,
+          estimated_cost: po.total_amount || 0,
+          completed_at: po.delivered_at || po.completed_at || po.updated_at,
+          delivered_at: po.delivered_at || po.completed_at || po.updated_at,
+          created_at: po.created_at,
+          updated_at: po.updated_at,
+          source: 'purchase_orders'
+        };
+      });
       
       console.log('📦 Transformed', deliveredFromPOs.length, 'delivered purchase_orders to history format (ALL delivered orders, not filtered by provider)');
       console.log('📋 Transformed order numbers:', deliveredFromPOs.map(po => po.order_number || po.id?.substring(0, 8)).join(', '));
