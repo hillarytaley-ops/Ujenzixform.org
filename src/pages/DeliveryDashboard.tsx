@@ -511,12 +511,19 @@ const DeliveryDashboard = () => {
                 }
               });
               console.log('✅ Fetched', drData.length, 'delivery_requests for history - builder-provided addresses available');
+              console.log('📋 Sample delivery addresses:', drData.slice(0, 3).map((dr: any) => ({
+                po_id: dr.purchase_order_id?.substring(0, 8),
+                delivery_address: dr.delivery_address?.substring(0, 50) || 'N/A'
+              })));
+            } else {
+              console.warn('⚠️ Failed to fetch delivery_requests:', drResponse.status, drResponse.statusText);
             }
           } catch (e: any) {
             console.warn('⚠️ Could not fetch delivery_requests for history:', e?.message);
           }
         }
         
+        // CRITICAL: Format history AFTER fetching delivery_requests (so map is populated)
         const formattedHistory: DeliveryHistory[] = isolatedHistory.map((d: any) => {
           const poId = d.purchase_order_id || d.id;
           const deliveryRequest = deliveryRequestsMap.get(poId);
@@ -526,12 +533,18 @@ const DeliveryDashboard = () => {
           const builderProvidedAddress = deliveryRequest?.delivery_address;
           const builderProvidedPickup = deliveryRequest?.pickup_address;
           
+          if (builderProvidedAddress) {
+            console.log('✅ Using builder-provided address for', poId?.substring(0, 8), ':', builderProvidedAddress.substring(0, 50));
+          } else {
+            console.warn('⚠️ No builder-provided address found for', poId?.substring(0, 8), '- using fallback');
+          }
+          
           return {
             id: d.id,
             pickup_location: builderProvidedPickup || d.pickup_location || d.pickup_address || 'N/A',
             // CRITICAL: Use builder-provided delivery_address from delivery_requests first
             // This is the address the builder filled in during delivery request
-            delivery_location: builderProvidedAddress || d.delivery_location || d.delivery_address || 'N/A',
+            delivery_location: builderProvidedAddress || d.delivery_location || d.delivery_address || 'To be provided',
             material_type: d.material_type || d.item_description || 'Materials',
             status: d.status,
             completed_at: d.completed_at || d.delivered_at || d.updated_at || d.created_at,
@@ -544,6 +557,10 @@ const DeliveryDashboard = () => {
         
         console.log('✅ Formatted delivery history:', formattedHistory.length, 'items');
         console.log('📋 Formatted history order numbers:', formattedHistory.map(d => d.order_number).filter(Boolean));
+        console.log('📋 Sample delivery locations:', formattedHistory.slice(0, 3).map(d => ({
+          order: d.order_number,
+          location: d.delivery_location?.substring(0, 50) || 'N/A'
+        })));
         setDeliveryHistory(formattedHistory);
       })();
     } else {
