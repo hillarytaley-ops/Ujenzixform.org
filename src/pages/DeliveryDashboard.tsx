@@ -862,39 +862,80 @@ const DeliveryDashboard = () => {
     return { scheduled, inTransit, deliveredFromActive };
   }, [activeDeliveries]);
 
-  // Calculate Deliveries badge count - deduplicated by purchase_order_id
+  // Calculate Deliveries badge count - must match Scheduled tab logic exactly
   const deliveriesBadgeCount = useMemo(() => {
-    // CRITICAL: Only count valid, actionable deliveries (same logic as notifications)
-    // Filter out: delivered/completed/cancelled, orders without purchase_order_id
-    // CRITICAL: Deduplicate by purchase_order_id to avoid double-counting
-    const validActiveDeliveries = activeDeliveries.filter(d => 
-      d.purchase_order_id && 
-      !['delivered', 'completed', 'cancelled'].includes(d.status || '')
-    );
-    const validPendingRequests = pendingRequests.filter(r => 
-      r.purchase_order_id && 
-      !['delivered', 'completed', 'cancelled'].includes(r.status || '')
-    );
+    // CRITICAL: Use the SAME categorization logic as the Scheduled tab
+    // This ensures badge count matches what's actually shown in Scheduled tab
+    const getCategory = (d: any): 'scheduled' | 'in_transit' | 'delivered' => {
+      const cat = String(d._categorized_status || d.status || '').toLowerCase();
+      // Check if order is delivered by status
+      if (cat === 'delivered' || cat === 'completed') return 'delivered';
+      // Check if all items are received (delivered via QR scan)
+      const allReceived = d._items_count != null && d._received_count != null &&
+        d._items_count > 0 && d._received_count >= d._items_count;
+      if (allReceived) return 'delivered';
+      // Everything else (including dispatched) stays in scheduled until delivered
+      return 'scheduled';
+    };
     
-    // CRITICAL: Deduplicate by purchase_order_id - use Set to ensure uniqueness (avoid Map bundling issues)
-    const seenPOIds = new Set<string>();
+    // Count only items that would appear in Scheduled tab (not delivered)
+    const scheduledDeliveries = activeDeliveries.filter(d => {
+      if (!d.purchase_order_id) return false;
+      const category = getCategory(d);
+      return category === 'scheduled'; // Only count scheduled items
+    });
     
-    // Add active deliveries first (they take priority)
-    validActiveDeliveries.forEach(d => {
+    // Also include pending requests that aren't delivered
+    const scheduledRequests = pendingRequests.filter(r => {
+      if (!r.purchase_order_id) return false;
+      if (['delivered', 'completed', 'cancelled'].includes(r.status || '')) return false;
+      return true;
+    });
+    
+    // CRITICAL: Deduplicate by purchase_order_id - use object to avoid minification issues
+    const seenPOIds: Record<string, boolean> = {};
+    
+    // Add scheduled deliveries first (they take priority)
+    scheduledDeliveries.forEach(d => {
       if (d.purchase_order_id) {
         seenPOIds[d.purchase_order_id] = true;
       }
     });
     
     // Add pending requests only if they don't already exist
-    validPendingRequests.forEach(r => {
+    scheduledRequests.forEach(r => {
       if (r.purchase_order_id && !seenPOIds[r.purchase_order_id]) {
         seenPOIds[r.purchase_order_id] = true;
       }
     });
     
-    return Object.keys(seenPOIds).length;
-  }, [activeDeliveries, pendingRequests]);
+    // CRITICAL: Also check unifiedScheduled if it's being used (single source of truth)
+    // This ensures badge count matches what's shown in the Scheduled tab
+    if (!useLegacyFallback && unifiedScheduled.length > 0) {
+      // Use unified source - count items in unifiedScheduled
+      unifiedScheduled.forEach(d => {
+        const poId = d.purchase_order_id || d.id;
+        if (poId) {
+          seenPOIds[poId] = true;
+        }
+      });
+    }
+    
+    const count = Object.keys(seenPOIds).length;
+    console.log('📊 Deliveries badge count:', {
+      useLegacyFallback,
+      unifiedScheduled: unifiedScheduled.length,
+      scheduledDeliveries: scheduledDeliveries.length,
+      scheduledRequests: scheduledRequests.length,
+      uniqueCount: count,
+      breakdown: {
+        activeDeliveries: activeDeliveries.length,
+        pendingRequests: pendingRequests.length
+      }
+    });
+    
+    return count;
+  }, [activeDeliveries, pendingRequests, unifiedScheduled, useLegacyFallback]);
 
   // When unified RPC returns empty or legacy has more data (FAST PATH/REST wins), use legacy so dashboard always shows something
   const unifiedCount = unifiedScheduled.length + unifiedInTransit.length + unifiedDelivered.length;
