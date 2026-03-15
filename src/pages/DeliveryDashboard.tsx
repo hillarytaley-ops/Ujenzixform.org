@@ -990,24 +990,52 @@ const DeliveryDashboard = () => {
         'Authorization': `Bearer ${accessToken}`
       };
 
-      // CRITICAL: Count only valid, actionable delivery requests (same logic as DeliveryNotifications.tsx)
-      // Filter out: delivered/completed/cancelled, NULL purchase_order_id, already accepted by this provider
+      // CRITICAL: Count only PENDING delivery requests that are NOT yet accepted by this provider
+      // Badge should only show NEW requests available for acceptance, not already-accepted ones
       // CRITICAL: Also fetch delivery_address and material_type for composite key deduplication
+      // Get current provider ID to filter out already-accepted requests
+      let currentProviderId = user?.id || null;
+      try {
+        const providerResponse = await fetch(
+          `${SUPABASE_URL}/rest/v1/delivery_providers?user_id=eq.${user?.id}&select=id&limit=1`,
+          { headers, cache: 'no-store' }
+        );
+        if (providerResponse.ok) {
+          const providers = await providerResponse.json();
+          if (Array.isArray(providers) && providers.length > 0) {
+            currentProviderId = providers[0].id;
+          }
+        }
+      } catch (e) {
+        console.warn('⚠️ Could not fetch provider ID, using user ID:', e);
+      }
+      
+      // Only fetch PENDING/REQUESTED/ASSIGNED requests (not accepted/in_transit - those are already accepted)
       const response = await fetch(
-        `${SUPABASE_URL}/rest/v1/delivery_requests?status=in.(pending,accepted,assigned,in_transit)&select=id,status,purchase_order_id,provider_id,delivery_address,material_type,created_at&order=created_at.desc&limit=100`,
+        `${SUPABASE_URL}/rest/v1/delivery_requests?status=in.(pending,requested,assigned)&select=id,status,purchase_order_id,provider_id,delivery_address,material_type,created_at&order=created_at.desc&limit=100`,
         { headers, cache: 'no-store' }
       );
       
       if (response.ok) {
         const data = await response.json();
         
-        // STEP 1: Filter out delivered/completed/cancelled (shouldn't be in query, but double-check)
+        // STEP 1: Filter out delivered/completed/cancelled/rejected (shouldn't be in query, but double-check)
         const activeRequests = data.filter((dr: any) => 
-          !['delivered', 'completed', 'cancelled'].includes(dr.status)
+          !['delivered', 'completed', 'cancelled', 'rejected'].includes(dr.status)
         );
         
-        // STEP 2: Filter out requests without purchase_order_id (placeholder/default requests)
-        const requestsWithPO = activeRequests.filter((dr: any) => 
+        // STEP 2: Filter out requests already accepted by THIS provider (should not appear in badge)
+        const pendingRequests = activeRequests.filter((dr: any) => {
+          // Exclude if already accepted by this provider
+          if (currentProviderId && dr.provider_id === currentProviderId) {
+            return false; // Already accepted by this provider - don't count
+          }
+          // Only count pending/requested/assigned with NULL provider_id (not yet accepted)
+          return !dr.provider_id || dr.provider_id === null;
+        });
+        
+        // STEP 3: Filter out requests without purchase_order_id (placeholder/default requests)
+        const requestsWithPO = pendingRequests.filter((dr: any) => 
           dr.purchase_order_id && 
           dr.purchase_order_id.trim() !== '' && 
           dr.purchase_order_id !== 'null' && 
@@ -1104,7 +1132,7 @@ const DeliveryDashboard = () => {
                 return true;
               }).length;
               
-              console.log(`📊 Notification count: ${data.length} total → ${activeRequests.length} active → ${requestsWithPO.length} with PO → ${uniqueCount} unique valid`);
+              console.log(`📊 Notification count: ${data.length} total → ${activeRequests.length} active → ${pendingRequests.length} pending (not accepted by this provider) → ${requestsWithPO.length} with PO → ${uniqueCount} unique valid`);
               setNotificationCount(uniqueCount);
               setPendingNotificationCount(uniqueCount);
             } else {
