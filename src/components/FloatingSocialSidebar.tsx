@@ -279,7 +279,7 @@ export const FloatingSocialSidebar: React.FC = () => {
           })}
         </div>
         
-        {/* Main toggle button - 44px same as chatbot */}
+        {/* Main toggle button - 44px same as chatbot - ORANGE COLOR PRESERVED */}
         <button
           onClick={() => setIsOpen(!isOpen)}
           onTouchStart={(e) => {
@@ -292,15 +292,21 @@ export const FloatingSocialSidebar: React.FC = () => {
               e.currentTarget.style.opacity = '1';
             }, 100);
           }}
-          className={`relative flex items-center justify-center rounded-full shadow-lg hover:shadow-xl transition-all duration-300 active:scale-95 touch-manipulation`}
+          className={`relative flex items-center justify-center rounded-full shadow-lg hover:shadow-xl transition-all duration-300 active:scale-95 ${
+            isOpen 
+              ? 'bg-gray-800' 
+              : 'bg-gradient-to-br from-orange-500 to-red-600'
+          }`}
           style={{ 
             width: '44px', 
             height: '44px',
             touchAction: 'manipulation',
-            WebkitTapHighlightColor: 'transparent',
+            WebkitTapHighlightColor: 'rgba(0,0,0,0.1)',
             cursor: 'pointer',
             userSelect: 'none',
             WebkitUserSelect: 'none',
+            WebkitTouchCallout: 'none',
+            zIndex: 10000,
           }}
           aria-label={isOpen ? 'Close social links' : 'Open social links'}
         >
