@@ -518,28 +518,28 @@ const DeliveryDashboard = () => {
         }
         
         const formattedHistory: DeliveryHistory[] = isolatedHistory.map((d: any) => {
-        const poId = d.purchase_order_id || d.id;
-        const deliveryRequest = deliveryRequestsMap.get(poId);
-        
-        // CRITICAL: Prioritize delivery_address from delivery_requests (builder-provided)
-        // This is the address the builder filled in during delivery request form
-        const builderProvidedAddress = deliveryRequest?.delivery_address;
-        const builderProvidedPickup = deliveryRequest?.pickup_address;
-        
-        return {
-          id: d.id,
-          pickup_location: builderProvidedPickup || d.pickup_location || d.pickup_address || 'N/A',
-          // CRITICAL: Use builder-provided delivery_address from delivery_requests first
-          // This is the address the builder filled in during delivery request
-          delivery_location: builderProvidedAddress || d.delivery_location || d.delivery_address || 'N/A',
-          material_type: d.material_type || d.item_description || 'Materials',
-          status: d.status,
-          completed_at: d.completed_at || d.delivered_at || d.updated_at || d.created_at,
-          price: d.price || d.delivery_fee || d.estimated_cost || 0,
-          rating: d.rating || 0,
-          // CRITICAL: Preserve order_number for display and matching
-          order_number: d.order_number || d.po_number || (d.purchase_order_id ? `PO-${d.purchase_order_id.slice(0, 8).toUpperCase()}` : 'N/A')
-        };
+          const poId = d.purchase_order_id || d.id;
+          const deliveryRequest = deliveryRequestsMap.get(poId);
+          
+          // CRITICAL: Prioritize delivery_address from delivery_requests (builder-provided)
+          // This is the address the builder filled in during delivery request form
+          const builderProvidedAddress = deliveryRequest?.delivery_address;
+          const builderProvidedPickup = deliveryRequest?.pickup_address;
+          
+          return {
+            id: d.id,
+            pickup_location: builderProvidedPickup || d.pickup_location || d.pickup_address || 'N/A',
+            // CRITICAL: Use builder-provided delivery_address from delivery_requests first
+            // This is the address the builder filled in during delivery request
+            delivery_location: builderProvidedAddress || d.delivery_location || d.delivery_address || 'N/A',
+            material_type: d.material_type || d.item_description || 'Materials',
+            status: d.status,
+            completed_at: d.completed_at || d.delivered_at || d.updated_at || d.created_at,
+            price: d.price || d.delivery_fee || d.estimated_cost || 0,
+            rating: d.rating || 0,
+            // CRITICAL: Preserve order_number for display and matching
+            order_number: d.order_number || d.po_number || (d.purchase_order_id ? `PO-${d.purchase_order_id.slice(0, 8).toUpperCase()}` : 'N/A')
+          };
         });
         
         console.log('✅ Formatted delivery history:', formattedHistory.length, 'items');
