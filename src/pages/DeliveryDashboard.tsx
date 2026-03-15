@@ -685,7 +685,7 @@ const DeliveryDashboard = () => {
               if (fallbackResponse.ok) {
                 const fallbackData = await fallbackResponse.json();
                 if (fallbackData && fallbackData.length > 0 && fallbackData[0].delivery_address) {
-                  deliveryRequestsMap.set(poId, fallbackData[0]);
+                  deliveryRequestsMap[poId] = fallbackData[0];
                   console.log('✅ Fetched address individually for', poId?.substring(0, 8), ':', fallbackData[0].delivery_address.substring(0, 60));
                   return fallbackData[0];
                 }
@@ -742,9 +742,9 @@ const DeliveryDashboard = () => {
             console.error('   - builderProvidedAddress:', builderProvidedAddress || 'null');
             console.error('   - d.delivery_address:', d.delivery_address || 'null');
             console.error('   - d.delivery_location:', d.delivery_location || 'null');
-            console.error('   - deliveryRequestsMap size:', deliveryRequestsMap.size);
+            console.error('   - deliveryRequestsMap size:', Object.keys(deliveryRequestsMap).length);
             console.error('   - Looking for poId:', poId);
-            console.error('   - Available keys in map:', Array.from(deliveryRequestsMap.keys()).map(k => k.substring(0, 8)).join(', '));
+            console.error('   - Available keys in map:', Object.keys(deliveryRequestsMap).map(k => k.substring(0, 8)).join(', '));
             // FINAL FALLBACK: If still no address, show error message (NOT "To be provided")
             finalDeliveryAddress = 'Delivery address missing - contact support';
           }
@@ -882,7 +882,7 @@ const DeliveryDashboard = () => {
     // Add active deliveries first (they take priority)
     validActiveDeliveries.forEach(d => {
       if (d.purchase_order_id) {
-        seenPOIds.add(d.purchase_order_id);
+        seenPOIds[d.purchase_order_id] = true;
       }
     });
     
@@ -893,7 +893,7 @@ const DeliveryDashboard = () => {
       }
     });
     
-    return seenPOIds.size;
+    return Object.keys(seenPOIds).length;
   }, [activeDeliveries, pendingRequests]);
 
   // When unified RPC returns empty or legacy has more data (FAST PATH/REST wins), use legacy so dashboard always shows something
@@ -1551,13 +1551,13 @@ const DeliveryDashboard = () => {
                   const normalizedAddress = String(dr.delivery_address).trim().toLowerCase();
                   const normalizedMaterial = normalizeMaterialType(dr.material_type);
                   const compositeKey = `${normalizedAddress}|${normalizedMaterial}`;
-                  if (seenCompositeKeys.has(compositeKey)) return false;
-                  seenCompositeKeys.add(compositeKey);
+                  if (seenCompositeKeys[compositeKey]) return false;
+                  seenCompositeKeys[compositeKey] = true;
                   return true;
                 }
                 // Fallback to purchase_order_id
-                if (dr.purchase_order_id && seenPOIds.has(dr.purchase_order_id)) return false;
-                if (dr.purchase_order_id) seenPOIds.add(dr.purchase_order_id);
+                if (dr.purchase_order_id && seenPOIds[dr.purchase_order_id]) return false;
+                if (dr.purchase_order_id) seenPOIds[dr.purchase_order_id] = true;
                 return true;
               }).length;
               setNotificationCount(uniqueCount);
