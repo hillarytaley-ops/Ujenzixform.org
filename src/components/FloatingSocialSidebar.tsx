@@ -216,21 +216,42 @@ export const FloatingSocialSidebar: React.FC = () => {
 
       {/* Mobile: ORANGE SOCIAL - LEFT side, same level as BLUE chatbot (75px) */}
       <div className="sm:hidden fixed z-[9998]" style={{ bottom: '75px', left: '16px' }}>
-        {/* Backdrop overlay when open */}
+        {/* Backdrop overlay when open - positioned behind icons */}
         {isOpen && (
           <div 
-            className="fixed inset-0 bg-black/10 -z-10"
-            onClick={() => setIsOpen(false)}
+            className="fixed inset-0 bg-black/10"
+            style={{ zIndex: -1 }}
+            onTouchStart={(e) => {
+              // Only close if touching the backdrop itself, not the icons
+              if (e.target === e.currentTarget) {
+                setIsOpen(false);
+              }
+            }}
+            onClick={(e) => {
+              // Only close if clicking the backdrop itself, not the icons
+              if (e.target === e.currentTarget) {
+                setIsOpen(false);
+              }
+            }}
           />
         )}
         
         {/* Expanded social links - vertical stack going UP */}
-        <div className={`absolute left-0 flex flex-col gap-2 transition-all duration-300 ease-out ${
-          isOpen 
-            ? 'opacity-100 translate-y-0 pointer-events-auto' 
-            : 'opacity-0 translate-y-4 pointer-events-none'
-        }`}
-        style={{ bottom: '48px' }}
+        <div 
+          className={`absolute left-0 flex flex-col gap-2 transition-all duration-300 ease-out ${
+            isOpen 
+              ? 'opacity-100 translate-y-0 pointer-events-auto' 
+              : 'opacity-0 translate-y-4 pointer-events-none'
+          }`}
+          style={{ bottom: '48px', zIndex: 10001 }}
+          onTouchStart={(e) => {
+            // Stop propagation to prevent backdrop from closing menu
+            e.stopPropagation();
+          }}
+          onClick={(e) => {
+            // Stop propagation to prevent backdrop from closing menu
+            e.stopPropagation();
+          }}
         >
           {SOCIAL_LINKS.map((link, index) => {
             const IconComponent = link.icon;
@@ -252,15 +273,20 @@ export const FloatingSocialSidebar: React.FC = () => {
                   userSelect: 'none',
                   WebkitUserSelect: 'none',
                   WebkitTouchCallout: 'none',
-                  zIndex: 9999,
+                  zIndex: 10002,
+                  position: 'relative',
                 }}
                 title={link.name}
                 onTouchStart={(e) => {
+                  // CRITICAL: Stop event propagation to prevent backdrop from closing menu
+                  e.stopPropagation();
                   // Provide visual feedback on touch
                   e.currentTarget.style.opacity = '0.7';
                   e.currentTarget.style.transform = 'scale(0.9)';
                 }}
                 onTouchEnd={(e) => {
+                  // CRITICAL: Stop event propagation
+                  e.stopPropagation();
                   // Reset after touch
                   setTimeout(() => {
                     e.currentTarget.style.opacity = '1';
@@ -268,9 +294,16 @@ export const FloatingSocialSidebar: React.FC = () => {
                   }, 150);
                 }}
                 onTouchCancel={(e) => {
+                  // CRITICAL: Stop event propagation
+                  e.stopPropagation();
                   // Reset if touch is cancelled
                   e.currentTarget.style.opacity = '1';
                   e.currentTarget.style.transform = isOpen ? 'scale(1)' : 'scale(0.5)';
+                }}
+                onClick={(e) => {
+                  // CRITICAL: Stop event propagation to prevent backdrop from closing menu
+                  e.stopPropagation();
+                  // Allow the link to navigate naturally
                 }}
               >
                 <IconComponent size={18} className="text-white" style={{ pointerEvents: 'none' }} />
