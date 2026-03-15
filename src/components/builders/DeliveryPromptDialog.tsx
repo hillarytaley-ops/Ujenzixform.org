@@ -222,7 +222,13 @@ export const DeliveryPromptDialog: React.FC<DeliveryPromptDialogProps> = ({
     if (purchaseOrder) {
       setDeliveryData(prev => ({
         ...prev,
-        deliveryAddress: purchaseOrder.delivery_address || '',
+        // CRITICAL: Don't pre-populate with purchase_order.delivery_address if it's a placeholder
+        // The builder should enter their own delivery address, not inherit "To be provided"
+        deliveryAddress: (purchaseOrder.delivery_address && 
+                         purchaseOrder.delivery_address.toLowerCase() !== 'to be provided' &&
+                         purchaseOrder.delivery_address.toLowerCase() !== 'tbd' &&
+                         purchaseOrder.delivery_address.toLowerCase() !== 'n/a') 
+                         ? purchaseOrder.delivery_address : '',
         preferredDate: purchaseOrder.delivery_date || '',
         // Auto-detect material type if single item
         materialType: purchaseOrder.items?.length === 1 
