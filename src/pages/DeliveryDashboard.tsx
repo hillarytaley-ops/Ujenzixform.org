@@ -1165,11 +1165,10 @@ const DeliveryDashboard = () => {
               } else {
                 console.log('⏭️ COMPONENT AGGRESSIVE: All orders were duplicates');
               }
-            })(); // End async IIFE
+            })(); // End async IIFE - errors inside are not caught by outer try-catch
           } else {
             console.error('❌ COMPONENT AGGRESSIVE: Failed to find any of the 3 known delivered orders!');
           }
-        }
         } catch (aggressiveError: any) {
           console.error('❌ COMPONENT AGGRESSIVE: Error:', aggressiveError?.message || aggressiveError);
         }
