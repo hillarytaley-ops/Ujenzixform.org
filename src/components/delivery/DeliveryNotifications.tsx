@@ -2385,20 +2385,20 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
                       )}
                     </div>
                   )}
-                  {!notification.deliveryAddress && notification.delivery_request_id && (
+                  {(!notification.deliveryAddress || notification.deliveryAddress === 'Delivery address missing - contact builder') && notification.delivery_request_id && (
                     <div className="bg-red-50 border-2 border-red-300 rounded-lg p-3 mb-3">
                       <div className="flex items-center gap-2">
                         <AlertTriangle className="h-4 w-4 text-red-600" />
                         <p className="text-xs font-bold text-red-800 uppercase tracking-wide">⚠️ DELIVERY LOCATION MISSING</p>
                       </div>
                       <p className="text-sm text-red-900 font-medium mt-1 ml-6">
-                        Delivery address missing - contact builder
+                        {notification.deliveryAddress || 'Delivery address missing - contact builder'}
                       </p>
                       <div className="mt-2 flex items-center gap-2 ml-6">
                         <Button
                           size="sm"
                           variant="outline"
-                          className="text-xs h-7"
+                          className="text-xs h-7 bg-white hover:bg-gray-50 border-gray-300"
                           onClick={async () => {
                             if (notification.delivery_request_id) {
                               console.log('🔍 Checking delivery address in database for:', notification.delivery_request_id);
