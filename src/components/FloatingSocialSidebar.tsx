@@ -216,22 +216,13 @@ export const FloatingSocialSidebar: React.FC = () => {
 
       {/* Mobile: ORANGE SOCIAL - LEFT side, same level as BLUE chatbot (75px) */}
       <div className="sm:hidden fixed z-[9998]" style={{ bottom: '75px', left: '16px' }}>
-        {/* Backdrop overlay when open - positioned behind icons */}
+        {/* Backdrop overlay when open - DISABLED pointer events to prevent interference */}
         {isOpen && (
           <div 
             className="fixed inset-0 bg-black/10"
-            style={{ zIndex: -1 }}
-            onTouchStart={(e) => {
-              // Only close if touching the backdrop itself, not the icons
-              if (e.target === e.currentTarget) {
-                setIsOpen(false);
-              }
-            }}
-            onClick={(e) => {
-              // Only close if clicking the backdrop itself, not the icons
-              if (e.target === e.currentTarget) {
-                setIsOpen(false);
-              }
+            style={{ 
+              zIndex: 9997,
+              pointerEvents: 'none', // DISABLED - icons will handle their own events
             }}
           />
         )}
@@ -243,14 +234,20 @@ export const FloatingSocialSidebar: React.FC = () => {
               ? 'opacity-100 translate-y-0 pointer-events-auto' 
               : 'opacity-0 translate-y-4 pointer-events-none'
           }`}
-          style={{ bottom: '48px', zIndex: 10001 }}
+          style={{ 
+            bottom: '48px', 
+            zIndex: 10000,
+            position: 'relative',
+          }}
           onTouchStart={(e) => {
-            // Stop propagation to prevent backdrop from closing menu
+            // CRITICAL: Stop ALL propagation at container level
             e.stopPropagation();
+            e.nativeEvent.stopImmediatePropagation();
           }}
           onClick={(e) => {
-            // Stop propagation to prevent backdrop from closing menu
+            // CRITICAL: Stop ALL propagation at container level
             e.stopPropagation();
+            e.nativeEvent.stopImmediatePropagation();
           }}
         >
           {SOCIAL_LINKS.map((link, index) => {
@@ -273,37 +270,59 @@ export const FloatingSocialSidebar: React.FC = () => {
                   userSelect: 'none',
                   WebkitUserSelect: 'none',
                   WebkitTouchCallout: 'none',
-                  zIndex: 10002,
+                  zIndex: 10001,
                   position: 'relative',
+                  pointerEvents: 'auto',
                 }}
                 title={link.name}
                 onTouchStart={(e) => {
-                  // CRITICAL: Stop event propagation to prevent backdrop from closing menu
+                  // CRITICAL: Stop ALL event propagation immediately - prevent backdrop from closing
                   e.stopPropagation();
+                  if (e.nativeEvent) {
+                    e.nativeEvent.stopImmediatePropagation();
+                  }
                   // Provide visual feedback on touch
                   e.currentTarget.style.opacity = '0.7';
                   e.currentTarget.style.transform = 'scale(0.9)';
                 }}
                 onTouchEnd={(e) => {
-                  // CRITICAL: Stop event propagation
+                  // CRITICAL: Stop ALL event propagation - allow link to open
                   e.stopPropagation();
-                  // Reset after touch
+                  if (e.nativeEvent) {
+                    e.nativeEvent.stopImmediatePropagation();
+                  }
+                  // Link will navigate via href - don't prevent default
+                  // Reset visual feedback after navigation starts
                   setTimeout(() => {
-                    e.currentTarget.style.opacity = '1';
-                    e.currentTarget.style.transform = isOpen ? 'scale(1)' : 'scale(0.5)';
-                  }, 150);
+                    if (e.currentTarget) {
+                      e.currentTarget.style.opacity = '1';
+                      e.currentTarget.style.transform = isOpen ? 'scale(1)' : 'scale(0.5)';
+                    }
+                  }, 100);
                 }}
                 onTouchCancel={(e) => {
-                  // CRITICAL: Stop event propagation
+                  // CRITICAL: Stop ALL event propagation
                   e.stopPropagation();
+                  if (e.nativeEvent) {
+                    e.nativeEvent.stopImmediatePropagation();
+                  }
                   // Reset if touch is cancelled
-                  e.currentTarget.style.opacity = '1';
-                  e.currentTarget.style.transform = isOpen ? 'scale(1)' : 'scale(0.5)';
+                  if (e.currentTarget) {
+                    e.currentTarget.style.opacity = '1';
+                    e.currentTarget.style.transform = isOpen ? 'scale(1)' : 'scale(0.5)';
+                  }
                 }}
                 onClick={(e) => {
                   // CRITICAL: Stop event propagation to prevent backdrop from closing menu
                   e.stopPropagation();
-                  // Allow the link to navigate naturally
+                  if (e.nativeEvent) {
+                    e.nativeEvent.stopImmediatePropagation();
+                  }
+                  // Link will navigate naturally via href - don't prevent default
+                }}
+                onMouseDown={(e) => {
+                  // Also stop mouse events for desktop
+                  e.stopPropagation();
                 }}
               >
                 <IconComponent size={18} className="text-white" style={{ pointerEvents: 'none' }} />
