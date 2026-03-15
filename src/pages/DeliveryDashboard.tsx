@@ -497,26 +497,40 @@ const DeliveryDashboard = () => {
             };
             
             // Fetch delivery_requests for these purchase_orders to get builder-provided delivery_address
+            // CRITICAL: Use proper PostgREST syntax for IN query
+            const poIdsParam = purchaseOrderIds.map(id => `"${id}"`).join(',');
             const drResponse = await fetch(
-              `${SUPABASE_URL}/rest/v1/delivery_requests?purchase_order_id=in.(${purchaseOrderIds.join(',')})&select=id,purchase_order_id,delivery_address,pickup_address&limit=500`,
+              `${SUPABASE_URL}/rest/v1/delivery_requests?purchase_order_id=in.(${poIdsParam})&select=id,purchase_order_id,delivery_address,pickup_address&limit=500`,
               { headers, cache: 'no-store' }
             );
             
             if (drResponse.ok) {
               const drData = await drResponse.json();
+              console.log('📦 Raw delivery_requests data:', drData.length, 'items');
+              
               // Map by purchase_order_id for quick lookup
               drData.forEach((dr: any) => {
                 if (dr.purchase_order_id) {
                   deliveryRequestsMap.set(dr.purchase_order_id, dr);
+                  // Log each one to verify we're getting addresses
+                  if (dr.delivery_address && dr.delivery_address.trim() && dr.delivery_address !== 'To be provided') {
+                    console.log('✅ Found delivery_address for', dr.purchase_order_id?.substring(0, 8), ':', dr.delivery_address.substring(0, 60));
+                  } else {
+                    console.warn('⚠️ delivery_request', dr.purchase_order_id?.substring(0, 8), 'has no valid delivery_address:', dr.delivery_address);
+                  }
                 }
               });
               console.log('✅ Fetched', drData.length, 'delivery_requests for history - builder-provided addresses available');
+              console.log('📋 Delivery requests map size:', deliveryRequestsMap.size);
               console.log('📋 Sample delivery addresses:', drData.slice(0, 3).map((dr: any) => ({
                 po_id: dr.purchase_order_id?.substring(0, 8),
                 delivery_address: dr.delivery_address?.substring(0, 50) || 'N/A'
               })));
             } else {
-              console.warn('⚠️ Failed to fetch delivery_requests:', drResponse.status, drResponse.statusText);
+              const errorText = await drResponse.text();
+              console.error('❌ Failed to fetch delivery_requests:', drResponse.status, drResponse.statusText);
+              console.error('❌ Error details:', errorText);
+              console.error('❌ Query was:', `${SUPABASE_URL}/rest/v1/delivery_requests?purchase_order_id=in.(${poIdsParam})&select=id,purchase_order_id,delivery_address,pickup_address&limit=500`);
             }
           } catch (e: any) {
             console.warn('⚠️ Could not fetch delivery_requests for history:', e?.message);
@@ -533,36 +547,34 @@ const DeliveryDashboard = () => {
           const builderProvidedAddress = deliveryRequest?.delivery_address;
           const builderProvidedPickup = deliveryRequest?.pickup_address;
           
-          // DEBUG: Log what we have
-          console.log('🔍 Processing history item:', {
-            poId: poId?.substring(0, 8),
-            order_number: d.order_number || d.po_number,
-            hasDeliveryRequest: !!deliveryRequest,
-            builderProvidedAddress: builderProvidedAddress?.substring(0, 50) || 'N/A',
-            d_delivery_location: d.delivery_location?.substring(0, 50) || 'N/A',
-            d_delivery_address: d.delivery_address?.substring(0, 50) || 'N/A'
-          });
+          // CRITICAL: Get the final delivery address - MUST use builder-provided address from delivery_requests
+          // This is the address the builder filled in during delivery request form
+          let finalDeliveryAddress = null;
           
-          if (builderProvidedAddress) {
-            console.log('✅ Using builder-provided address for', poId?.substring(0, 8), ':', builderProvidedAddress.substring(0, 50));
-          } else if (d.delivery_address && d.delivery_address !== 'Delivery location' && d.delivery_address !== 'To be provided') {
-            console.log('✅ Using delivery_address from isolatedHistory for', poId?.substring(0, 8), ':', d.delivery_address.substring(0, 50));
-          } else if (d.delivery_location && d.delivery_location !== 'Delivery location' && d.delivery_location !== 'To be provided') {
-            console.log('✅ Using delivery_location from isolatedHistory for', poId?.substring(0, 8), ':', d.delivery_location.substring(0, 50));
+          if (builderProvidedAddress && builderProvidedAddress.trim() && builderProvidedAddress !== 'To be provided' && builderProvidedAddress !== 'Delivery location') {
+            finalDeliveryAddress = builderProvidedAddress;
+            console.log('✅ Using builder-provided address from delivery_requests for', poId?.substring(0, 8), ':', finalDeliveryAddress.substring(0, 60));
+          } else if (d.delivery_address && d.delivery_address.trim() && d.delivery_address !== 'Delivery location' && d.delivery_address !== 'To be provided') {
+            finalDeliveryAddress = d.delivery_address;
+            console.log('✅ Using delivery_address from isolatedHistory for', poId?.substring(0, 8), ':', finalDeliveryAddress.substring(0, 60));
+          } else if (d.delivery_location && d.delivery_location.trim() && d.delivery_location !== 'Delivery location' && d.delivery_location !== 'To be provided') {
+            finalDeliveryAddress = d.delivery_location;
+            console.log('✅ Using delivery_location from isolatedHistory for', poId?.substring(0, 8), ':', finalDeliveryAddress.substring(0, 60));
           } else {
-            console.warn('⚠️ No builder-provided address found for', poId?.substring(0, 8), '- will show "To be provided"');
+            console.error('❌ NO DELIVERY ADDRESS FOUND for', poId?.substring(0, 8), 'order', d.order_number || d.po_number);
+            console.error('   - deliveryRequest:', deliveryRequest ? 'found' : 'NOT FOUND');
+            console.error('   - builderProvidedAddress:', builderProvidedAddress || 'null');
+            console.error('   - d.delivery_address:', d.delivery_address || 'null');
+            console.error('   - d.delivery_location:', d.delivery_location || 'null');
+            // Don't show "To be provided" - show an error message or fetch it differently
+            finalDeliveryAddress = 'Address not found - please check delivery request';
           }
           
           return {
             id: d.id,
             pickup_location: builderProvidedPickup || d.pickup_location || d.pickup_address || 'N/A',
-            // CRITICAL: Use builder-provided delivery_address from delivery_requests first
-            // Then try delivery_address/delivery_location from isolatedHistory (which may already have it from useDataIsolation)
-            // Only show "To be provided" if none of these have a real address
-            delivery_location: builderProvidedAddress || 
-                              (d.delivery_address && d.delivery_address !== 'Delivery location' && d.delivery_address !== 'To be provided' ? d.delivery_address : null) ||
-                              (d.delivery_location && d.delivery_location !== 'Delivery location' && d.delivery_location !== 'To be provided' ? d.delivery_location : null) ||
-                              'To be provided',
+            // CRITICAL: Use the final delivery address (builder-provided from delivery_requests)
+            delivery_location: finalDeliveryAddress || 'Address not found',
             material_type: d.material_type || d.item_description || 'Materials',
             status: d.status,
             completed_at: d.completed_at || d.delivered_at || d.updated_at || d.created_at,
