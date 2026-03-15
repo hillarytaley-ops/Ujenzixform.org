@@ -548,13 +548,13 @@ const DeliveryDashboard = () => {
         setActiveDeliveries(isolatedActiveDeliveries.map((d: any) => formatDelivery(d)));
       };
       
-      // Run validation asynchronously
-      // Note: validateOrders() will call setActiveDeliveries() when complete
-      validateOrders();
+        // Run validation asynchronously
+        // Note: validateOrders() will call setActiveDeliveries() when complete
+        validateOrders();
+        
+        // Log initial count (validation will update state asynchronously)
+        console.log('🚚 Processing', isolatedActiveDeliveries.length, 'active deliveries for validation');
       })(); // End async IIFE for fetching delivery_requests
-      
-      // Log initial count (validation will update state asynchronously)
-      console.log('🚚 Processing', isolatedActiveDeliveries.length, 'active deliveries for validation');
     } else {
       // Ensure empty array if no data
       setActiveDeliveries([]);
