@@ -1941,7 +1941,7 @@ const DeliveryDashboard = () => {
         </div>
 
         {/* Card-Style Navigation - Reorganized with Deliveries button */}
-        <div className="grid grid-cols-4 md:grid-cols-6 gap-2 mb-8">
+        <div className="grid grid-cols-4 md:grid-cols-7 gap-2 mb-8">
           <Button 
             variant="ghost"
             className={`h-auto py-3 px-2 flex flex-col items-center gap-1 transition-all ${
@@ -1961,6 +1961,25 @@ const DeliveryDashboard = () => {
             {deliveriesBadgeCount > 0 && (
               <Badge className="text-[10px] px-1 py-0 bg-yellow-500 text-white">
                 {deliveriesBadgeCount}
+              </Badge>
+            )}
+          </Button>
+          <Button 
+            variant="ghost"
+            className={`h-auto py-3 px-2 flex flex-col items-center gap-1 transition-all relative ${
+              activeTab === 'history' 
+                ? 'bg-gradient-to-r from-teal-500 to-cyan-500 text-white shadow-lg ring-2 ring-teal-300' 
+                : isDarkMode 
+                  ? 'bg-gray-800 text-gray-300 hover:bg-gray-700 border border-gray-700' 
+                  : 'bg-white text-gray-700 hover:bg-teal-50 border border-gray-200 shadow-sm'
+            }`}
+            onClick={() => setActiveTab('history')}
+          >
+            <CheckCircle className="h-5 w-5" />
+            <span className="text-xs font-medium">History</span>
+            {deliveryHistory.length > 0 && (
+              <Badge className="absolute -top-1 -right-1 text-[10px] px-1 py-0 bg-green-500 text-white">
+                {deliveryHistory.length}
               </Badge>
             )}
           </Button>
@@ -2043,6 +2062,7 @@ const DeliveryDashboard = () => {
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
           <TabsList className="hidden">
             <TabsTrigger value="deliveries">Deliveries</TabsTrigger>
+            <TabsTrigger value="history">Delivery History</TabsTrigger>
             <TabsTrigger value="map">Map</TabsTrigger>
             <TabsTrigger value="scanning">Scanning</TabsTrigger>
             <TabsTrigger value="analytics">Analytics</TabsTrigger>
@@ -2302,6 +2322,134 @@ const DeliveryDashboard = () => {
             </div>
           </TabsContent>
 
+          {/* Delivery History Tab */}
+          <TabsContent value="history">
+            <div className="space-y-4">
+              <div className={`flex items-center justify-between mb-4 ${isDarkMode ? 'bg-teal-900/20 border border-teal-800' : 'bg-teal-50 border border-teal-200'} px-4 py-3 rounded-lg`}>
+                <div className="flex items-center gap-2">
+                  <CheckCircle className="h-5 w-5 text-green-500" />
+                  <h2 className={`text-xl font-semibold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                    Delivery History
+                  </h2>
+                  {deliveryHistory.length > 0 && (
+                    <Badge className="ml-2 bg-green-500 text-white">
+                      {deliveryHistory.length} {deliveryHistory.length === 1 ? 'delivery' : 'deliveries'}
+                    </Badge>
+                  )}
+                </div>
+                <p className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                  Completed deliveries appear here after scanning all items as delivered
+                </p>
+              </div>
+
+              {deliveryHistory.length > 0 ? (
+                <div className="space-y-4">
+                  {deliveryHistory
+                    .sort((a, b) => {
+                      // Sort by completed_at date (most recent first)
+                      const dateA = a.completed_at ? new Date(a.completed_at).getTime() : 0;
+                      const dateB = b.completed_at ? new Date(b.completed_at).getTime() : 0;
+                      return dateB - dateA;
+                    })
+                    .map((delivery) => (
+                      <Card key={delivery.id} className={isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white'}>
+                        <CardContent className="p-6">
+                          <div className="flex items-start justify-between mb-4">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 mb-2">
+                                <Badge className="bg-green-500 text-white">
+                                  <CheckCircle className="h-3 w-3 mr-1" />
+                                  Delivered
+                                </Badge>
+                                {delivery.order_number && (
+                                  <span className={`font-semibold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                                    {delivery.order_number}
+                                  </span>
+                                )}
+                              </div>
+                              {delivery.material_type && (
+                                <p className={`text-sm ${isDarkMode ? 'text-gray-300' : 'text-gray-600'} mb-1`}>
+                                  <Package className="h-4 w-4 inline mr-1" />
+                                  {delivery.material_type}
+                                </p>
+                              )}
+                            </div>
+                            {delivery.completed_at && (
+                              <div className="text-right">
+                                <p className={`text-xs ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                                  Completed
+                                </p>
+                                <p className={`text-sm font-medium ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                                  {new Date(delivery.completed_at).toLocaleDateString('en-US', {
+                                    month: 'short',
+                                    day: 'numeric',
+                                    year: 'numeric',
+                                    hour: '2-digit',
+                                    minute: '2-digit'
+                                  })}
+                                </p>
+                              </div>
+                            )}
+                          </div>
+                          
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                            {delivery.pickup_location && (
+                              <div className={`p-3 rounded-lg ${isDarkMode ? 'bg-gray-700' : 'bg-gray-50'}`}>
+                                <div className="flex items-center gap-2 mb-1">
+                                  <MapPin className="h-4 w-4 text-blue-500" />
+                                  <span className={`text-xs font-medium ${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`}>
+                                    Pickup Location
+                                  </span>
+                                </div>
+                                <p className={`text-sm ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                                  {delivery.pickup_location}
+                                </p>
+                              </div>
+                            )}
+                            {delivery.delivery_location && (
+                              <div className={`p-3 rounded-lg ${isDarkMode ? 'bg-gray-700' : 'bg-gray-50'}`}>
+                                <div className="flex items-center gap-2 mb-1">
+                                  <MapPin className="h-4 w-4 text-green-500" />
+                                  <span className={`text-xs font-medium ${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`}>
+                                    Delivery Location
+                                  </span>
+                                </div>
+                                <p className={`text-sm ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                                  {delivery.delivery_location}
+                                </p>
+                              </div>
+                            )}
+                          </div>
+
+                          {delivery.price && (
+                            <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+                              <div className="flex items-center justify-between">
+                                <span className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                                  Earnings
+                                </span>
+                                <span className={`text-lg font-bold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                                  {formatCurrency(delivery.price)}
+                                </span>
+                              </div>
+                            </div>
+                          )}
+                        </CardContent>
+                      </Card>
+                    ))}
+                </div>
+              ) : (
+                <Card className={isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white'}>
+                  <CardContent className="py-12 text-center">
+                    <CheckCircle className={`h-12 w-12 ${isDarkMode ? 'text-gray-600' : 'text-gray-300'} mx-auto mb-4`} />
+                    <p className={isDarkMode ? 'text-gray-400' : 'text-gray-500'}>No delivery history yet</p>
+                    <p className={`text-sm ${isDarkMode ? 'text-gray-500' : 'text-gray-400'}`}>
+                      Completed deliveries will appear here after you scan all items as delivered
+                    </p>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+          </TabsContent>
 
           {/* Map Tab */}
           <TabsContent value="map">
@@ -2393,11 +2541,10 @@ const DeliveryDashboard = () => {
                         // Wait for DB trigger to commit before refetch so order moves to Delivered
                         await new Promise(resolve => setTimeout(resolve, 1800));
                         
-                        // Switch to Delivered tab when full order complete (aligns with supplier QR tab)
+                        // Switch to Delivery History tab when full order complete
                         if (orderCompleted) {
-                          console.log('🔄 Full order delivered - refreshing data');
-                          setActiveTab('deliveries');
-                          setDeliveriesSubTab('scheduled');
+                          console.log('🔄 Full order delivered - moving to Delivery History tab');
+                          setActiveTab('history');
                         }
                         
                         // Aggressive refresh with multiple retries to ensure updated data
@@ -2444,12 +2591,12 @@ const DeliveryDashboard = () => {
                         toast({
                           title: orderCompleted ? '✅ Delivery Complete!' : '✅ Item Scanned',
                           description: orderCompleted 
-                            ? 'All items received. Order moved to "Delivered" tab.' 
+                            ? 'All items received. Order moved to "Delivery History" tab.' 
                             : 'Item scan recorded. Scan remaining QR codes to complete delivery.',
                           duration: 5000,
                         });
                         
-                        console.log('✅ onDeliveryComplete callback completed - order should now appear in Delivered tab');
+                        console.log('✅ onDeliveryComplete callback completed - order should now appear in Delivery History tab');
                       }}
                     />
                   </div>
