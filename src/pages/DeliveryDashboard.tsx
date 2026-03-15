@@ -911,7 +911,12 @@ const DeliveryDashboard = () => {
     
     // CRITICAL: Also check unifiedScheduled if it's being used (single source of truth)
     // This ensures badge count matches what's shown in the Scheduled tab
-    if (!useLegacyFallback && unifiedScheduled.length > 0) {
+    // Calculate if unified should be used (same logic as useLegacyFallback but inline to avoid circular dependency)
+    const unifiedCount = unifiedScheduled.length + (unifiedInTransit?.length || 0) + (unifiedDelivered?.length || 0);
+    const hasUnifiedData = unifiedCount > 0;
+    const shouldUseUnified = hasUnifiedData; // Use unified if it has data
+    
+    if (shouldUseUnified && unifiedScheduled.length > 0) {
       // Use unified source - count items in unifiedScheduled
       unifiedScheduled.forEach(d => {
         const poId = d.purchase_order_id || d.id;
@@ -923,7 +928,7 @@ const DeliveryDashboard = () => {
     
     const count = Object.keys(seenPOIds).length;
     console.log('📊 Deliveries badge count:', {
-      useLegacyFallback,
+      shouldUseUnified,
       unifiedScheduled: unifiedScheduled.length,
       scheduledDeliveries: scheduledDeliveries.length,
       scheduledRequests: scheduledRequests.length,
@@ -935,7 +940,7 @@ const DeliveryDashboard = () => {
     });
     
     return count;
-  }, [activeDeliveries, pendingRequests, unifiedScheduled, useLegacyFallback]);
+  }, [activeDeliveries, pendingRequests, unifiedScheduled, unifiedInTransit, unifiedDelivered]);
 
   // When unified RPC returns empty or legacy has more data (FAST PATH/REST wins), use legacy so dashboard always shows something
   const unifiedCount = unifiedScheduled.length + unifiedInTransit.length + unifiedDelivered.length;
