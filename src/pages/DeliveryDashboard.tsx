@@ -1354,14 +1354,16 @@ const DeliveryDashboard = () => {
           
           // IMMEDIATE: When status changes to 'delivered', refresh to move order to history
           if (oldStatus !== 'delivered' && newStatus === 'delivered') {
-            console.log('✅ Delivery completed - immediately refreshing to move to history...');
+            console.log('✅ Delivery completed - immediately refreshing to move to Delivery History tab...');
             refetchData();
             refetchUnified();
             loadNotificationCounts();
+            // Switch to Delivery History tab when order is delivered
+            setActiveTab('history');
             
             toast({
               title: '✅ Delivery Completed!',
-              description: 'Order has been delivered and moved to delivery history.',
+              description: 'Order has been delivered and moved to Delivery History tab.',
               duration: 4000,
             });
             
