@@ -1583,21 +1583,22 @@ const DeliveryDashboard = () => {
               return normalized;
             };
             
-            const seenCompositeKeys = new Set<string>();
-            const seenPOIds = new Set<string>();
-            const uniqueCount = requestsWithPO.filter((dr: any) => {
-              // Use composite key (deliveryAddress + materialType) when available
-              if (dr.delivery_address && dr.material_type) {
-                const normalizedAddress = String(dr.delivery_address).trim().toLowerCase();
-                const normalizedMaterial = normalizeMaterialType(dr.material_type);
-                const compositeKey = `${normalizedAddress}|${normalizedMaterial}`;
-                if (seenCompositeKeys.has(compositeKey)) return false;
-                seenCompositeKeys.add(compositeKey);
-                return true;
-              }
-              // Fallback to purchase_order_id
-              if (dr.purchase_order_id && seenPOIds.has(dr.purchase_order_id)) return false;
-              if (dr.purchase_order_id) seenPOIds.add(dr.purchase_order_id);
+              // Use object-based sets instead of Set to avoid minification errors
+              const seenCompositeKeys: Record<string, boolean> = {};
+              const seenPOIds: Record<string, boolean> = {};
+              const uniqueCount = requestsWithPO.filter((dr: any) => {
+                // Use composite key (deliveryAddress + materialType) when available
+                if (dr.delivery_address && dr.material_type) {
+                  const normalizedAddress = String(dr.delivery_address).trim().toLowerCase();
+                  const normalizedMaterial = normalizeMaterialType(dr.material_type);
+                  const compositeKey = `${normalizedAddress}|${normalizedMaterial}`;
+                  if (seenCompositeKeys[compositeKey]) return false;
+                  seenCompositeKeys[compositeKey] = true;
+                  return true;
+                }
+                // Fallback to purchase_order_id
+                if (dr.purchase_order_id && seenPOIds[dr.purchase_order_id]) return false;
+                if (dr.purchase_order_id) seenPOIds[dr.purchase_order_id] = true;
               return true;
             }).length;
             setNotificationCount(uniqueCount);
