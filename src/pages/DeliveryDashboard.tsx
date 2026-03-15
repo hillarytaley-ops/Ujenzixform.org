@@ -540,11 +540,12 @@ const DeliveryDashboard = () => {
           // CRITICAL: Preserve order_number for display and matching
           order_number: d.order_number || d.po_number || (d.purchase_order_id ? `PO-${d.purchase_order_id.slice(0, 8).toUpperCase()}` : 'N/A')
         };
-      });
-      
-      console.log('✅ Formatted delivery history:', formattedHistory.length, 'items');
-      console.log('📋 Formatted history order numbers:', formattedHistory.map(d => d.order_number).filter(Boolean));
-      setDeliveryHistory(formattedHistory);
+        });
+        
+        console.log('✅ Formatted delivery history:', formattedHistory.length, 'items');
+        console.log('📋 Formatted history order numbers:', formattedHistory.map(d => d.order_number).filter(Boolean));
+        setDeliveryHistory(formattedHistory);
+      })();
     } else {
       console.log('⚠️ No isolatedHistory found or empty');
       setDeliveryHistory([]);
