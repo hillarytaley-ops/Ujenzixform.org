@@ -2346,6 +2346,26 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
                         <p className="text-xs font-bold text-orange-800 uppercase tracking-wide">🚚 DELIVERY LOCATION</p>
                       </div>
                       <p className="text-sm text-orange-900 font-medium mt-1 ml-6">{notification.deliveryAddress}</p>
+                      {/* DEBUG: Show delivery_request_id for verification */}
+                      {notification.delivery_request_id && (
+                        <p className="text-[10px] text-gray-500 mt-1 ml-6">
+                          Debug ID: {notification.delivery_request_id.slice(0, 8)}...
+                        </p>
+                      )}
+                    </div>
+                  )}
+                  {!notification.deliveryAddress && notification.delivery_request_id && (
+                    <div className="bg-red-50 border-2 border-red-300 rounded-lg p-3 mb-3">
+                      <div className="flex items-center gap-2">
+                        <AlertTriangle className="h-4 w-4 text-red-600" />
+                        <p className="text-xs font-bold text-red-800 uppercase tracking-wide">⚠️ DELIVERY LOCATION MISSING</p>
+                      </div>
+                      <p className="text-sm text-red-900 font-medium mt-1 ml-6">
+                        Delivery address missing - contact builder
+                      </p>
+                      <p className="text-[10px] text-gray-500 mt-1 ml-6">
+                        Debug: Request ID {notification.delivery_request_id.slice(0, 8)}... - Check console for details
+                      </p>
                     </div>
                   )}
 
