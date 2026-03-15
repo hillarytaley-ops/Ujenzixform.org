@@ -563,9 +563,12 @@ const DeliveryDashboard = () => {
   }, [isolatedProfile, isolatedStats, isolatedActiveDeliveries, isolatedHistory, isolatedPendingRequests]);
 
   // Map unified RPC row to card shape (delivery_location, material_type, etc.)
+  // CRITICAL: delivery_address should come from delivery_requests (builder-provided), not purchase_orders
   const toCardDelivery = useCallback((row: UnifiedDeliveryRow): ActiveDelivery & { _items_count?: number; _received_count?: number } => ({
     id: row.id,
     pickup_location: row.pickup_location ?? 'N/A',
+    // CRITICAL: Use delivery_address from delivery_requests (builder-provided)
+    // The row.delivery_address should already be from delivery_requests if data comes from useDataIsolation
     delivery_location: row.delivery_address ?? 'N/A',
     material_type: 'Materials',
     quantity: String(row._items_count ?? 0),

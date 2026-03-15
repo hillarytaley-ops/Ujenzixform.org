@@ -1367,6 +1367,26 @@ export const useDeliveryProviderData = () => {
           } else {
             // Only add as new entry if not delivered/completed (those should only sync existing delivery_requests)
             if (po.status !== 'delivered' && po.status !== 'completed') {
+            // CRITICAL: Fetch delivery_request to get builder-provided delivery_address
+            // The builder fills in delivery_address in delivery_requests table during delivery request
+            let builderProvidedAddress = null;
+            let builderProvidedPickup = null;
+            try {
+              const { data: drData } = await supabase
+                .from('delivery_requests')
+                .select('delivery_address, pickup_address')
+                .eq('purchase_order_id', po.id)
+                .limit(1)
+                .maybeSingle();
+              
+              if (drData) {
+                builderProvidedAddress = drData.delivery_address;
+                builderProvidedPickup = drData.pickup_address;
+              }
+            } catch (e: any) {
+              console.warn('⚠️ Could not fetch delivery_request for purchase_order:', e?.message);
+            }
+            
             allActiveDeliveries.push({
               id: po.id,
               purchase_order_id: po.id,
@@ -1375,10 +1395,12 @@ export const useDeliveryProviderData = () => {
               status: po.status,
               po_status: po.status, // Store purchase_order status for categorization
               purchase_order_status: po.status, // Alias
-              pickup_location: po.supplier?.address || po.supplier?.location || po.pickup_address || 'Supplier location',
-              pickup_address: po.supplier?.address || po.supplier?.location || po.pickup_address || 'Supplier location',
-              delivery_location: po.delivery_address || 'Delivery location',
-              delivery_address: po.delivery_address || 'Delivery location',
+              pickup_location: builderProvidedPickup || po.supplier?.address || po.supplier?.location || po.pickup_address || 'Supplier location',
+              pickup_address: builderProvidedPickup || po.supplier?.address || po.supplier?.location || po.pickup_address || 'Supplier location',
+              // CRITICAL: Use builder-provided delivery_address from delivery_requests first
+              // This is the address the builder filled in during delivery request
+              delivery_location: builderProvidedAddress || po.delivery_address || 'Delivery location',
+              delivery_address: builderProvidedAddress || po.delivery_address || 'Delivery location',
               material_type: Array.isArray(po.items) ? po.items.map((i: any) => i.name || i.material_type).join(', ') : 'Construction Materials',
               quantity: Array.isArray(po.items) ? po.items.reduce((sum: number, i: any) => sum + (i.quantity || 1), 0) : 1,
               builder_name: po.buyer?.full_name || po.builder_name || 'Builder',
