@@ -715,9 +715,31 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
           console.warn(`⚠️ PLACEHOLDER DETECTED: Delivery request ${dr.id.slice(0, 8)} has placeholder address "${deliveryAddr}" - attempting fallback to purchase_order address`);
           
           // FALLBACK: Try to get address from purchase_order if delivery_request has placeholder
-          if (poId && poMap.has(poId)) {
-            const po = poMap.get(poId);
-            const poAddress = (po?.delivery_address || '').trim();
+          // CRITICAL: If purchase_order is not in poMap, try to fetch it directly
+          let po = poMap.has(poId) ? poMap.get(poId) : null;
+          
+          if (!po && poId) {
+            console.log(`📍 FALLBACK: Purchase order ${poId.slice(0, 8)} not in map, fetching directly...`);
+            try {
+              const poFetchResponse = await fetch(
+                `${url}/rest/v1/purchase_orders?id=eq.${poId}&select=id,po_number,delivery_address&limit=1`,
+                { headers, cache: 'no-store' }
+              );
+              if (poFetchResponse.ok) {
+                const poData = await poFetchResponse.json();
+                if (Array.isArray(poData) && poData.length > 0) {
+                  po = poData[0];
+                  poMap.set(poId, po); // Cache it for future use
+                  console.log(`✅ FALLBACK: Fetched purchase order ${poId.slice(0, 8)} directly`);
+                }
+              }
+            } catch (fetchError) {
+              console.warn(`⚠️ FALLBACK: Failed to fetch purchase order ${poId.slice(0, 8)}:`, fetchError);
+            }
+          }
+          
+          if (po) {
+            const poAddress = (po.delivery_address || '').trim();
             
             console.log(`📍 FALLBACK CHECK: Purchase order ${poId.slice(0, 8)} address: "${poAddress?.substring(0, 50) || 'EMPTY'}..."`);
             
@@ -745,6 +767,7 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
             // No purchase_order found or not in map
             deliveryAddr = 'Delivery address missing - contact builder';
             console.warn(`⚠️ NO FALLBACK: Purchase order not found for ${poId?.slice(0, 8) || 'NULL'} (poMap.has: ${poId ? poMap.has(poId) : false}) - showing error message`);
+            console.warn(`⚠️ CRITICAL: Delivery request ${dr.id.slice(0, 8)} has placeholder address but purchase_order ${poId?.slice(0, 8) || 'NULL'} cannot be found. This means the builder's address was NOT saved correctly!`);
           }
         } else if (!deliveryAddr || deliveryAddr === '') {
           // Address is empty (not a placeholder, just empty)

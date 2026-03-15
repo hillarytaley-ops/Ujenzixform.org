@@ -447,12 +447,22 @@ export const DeliveryPromptDialog: React.FC<DeliveryPromptDialogProps> = ({
       // The purchase_order.delivery_address might be "To be provided" - we want the builder's actual input
       let fullDeliveryAddress = deliveryData.deliveryAddress.trim();
       
-      // CRITICAL: If the address is empty or "To be provided", use coordinates only
-      // Don't save "To be provided" - that's a placeholder, not a real address
-      if (!fullDeliveryAddress || 
-          fullDeliveryAddress.toLowerCase() === 'to be provided' || 
-          fullDeliveryAddress.toLowerCase() === 'tbd' ||
-          fullDeliveryAddress.toLowerCase() === 'n/a') {
+      // CRITICAL: Validate that builder actually entered an address (not just placeholder)
+      const isPlaceholderInput = fullDeliveryAddress && (
+        fullDeliveryAddress.toLowerCase() === 'to be provided' || 
+        fullDeliveryAddress.toLowerCase() === 'tbd' ||
+        fullDeliveryAddress.toLowerCase() === 't.b.d.' ||
+        fullDeliveryAddress.toLowerCase() === 'n/a' ||
+        fullDeliveryAddress.toLowerCase() === 'na' ||
+        fullDeliveryAddress.toLowerCase() === 'tba' ||
+        fullDeliveryAddress.toLowerCase() === 'to be determined' ||
+        fullDeliveryAddress.toLowerCase() === 'delivery location' ||
+        fullDeliveryAddress.toLowerCase() === 'address not found'
+      );
+      
+      // CRITICAL: If the address is a placeholder, clear it - builder must provide real address
+      if (isPlaceholderInput) {
+        console.warn(`⚠️⚠️⚠️ BUILDER ENTERED PLACEHOLDER: "${fullDeliveryAddress}" - clearing it, builder must provide real address`);
         fullDeliveryAddress = ''; // Clear placeholder values
       }
       
