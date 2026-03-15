@@ -1870,12 +1870,11 @@ export const useDeliveryProviderData = () => {
           }
           
           // Categorize each delivery based on material_items scan status
-          // Logic matches EnhancedQRCodeManager (supplier dashboard "Dispatched" tab):
-          // - Scheduled: No items have dispatch_scanned = true
-          // - In Transit: Some or all items have dispatch_scanned = true (matches supplier "Dispatched" tab)
-          //   - If all dispatched AND some received = in_transit (partially delivered)
-          //   - If some/all dispatched AND none received = in_transit (just dispatched, awaiting receiving)
-          // - Delivered: All items have receive_scanned = true
+          // CRITICAL: Orders should remain in "scheduled" after dispatch until all items are delivered
+          // - Scheduled: All orders (including dispatched) stay here until delivery is complete
+          //   - After supplier dispatches (dispatch_scanned = true), order STAYS in scheduled
+          //   - Order remains in scheduled until delivery provider scans all items as delivered
+          // - Delivered: All items have receive_scanned = true (moves to History tab)
           
           const categorized = allActiveDeliveries.map((delivery: any) => {
             const poId = delivery.purchase_order_id;
@@ -1962,16 +1961,17 @@ export const useDeliveryProviderData = () => {
                                       delivery.po_status === 'delivered' || delivery.po_status === 'completed' ||
                                       delivery.purchase_order_status === 'delivered' || delivery.purchase_order_status === 'completed';
               
+              // CRITICAL: Orders should remain in "scheduled" after dispatch until all items are delivered
+              // Only move to 'delivered' when all items are receive_scanned = true
+              // DO NOT move to 'in_transit' based on dispatch_scanned - keep in scheduled until delivery is complete
               let categorizedStatus = 'scheduled';
               if (allItemsReceived || isDeliveredStatus) {
+                // All items received = delivered (move to History)
                 categorizedStatus = 'delivered';
-              } else if (isAcceptedStatus && !isDeliveredStatus) {
-                // Accepted/assigned orders that are not delivered = scheduled
+              } else {
+                // Everything else (including dispatched items) stays in scheduled until delivery is complete
+                // This ensures orders remain visible in Scheduled tab after supplier dispatches
                 categorizedStatus = 'scheduled';
-              } else if (allItemsDispatched && hasReceivedItems) {
-                categorizedStatus = 'in_transit';
-              } else if (hasDispatchedItems) {
-                categorizedStatus = 'in_transit';
               }
               return {
                 ...delivery,
@@ -1993,23 +1993,18 @@ export const useDeliveryProviderData = () => {
                                     delivery.po_status === 'delivered' || delivery.po_status === 'completed' ||
                                     delivery.purchase_order_status === 'delivered' || delivery.purchase_order_status === 'completed';
             
-            let categorizedStatus = delivery.status; // Default to original status
+            // CRITICAL: Orders should remain in "scheduled" after dispatch until all items are delivered
+            // Only move to 'delivered' when all items are receive_scanned = true
+            // DO NOT move to 'in_transit' based on dispatch_scanned - keep in scheduled until delivery is complete
+            let categorizedStatus = 'scheduled';
             
             if (allItemsReceived || isDeliveredStatus) {
-              // All items received = delivered
+              // All items received = delivered (move to History)
               categorizedStatus = 'delivered';
-            } else if (isAcceptedStatus && !isDeliveredStatus) {
-              // Accepted/assigned orders that are not delivered = scheduled
-              categorizedStatus = 'scheduled';
-            } else if (allItemsDispatched && hasReceivedItems) {
-              // All dispatched, some received = in transit (partially delivered)
-              categorizedStatus = 'in_transit';
-            } else if (hasDispatchedItems) {
-              // Some or all dispatched, none received = in_transit
-              // This matches supplier dashboard "Dispatched" tab - when supplier dispatches, provider sees it as "In Transit"
-              categorizedStatus = 'in_transit';
             } else {
-              // No items dispatched = scheduled
+              // Everything else (including dispatched items) stays in scheduled until delivery is complete
+              // This ensures orders remain visible in Scheduled tab after supplier dispatches
+              // Orders stay in Scheduled until delivery provider scans all items as delivered
               categorizedStatus = 'scheduled';
             }
             

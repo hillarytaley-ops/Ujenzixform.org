@@ -512,8 +512,8 @@ const DeliveryDashboard = () => {
               });
               
               // Second filter: Only validate that orders exist - don't filter by dispatch status
-              // Orders with dispatched items should appear in "In Transit", not be removed
-              // Let getCategory() handle categorization into Scheduled/In Transit/Delivered
+              // Orders with dispatched items STAY in "Scheduled" until all items are scanned as delivered
+              // Let getCategory() handle categorization into Scheduled/Delivered
               const validDeliveries = ordersThatExist.filter((d: any) => {
                 if (!d.purchase_order_id) {
                   // No purchase_order_id - exclude it
@@ -819,7 +819,7 @@ const DeliveryDashboard = () => {
 
   // Single source of truth (legacy fallback when unified returns empty): categorize each delivery so badge counts and tab content always match
   // CRITICAL: Delivered orders are EXCLUDED from scheduled list - they should not appear in schedule
-  // CRITICAL: Also filter out orders that are not in "Awaiting Dispatch" status (have dispatched items)
+  // CRITICAL: Orders with dispatched items STAY in scheduled until all items are scanned as delivered
   const deliveryCategories = useMemo(() => {
     const getCategory = (d: any): 'scheduled' | 'in_transit' | 'delivered' => {
       const cat = String(d._categorized_status || d.status || '').toLowerCase();
