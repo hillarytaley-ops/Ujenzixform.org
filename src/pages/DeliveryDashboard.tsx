@@ -1129,42 +1129,43 @@ const DeliveryDashboard = () => {
                   // Skip this entry on error
                 }
               }
-            
-            // Check for duplicates before adding
-            const existingIds = new Set(deliveryHistory.map(h => h.id));
-            const existingOrderNums = new Set(deliveryHistory.map(h => h.order_number).filter(Boolean));
-            
-            const newEntries = aggressiveHistoryEntries.filter(entry => {
-              const isDuplicate = existingIds.has(entry.id) || 
-                                 (entry.order_number && existingOrderNums.has(entry.order_number));
-              return !isDuplicate;
-            });
-            
-            if (newEntries.length > 0) {
-              console.log('✅ COMPONENT AGGRESSIVE: Force-adding', newEntries.length, 'orders to deliveryHistory');
-              setDeliveryHistory(prev => {
-                const combined = [...prev, ...newEntries];
-                // Re-sort by date string comparison - NO Date constructor
-                combined.sort((a, b) => {
-                  try {
-                    // Simple string comparison - ISO dates sort correctly as strings
-                    const dateA = a.completed_at || '';
-                    const dateB = b.completed_at || '';
-                    // Compare strings directly (ISO format sorts correctly)
-                    if (dateB > dateA) return 1;
-                    if (dateB < dateA) return -1;
-                    return 0;
-                  } catch (sortError) {
-                    console.warn('⚠️ COMPONENT AGGRESSIVE: Sort error:', sortError);
-                    return 0;
-                  }
-                });
-                console.log('🚨🚨🚨 COMPONENT AGGRESSIVE: Final deliveryHistory count:', combined.length);
-                return combined;
+              
+              // Check for duplicates before adding
+              const existingIds = new Set(deliveryHistory.map(h => h.id));
+              const existingOrderNums = new Set(deliveryHistory.map(h => h.order_number).filter(Boolean));
+              
+              const newEntries = aggressiveHistoryEntries.filter(entry => {
+                const isDuplicate = existingIds.has(entry.id) || 
+                                   (entry.order_number && existingOrderNums.has(entry.order_number));
+                return !isDuplicate;
               });
-            } else {
-              console.log('⏭️ COMPONENT AGGRESSIVE: All orders were duplicates');
-            }
+              
+              if (newEntries.length > 0) {
+                console.log('✅ COMPONENT AGGRESSIVE: Force-adding', newEntries.length, 'orders to deliveryHistory');
+                setDeliveryHistory(prev => {
+                  const combined = [...prev, ...newEntries];
+                  // Re-sort by date string comparison - NO Date constructor
+                  combined.sort((a, b) => {
+                    try {
+                      // Simple string comparison - ISO dates sort correctly as strings
+                      const dateA = a.completed_at || '';
+                      const dateB = b.completed_at || '';
+                      // Compare strings directly (ISO format sorts correctly)
+                      if (dateB > dateA) return 1;
+                      if (dateB < dateA) return -1;
+                      return 0;
+                    } catch (sortError) {
+                      console.warn('⚠️ COMPONENT AGGRESSIVE: Sort error:', sortError);
+                      return 0;
+                    }
+                  });
+                  console.log('🚨🚨🚨 COMPONENT AGGRESSIVE: Final deliveryHistory count:', combined.length);
+                  return combined;
+                });
+              } else {
+                console.log('⏭️ COMPONENT AGGRESSIVE: All orders were duplicates');
+              }
+            })(); // End async IIFE
           } else {
             console.error('❌ COMPONENT AGGRESSIVE: Failed to find any of the 3 known delivered orders!');
           }
