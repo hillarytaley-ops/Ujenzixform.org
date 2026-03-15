@@ -122,6 +122,7 @@ DECLARE
   builder_user_id UUID;
   po_number TEXT;
   notification_count INTEGER := 0;
+  rows_inserted INTEGER;
 BEGIN
   RAISE NOTICE 'Creating notifications for existing delivery requests with missing addresses...';
   
@@ -178,7 +179,8 @@ BEGIN
       )
       ON CONFLICT DO NOTHING;
       
-      GET DIAGNOSTICS notification_count = notification_count + ROW_COUNT;
+      GET DIAGNOSTICS rows_inserted = ROW_COUNT;
+      notification_count := notification_count + rows_inserted;
     END IF;
     
     -- Also try user_notifications table
