@@ -1000,7 +1000,8 @@ const DeliveryDashboard = () => {
             
             // Fetch delivery_requests asynchronously
             (async () => {
-              let deliveryRequestsMap = new Map<string, any>();
+              // Use plain object instead of Map to avoid minification issues
+              let deliveryRequestsMap: Record<string, any> = {};
               
               if (aggressivePOIds.length > 0) {
                 try {
@@ -1035,12 +1036,12 @@ const DeliveryDashboard = () => {
                     // Map by purchase_order_id - use most recent with valid address
                     drData.forEach((dr: any) => {
                       if (dr.purchase_order_id) {
-                        const existing = deliveryRequestsMap.get(dr.purchase_order_id);
+                        const existing = deliveryRequestsMap[dr.purchase_order_id];
                         // Only update if this is newer or if existing doesn't have a valid address
                         if (!existing || 
                             (dr.delivery_address && dr.delivery_address.trim() && dr.delivery_address !== 'To be provided' && 
                              (!existing.delivery_address || existing.delivery_address === 'To be provided'))) {
-                          deliveryRequestsMap.set(dr.purchase_order_id, dr);
+                          deliveryRequestsMap[dr.purchase_order_id] = dr;
                           if (dr.delivery_address && dr.delivery_address.trim() && dr.delivery_address !== 'To be provided') {
                             console.log('✅✅✅ COMPONENT AGGRESSIVE: Found builder-provided address for', dr.purchase_order_id?.substring(0, 8), ':', dr.delivery_address.substring(0, 60));
                           }
@@ -1061,7 +1062,7 @@ const DeliveryDashboard = () => {
                 const po = uniqueAggressiveOrders[i];
                 try {
                   // CRITICAL: Get builder-provided address from delivery_requests
-                  const deliveryRequest = deliveryRequestsMap.get(po.id);
+                  const deliveryRequest = deliveryRequestsMap[po.id];
                   const builderProvidedAddress = deliveryRequest?.delivery_address;
                   
                   // Get completed_at - use string directly, NO Date constructor
@@ -1130,13 +1131,17 @@ const DeliveryDashboard = () => {
                 }
               }
               
-              // Check for duplicates before adding
-              const existingIds = new Set(deliveryHistory.map(h => h.id));
-              const existingOrderNums = new Set(deliveryHistory.map(h => h.order_number).filter(Boolean));
+              // Check for duplicates before adding - use plain objects instead of Set to avoid minification issues
+              const existingIds: Record<string, boolean> = {};
+              const existingOrderNums: Record<string, boolean> = {};
+              deliveryHistory.forEach(h => {
+                if (h.id) existingIds[h.id] = true;
+                if (h.order_number) existingOrderNums[h.order_number] = true;
+              });
               
               const newEntries = aggressiveHistoryEntries.filter(entry => {
-                const isDuplicate = existingIds.has(entry.id) || 
-                                   (entry.order_number && existingOrderNums.has(entry.order_number));
+                const isDuplicate = existingIds[entry.id] || 
+                                   (entry.order_number && existingOrderNums[entry.order_number]);
                 return !isDuplicate;
               });
               
@@ -1165,7 +1170,7 @@ const DeliveryDashboard = () => {
               } else {
                 console.log('⏭️ COMPONENT AGGRESSIVE: All orders were duplicates');
               }
-            })(); // End async IIFE - errors inside are not caught by outer try-catch
+            })(); // End async IIFE
           } else {
             console.error('❌ COMPONENT AGGRESSIVE: Failed to find any of the 3 known delivered orders!');
           }
