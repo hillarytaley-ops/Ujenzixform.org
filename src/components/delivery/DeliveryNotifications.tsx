@@ -2399,38 +2399,86 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
                           size="sm"
                           variant="outline"
                           className="text-xs h-7 bg-white hover:bg-gray-50 border-gray-300"
+                          disabled={checkingAddress === notification.delivery_request_id}
                           onClick={async () => {
                             if (notification.delivery_request_id) {
-                              console.log('🔍 Checking delivery address in database for:', notification.delivery_request_id);
-                              const addressCheck = await checkDeliveryAddress(notification.delivery_request_id);
-                              if (addressCheck) {
-                                console.log('📍📍📍 DATABASE CHECK RESULT:', {
-                                  delivery_request_id: addressCheck.delivery_request_id,
-                                  delivery_address: addressCheck.delivery_address,
-                                  delivery_coordinates: addressCheck.delivery_coordinates,
-                                  purchase_order_id: addressCheck.purchase_order_id,
-                                  status: addressCheck.status,
-                                  created_at: addressCheck.created_at
-                                });
+                              setCheckingAddress(notification.delivery_request_id);
+                              try {
+                                console.log('🔍 Checking delivery address in database for:', notification.delivery_request_id);
+                                const addressCheck = await checkDeliveryAddress(notification.delivery_request_id);
+                                
+                                if (addressCheck) {
+                                  console.log('📍📍📍 DATABASE CHECK RESULT:', {
+                                    delivery_request_id: addressCheck.delivery_request_id,
+                                    delivery_address: addressCheck.delivery_address,
+                                    delivery_coordinates: addressCheck.delivery_coordinates,
+                                    purchase_order_id: addressCheck.purchase_order_id,
+                                    status: addressCheck.status,
+                                    created_at: addressCheck.created_at
+                                  });
+                                  
+                                  // Check if address is a placeholder
+                                  const isPlaceholder = addressCheck.delivery_address && (
+                                    addressCheck.delivery_address.toLowerCase().trim() === 'to be provided' ||
+                                    addressCheck.delivery_address.toLowerCase().trim() === 'tbd' ||
+                                    addressCheck.delivery_address.toLowerCase().trim() === 'n/a'
+                                  );
+                                  
+                                  if (addressCheck.delivery_address && !isPlaceholder) {
+                                    toast({
+                                      title: '✅ Address Found in Database!',
+                                      description: `Address: ${addressCheck.delivery_address.substring(0, 80)}${addressCheck.delivery_address.length > 80 ? '...' : ''}${addressCheck.delivery_coordinates ? `\nCoordinates: ${addressCheck.delivery_coordinates}` : ''}`,
+                                      variant: 'default',
+                                      duration: 10000
+                                    });
+                                  } else if (isPlaceholder) {
+                                    toast({
+                                      title: '⚠️ Placeholder Address in Database',
+                                      description: `The database contains a placeholder: "${addressCheck.delivery_address}". The builder needs to provide a real address.`,
+                                      variant: 'destructive',
+                                      duration: 10000
+                                    });
+                                  } else {
+                                    toast({
+                                      title: '❌ No Address in Database',
+                                      description: 'The address field is NULL or empty. The builder must provide a delivery address.',
+                                      variant: 'destructive',
+                                      duration: 10000
+                                    });
+                                  }
+                                } else {
+                                  console.error('❌ checkDeliveryAddress returned null');
+                                  toast({
+                                    title: 'Check Failed',
+                                    description: 'Could not retrieve data from database. Check console for details.',
+                                    variant: 'destructive',
+                                    duration: 5000
+                                  });
+                                }
+                              } catch (error: any) {
+                                console.error('❌ Error checking address:', error);
                                 toast({
-                                  title: addressCheck.delivery_address ? '✅ Address Found in Database!' : '❌ No Address in Database',
-                                  description: addressCheck.delivery_address 
-                                    ? `Address: ${addressCheck.delivery_address.substring(0, 60)}${addressCheck.delivery_address.length > 60 ? '...' : ''}` 
-                                    : 'The address is not saved in the database. Check console for full details.',
-                                  variant: addressCheck.delivery_address ? 'default' : 'destructive',
-                                  duration: 10000
+                                  title: 'Error',
+                                  description: error.message || 'An error occurred while checking the database. See console for details.',
+                                  variant: 'destructive',
+                                  duration: 5000
                                 });
-                              } else {
-                                toast({
-                                  title: 'Check Failed',
-                                  description: 'Could not check database. See console for details.',
-                                  variant: 'destructive'
-                                });
+                              } finally {
+                                setCheckingAddress(null);
                               }
                             }
                           }}
                         >
-                          🔍 Check Database
+                          {checkingAddress === notification.delivery_request_id ? (
+                            <>
+                              <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                              Checking...
+                            </>
+                          ) : (
+                            <>
+                              🔍 Check Address
+                            </>
+                          )}
                         </Button>
                         <p className="text-[10px] text-gray-500">
                           ID: {notification.delivery_request_id.slice(0, 8)}...
