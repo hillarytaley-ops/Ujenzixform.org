@@ -993,60 +993,142 @@ const DeliveryDashboard = () => {
           if (uniqueAggressiveOrders.length > 0) {
             console.log('🚨 COMPONENT AGGRESSIVE: Found', uniqueAggressiveOrders.length, 'orders. Force-adding to deliveryHistory...');
             
-            // Transform to history format - NO CONSTRUCTORS to avoid minification errors
-            const aggressiveHistoryEntries: DeliveryHistory[] = [];
-            for (let i = 0; i < uniqueAggressiveOrders.length; i++) {
-              const po = uniqueAggressiveOrders[i];
-              try {
-                // Get completed_at - use string directly, NO Date constructor
-                let completedAt = '';
-                if (po.delivered_at) {
-                  completedAt = po.delivered_at + '';
-                } else if (po.updated_at) {
-                  completedAt = po.updated_at + '';
-                } else if (po.created_at) {
-                  completedAt = po.created_at + '';
-                } else {
-                  // Fallback: use hardcoded ISO string - NO Date operations at all
-                  completedAt = '2024-03-07T00:00:00.000Z';
-                }
-                
-                // Get price - avoid Number() constructor
-                let price = 0;
-                if (po.total_amount != null) {
-                  if (typeof po.total_amount === 'number') {
-                    price = po.total_amount;
+            // CRITICAL: Fetch delivery_requests to get builder-provided delivery_address
+            // The builder fills in delivery_address in delivery_requests table during delivery request
+            const aggressivePOIds = uniqueAggressiveOrders.map((po: any) => po.id).filter(Boolean);
+            console.log('🔍 COMPONENT AGGRESSIVE: Fetching delivery_requests for', aggressivePOIds.length, 'purchase_order_ids...');
+            
+            // Fetch delivery_requests asynchronously
+            (async () => {
+              let deliveryRequestsMap = new Map<string, any>();
+              
+              if (aggressivePOIds.length > 0) {
+                try {
+                  const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
+                  const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
+                  
+                  let accessToken = SUPABASE_ANON_KEY;
+                  try {
+                    const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+                    if (storedSession) {
+                      const parsed = JSON.parse(storedSession);
+                      if (parsed.access_token) accessToken = parsed.access_token;
+                    }
+                  } catch (e) {}
+                  
+                  const headers = {
+                    'apikey': SUPABASE_ANON_KEY,
+                    'Authorization': `Bearer ${accessToken}`
+                  };
+                  
+                  // Fetch delivery_requests for these purchase_orders - ALL statuses
+                  const poIdsParam = aggressivePOIds.join(',');
+                  const drResponse = await fetch(
+                    `${SUPABASE_URL}/rest/v1/delivery_requests?purchase_order_id=in.(${poIdsParam})&select=id,purchase_order_id,delivery_address,pickup_address,status&order=created_at.desc&limit=500`,
+                    { headers, cache: 'no-store' }
+                  );
+                  
+                  if (drResponse.ok) {
+                    const drData = await drResponse.json();
+                    console.log('✅ COMPONENT AGGRESSIVE: Fetched', drData.length, 'delivery_requests');
+                    
+                    // Map by purchase_order_id - use most recent with valid address
+                    drData.forEach((dr: any) => {
+                      if (dr.purchase_order_id) {
+                        const existing = deliveryRequestsMap.get(dr.purchase_order_id);
+                        // Only update if this is newer or if existing doesn't have a valid address
+                        if (!existing || 
+                            (dr.delivery_address && dr.delivery_address.trim() && dr.delivery_address !== 'To be provided' && 
+                             (!existing.delivery_address || existing.delivery_address === 'To be provided'))) {
+                          deliveryRequestsMap.set(dr.purchase_order_id, dr);
+                          if (dr.delivery_address && dr.delivery_address.trim() && dr.delivery_address !== 'To be provided') {
+                            console.log('✅✅✅ COMPONENT AGGRESSIVE: Found builder-provided address for', dr.purchase_order_id?.substring(0, 8), ':', dr.delivery_address.substring(0, 60));
+                          }
+                        }
+                      }
+                    });
                   } else {
-                    // Use unary + operator instead of Number()
-                    const num = +po.total_amount;
-                    price = (num === num) ? num : 0; // NaN check: NaN !== NaN
+                    console.warn('⚠️ COMPONENT AGGRESSIVE: Failed to fetch delivery_requests:', drResponse.status);
                   }
+                } catch (e: any) {
+                  console.warn('⚠️ COMPONENT AGGRESSIVE: Error fetching delivery_requests:', e?.message);
                 }
-                
-                // Build entry - NO String() or Number() constructors
-                const poId = po.id || '';
-                const poNumber = po.po_number || '';
-                const idValue = poId ? (poId + '') : ('aggressive-' + (poNumber || i) + '');
-                const deliveryAddr = po.delivery_address || 'Delivery location';
-                
-                const entry: DeliveryHistory = {
-                  id: idValue,
-                  pickup_location: 'Supplier location',
-                  delivery_location: deliveryAddr + '',
-                  material_type: 'Construction Materials',
-                  status: 'delivered',
-                  completed_at: completedAt,
-                  price: price,
-                  rating: 0,
-                  order_number: poNumber ? (poNumber + '') : undefined
-                };
-                
-                aggressiveHistoryEntries.push(entry);
-              } catch (mapError: any) {
-                console.error('❌ COMPONENT AGGRESSIVE: Error mapping order:', po?.po_number || po?.id, mapError);
-                // Skip this entry on error
               }
-            }
+              
+              // Transform to history format - NO CONSTRUCTORS to avoid minification errors
+              const aggressiveHistoryEntries: DeliveryHistory[] = [];
+              for (let i = 0; i < uniqueAggressiveOrders.length; i++) {
+                const po = uniqueAggressiveOrders[i];
+                try {
+                  // CRITICAL: Get builder-provided address from delivery_requests
+                  const deliveryRequest = deliveryRequestsMap.get(po.id);
+                  const builderProvidedAddress = deliveryRequest?.delivery_address;
+                  
+                  // Get completed_at - use string directly, NO Date constructor
+                  let completedAt = '';
+                  if (po.delivered_at) {
+                    completedAt = po.delivered_at + '';
+                  } else if (po.updated_at) {
+                    completedAt = po.updated_at + '';
+                  } else if (po.created_at) {
+                    completedAt = po.created_at + '';
+                  } else {
+                    // Fallback: use hardcoded ISO string - NO Date operations at all
+                    completedAt = '2024-03-07T00:00:00.000Z';
+                  }
+                  
+                  // Get price - avoid Number() constructor
+                  let price = 0;
+                  if (po.total_amount != null) {
+                    if (typeof po.total_amount === 'number') {
+                      price = po.total_amount;
+                    } else {
+                      // Use unary + operator instead of Number()
+                      const num = +po.total_amount;
+                      price = (num === num) ? num : 0; // NaN check: NaN !== NaN
+                    }
+                  }
+                  
+                  // Build entry - NO String() or Number() constructors
+                  const poId = po.id || '';
+                  const poNumber = po.po_number || '';
+                  const idValue = poId ? (poId + '') : ('aggressive-' + (poNumber || i) + '');
+                  
+                  // CRITICAL: Use builder-provided address from delivery_requests (highest priority)
+                  // Fallback to po.delivery_address if not found
+                  let deliveryAddr = 'Delivery address missing - contact support';
+                  if (builderProvidedAddress && builderProvidedAddress.trim() && 
+                      builderProvidedAddress !== 'To be provided' && 
+                      builderProvidedAddress !== 'Delivery location') {
+                    deliveryAddr = builderProvidedAddress;
+                    console.log('✅✅✅ COMPONENT AGGRESSIVE: Using builder-provided address for', poId?.substring(0, 8), ':', deliveryAddr.substring(0, 60));
+                  } else if (po.delivery_address && po.delivery_address.trim() && 
+                             po.delivery_address !== 'To be provided' && 
+                             po.delivery_address !== 'Delivery location') {
+                    deliveryAddr = po.delivery_address;
+                    console.log('✅ COMPONENT AGGRESSIVE: Using delivery_address from purchase_order for', poId?.substring(0, 8));
+                  } else {
+                    console.warn('⚠️ COMPONENT AGGRESSIVE: No valid address found for', poId?.substring(0, 8), 'order', poNumber);
+                  }
+                  
+                  const entry: DeliveryHistory = {
+                    id: idValue,
+                    pickup_location: deliveryRequest?.pickup_address || 'Supplier location',
+                    delivery_location: deliveryAddr + '',
+                    material_type: 'Construction Materials',
+                    status: 'delivered',
+                    completed_at: completedAt,
+                    price: price,
+                    rating: 0,
+                    order_number: poNumber ? (poNumber + '') : undefined
+                  };
+                  
+                  aggressiveHistoryEntries.push(entry);
+                } catch (mapError: any) {
+                  console.error('❌ COMPONENT AGGRESSIVE: Error mapping order:', po?.po_number || po?.id, mapError);
+                  // Skip this entry on error
+                }
+              }
             
             // Check for duplicates before adding
             const existingIds = new Set(deliveryHistory.map(h => h.id));
