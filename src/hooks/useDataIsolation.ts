@@ -1330,8 +1330,9 @@ export const useDeliveryProviderData = () => {
       if (purchaseOrdersToProcess && purchaseOrdersToProcess.length > 0) {
         console.log('📦 Processing', purchaseOrdersToProcess.length, 'purchase orders...');
         
-        // CRITICAL: Fetch delivery_requests in batch to get builder-provided delivery_address
-        // The builder fills in delivery_address in delivery_requests table during delivery request
+        // CRITICAL: Fetch delivery_requests in batch to get delivery_address from delivery request form
+        // IMPORTANT: This is the DELIVERY ADDRESS the builder provides when filling the delivery request form
+        // This is DIFFERENT from the builder's profile/account address - it's specific to each delivery request
         const poIdsForDR = purchaseOrdersToProcess.map((po: any) => po.id).filter(Boolean);
         let deliveryRequestsMap = new Map<string, any>();
         
@@ -1350,7 +1351,7 @@ export const useDeliveryProviderData = () => {
                   deliveryRequestsMap.set(dr.purchase_order_id, dr);
                 }
               });
-              console.log('✅ Fetched', drData.length, 'delivery_requests for purchase_orders - builder-provided addresses available');
+              console.log('✅ Fetched', drData.length, 'delivery_requests for purchase_orders - delivery addresses from delivery request forms available');
             }
           } catch (e: any) {
             console.warn('⚠️ Could not fetch delivery_requests for purchase_orders:', e?.message);
@@ -1395,10 +1396,13 @@ export const useDeliveryProviderData = () => {
           } else {
             // Only add as new entry if not delivered/completed (those should only sync existing delivery_requests)
             if (po.status !== 'delivered' && po.status !== 'completed') {
-              // CRITICAL: Get builder-provided delivery_address from delivery_requests map
+              // CRITICAL: Get delivery_address from delivery_requests map
+              // IMPORTANT: This is the DELIVERY ADDRESS the builder provides when filling the delivery request form
+              // This is DIFFERENT from the builder's profile/account address
+              // The delivery address is specific to each delivery request and may be different for each order
               const deliveryRequest = deliveryRequestsMap.get(po.id);
-              const builderProvidedAddress = deliveryRequest?.delivery_address;
-              const builderProvidedPickup = deliveryRequest?.pickup_address;
+              const deliveryAddressFromForm = deliveryRequest?.delivery_address; // Address from delivery request form
+              const pickupAddressFromForm = deliveryRequest?.pickup_address;
               
               allActiveDeliveries.push({
                 id: po.id,
@@ -1408,12 +1412,13 @@ export const useDeliveryProviderData = () => {
                 status: po.status,
                 po_status: po.status, // Store purchase_order status for categorization
                 purchase_order_status: po.status, // Alias
-                pickup_location: builderProvidedPickup || po.supplier?.address || po.supplier?.location || po.pickup_address || 'Supplier location',
-                pickup_address: builderProvidedPickup || po.supplier?.address || po.supplier?.location || po.pickup_address || 'Supplier location',
-                // CRITICAL: Use builder-provided delivery_address from delivery_requests first
-                // This is the address the builder filled in during delivery request
-                delivery_location: builderProvidedAddress || po.delivery_address || 'Delivery location',
-                delivery_address: builderProvidedAddress || po.delivery_address || 'Delivery location',
+                pickup_location: pickupAddressFromForm || po.supplier?.address || po.supplier?.location || po.pickup_address || 'Supplier location',
+                pickup_address: pickupAddressFromForm || po.supplier?.address || po.supplier?.location || po.pickup_address || 'Supplier location',
+                // CRITICAL: Use delivery_address from delivery_requests table (what builder filled in delivery request form)
+                // This is NOT the builder's profile address - it's the specific delivery address for this order
+                // Fallback to purchase_orders.delivery_address (which may have been synced from delivery_requests)
+                delivery_location: deliveryAddressFromForm || po.delivery_address || 'Delivery location',
+                delivery_address: deliveryAddressFromForm || po.delivery_address || 'Delivery location',
                 material_type: Array.isArray(po.items) ? po.items.map((i: any) => i.name || i.material_type).join(', ') : 'Construction Materials',
                 quantity: Array.isArray(po.items) ? po.items.reduce((sum: number, i: any) => sum + (i.quantity || 1), 0) : 1,
                 builder_name: po.buyer?.full_name || po.builder_name || 'Builder',
@@ -3224,8 +3229,9 @@ export const useDeliveryProviderData = () => {
       console.log('🔄 CRITICAL: Using ordersToTransform.length:', ordersToTransform?.length || 0);
       console.log('🔄 CRITICAL: ordersToTransform details:', ordersToTransform?.map((po: any) => ({ id: po.id?.substring(0, 8), po_number: po.po_number, status: po.status })));
       
-      // CRITICAL: Fetch delivery_requests to get builder-provided delivery_address
-      // The builder fills in delivery_address in delivery_requests table during delivery request
+      // CRITICAL: Fetch delivery_requests to get delivery_address from delivery request form
+      // IMPORTANT: This is the DELIVERY ADDRESS the builder provides when filling the delivery request form
+      // This is DIFFERENT from the builder's profile/account address - it's specific to each delivery request
       const poIdsForDR = (ordersToTransform || []).map((po: any) => po.id).filter(Boolean);
       let deliveryRequestsMap = new Map<string, any>();
       
@@ -3250,7 +3256,7 @@ export const useDeliveryProviderData = () => {
                 deliveryRequestsMap.set(dr.purchase_order_id, dr);
               }
             });
-            console.log('✅ Fetched', drData.length, 'delivery_requests for history - builder-provided addresses available');
+                  console.log('✅ Fetched', drData.length, 'delivery_requests for history - delivery addresses from delivery request forms available');
           }
         } catch (e: any) {
           console.warn('⚠️ Could not fetch delivery_requests for history:', e?.message);
@@ -3261,10 +3267,11 @@ export const useDeliveryProviderData = () => {
       // CRITICAL: Prioritize delivery_address from delivery_requests (builder-provided)
       const deliveredFromPOs = (ordersToTransform || []).map((po: any) => {
         const deliveryRequest = deliveryRequestsMap.get(po.id);
-        // CRITICAL: Use builder-provided delivery_address from delivery_requests first
-        // This is the address the builder filled in during delivery request form
-        const builderProvidedAddress = deliveryRequest?.delivery_address;
-        const builderProvidedPickup = deliveryRequest?.pickup_address;
+        // CRITICAL: Get delivery_address from delivery_requests map
+        // IMPORTANT: This is the DELIVERY ADDRESS the builder provides when filling the delivery request form
+        // This is DIFFERENT from the builder's profile/account address
+        const deliveryAddressFromForm = deliveryRequest?.delivery_address; // Address from delivery request form
+        const pickupAddressFromForm = deliveryRequest?.pickup_address;
         
         return {
           id: po.id,
@@ -3272,12 +3279,13 @@ export const useDeliveryProviderData = () => {
           provider_id: po.delivery_provider_id || userId, // Use actual provider_id from PO if available
           status: 'delivered', // Always mark as delivered since all items are received
           order_number: po.po_number || null, // CRITICAL: Include order_number for matching with supplier dashboard
-          pickup_location: builderProvidedPickup || po.supplier?.address || po.supplier?.location || 'Supplier location',
-          pickup_address: builderProvidedPickup || po.supplier?.address || po.supplier?.location || 'Supplier location',
-          // CRITICAL: Use builder-provided delivery_address from delivery_requests first
-          // This is the address the builder filled in during delivery request
-          delivery_location: builderProvidedAddress || po.delivery_address || 'Delivery location',
-          delivery_address: builderProvidedAddress || po.delivery_address || 'Delivery location',
+          pickup_location: pickupAddressFromForm || po.supplier?.address || po.supplier?.location || 'Supplier location',
+          pickup_address: pickupAddressFromForm || po.supplier?.address || po.supplier?.location || 'Supplier location',
+        // CRITICAL: Use delivery_address from delivery_requests table (what builder filled in delivery request form)
+        // This is NOT the builder's profile address - it's the specific delivery address for this order
+        // Fallback to purchase_orders.delivery_address (which may have been synced from delivery_requests)
+          delivery_location: deliveryAddressFromForm || po.delivery_address || 'Delivery location',
+          delivery_address: deliveryAddressFromForm || po.delivery_address || 'Delivery location',
           material_type: Array.isArray(po.items) ? po.items.map((i: any) => i.name || i.material_type).join(', ') : 'Construction Materials',
           quantity: Array.isArray(po.items) ? po.items.reduce((sum: number, i: any) => sum + (i.quantity || 1), 0) : 1,
           builder_name: po.buyer?.full_name || 'Builder',
@@ -3427,7 +3435,9 @@ export const useDeliveryProviderData = () => {
           if (missingPOs && missingPOs.length > 0) {
             console.log('✅ Found', missingPOs.length, 'missing delivered orders directly');
             
-            // CRITICAL: Fetch delivery_requests in batch to get builder-provided delivery_address
+            // CRITICAL: Fetch delivery_requests in batch to get delivery_address from delivery request form
+            // IMPORTANT: This is the DELIVERY ADDRESS the builder provides when filling the delivery request form
+            // This is DIFFERENT from the builder's profile/account address
             const missingPOIds = missingPOs.map((po: any) => po.id).filter(Boolean);
             let deliveryRequestsMapForMissing = new Map<string, any>();
             
@@ -3446,7 +3456,7 @@ export const useDeliveryProviderData = () => {
                       deliveryRequestsMapForMissing.set(dr.purchase_order_id, dr);
                     }
                   });
-                  console.log('✅ Fetched', drData.length, 'delivery_requests for missing orders - builder-provided addresses available');
+                  console.log('✅ Fetched', drData.length, 'delivery_requests for missing orders - delivery addresses from delivery request forms available');
                 }
               } catch (e: any) {
                 console.warn('⚠️ Could not fetch delivery_requests for missing orders:', e?.message);
@@ -3459,10 +3469,12 @@ export const useDeliveryProviderData = () => {
               const isKnown = knownDeliveredOrderNumbersForHistory.some(num => poNumber.includes(num));
               
               if (isKnown && !filteredHistory.some(h => (h.order_number || '').includes(poNumber.split('-')[1]))) {
-                // CRITICAL: Get builder-provided delivery_address from delivery_requests map
+                // CRITICAL: Get delivery_address from delivery_requests map
+                // IMPORTANT: This is the DELIVERY ADDRESS the builder provides when filling the delivery request form
+                // This is DIFFERENT from the builder's profile/account address
                 const deliveryRequest = deliveryRequestsMapForMissing.get(po.id);
-                const builderProvidedAddress = deliveryRequest?.delivery_address;
-                const builderProvidedPickup = deliveryRequest?.pickup_address;
+                const deliveryAddressFromForm = deliveryRequest?.delivery_address; // Address from delivery request form
+                const pickupAddressFromForm = deliveryRequest?.pickup_address;
                 
                 const historyEntry = {
                   id: po.id,
@@ -3472,9 +3484,11 @@ export const useDeliveryProviderData = () => {
                   order_number: poNumber,
                   pickup_location: builderProvidedPickup || 'Supplier location',
                   pickup_address: builderProvidedPickup || 'Supplier location',
-                  // CRITICAL: Use builder-provided delivery_address from delivery_requests first
-                  delivery_location: builderProvidedAddress || po.delivery_address || 'Delivery location',
-                  delivery_address: builderProvidedAddress || po.delivery_address || 'Delivery location',
+                  // CRITICAL: Use delivery_address from delivery_requests table (what builder filled in delivery request form)
+                  // This is NOT the builder's profile address - it's the specific delivery address for this order
+                  // Fallback to purchase_orders.delivery_address (which may have been synced from delivery_requests)
+                  delivery_location: deliveryAddressFromForm || po.delivery_address || 'Delivery location',
+                  delivery_address: deliveryAddressFromForm || po.delivery_address || 'Delivery location',
                   material_type: 'Materials',
                   quantity: 1,
                   builder_name: 'Builder',
