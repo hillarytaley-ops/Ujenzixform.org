@@ -98,6 +98,7 @@ export const CartSidebar: React.FC = () => {
   const [lastOrderId, setLastOrderId] = useState<string | null>(null);
   const [lastOrderTotal, setLastOrderTotal] = useState<number>(0);
   const [lastOrderItems, setLastOrderItems] = useState<Array<{ material_name?: string; name?: string; quantity: number; unit?: string; unit_price?: number }>>([]);
+  const [lastDeliveryAddress, setLastDeliveryAddress] = useState<string>('');
   
   // Project selection for linking orders to projects
   const [projects, setProjects] = useState<BuilderProject[]>([]);
@@ -1083,8 +1084,9 @@ export const CartSidebar: React.FC = () => {
           items: lastOrderItems,
           project_name: 'Direct Purchase'
         }}
-        onDeliveryRequested={() => {
+        onDeliveryRequested={(opts) => {
           setShowDeliveryPrompt(false);
+          if (opts?.deliveryAddress) setLastDeliveryAddress(opts.deliveryAddress);
           toast({
             title: '🚚 Delivery Requested!',
             description: 'A delivery provider will be assigned to your order soon.',
@@ -1105,25 +1107,29 @@ export const CartSidebar: React.FC = () => {
           setLastOrderId(null);
           setLastOrderTotal(0);
           setLastOrderItems([]);
+          setLastDeliveryAddress('');
         }
       }}
       purchaseOrder={lastOrderId ? {
         id: lastOrderId,
         po_number: `PO-${lastOrderId.slice(0, 8)}`,
         total_amount: lastOrderTotal,
-        project_name: 'Direct Purchase'
+        project_name: 'Direct Purchase',
+        delivery_address: lastDeliveryAddress || undefined
       } : undefined}
       onServiceRequested={() => {
         setShowMonitoringPrompt(false);
         setLastOrderId(null);
         setLastOrderTotal(0);
         setLastOrderItems([]);
+        setLastDeliveryAddress('');
       }}
       onDeclined={() => {
         setShowMonitoringPrompt(false);
         setLastOrderId(null);
         setLastOrderTotal(0);
         setLastOrderItems([]);
+        setLastDeliveryAddress('');
       }}
     />
 

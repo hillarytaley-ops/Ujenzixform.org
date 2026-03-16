@@ -106,6 +106,7 @@ const PrivateClientDashboard = () => {
   const [showDeliveryPrompt, setShowDeliveryPrompt] = useState(false);
   const [showMonitoringServicePrompt, setShowMonitoringServicePrompt] = useState(false);
   const [selectedOrderForDelivery, setSelectedOrderForDelivery] = useState<Order | null>(null);
+  const [lastDeliveryAddressFromForm, setLastDeliveryAddressFromForm] = useState<string>('');
   // Order details modal state
   const [selectedOrderForDetails, setSelectedOrderForDetails] = useState<Order | null>(null);
   const [showOrderDetailsModal, setShowOrderDetailsModal] = useState(false);
@@ -1883,8 +1884,9 @@ const PrivateClientDashboard = () => {
             items: selectedOrderForDelivery.items || [],
             project_name: selectedOrderForDelivery.project_name
           }}
-          onDeliveryRequested={() => {
+          onDeliveryRequested={(opts) => {
             setShowDeliveryPrompt(false);
+            if (opts?.deliveryAddress) setLastDeliveryAddressFromForm(opts.deliveryAddress);
             toast({
               title: '🚚 Delivery Requested!',
               description: `Delivery has been requested for order #${selectedOrderForDelivery.po_number}. A provider will be assigned soon.`,
@@ -2033,6 +2035,7 @@ const PrivateClientDashboard = () => {
             setShowMonitoringServicePrompt(open);
             if (!open) {
               setSelectedOrderForDelivery(null);
+              setLastDeliveryAddressFromForm('');
             }
           }}
           purchaseOrder={{
@@ -2040,7 +2043,7 @@ const PrivateClientDashboard = () => {
             po_number: selectedOrderForDelivery.po_number,
             supplier_id: '',
             total_amount: selectedOrderForDelivery.total_amount || 0,
-            delivery_address: selectedOrderForDelivery.delivery_address || '',
+            delivery_address: lastDeliveryAddressFromForm || selectedOrderForDelivery.delivery_address || '',
             delivery_date: '',
             items: selectedOrderForDelivery.items || [],
             project_name: selectedOrderForDelivery.project_name
@@ -2048,10 +2051,12 @@ const PrivateClientDashboard = () => {
           onServiceRequested={() => {
             setShowMonitoringServicePrompt(false);
             setSelectedOrderForDelivery(null);
+            setLastDeliveryAddressFromForm('');
           }}
           onDeclined={() => {
             setShowMonitoringServicePrompt(false);
             setSelectedOrderForDelivery(null);
+            setLastDeliveryAddressFromForm('');
           }}
         />
       )}

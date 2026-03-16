@@ -371,15 +371,27 @@ export const MonitoringServicePrompt: React.FC<MonitoringServicePromptProps> = (
     }
   };
 
-  // Auto-fill site address from delivery address when dialog opens or purchaseOrder changes
+  // Pre-fill site address from delivery address provided by builder during delivery request (remains editable)
   React.useEffect(() => {
-    if (isOpen && purchaseOrder?.delivery_address) {
+    if (isOpen && purchaseOrder?.delivery_address?.trim()) {
       setFormData(prev => ({
         ...prev,
-        siteAddress: prev.siteAddress || purchaseOrder.delivery_address || ''
+        siteAddress: prev.siteAddress?.trim() || purchaseOrder.delivery_address?.trim() || ''
       }));
     }
   }, [isOpen, purchaseOrder?.delivery_address]);
+
+  // When user reaches Project Details step, pre-fill site address from delivery address if still empty
+  React.useEffect(() => {
+    if (step === 'details' && purchaseOrder?.delivery_address?.trim()) {
+      setFormData(prev => {
+        if (!prev.siteAddress?.trim()) {
+          return { ...prev, siteAddress: purchaseOrder.delivery_address?.trim() || '' };
+        }
+        return prev;
+      });
+    }
+  }, [step, purchaseOrder?.delivery_address]);
 
   const handleRequestMonitoring = async () => {
     if (!selectedPackage || !formData.siteAddress || !formData.contactPhone) {
@@ -756,6 +768,11 @@ export const MonitoringServicePrompt: React.FC<MonitoringServicePromptProps> = (
                   value={formData.siteAddress}
                   onChange={(e) => setFormData(prev => ({ ...prev, siteAddress: e.target.value }))}
                 />
+                {purchaseOrder?.delivery_address && (
+                  <p className="text-xs text-muted-foreground">
+                    Pre-filled from your delivery address. You can edit if needed.
+                  </p>
+                )}
               </div>
 
               {/* GPS Location */}

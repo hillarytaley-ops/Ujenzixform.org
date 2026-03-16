@@ -86,7 +86,7 @@ interface DeliveryPromptDialogProps {
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
   purchaseOrder: PurchaseOrder | null;
-  onDeliveryRequested?: () => void;
+  onDeliveryRequested?: (opts?: { deliveryAddress?: string }) => void;
   onDeclined?: () => void;
 }
 
@@ -1199,10 +1199,10 @@ export const DeliveryPromptDialog: React.FC<DeliveryPromptDialogProps> = ({
         console.warn('⚠️ Provider notification error (non-critical):', notifyError.message);
       });
 
-      // Call success callback and show monitoring prompt
+      // Call success callback with builder's delivery address so monitoring form can pre-fill site address
       if (onDeliveryRequested) {
         setTimeout(() => {
-          onDeliveryRequested();
+          onDeliveryRequested({ deliveryAddress: fullDeliveryAddress });
           onOpenChange(false);
           setStep('prompt');
           
