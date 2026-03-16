@@ -800,19 +800,13 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
           }
         }
         
-        // CRITICAL: For pending/requested/assigned status, show even if address is placeholder
-        // This ensures delivery providers can see and accept requests even if address isn't finalized yet
-        // Only filter out if address is completely empty AND status is not pending/requested/assigned
+        // Under NO circumstance show requests without a valid address to the provider.
         const isPendingStatus = ['pending', 'requested', 'assigned'].includes(dr.status);
         if (!deliveryAddr || deliveryAddr === '') {
           if (isPendingStatus) {
-            // For pending requests, show error message instead of "To be provided" - driver needs to know address is missing
-            deliveryAddr = 'Delivery address missing - contact builder';
-            console.warn(`⚠️ MISSING ADDRESS: Delivery request ${dr.id.slice(0, 8)} has no address but is pending - showing error message instead of placeholder`);
-          } else {
-            console.log(`🚫 FILTERED OUT: Delivery request ${dr.id.slice(0, 8)} has NO delivery_address and status is ${dr.status} (not pending/requested/assigned)`);
-            return; // Filter out - only pending/requested/assigned can have empty address
+            deliveryAddr = 'Delivery address missing - contact builder'; // used only so isValidAddress below is false
           }
+          // Fall through so we hit the isValidAddress check and return (request hidden from provider)
         }
         
         // Check if it's a GPS coordinate (contains numbers and comma, or starts with GPS:)
@@ -822,19 +816,18 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
           /^\d+\.?\d*\s*[|,]\s*\d+\.?\d*/.test(deliveryAddr) // GPS with | separator (e.g., "1.2921 | 36.8219")
         );
         
-        // Valid if: has content, not a placeholder (already replaced above), and either GPS coords OR actual address (min 3 chars for short addresses)
-        // Note: Placeholder addresses have already been replaced with error message above, so we don't need to check isPlaceholder here
-        const isValidAddress = deliveryAddr && 
-                               deliveryAddr !== '' && 
-                               deliveryAddr !== 'Delivery address missing - contact builder' && // Don't treat error message as valid for filtering (but show it for pending)
-                               (isGPSCoordinate || deliveryAddr.length >= 3); // GPS coords or actual address (min 3 chars)
-        
-        if (!isValidAddress && !isPendingStatus) {
-          console.log(`🚫 FILTERED OUT: Delivery request ${dr.id.slice(0, 8)} has no valid delivery address - Address: "${deliveryAddr || 'empty'}", isGPS: ${isGPSCoordinate}, length: ${deliveryAddr?.length || 0}, status: ${dr.status}`);
-          return; // Filter out requests without valid delivery addresses (unless pending)
-        } else {
-          console.log(`✅ VALID ADDRESS: Delivery request ${dr.id.slice(0, 8)} - Final address: "${deliveryAddr.substring(0, 60)}${deliveryAddr.length > 60 ? '...' : ''}"`);
+        // CRITICAL: Under NO circumstance show a request without a valid address to the provider.
+        // Only show requests that have a real delivery address (from the builder's form).
+        const isValidAddress = deliveryAddr &&
+                               deliveryAddr !== '' &&
+                               deliveryAddr !== 'Delivery address missing - contact builder' &&
+                               (isGPSCoordinate || deliveryAddr.length >= 3);
+
+        if (!isValidAddress) {
+          console.log(`🚫 HIDDEN FROM PROVIDER: Delivery request ${dr.id.slice(0, 8)} has no valid address - not shown in Alerts until builder adds address. Status: ${dr.status}`);
+          return; // Do not show to provider until builder has provided address on the form
         }
+        console.log(`✅ VALID ADDRESS: Delivery request ${dr.id.slice(0, 8)} - Final address: "${deliveryAddr.substring(0, 60)}${deliveryAddr.length > 60 ? '...' : ''}"`);
         
         const poNumber = poIdToPONumber.get(poId);
         if (!poNumber) {
