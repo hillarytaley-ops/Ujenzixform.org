@@ -2555,28 +2555,6 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
                         </div>
                       ) : (
                         <div className="space-y-2">
-                          {/* Navigation Button - Always visible */}
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => {
-                              if (notification.pickupAddress && notification.deliveryAddress) {
-                                window.open(`https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(notification.pickupAddress)}&destination=${encodeURIComponent(notification.deliveryAddress)}`, '_blank');
-                              } else {
-                                toast({
-                                  title: "Location Missing",
-                                  description: "Pickup or delivery address is not available yet.",
-                                  variant: "destructive"
-                                });
-                              }
-                            }}
-                            className="w-full border-2 border-blue-500 text-blue-700 hover:bg-blue-50 font-semibold"
-                            disabled={!notification.pickupAddress || !notification.deliveryAddress}
-                          >
-                            <Navigation className="h-4 w-4 mr-2" />
-                            Start Navigation
-                          </Button>
-                          
                           {/* Accept and Reject Buttons */}
                           <div className="flex gap-2">
                             <Button
@@ -2621,23 +2599,7 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
                         </div>
                       )}
                     </>
-                  ) : (
-                    /* For non-pending status, show navigation only */
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => {
-                        if (notification.pickupAddress && notification.deliveryAddress) {
-                          window.open(`https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(notification.pickupAddress)}&destination=${encodeURIComponent(notification.deliveryAddress)}`, '_blank');
-                        }
-                      }}
-                      className="w-full border-2 border-blue-500 text-blue-700 hover:bg-blue-50 font-semibold"
-                      disabled={!notification.pickupAddress || !notification.deliveryAddress}
-                    >
-                      <Navigation className="h-4 w-4 mr-2" />
-                      Start Navigation
-                    </Button>
-                  )}
+                  ) : null}
 
                   {/* Timestamp */}
                   <div className="flex items-center justify-between mt-3 pt-2 border-t border-gray-200">
