@@ -256,7 +256,16 @@ const ProfessionalBuilderDashboardPage = () => {
 
   // Fetch "Delivery address needed" prompts (when driver clicked Check Address) so builder sees them
   useEffect(() => {
-    const userId = authUser?.id || user?.id;
+    let userId = authUser?.id || user?.id;
+    if (!userId) {
+      try {
+        const stored = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          userId = parsed.user?.id || '';
+        }
+      } catch {}
+    }
     if (!userId) return;
     const fetchPrompts = async () => {
       try {

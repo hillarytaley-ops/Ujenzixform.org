@@ -21,21 +21,26 @@ DECLARE
   v_dr_status TEXT;
 BEGIN
   -- Get builder and order info from delivery_request
-  SELECT dr.builder_id, dr.status, po.po_number
-  INTO v_builder_id, v_dr_status, v_po_number
+  SELECT dr.builder_id, dr.status, po.po_number, po.buyer_id
+  INTO v_builder_id, v_dr_status, v_po_number, v_builder_user_id
   FROM delivery_requests dr
   LEFT JOIN purchase_orders po ON po.id = dr.purchase_order_id
   WHERE dr.id = p_delivery_request_id
   LIMIT 1;
 
-  IF v_builder_id IS NULL THEN
+  IF v_builder_id IS NULL AND v_builder_user_id IS NULL THEN
     RETURN jsonb_build_object('success', false, 'error', 'delivery_request_not_found_or_no_builder');
   END IF;
 
-  -- Resolve builder_id to auth user_id (notifications.user_id = auth.users.id). builder_id may be profiles.id.
-  SELECT user_id INTO v_builder_user_id FROM profiles WHERE id = v_builder_id LIMIT 1;
-  IF v_builder_user_id IS NULL THEN
+  -- Resolve to auth user_id (notifications.user_id = auth.users.id). Prefer PO.buyer_id, else profiles.id=builder_id -> user_id, else builder_id.
+  IF v_builder_user_id IS NULL AND v_builder_id IS NOT NULL THEN
+    SELECT user_id INTO v_builder_user_id FROM profiles WHERE id = v_builder_id LIMIT 1;
+  END IF;
+  IF v_builder_user_id IS NULL AND v_builder_id IS NOT NULL THEN
     v_builder_user_id := v_builder_id;
+  END IF;
+  IF v_builder_user_id IS NULL THEN
+    RETURN jsonb_build_object('success', false, 'error', 'could_not_resolve_builder_user_id');
   END IF;
 
   -- Create notification for builder (they add address in Professional Builder Dashboard → Deliveries)

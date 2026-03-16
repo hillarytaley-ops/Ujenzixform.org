@@ -31,7 +31,8 @@ import {
   Calendar,
   Plus,
   XCircle,
-  Eye
+  Eye,
+  AlertTriangle
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -124,6 +125,7 @@ const PrivateClientDashboard = () => {
   const [monitoringRequests, setMonitoringRequests] = useState<any[]>([]);
   const navigate = useNavigate();
   const { toast } = useToast();
+  const [deliveryAddressNeededNotifications, setDeliveryAddressNeededNotifications] = useState<{ id: string; title: string; message: string; action_url?: string }[]>([]);
 
   useEffect(() => {
     // Set loading false after 3 seconds max to prevent infinite loading
@@ -138,6 +140,43 @@ const PrivateClientDashboard = () => {
     
     return () => clearTimeout(timeout);
   }, []);
+
+  // Fetch "Delivery address needed" prompts (when driver clicked Check Address) so builder sees them
+  useEffect(() => {
+    let userId = user?.id;
+    if (!userId) {
+      try {
+        const stored = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          userId = parsed.user?.id || '';
+        }
+      } catch {}
+    }
+    if (!userId) return;
+    const fetchPrompts = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('notifications')
+          .select('id, title, message, action_url')
+          .eq('user_id', userId)
+          .eq('read', false)
+          .in('type', ['reminder', 'delivery_address_missing'])
+          .order('created_at', { ascending: false })
+          .limit(10);
+        if (!error && data?.length) {
+          setDeliveryAddressNeededNotifications(data);
+        } else {
+          setDeliveryAddressNeededNotifications([]);
+        }
+      } catch {
+        setDeliveryAddressNeededNotifications([]);
+      }
+    };
+    fetchPrompts();
+    const interval = setInterval(fetchPrompts, 60000);
+    return () => clearInterval(interval);
+  }, [user?.id]);
 
   // Immediate data loader - runs on mount for orders and monitoring
   useEffect(() => {
@@ -761,6 +800,29 @@ const PrivateClientDashboard = () => {
 
       {/* Main Content */}
       <div className="container mx-auto max-w-7xl px-4 py-8">
+        {/* Delivery address needed – prompt from driver (Check Address) so builder sees it */}
+        {deliveryAddressNeededNotifications.length > 0 && (
+          <div className="mb-4 rounded-lg border-2 border-amber-400 bg-amber-50 p-4 shadow-sm">
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="h-6 w-6 shrink-0 text-amber-600" />
+              <div className="flex-1">
+                <h3 className="font-semibold text-amber-900">Delivery address needed</h3>
+                <p className="mt-1 text-sm text-amber-800">
+                  {deliveryAddressNeededNotifications[0].message}
+                </p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <Button
+                    size="sm"
+                    className="bg-amber-600 hover:bg-amber-700"
+                    onClick={() => setActiveTab('deliveries')}
+                  >
+                    Add address in Deliveries
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
         {/* Navigation Cards - Single Row */}
         <div className="grid grid-cols-3 sm:grid-cols-5 md:grid-cols-9 gap-2 mb-6">
           <Button 
