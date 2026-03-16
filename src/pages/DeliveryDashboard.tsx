@@ -53,6 +53,55 @@ import { RouteOptimizer } from "@/components/delivery/RouteOptimizer";
 import { DriverGamification } from "@/components/delivery/DriverGamification";
 import { DeliveryRequestCard } from "@/components/delivery/DeliveryRequestCard";
 import { useLanguage } from "@/contexts/LanguageContext";
+
+// Play a short alarm sound so delivery provider knows there's a new request (no audio file needed)
+function playNewRequestAlarm() {
+  try {
+    const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.frequency.value = 880;
+    osc.type = "sine";
+    gain.gain.setValueAtTime(0.2, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.2);
+    osc.start(ctx.currentTime);
+    osc.stop(ctx.currentTime + 0.2);
+    const osc2 = ctx.createOscillator();
+    const gain2 = ctx.createGain();
+    osc2.connect(gain2);
+    gain2.connect(ctx.destination);
+    osc2.frequency.value = 1100;
+    osc2.type = "sine";
+    gain2.gain.setValueAtTime(0.2, ctx.currentTime + 0.25);
+    gain2.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.45);
+    osc2.start(ctx.currentTime + 0.25);
+    osc2.stop(ctx.currentTime + 0.45);
+  } catch (_) {}
+}
+
+// Show browser notification so provider is alerted even when tab is in background
+function notifyNewDeliveryRequest() {
+  if (!("Notification" in window)) return;
+  if (Notification.permission === "granted") {
+    new Notification("🚚 New Delivery Request!", {
+      body: "A new delivery job is available. Open the Alerts tab to accept.",
+      icon: "/favicon.ico",
+      tag: "ujenzi-new-delivery",
+    });
+  } else if (Notification.permission !== "denied") {
+    Notification.requestPermission().then((p) => {
+      if (p === "granted") {
+        new Notification("🚚 New Delivery Request!", {
+          body: "A new delivery job is available. Open the Alerts tab to accept.",
+          icon: "/favicon.ico",
+          tag: "ujenzi-new-delivery",
+        });
+      }
+    });
+  }
+}
 import { useToast } from "@/hooks/use-toast";
 import { useDeliveryProviderData, logDataAccessAttempt } from "@/hooks/useDataIsolation";
 import { useDeliveriesUnified, type UnifiedDeliveryRow } from "@/hooks/useDeliveriesUnified";
@@ -1615,7 +1664,7 @@ const DeliveryDashboard = () => {
     } catch (error) {
       console.error('Error loading notification counts:', error);
     }
-  }, []);
+  }, [user?.id]);
 
   // Real-time subscription for delivery updates - including material_items (receive scans)
   // CRITICAL: material_items subscription catches receive_scanned updates so orders move to Delivered tab
@@ -1696,12 +1745,19 @@ const DeliveryDashboard = () => {
         },
         (payload) => {
           console.log('🚚 New delivery request received:', payload);
-          // Refresh data when new request comes in
+          // Alarm: play sound so provider hears there's a new request
+          playNewRequestAlarm();
+          // Alarm: browser notification (works when tab is in background)
+          notifyNewDeliveryRequest();
+          // Switch to Alerts tab so provider sees the new request immediately
+          setActiveTab('notifications');
+          // Refresh data and badge count
           refetchData();
           loadNotificationCounts();
           toast({
             title: '🚚 New Delivery Request!',
-            description: 'A new delivery job is available. Check Alerts tab.',
+            description: 'A new delivery job is available. Check the Alerts tab.',
+            duration: 6000,
           });
         }
       )
@@ -1953,6 +2009,13 @@ const DeliveryDashboard = () => {
       clearInterval(interval);
     };
   }, [loadNotificationCounts]);
+
+  // Request browser notification permission on load so alarm notifications work when new request arrives
+  useEffect(() => {
+    if ("Notification" in window && Notification.permission === "default") {
+      Notification.requestPermission().catch(() => {});
+    }
+  }, []);
 
   useEffect(() => {
     const fetchDashboardData = async () => {
@@ -2452,6 +2515,7 @@ const DeliveryDashboard = () => {
           </Button>
           <Button 
             variant="ghost"
+            title={pendingNotificationCount > 0 ? `${pendingNotificationCount} new delivery request${pendingNotificationCount !== 1 ? 's' : ''} — click to view` : 'Alerts'}
             className={`h-auto py-3 px-2 flex flex-col items-center gap-1 transition-all relative ${
               activeTab === 'notifications' 
                 ? 'bg-gradient-to-r from-teal-500 to-cyan-500 text-white shadow-lg ring-2 ring-teal-300' 
@@ -2464,7 +2528,9 @@ const DeliveryDashboard = () => {
             <Bell className="h-5 w-5" />
             <span className="text-xs font-medium">Alerts</span>
             {pendingNotificationCount > 0 && (
-              <Badge className="absolute -top-1 -right-1 text-[10px] px-1 py-0 bg-red-500 text-white animate-pulse">{pendingNotificationCount}</Badge>
+              <Badge className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] flex items-center justify-center text-[10px] font-bold px-1.5 py-0 bg-red-500 text-white animate-pulse ring-2 ring-white shadow-md">
+                {pendingNotificationCount > 99 ? '99+' : pendingNotificationCount}
+              </Badge>
             )}
           </Button>
           <Button 
