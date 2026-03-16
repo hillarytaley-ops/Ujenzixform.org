@@ -2914,7 +2914,7 @@ const DeliveryDashboard = () => {
                                 <div className="flex items-center gap-2 mb-1">
                                   <MapPin className="h-4 w-4 text-green-500" />
                                   <span className={`text-xs font-medium ${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`}>
-                                    Delivery address (from builder)
+                                    Delivery address (from builder — use this for delivery)
                                   </span>
                                 </div>
                                 <p className={`text-sm ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>

@@ -2370,7 +2370,7 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
 
                   {notification.deliveryAddress && (
                     <div className="bg-orange-50/80 rounded-md px-2 py-1.5 mb-2 border border-orange-200">
-                      <p className="text-[10px] font-semibold text-orange-800 uppercase">📍 Delivery (from builder)</p>
+                      <p className="text-[10px] font-semibold text-orange-800 uppercase">📍 Delivery address (from builder — use this for delivery)</p>
                       <p className="text-xs text-orange-900 truncate" title={notification.deliveryAddress}>{notification.deliveryAddress}</p>
                     </div>
                   )}

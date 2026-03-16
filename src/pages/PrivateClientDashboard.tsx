@@ -158,14 +158,19 @@ const PrivateClientDashboard = () => {
       try {
         const { data, error } = await supabase
           .from('notifications')
-          .select('id, title, message, action_url')
+          .select('id, title, message, action_url, type')
           .eq('user_id', userId)
           .eq('read', false)
-          .in('type', ['reminder', 'delivery_address_missing'])
           .order('created_at', { ascending: false })
-          .limit(10);
+          .limit(20);
         if (!error && data?.length) {
-          setDeliveryAddressNeededNotifications(data);
+          const relevant = data.filter(
+            (n: any) =>
+              n.type === 'reminder' ||
+              n.type === 'delivery_address_missing' ||
+              (n.title && String(n.title).toLowerCase().includes('delivery address'))
+          );
+          setDeliveryAddressNeededNotifications(relevant);
         } else {
           setDeliveryAddressNeededNotifications([]);
         }

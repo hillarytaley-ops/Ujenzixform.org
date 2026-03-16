@@ -127,6 +127,15 @@ export const DeliveryPromptDialog: React.FC<DeliveryPromptDialogProps> = ({
   });
   const { toast } = useToast();
 
+  // Required for Send Request: address or coordinates (same validation as submit) — ensures address is never missing on provider dashboard
+  const hasAddress = Boolean(
+    deliveryData.deliveryAddress.trim() &&
+    deliveryData.deliveryAddress.toLowerCase() !== 'to be provided' &&
+    deliveryData.deliveryAddress.toLowerCase() !== 'tbd' &&
+    deliveryData.deliveryAddress.toLowerCase() !== 'n/a'
+  );
+  const hasCoordinates = Boolean(deliveryData.deliveryCoordinates.trim());
+
   // Get current GPS location
   const getCurrentLocation = () => {
     if (!navigator.geolocation) {
@@ -1560,7 +1569,7 @@ export const DeliveryPromptDialog: React.FC<DeliveryPromptDialogProps> = ({
                 <div className="relative flex justify-center text-xs"><span className="bg-white px-2 text-gray-400">or address</span></div>
               </div>
 
-              {/* Address field - MANDATORY */}
+              {/* Address field - MANDATORY: shared DIRECTLY to delivery provider; must never be missing on their dashboard */}
               <div className="space-y-1">
                 <Label className="text-xs text-gray-500">
                   Delivery Address <span className="text-red-500">*</span>
@@ -1573,9 +1582,12 @@ export const DeliveryPromptDialog: React.FC<DeliveryPromptDialogProps> = ({
                   required
                   aria-required="true"
                 />
+                <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1.5 mt-1">
+                  This address is shared <strong>directly</strong> with the delivery provider who accepts your order. It must not be missing from their dashboard. Provide a street address above or use GPS / Search on Map.
+                </p>
                 {!deliveryData.deliveryAddress.trim() && !deliveryData.deliveryCoordinates.trim() && (
-                  <p className="text-xs text-red-500 mt-1">
-                    Delivery address or GPS coordinates is required
+                  <p className="text-xs text-red-500 mt-0.5">
+                    Delivery address or GPS coordinates is required to send the request.
                   </p>
                 )}
               </div>
@@ -1646,7 +1658,13 @@ export const DeliveryPromptDialog: React.FC<DeliveryPromptDialogProps> = ({
               <Button variant="outline" onClick={() => setStep('prompt')} disabled={submitting} size="sm" className="h-8">
                 Back
               </Button>
-              <Button onClick={handleRequestDelivery} disabled={submitting} className="bg-blue-600 hover:bg-blue-700 h-8" size="sm">
+              <Button
+                onClick={handleRequestDelivery}
+                disabled={submitting || !(hasAddress || hasCoordinates)}
+                className="bg-blue-600 hover:bg-blue-700 h-8"
+                size="sm"
+                title={!(hasAddress || hasCoordinates) ? 'Provide delivery address or GPS coordinates to continue' : undefined}
+              >
                 {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Truck className="h-4 w-4 mr-1" />Send Request</>}
               </Button>
             </DialogFooter>

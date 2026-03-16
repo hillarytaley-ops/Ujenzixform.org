@@ -43,9 +43,11 @@ BEGIN
     RETURN jsonb_build_object('success', false, 'error', 'could_not_resolve_builder_user_id');
   END IF;
 
-  -- Create notification for builder (they add address in Professional Builder Dashboard → Deliveries)
+  -- Insert notification directly (no dependency on create_notification)
   IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'notifications') THEN
-    v_notification_id := public.create_notification(
+    INSERT INTO public.notifications (
+      user_id, type, title, message, data, action_url, action_label, priority
+    ) VALUES (
       v_builder_user_id,
       'reminder',
       'Delivery address needed',
@@ -56,9 +58,9 @@ BEGIN
       jsonb_build_object('delivery_request_id', p_delivery_request_id, 'po_number', v_po_number),
       '/professional-builder-dashboard?tab=deliveries',
       'Open Deliveries',
-      'high',
-      NULL
-    );
+      'high'
+    )
+    RETURNING id INTO v_notification_id;
   END IF;
 
   RETURN jsonb_build_object(
