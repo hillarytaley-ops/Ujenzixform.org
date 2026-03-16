@@ -90,14 +90,6 @@ interface DeliveryPromptDialogProps {
   onDeclined?: () => void;
 }
 
-const BUDGET_RANGES = [
-  { value: '0-5000', label: 'KES 0 - 5,000' },
-  { value: '5000-10000', label: 'KES 5,000 - 10,000' },
-  { value: '10000-20000', label: 'KES 10,000 - 20,000' },
-  { value: '20000-50000', label: 'KES 20,000 - 50,000' },
-  { value: '50000+', label: 'KES 50,000+' },
-];
-
 const MATERIAL_TYPES = [
   'cement',
   'steel',
@@ -131,7 +123,6 @@ export const DeliveryPromptDialog: React.FC<DeliveryPromptDialogProps> = ({
     preferredTime: '',
     materialType: 'mixed',
     totalWeight: '',
-    budgetRange: '10000-20000',
     specialInstructions: ''
   });
   const { toast } = useToast();
@@ -488,12 +479,14 @@ export const DeliveryPromptDialog: React.FC<DeliveryPromptDialogProps> = ({
         return;
       }
 
-      // Create delivery request payload
+      // Create delivery request payload.
+      // CRITICAL: delivery_address is shared DIRECTLY to the delivery provider dashboard (delivery_requests table);
+      // the provider who accepts the order sees this address on their dashboard.
       const deliveryPayload: Record<string, any> = {
         builder_id: userId,
         purchase_order_id: purchaseOrder.id,
         pickup_address: pickupAddress,
-        delivery_address: fullDeliveryAddress.trim(), // CRITICAL: Save the actual address builder entered
+        delivery_address: fullDeliveryAddress.trim(),
         pickup_date: deliveryData.preferredDate,
         material_type: deliveryData.materialType,
         quantity: purchaseOrder.items?.length || 1,
@@ -522,9 +515,6 @@ export const DeliveryPromptDialog: React.FC<DeliveryPromptDialogProps> = ({
       }
       if (deliveryData.specialInstructions) {
         deliveryPayload.special_instructions = deliveryData.specialInstructions;
-      }
-      if (deliveryData.budgetRange) {
-        deliveryPayload.budget_range = deliveryData.budgetRange;
       }
 
       console.log('📦 Creating delivery request with payload:', deliveryPayload);
@@ -1198,7 +1188,6 @@ export const DeliveryPromptDialog: React.FC<DeliveryPromptDialogProps> = ({
         material_type: deliveryData.materialType,
         quantity: purchaseOrder.items?.length || 1,
         weight_kg: deliveryData.totalWeight ? parseFloat(deliveryData.totalWeight) : undefined,
-        budget_range: deliveryData.budgetRange,
         special_instructions: deliveryData.specialInstructions
       }).then(notificationResult => {
         console.log(`✅ Delivery providers notified: ${notificationResult.notified}/${notificationResult.totalProviders}`);
@@ -1591,8 +1580,8 @@ export const DeliveryPromptDialog: React.FC<DeliveryPromptDialogProps> = ({
                 )}
               </div>
 
-              {/* Date, Time, Budget - Compact Grid */}
-              <div className="grid grid-cols-3 gap-2">
+              {/* Date & Time */}
+              <div className="grid grid-cols-2 gap-2">
                 <div className="space-y-1">
                   <Label className="text-xs text-gray-500">Date *</Label>
                   <Input
@@ -1611,17 +1600,6 @@ export const DeliveryPromptDialog: React.FC<DeliveryPromptDialogProps> = ({
                       <SelectItem value="anytime">Any</SelectItem>
                       <SelectItem value="morning">AM</SelectItem>
                       <SelectItem value="afternoon">PM</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-xs text-gray-500">Budget</Label>
-                  <Select value={deliveryData.budgetRange} onValueChange={(value) => setDeliveryData(prev => ({ ...prev, budgetRange: value }))}>
-                    <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      {BUDGET_RANGES.map(range => (
-                        <SelectItem key={range.value} value={range.value} className="text-xs">{range.label}</SelectItem>
-                      ))}
                     </SelectContent>
                   </Select>
                 </div>

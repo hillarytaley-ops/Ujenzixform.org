@@ -594,7 +594,7 @@ export const DeliveryProviderNotifications: React.FC<{ providerId: string }> = (
                     <div className="flex items-start gap-2">
                       <MapPin className="h-4 w-4 text-muted-foreground mt-1" />
                       <div>
-                        <div className="text-sm font-medium">Delivery Location:</div>
+                        <div className="text-sm font-medium">Delivery address (from builder):</div>
                         <div className="text-sm text-muted-foreground">{request.delivery_address}</div>
                       </div>
                     </div>

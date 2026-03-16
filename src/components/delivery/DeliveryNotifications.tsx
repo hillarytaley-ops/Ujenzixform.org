@@ -2375,7 +2375,7 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
                     <div className="bg-gradient-to-r from-orange-50 to-amber-50 rounded-lg p-3 mb-3 border border-orange-200">
                       <div className="flex items-center gap-2">
                         <MapPin className="h-4 w-4 text-orange-600" />
-                        <p className="text-xs font-bold text-orange-800 uppercase tracking-wide">🚚 DELIVERY LOCATION</p>
+                        <p className="text-xs font-bold text-orange-800 uppercase tracking-wide">📍 Delivery address (from builder) — use this for delivery</p>
                       </div>
                       <p className="text-sm text-orange-900 font-medium mt-1 ml-6">{notification.deliveryAddress}</p>
                       {/* DEBUG: Show delivery_request_id for verification */}
