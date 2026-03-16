@@ -2323,83 +2323,65 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
               return (
                 <div
                   key={finalKey}
-                  className={`p-4 rounded-xl border-2 shadow-lg transition-all hover:shadow-xl ${
+                  className={`p-3 rounded-lg border shadow-md transition-all hover:shadow-lg ${
                     notification.read 
-                      ? 'bg-gradient-to-br from-white to-gray-50 border-gray-300' 
-                      : 'bg-gradient-to-br from-teal-50 via-blue-50 to-indigo-50 border-teal-400 animate-pulse'
+                      ? 'bg-gradient-to-br from-white to-gray-50 border-gray-200' 
+                      : 'bg-gradient-to-br from-teal-50 via-blue-50 to-indigo-50 border-teal-300'
                   }`}
                 >
-                  {/* Enhanced Header with Professional Builder Badge */}
-                  <div className="flex items-start justify-between mb-3">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-1">
-                        <Truck className="h-5 w-5 text-teal-600" />
-                        <p className="font-bold text-base text-gray-900">{notification.title}</p>
+                  {/* Compact Header */}
+                  <div className="flex items-start justify-between mb-2">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <Truck className="h-4 w-4 text-teal-600 flex-shrink-0" />
+                        <p className="font-semibold text-sm text-gray-900">{notification.title}</p>
                         {notification.status === 'pending' && (
-                          <Badge className="bg-orange-500 text-white text-xs px-2 py-0.5 animate-pulse">
+                          <Badge className="bg-orange-500 text-white text-[10px] px-1.5 py-0 animate-pulse">
                             NEW
                           </Badge>
                         )}
                       </div>
                       {notification.materialType && (
-                        <p className="text-sm text-gray-700 font-medium mt-1">
+                        <p className="text-xs text-gray-600 mt-0.5">
                           📦 {notification.materialType} {notification.quantity && `(${notification.quantity} items)`}
                         </p>
                       )}
                       {notification.estimatedCost && notification.estimatedCost > 0 && (
-                        <p className="text-xs text-gray-600 mt-1">
-                          💰 Estimated: Ksh {notification.estimatedCost.toLocaleString()}
+                        <p className="text-[10px] text-gray-500 mt-0.5">
+                          💰 Ksh {notification.estimatedCost.toLocaleString()}
                         </p>
                       )}
                     </div>
                     <Badge 
                       variant={notification.priority === 'high' ? 'destructive' : 'outline'} 
-                      className="text-xs font-semibold"
+                      className="text-[10px] font-medium px-1.5 py-0 flex-shrink-0"
                     >
                       {notification.priority}
                     </Badge>
                   </div>
 
-                  {/* Enhanced Location Cards */}
+                  {/* Compact Location Blocks */}
                   {notification.pickupAddress && (
-                    <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg p-3 mb-2 border border-green-200">
-                      <div className="flex items-center gap-2">
-                        <MapPin className="h-4 w-4 text-green-600" />
-                        <p className="text-xs font-bold text-green-800 uppercase tracking-wide">📦 PICKUP LOCATION</p>
-                      </div>
-                      <p className="text-sm text-green-900 font-medium mt-1 ml-6">{notification.pickupAddress}</p>
+                    <div className="bg-green-50/80 rounded-md px-2 py-1.5 mb-1.5 border border-green-200">
+                      <p className="text-[10px] font-semibold text-green-800 uppercase">📦 Pickup</p>
+                      <p className="text-xs text-green-900 truncate" title={notification.pickupAddress}>{notification.pickupAddress}</p>
                     </div>
                   )}
 
                   {notification.deliveryAddress && (
-                    <div className="bg-gradient-to-r from-orange-50 to-amber-50 rounded-lg p-3 mb-3 border border-orange-200">
-                      <div className="flex items-center gap-2">
-                        <MapPin className="h-4 w-4 text-orange-600" />
-                        <p className="text-xs font-bold text-orange-800 uppercase tracking-wide">📍 Delivery address (from builder) — use this for delivery</p>
-                      </div>
-                      <p className="text-sm text-orange-900 font-medium mt-1 ml-6">{notification.deliveryAddress}</p>
-                      {/* DEBUG: Show delivery_request_id for verification */}
-                      {notification.delivery_request_id && (
-                        <p className="text-[10px] text-gray-500 mt-1 ml-6">
-                          Debug ID: {notification.delivery_request_id.slice(0, 8)}...
-                        </p>
-                      )}
+                    <div className="bg-orange-50/80 rounded-md px-2 py-1.5 mb-2 border border-orange-200">
+                      <p className="text-[10px] font-semibold text-orange-800 uppercase">📍 Delivery (from builder)</p>
+                      <p className="text-xs text-orange-900 truncate" title={notification.deliveryAddress}>{notification.deliveryAddress}</p>
                     </div>
                   )}
                   {(!notification.deliveryAddress || notification.deliveryAddress === 'Delivery address missing - contact builder') && notification.delivery_request_id && (
-                    <div className="bg-red-50 border-2 border-red-300 rounded-lg p-3 mb-3">
-                      <div className="flex items-center gap-2">
-                        <AlertTriangle className="h-4 w-4 text-red-600" />
-                        <p className="text-xs font-bold text-red-800 uppercase tracking-wide">⚠️ DELIVERY LOCATION MISSING</p>
-                      </div>
-                      <p className="text-sm text-red-900 font-medium mt-1 ml-6">
-                        {notification.deliveryAddress || 'Delivery address missing - contact builder'}
-                      </p>
-                      <div className="mt-2 flex items-center gap-2 ml-6">
+                    <div className="bg-red-50 border border-red-300 rounded-md px-2 py-1.5 mb-2">
+                      <p className="text-[10px] font-semibold text-red-800 uppercase">⚠️ Delivery address missing</p>
+                      <div className="mt-1 flex items-center gap-2 flex-wrap">
                         <Button
                           size="sm"
                           variant="outline"
-                          className="text-xs h-7 bg-red-100 hover:bg-red-200 text-red-800 border-red-300"
+                          className="text-[10px] h-6 bg-red-100 hover:bg-red-200 text-red-800 border-red-300"
                           disabled={checkingAddress === notification.delivery_request_id || !notification.delivery_request_id}
                           onClick={async (e) => {
                             e.preventDefault();
@@ -2532,85 +2514,74 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
                             </>
                           )}
                         </Button>
-                        <p className="text-[10px] text-gray-500">
-                          ID: {notification.delivery_request_id.slice(0, 8)}...
-                        </p>
+                        <span className="text-[10px] text-gray-500">ID: {notification.delivery_request_id.slice(0, 8)}…</span>
                       </div>
                     </div>
                   )}
 
-                  {/* Enhanced Action Buttons - Always show Navigation, Accept, and Reject for pending requests */}
+                  {/* Action Buttons */}
                   {notification.status === 'pending' && notification.delivery_request_id ? (
                     <>
                       {/* Show if already accepted by another provider */}
                       {notification.provider_id && notification.provider_id !== userId ? (
-                        <div className="bg-amber-50 border-2 border-amber-300 rounded-lg p-3 text-center">
-                          <p className="text-sm font-semibold text-amber-800 flex items-center justify-center gap-2">
-                            <AlertTriangle className="h-4 w-4" />
-                            Already Accepted by Another Provider
-                          </p>
-                          <p className="text-xs text-amber-700 mt-1">
-                            {notification.provider_name ? `Provider: ${notification.provider_name}` : 'Another provider has accepted this delivery'}
+                        <div className="bg-amber-50 border border-amber-300 rounded-md px-2 py-1.5 text-center">
+                          <p className="text-xs font-semibold text-amber-800 flex items-center justify-center gap-1">
+                            <AlertTriangle className="h-3 w-3" />
+                            Already accepted by another provider
                           </p>
                         </div>
                       ) : (
-                        <div className="space-y-2">
-                          {/* Accept and Reject Buttons */}
-                          <div className="flex gap-2">
+                        <div className="flex gap-2">
                             <Button
                               size="sm"
                               onClick={() => handleAcceptDelivery(notification.delivery_request_id!)}
                               disabled={acceptingId === notification.delivery_request_id || rejectingId === notification.delivery_request_id}
-                              className="flex-1 bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white font-bold shadow-md"
+                              className="flex-1 h-8 text-xs bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white font-semibold"
                             >
                               {acceptingId === notification.delivery_request_id ? (
                                 <>
-                                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                  <Loader2 className="h-3 w-3 mr-1.5 animate-spin" />
                                   Accepting...
                                 </>
                               ) : (
                                 <>
-                                  <Check className="h-4 w-4 mr-2" />
+                                  <Check className="h-3 w-3 mr-1.5" />
                                   Accept Delivery
                                 </>
                               )}
                             </Button>
-                            
                             <Button
                               size="sm"
                               variant="destructive"
                               onClick={() => handleRejectDelivery(notification.delivery_request_id!)}
                               disabled={acceptingId === notification.delivery_request_id || rejectingId === notification.delivery_request_id}
-                              className="flex-1 bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white font-bold shadow-md"
+                              className="flex-1 h-8 text-xs font-semibold"
                             >
                               {rejectingId === notification.delivery_request_id ? (
                                 <>
-                                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                  <Loader2 className="h-3 w-3 mr-1.5 animate-spin" />
                                   Rejecting...
                                 </>
                               ) : (
                                 <>
-                                  <XCircle className="h-4 w-4 mr-2" />
+                                  <XCircle className="h-3 w-3 mr-1.5" />
                                   Reject
                                 </>
                               )}
                             </Button>
-                          </div>
                         </div>
                       )}
                     </>
                   ) : null}
 
                   {/* Timestamp */}
-                  <div className="flex items-center justify-between mt-3 pt-2 border-t border-gray-200">
-                    <p className="text-xs text-gray-500 flex items-center gap-1">
-                      <Clock className="h-3 w-3" />
+                  <div className="flex items-center justify-between mt-2 pt-1.5 border-t border-gray-200">
+                    <p className="text-[10px] text-gray-500 flex items-center gap-1">
+                      <Clock className="h-2.5 w-2.5" />
                       {formatTime(notification.timestamp)}
                     </p>
                     {notification.delivery_request_id && (
-                      <p className="text-xs text-gray-400">
-                        ID: {notification.delivery_request_id.substring(0, 8)}...
-                      </p>
+                      <p className="text-[10px] text-gray-400">ID: {notification.delivery_request_id.substring(0, 8)}…</p>
                     )}
                   </div>
                 </div>
