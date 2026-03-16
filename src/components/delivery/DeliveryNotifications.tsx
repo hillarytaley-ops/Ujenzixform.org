@@ -779,22 +779,31 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
             console.warn(`⚠️ CRITICAL: Delivery request ${dr.id.slice(0, 8)} has placeholder address but purchase_order ${poId?.slice(0, 8) || 'NULL'} cannot be found. This means the builder's address was NOT saved correctly!`);
           }
         } else if (!deliveryAddr || deliveryAddr === '') {
-          // Address is empty (not a placeholder, just empty)
-          console.warn(`⚠️ EMPTY ADDRESS: Delivery request ${dr.id.slice(0, 8)} has empty address (not placeholder) - attempting fallback`);
-          
-          // Try fallback to purchase_order
-          if (poId && poMap.has(poId)) {
-            const po = poMap.get(poId);
-            const poAddress = (po?.delivery_address || '').trim();
-            
+          // Address is empty (not a placeholder) - use same fallback as private builder: get from purchase_order
+          console.warn(`⚠️ EMPTY ADDRESS: Delivery request ${dr.id.slice(0, 8)} has empty address - attempting fallback to purchase_order (private builder logic)`);
+          let po = poMap.has(poId) ? poMap.get(poId) : null;
+          if (!po && poId) {
+            try {
+              const poFetchResponse = await fetch(
+                `${url}/rest/v1/purchase_orders?id=eq.${poId}&select=id,po_number,delivery_address&limit=1`,
+                { headers, cache: 'no-store' }
+              );
+              if (poFetchResponse.ok) {
+                const poData = await poFetchResponse.json();
+                if (Array.isArray(poData) && poData.length > 0) {
+                  po = poData[0];
+                  poMap.set(poId, po);
+                }
+              }
+            } catch (e) { /* ignore */ }
+          }
+          if (po) {
+            const poAddress = (po.delivery_address || '').trim();
             if (poAddress && poAddress.length >= 3) {
-              const isPOPlaceholder = poAddress.toLowerCase().trim() === 'to be provided' || 
-                                      poAddress.toLowerCase().trim() === 'tbd' ||
-                                      poAddress.toLowerCase().trim() === 'n/a';
-              
+              const isPOPlaceholder = ['to be provided', 'tbd', 'n/a', 'na', 'tba', 'to be determined', 'delivery location', 'address not found'].includes(poAddress.toLowerCase().trim());
               if (!isPOPlaceholder) {
                 deliveryAddr = poAddress;
-                console.log(`✅ FALLBACK SUCCESS (empty): Using purchase_order address: "${deliveryAddr.substring(0, 50)}..."`);
+                console.log(`✅ FALLBACK SUCCESS (empty): Using purchase_order address (private builder logic): "${deliveryAddr.substring(0, 50)}..."`);
               }
             }
           }
