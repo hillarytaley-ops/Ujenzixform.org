@@ -867,6 +867,7 @@ const DeliveryDashboard = () => {
   }), []);
 
   // Single source of truth (legacy fallback when unified returns empty): categorize each delivery so badge counts and tab content always match
+  // RULE: Accept → order moves to Scheduled; order stays in Scheduled until delivery scan (all items receive_scanned); then it moves to History.
   // CRITICAL: Delivered orders are EXCLUDED from scheduled list - they should not appear in schedule
   // CRITICAL: Orders with dispatched items STAY in scheduled until all items are scanned as delivered
   const deliveryCategories = useMemo(() => {
@@ -2592,6 +2593,7 @@ const DeliveryDashboard = () => {
                   <span>Accept</span>
                   <ChevronRight className="h-3 w-3 text-teal-500" />
                   <span className="font-medium">Scheduled</span>
+                  <span className={`text-[10px] ${isDarkMode ? 'text-teal-400' : 'text-teal-600'}`}>(stays until delivery scan)</span>
                   <ChevronRight className="h-3 w-3 text-teal-500" />
                   <span>Supplier dispatches</span>
                   <ChevronRight className="h-3 w-3 text-teal-500" />
@@ -2600,6 +2602,7 @@ const DeliveryDashboard = () => {
                   <span>You scan all items</span>
                   <ChevronRight className="h-3 w-3 text-teal-500" />
                   <span className="font-medium">Delivered</span>
+                  <span className={`text-[10px] ${isDarkMode ? 'text-teal-400' : 'text-teal-600'}`}>(moves to History)</span>
                 </div>
                 <Button
                   type="button"
@@ -2639,7 +2642,7 @@ const DeliveryDashboard = () => {
                 </Button>
               </div>
               <p className={`text-xs px-3 ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-                Scheduled orders ready for delivery. Select an order from the dropdown to view details.
+                Accepted deliveries appear here and stay until you complete the delivery scan. When you scan all items as delivered, the order moves to the History tab. Select an order from the dropdown to view details.
               </p>
 
               {unifiedError && (
@@ -2825,7 +2828,7 @@ const DeliveryDashboard = () => {
                       <CardContent className="py-12 text-center">
                         <Calendar className={`h-12 w-12 ${isDarkMode ? 'text-gray-600' : 'text-gray-300'} mx-auto mb-4`} />
                         <p className={isDarkMode ? 'text-gray-400' : 'text-gray-500'}>No scheduled deliveries</p>
-                        <p className={`text-sm ${isDarkMode ? 'text-gray-500' : 'text-gray-400'}`}>Accepted deliveries will appear here</p>
+                        <p className={`text-sm ${isDarkMode ? 'text-gray-500' : 'text-gray-400'}`}>Accepted deliveries will appear here and stay until you scan all items as delivered; then they move to the History tab.</p>
                       </CardContent>
                     </Card>
                   );
