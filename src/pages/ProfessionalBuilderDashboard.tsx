@@ -2283,11 +2283,18 @@ const ProfessionalBuilderDashboardPage = () => {
                     </TabsTrigger>
                     <TabsTrigger 
                       value="supplier-quotes"
-                      className="data-[state=active]:bg-white data-[state=active]:text-green-700 data-[state=active]:shadow-sm data-[state=active]:border-green-200 data-[state=active]:border py-3 rounded-md font-medium transition-all"
+                      className="data-[state=active]:bg-white data-[state=active]:text-green-700 data-[state=active]:shadow-sm data-[state=active]:border-green-200 data-[state=active]:border py-3 rounded-md font-medium transition-all relative"
                     >
                       <CheckCircle className="h-4 w-4 mr-2 text-green-600" />
                       <div className="flex flex-col items-start">
-                        <span>Supplier Responses</span>
+                        <span className="inline-flex items-center gap-1.5">
+                          Supplier Responses
+                          {supplierResponseCount > 0 && (
+                            <Badge className="h-5 min-w-[20px] rounded-full px-1.5 flex items-center justify-center text-xs bg-red-500 text-white border-2 border-white font-semibold">
+                              {supplierResponseCount > 99 ? '99+' : supplierResponseCount}
+                            </Badge>
+                          )}
+                        </span>
                         <span className="text-[10px] font-normal text-gray-500">Accept or reject quotes</span>
                       </div>
                     </TabsTrigger>
