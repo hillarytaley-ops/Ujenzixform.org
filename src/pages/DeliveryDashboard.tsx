@@ -1570,8 +1570,9 @@ const DeliveryDashboard = () => {
               }).length;
               
               console.log(`📊 Notification count: ${data.length} total → ${activeRequests.length} active → ${pendingRequests.length} pending (not accepted by this provider) → ${requestsWithPO.length} with PO → ${uniqueCount} unique valid`);
-              setNotificationCount(uniqueCount);
-              setPendingNotificationCount(uniqueCount);
+              const countToShow = uniqueCount > 0 ? uniqueCount : (requestsWithPO.length > 0 ? uniquePOIds.length : 0);
+              setNotificationCount(countToShow);
+              setPendingNotificationCount(countToShow);
             } else {
               console.warn('⚠️ Failed to verify purchase_orders for notification count');
               // Fallback: count using composite key deduplication (same logic as above)
@@ -1660,6 +1661,9 @@ const DeliveryDashboard = () => {
           setNotificationCount(0);
           setPendingNotificationCount(0);
         }
+      } else {
+        setNotificationCount(0);
+        setPendingNotificationCount(0);
       }
     } catch (error) {
       console.error('Error loading notification counts:', error);
@@ -1985,8 +1989,9 @@ const DeliveryDashboard = () => {
     }
   }, [unifiedScheduled, deliveryCategories.scheduled, activeTab, selectedScheduledOrderId]);
 
-  // Load notification counts for the Alerts tab badge
+  // Load notification counts for the Alerts tab badge (run when user is available and when Alerts tab is shown)
   useEffect(() => {
+    if (!user?.id) return;
     loadNotificationCounts();
     
     // Set up real-time subscription to update counts when delivery_requests change
@@ -2008,7 +2013,22 @@ const DeliveryDashboard = () => {
       subscription.unsubscribe();
       clearInterval(interval);
     };
-  }, [loadNotificationCounts]);
+  }, [loadNotificationCounts, user?.id]);
+
+  // When user becomes available, refresh Alerts badge count (in case first run was before auth)
+  useEffect(() => {
+    if (user?.id) {
+      const t = setTimeout(loadNotificationCounts, 800);
+      return () => clearTimeout(t);
+    }
+  }, [user?.id, loadNotificationCounts]);
+
+  // When Alerts tab is selected, refresh count so badge is up to date
+  useEffect(() => {
+    if (activeTab === 'notifications' && user?.id) {
+      loadNotificationCounts();
+    }
+  }, [activeTab, user?.id, loadNotificationCounts]);
 
   // Request browser notification permission on load so alarm notifications work when new request arrives
   useEffect(() => {
@@ -2516,7 +2536,7 @@ const DeliveryDashboard = () => {
           <Button 
             variant="ghost"
             title={pendingNotificationCount > 0 ? `${pendingNotificationCount} new delivery request${pendingNotificationCount !== 1 ? 's' : ''} — click to view` : 'Alerts'}
-            className={`h-auto py-3 px-2 flex flex-col items-center gap-1 transition-all relative ${
+            className={`h-auto py-3 px-2 flex flex-col items-center gap-1 transition-all relative overflow-visible ${
               activeTab === 'notifications' 
                 ? 'bg-gradient-to-r from-teal-500 to-cyan-500 text-white shadow-lg ring-2 ring-teal-300' 
                 : isDarkMode 
@@ -2525,13 +2545,15 @@ const DeliveryDashboard = () => {
             }`}
             onClick={() => setActiveTab('notifications')}
           >
-            <Bell className="h-5 w-5" />
+            <span className="relative inline-flex">
+              <Bell className="h-5 w-5" />
+              {pendingNotificationCount > 0 && (
+                <Badge className="absolute -top-2 -right-2 min-w-[18px] h-[18px] flex items-center justify-center text-[10px] font-bold px-1.5 py-0 bg-red-500 text-white animate-pulse ring-2 ring-white shadow-md rounded-full">
+                  {pendingNotificationCount > 99 ? '99+' : pendingNotificationCount}
+                </Badge>
+              )}
+            </span>
             <span className="text-xs font-medium">Alerts</span>
-            {pendingNotificationCount > 0 && (
-              <Badge className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] flex items-center justify-center text-[10px] font-bold px-1.5 py-0 bg-red-500 text-white animate-pulse ring-2 ring-white shadow-md">
-                {pendingNotificationCount > 99 ? '99+' : pendingNotificationCount}
-              </Badge>
-            )}
           </Button>
           <Button 
             variant="ghost"
