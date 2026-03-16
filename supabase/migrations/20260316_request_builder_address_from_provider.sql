@@ -15,6 +15,7 @@ SET search_path = public
 AS $$
 DECLARE
   v_builder_id UUID;
+  v_builder_user_id UUID;  -- auth.users.id so notification is visible to builder
   v_po_number TEXT;
   v_notification_id UUID;
   v_dr_status TEXT;
@@ -31,10 +32,16 @@ BEGIN
     RETURN jsonb_build_object('success', false, 'error', 'delivery_request_not_found_or_no_builder');
   END IF;
 
+  -- Resolve builder_id to auth user_id (notifications.user_id = auth.users.id). builder_id may be profiles.id.
+  SELECT user_id INTO v_builder_user_id FROM profiles WHERE id = v_builder_id LIMIT 1;
+  IF v_builder_user_id IS NULL THEN
+    v_builder_user_id := v_builder_id;
+  END IF;
+
   -- Create notification for builder (they add address in Professional Builder Dashboard → Deliveries)
   IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'notifications') THEN
     v_notification_id := public.create_notification(
-      v_builder_id,
+      v_builder_user_id,
       'reminder',
       'Delivery address needed',
       COALESCE(

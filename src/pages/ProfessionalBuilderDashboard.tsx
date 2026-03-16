@@ -20,6 +20,7 @@ import {
   Clock,
   CheckCircle,
   AlertCircle,
+  AlertTriangle,
   TrendingUp,
   FileText,
   Building2,
@@ -115,6 +116,7 @@ const ProfessionalBuilderDashboardPage = () => {
   const [extrasSubTab, setExtrasSubTab] = useState('team'); // Sub-tab for Extras (team or support)
   const [deliveriesSubTab, setDeliveriesSubTab] = useState('request'); // Sub-tab for Deliveries (request, schedule, history)
   const [supplierResponseCount, setSupplierResponseCount] = useState(0); // Count of supplier responses for notification badge
+  const [deliveryAddressNeededNotifications, setDeliveryAddressNeededNotifications] = useState<{ id: string; title: string; message: string; action_url?: string }[]>([]);
 
   // Projects state - start with loading false to show empty state immediately
   const [projects, setProjects] = useState<any[]>([]);
@@ -251,6 +253,34 @@ const ProfessionalBuilderDashboardPage = () => {
     const tab = searchParams.get('tab');
     if (tab === 'deliveries') setActiveTab('deliveries');
   }, [searchParams]);
+
+  // Fetch "Delivery address needed" prompts (when driver clicked Check Address) so builder sees them
+  useEffect(() => {
+    const userId = authUser?.id || user?.id;
+    if (!userId) return;
+    const fetchPrompts = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('notifications')
+          .select('id, title, message, action_url')
+          .eq('user_id', userId)
+          .eq('read', false)
+          .in('type', ['reminder', 'delivery_address_missing'])
+          .order('created_at', { ascending: false })
+          .limit(10);
+        if (!error && data?.length) {
+          setDeliveryAddressNeededNotifications(data);
+        } else {
+          setDeliveryAddressNeededNotifications([]);
+        }
+      } catch {
+        setDeliveryAddressNeededNotifications([]);
+      }
+    };
+    fetchPrompts();
+    const interval = setInterval(fetchPrompts, 60000);
+    return () => clearInterval(interval);
+  }, [authUser?.id, user?.id]);
 
   // Fetch monitoring requests directly - run on mount and when authUser changes
   useEffect(() => {
@@ -1653,6 +1683,46 @@ const ProfessionalBuilderDashboardPage = () => {
 
       {/* Main Content */}
       <div className="container mx-auto max-w-7xl px-4 py-8">
+        {/* Delivery address needed – prompt from driver (Check Address) so builder sees it */}
+        {deliveryAddressNeededNotifications.length > 0 && (
+          <div className="mb-4 rounded-lg border-2 border-amber-400 bg-amber-50 p-4 shadow-sm">
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="h-6 w-6 shrink-0 text-amber-600" />
+              <div className="flex-1">
+                <h3 className="font-semibold text-amber-900">Delivery address needed</h3>
+                <p className="mt-1 text-sm text-amber-800">
+                  {deliveryAddressNeededNotifications[0].message}
+                </p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <Button
+                    size="sm"
+                    className="bg-amber-600 hover:bg-amber-700"
+                    onClick={() => {
+                      setActiveTab('deliveries');
+                      setDeliveriesSubTab('request');
+                    }}
+                  >
+                    Add address in Deliveries
+                  </Button>
+                  {deliveryAddressNeededNotifications[0].action_url && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="border-amber-600 text-amber-800"
+                      onClick={() => {
+                        setActiveTab('deliveries');
+                        setDeliveriesSubTab('request');
+                        navigate(deliveryAddressNeededNotifications[0].action_url || '/professional-builder-dashboard');
+                      }}
+                    >
+                      Open Deliveries
+                    </Button>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
         {/* Navigation Cards - Single Row */}
         <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-7 lg:grid-cols-14 gap-2 mb-6">
           <Button 
