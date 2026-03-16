@@ -372,21 +372,24 @@ export const MonitoringServicePrompt: React.FC<MonitoringServicePromptProps> = (
   };
 
   // Pre-fill site address from delivery address provided by builder during delivery request (remains editable)
+  // When dialog opens with a delivery address, always apply it so Site Address is never left empty when we have it
   React.useEffect(() => {
     if (isOpen && purchaseOrder?.delivery_address?.trim()) {
+      const addr = purchaseOrder.delivery_address.trim();
       setFormData(prev => ({
         ...prev,
-        siteAddress: prev.siteAddress?.trim() || purchaseOrder.delivery_address?.trim() || ''
+        siteAddress: addr
       }));
     }
   }, [isOpen, purchaseOrder?.delivery_address]);
 
-  // When user reaches Project Details step, pre-fill site address from delivery address if still empty
+  // When user reaches Project Details step, ensure site address is set from delivery address if still empty
   React.useEffect(() => {
     if (step === 'details' && purchaseOrder?.delivery_address?.trim()) {
+      const addr = purchaseOrder.delivery_address.trim();
       setFormData(prev => {
         if (!prev.siteAddress?.trim()) {
-          return { ...prev, siteAddress: purchaseOrder.delivery_address?.trim() || '' };
+          return { ...prev, siteAddress: addr };
         }
         return prev;
       });

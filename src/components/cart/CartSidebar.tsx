@@ -1067,12 +1067,7 @@ export const CartSidebar: React.FC = () => {
         isOpen={showDeliveryPrompt}
         onOpenChange={(open) => {
           setShowDeliveryPrompt(open);
-          if (!open) {
-            // Show monitoring prompt after delivery decision
-            setTimeout(() => {
-              setShowMonitoringPrompt(true);
-            }, 300);
-          }
+          // Monitoring prompt is opened only from onDeliveryRequested (when builder submits delivery address) so Site Address can be pre-filled
         }}
         purchaseOrder={{
           id: lastOrderId,
@@ -1085,8 +1080,12 @@ export const CartSidebar: React.FC = () => {
           project_name: 'Direct Purchase'
         }}
         onDeliveryRequested={(opts) => {
-          setShowDeliveryPrompt(false);
           if (opts?.deliveryAddress) setLastDeliveryAddress(opts.deliveryAddress);
+          setShowDeliveryPrompt(false);
+          // Open monitoring prompt after a short delay so Site Address can be pre-filled from delivery address
+          if (opts?.deliveryAddress?.trim()) {
+            setTimeout(() => setShowMonitoringPrompt(true), 300);
+          }
           toast({
             title: '🚚 Delivery Requested!',
             description: 'A delivery provider will be assigned to your order soon.',
