@@ -800,34 +800,36 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
           }
         }
         
-        // Under NO circumstance show requests without a valid address to the provider.
+        // Show pending/requested/assigned even if address is missing (provider can use Check Address to prompt builder)
         const isPendingStatus = ['pending', 'requested', 'assigned'].includes(dr.status);
         if (!deliveryAddr || deliveryAddr === '') {
           if (isPendingStatus) {
-            deliveryAddr = 'Delivery address missing - contact builder'; // used only so isValidAddress below is false
+            deliveryAddr = 'Delivery address missing - contact builder';
+            console.warn(`⚠️ MISSING ADDRESS: Delivery request ${dr.id.slice(0, 8)} has no address - show card so provider can use Check Address`);
+          } else {
+            console.log(`🚫 FILTERED OUT: Delivery request ${dr.id.slice(0, 8)} has NO delivery_address and status is ${dr.status}`);
+            return;
           }
-          // Fall through so we hit the isValidAddress check and return (request hidden from provider)
         }
-        
-        // Check if it's a GPS coordinate (contains numbers and comma, or starts with GPS:)
+
+        // Valid if: has content, not the "missing" message (for non-pending), and either GPS or real address
         const isGPSCoordinate = deliveryAddr && (
-          /^-?\d+\.?\d*,\s*-?\d+\.?\d*/.test(deliveryAddr) || // lat,lng format (e.g., -1.2921,36.8219)
+          /^-?\d+\.?\d*,\s*-?\d+\.?\d*/.test(deliveryAddr) ||
           deliveryAddr.toLowerCase().startsWith('gps:') ||
-          /^\d+\.?\d*\s*[|,]\s*\d+\.?\d*/.test(deliveryAddr) // GPS with | separator (e.g., "1.2921 | 36.8219")
+          /^\d+\.?\d*\s*[|,]\s*\d+\.?\d*/.test(deliveryAddr)
         );
-        
-        // CRITICAL: Under NO circumstance show a request without a valid address to the provider.
-        // Only show requests that have a real delivery address (from the builder's form).
         const isValidAddress = deliveryAddr &&
                                deliveryAddr !== '' &&
                                deliveryAddr !== 'Delivery address missing - contact builder' &&
                                (isGPSCoordinate || deliveryAddr.length >= 3);
 
-        if (!isValidAddress) {
-          console.log(`🚫 HIDDEN FROM PROVIDER: Delivery request ${dr.id.slice(0, 8)} has no valid address - not shown in Alerts until builder adds address. Status: ${dr.status}`);
-          return; // Do not show to provider until builder has provided address on the form
+        if (!isValidAddress && !isPendingStatus) {
+          console.log(`🚫 FILTERED OUT: Delivery request ${dr.id.slice(0, 8)} has no valid address, status: ${dr.status}`);
+          return;
         }
-        console.log(`✅ VALID ADDRESS: Delivery request ${dr.id.slice(0, 8)} - Final address: "${deliveryAddr.substring(0, 60)}${deliveryAddr.length > 60 ? '...' : ''}"`);
+        if (isValidAddress) {
+          console.log(`✅ ADDRESS ON CARD: Delivery request ${dr.id.slice(0, 8)} - "${deliveryAddr.substring(0, 60)}${deliveryAddr.length > 60 ? '...' : ''}"`);
+        }
         
         const poNumber = poIdToPONumber.get(poId);
         if (!poNumber) {

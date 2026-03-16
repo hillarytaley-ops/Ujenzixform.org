@@ -666,7 +666,10 @@ export const SupplierQuoteReview: React.FC<SupplierQuoteReviewProps> = ({
     }
   };
 
-  // Handle when user chooses DELIVERY (called from DeliveryPromptDialog)
+  // Handle when user chooses DELIVERY (called from DeliveryPromptDialog after builder submitted form WITH address)
+  // CRITICAL: Do NOT create a delivery_request here with PO.delivery_address (often "To be provided").
+  // The dialog already created/updated the request with the builder's real address. Creating here would
+  // cause "Delivery address missing" on the provider card. Only fetch the request the dialog created and notify.
   const handleDeliveryRequested = async () => {
     if (!acceptedPurchaseOrder) return;
     
@@ -675,19 +678,16 @@ export const SupplierQuoteReview: React.FC<SupplierQuoteReviewProps> = ({
     const effectiveBuilderId = getEffectiveBuilderId();
     
     try {
-      // Get supplier info for pickup address using native fetch
       let pickupAddress = acceptedPurchaseOrder.supplier_address || 'Supplier location';
       if (acceptedPurchaseOrder.supplier_id) {
         try {
           const supplierController = new AbortController();
           const supplierTimeout = setTimeout(() => supplierController.abort(), 5000);
-          
           const supplierResponse = await fetch(
             `${SUPABASE_URL}/rest/v1/suppliers?or=(id.eq.${acceptedPurchaseOrder.supplier_id},user_id.eq.${acceptedPurchaseOrder.supplier_id})&select=address,location,company_name&limit=1`,
             { headers, signal: supplierController.signal, cache: 'no-store' }
           );
           clearTimeout(supplierTimeout);
-          
           if (supplierResponse.ok) {
             const suppliersData = await supplierResponse.json();
             const supplierData = suppliersData?.[0];
@@ -700,94 +700,34 @@ export const SupplierQuoteReview: React.FC<SupplierQuoteReviewProps> = ({
         }
       }
 
-      // Check if delivery request already exists for this purchase order
-      const checkController = new AbortController();
-      const checkTimeout = setTimeout(() => checkController.abort(), 5000);
-      
+      // Delivery request was created by DeliveryPromptDialog with the builder's address. Fetch it.
+      let deliveryRequest = null;
       const checkResponse = await fetch(
-        `${SUPABASE_URL}/rest/v1/delivery_requests?purchase_order_id=eq.${acceptedPurchaseOrder.id}&select=id,status&limit=1`,
-        { headers, signal: checkController.signal, cache: 'no-store' }
+        `${SUPABASE_URL}/rest/v1/delivery_requests?purchase_order_id=eq.${acceptedPurchaseOrder.id}&select=id,status,delivery_address&order=created_at.desc&limit=1`,
+        { headers, cache: 'no-store' }
       );
-      clearTimeout(checkTimeout);
-      
-      let existingDeliveryRequest = null;
       if (checkResponse.ok) {
         const existing = await checkResponse.json();
         if (existing && existing.length > 0) {
-          existingDeliveryRequest = existing[0];
-          console.log('⚠️ Delivery request already exists for this order:', existingDeliveryRequest.id);
+          deliveryRequest = existing[0];
         }
       }
-      
-      // Only create if no existing delivery request
-      let deliveryRequest = null;
-      if (!existingDeliveryRequest) {
-        // Create delivery request using native fetch
-        const deliveryController = new AbortController();
-        const deliveryTimeout = setTimeout(() => deliveryController.abort(), 10000);
-        
-        const deliveryPayload = {
-          builder_id: effectiveBuilderId,
-          purchase_order_id: acceptedPurchaseOrder.id,
-          pickup_address: pickupAddress,
-          delivery_address: acceptedPurchaseOrder.delivery_address,
-          pickup_date: acceptedPurchaseOrder.delivery_date,
-          material_type: detectMaterialType(acceptedPurchaseOrder.items?.[0]?.material_name || ''),
-          quantity: acceptedPurchaseOrder.items?.reduce((sum: number, item: any) => sum + (item.quantity || 1), 0) || 1,
-          weight_kg: (acceptedPurchaseOrder.items?.reduce((sum: number, item: any) => sum + (item.quantity || 1), 0) || 1) * 50,
-          special_instructions: acceptedPurchaseOrder.special_instructions || null,
-          budget_range: '10000-20000',
-          status: 'pending',
-          created_at: new Date().toISOString()
-        };
-        
-        console.log('🚚 Creating delivery request:', deliveryPayload);
-        
-        const deliveryResponse = await fetch(
-          `${SUPABASE_URL}/rest/v1/delivery_requests`,
-          {
-            method: 'POST',
-            headers: { ...headers, 'Prefer': 'return=representation' },
-            body: JSON.stringify(deliveryPayload),
-            signal: deliveryController.signal
-          }
+      if (!deliveryRequest) {
+        await new Promise(r => setTimeout(r, 600));
+        const retryResponse = await fetch(
+          `${SUPABASE_URL}/rest/v1/delivery_requests?purchase_order_id=eq.${acceptedPurchaseOrder.id}&select=id,status,delivery_address&order=created_at.desc&limit=1`,
+          { headers, cache: 'no-store' }
         );
-        clearTimeout(deliveryTimeout);
-      
-        if (deliveryResponse.ok) {
-          const deliveryData = await deliveryResponse.json();
-          deliveryRequest = deliveryData?.[0];
-          console.log('✅ Delivery request created:', deliveryRequest?.id);
-        } else {
-          const errorText = await deliveryResponse.text();
-          console.error('Error creating delivery request:', errorText);
-          // If error is about duplicate, try to get existing request
-          if (errorText.includes('unique') || errorText.includes('duplicate')) {
-            const retryCheck = await fetch(
-              `${SUPABASE_URL}/rest/v1/delivery_requests?purchase_order_id=eq.${acceptedPurchaseOrder.id}&select=id&limit=1`,
-              { headers, cache: 'no-store' }
-            );
-            if (retryCheck.ok) {
-              const existing = await retryCheck.json();
-              if (existing && existing.length > 0) {
-                deliveryRequest = existing[0];
-                console.log('✅ Using existing delivery request:', deliveryRequest.id);
-              }
-            }
-          }
+        if (retryResponse.ok) {
+          const retryData = await retryResponse.json();
+          if (retryData?.length > 0) deliveryRequest = retryData[0];
         }
-      } else {
-        // Use existing delivery request
-        deliveryRequest = existingDeliveryRequest;
-        console.log('✅ Using existing delivery request:', deliveryRequest.id);
       }
 
-      // Notify delivery providers (non-blocking)
       if (deliveryRequest) {
         try {
           const notifyController = new AbortController();
           setTimeout(() => notifyController.abort(), 8000);
-          
           await fetch(`${SUPABASE_URL}/functions/v1/notify-delivery-providers`, {
             method: 'POST',
             headers: { ...headers },
@@ -796,7 +736,7 @@ export const SupplierQuoteReview: React.FC<SupplierQuoteReviewProps> = ({
               request_id: deliveryRequest.id,
               builder_id: effectiveBuilderId,
               pickup_address: pickupAddress,
-              delivery_address: acceptedPurchaseOrder.delivery_address,
+              delivery_address: deliveryRequest.delivery_address ?? acceptedPurchaseOrder.delivery_address,
               material_details: acceptedPurchaseOrder.items?.map((item: any) => ({
                 material_type: item.material_name || item.name,
                 quantity: item.quantity,
