@@ -55,12 +55,15 @@ export const QuoteComparison: React.FC<QuoteComparisonProps> = ({ orderId, build
   const [acceptedPurchaseOrder, setAcceptedPurchaseOrder] = useState<any>(null);
   const { toast } = useToast();
 
-  // Handle when user chooses DELIVERY (called from DeliveryPromptDialog)
+  // Handle when user chooses DELIVERY (called from DeliveryPromptDialog after builder submitted form WITH address)
+  // CRITICAL: We do NOT create a delivery_request here. The dialog already created/updated it with the builder's
+  // real address. Creating one here would use PO.delivery_address which is often "To be provided" and would
+  // show "Delivery address missing" on the provider dashboard. Under NO circumstance should the provider
+  // see a request without the address the builder entered on the form.
   const handleDeliveryRequested = async () => {
     if (!acceptedPurchaseOrder) return;
     
     try {
-      // Get supplier info for pickup address
       let pickupAddress = acceptedPurchaseOrder.supplier_address || 'Supplier location';
       if (acceptedPurchaseOrder.supplier_id) {
         const { data: supplierData } = await supabase
@@ -68,70 +71,38 @@ export const QuoteComparison: React.FC<QuoteComparisonProps> = ({ orderId, build
           .select('address, company_name')
           .eq('id', acceptedPurchaseOrder.supplier_id)
           .maybeSingle();
-        
         if (supplierData) {
           pickupAddress = supplierData.address || `${supplierData.company_name} - Pickup Location`;
         }
       }
 
-      // CRITICAL: Check if delivery request already exists for this purchase_order_id
+      // Delivery request was already created/updated by DeliveryPromptDialog with the builder's address.
+      // Fetch it (may need a short delay so the dialog's POST has committed).
       let deliveryRequest = null;
-      
-      // First, check for existing active delivery request
       const { data: existingRequest } = await supabase
         .from('delivery_requests')
-        .select('id, status')
+        .select('id, status, delivery_address')
         .eq('purchase_order_id', acceptedPurchaseOrder.id)
         .in('status', ['pending', 'assigned', 'accepted', 'in_transit', 'picked_up', 'out_for_delivery', 'scheduled'])
+        .order('created_at', { ascending: false })
         .limit(1)
         .maybeSingle();
 
       if (existingRequest) {
-        console.log('⚠️ Active delivery request already exists for this order:', existingRequest.id, 'Status:', existingRequest.status);
         deliveryRequest = existingRequest;
       } else {
-        // Create delivery request only if one doesn't exist
-        const { data: newRequest, error: deliveryError } = await supabase
+        // Dialog just created it; allow a moment for commit then refetch
+        await new Promise(r => setTimeout(r, 600));
+        const { data: refetched } = await supabase
           .from('delivery_requests')
-          .insert({
-            builder_id: builderId,
-            purchase_order_id: acceptedPurchaseOrder.id,
-            pickup_address: pickupAddress,
-            delivery_address: acceptedPurchaseOrder.delivery_address,
-            pickup_date: acceptedPurchaseOrder.delivery_date,
-            material_type: 'mixed',
-            quantity: acceptedPurchaseOrder.items?.length || 1,
-            weight_kg: (acceptedPurchaseOrder.items?.reduce((sum: number, item: any) => sum + (item.quantity || 1), 0) || 1) * 50,
-            special_instructions: null,
-            budget_range: '10000-20000',
-            status: 'pending',
-            max_rotation_attempts: 5,
-            created_at: new Date().toISOString()
-          })
-          .select()
-          .single();
-
-        if (deliveryError) {
-          console.error('Error creating delivery request:', deliveryError);
-          // If duplicate error, try to find existing one
-          if (deliveryError.message.includes('duplicate') || deliveryError.message.includes('Duplicate')) {
-            const { data: foundRequest } = await supabase
-              .from('delivery_requests')
-              .select('id, status')
-              .eq('purchase_order_id', acceptedPurchaseOrder.id)
-              .limit(1)
-              .maybeSingle();
-            if (foundRequest) {
-              deliveryRequest = foundRequest;
-              console.log('✅ Found existing delivery request after duplicate error:', foundRequest.id);
-            }
-          }
-        } else {
-          deliveryRequest = newRequest;
-        }
+          .select('id, status, delivery_address')
+          .eq('purchase_order_id', acceptedPurchaseOrder.id)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (refetched) deliveryRequest = refetched;
       }
 
-      // Notify delivery providers
       if (deliveryRequest) {
         try {
           await supabase.functions.invoke('notify-delivery-providers', {
@@ -140,7 +111,7 @@ export const QuoteComparison: React.FC<QuoteComparisonProps> = ({ orderId, build
               request_id: deliveryRequest.id,
               builder_id: builderId,
               pickup_address: pickupAddress,
-              delivery_address: acceptedPurchaseOrder.delivery_address,
+              delivery_address: deliveryRequest.delivery_address ?? acceptedPurchaseOrder.delivery_address,
               material_details: acceptedPurchaseOrder.items?.map((item: any) => ({
                 material_type: item.material_name,
                 quantity: item.quantity,
