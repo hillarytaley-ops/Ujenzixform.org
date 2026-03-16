@@ -97,6 +97,7 @@ export const CartSidebar: React.FC = () => {
   const [showMonitoringPrompt, setShowMonitoringPrompt] = useState(false);
   const [lastOrderId, setLastOrderId] = useState<string | null>(null);
   const [lastOrderTotal, setLastOrderTotal] = useState<number>(0);
+  const [lastOrderItems, setLastOrderItems] = useState<Array<{ material_name?: string; name?: string; quantity: number; unit?: string; unit_price?: number }>>([]);
   
   // Project selection for linking orders to projects
   const [projects, setProjects] = useState<BuilderProject[]>([]);
@@ -626,13 +627,21 @@ export const CartSidebar: React.FC = () => {
       
       console.log('✅ Purchase order created:', orderData);
 
-      // Success! Store order info for delivery/monitoring prompts
+      // Success! Store order info for delivery/monitoring prompts (snapshot items before clearing cart)
       const orderTotal = getTotalPrice();
       const orderItemCount = getTotalItems();
-      
+      const orderItemsSnapshot = items.map(item => ({
+        material_name: item.name,
+        name: item.name,
+        quantity: item.quantity,
+        unit: item.unit,
+        unit_price: item.unit_price
+      }));
+
       setLastOrderId(orderData.id);
       setLastOrderTotal(orderTotal);
-      
+      setLastOrderItems(orderItemsSnapshot);
+
       clearCart();
       setIsCartOpen(false);
       
@@ -1071,7 +1080,7 @@ export const CartSidebar: React.FC = () => {
           total_amount: lastOrderTotal,
           delivery_address: 'To be provided',
           delivery_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-          items: [],
+          items: lastOrderItems,
           project_name: 'Direct Purchase'
         }}
         onDeliveryRequested={() => {
@@ -1095,6 +1104,7 @@ export const CartSidebar: React.FC = () => {
         if (!open) {
           setLastOrderId(null);
           setLastOrderTotal(0);
+          setLastOrderItems([]);
         }
       }}
       purchaseOrder={lastOrderId ? {
@@ -1107,11 +1117,13 @@ export const CartSidebar: React.FC = () => {
         setShowMonitoringPrompt(false);
         setLastOrderId(null);
         setLastOrderTotal(0);
+        setLastOrderItems([]);
       }}
       onDeclined={() => {
         setShowMonitoringPrompt(false);
         setLastOrderId(null);
         setLastOrderTotal(0);
+        setLastOrderItems([]);
       }}
     />
 

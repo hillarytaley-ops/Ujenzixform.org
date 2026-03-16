@@ -1426,6 +1426,35 @@ export const DeliveryPromptDialog: React.FC<DeliveryPromptDialogProps> = ({
               <DialogDescription className="sr-only">Enter delivery address and preferences</DialogDescription>
             </DialogHeader>
 
+            {/* Products bought by builder - MUST show what client ordered */}
+            {purchaseOrder?.items && purchaseOrder.items.length > 0 && (
+              <Card className="border-blue-200 bg-blue-50/50">
+                <CardContent className="p-3">
+                  <p className="text-xs font-semibold text-gray-700 flex items-center gap-1 mb-2">
+                    <Package className="h-3.5 w-3.5 text-blue-600" />
+                    Products in this order
+                  </p>
+                  <ul className="space-y-1.5 max-h-[120px] overflow-y-auto">
+                    {purchaseOrder.items.map((item, idx) => (
+                      <li key={idx} className="flex justify-between items-center text-xs bg-white/80 rounded px-2 py-1.5 border border-blue-100">
+                        <span className="font-medium text-gray-800 truncate flex-1 mr-2">
+                          {item.material_name || item.name || 'Item'}
+                        </span>
+                        <span className="text-gray-600 shrink-0">
+                          {item.quantity} {item.unit || 'unit'}
+                          {item.unit_price != null && (
+                            <span className="ml-1 text-green-600">
+                              · KES {((item.quantity) * (item.unit_price || 0)).toLocaleString()}
+                            </span>
+                          )}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </CardContent>
+              </Card>
+            )}
+
             <div className="py-2 space-y-3 max-h-[55vh] overflow-y-auto">
               {/* GPS Button - Compact */}
               <Button
