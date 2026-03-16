@@ -69,12 +69,28 @@ interface MonitoringServicePromptProps {
   onDeclined?: () => void;
 }
 
-// Professional Builder Packages (Full Price)
+// Professional Builder Packages – includes drone, AI cameras, site visits, and full monitoring services
 const PROFESSIONAL_PACKAGES = [
+  {
+    id: 'pro-starter',
+    name: 'Starter',
+    priceMonthly: 5000,
+    duration: '1 month',
+    features: [
+      'Monthly site visit reports',
+      'Photo documentation',
+      'Material quantity checks',
+      'GPS location tracking',
+      'Progress tracking',
+      'Email support'
+    ],
+    recommended: false,
+    icon: '🌱'
+  },
   {
     id: 'pro-basic',
     name: 'Basic',
-    priceMonthly: 15000,
+    priceMonthly: 9000,
     duration: '1 month',
     features: [
       'Weekly site visit reports',
@@ -90,7 +106,7 @@ const PROFESSIONAL_PACKAGES = [
   {
     id: 'pro-standard',
     name: 'Standard',
-    priceMonthly: 35000,
+    priceMonthly: 22000,
     duration: '3 months',
     features: [
       'Bi-weekly site visits',
@@ -110,7 +126,7 @@ const PROFESSIONAL_PACKAGES = [
   {
     id: 'pro-premium',
     name: 'Premium',
-    priceMonthly: 65000,
+    priceMonthly: 39000,
     duration: '6 months',
     features: [
       'Weekly site visits',
@@ -134,7 +150,7 @@ const PROFESSIONAL_PACKAGES = [
   {
     id: 'pro-enterprise',
     name: 'Enterprise',
-    priceMonthly: 120000,
+    priceMonthly: 72000,
     duration: '12 months',
     features: [
       'Daily site monitoring',
@@ -157,12 +173,28 @@ const PROFESSIONAL_PACKAGES = [
   }
 ];
 
-// Private Builder Packages (Half Price)
+// Private Builder Packages – same monitoring services (drone, AI cameras, etc.) at lower rates
 const PRIVATE_PACKAGES = [
+  {
+    id: 'pvt-starter',
+    name: 'Starter',
+    priceMonthly: 2500,
+    duration: '1 month',
+    features: [
+      'Monthly site visit reports',
+      'Photo documentation',
+      'Material quantity checks',
+      'GPS location tracking',
+      'Progress tracking',
+      'Email support'
+    ],
+    recommended: false,
+    icon: '🌱'
+  },
   {
     id: 'pvt-basic',
     name: 'Basic',
-    priceMonthly: 7500,
+    priceMonthly: 4500,
     duration: '1 month',
     features: [
       'Bi-weekly site visit reports',
@@ -178,7 +210,7 @@ const PRIVATE_PACKAGES = [
   {
     id: 'pvt-standard',
     name: 'Standard',
-    priceMonthly: 17500,
+    priceMonthly: 11000,
     duration: '3 months',
     features: [
       'Weekly site visits',
@@ -198,7 +230,7 @@ const PRIVATE_PACKAGES = [
   {
     id: 'pvt-premium',
     name: 'Premium',
-    priceMonthly: 32500,
+    priceMonthly: 19500,
     duration: '6 months',
     features: [
       'Weekly site visits',
@@ -220,7 +252,7 @@ const PRIVATE_PACKAGES = [
   {
     id: 'pvt-enterprise',
     name: 'Enterprise',
-    priceMonthly: 60000,
+    priceMonthly: 36000,
     duration: '12 months',
     features: [
       'Daily site monitoring',
@@ -386,7 +418,7 @@ export const MonitoringServicePrompt: React.FC<MonitoringServicePromptProps> = (
 
       console.log('📹 User ID:', userId);
 
-      const selectedPkg = MONITORING_PACKAGES.find(p => p.id === selectedPackage);
+      const selectedPkg = packages.find(p => p.id === selectedPackage);
 
       // Create monitoring service request
       const monitoringRequest = {
@@ -402,7 +434,7 @@ export const MonitoringServicePrompt: React.FC<MonitoringServicePromptProps> = (
         selected_services: [selectedPackage],
         camera_count: 1,
         special_requirements: formData.specialRequirements || null,
-        estimated_cost: selectedPkg?.price || 0,
+        estimated_cost: selectedPkg?.priceMonthly ?? selectedPkg?.price ?? 0,
         additional_notes: `Package: ${selectedPkg?.name || selectedPackage}. Duration: ${selectedPkg?.duration || 'N/A'}${formData.gpsCoordinates ? `. GPS: ${formData.gpsCoordinates}` : ''}`,
         status: 'pending',
         urgency: 'normal'
@@ -594,7 +626,10 @@ export const MonitoringServicePrompt: React.FC<MonitoringServicePromptProps> = (
                 <Eye className="h-5 w-5 text-blue-600" />
                 Choose Your Monitoring Package
               </DialogTitle>
-              <DialogDescription>
+              <DialogDescription className="space-y-2">
+                <p className="text-sm text-gray-600">
+                  Our monitoring covers all services we offer: site visits, progress tracking, drone aerial surveys, AI cameras, live video, material verification, GPS tracking, and more. Choose a package that fits your project.
+                </p>
                 {isProfessional ? (
                   <span className="flex items-center gap-1">
                     <Badge className="bg-blue-600">Professional Builder</Badge>
@@ -670,9 +705,9 @@ export const MonitoringServicePrompt: React.FC<MonitoringServicePromptProps> = (
               <Alert className="bg-gray-50 border-gray-200">
                 <AlertDescription className="text-xs text-gray-600">
                   {isProfessional ? (
-                    <>💼 Professional Builder pricing includes advanced features for commercial projects.</>
+                    <>💼 Professional Builder packages include drone surveys, AI cameras, site visits, and full monitoring—reduced rates for all tiers.</>
                   ) : (
-                    <>🏠 Private Builder pricing is <strong>50% off</strong> professional rates - perfect for home construction!</>
+                    <>🏠 Private Builder packages include the same monitoring services (drone, AI cameras, site visits) at lower rates—perfect for home construction.</>
                   )}
                 </AlertDescription>
               </Alert>
