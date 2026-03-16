@@ -867,49 +867,34 @@ const DeliveryDashboard = () => {
   }), []);
 
   // Single source of truth (legacy fallback when unified returns empty): categorize each delivery so badge counts and tab content always match
-  // RULE: Accept → order moves to Scheduled; order stays in Scheduled until delivery scan (all items receive_scanned); then it moves to History.
-  // CRITICAL: Delivered orders are EXCLUDED from scheduled list - they should not appear in schedule
-  // CRITICAL: Orders with dispatched items STAY in scheduled until all items are scanned as delivered
+  // RULE: Accept → order moves to Scheduled; order STAYS in Scheduled until delivery scan (all items receive_scanned); then it moves to History.
+  // CRITICAL: Dispatch scan must NOT remove orders from Schedule - they stay until delivery scan.
   const deliveryCategories = useMemo(() => {
-    const getCategory = (d: any): 'scheduled' | 'in_transit' | 'delivered' => {
+    const getCategory = (d: any): 'scheduled' | 'delivered' => {
       const cat = String(d._categorized_status || d.status || '').toLowerCase();
-      // Check if order is delivered by status
+      // Only "delivered" leaves the Schedule tab; everything else stays in Schedule until delivery scan
       if (cat === 'delivered' || cat === 'completed') return 'delivered';
-      // Check if all items are received (delivered via QR scan)
       const allReceived = d._items_count != null && d._received_count != null &&
         d._items_count > 0 && d._received_count >= d._items_count;
       if (allReceived) return 'delivered';
-      // CRITICAL: Orders should remain in "scheduled" after dispatch until delivered
-      // Only move to 'in_transit' if explicitly marked as in_transit status
-      // After dispatch, orders stay in scheduled until all items are delivered
-      const inTransitList = ['in_transit', 'picked_up', 'on_the_way', 'near_destination', 'out_for_delivery', 'delivery_arrived'];
-      if (inTransitList.includes(cat)) return 'in_transit';
-      // Everything else (including dispatched/shipped) stays in scheduled until delivered
-      // This ensures orders remain visible in schedule after dispatch until delivery is complete
+      // All non-delivered orders (accepted, assigned, in_transit, dispatched, shipped, etc.) stay in Schedule until delivery scan
       return 'scheduled';
     };
     const scheduled: any[] = [];
-    const inTransit: any[] = [];
     const deliveredFromActive: any[] = [];
     activeDeliveries.forEach(d => {
       const c = getCategory(d);
       if (c === 'scheduled') scheduled.push(d);
-      else if (c === 'in_transit') inTransit.push(d);
-      else deliveredFromActive.push(d); // Delivered orders go here (excluded from schedule)
+      else deliveredFromActive.push(d);
     });
-    
-    // Check if problematic order is in scheduled list
-    const problematicInScheduled = scheduled.some(d => d.order_number === 'QR-1773125455597-K3447');
-    
-    console.log('📊 Delivery categorization:', {
+
+    console.log('📊 Delivery categorization (Schedule = until delivery scan):', {
       total: activeDeliveries.length,
       scheduled: scheduled.length,
-      inTransit: inTransit.length,
-      delivered: deliveredFromActive.length,
-      problematic_order_in_scheduled: problematicInScheduled ? '⚠️ PROBLEMATIC ORDER FOUND IN SCHEDULED!' : 'OK'
+      delivered: deliveredFromActive.length
     });
-    
-    return { scheduled, inTransit, deliveredFromActive };
+
+    return { scheduled, inTransit: [] as any[], deliveredFromActive };
   }, [activeDeliveries]);
 
   // Calculate Deliveries badge count - must match Scheduled tab logic EXACTLY
@@ -926,10 +911,11 @@ const DeliveryDashboard = () => {
     let count = 0;
     
     if (shouldUseUnified) {
-      // Use unified source - count items in unifiedScheduled (same as Scheduled tab)
-      count = unifiedScheduled.length;
+      // Use unified source - Scheduled tab shows scheduled + in_transit (stay until delivery scan)
+      count = unifiedScheduled.length + (unifiedInTransit?.length || 0);
       console.log('📊 Deliveries badge count (unified):', {
         unifiedScheduled: unifiedScheduled.length,
+        unifiedInTransit: unifiedInTransit?.length ?? 0,
         count
       });
     } else {
@@ -1966,12 +1952,11 @@ const DeliveryDashboard = () => {
     };
   }, [user?.id, refetchData, refetchUnified, loadNotificationCounts, toast, activeTab]);
 
-  // Update selected scheduled order when scheduled orders change
+  // Update selected scheduled order when scheduled orders change (Schedule = scheduled + in_transit until delivery scan)
   useEffect(() => {
     if (activeTab !== 'deliveries') return;
     
-    // Check both unified and legacy scheduled orders
-    const unifiedIds = unifiedScheduled.map(d => d.id || d.purchase_order_id || '').filter(Boolean);
+    const unifiedIds = [...unifiedScheduled, ...(unifiedInTransit || [])].map(d => d.id || d.purchase_order_id || '').filter(Boolean);
     const legacyIds = deliveryCategories.scheduled.map(d => d.id || d.purchase_order_id || '').filter(Boolean);
     // Use object-based deduplication instead of Set to avoid minification errors
     const allScheduledIdsObj: Record<string, boolean> = {};
@@ -1988,7 +1973,7 @@ const DeliveryDashboard = () => {
     } else if (selectedScheduledOrderId) {
       setSelectedScheduledOrderId("");
     }
-  }, [unifiedScheduled, deliveryCategories.scheduled, activeTab, selectedScheduledOrderId]);
+  }, [unifiedScheduled, unifiedInTransit, deliveryCategories.scheduled, activeTab, selectedScheduledOrderId]);
 
   // Load notification counts for the Alerts tab badge (run when user is available and when Alerts tab is shown)
   useEffect(() => {
@@ -2652,10 +2637,12 @@ const DeliveryDashboard = () => {
                 </Alert>
               )}
 
-              {/* Scheduled Orders - unified RPC or legacy fallback */}
+              {/* Scheduled Orders - unified RPC or legacy fallback. Include both scheduled AND in-transit so orders stay until delivery scan. */}
               <div className="space-y-4 mt-4">
                 {(() => {
-                  const scheduled = useLegacyFallback ? deliveryCategories.scheduled : unifiedScheduled.map(toCardDelivery);
+                  const scheduled = useLegacyFallback
+                    ? deliveryCategories.scheduled
+                    : [...unifiedScheduled, ...(unifiedInTransit || [])].map(toCardDelivery);
                   const showSpinner = !useLegacyFallback && unifiedLoading && scheduled.length === 0;
                   
                   if (showSpinner) {

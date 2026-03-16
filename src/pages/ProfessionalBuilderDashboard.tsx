@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useNavigate, Link } from "react-router-dom";
+import { useNavigate, Link, useSearchParams } from "react-router-dom";
 import { supabase, SUPABASE_URL, SUPABASE_ANON_KEY } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
@@ -244,6 +244,13 @@ const ProfessionalBuilderDashboardPage = () => {
       setUser(authUser);
     }
   }, [authUser]);
+
+  // Deep-link to Deliveries tab when opened from "Check Address" notification (builder prompted to add address)
+  const [searchParams] = useSearchParams();
+  useEffect(() => {
+    const tab = searchParams.get('tab');
+    if (tab === 'deliveries') setActiveTab('deliveries');
+  }, [searchParams]);
 
   // Fetch monitoring requests directly - run on mount and when authUser changes
   useEffect(() => {

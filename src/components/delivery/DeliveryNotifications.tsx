@@ -2390,115 +2390,65 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
                             const deliveryRequestId = notification.delivery_request_id;
                             
                             if (!deliveryRequestId) {
-                              console.error('❌ No delivery_request_id provided');
                               toast({
                                 title: 'Error',
-                                description: 'No delivery request ID found. Cannot check address.',
+                                description: 'No delivery request ID found. Cannot request address.',
                                 variant: 'destructive',
                                 duration: 5000
                               });
                               return;
                             }
                             
-                            console.log('🔍🔍🔍 CHECK ADDRESS BUTTON CLICKED:', {
-                              delivery_request_id: deliveryRequestId,
-                              notification_id: notification.id,
-                              timestamp: new Date().toISOString()
-                            });
-                            
                             setCheckingAddress(deliveryRequestId);
                             
                             try {
-                              console.log('🔍 Calling checkDeliveryAddress with ID:', deliveryRequestId);
-                              const startTime = Date.now();
-                              const addressCheck = await checkDeliveryAddress(deliveryRequestId);
-                              const endTime = Date.now();
-                              
-                              console.log(`✅ checkDeliveryAddress completed in ${endTime - startTime}ms`);
-                              console.log('📍📍📍 DATABASE CHECK RESULT:', {
-                                delivery_request_id: addressCheck?.delivery_request_id,
-                                delivery_address: addressCheck?.delivery_address,
-                                delivery_coordinates: addressCheck?.delivery_coordinates,
-                                purchase_order_id: addressCheck?.purchase_order_id,
-                                status: addressCheck?.status,
-                                created_at: addressCheck?.created_at,
-                                builder_id: addressCheck?.builder_id,
-                                isNull: addressCheck === null,
-                                isUndefined: addressCheck === undefined
+                              // Prompt the builder: notify them to add the address in their Professional Builder Dashboard (Deliveries tab)
+                              const { data: rpcData, error: rpcError } = await (supabase as any).rpc('request_builder_to_add_delivery_address', {
+                                p_delivery_request_id: deliveryRequestId
                               });
                               
-                              if (!addressCheck) {
-                                console.error('❌ checkDeliveryAddress returned null or undefined');
-                                toast({
-                                  title: '❌ Check Failed',
-                                  description: 'Could not retrieve data from database. The delivery request may not exist. Check console for details.',
-                                  variant: 'destructive',
-                                  duration: 8000
-                                });
-                                return;
-                              }
+                              const result = rpcData as { success?: boolean; error?: string; message?: string } | null;
+                              const success = result?.success === true && !rpcError;
                               
-                              // Check if address is a placeholder
-                              const addressValue = addressCheck.delivery_address || '';
-                              const isPlaceholder = addressValue && (
-                                addressValue.toLowerCase().trim() === 'to be provided' ||
-                                addressValue.toLowerCase().trim() === 'tbd' ||
-                                addressValue.toLowerCase().trim() === 't.b.d.' ||
-                                addressValue.toLowerCase().trim() === 'n/a' ||
-                                addressValue.toLowerCase().trim() === 'na' ||
-                                addressValue.toLowerCase().trim() === 'tba' ||
-                                addressValue.toLowerCase().trim() === 'to be determined' ||
-                                addressValue.toLowerCase().trim() === 'delivery location' ||
-                                addressValue.toLowerCase().trim() === 'address not found' ||
-                                addressValue.toLowerCase().trim() === 'address not specified by builder'
-                              );
-                              
-                              if (addressValue && !isPlaceholder) {
-                                const addressDisplay = addressValue.length > 100 
-                                  ? `${addressValue.substring(0, 100)}...` 
-                                  : addressValue;
-                                const coordsDisplay = addressCheck.delivery_coordinates 
-                                  ? `\n\n📍 Coordinates: ${addressCheck.delivery_coordinates}` 
-                                  : '';
-                                
+                              if (success) {
                                 toast({
-                                  title: '✅ Address Found in Database!',
-                                  description: `Address: ${addressDisplay}${coordsDisplay}\n\nStatus: ${addressCheck.status}\nCreated: ${new Date(addressCheck.created_at).toLocaleString()}`,
+                                  title: '✅ Builder prompted',
+                                  description: "We've asked the builder to add the delivery address. They'll see a prompt in their Professional Builder Dashboard under the Deliveries tab. Refresh this page after they add it.",
                                   variant: 'default',
-                                  duration: 12000
-                                });
-                              } else if (isPlaceholder) {
-                                toast({
-                                  title: '⚠️ Placeholder Address in Database',
-                                  description: `The database contains a placeholder: "${addressValue}".\n\nThe builder needs to provide a real address.\n\nStatus: ${addressCheck.status}`,
-                                  variant: 'destructive',
                                   duration: 10000
                                 });
                               } else {
+                                // RPC not deployed or failed: show instructions without backend notification
                                 toast({
-                                  title: '❌ No Address in Database',
-                                  description: `The address field is NULL or empty.\n\nThe builder must provide a delivery address.\n\nStatus: ${addressCheck.status}\nPurchase Order ID: ${addressCheck.purchase_order_id || 'N/A'}`,
-                                  variant: 'destructive',
-                                  duration: 10000
+                                  title: 'Ask builder to add address',
+                                  description: "The address must be added by the builder. Ask them to open their Professional Builder Dashboard → Deliveries tab. They'll see 'Action Required: Missing Delivery Addresses' and can add the address there. Then refresh this page.",
+                                  variant: 'default',
+                                  duration: 12000
                                 });
                               }
-                            } catch (error: any) {
-                              console.error('❌❌❌ EXCEPTION in checkDeliveryAddress:', error);
-                              console.error('Error details:', {
-                                message: error?.message,
-                                stack: error?.stack,
-                                name: error?.name,
-                                code: error?.code
-                              });
                               
+                              // Optionally re-check DB so driver can see if address was already added
+                              const addressCheck = await checkDeliveryAddress(deliveryRequestId).catch(() => null);
+                              if (addressCheck?.delivery_address?.trim()) {
+                                const isPlaceholder = ['to be provided', 'tbd', 't.b.d.', 'n/a', 'na', 'tba', 'to be determined', 'delivery location', 'address not found', 'address not specified by builder'].some(
+                                  p => (addressCheck.delivery_address || '').toLowerCase().trim() === p
+                                );
+                                if (!isPlaceholder) {
+                                  toast({
+                                    title: '📍 Address on file',
+                                    description: `Address: ${(addressCheck.delivery_address || '').substring(0, 80)}${(addressCheck.delivery_address || '').length > 80 ? '...' : ''}`,
+                                    duration: 8000
+                                  });
+                                }
+                              }
+                            } catch (err: any) {
                               toast({
-                                title: '❌ Error Checking Address',
-                                description: error?.message || error?.toString() || 'An unexpected error occurred while checking the database. See console for details.',
-                                variant: 'destructive',
-                                duration: 8000
+                                title: 'Ask builder to add address',
+                                description: "The address must be added by the builder in their Professional Builder Dashboard under the Deliveries tab. Refresh this page after they add it.",
+                                variant: 'default',
+                                duration: 10000
                               });
                             } finally {
-                              console.log('🔍 Clearing checkingAddress state');
                               setCheckingAddress(null);
                             }
                           }}
@@ -2506,7 +2456,7 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
                           {checkingAddress === notification.delivery_request_id ? (
                             <>
                               <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                              Checking...
+                              Sending...
                             </>
                           ) : (
                             <>
