@@ -650,26 +650,23 @@ const DeliveryDashboard = () => {
       (async () => {
         // Use object-based map instead of Map to avoid minification errors
         let deliveryRequestsMap: Record<string, any> = {};
+        const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
+        let accessToken = SUPABASE_ANON_KEY;
+        try {
+          const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+          if (storedSession) {
+            const parsed = JSON.parse(storedSession);
+            if (parsed.access_token) accessToken = parsed.access_token;
+          }
+        } catch (e) {}
+        const headers = {
+          'apikey': SUPABASE_ANON_KEY,
+          'Authorization': `Bearer ${accessToken}`
+        };
         
         if (purchaseOrderIds.length > 0) {
           try {
-            const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
-            const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
-            
-            let accessToken = SUPABASE_ANON_KEY;
-            try {
-              const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
-              if (storedSession) {
-                const parsed = JSON.parse(storedSession);
-                if (parsed.access_token) accessToken = parsed.access_token;
-              }
-            } catch (e) {}
-            
-            const headers = {
-              'apikey': SUPABASE_ANON_KEY,
-              'Authorization': `Bearer ${accessToken}`
-            };
-            
             // Fetch delivery_requests for these purchase_orders to get builder-provided delivery_address
             // CRITICAL: Query ALL statuses (not just pending) because these are completed orders
             // CRITICAL: Use proper PostgREST syntax for IN query (no quotes around UUIDs)

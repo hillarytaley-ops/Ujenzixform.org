@@ -774,10 +774,11 @@ export const useDeliveryProviderData = () => {
               // RLS policy will handle matching provider_id (either user_id or delivery_providers.id)
               // Query delivery_requests with order_number directly (now stored in table)
               // Use simple select without join to avoid 400 errors
+              // Use .in() with allowed statuses to avoid PostgREST 400 on .not('status','in',[...])
               const joinQueryPromise = supabase
                 .from('delivery_requests')
                 .select('*')
-                .not('status', 'in', ['cancelled', 'delivered', 'completed'])
+                .in('status', ['pending', 'requested', 'assigned', 'accepted', 'scheduled', 'dispatched', 'in_transit', 'picked_up', 'out_for_delivery'])
                 .order('created_at', { ascending: false })
                 .limit(100);
               
@@ -819,10 +820,10 @@ export const useDeliveryProviderData = () => {
               // Fall back to simple query if join fails
               // Filter by status to exclude pending requests (RLS policy will handle provider_id matching)
               console.warn('⚠️ Join query failed, falling back to simple query:', joinError);
-            // Fetch delivery_requests - simple query without joins
-            // Use URL-encoded parentheses for PostgREST not.in.() syntax
+            // Fetch delivery_requests - simple query without joins (use in.() to avoid not.in parsing issues)
+            const activeStatuses = 'pending,requested,assigned,accepted,scheduled,dispatched,in_transit,picked_up,out_for_delivery';
             const activeResponse = await fetch(
-                `${SUPABASE_URL}/rest/v1/delivery_requests?status=not.in.%28cancelled%2Cdelivered%2Ccompleted%29&select=*&order=created_at.desc&limit=200`,
+                `${SUPABASE_URL}/rest/v1/delivery_requests?status=in.%28${activeStatuses}%29&select=*&order=created_at.desc&limit=200`,
               {
                 headers: {
                   'apikey': SUPABASE_ANON_KEY,
@@ -1304,7 +1305,11 @@ export const useDeliveryProviderData = () => {
               orderNumber = dr.po_number_from_join;
               console.log('✅ Using po_number from join query for delivery_request', dr.id.slice(0, 8), ':', orderNumber);
             }
-            // If po_number is missing, log warning but don't create fallback - this order shouldn't appear
+            // Priority 3: delivery_requests.order_number (e.g. fallback "Order-xxx" when RLS blocks PO - apply migration 20260319 for real po_number)
+            else if (dr.order_number && typeof dr.order_number === 'string' && dr.order_number.startsWith('Order-')) {
+              orderNumber = dr.order_number;
+              console.log('✅ Using order_number (fallback) from delivery_request', dr.id.slice(0, 8), ':', orderNumber);
+            }
             else {
               console.warn('⚠️ Missing po_number for delivery_request', dr.id.slice(0, 8), 'purchase_order_id:', dr.purchase_order_id?.slice(0, 8), '- order will be excluded (matching supplier dashboard behavior)');
             }
@@ -3246,6 +3251,8 @@ export const useDeliveryProviderData = () => {
       // This is DIFFERENT from the builder's profile/account address - it's specific to each delivery request
       const poIdsForDR = (ordersToTransform || []).map((po: any) => po.id).filter(Boolean);
       let deliveryRequestsMap = new Map<string, any>();
+      const withTimeoutLocal = <T,>(promise: Promise<T>, ms: number, fallback: T): Promise<T> =>
+        Promise.race([promise, new Promise<T>((resolve) => setTimeout(() => resolve(fallback), ms))]);
       
       if (poIdsForDR.length > 0) {
         try {
@@ -3255,11 +3262,16 @@ export const useDeliveryProviderData = () => {
             .in('purchase_order_id', poIdsForDR)
             .limit(500);
           
-          const { data: drData, error: drError } = await withTimeout(
-            drQuery,
+          const qResult = await withTimeoutLocal(
+            (async () => {
+              const r = await drQuery;
+              return { data: r.data, error: r.error };
+            })(),
             5000,
-            { data: [], error: null } as any
+            { data: [] as any[], error: null } as any
           );
+          const drData = qResult?.data;
+          const drError = qResult?.error;
           
           if (!drError && drData && drData.length > 0) {
             // Map by purchase_order_id for quick lookup
