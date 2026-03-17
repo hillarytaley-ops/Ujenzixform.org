@@ -1914,7 +1914,7 @@ class TrackingNumberService {
             try {
               // Try delivery_providers table first
               const providerResponse = await fetch(
-                `${SUPABASE_URL}/rest/v1/delivery_providers?id=eq.${dr.provider_id}&select=provider_name,company_name,phone&limit=1`,
+                `${SUPABASE_URL}/rest/v1/delivery_providers?id=eq.${dr.provider_id}&select=provider_name,phone&limit=1`,
                 {
                   headers: {
                     'apikey': SUPABASE_ANON_KEY,

@@ -378,7 +378,7 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
             // Build PostgREST filter: id=in.(uuid1,uuid2,uuid3)
             // UUIDs don't need quotes in PostgREST
             const idFilter = providerIdsArray.join(',');
-            const providersUrl = `${SUPABASE_URL}/rest/v1/delivery_providers?id=in.(${idFilter})&select=id,provider_name,company_name,phone`;
+            const providersUrl = `${SUPABASE_URL}/rest/v1/delivery_providers?id=in.(${idFilter})&select=id,provider_name,phone`;
             
             console.log('👤 Fetching providers from delivery_providers:', providerIdsArray.length, 'provider IDs');
             
@@ -395,7 +395,7 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
           if (providersRes && providersRes.ok) {
             const providers = await providersRes.json();
             providers.forEach((p: any) => {
-              providerNamesMap.set(p.id, p.provider_name || p.company_name || 'Delivery Provider');
+              providerNamesMap.set(p.id, p.provider_name || 'Delivery Provider');
               if (p.phone) {
                 providerPhonesMap.set(p.id, p.phone);
               }
@@ -1397,8 +1397,8 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
                 <div className="flex items-start gap-2 text-sm bg-blue-50 p-3 rounded-lg border border-blue-200">
                   <Truck className="h-4 w-4 text-blue-600 mt-0.5" />
                   <div className="flex-1">
-                    <p className="font-medium text-blue-900">Delivery Provider</p>
-                    {order.delivery_provider_name && order.delivery_provider_name !== 'Delivery Provider' ? (
+                    <p className="font-medium text-blue-900">Delivery provider</p>
+                    {(order.delivery_provider_name && order.delivery_provider_name !== 'Delivery Provider') ? (
                       <>
                         <p className="text-blue-700 font-semibold">{order.delivery_provider_name}</p>
                         {order.delivery_provider_phone && (

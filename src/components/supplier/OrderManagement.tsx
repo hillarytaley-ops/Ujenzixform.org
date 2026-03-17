@@ -457,7 +457,7 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, is
                 // Try to get from delivery_providers table
                 const { data: providerData } = await supabase
                   .from('delivery_providers')
-                  .select('provider_name, company_name, phone')
+                  .select('provider_name, phone')
                   .eq('id', providerId)
                   .single();
                 
@@ -693,7 +693,7 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, is
         try {
           const ids = Array.from(providerIdsToResolve);
           const fromProviders = await fetch(
-            `${SUPABASE_URL}/rest/v1/delivery_providers?id=in.(${ids.join(',')})&select=id,provider_name,company_name,phone`,
+            `${SUPABASE_URL}/rest/v1/delivery_providers?id=in.(${ids.join(',')})&select=id,provider_name,phone`,
             { headers, cache: 'no-store' }
           );
           if (fromProviders.ok) {
@@ -1002,8 +1002,8 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, is
                 <p className={`font-semibold ${isAccepted ? 'text-green-700' : 'text-blue-700'} mb-1`}>
                   {isAccepted ? '✅ Delivery Confirmed' : '📋 Assigned'}
                 </p>
-                <p className="font-medium text-gray-800 mt-1">
-                  {providerName}
+                <p className="font-medium text-gray-800 mt-1" title={providerName}>
+                  {providerName !== 'Delivery Provider' ? providerName : (order.delivery_provider_id ? 'Loading…' : '—')}
                 </p>
               </>
             )}
