@@ -576,8 +576,9 @@ const DeliveryDashboard = () => {
                 
                 const isFallbackLabel = d.order_number && typeof d.order_number === 'string' && d.order_number.startsWith('Order-');
                 if (isFallbackLabel) {
-                  // Fallback label: PO/material not visible (e.g. RLS before migration 20260319) - keep for Schedule tab
-                  return true;
+                  // Do NOT show "Order-xxx" weird order numbers on Schedule — remove and reject these app-wide
+                  console.warn('🚫 Removing fallback order from Schedule (weird order number):', d.order_number);
+                  return false;
                 }
                 
                 // Only validate that the order exists - don't filter by dispatch status

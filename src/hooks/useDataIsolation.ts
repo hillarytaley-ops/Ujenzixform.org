@@ -586,10 +586,11 @@ export const useDeliveryProviderData = () => {
                     orderNumber = on;
                   }
                 }
-                // Include accepted orders in Schedule even when PO fetch returned 0 (use fallback label)
+                // Do NOT use fallback "Order-xxx" — user does not want these weird order numbers on Schedule.
+                // Exclude this delivery from Schedule so it does not appear (will stay on Alerts until rejected/cleaned).
                 if (!orderNumber) {
-                  orderNumber = `Order-${(dr.purchase_order_id || dr.id).toString().slice(0, 8)}`;
-                  console.log('⚡ FAST PATH: Using fallback label for', dr.id.slice(0, 8), '(apply migration 20260319 for real po_number)');
+                  console.log('🚫 FAST PATH: Excluding delivery_request', dr.id.slice(0, 8), '- no real po_number (not adding fallback Order-xxx to Schedule)');
+                  return null;
                 }
               }
             }
@@ -1305,10 +1306,10 @@ export const useDeliveryProviderData = () => {
               orderNumber = dr.po_number_from_join;
               console.log('✅ Using po_number from join query for delivery_request', dr.id.slice(0, 8), ':', orderNumber);
             }
-            // Priority 3: delivery_requests.order_number (e.g. fallback "Order-xxx" when RLS blocks PO - apply migration 20260319 for real po_number)
+            // Do NOT use "Order-xxx" fallback — user does not want these weird order numbers on Schedule
             else if (dr.order_number && typeof dr.order_number === 'string' && dr.order_number.startsWith('Order-')) {
-              orderNumber = dr.order_number;
-              console.log('✅ Using order_number (fallback) from delivery_request', dr.id.slice(0, 8), ':', orderNumber);
+              console.warn('🚫 Excluding delivery_request', dr.id.slice(0, 8), '- has fallback Order-xxx (no real po_number)');
+              orderNumber = null;
             }
             else {
               console.warn('⚠️ Missing po_number for delivery_request', dr.id.slice(0, 8), 'purchase_order_id:', dr.purchase_order_id?.slice(0, 8), '- order will be excluded (matching supplier dashboard behavior)');
@@ -1542,11 +1543,15 @@ export const useDeliveryProviderData = () => {
       const withOrderNumbers = allActiveDeliveries.filter((d: any) => d.order_number).length;
       
       // Helper function to check if order number is REAL (not a fallback)
+      // User does not want "Order-xxx" or "PO-xxxxxxxx" fake numbers on Schedule — exclude them.
       const hasRealOrderNumber = (d: any) => {
         if (!d.order_number || !d.order_number.trim()) return false;
+        const on = d.order_number.trim();
+        // Exclude "Order-xxxxxxxx" fallback (e.g. Order-3729cc1a) — not real PO numbers
+        if (on.startsWith('Order-')) return false;
         // Fallback format is exactly "PO-" + 8 hex chars (e.g., PO-91623C3B)
         // Real order numbers are longer (e.g., PO-1772776419681-YMFXN)
-        const isFallback = /^PO-[A-F0-9]{8}$/i.test(d.order_number);
+        const isFallback = /^PO-[A-F0-9]{8}$/i.test(on);
         return !isFallback;
       };
       
@@ -1682,8 +1687,8 @@ export const useDeliveryProviderData = () => {
                   // All items are not dispatched - this is valid for Awaiting Dispatch
                   validatedDeliveries.push(item);
                 } else if (isFallbackLabel) {
-                  // Fallback label: PO/material_items not available (e.g. RLS before migration 20260319) - keep so Schedule tab shows the order
-                  validatedDeliveries.push(item);
+                  // Do NOT keep Order-xxx fallback — user does not want these on Schedule
+                  continue;
                 } else {
                   // No material_items found for this order - exclude it
                   console.warn('🚫 Removing order with no material_items data:', {
