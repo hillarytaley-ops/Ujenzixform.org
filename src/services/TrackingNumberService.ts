@@ -1278,8 +1278,9 @@ class TrackingNumberService {
       ).then(r => r.ok ? r.json() : []).then(d => Array.isArray(d) && d.length > 0 ? d[0] : null).catch(() => null);
       
       // CRITICAL: providerId is auth.uid() (user_id), not delivery_providers.id - query by user_id first
+      // Note: delivery_providers has provider_name, NOT company_name
       const providerPromise = fetch(
-        `${SUPABASE_URL}/rest/v1/delivery_providers?user_id=eq.${providerId}&select=id,provider_name,phone,company_name&limit=1`,
+        `${SUPABASE_URL}/rest/v1/delivery_providers?user_id=eq.${providerId}&select=id,provider_name,phone&limit=1`,
         {
           headers: {
             'apikey': SUPABASE_ANON_KEY,
@@ -1320,7 +1321,7 @@ class TrackingNumberService {
         builderEmail,
         builderPhone: builderResult?.phone || '',
         trackingNumber,
-        providerName: providerResult?.company_name || providerResult?.provider_name || 'Delivery Provider',
+        providerName: providerResult?.provider_name || 'Delivery Provider',
         pickupAddress: existingRequest.pickup_address,
         deliveryAddress: existingRequest.delivery_address,
         materialType: existingRequest.material_type,
@@ -1448,9 +1449,9 @@ class TrackingNumberService {
         // Use anon key
       }
       
-      // Create in-app notification using direct REST API with timeout
+      // Use create_notification RPC (SECURITY DEFINER) - bypasses RLS, allows provider to notify builder
       const notificationPromise = fetch(
-        `${SUPABASE_URL}/rest/v1/notifications`,
+        `${SUPABASE_URL}/rest/v1/rpc/create_notification`,
         {
           method: 'POST',
           headers: {
@@ -1460,11 +1461,11 @@ class TrackingNumberService {
             'Prefer': 'return=minimal'
           },
           body: JSON.stringify({
-            user_id: notification.builderId,
-            type: 'delivery_accepted',
-            title: '🚚 Delivery Provider Assigned!',
-            message: `Your delivery has been accepted! Track it with: ${notification.trackingNumber}`,
-            data: {
+            p_user_id: notification.builderId,
+            p_type: 'delivery_accepted',
+            p_title: '🚚 Delivery Provider Assigned!',
+            p_message: `Your delivery has been accepted! Track it with: ${notification.trackingNumber}`,
+            p_data: {
               tracking_number: notification.trackingNumber,
               provider_name: notification.providerName,
               pickup_address: notification.pickupAddress,
@@ -1472,8 +1473,7 @@ class TrackingNumberService {
               material_type: notification.materialType,
               estimated_pickup: notification.estimatedPickupDate
             },
-            read: false,
-            created_at: new Date().toISOString()
+            p_priority: 'normal'
           }),
           cache: 'no-store'
         }
@@ -1603,23 +1603,46 @@ class TrackingNumberService {
       }
 
       // CRITICAL: delivery_tracking.provider_id must be delivery_providers.id, not auth.uid()
+      // Use get_delivery_provider_id_for_user RPC (SECURITY DEFINER) - bypasses RLS
       let providerIdForTracking = providerId;
       try {
-        const dpRes = await fetch(
-          `${SUPABASE_URL}/rest/v1/delivery_providers?user_id=eq.${providerId}&select=id&limit=1`,
+        const rpcRes = await fetch(
+          `${SUPABASE_URL}/rest/v1/rpc/get_delivery_provider_id_for_user`,
           {
+            method: 'POST',
             headers: {
               'apikey': SUPABASE_ANON_KEY,
               'Authorization': `Bearer ${accessToken}`,
               'Content-Type': 'application/json'
             },
+            body: JSON.stringify({}),
             cache: 'no-store'
           }
         );
-        if (dpRes.ok) {
-          const dpData = await dpRes.json();
-          if (Array.isArray(dpData) && dpData.length > 0 && dpData[0].id) {
-            providerIdForTracking = dpData[0].id;
+        if (rpcRes.ok) {
+          const rpcData = await rpcRes.json();
+          if (rpcData != null && typeof rpcData === 'string') {
+            providerIdForTracking = rpcData;
+          }
+        }
+        // Fallback: direct query if RPC returns null (e.g. not a provider)
+        if (providerIdForTracking === providerId) {
+          const dpRes = await fetch(
+            `${SUPABASE_URL}/rest/v1/delivery_providers?user_id=eq.${providerId}&select=id&limit=1`,
+            {
+              headers: {
+                'apikey': SUPABASE_ANON_KEY,
+                'Authorization': `Bearer ${accessToken}`,
+                'Content-Type': 'application/json'
+              },
+              cache: 'no-store'
+            }
+          );
+          if (dpRes.ok) {
+            const dpData = await dpRes.json();
+            if (Array.isArray(dpData) && dpData.length > 0 && dpData[0].id) {
+              providerIdForTracking = dpData[0].id;
+            }
           }
         }
       } catch (_) { /* use providerId */ }
