@@ -592,13 +592,20 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
         finalNotificationMap.set(poId, drs[0]);
       }
       
-      console.log(`✅ FINAL NOTIFICATION MAP: ${finalNotificationMap.size} unique purchase_order_ids (was ${finalDeliveryRequestsByPO.size} in finalDeliveryRequestsByPO)`);
+      // Include delivery requests with NULL purchase_order_id so they appear on Alerts (key by dr.id)
+      finalDeliveryRequestsByKey.forEach((dr) => {
+        if (dr?.id && !finalNotificationMap.has(dr.id)) {
+          finalNotificationMap.set(dr.id, dr);
+        }
+      });
+      
+      console.log(`✅ FINAL NOTIFICATION MAP: ${finalNotificationMap.size} unique (${finalDeliveryRequestsByPO.size} with PO + ${finalDeliveryRequestsByKey.size} without PO)`);
       
       // THIRD PASS: Create notifications from the deduplicated map
       for (const [poId, dr] of finalNotificationMap.entries()) {
-        // CRITICAL: Skip delivery requests without purchase_order_id (these are placeholder/default requests)
+        // Skip only invalid/placeholder keys; keys from NULL purchase_order_id requests are dr.id (UUID), so valid
         if (!poId || poId.trim() === '' || poId === 'null' || poId === 'undefined') {
-          console.log(`🚫 SKIPPING: Delivery request ${dr.id} has no valid purchase_order_id (placeholder/default request)`);
+          console.log(`🚫 SKIPPING: Delivery request ${dr?.id} has no valid key (placeholder/default request)`);
           continue;
         }
         
@@ -868,7 +875,7 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
           materialType: dr.material_type || '',
           quantity: dr.quantity || '',
           estimatedCost: dr.estimated_cost || dr.budget_range || 0,
-          purchase_order_id: poId, // CRITICAL
+          purchase_order_id: dr.purchase_order_id ?? (poId === dr.id ? undefined : poId), // Use real PO id; for null-po requests key is dr.id so pass undefined
           po_number: poNumber || undefined, // CRITICAL: Include po_number for deduplication
           delivery_request_id: dr.id, // For accepting
           provider_id: dr.provider_id || null, // Provider who accepted (null = unaccepted)
@@ -911,14 +918,7 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
         console.error(`🚨 EMERGENCY CLEANUP: Reduced finalNotifications from ${beforeCount} to ${cleanedNotifications.length} (removed ${beforeCount - cleanedNotifications.length} duplicates)`);
       }
       
-      // CRITICAL: DO NOT show notifications for NULL purchase_order_id requests
-      // These are placeholder/default delivery requests that don't have actual orders
-      // Only show delivery requests with valid purchase_order_id
-      console.log(`🚫 FILTERED OUT: delivery requests without purchase_order_id (placeholder/default requests - not showing to providers)`);
-      
-      // REMOVED: We no longer show NULL purchase_order_id requests to providers
-      // These are likely placeholder/default requests that were created without actual orders
-      // Providers should only see delivery requests linked to real purchase orders
+      // NULL purchase_order_id requests are now included (keyed by dr.id) so they appear on Alerts.
       
       // STEP 4: Fetch purchase_orders that DON'T have a delivery_request yet
       // CRITICAL: Only add if purchase_order_id is NOT already in addedPOIds
@@ -2126,6 +2126,9 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
           <div className="text-center py-8">
             <BellOff className="h-12 w-12 text-gray-300 mx-auto mb-3" />
             <p className="text-gray-500">No active delivery requests</p>
+            <p className="text-gray-400 text-sm mt-2 max-w-sm mx-auto">
+              Expecting requests? Click <strong>Refresh</strong> above. If they still don&apos;t appear, ensure migration <code className="text-xs bg-gray-100 dark:bg-gray-800 px-1 rounded">20260317_delivery_provider_see_all_pending_requests</code> has been applied to your database.
+            </p>
           </div>
         ) : (
           (() => {
