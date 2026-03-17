@@ -568,25 +568,27 @@ export const useDeliveryProviderData = () => {
         const quickDeliveries = fastData
           .map((dr: any) => {
             const po = Array.isArray(dr.purchase_orders) ? dr.purchase_orders[0] : dr.purchase_orders;
-            // CRITICAL: Use ONLY purchase_orders.po_number (same as supplier dashboard)
-            // DO NOT use delivery_requests.order_number - it may be outdated/wrong
-            // DO NOT create fallback formats - if po_number is missing, order shouldn't appear
-            let orderNumber = null;
+            // Priority 1: purchase_orders.po_number (join)
+            // Priority 2: fastPathPONumberMap (batch fetch - can be empty if RLS blocks POs)
+            // Priority 3: delivery_requests.order_number (synced from PO; fallback when PO fetch returns 0)
+            let orderNumber: string | null = null;
             if (dr.purchase_order_id) {
-              // Priority 1: po_number from join (if available)
               if (po?.po_number && po.po_number.trim() !== '') {
                 orderNumber = po.po_number;
-              }
-              // Priority 2: po_number from fastPathPONumberMap
-              else {
+              } else {
                 const mapNumber = fastPathPONumberMap.get(dr.purchase_order_id);
                 if (mapNumber && mapNumber.trim() !== '') {
                   orderNumber = mapNumber;
+                } else if (dr.order_number && typeof dr.order_number === 'string' && dr.order_number.trim() !== '') {
+                  const on = dr.order_number.trim();
+                  // Use synced order_number from delivery_requests when PO fetch returned 0 (e.g. RLS)
+                  if (on.length >= 10 && (on.toUpperCase().startsWith('QR-') || on.toUpperCase().startsWith('PO-'))) {
+                    orderNumber = on;
+                  }
                 }
               }
             }
             
-            // Only include orders with valid po_number
             if (!orderNumber) {
               console.warn('⚠️ FAST PATH: Excluding delivery_request', dr.id.slice(0, 8), '- no valid po_number');
               return null;
