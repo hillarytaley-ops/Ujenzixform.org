@@ -131,14 +131,12 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
       const seenPurchaseOrderIds = new Set<string>(); // Track which purchase_orders we've already added
       const seenPONumbers = new Set<string>(); // Track which po_numbers we've already added (CRITICAL for deduplication)
       
-      // STEP 1: Fetch delivery_requests - show all pending/requested/assigned requests
+      // STEP 1: Fetch delivery_requests - show all pending/requested/assigned on ALERTS TAB
+      // CRITICAL: Alerts tab MUST show every pending/requested/assigned request, including missing address / no PO.
+      // Do NOT add status filter in URL — fetch ALL so RLS determines visibility; then filter in JS.
       // Don't show deliveries already accepted by THIS provider (those are in Scheduled tab)
-      // Fetch all delivery_requests, then filter in JavaScript to show:
-      // - status IN ('pending', 'requested', 'assigned') AND provider_id IS NULL or != userId
-      // CRITICAL: Fetch ALL delivery_requests to ensure we see all valid requests
       // CRITICAL: MUST include delivery_address field - this is the address filled by builder in delivery request form
       // CRITICAL: Also fetch pickup_address and all address-related fields to ensure we get the builder-provided address
-      // NOTE: RLS policy should allow pending/requested/assigned, but fetch all to be safe
       const drResponse = await fetch(
         `${url}/rest/v1/delivery_requests?order=created_at.desc&limit=200&select=id,status,purchase_order_id,provider_id,delivery_address,pickup_address,delivery_coordinates,material_type,quantity,created_at,builder_id,rejection_reason,estimated_cost,budget_range`,
         { headers, cache: 'no-store' }
@@ -592,7 +590,8 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
         finalNotificationMap.set(poId, drs[0]);
       }
       
-      // Include delivery requests with NULL purchase_order_id so they appear on Alerts (key by dr.id)
+      // CRITICAL: Include delivery requests with NULL purchase_order_id so they appear on Alerts (key by dr.id)
+      // Missing delivery requests (no PO, missing address) MUST show on Alerts tab so provider can act on them.
       finalDeliveryRequestsByKey.forEach((dr) => {
         if (dr?.id && !finalNotificationMap.has(dr.id)) {
           finalNotificationMap.set(dr.id, dr);
@@ -615,12 +614,11 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
           continue;
         }
         
-        // RELAXED: Only skip if we're certain the purchase_order doesn't exist
-        // If verification failed or purchase_order wasn't found, show the notification anyway
-        // This ensures delivery alerts come through even if there's a temporary database issue
+        // RELAXED: Never skip pending/requested/assigned for PO verification — Alerts tab must show them.
+        // If verification failed or purchase_order wasn't found, show the notification anyway.
         if (validPOIds.size > 0 && !validPOIds.has(poId)) {
           console.log(`⚠️ Delivery request ${dr.id} has purchase_order_id ${poId} but purchase_order not found (showing anyway to ensure alerts come through)`);
-          // Don't skip - show the notification anyway to ensure alerts come through
+          // Do NOT skip — missing delivery requests must appear on Alerts tab
         }
         
         // ABSOLUTE GUARANTEE: Also check delivery_request_id to prevent duplicates
@@ -816,7 +814,8 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
           }
         }
         
-        // Show pending/requested/assigned even if address is missing (provider can use Check Address to prompt builder)
+        // CRITICAL: Alerts tab MUST show ALL pending/requested/assigned delivery requests — including missing/placeholder address.
+        // Do NOT filter out these requests; provider can use "Check Address" to get address from builder.
         const isPendingStatus = ['pending', 'requested', 'assigned'].includes(dr.status);
         if (!deliveryAddr || deliveryAddr === '') {
           if (isPendingStatus) {
@@ -839,6 +838,7 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
                                deliveryAddr !== 'Delivery address missing - contact builder' &&
                                (isGPSCoordinate || deliveryAddr.length >= 3);
 
+        // NEVER filter out pending/requested/assigned for Alerts tab, even if address is missing or placeholder
         if (!isValidAddress && !isPendingStatus) {
           console.log(`🚫 FILTERED OUT: Delivery request ${dr.id.slice(0, 8)} has no valid address, status: ${dr.status}`);
           return;
