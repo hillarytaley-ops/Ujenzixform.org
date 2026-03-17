@@ -571,6 +571,7 @@ export const useDeliveryProviderData = () => {
             // Priority 1: purchase_orders.po_number (join)
             // Priority 2: fastPathPONumberMap (batch fetch - can be empty if RLS blocks POs)
             // Priority 3: delivery_requests.order_number (synced from PO; fallback when PO fetch returns 0)
+            // Priority 4: fallback label so accepted orders still show in Schedule when RLS blocks PO fetch (apply migration 20260319 to get real po_number)
             let orderNumber: string | null = null;
             if (dr.purchase_order_id) {
               if (po?.po_number && po.po_number.trim() !== '') {
@@ -581,16 +582,20 @@ export const useDeliveryProviderData = () => {
                   orderNumber = mapNumber;
                 } else if (dr.order_number && typeof dr.order_number === 'string' && dr.order_number.trim() !== '') {
                   const on = dr.order_number.trim();
-                  // Use synced order_number from delivery_requests when PO fetch returned 0 (e.g. RLS)
                   if (on.length >= 10 && (on.toUpperCase().startsWith('QR-') || on.toUpperCase().startsWith('PO-'))) {
                     orderNumber = on;
                   }
+                }
+                // Include accepted orders in Schedule even when PO fetch returned 0 (use fallback label)
+                if (!orderNumber) {
+                  orderNumber = `Order-${(dr.purchase_order_id || dr.id).toString().slice(0, 8)}`;
+                  console.log('⚡ FAST PATH: Using fallback label for', dr.id.slice(0, 8), '(apply migration 20260319 for real po_number)');
                 }
               }
             }
             
             if (!orderNumber) {
-              console.warn('⚠️ FAST PATH: Excluding delivery_request', dr.id.slice(0, 8), '- no valid po_number');
+              console.warn('⚠️ FAST PATH: Excluding delivery_request', dr.id.slice(0, 8), '- no purchase_order_id');
               return null;
             }
             
