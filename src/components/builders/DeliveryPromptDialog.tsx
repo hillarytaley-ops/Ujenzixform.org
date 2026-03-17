@@ -502,15 +502,8 @@ export const DeliveryPromptDialog: React.FC<DeliveryPromptDialogProps> = ({
         status: 'pending'
       };
 
-      // Add supplier_id for address lookup later
-      if (purchaseOrder.supplier_id) {
-        deliveryPayload.supplier_id = purchaseOrder.supplier_id;
-      }
-
-      // Add supplier name for display
-      if (purchaseOrder.supplier_name) {
-        deliveryPayload.supplier_name = purchaseOrder.supplier_name;
-      }
+      // NOTE: delivery_requests table does not have supplier_id or supplier_name columns.
+      // Supplier info is on purchase_orders; do not add to deliveryPayload.
 
       // Add optional fields
       if (deliveryData.deliveryCoordinates) {
