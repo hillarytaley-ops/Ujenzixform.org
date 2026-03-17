@@ -1277,8 +1277,9 @@ class TrackingNumberService {
         }
       ).then(r => r.ok ? r.json() : []).then(d => Array.isArray(d) && d.length > 0 ? d[0] : null).catch(() => null);
       
+      // CRITICAL: providerId is auth.uid() (user_id), not delivery_providers.id - query by user_id first
       const providerPromise = fetch(
-        `${SUPABASE_URL}/rest/v1/delivery_providers?id=eq.${providerId}&select=provider_name,phone,company_name&limit=1`,
+        `${SUPABASE_URL}/rest/v1/delivery_providers?user_id=eq.${providerId}&select=id,provider_name,phone,company_name&limit=1`,
         {
           headers: {
             'apikey': SUPABASE_ANON_KEY,
@@ -1312,8 +1313,10 @@ class TrackingNumberService {
       
       // Send notification to builder
       console.log('📦 Step 7: Sending notification to builder...');
+      // Use builder's auth user_id for notifications (builder_id may be profiles.id)
+      const builderAuthUserId = builderResult?.user_id ?? existingRequest.builder_id;
       const notificationPromise = this.notifyBuilder({
-        builderId: existingRequest.builder_id,
+        builderId: builderAuthUserId,
         builderEmail,
         builderPhone: builderResult?.phone || '',
         trackingNumber,
@@ -1599,6 +1602,28 @@ class TrackingNumberService {
         console.warn('⚠️ Error checking existing delivery tracking:', error);
       }
 
+      // CRITICAL: delivery_tracking.provider_id must be delivery_providers.id, not auth.uid()
+      let providerIdForTracking = providerId;
+      try {
+        const dpRes = await fetch(
+          `${SUPABASE_URL}/rest/v1/delivery_providers?user_id=eq.${providerId}&select=id&limit=1`,
+          {
+            headers: {
+              'apikey': SUPABASE_ANON_KEY,
+              'Authorization': `Bearer ${accessToken}`,
+              'Content-Type': 'application/json'
+            },
+            cache: 'no-store'
+          }
+        );
+        if (dpRes.ok) {
+          const dpData = await dpRes.json();
+          if (Array.isArray(dpData) && dpData.length > 0 && dpData[0].id) {
+            providerIdForTracking = dpData[0].id;
+          }
+        }
+      } catch (_) { /* use providerId */ }
+
       if (!existing) {
         // Create initial tracking entry (provider will update with actual GPS)
         const insertPromise = fetch(
@@ -1613,7 +1638,7 @@ class TrackingNumberService {
             },
             body: JSON.stringify({
               delivery_id: deliveryRequestId,
-              provider_id: providerId,
+              provider_id: providerIdForTracking,
               current_latitude: 0,
               current_longitude: 0,
               delivery_status: 'accepted',
@@ -1645,7 +1670,7 @@ class TrackingNumberService {
               'Prefer': 'return=representation'
             },
             body: JSON.stringify({
-              provider_id: providerId,
+              provider_id: providerIdForTracking,
               delivery_status: 'accepted',
               tracking_timestamp: new Date().toISOString()
             }),

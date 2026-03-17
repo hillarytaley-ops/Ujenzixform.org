@@ -641,7 +641,65 @@ export const SupplierQuoteReview: React.FC<SupplierQuoteReviewProps> = ({
 
       setAcceptedPurchaseOrder(purchaseOrderForDelivery);
       
-      // Show delivery/pickup choice dialog
+      // AUTO-CREATE delivery_request so it appears on provider dashboard immediately
+      const effectiveBuilderId = getEffectiveBuilderId();
+      if (effectiveBuilderId) {
+        try {
+          const pickupAddr = quote.supplier?.address || quote.supplier?.location || 'Supplier location';
+          const fullDeliveryAddr = (deliveryAddress || 'To be provided').trim();
+          const materialType = (quote.purchase_order?.items?.[0]?.material_name || quote.material_name || 'Construction Materials').toString();
+          const qty = quote.purchase_order?.items?.reduce((s: number, i: any) => s + (i.quantity || 0), 0) || quote.quantity || 1;
+          const drPayload = {
+            builder_id: effectiveBuilderId,
+            purchase_order_id: quote.id,
+            pickup_address: pickupAddr,
+            delivery_address: fullDeliveryAddr,
+            pickup_date: deliveryDate,
+            material_type: materialType,
+            quantity: qty,
+            status: 'pending'
+          };
+          const drRes = await fetch(`${SUPABASE_URL}/rest/v1/delivery_requests`, {
+            method: 'POST',
+            headers: { ...headers, 'Content-Type': 'application/json', 'Prefer': 'return=representation' },
+            body: JSON.stringify(drPayload),
+            cache: 'no-store'
+          });
+          if (drRes.ok) {
+            console.log('✅ Auto-created delivery_request — appears on provider dashboard');
+            const drData = await drRes.json();
+            const drId = Array.isArray(drData) ? drData[0]?.id : drData?.id;
+            if (drId) {
+              try {
+                await fetch(`${SUPABASE_URL}/functions/v1/notify-delivery-providers`, {
+                  method: 'POST',
+                  headers: { ...headers },
+                  body: JSON.stringify({
+                    request_type: 'quote_accepted',
+                    request_id: drId,
+                    builder_id: effectiveBuilderId,
+                    pickup_address: pickupAddr,
+                    delivery_address: fullDeliveryAddr,
+                    material_details: (purchaseOrderForDelivery.items || []).map((i: any) => ({
+                      material_type: i.material_name || i.name,
+                      quantity: i.quantity,
+                      unit: i.unit || 'units'
+                    })),
+                    priority_level: 'normal',
+                    po_number: purchaseOrderForDelivery.po_number
+                  })
+                });
+              } catch (_) {}
+            }
+          } else {
+            console.warn('⚠️ Auto-create delivery_request failed (dialog will allow manual):', await drRes.text());
+          }
+        } catch (e) {
+          console.warn('⚠️ Auto-create delivery_request error (dialog will allow manual):', e);
+        }
+      }
+
+      // Show delivery/pickup choice dialog (for pickup or to update address if needed)
       setTimeout(() => {
         setShowDeliveryPrompt(true);
       }, 500);

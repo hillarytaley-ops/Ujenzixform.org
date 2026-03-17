@@ -246,7 +246,32 @@ export const QuoteComparison: React.FC<QuoteComparisonProps> = ({ orderId, build
 
       setAcceptedPurchaseOrder(purchaseOrderForDelivery);
       
-      // Show delivery confirmation dialog
+      // AUTO-CREATE delivery_request so it appears on provider dashboard immediately
+      if (builderId) {
+        try {
+          const pickupAddr = purchaseOrderForDelivery.supplier_address || 'Supplier location';
+          const fullDeliveryAddr = (deliveryAddress || 'To be provided').trim();
+          const materialType = purchaseOrderForDelivery.items?.[0]?.material_name || 'Construction Materials';
+          const qty = purchaseOrderForDelivery.items?.reduce((s: number, i: any) => s + (i.quantity || 0), 0) || 1;
+          const { error: drErr } = await supabase.from('delivery_requests').insert({
+            builder_id: builderId,
+            purchase_order_id: orderId,
+            pickup_address: pickupAddr,
+            delivery_address: fullDeliveryAddr,
+            pickup_date: deliveryDate,
+            material_type: materialType,
+            quantity: qty,
+            status: 'pending'
+          });
+          if (!drErr) {
+            console.log('✅ Auto-created delivery_request — appears on provider dashboard');
+          }
+        } catch (e) {
+          console.warn('⚠️ Auto-create delivery_request:', e);
+        }
+      }
+
+      // Show delivery confirmation dialog (for pickup or to update address)
       setTimeout(() => {
         setShowDeliveryPrompt(true);
       }, 500);
