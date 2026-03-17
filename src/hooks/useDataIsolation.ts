@@ -3945,24 +3945,28 @@ export const useDeliveryProviderData = () => {
       setPendingRequests(allPending);
 
       // Calculate stats from actual data
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      
-      const completedToday = (historyData || []).filter(d => {
-        const deliveryDate = new Date(d.updated_at);
-        return deliveryDate >= today;
+      // active count = fastData (scheduled + in transit); history = dedupedHistory (delivered)
+      const activeCount = (typeof fastData !== 'undefined' ? fastData : []).length;
+      const historyCount = (dedupedHistory || filteredHistory || historyData || []).length;
+      const historyForStats = dedupedHistory || filteredHistory || historyData || [];
+
+      const todayStr = new Date().toDateString();
+      const completedToday = historyForStats.filter((d: any) => {
+        const dte = new Date(d.delivered_at || d.updated_at || d.completed_at || d.created_at);
+        return dte.toDateString() === todayStr;
       }).length;
 
-      const totalEarnings = [...(activeData || []), ...(historyData || [])]
-        .reduce((sum, d) => sum + (d.price || d.delivery_fee || 0), 0);
+      const totalEarnings = historyForStats.reduce((sum: number, d: any) =>
+        sum + (d.final_cost || d.estimated_cost || d.price || d.delivery_fee || 0), 0
+      );
 
       setStats({
-        totalDeliveries: (activeData || []).length + (historyData || []).length,
+        totalDeliveries: activeCount + historyCount,
         completedToday,
-        pendingDeliveries: (activeData || []).length,
+        pendingDeliveries: (allPending || []).length,
         totalEarnings,
-        averageRating: providerReg?.rating || 0,
-        totalDistance: 0 // Would need to track this
+        averageRating: Number(providerReg?.rating) || 0,
+        totalDistance: 0 // Would need delivery_tracking to compute
       });
 
     } catch (err: any) {

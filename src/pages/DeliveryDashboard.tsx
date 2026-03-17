@@ -311,7 +311,33 @@ const DeliveryDashboard = () => {
     if (isolatedProfile) {
       setProviderProfile(isolatedProfile);
     }
-    if (isolatedStats) {
+    // Use isolatedStats when available; fallback: derive from raw data when stats are zero
+    const activeCount = isolatedActiveDeliveries?.length ?? 0;
+    const historyCount = isolatedHistory?.length ?? 0;
+    const pendingCount = isolatedPendingRequests?.length ?? 0;
+    const hasRawData = activeCount > 0 || historyCount > 0 || pendingCount > 0;
+    const hasStatsData = isolatedStats && (isolatedStats.totalDeliveries > 0 || isolatedStats.pendingDeliveries > 0 || isolatedStats.completedToday > 0 || isolatedStats.totalEarnings > 0);
+    if (hasStatsData && isolatedStats) {
+      setStats(isolatedStats);
+    } else if (hasRawData) {
+      const todayStr = new Date().toDateString();
+      const historyItems = isolatedHistory || [];
+      const completedToday = historyItems.filter((d: Record<string, unknown>) => {
+        const dte = new Date((d.completed_at || d.delivered_at || d.updated_at || d.created_at) as string);
+        return !isNaN(dte.getTime()) && dte.toDateString() === todayStr;
+      }).length;
+      const totalEarnings = historyItems.reduce((sum: number, d: Record<string, unknown>) =>
+        sum + (Number(d.final_cost) || Number(d.estimated_cost) || Number(d.price) || Number(d.delivery_fee) || 0), 0
+      );
+      setStats(prev => ({
+        totalDeliveries: activeCount + historyCount,
+        completedToday,
+        pendingDeliveries: pendingCount,
+        totalEarnings,
+        averageRating: isolatedStats?.averageRating ?? prev.averageRating ?? 0,
+        totalDistance: isolatedStats?.totalDistance ?? prev.totalDistance ?? 0
+      }));
+    } else if (isolatedStats) {
       setStats(isolatedStats);
     }
     // Transform active deliveries - ONLY THIS PROVIDER'S DELIVERIES
