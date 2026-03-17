@@ -498,11 +498,12 @@ const DeliveryDashboard = () => {
                 if (po.po_number) existingOrderNumbers[po.po_number] = true;
               });
               
-              // First filter: Only orders that exist in purchase_orders
+              // First filter: Only orders that exist in purchase_orders (or have fallback label when RLS blocks PO fetch)
               const ordersThatExist = isolatedActiveDeliveries.filter((d: any) => {
                 const hasValidPO = d.purchase_order_id && existingOrderIds[d.purchase_order_id];
                 const hasValidOrderNumber = d.order_number && existingOrderNumbers[d.order_number];
-                const orderExists = hasValidPO || hasValidOrderNumber;
+                const isFallbackLabel = d.order_number && typeof d.order_number === 'string' && d.order_number.startsWith('Order-');
+                const orderExists = hasValidPO || hasValidOrderNumber || isFallbackLabel;
                 
                 if (!orderExists && d.order_number) {
                   console.warn('🚫 Removing order that does not exist:', {
@@ -571,6 +572,12 @@ const DeliveryDashboard = () => {
                     reason: 'No purchase_order_id - cannot validate'
                   });
                   return false;
+                }
+                
+                const isFallbackLabel = d.order_number && typeof d.order_number === 'string' && d.order_number.startsWith('Order-');
+                if (isFallbackLabel) {
+                  // Fallback label: PO/material not visible (e.g. RLS before migration 20260319) - keep for Schedule tab
+                  return true;
                 }
                 
                 // Only validate that the order exists - don't filter by dispatch status

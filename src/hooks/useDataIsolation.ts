@@ -1622,12 +1622,14 @@ export const useDeliveryProviderData = () => {
               });
               
               // Filter to only include deliveries where the purchase_order actually exists
+              // (or has fallback label when RLS blocks PO fetch - e.g. before migration 20260319)
               // AND where all material_items have dispatch_scanned = FALSE (Awaiting Dispatch)
               for (const item of filteredRealDeliveries) {
                 const hasValidPO = item.purchase_order_id && existingOrderIds.has(item.purchase_order_id);
                 const hasValidOrderNumber = item.order_number && existingOrderNumbers.has(item.order_number);
+                const isFallbackLabel = item.order_number && typeof item.order_number === 'string' && item.order_number.startsWith('Order-');
                 
-                if (!hasValidPO && !hasValidOrderNumber) {
+                if (!hasValidPO && !hasValidOrderNumber && !isFallbackLabel) {
                   console.warn('🚫 Removing order that does not exist:', {
                     order_number: item.order_number,
                     purchase_order_id: item.purchase_order_id?.substring(0, 8),
@@ -1673,6 +1675,9 @@ export const useDeliveryProviderData = () => {
                   }
                   
                   // All items are not dispatched - this is valid for Awaiting Dispatch
+                  validatedDeliveries.push(item);
+                } else if (isFallbackLabel) {
+                  // Fallback label: PO/material_items not available (e.g. RLS before migration 20260319) - keep so Schedule tab shows the order
                   validatedDeliveries.push(item);
                 } else {
                   // No material_items found for this order - exclude it
