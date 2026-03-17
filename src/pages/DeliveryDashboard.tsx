@@ -817,16 +817,17 @@ const DeliveryDashboard = () => {
             finalDeliveryAddress = d.delivery_location;
             console.log('✅ Using delivery_location from isolatedHistory for', poId?.substring(0, 8), ':', finalDeliveryAddress.substring(0, 60));
           } else {
-            console.error('❌❌❌ NO DELIVERY ADDRESS FOUND for', poId?.substring(0, 8), 'order', d.order_number || d.po_number);
-            console.error('   - deliveryRequest found:', deliveryRequest ? 'YES' : 'NO');
-            console.error('   - builderProvidedAddress:', builderProvidedAddress || 'null');
-            console.error('   - d.delivery_address:', d.delivery_address || 'null');
-            console.error('   - d.delivery_location:', d.delivery_location || 'null');
-            console.error('   - deliveryRequestsMap size:', Object.keys(deliveryRequestsMap).length);
-            console.error('   - Looking for poId:', poId);
-            console.error('   - Available keys in map:', Object.keys(deliveryRequestsMap).map(k => k.substring(0, 8)).join(', '));
-            // FINAL FALLBACK: If still no address, show error message (NOT "To be provided")
-            finalDeliveryAddress = 'Delivery address missing - contact support';
+            // Placeholder or missing: show user-friendly text; avoid console spam for legacy "To be provided" data
+            const isPlaceholder =
+              (builderProvidedAddress === 'To be provided' || (builderProvidedAddress || '').trim() === '') &&
+              (d.delivery_address === 'To be provided' || (d.delivery_address || '').trim() === '') &&
+              (d.delivery_location === 'To be provided' || (d.delivery_location || '').trim() === '');
+            finalDeliveryAddress = isPlaceholder
+              ? 'Address to be provided'
+              : 'Delivery address missing - contact support';
+            if (!isPlaceholder) {
+              console.warn('⚠️ NO DELIVERY ADDRESS for', poId?.substring(0, 8), 'order', d.order_number || d.po_number);
+            }
           }
           
           return {
@@ -1281,20 +1282,26 @@ const DeliveryDashboard = () => {
                   const idValue = poId ? (poId + '') : ('aggressive-' + (poNumber || i) + '');
                   
                   // CRITICAL: Use builder-provided address from delivery_requests (highest priority)
-                  // Fallback to po.delivery_address if not found
-                  let deliveryAddr = 'Delivery address missing - contact support';
-                  if (builderProvidedAddress && builderProvidedAddress.trim() && 
-                      builderProvidedAddress !== 'To be provided' && 
+                  // Fallback to po.delivery_address; if both placeholder/missing, show user-friendly label
+                  const isPlaceholder =
+                    (builderProvidedAddress === 'To be provided' || (builderProvidedAddress || '').trim() === '') &&
+                    (po.delivery_address === 'To be provided' || (po.delivery_address || '').trim() === '');
+                  let deliveryAddr: string;
+                  if (builderProvidedAddress && builderProvidedAddress.trim() &&
+                      builderProvidedAddress !== 'To be provided' &&
                       builderProvidedAddress !== 'Delivery location') {
                     deliveryAddr = builderProvidedAddress;
                     console.log('✅✅✅ COMPONENT AGGRESSIVE: Using builder-provided address for', poId?.substring(0, 8), ':', deliveryAddr.substring(0, 60));
-                  } else if (po.delivery_address && po.delivery_address.trim() && 
-                             po.delivery_address !== 'To be provided' && 
+                  } else if (po.delivery_address && po.delivery_address.trim() &&
+                             po.delivery_address !== 'To be provided' &&
                              po.delivery_address !== 'Delivery location') {
                     deliveryAddr = po.delivery_address;
                     console.log('✅ COMPONENT AGGRESSIVE: Using delivery_address from purchase_order for', poId?.substring(0, 8));
                   } else {
-                    console.warn('⚠️ COMPONENT AGGRESSIVE: No valid address found for', poId?.substring(0, 8), 'order', poNumber);
+                    deliveryAddr = isPlaceholder ? 'Address to be provided' : 'Delivery address missing - contact support';
+                    if (!isPlaceholder) {
+                      console.warn('⚠️ COMPONENT AGGRESSIVE: No valid address for', poId?.substring(0, 8), 'order', poNumber);
+                    }
                   }
                   
                   const entry: DeliveryHistory = {
