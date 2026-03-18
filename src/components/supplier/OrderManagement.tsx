@@ -627,10 +627,12 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, is
         return;
       }
 
-      const purchaseOrders = await ordersResponse.json();
-      console.log(`✅ OrderManagement: Found ${purchaseOrders?.length || 0} orders`);
+      const ordersPayload = await ordersResponse.json();
+      // Ensure we always have an array (Supabase returns array; guard against unexpected shape)
+      const purchaseOrders: any[] = Array.isArray(ordersPayload) ? ordersPayload : (ordersPayload?.data && Array.isArray(ordersPayload.data) ? ordersPayload.data : []);
+      console.log(`✅ OrderManagement: Found ${purchaseOrders.length} orders`);
 
-      if (!purchaseOrders || purchaseOrders.length === 0) {
+      if (purchaseOrders.length === 0) {
         setOrders([]);
         return;
       }
@@ -744,7 +746,9 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, is
       }
 
       // Map orders to UI format (use delivery_requests to fill provider when PO missing it)
-      const realOrders: Order[] = purchaseOrders.map((po: any, index: number) => {
+      let realOrders: Order[];
+      try {
+        realOrders = purchaseOrders.map((po: any, index: number) => {
         const buyer = buyerProfiles[po.buyer_id] || {};
         const items = Array.isArray(po.items) ? po.items : [];
         // Determine if this is a quote request or an order
@@ -800,13 +804,47 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, is
           delivery_required: po.delivery_required || false
         };
       });
+      } catch (mapErr) {
+        console.error('OrderManagement: Error mapping orders, using minimal transform:', mapErr);
+        realOrders = purchaseOrders.map((po: any, index: number) => {
+          const buyer = buyerProfiles[po.buyer_id] || {};
+          const items = Array.isArray(po.items) ? po.items : [];
+          return {
+            id: po.id,
+            order_number: po.po_number || `ORD-${String(index + 1).padStart(4, '0')}`,
+            customer_name: buyer?.full_name || po.project_name || 'Customer',
+            customer_email: buyer?.email || '',
+            customer_phone: buyer?.phone || '',
+            delivery_address: po.delivery_address || '',
+            items: items.map((item: any) => ({ name: item.material_name || item.name || 'Item', quantity: item.quantity || 1, price: item.unit_price || item.price || 0 })),
+            total_amount: po.total_amount || 0,
+            status: (po.status || 'pending') as Order['status'],
+            payment_status: 'paid' as const,
+            notes: po.special_instructions || po.delivery_notes || '',
+            created_at: po.created_at,
+            updated_at: po.updated_at || po.created_at,
+            order_type: (po.po_number?.startsWith('QR-') ? 'quote_request' : 'direct_purchase') as Order['order_type'],
+            buyer_role: po.buyer_role || 'unknown',
+            delivery_provider_id: po.delivery_provider_id,
+            delivery_provider_name: po.delivery_provider_name,
+            delivery_provider_phone: po.delivery_provider_phone,
+            delivery_vehicle_info: po.delivery_vehicle_info,
+            delivery_status: po.delivery_status,
+            delivery_assigned_at: po.delivery_assigned_at,
+            delivery_accepted_at: po.delivery_accepted_at,
+            estimated_delivery_time: po.estimated_delivery_time,
+            delivery_required: po.delivery_required || false
+          };
+        });
+      }
 
       setOrders(realOrders);
       console.log(`✅ OrderManagement: Loaded ${realOrders.length} orders successfully`);
 
     } catch (error) {
       console.error('Error loading orders:', error);
-      setOrders([]);
+      // Never clear orders on error if we already have orders (e.g. from prefetch); avoids "disappearing" after background refresh
+      setOrders(prev => (prev.length > 0 ? prev : []));
     } finally {
       setLoading(false);
     }
