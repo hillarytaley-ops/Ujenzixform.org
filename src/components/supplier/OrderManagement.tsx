@@ -582,28 +582,41 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, is
         headers['Authorization'] = `Bearer ${accessToken}`;
       }
 
-      // Build supplier IDs list
+      // Build supplier IDs list - use Supabase client so RLS applies (supplier sees own row and own orders)
       const orderSupplierIds: string[] = [];
       const effectiveId = supplierId && supplierId.trim() !== '' ? supplierId : userId;
-      
       if (effectiveId) orderSupplierIds.push(effectiveId);
       if (userId && !orderSupplierIds.includes(userId)) orderSupplierIds.push(userId);
 
-      // Look up supplier record to get all related IDs
+      // Resolve supplier table id via Supabase client (RLS allows current user to read own supplier row)
       try {
-        const supplierResponse = await fetch(
-          `${SUPABASE_URL}/rest/v1/suppliers?or=(user_id.eq.${effectiveId},id.eq.${effectiveId})&select=id,user_id`,
-          { headers, cache: 'no-store' }
-        );
-        if (supplierResponse.ok) {
-          const supplierData = await supplierResponse.json();
-          supplierData.forEach((s: any) => {
+        const { data: supplierRows, error: supplierError } = await supabase
+          .from('suppliers')
+          .select('id, user_id')
+          .or(`user_id.eq.${effectiveId},id.eq.${effectiveId}`);
+        if (!supplierError && supplierRows?.length) {
+          supplierRows.forEach((s: any) => {
             if (s.id && !orderSupplierIds.includes(s.id)) orderSupplierIds.push(s.id);
             if (s.user_id && !orderSupplierIds.includes(s.user_id)) orderSupplierIds.push(s.user_id);
           });
         }
+        // Fallback: if Supabase client returned nothing, try fetch with auth (same as before)
+        if (orderSupplierIds.length <= 1 && (supplierError || !supplierRows?.length)) {
+          const supplierResponse = await fetch(
+            `${SUPABASE_URL}/rest/v1/suppliers?or=(user_id.eq.${effectiveId},id.eq.${effectiveId})&select=id,user_id`,
+            { headers, cache: 'no-store' }
+          );
+          if (supplierResponse.ok) {
+            const supplierData = await supplierResponse.json();
+            const arr = Array.isArray(supplierData) ? supplierData : [];
+            arr.forEach((s: any) => {
+              if (s.id && !orderSupplierIds.includes(s.id)) orderSupplierIds.push(s.id);
+              if (s.user_id && !orderSupplierIds.includes(s.user_id)) orderSupplierIds.push(s.user_id);
+            });
+          }
+        }
       } catch (e) {
-        console.log('Supplier lookup failed');
+        console.log('Supplier lookup failed', e);
       }
 
       console.log('🔑 OrderManagement: Supplier IDs to check:', orderSupplierIds);
@@ -614,22 +627,31 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, is
         return;
       }
 
-      // Fetch orders using native fetch (same as dashboard) - Include delivery provider and delivery_required fields
-      const supplierIdsParam = orderSupplierIds.join(',');
-      const ordersResponse = await fetch(
-        `${SUPABASE_URL}/rest/v1/purchase_orders?supplier_id=in.(${supplierIdsParam})&select=*&order=created_at.desc&limit=500`,
-        { headers, cache: 'no-store' }
-      );
+      // Fetch orders via Supabase client first (RLS applies - supplier sees own orders)
+      let purchaseOrders: any[] = [];
+      const { data: poData, error: poError } = await supabase
+        .from('purchase_orders')
+        .select('*')
+        .in('supplier_id', orderSupplierIds)
+        .order('created_at', { ascending: false })
+        .limit(500);
 
-      if (!ordersResponse.ok) {
-        console.error('❌ Orders fetch failed:', ordersResponse.status);
-        setOrders([]);
-        return;
+      if (!poError && poData != null) {
+        purchaseOrders = Array.isArray(poData) ? poData : [];
+      }
+      // Fallback: if client returned error or empty, try REST fetch (e.g. anon key + auth header)
+      if (purchaseOrders.length === 0 && (poError || !poData?.length)) {
+        const supplierIdsParam = orderSupplierIds.join(',');
+        const ordersResponse = await fetch(
+          `${SUPABASE_URL}/rest/v1/purchase_orders?supplier_id=in.(${supplierIdsParam})&select=*&order=created_at.desc&limit=500`,
+          { headers, cache: 'no-store' }
+        );
+        if (ordersResponse.ok) {
+          const ordersPayload = await ordersResponse.json();
+          purchaseOrders = Array.isArray(ordersPayload) ? ordersPayload : (ordersPayload?.data && Array.isArray(ordersPayload.data) ? ordersPayload.data : []);
+        }
       }
 
-      const ordersPayload = await ordersResponse.json();
-      // Ensure we always have an array (Supabase returns array; guard against unexpected shape)
-      const purchaseOrders: any[] = Array.isArray(ordersPayload) ? ordersPayload : (ordersPayload?.data && Array.isArray(ordersPayload.data) ? ordersPayload.data : []);
       console.log(`✅ OrderManagement: Found ${purchaseOrders.length} orders`);
 
       if (purchaseOrders.length === 0) {
