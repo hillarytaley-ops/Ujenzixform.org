@@ -276,6 +276,18 @@ const PRIVATE_PACKAGES = [
 // Legacy array for backward compatibility
 const MONITORING_PACKAGES = PROFESSIONAL_PACKAGES;
 
+const PLACEHOLDER_ADDRESSES = ['to be provided', 'to be confirmed', 'tbd', 'tba', 'n/a', 'na', 'to be determined', 'delivery location', 'address not found'];
+function isRealDeliveryAddress(addr: string | undefined): boolean {
+  if (!addr || typeof addr !== 'string') return false;
+  const t = addr.trim().toLowerCase();
+  if (t.length < 5) return false;
+  return !PLACEHOLDER_ADDRESSES.some(p => t === p || t.startsWith(p + ' ') || t.endsWith(' ' + p));
+}
+function getRealDeliveryAddress(addr: string | undefined): string {
+  if (!addr || !isRealDeliveryAddress(addr)) return '';
+  return addr.trim();
+}
+
 export const MonitoringServicePrompt: React.FC<MonitoringServicePromptProps> = ({
   isOpen,
   onOpenChange,
@@ -292,7 +304,7 @@ export const MonitoringServicePrompt: React.FC<MonitoringServicePromptProps> = (
   const isProfessional = userRole === 'professional_builder' || userRole === 'admin';
   const packages = isProfessional ? PROFESSIONAL_PACKAGES : PRIVATE_PACKAGES;
   const [formData, setFormData] = useState({
-    siteAddress: purchaseOrder?.delivery_address || '',
+    siteAddress: getRealDeliveryAddress(purchaseOrder?.delivery_address) || '',
     projectDescription: '',
     contactPhone: '',
     preferredStartDate: '',
@@ -372,23 +384,52 @@ export const MonitoringServicePrompt: React.FC<MonitoringServicePromptProps> = (
   };
 
   // Pre-fill site address from delivery address provided by builder during delivery request (remains editable)
-  // When dialog opens with a delivery address, always apply it so Site Address is never left empty when we have it
+  // 1) Use purchaseOrder.delivery_address if it's a real address (not "To be provided" etc.)
   React.useEffect(() => {
-    if (isOpen && purchaseOrder?.delivery_address?.trim()) {
-      const addr = purchaseOrder.delivery_address.trim();
-      setFormData(prev => ({
-        ...prev,
-        siteAddress: addr
-      }));
+    const addr = getRealDeliveryAddress(purchaseOrder?.delivery_address);
+    if (isOpen && addr) {
+      setFormData(prev => ({ ...prev, siteAddress: addr }));
     }
   }, [isOpen, purchaseOrder?.delivery_address]);
 
+  // 2) When we have an order id but no real address from props, fetch builder-provided address from delivery_requests
+  React.useEffect(() => {
+    if (!isOpen || !purchaseOrder?.id) return;
+    const fromProps = getRealDeliveryAddress(purchaseOrder?.delivery_address);
+    if (fromProps) return; // already have a real address
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(
+          `${SUPABASE_URL}/rest/v1/delivery_requests?purchase_order_id=eq.${purchaseOrder.id}&select=delivery_address&order=created_at.desc&limit=1`,
+          {
+            headers: {
+              apikey: SUPABASE_ANON_KEY,
+              Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+              'Content-Type': 'application/json',
+            },
+          }
+        );
+        if (!res.ok || cancelled) return;
+        const rows = await res.json();
+        const addr = rows?.[0]?.delivery_address;
+        if (cancelled || !addr || typeof addr !== 'string' || !addr.trim()) return;
+        if (PLACEHOLDER_ADDRESSES.some(p => addr.trim().toLowerCase().startsWith(p))) return;
+        setFormData(prev => ({ ...prev, siteAddress: addr.trim() }));
+      } catch (e) {
+        console.warn('Could not fetch delivery address for monitoring pre-fill:', e);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [isOpen, purchaseOrder?.id, purchaseOrder?.delivery_address]);
+
   // When user reaches Project Details step, ensure site address is set from delivery address if still empty
   React.useEffect(() => {
-    if (step === 'details' && purchaseOrder?.delivery_address?.trim()) {
-      const addr = purchaseOrder.delivery_address.trim();
+    const addr = getRealDeliveryAddress(purchaseOrder?.delivery_address);
+    if (step === 'details' && addr) {
       setFormData(prev => {
-        if (!prev.siteAddress?.trim()) {
+        if (!prev.siteAddress?.trim() || !isRealDeliveryAddress(prev.siteAddress)) {
           return { ...prev, siteAddress: addr };
         }
         return prev;
@@ -771,9 +812,9 @@ export const MonitoringServicePrompt: React.FC<MonitoringServicePromptProps> = (
                   value={formData.siteAddress}
                   onChange={(e) => setFormData(prev => ({ ...prev, siteAddress: e.target.value }))}
                 />
-                {purchaseOrder?.delivery_address && (
+                {purchaseOrder && (
                   <p className="text-xs text-muted-foreground">
-                    Pre-filled from your delivery address. You can edit if needed.
+                    {formData.siteAddress ? 'Pre-filled from your delivery address. You can edit if needed.' : 'Enter the construction site address (same as your delivery request address if applicable).'}
                   </p>
                 )}
               </div>
