@@ -719,6 +719,20 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, is
               }
             });
           }
+          // RPC fallback: suppliers can resolve provider name/phone even when direct table read is blocked by RLS
+          try {
+            const { data: rpcRows } = await supabase.rpc('get_delivery_provider_names_for_supplier', {
+              provider_ids: ids,
+            });
+            (rpcRows || []).forEach((row: { id: string; provider_name?: string; phone?: string }) => {
+              if (row?.id && (row.provider_name || row.phone)) {
+                if (row.provider_name) providerNames[row.id] = row.provider_name;
+                if (row.phone) providerPhones[row.id] = row.phone;
+              }
+            });
+          } catch (_) {
+            // RPC may not exist or fail; direct fetch + profiles already applied
+          }
         } catch (e) {
           console.log('Provider names fetch failed');
         }
