@@ -85,13 +85,17 @@ const COLOR_NAME_TO_HEX: Record<string, string> = {
   yellow: '#FFD700', red: '#DC2626', blue: '#2563EB', green: '#16A34A', white: '#FFFFFF',
   black: '#171717', orange: '#EA580C', brown: '#78350F', pink: '#DB2777', purple: '#7C3AED',
   beige: '#D4B896', navy: '#1E3A8A', maroon: '#800000', cream: '#FFFDD0', terracotta: '#C4622E',
+  bronze: '#CD7F32', chrome: '#E8E8E8', brass: '#B5A642', nickel: '#727472', copper: '#B87333',
 };
 function getVariantSwatchColor(v: PriceVariant): string {
   if (v.colorHex && /^#[0-9A-Fa-f]{3,8}$/.test(v.colorHex)) return v.colorHex;
-  if (v.color) {
-    const hex = COLOR_NAME_TO_HEX[v.color.toLowerCase().trim()];
-    if (hex) return hex;
-  }
+  const fromName = (name: string | undefined) => {
+    if (!name || typeof name !== 'string') return null;
+    const key = name.toLowerCase().trim();
+    return COLOR_NAME_TO_HEX[key] ?? null;
+  };
+  const hex = fromName(v.color) ?? fromName(v.sizeLabel) ?? fromName(v.texture);
+  if (hex) return hex;
   return '#E5E7EB';
 }
 
