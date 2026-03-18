@@ -2166,8 +2166,15 @@ export const MaterialsGrid = () => {
                                   })()}
                                 </button>
                               </PopoverTrigger>
-                              <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-1" align="start" onClick={(e) => e.stopPropagation()}>
-                                <div className="flex flex-col gap-0.5 max-h-60 overflow-auto">
+                              <PopoverContent
+                                className="w-[var(--radix-popover-trigger-width)] p-1 z-[100]"
+                                align="start"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                <div
+                                  className="flex flex-col gap-0.5 max-h-60 overflow-auto"
+                                  onPointerDownCapture={(e) => e.stopPropagation()}
+                                >
                                   {material.variants.map((variant) => {
                                     const sizePart = [variant.sizeLabel, variant.sizeUnit].filter(Boolean).join(' ');
                                     const parts = [sizePart, variant.color, variant.texture].filter(Boolean);
@@ -2177,12 +2184,19 @@ export const MaterialsGrid = () => {
                                       <button
                                         key={variant.id}
                                         type="button"
-                                        onClick={(e) => {
+                                        onPointerDown={(e) => {
+                                          e.preventDefault();
                                           e.stopPropagation();
                                           setSelectedVariants(prev => ({ ...prev, [material.id]: variant.id }));
                                           setOpenColorPopoverMaterialId(null);
                                         }}
-                                        className={`flex items-center gap-3 w-full px-3 py-2.5 rounded-md text-sm text-left hover:bg-purple-50 ${isSelected ? 'bg-purple-100 ring-1 ring-purple-300' : ''}`}
+                                        onClick={(e) => {
+                                          e.preventDefault();
+                                          e.stopPropagation();
+                                          setSelectedVariants(prev => ({ ...prev, [material.id]: variant.id }));
+                                          setOpenColorPopoverMaterialId(null);
+                                        }}
+                                        className={`flex items-center gap-3 w-full px-3 py-2.5 rounded-md text-sm text-left hover:bg-purple-50 cursor-pointer ${isSelected ? 'bg-purple-100 ring-1 ring-purple-300' : ''}`}
                                       >
                                         <span className="h-6 w-6 rounded-full border-2 border-gray-300 flex-shrink-0" style={{ backgroundColor: getVariantSwatchColor(variant) }} />
                                         <span>{label} - KES {variant.price.toLocaleString()}/{material.unit}</span>
