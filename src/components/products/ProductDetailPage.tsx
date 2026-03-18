@@ -33,8 +33,10 @@ import { cn } from '@/lib/utils';
 interface ProductVariant {
   id: string;
   size?: string;
+  sizeUnit?: string;
   color?: string;
   colorHex?: string;
+  texture?: string;
   price: number;
   stock: number;
   imageUrl: string;
@@ -80,7 +82,11 @@ const COLOR_MAP: Record<string, string> = {
   'brown': '#92400E',
   'silver': '#C0C0C0',
   'gold': '#FFD700',
+  'golden': '#FFD700',
 };
+
+// Names that are colors not sizes - so we show "Color" not "Size" when these appear in size field
+const KNOWN_COLOR_NAMES = new Set(['silver', 'golden', 'gold', 'yellow', 'red', 'blue', 'green', 'white', 'black', 'gray', 'grey', 'orange', 'brown', 'pink', 'purple', 'beige', 'navy', 'maroon', 'cream', 'terracotta']);
 
 export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
   product,
@@ -99,38 +105,50 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
   // Derived state
   const selectedVariant = product.variants[selectedVariantIndex] || product.variants[0];
   
-  // Get unique sizes and colors
-  const { uniqueSizes, uniqueColors } = useMemo(() => {
+  // Get unique sizes, colors, textures (show "Size" only when values are not color names)
+  const { uniqueSizes, uniqueColors, uniqueTextures, sizesAreActuallyColors } = useMemo(() => {
     const sizes = [...new Set(product.variants.map(v => v.size).filter(Boolean))];
     const colors = [...new Set(product.variants.map(v => v.color).filter(Boolean))];
-    return { uniqueSizes: sizes as string[], uniqueColors: colors as string[] };
+    const textures = [...new Set(product.variants.map(v => (v as any).texture).filter(Boolean))];
+    const sizesLookLikeColors = sizes.length > 0 && sizes.every(s => KNOWN_COLOR_NAMES.has(String(s).toLowerCase()));
+    return {
+      uniqueSizes: sizes as string[],
+      uniqueColors: colors as string[],
+      uniqueTextures: textures as string[],
+      sizesAreActuallyColors: sizesLookLikeColors,
+    };
   }, [product.variants]);
   
-  // Find variant by size and color
-  const findVariant = useCallback((size?: string, color?: string) => {
-    return product.variants.find(v => 
-      (!size || v.size === size) && (!color || v.color === color)
+  // Find variant by size, color, texture
+  const findVariant = useCallback((size?: string, color?: string, texture?: string) => {
+    return product.variants.find(v =>
+      (!size || v.size === size) && (!color || v.color === color) && (!texture || (v as any).texture === texture)
     );
   }, [product.variants]);
   
-  // Check if a size/color combination is available
-  const isComboAvailable = useCallback((size?: string, color?: string) => {
-    const variant = findVariant(size, color);
+  const isComboAvailable = useCallback((size?: string, color?: string, texture?: string) => {
+    const variant = findVariant(size, color, texture);
     return variant && variant.stock > 0;
   }, [findVariant]);
   
-  // Handle size selection
   const handleSizeSelect = (size: string) => {
-    const newVariant = findVariant(size, selectedVariant.color);
+    const newVariant = findVariant(size, selectedVariant.color, (selectedVariant as any).texture);
     if (newVariant) {
       const index = product.variants.findIndex(v => v.id === newVariant.id);
       if (index !== -1) setSelectedVariantIndex(index);
     }
   };
   
-  // Handle color selection
   const handleColorSelect = (color: string) => {
-    const newVariant = findVariant(selectedVariant.size, color);
+    const newVariant = findVariant(selectedVariant.size, color, (selectedVariant as any).texture);
+    if (newVariant) {
+      const index = product.variants.findIndex(v => v.id === newVariant.id);
+      if (index !== -1) setSelectedVariantIndex(index);
+    }
+  };
+  
+  const handleTextureSelect = (texture: string) => {
+    const newVariant = findVariant(selectedVariant.size, selectedVariant.color, texture);
     if (newVariant) {
       const index = product.variants.findIndex(v => v.id === newVariant.id);
       if (index !== -1) setSelectedVariantIndex(index);
@@ -351,8 +369,8 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
                 VARIANT SELECTORS - Smart buttons, not dropdowns
                 ───────────────────────────────────────────────────────────── */}
             
-            {/* Size Selector */}
-            {uniqueSizes.length > 1 && (
+            {/* Size Selector - only when we have real size options (not color names in size field) */}
+            {uniqueSizes.length > 1 && !sizesAreActuallyColors && (
               <div className="mb-6">
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
                   Size
@@ -360,8 +378,7 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
                 <div className="flex flex-wrap gap-2">
                   {uniqueSizes.map(size => {
                     const isSelected = selectedVariant.size === size;
-                    const isAvailable = isComboAvailable(size, selectedVariant.color);
-                    
+                    const isAvailable = isComboAvailable(size, selectedVariant.color, (selectedVariant as any).texture);
                     return (
                       <button
                         key={size}
@@ -384,22 +401,36 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
               </div>
             )}
             
-            {/* Color Selector */}
-            {uniqueColors.length > 1 && (
+            {/* Color Selector - show when we have multiple colors, or when "sizes" are actually color names (e.g. Silver, Golden) */}
+            {(uniqueColors.length > 1 || (sizesAreActuallyColors && uniqueSizes.length > 1)) && (
               <div className="mb-6">
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
-                  Color: <span className="font-normal text-gray-500">{selectedVariant.color}</span>
+                  Color{(sizesAreActuallyColors ? selectedVariant.size : selectedVariant.color) ? `: ${sizesAreActuallyColors ? selectedVariant.size : selectedVariant.color}` : ''}
                 </label>
                 <div className="flex flex-wrap gap-3">
-                  {uniqueColors.map(color => {
-                    const isSelected = selectedVariant.color === color;
-                    const isAvailable = isComboAvailable(selectedVariant.size, color);
+                  {(sizesAreActuallyColors ? uniqueSizes : uniqueColors).map(color => {
+                    const isSelected = sizesAreActuallyColors
+                      ? selectedVariant.size === color
+                      : selectedVariant.color === color;
+                    const isAvailable = sizesAreActuallyColors
+                      ? product.variants.some(v => v.size === color && v.stock > 0)
+                      : isComboAvailable(selectedVariant.size, color, (selectedVariant as any).texture);
                     const colorHex = getColorHex(color);
-                    
+                    const handleClick = () => {
+                      if (sizesAreActuallyColors) {
+                        const newVariant = product.variants.find(v => v.size === color);
+                        if (newVariant) {
+                          const idx = product.variants.findIndex(v => v.id === newVariant.id);
+                          if (idx !== -1) setSelectedVariantIndex(idx);
+                        }
+                      } else {
+                        handleColorSelect(color);
+                      }
+                    };
                     return (
                       <button
                         key={color}
-                        onClick={() => isAvailable && handleColorSelect(color)}
+                        onClick={() => isAvailable && handleClick()}
                         disabled={!isAvailable}
                         className={cn(
                           "relative w-10 h-10 rounded-full border-2 transition-all",
@@ -408,25 +439,57 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
                             : "hover:scale-110",
                           !isAvailable && "opacity-30 cursor-not-allowed"
                         )}
-                        style={{ 
+                        style={{
                           backgroundColor: colorHex,
                           borderColor: colorHex === '#FFFFFF' ? '#E5E7EB' : colorHex
                         }}
                         title={color}
                       >
                         {isSelected && (
-                          <Check 
+                          <Check
                             className={cn(
                               "absolute inset-0 m-auto h-5 w-5",
                               colorHex === '#FFFFFF' || colorHex === '#FFD700' || colorHex === '#F59E0B'
                                 ? "text-gray-800"
                                 : "text-white"
-                            )} 
+                            )}
                           />
                         )}
                         {!isAvailable && (
                           <X className="absolute inset-0 m-auto h-5 w-5 text-red-500" />
                         )}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+            
+            {/* Texture Selector */}
+            {uniqueTextures.length > 1 && (
+              <div className="mb-6">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+                  Texture
+                </label>
+                <div className="flex flex-wrap gap-2">
+                  {uniqueTextures.map(texture => {
+                    const isSelected = (selectedVariant as any).texture === texture;
+                    const isAvailable = isComboAvailable(selectedVariant.size, selectedVariant.color, texture);
+                    return (
+                      <button
+                        key={texture}
+                        onClick={() => isAvailable && handleTextureSelect(texture)}
+                        disabled={!isAvailable}
+                        className={cn(
+                          "px-4 py-2 rounded-lg border-2 font-medium transition-all",
+                          isSelected
+                            ? "border-green-600 bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400"
+                            : isAvailable
+                              ? "border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600"
+                              : "border-gray-100 dark:border-gray-800 text-gray-300 dark:text-gray-600 cursor-not-allowed line-through"
+                        )}
+                      >
+                        {texture}
                       </button>
                     );
                   })}

@@ -63,6 +63,22 @@ interface PriceVariant {
   imageUrl?: string; // Optional image per variant
 }
 
+// Names that are colors not sizes - use for dynamic variant label (show "Color" not "Size")
+const KNOWN_COLOR_NAMES = new Set(['silver', 'golden', 'gold', 'yellow', 'red', 'blue', 'green', 'white', 'black', 'gray', 'grey', 'orange', 'brown', 'pink', 'purple', 'beige', 'navy', 'maroon', 'cream', 'terracotta']);
+
+function getVariantDimensionLabel(variants: PriceVariant[]): string {
+  if (!variants?.length) return 'Variant';
+  const sizeKeys = new Set(variants.map(v => [v.sizeLabel, v.sizeUnit].filter(Boolean).join(' ').trim()).filter(Boolean));
+  const colorKeys = new Set(variants.map(v => v.color).filter(Boolean));
+  const textureKeys = new Set(variants.map(v => v.texture).filter(Boolean));
+  const sizesLookLikeColors = sizeKeys.size > 0 && [...sizeKeys].every(s => KNOWN_COLOR_NAMES.has(String(s).toLowerCase()));
+  if (sizesLookLikeColors && colorKeys.size <= 1) return 'Color';
+  if (sizeKeys.size > 1 && !sizesLookLikeColors && colorKeys.size <= 1 && textureKeys.size <= 1) return 'Size';
+  if (colorKeys.size > 1 && sizeKeys.size <= 1 && textureKeys.size <= 1) return 'Color';
+  if (textureKeys.size > 1 && sizeKeys.size <= 1 && colorKeys.size <= 1) return 'Texture';
+  return 'Variant';
+}
+
 interface Material {
   id: string;
   supplier_id?: string; // Optional - admin materials don't have supplier_id
@@ -2085,44 +2101,17 @@ export const MaterialsGrid = () => {
                           <span className="text-xs font-medium text-blue-700">Request quote for pricing</span>
                         </div>
                       ) : material.pricing_type === 'variants' && material.variants && material.variants.length > 0 ? (
-                        /* Multiple Variants - show size, color, texture on card; select without opening product */
-                        <div className="space-y-2">
-                          <div className="flex items-center justify-between">
-                            <span className="text-xs font-medium text-purple-600 bg-purple-50 px-2 py-0.5 rounded">Select variant</span>
-                          </div>
-                          {/* Variant Selector: label shows e.g. "2 inch, Yellow, Smooth - KES 120/unit" */}
-                          <select
-                            value={selectedVariants[material.id] || material.variants[0]?.id || ''}
-                            onChange={(e) => {
-                              e.stopPropagation();
-                              setSelectedVariants(prev => ({ ...prev, [material.id]: e.target.value }));
-                            }}
-                            onClick={(e) => e.stopPropagation()}
-                            className="w-full h-9 px-2 text-sm rounded-md border border-purple-300 bg-white focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
-                          >
-                            {material.variants.map((variant) => {
-                              const sizePart = [variant.sizeLabel, variant.sizeUnit].filter(Boolean).join(' ');
-                              const parts = [sizePart, variant.color, variant.texture].filter(Boolean);
-                              const label = parts.length > 0 ? parts.join(', ') : variant.sizeLabel || 'Variant';
-                              return (
-                                <option key={variant.id} value={variant.id}>
-                                  {label} - KES {variant.price.toLocaleString()}/{material.unit}
-                                </option>
-                              );
-                            })}
-                          </select>
-                          {/* Selected Variant Price Display */}
-                          {(() => {
-                            const selectedVariantId = selectedVariants[material.id] || material.variants[0]?.id;
-                            const selectedVariant = material.variants.find(v => v.id === selectedVariantId) || material.variants[0];
-                            return selectedVariant ? (
-                              <div className="flex items-baseline justify-between">
-                                <span className="text-lg font-bold text-blue-600">KES {selectedVariant.price.toLocaleString()}</span>
-                                <span className="text-xs text-muted-foreground">/{material.unit}</span>
-                              </div>
-                            ) : null;
-                          })()}
-                        </div>
+                        /* Multiple Variants - show selected price only; variant selector is above Add to Cart */
+                        (() => {
+                          const selectedVariantId = selectedVariants[material.id] || material.variants[0]?.id;
+                          const selectedVariant = material.variants.find(v => v.id === selectedVariantId) || material.variants[0];
+                          return selectedVariant ? (
+                            <div className="flex items-baseline justify-between">
+                              <span className="text-lg font-bold text-blue-600">KES {selectedVariant.price.toLocaleString()}</span>
+                              <span className="text-xs text-muted-foreground">/{material.unit}</span>
+                            </div>
+                          ) : null;
+                        })()
                       ) : (
                         /* Single Price */
                         <div className="flex items-baseline gap-1">
@@ -2207,6 +2196,35 @@ export const MaterialsGrid = () => {
                           </span>
                         )}
                       </div>
+                      
+                      {/* Variant selector: Size / Color / Texture - right above Add to Cart, no need to open View Product */}
+                      {userRole !== 'professional_builder' && material.pricing_type === 'variants' && material.variants && material.variants.length > 0 && (
+                        <div className="space-y-1.5">
+                          <span className="text-xs font-medium text-purple-600 bg-purple-50 px-2 py-0.5 rounded block w-fit">
+                            {getVariantDimensionLabel(material.variants)}
+                          </span>
+                          <select
+                            value={selectedVariants[material.id] || material.variants[0]?.id || ''}
+                            onChange={(e) => {
+                              e.stopPropagation();
+                              setSelectedVariants(prev => ({ ...prev, [material.id]: e.target.value }));
+                            }}
+                            onClick={(e) => e.stopPropagation()}
+                            className="w-full h-9 px-2 text-sm rounded-md border border-purple-300 bg-white focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                          >
+                            {material.variants.map((variant) => {
+                              const sizePart = [variant.sizeLabel, variant.sizeUnit].filter(Boolean).join(' ');
+                              const parts = [sizePart, variant.color, variant.texture].filter(Boolean);
+                              const label = parts.length > 0 ? parts.join(', ') : variant.sizeLabel || 'Variant';
+                              return (
+                                <option key={variant.id} value={variant.id}>
+                                  {label} - KES {variant.price.toLocaleString()}/{material.unit}
+                                </option>
+                              );
+                            })}
+                          </select>
+                        </div>
+                      )}
                       
                       {/* ACTION BUTTON - Single Add to Cart for all builders */}
                       <Button 
