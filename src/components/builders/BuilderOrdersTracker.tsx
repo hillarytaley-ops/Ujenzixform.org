@@ -626,6 +626,25 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
       )
       .subscribe();
 
+    // Subscribe to purchase_orders updates (e.g. delivery_provider_id/delivery_status when provider accepts)
+    const poChannel = supabase
+      .channel('builder-purchase-orders')
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'purchase_orders'
+        },
+        (payload: any) => {
+          const row = payload?.new;
+          if (row?.buyer_id === builderId) {
+            fetchOrders();
+          }
+        }
+      )
+      .subscribe();
+
     // Subscribe to scan events
     const scansChannel = supabase
       .channel('builder-scan-events')
@@ -700,6 +719,7 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
 
     return () => {
       supabase.removeChannel(itemsChannel);
+      supabase.removeChannel(poChannel);
       supabase.removeChannel(scansChannel);
     };
   };
@@ -858,6 +878,18 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
                                 ['assigned', 'accepted', 'picked_up', 'in_transit', 'delivered'].includes(deliveryStatus);
     const providerName = order.delivery_provider_name || 'Delivery Provider';
     const items = order.material_items || [];
+    
+    // Provider has already accepted – check FIRST so we never show "Awaiting Delivery Request" when provider is set
+    // (handles race where PO has delivery_provider_id but delivery_status not yet synced)
+    if (hasDeliveryProvider && (
+      deliveryStatus === 'accepted' || deliveryStatus === 'assigned' ||
+      ['awaiting_delivery_request', 'delivery_requested', 'awaiting_delivery_provider'].includes(status)
+    )) {
+      if (providerName && providerName !== 'Delivery Provider') {
+        return `✅ Accepted by ${providerName}`;
+      }
+      return '✅ Accepted by Delivery Provider';
+    }
     
     // Check if items are dispatched, in transit, or received (regardless of order status)
     const hasDispatchedItems = items.some((i: any) => (i.dispatch_scanned || i.status === 'dispatched') && !['in_transit', 'received', 'verified'].includes(i.status) && !i.receive_scanned);
@@ -1286,10 +1318,11 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
             <div className="bg-gray-50 rounded-lg p-4">
               <p className="font-medium text-sm text-gray-600 mb-3">Order Status Timeline</p>
               <div className="flex items-center justify-between">
-                {/* Step 1: Pending/Confirmed */}
+                {/* Step 1: Pending/Confirmed – green when accepted or when provider has accepted */}
                 <div className="flex flex-col items-center">
                   <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                    ['pending', 'confirmed', 'quoted', 'dispatched', 'in_transit', 'delivered', 'received', 'verified'].includes(order.status)
+                    ['pending', 'confirmed', 'quoted', 'dispatched', 'in_transit', 'delivered', 'received', 'verified'].includes(order.status) ||
+                    order.delivery_provider_id || order.delivery_provider_name || ['accepted', 'assigned'].includes(order.delivery_status)
                       ? 'bg-green-500 text-white'
                       : 'bg-gray-200 text-gray-400'
                   }`}>
@@ -1319,10 +1352,10 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
                   )}
                 </div>
                 
-                {/* Line */}
+                {/* Line – green when step 1 (Accepted) is complete */}
                 <div className={`flex-1 h-1 mx-2 ${
                   ['dispatched', 'in_transit', 'delivered', 'received', 'verified'].includes(order.status) ||
-                  (order.delivery_provider_id && ['pending', 'confirmed'].includes(order.status))
+                  order.delivery_provider_id || order.delivery_provider_name || ['accepted', 'assigned'].includes(order.delivery_status)
                     ? 'bg-green-500'
                     : 'bg-gray-200'
                 }`} />
