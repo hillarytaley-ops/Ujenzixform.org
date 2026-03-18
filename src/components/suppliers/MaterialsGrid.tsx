@@ -2149,22 +2149,7 @@ export const MaterialsGrid = () => {
                                 onClick={(e) => e.stopPropagation()}
                                 className="h-9 w-full text-sm rounded-md border border-purple-300 bg-white focus:ring-2 focus:ring-purple-500"
                               >
-                                <SelectValue>
-                                  {(() => {
-                                    const vid = selectedVariants[material.id] || material.variants[0]?.id;
-                                    const v = material.variants.find(x => x.id === vid) || material.variants[0];
-                                    if (!v) return null;
-                                    const sizePart = [v.sizeLabel, v.sizeUnit].filter(Boolean).join(' ');
-                                    const parts = [sizePart, v.color, v.texture].filter(Boolean);
-                                    const label = parts.length > 0 ? parts.join(', ') : v.sizeLabel || 'Variant';
-                                    return (
-                                      <span className="flex items-center gap-2">
-                                        <span className="h-4 w-4 rounded-full border border-gray-300 flex-shrink-0" style={{ backgroundColor: getVariantSwatchColor(v) }} />
-                                        {label} - KES {v.price.toLocaleString()}/{material.unit}
-                                      </span>
-                                    );
-                                  })()}
-                                </SelectValue>
+                                <SelectValue />
                               </SelectTrigger>
                               <SelectContent onClick={(e) => e.stopPropagation()}>
                                 {material.variants.map((variant) => {
@@ -2172,8 +2157,7 @@ export const MaterialsGrid = () => {
                                   const parts = [sizePart, variant.color, variant.texture].filter(Boolean);
                                   const label = parts.length > 0 ? parts.join(', ') : variant.sizeLabel || 'Variant';
                                   return (
-                                    <SelectItem key={variant.id} value={variant.id} className="flex items-center gap-2 py-2">
-                                      <span className="h-4 w-4 rounded-full border border-gray-300 flex-shrink-0" style={{ backgroundColor: getVariantSwatchColor(variant) }} />
+                                    <SelectItem key={variant.id} value={variant.id} className="py-2">
                                       {label} - KES {variant.price.toLocaleString()}/{material.unit}
                                     </SelectItem>
                                   );
