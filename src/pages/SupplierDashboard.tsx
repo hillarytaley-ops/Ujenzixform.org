@@ -660,8 +660,9 @@ const SupplierDashboard = () => {
     if (isolatedStats) {
       setStats(isolatedStats);
     }
-    // Transform orders to match local format
+    // Transform orders to match local format and feed Orders sub-tab immediately so it's not lazy-loading
     if (supplierOrders && supplierOrders.length > 0) {
+      setOrdersForOrdersTab(supplierOrders);
       const formattedOrders: RecentOrder[] = supplierOrders.slice(0, 10).map((order: any) => ({
         id: order.id,
         customer_name: order.builder_name || 'Customer',
@@ -1269,6 +1270,23 @@ const SupplierDashboard = () => {
       if (accessToken) {
         authHeaders['Authorization'] = `Bearer ${accessToken}`;
       }
+
+      // Fire orders fetch immediately (parallel) so Orders sub-tab is not lazy-loading
+      fetch(
+        `${SUPABASE_URL}/rest/v1/rpc/get_supplier_orders_for_current_user`,
+        {
+          method: 'POST',
+          headers: { ...authHeaders, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ _limit: 500 }),
+          cache: 'no-store'
+        }
+      ).then(async (res) => {
+        if (!res.ok) return [];
+        const data = await res.json();
+        return Array.isArray(data) ? data : [];
+      }).catch(() => []).then((ordersData: any[]) => {
+        if (ordersData?.length) setOrdersForOrdersTab(ordersData);
+      });
 
       try {
         // Fetch supplier profile
