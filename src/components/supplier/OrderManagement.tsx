@@ -763,8 +763,11 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, is
         const dr = deliveryRequestsByPO.get(po.id);
         const resolvedProviderId = po.delivery_provider_id || dr?.provider_id;
         const resolvedStatus = po.delivery_status || (dr?.status && ['accepted', 'assigned', 'picked_up', 'in_transit', 'delivered'].includes(dr.status) ? dr.status : undefined);
-        const resolvedProviderName = po.delivery_provider_name || (resolvedProviderId ? providerNames[resolvedProviderId] : undefined);
         const resolvedProviderPhone = po.delivery_provider_phone || (resolvedProviderId ? providerPhones[resolvedProviderId] : undefined);
+        // Name: prefer PO column, then RPC/direct lookup; if we have phone but no name, show "Delivery Provider" so we never show "Loading..."
+        const resolvedProviderName = po.delivery_provider_name
+          || (resolvedProviderId ? providerNames[resolvedProviderId] : undefined)
+          || (resolvedProviderPhone ? 'Delivery Provider' : undefined);
 
         return {
           id: po.id,

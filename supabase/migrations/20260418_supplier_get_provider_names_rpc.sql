@@ -13,8 +13,12 @@ SECURITY DEFINER
 STABLE
 SET search_path = public
 AS $$
-  SELECT dp.id, dp.provider_name, dp.phone
+  SELECT
+    dp.id,
+    COALESCE(NULLIF(TRIM(dp.provider_name), ''), p.full_name, 'Delivery Provider') AS provider_name,
+    COALESCE(NULLIF(TRIM(dp.phone), ''), p.phone) AS phone
   FROM delivery_providers dp
+  LEFT JOIN profiles p ON p.user_id = dp.user_id
   WHERE dp.id = ANY(provider_ids)
     AND EXISTS (
       SELECT 1 FROM purchase_orders po
