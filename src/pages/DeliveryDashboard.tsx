@@ -2665,7 +2665,7 @@ const DeliveryDashboard = () => {
                 </Button>
               </div>
               <p className={`text-xs px-3 ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-                Accepted deliveries appear here and stay until you complete the delivery scan. When you scan all items as delivered, the order moves to the History tab. Select an order from the dropdown to view details.
+                Accepted deliveries appear here and stay until you complete the delivery scan. When you scan all items as delivered, the order moves to the History tab. Select an order from the list to view details.
               </p>
 
               {unifiedError && (
@@ -2713,47 +2713,54 @@ const DeliveryDashboard = () => {
                           </div>
                         </div>
                         
-                        {/* Dropdown for selecting scheduled orders */}
-                        <div className="mb-4">
+                        {/* List of scheduled orders - click to select and view details */}
+                        <div className="space-y-2 mb-4">
                           <Label className={`mb-2 block ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
-                            Select Scheduled Order
+                            Scheduled orders
                           </Label>
-                          <Select 
-                            value={selectedScheduledOrderId || defaultSelected?.id || ''} 
-                            onValueChange={setSelectedScheduledOrderId}
-                          >
-                            <SelectTrigger className={`w-full ${isDarkMode ? 'bg-gray-800 border-gray-700 text-white' : ''}`}>
-                              <SelectValue>
-                                {selectedDelivery ? (
-                                  <div className="flex items-center gap-2">
-                                    <span>{selectedDelivery.order_number || 'Loading...'}</span>
-                                    {selectedDelivery.material_type && (
-                                      <span className="text-xs text-gray-500">- {selectedDelivery.material_type}</span>
-                                    )}
-                                  </div>
-                                ) : (
-                                  'Select an order'
-                                )}
-                              </SelectValue>
-                            </SelectTrigger>
-                            <SelectContent>
-                              {scheduled.map((delivery) => (
-                                <SelectItem key={delivery.id} value={delivery.id}>
-                                  <div className="flex flex-col">
-                                    <span className="font-medium">
-                                      {delivery.order_number || 'Loading...'}
-                                    </span>
-                                    {delivery.material_type && (
-                                      <span className="text-xs text-gray-500">{delivery.material_type}</span>
-                                    )}
-                                    {delivery.delivery_location && (
-                                      <span className="text-xs text-gray-400">{delivery.delivery_location}</span>
-                                    )}
-                                  </div>
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
+                          <ul className="space-y-2" role="list">
+                            {scheduled.map((delivery) => {
+                              const isSelected = (selectedScheduledOrderId || defaultSelected?.id) === delivery.id;
+                              return (
+                                <li key={delivery.id}>
+                                  <button
+                                    type="button"
+                                    onClick={() => setSelectedScheduledOrderId(delivery.id)}
+                                    className={`w-full text-left rounded-lg border-2 p-3 transition-colors ${
+                                      isSelected
+                                        ? isDarkMode
+                                          ? 'border-teal-500 bg-teal-500/10'
+                                          : 'border-teal-500 bg-teal-50'
+                                        : isDarkMode
+                                          ? 'border-gray-700 bg-gray-800 hover:border-gray-600 hover:bg-gray-750'
+                                          : 'border-gray-200 bg-white hover:border-teal-300 hover:bg-gray-50'
+                                    }`}
+                                  >
+                                    <div className="flex items-center justify-between gap-2">
+                                      <div className="flex-1 min-w-0">
+                                        <div className="flex items-center gap-2 flex-wrap">
+                                          <span className="font-medium truncate">
+                                            {delivery.order_number || 'Order'}
+                                          </span>
+                                          {delivery.material_type && (
+                                            <span className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                                              {delivery.material_type}
+                                            </span>
+                                          )}
+                                        </div>
+                                        {delivery.delivery_location && (
+                                          <p className={`text-sm mt-1 truncate ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                                            📍 {delivery.delivery_location}
+                                          </p>
+                                        )}
+                                      </div>
+                                      <ChevronRight className={`h-5 w-5 flex-shrink-0 ${isSelected ? 'text-teal-600' : 'text-gray-400'}`} />
+                                    </div>
+                                  </button>
+                                </li>
+                              );
+                            })}
+                          </ul>
                         </div>
                         
                         {/* Display selected order details */}
