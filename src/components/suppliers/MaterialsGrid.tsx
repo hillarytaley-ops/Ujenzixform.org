@@ -79,6 +79,22 @@ function getVariantDimensionLabel(variants: PriceVariant[]): string {
   return 'Variant';
 }
 
+// Map common color names to hex for swatch display (when colorHex not set)
+const COLOR_NAME_TO_HEX: Record<string, string> = {
+  silver: '#C0C0C0', gray: '#808080', grey: '#808080', gold: '#FFD700', golden: '#FFD700',
+  yellow: '#FFD700', red: '#DC2626', blue: '#2563EB', green: '#16A34A', white: '#FFFFFF',
+  black: '#171717', orange: '#EA580C', brown: '#78350F', pink: '#DB2777', purple: '#7C3AED',
+  beige: '#D4B896', navy: '#1E3A8A', maroon: '#800000', cream: '#FFFDD0', terracotta: '#C4622E',
+};
+function getVariantSwatchColor(v: PriceVariant): string {
+  if (v.colorHex && /^#[0-9A-Fa-f]{3,8}$/.test(v.colorHex)) return v.colorHex;
+  if (v.color) {
+    const hex = COLOR_NAME_TO_HEX[v.color.toLowerCase().trim()];
+    if (hex) return hex;
+  }
+  return '#E5E7EB';
+}
+
 interface Material {
   id: string;
   supplier_id?: string; // Optional - admin materials don't have supplier_id
@@ -2112,6 +2128,81 @@ export const MaterialsGrid = () => {
                         )}
                       </div>
                       
+                      {/* Variant selector - visible at first sight for ALL users (before price) */}
+                      {material.pricing_type === 'variants' && material.variants && material.variants.length > 0 && (
+                        <div className="space-y-1.5">
+                          <span className="text-xs font-medium text-purple-600 bg-purple-50 px-2 py-0.5 rounded block w-fit">
+                            Select {getVariantDimensionLabel(material.variants)}
+                          </span>
+                          {getVariantDimensionLabel(material.variants) === 'Color' ? (
+                            <div className="flex flex-wrap items-center gap-2">
+                              {material.variants.map((variant) => {
+                                const isSelected = (selectedVariants[material.id] || material.variants[0]?.id) === variant.id;
+                                const sizePart = [variant.sizeLabel, variant.sizeUnit].filter(Boolean).join(' ');
+                                const parts = [sizePart, variant.color, variant.texture].filter(Boolean);
+                                const label = parts.length > 0 ? parts.join(', ') : variant.sizeLabel || 'Variant';
+                                return (
+                                  <button
+                                    key={variant.id}
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setSelectedVariants(prev => ({ ...prev, [material.id]: variant.id }));
+                                    }}
+                                    title={`${label} - KES ${variant.price.toLocaleString()}`}
+                                    className={`h-8 w-8 rounded-full border-2 flex-shrink-0 transition-all ${
+                                      isSelected ? 'border-purple-600 ring-2 ring-purple-400 scale-110' : 'border-gray-300 hover:border-purple-400'
+                                    }`}
+                                    style={{ backgroundColor: getVariantSwatchColor(variant) }}
+                                  />
+                                );
+                              })}
+                              <select
+                                value={selectedVariants[material.id] || material.variants[0]?.id || ''}
+                                onChange={(e) => {
+                                  e.stopPropagation();
+                                  setSelectedVariants(prev => ({ ...prev, [material.id]: e.target.value }));
+                                }}
+                                onClick={(e) => e.stopPropagation()}
+                                className="flex-1 min-w-0 h-8 text-xs rounded-md border border-purple-300 bg-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+                              >
+                                {material.variants.map((variant) => {
+                                  const sizePart = [variant.sizeLabel, variant.sizeUnit].filter(Boolean).join(' ');
+                                  const parts = [sizePart, variant.color, variant.texture].filter(Boolean);
+                                  const label = parts.length > 0 ? parts.join(', ') : variant.sizeLabel || 'Variant';
+                                  return (
+                                    <option key={variant.id} value={variant.id}>
+                                      {label} - KES {variant.price.toLocaleString()}/{material.unit}
+                                    </option>
+                                  );
+                                })}
+                              </select>
+                            </div>
+                          ) : (
+                            <select
+                              value={selectedVariants[material.id] || material.variants[0]?.id || ''}
+                              onChange={(e) => {
+                                e.stopPropagation();
+                                setSelectedVariants(prev => ({ ...prev, [material.id]: e.target.value }));
+                              }}
+                              onClick={(e) => e.stopPropagation()}
+                              className="w-full h-9 px-2 text-sm rounded-md border border-purple-300 bg-white focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                            >
+                              {material.variants.map((variant) => {
+                                const sizePart = [variant.sizeLabel, variant.sizeUnit].filter(Boolean).join(' ');
+                                const parts = [sizePart, variant.color, variant.texture].filter(Boolean);
+                                const label = parts.length > 0 ? parts.join(', ') : variant.sizeLabel || 'Variant';
+                                return (
+                                  <option key={variant.id} value={variant.id}>
+                                    {label} - KES {variant.price.toLocaleString()}/{material.unit}
+                                  </option>
+                                );
+                              })}
+                            </select>
+                          )}
+                        </div>
+                      )}
+                      
                       {/* Price - Hidden for Professional Builders who get pricing via quotes */}
                       {userRole === 'professional_builder' ? (
                         <div className="flex items-center gap-1 bg-blue-50 rounded-lg px-2 py-1">
@@ -2214,35 +2305,6 @@ export const MaterialsGrid = () => {
                           </span>
                         )}
                       </div>
-                      
-                      {/* Variant selector: Size / Color / Texture - right above Add to Cart, no need to open View Product */}
-                      {userRole !== 'professional_builder' && material.pricing_type === 'variants' && material.variants && material.variants.length > 0 && (
-                        <div className="space-y-1.5">
-                          <span className="text-xs font-medium text-purple-600 bg-purple-50 px-2 py-0.5 rounded block w-fit">
-                            {getVariantDimensionLabel(material.variants)}
-                          </span>
-                          <select
-                            value={selectedVariants[material.id] || material.variants[0]?.id || ''}
-                            onChange={(e) => {
-                              e.stopPropagation();
-                              setSelectedVariants(prev => ({ ...prev, [material.id]: e.target.value }));
-                            }}
-                            onClick={(e) => e.stopPropagation()}
-                            className="w-full h-9 px-2 text-sm rounded-md border border-purple-300 bg-white focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
-                          >
-                            {material.variants.map((variant) => {
-                              const sizePart = [variant.sizeLabel, variant.sizeUnit].filter(Boolean).join(' ');
-                              const parts = [sizePart, variant.color, variant.texture].filter(Boolean);
-                              const label = parts.length > 0 ? parts.join(', ') : variant.sizeLabel || 'Variant';
-                              return (
-                                <option key={variant.id} value={variant.id}>
-                                  {label} - KES {variant.price.toLocaleString()}/{material.unit}
-                                </option>
-                              );
-                            })}
-                          </select>
-                        </div>
-                      )}
                       
                       {/* ACTION BUTTON - Single Add to Cart for all builders */}
                       <Button 
