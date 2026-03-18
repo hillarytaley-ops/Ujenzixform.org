@@ -1910,72 +1910,90 @@ export const MaterialsGrid = () => {
                 const cartQty = getItemQuantity(material.id);
 
                 const handleAddToCart = () => {
-                  // Only authenticated users can add to cart
-                  if (!isAuthenticated) {
+                  try {
+                    // Only authenticated users can add to cart
+                    if (!isAuthenticated) {
+                      toast({
+                        title: '🔐 Sign In Required',
+                        description: 'Please sign in to purchase materials.',
+                      });
+                      setTimeout(() => {
+                        window.location.href = '/home';
+                      }, 1500);
+                      return;
+                    }
+                    
+                    // Allow cart additions for:
+                    // 1. Private Clients, Professional Builders, Admins (explicit roles)
+                    // 2. Users with null role (role not yet loaded or not assigned - let them shop, check at checkout)
+                    const allowedRoles = ['private_client', 'professional_builder', 'admin', 'builder'];
+                    const canAddToCart = userRole === null || allowedRoles.includes(userRole);
+                    
+                    if (!canAddToCart) {
+                      toast({
+                        title: '⚠️ Builder Account Required',
+                        description: `Your role (${userRole}) cannot purchase materials. Please register as a Private Client or Professional Builder.`,
+                        variant: 'destructive',
+                      });
+                      return;
+                    }
+                    
+                    if (!material?.id) {
+                      toast({
+                        title: 'Cannot add to cart',
+                        description: 'This item is missing required data. Please refresh and try again.',
+                        variant: 'destructive',
+                      });
+                      return;
+                    }
+                    
+                    // Ensure quantity is at least 1
+                    const qtyToAdd = currentQty > 0 ? currentQty : 1;
+                    
+                    // Get the correct price based on variant selection
+                    let unitPrice = material.unit_price ?? 0;
+                    let itemName = material.name ?? 'Material';
+                    
+                    if (material.pricing_type === 'variants' && material.variants && material.variants.length > 0) {
+                      const selectedVariantId = selectedVariants[material.id] || material.variants[0]?.id;
+                      const selectedVariant = material.variants.find(v => v.id === selectedVariantId) || material.variants[0];
+                      if (selectedVariant) {
+                        unitPrice = selectedVariant.price;
+                        const sizePart = [selectedVariant.sizeLabel, selectedVariant.sizeUnit].filter(Boolean).join(' ');
+                        const variantParts = [sizePart, selectedVariant.color, selectedVariant.texture].filter(Boolean);
+                        itemName = variantParts.length > 0 ? `${material.name} (${variantParts.join(', ')})` : `${material.name} (${selectedVariant.sizeLabel})`;
+                      }
+                    }
+                    
+                    console.log('🛒 Adding to cart:', itemName, 'qty:', qtyToAdd, 'price:', unitPrice);
+                    
+                    addToCart({
+                      id: material.id,
+                      name: itemName,
+                      category: material.category ?? '',
+                      unit: material.unit ?? 'piece',
+                      unit_price: unitPrice,
+                      image_url: imageUrl,
+                      supplier_name: material.supplier?.company_name || 'UjenziXform Catalog',
+                      supplier_id: material.supplier_id
+                    }, qtyToAdd);
+                    
+                    // Show success toast
                     toast({
-                      title: '🔐 Sign In Required',
-                      description: 'Please sign in to purchase materials.',
+                      title: '✅ Added to Cart',
+                      description: `${itemName} x${qtyToAdd} added to your cart`,
                     });
-                    setTimeout(() => {
-                      window.location.href = '/home';
-                    }, 1500);
-                    return;
-                  }
-                  
-                  // Allow cart additions for:
-                  // 1. Private Clients, Professional Builders, Admins (explicit roles)
-                  // 2. Users with null role (role not yet loaded or not assigned - let them shop, check at checkout)
-                  const allowedRoles = ['private_client', 'professional_builder', 'admin', 'builder'];
-                  const canAddToCart = userRole === null || allowedRoles.includes(userRole);
-                  
-                  if (!canAddToCart) {
+                    
+                    // Reset quantity counter after adding to cart (back to default of 1)
+                    setQuantities(prev => ({ ...prev, [material.id]: 1 }));
+                  } catch (err) {
+                    console.error('Add to cart error:', err);
                     toast({
-                      title: '⚠️ Builder Account Required',
-                      description: `Your role (${userRole}) cannot purchase materials. Please register as a Private Client or Professional Builder.`,
+                      title: 'Could not add to cart',
+                      description: err instanceof Error ? err.message : 'Please try again or refresh the page.',
                       variant: 'destructive',
                     });
-                    return;
                   }
-                  
-                  // Ensure quantity is at least 1
-                  const qtyToAdd = currentQty > 0 ? currentQty : 1;
-                  
-                  // Get the correct price based on variant selection
-                  let unitPrice = material.unit_price;
-                  let itemName = material.name;
-                  
-                  if (material.pricing_type === 'variants' && material.variants && material.variants.length > 0) {
-                    const selectedVariantId = selectedVariants[material.id] || material.variants[0]?.id;
-                    const selectedVariant = material.variants.find(v => v.id === selectedVariantId) || material.variants[0];
-                    if (selectedVariant) {
-                      unitPrice = selectedVariant.price;
-                      const sizePart = [selectedVariant.sizeLabel, selectedVariant.sizeUnit].filter(Boolean).join(' ');
-                      const variantParts = [sizePart, selectedVariant.color, selectedVariant.texture].filter(Boolean);
-                      itemName = variantParts.length > 0 ? `${material.name} (${variantParts.join(', ')})` : `${material.name} (${selectedVariant.sizeLabel})`;
-                    }
-                  }
-                  
-                  console.log('🛒 Adding to cart:', itemName, 'qty:', qtyToAdd, 'price:', unitPrice);
-                  
-                  addToCart({
-                    id: material.id,
-                    name: itemName,
-                    category: material.category,
-                    unit: material.unit,
-                    unit_price: unitPrice,
-                    image_url: imageUrl,
-                    supplier_name: material.supplier?.company_name || 'UjenziXform Catalog',
-                    supplier_id: material.supplier_id
-                  }, qtyToAdd);
-                  
-                  // Show success toast
-                  toast({
-                    title: '✅ Added to Cart',
-                    description: `${itemName} x${qtyToAdd} added to your cart`,
-                  });
-                  
-                  // Reset quantity counter after adding to cart (back to default of 1)
-                  setQuantities(prev => ({ ...prev, [material.id]: 1 }));
                 };
 
                 const isSelectedForCompare = compareItems.has(material.id);
@@ -2234,22 +2252,12 @@ export const MaterialsGrid = () => {
                             window.location.href = '/home';
                             return;
                           }
-                          const qtyToAdd = currentQty > 0 ? currentQty : 1;
-                          handleAddToCart();
-                          toast({
-                            title: '🛒 Added to Cart!',
-                            description: `${qtyToAdd} x ${material.name} added to cart.`,
-                            action: (
-                              <Button 
-                                variant="outline" 
-                                size="sm" 
-                                onClick={() => setIsCartOpen(true)}
-                                className="bg-white hover:bg-gray-100"
-                              >
-                                View Cart
-                              </Button>
-                            ),
-                          });
+                          try {
+                            handleAddToCart();
+                            // Success toast is shown inside handleAddToCart
+                          } catch (err) {
+                            // Error toast already shown in handleAddToCart
+                          }
                         }}
                         disabled={!material.in_stock}
                       >

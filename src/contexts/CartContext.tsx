@@ -59,8 +59,10 @@ export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       console.log('🛒 Loading cart from localStorage:', savedCart ? 'found' : 'not found');
       if (savedCart) {
         const parsed = JSON.parse(savedCart);
-        console.log('🛒 Loaded cart items:', parsed.length);
-        setItems(parsed);
+        const list = Array.isArray(parsed) ? parsed : [];
+        const valid = list.filter((i: any) => i && typeof i.id === 'string' && typeof i.quantity === 'number');
+        console.log('🛒 Loaded cart items:', valid.length);
+        setItems(valid);
       }
     } catch (error) {
       console.error('Error loading cart from storage:', error);
@@ -78,8 +80,12 @@ export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   }, [items]);
 
   const addToCart = (item: Omit<CartItem, 'quantity'>, quantity: number) => {
-    console.log('🛒 CartContext.addToCart called:', item.name, 'qty:', quantity);
+    console.log('🛒 CartContext.addToCart called:', item?.name, 'qty:', quantity);
     
+    if (!item || typeof item.id !== 'string') {
+      console.warn('🛒 addToCart: invalid item (missing id)');
+      return;
+    }
     if (quantity <= 0) {
       console.log('🛒 Quantity is 0 or less, not adding');
       return;
