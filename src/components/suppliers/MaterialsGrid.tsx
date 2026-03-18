@@ -99,6 +99,24 @@ function getVariantSwatchColor(v: PriceVariant): string {
   return '#E5E7EB';
 }
 
+/** Stable key for variant selection (works when variant.id is missing, e.g. from API) */
+function getVariantKey(variant: PriceVariant, index: number): string {
+  if (variant?.id && String(variant.id).trim()) return String(variant.id);
+  return `idx:${index}`;
+}
+
+/** Resolve selected variant from stored key */
+function getVariantByKey(variants: PriceVariant[], key: string | undefined): PriceVariant | undefined {
+  if (!key || !variants?.length) return variants?.[0];
+  if (key.startsWith('idx:')) {
+    const i = parseInt(key.slice(4), 10);
+    if (!Number.isNaN(i) && i >= 0 && i < variants.length) return variants[i];
+  }
+  const byId = variants.find((v) => v.id === key);
+  if (byId) return byId;
+  return variants[0];
+}
+
 interface Material {
   id: string;
   supplier_id?: string; // Optional - admin materials don't have supplier_id
@@ -430,8 +448,7 @@ export const MaterialsGrid = () => {
     let unitPrice = material.unit_price;
     
     if (material.pricing_type === 'variants' && material.variants && material.variants.length > 0) {
-      const selectedVariantId = selectedVariants[material.id] || material.variants[0]?.id;
-      const selectedVariant = material.variants.find(v => v.id === selectedVariantId) || material.variants[0];
+      const selectedVariant = getVariantByKey(material.variants, selectedVariants[material.id]) ?? material.variants[0];
       if (selectedVariant) {
         const sizePart = [selectedVariant.sizeLabel, selectedVariant.sizeUnit].filter(Boolean).join(' ');
         const variantParts = [sizePart, selectedVariant.color, selectedVariant.texture].filter(Boolean);
@@ -1976,8 +1993,7 @@ export const MaterialsGrid = () => {
                     let itemName = material.name ?? 'Material';
                     
                     if (material.pricing_type === 'variants' && material.variants && material.variants.length > 0) {
-                      const selectedVariantId = selectedVariants[material.id] || material.variants[0]?.id;
-                      const selectedVariant = material.variants.find(v => v.id === selectedVariantId) || material.variants[0];
+                      const selectedVariant = getVariantByKey(material.variants, selectedVariants[material.id]) ?? material.variants[0];
                       if (selectedVariant) {
                         unitPrice = selectedVariant.price;
                         const sizePart = [selectedVariant.sizeLabel, selectedVariant.sizeUnit].filter(Boolean).join(' ');
@@ -2148,8 +2164,8 @@ export const MaterialsGrid = () => {
                                   className="h-9 w-full text-sm rounded-md border border-purple-300 bg-white px-3 flex items-center justify-between gap-2 focus:outline-none focus:ring-2 focus:ring-purple-500 text-left"
                                 >
                                   {(() => {
-                                    const vid = selectedVariants[material.id] || material.variants[0]?.id;
-                                    const v = material.variants.find(x => x.id === vid) || material.variants[0];
+                                    const storedKey = selectedVariants[material.id];
+                                    const v = getVariantByKey(material.variants, storedKey) ?? material.variants[0];
                                     if (!v) return <span className="text-muted-foreground">Select…</span>;
                                     const sizePart = [v.sizeLabel, v.sizeUnit].filter(Boolean).join(' ');
                                     const parts = [sizePart, v.color, v.texture].filter(Boolean);
@@ -2175,25 +2191,27 @@ export const MaterialsGrid = () => {
                                   className="flex flex-col gap-0.5 max-h-60 overflow-auto"
                                   onPointerDownCapture={(e) => e.stopPropagation()}
                                 >
-                                  {material.variants.map((variant) => {
+                                  {material.variants.map((variant, idx) => {
                                     const sizePart = [variant.sizeLabel, variant.sizeUnit].filter(Boolean).join(' ');
                                     const parts = [sizePart, variant.color, variant.texture].filter(Boolean);
                                     const label = parts.length > 0 ? parts.join(', ') : variant.sizeLabel || 'Variant';
-                                    const isSelected = (selectedVariants[material.id] || material.variants[0]?.id) === variant.id;
+                                    const variantKey = getVariantKey(variant, idx);
+                                    const currentKey = selectedVariants[material.id] ?? getVariantKey(material.variants[0], 0);
+                                    const isSelected = currentKey === variantKey;
                                     return (
                                       <button
-                                        key={variant.id}
+                                        key={variant.id ?? variantKey}
                                         type="button"
                                         onPointerDown={(e) => {
                                           e.preventDefault();
                                           e.stopPropagation();
-                                          setSelectedVariants(prev => ({ ...prev, [material.id]: variant.id }));
+                                          setSelectedVariants(prev => ({ ...prev, [material.id]: variantKey }));
                                           setOpenColorPopoverMaterialId(null);
                                         }}
                                         onClick={(e) => {
                                           e.preventDefault();
                                           e.stopPropagation();
-                                          setSelectedVariants(prev => ({ ...prev, [material.id]: variant.id }));
+                                          setSelectedVariants(prev => ({ ...prev, [material.id]: variantKey }));
                                           setOpenColorPopoverMaterialId(null);
                                         }}
                                         className={`flex items-center gap-3 w-full px-3 py-2.5 rounded-md text-sm text-left hover:bg-purple-50 cursor-pointer ${isSelected ? 'bg-purple-100 ring-1 ring-purple-300' : ''}`}
@@ -2209,7 +2227,7 @@ export const MaterialsGrid = () => {
                             </Popover>
                           ) : (
                             <select
-                              value={selectedVariants[material.id] || material.variants[0]?.id || ''}
+                              value={selectedVariants[material.id] ?? (material.variants[0] ? getVariantKey(material.variants[0], 0) : '')}
                               onChange={(e) => {
                                 e.stopPropagation();
                                 setSelectedVariants(prev => ({ ...prev, [material.id]: e.target.value }));
@@ -2217,12 +2235,12 @@ export const MaterialsGrid = () => {
                               onClick={(e) => e.stopPropagation()}
                               className="w-full h-9 px-2 text-sm rounded-md border border-purple-300 bg-white focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
                             >
-                              {material.variants.map((variant) => {
+                              {material.variants.map((variant, idx) => {
                                 const sizePart = [variant.sizeLabel, variant.sizeUnit].filter(Boolean).join(' ');
                                 const parts = [sizePart, variant.color, variant.texture].filter(Boolean);
                                 const label = parts.length > 0 ? parts.join(', ') : variant.sizeLabel || 'Variant';
                                 return (
-                                  <option key={variant.id} value={variant.id}>
+                                  <option key={variant.id ?? getVariantKey(variant, idx)} value={getVariantKey(variant, idx)}>
                                     {label} - KES {variant.price.toLocaleString()}/{material.unit}
                                   </option>
                                 );
@@ -2241,8 +2259,7 @@ export const MaterialsGrid = () => {
                       ) : material.pricing_type === 'variants' && material.variants && material.variants.length > 0 ? (
                         /* Multiple Variants - show selected price only; variant selector is above Add to Cart */
                         (() => {
-                          const selectedVariantId = selectedVariants[material.id] || material.variants[0]?.id;
-                          const selectedVariant = material.variants.find(v => v.id === selectedVariantId) || material.variants[0];
+                          const selectedVariant = getVariantByKey(material.variants, selectedVariants[material.id]) ?? material.variants[0];
                           return selectedVariant ? (
                             <div className="flex items-baseline justify-between">
                               <span className="text-lg font-bold text-blue-600">KES {selectedVariant.price.toLocaleString()}</span>
@@ -2325,8 +2342,7 @@ export const MaterialsGrid = () => {
                             {(() => {
                               // Calculate price based on variant if available
                               if (material.pricing_type === 'variants' && material.variants && material.variants.length > 0) {
-                                const selectedVariantId = selectedVariants[material.id] || material.variants[0]?.id;
-                                const selectedVariant = material.variants.find(v => v.id === selectedVariantId) || material.variants[0];
+                                const selectedVariant = getVariantByKey(material.variants, selectedVariants[material.id]) ?? material.variants[0];
                                 return `KES ${((selectedVariant?.price || 0) * currentQty).toLocaleString()}`;
                               }
                               return `KES ${(material.unit_price * currentQty).toLocaleString()}`;
