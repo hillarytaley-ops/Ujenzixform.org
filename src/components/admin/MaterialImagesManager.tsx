@@ -217,16 +217,21 @@ export const MaterialImagesManager: React.FC = () => {
     lastUpdated: new Date()
   });
   
-  // Variant type for multiple sizes/prices/colors
+  // Variant type for multiple sizes/prices/colors/textures
   interface PriceVariant {
     id: string;
     sizeLabel: string;
+    sizeUnit?: string; // e.g. inch, feet, metres, cm
     color?: string;
     colorHex?: string;
+    texture?: string; // e.g. Smooth, Rough
     price: number;
     stock: number;
     imageUrl?: string; // Optional image per variant
   }
+
+  const SIZE_UNITS = ['', 'inch', 'inches', 'ft', 'feet', 'm', 'metres', 'cm', 'mm', 'L', 'litre', 'litres'];
+  const TEXTURE_OPTIONS = ['', 'Smooth', 'Rough', 'Textured', 'Matte', 'Glossy', 'Coarse', 'Fine', 'Other'];
   
   // Common color presets for quick selection
   const COLOR_PRESETS = [
@@ -238,6 +243,7 @@ export const MaterialImagesManager: React.FC = () => {
     { name: 'Blue', hex: '#3B82F6' },
     { name: 'Green', hex: '#22C55E' },
     { name: 'Yellow', hex: '#EAB308' },
+    { name: 'Golden', hex: '#FFD700' },
     { name: 'Orange', hex: '#F97316' },
     { name: 'Brown', hex: '#92400E' },
     { name: 'Beige', hex: '#D4A574' },
@@ -2103,7 +2109,7 @@ export const MaterialImagesManager: React.FC = () => {
                     onClick={() => setUploadForm(prev => ({ 
                       ...prev, 
                       pricingType: 'variants',
-                      variants: (!prev.variants || prev.variants.length === 0) ? [{ id: crypto.randomUUID(), sizeLabel: '', color: '', colorHex: '', price: 0, stock: 0 }] : prev.variants
+                      variants: (!prev.variants || prev.variants.length === 0) ? [{ id: crypto.randomUUID(), sizeLabel: '', sizeUnit: '', color: '', colorHex: '', texture: '', price: 0, stock: 0 }] : prev.variants
                     }))}
                   >
                     📊 Multiple Sizes / Variants
@@ -2136,7 +2142,7 @@ export const MaterialImagesManager: React.FC = () => {
                     onClick={() => setUploadForm(prev => ({
                       ...prev,
                       pricingType: 'variants',
-                      variants: [...prev.variants, { id: crypto.randomUUID(), sizeLabel: '', color: '', colorHex: '', price: 0, stock: 0, imageUrl: '' }]
+                      variants: [...prev.variants, { id: crypto.randomUUID(), sizeLabel: '', sizeUnit: '', color: '', colorHex: '', texture: '', price: 0, stock: 0, imageUrl: '' }]
                     }))}
                   >
                     + Add Variant
@@ -2170,19 +2176,34 @@ export const MaterialImagesManager: React.FC = () => {
                         </div>
                         
                         <div className="grid grid-cols-2 gap-2 mb-2">
-                          {/* Size Input */}
+                          {/* Size Input + Unit */}
                           <div>
                             <Label className="text-xs text-slate-500 mb-1 block">Size</Label>
-                            <Input
-                              placeholder="e.g., 1 inch, Large"
-                              value={variant.sizeLabel}
-                              onChange={(e) => {
-                                const newVariants = [...uploadForm.variants];
-                                newVariants[index].sizeLabel = e.target.value;
-                                setUploadForm(prev => ({ ...prev, variants: newVariants }));
-                              }}
-                              className="bg-slate-700 border-slate-600 h-8 text-sm"
-                            />
+                            <div className="flex gap-1">
+                              <Input
+                                placeholder="e.g., 1, 2, Large"
+                                value={variant.sizeLabel}
+                                onChange={(e) => {
+                                  const newVariants = [...uploadForm.variants];
+                                  newVariants[index].sizeLabel = e.target.value;
+                                  setUploadForm(prev => ({ ...prev, variants: newVariants }));
+                                }}
+                                className="bg-slate-700 border-slate-600 h-8 text-sm flex-1"
+                              />
+                              <select
+                                value={variant.sizeUnit || ''}
+                                onChange={(e) => {
+                                  const newVariants = [...uploadForm.variants];
+                                  newVariants[index].sizeUnit = e.target.value;
+                                  setUploadForm(prev => ({ ...prev, variants: newVariants }));
+                                }}
+                                className="bg-slate-700 border-slate-600 rounded-md h-8 text-sm min-w-[70px]"
+                              >
+                                {SIZE_UNITS.map((u) => (
+                                  <option key={u || 'none'} value={u}>{u || '—'}</option>
+                                ))}
+                              </select>
+                            </div>
                           </div>
                           
                           {/* Price Input */}
@@ -2200,6 +2221,24 @@ export const MaterialImagesManager: React.FC = () => {
                               className="bg-slate-700 border-slate-600 h-8 text-sm"
                             />
                           </div>
+                        </div>
+                        
+                        {/* Texture (optional) */}
+                        <div className="mb-2">
+                          <Label className="text-xs text-slate-500 mb-1 block">Texture (optional)</Label>
+                          <select
+                            value={variant.texture || ''}
+                            onChange={(e) => {
+                              const newVariants = [...uploadForm.variants];
+                              newVariants[index].texture = e.target.value;
+                              setUploadForm(prev => ({ ...prev, variants: newVariants }));
+                            }}
+                            className="w-full bg-slate-700 border-slate-600 rounded-md h-8 text-sm"
+                          >
+                            {TEXTURE_OPTIONS.map((t) => (
+                              <option key={t || 'none'} value={t}>{t || '—'}</option>
+                            ))}
+                          </select>
                         </div>
                         
                         {/* Color Selection */}
@@ -2735,7 +2774,7 @@ export const MaterialImagesManager: React.FC = () => {
                                 className={`flex-1 ${item.pricingType === 'variants' ? 'bg-purple-500 hover:bg-purple-600' : 'border-slate-500 text-slate-300'}`}
                                 onClick={() => updateBulkItem(item.id, { 
                                   pricingType: 'variants',
-                                  variants: item.variants.length === 0 ? [{ id: crypto.randomUUID(), sizeLabel: '', color: '', colorHex: '', price: 0, stock: 0, imageUrl: '' }] : item.variants
+                                  variants: item.variants.length === 0 ? [{ id: crypto.randomUUID(), sizeLabel: '', sizeUnit: '', color: '', colorHex: '', texture: '', price: 0, stock: 0, imageUrl: '' }] : item.variants
                                 })}
                                 disabled={item.uploaded || item.uploading}
                               >
@@ -2767,7 +2806,7 @@ export const MaterialImagesManager: React.FC = () => {
                                 variant="outline"
                                 className="border-purple-500 text-purple-400 hover:bg-purple-500/20 h-8 text-xs px-3"
                                 onClick={() => {
-                                  const newVariants = [...item.variants, { id: crypto.randomUUID(), sizeLabel: '', color: '', colorHex: '', price: 0, stock: 0, imageUrl: '' }];
+                                  const newVariants = [...item.variants, { id: crypto.randomUUID(), sizeLabel: '', sizeUnit: '', color: '', colorHex: '', texture: '', price: 0, stock: 0, imageUrl: '' }];
                                   updateBulkItem(item.id, { pricingType: 'variants', variants: newVariants });
                                 }}
                                 disabled={item.uploaded || item.uploading}
@@ -2802,17 +2841,33 @@ export const MaterialImagesManager: React.FC = () => {
                                     </div>
                                     
                                     <div className="grid grid-cols-2 gap-2 mb-2">
-                                      <Input
-                                        placeholder="Size (e.g., 1 inch)"
-                                        value={variant.sizeLabel}
-                                        onChange={(e) => {
-                                          const newVariants = [...item.variants];
-                                          newVariants[vIdx].sizeLabel = e.target.value;
-                                          updateBulkItem(item.id, { variants: newVariants });
-                                        }}
-                                        className="bg-slate-600 border-slate-500 h-8 text-sm"
-                                        disabled={item.uploaded || item.uploading}
-                                      />
+                                      <div className="flex gap-1">
+                                        <Input
+                                          placeholder="Size (e.g., 1, 2)"
+                                          value={variant.sizeLabel}
+                                          onChange={(e) => {
+                                            const newVariants = [...item.variants];
+                                            newVariants[vIdx].sizeLabel = e.target.value;
+                                            updateBulkItem(item.id, { variants: newVariants });
+                                          }}
+                                          className="bg-slate-600 border-slate-500 h-8 text-sm flex-1"
+                                          disabled={item.uploaded || item.uploading}
+                                        />
+                                        <select
+                                          value={variant.sizeUnit || ''}
+                                          onChange={(e) => {
+                                            const newVariants = [...item.variants];
+                                            newVariants[vIdx].sizeUnit = e.target.value;
+                                            updateBulkItem(item.id, { variants: newVariants });
+                                          }}
+                                          className="bg-slate-600 border-slate-500 rounded h-8 text-xs min-w-[60px]"
+                                          disabled={item.uploaded || item.uploading}
+                                        >
+                                          {SIZE_UNITS.map((u) => (
+                                            <option key={u || 'none'} value={u}>{u || '—'}</option>
+                                          ))}
+                                        </select>
+                                      </div>
                                       <Input
                                         type="number"
                                         placeholder="Price (KES)"
@@ -2826,7 +2881,22 @@ export const MaterialImagesManager: React.FC = () => {
                                         disabled={item.uploaded || item.uploading}
                                       />
                                     </div>
-                                    
+                                    <div className="mb-2">
+                                      <select
+                                        value={variant.texture || ''}
+                                        onChange={(e) => {
+                                          const newVariants = [...item.variants];
+                                          newVariants[vIdx].texture = e.target.value;
+                                          updateBulkItem(item.id, { variants: newVariants });
+                                        }}
+                                        className="w-full bg-slate-600 border-slate-500 rounded h-8 text-xs"
+                                        disabled={item.uploaded || item.uploading}
+                                      >
+                                        {TEXTURE_OPTIONS.map((t) => (
+                                          <option key={t || 'none'} value={t}>{t || '—'}</option>
+                                        ))}
+                                      </select>
+                                    </div>
                                     {/* Color Selection */}
                                     <div className="flex items-center gap-2">
                                       <div 
@@ -3211,7 +3281,7 @@ export const MaterialImagesManager: React.FC = () => {
                       onClick={() => setEditForm(prev => ({ 
                         ...prev, 
                         pricingType: 'variants',
-                        variants: prev.variants.length === 0 ? [{ id: crypto.randomUUID(), sizeLabel: '', color: '', colorHex: '', price: 0, stock: 0, imageUrl: '' }] : prev.variants
+                        variants: prev.variants.length === 0 ? [{ id: crypto.randomUUID(), sizeLabel: '', sizeUnit: '', color: '', colorHex: '', texture: '', price: 0, stock: 0, imageUrl: '' }] : prev.variants
                       }))}
                     >
                       📊 Multiple Sizes / Variants
@@ -3244,7 +3314,7 @@ export const MaterialImagesManager: React.FC = () => {
                       onClick={() => setEditForm(prev => ({
                         ...prev,
                         pricingType: 'variants',
-                        variants: [...prev.variants, { id: crypto.randomUUID(), sizeLabel: '', color: '', colorHex: '', price: 0, stock: 0, imageUrl: '' }]
+                        variants: [...prev.variants, { id: crypto.randomUUID(), sizeLabel: '', sizeUnit: '', color: '', colorHex: '', texture: '', price: 0, stock: 0, imageUrl: '' }]
                       }))}
                     >
                       + Add Variant
@@ -3278,19 +3348,34 @@ export const MaterialImagesManager: React.FC = () => {
                           </div>
                           
                           <div className="grid grid-cols-2 gap-2 mb-2">
-                            {/* Size Input */}
+                            {/* Size Input + Unit */}
                             <div>
                               <Label className="text-xs text-slate-500 mb-1 block">Size</Label>
-                              <Input
-                                placeholder="e.g., 1 inch, Large"
-                                value={variant.sizeLabel}
-                                onChange={(e) => {
-                                  const newVariants = [...editForm.variants];
-                                  newVariants[index].sizeLabel = e.target.value;
-                                  setEditForm(prev => ({ ...prev, variants: newVariants }));
-                                }}
-                                className="bg-slate-700 border-slate-600 h-8 text-sm"
-                              />
+                              <div className="flex gap-1">
+                                <Input
+                                  placeholder="e.g., 1, 2, Large"
+                                  value={variant.sizeLabel}
+                                  onChange={(e) => {
+                                    const newVariants = [...editForm.variants];
+                                    newVariants[index].sizeLabel = e.target.value;
+                                    setEditForm(prev => ({ ...prev, variants: newVariants }));
+                                  }}
+                                  className="bg-slate-700 border-slate-600 h-8 text-sm flex-1"
+                                />
+                                <select
+                                  value={variant.sizeUnit || ''}
+                                  onChange={(e) => {
+                                    const newVariants = [...editForm.variants];
+                                    newVariants[index].sizeUnit = e.target.value;
+                                    setEditForm(prev => ({ ...prev, variants: newVariants }));
+                                  }}
+                                  className="bg-slate-700 border-slate-600 rounded-md h-8 text-sm min-w-[70px]"
+                                >
+                                  {SIZE_UNITS.map((u) => (
+                                    <option key={u || 'none'} value={u}>{u || '—'}</option>
+                                  ))}
+                                </select>
+                              </div>
                             </div>
                             
                             {/* Price Input */}
@@ -3308,6 +3393,24 @@ export const MaterialImagesManager: React.FC = () => {
                                 className="bg-slate-700 border-slate-600 h-8 text-sm"
                               />
                             </div>
+                          </div>
+                          
+                          {/* Texture (optional) */}
+                          <div className="mb-2">
+                            <Label className="text-xs text-slate-500 mb-1 block">Texture (optional)</Label>
+                            <select
+                              value={variant.texture || ''}
+                              onChange={(e) => {
+                                const newVariants = [...editForm.variants];
+                                newVariants[index].texture = e.target.value;
+                                setEditForm(prev => ({ ...prev, variants: newVariants }));
+                              }}
+                              className="w-full bg-slate-700 border-slate-600 rounded-md h-8 text-sm"
+                            >
+                              {TEXTURE_OPTIONS.map((t) => (
+                                <option key={t || 'none'} value={t}>{t || '—'}</option>
+                              ))}
+                            </select>
                           </div>
                           
                           {/* Color Selection */}

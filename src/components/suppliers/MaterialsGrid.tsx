@@ -50,10 +50,14 @@ const isIOSSafari = () => {
   return /iPad|iPhone|iPod/.test(ua) || (ua.includes('Mac') && 'ontouchend' in document);
 };
 
-// Variant type for products with multiple sizes/prices
+// Variant type for products with multiple sizes/colors/textures/prices
 interface PriceVariant {
   id: string;
   sizeLabel: string;
+  sizeUnit?: string;
+  color?: string;
+  colorHex?: string;
+  texture?: string;
   price: number;
   stock: number;
   imageUrl?: string; // Optional image per variant
@@ -392,7 +396,9 @@ export const MaterialsGrid = () => {
       const selectedVariantId = selectedVariants[material.id] || material.variants[0]?.id;
       const selectedVariant = material.variants.find(v => v.id === selectedVariantId) || material.variants[0];
       if (selectedVariant) {
-        itemName = `${material.name} (${selectedVariant.sizeLabel})`;
+        const sizePart = [selectedVariant.sizeLabel, selectedVariant.sizeUnit].filter(Boolean).join(' ');
+        const variantParts = [sizePart, selectedVariant.color, selectedVariant.texture].filter(Boolean);
+        itemName = variantParts.length > 0 ? `${material.name} (${variantParts.join(', ')})` : `${material.name} (${selectedVariant.sizeLabel})`;
         unitPrice = selectedVariant.price;
       }
     }
@@ -1927,7 +1933,9 @@ export const MaterialsGrid = () => {
                     const selectedVariant = material.variants.find(v => v.id === selectedVariantId) || material.variants[0];
                     if (selectedVariant) {
                       unitPrice = selectedVariant.price;
-                      itemName = `${material.name} (${selectedVariant.sizeLabel})`;
+                      const sizePart = [selectedVariant.sizeLabel, selectedVariant.sizeUnit].filter(Boolean).join(' ');
+                      const variantParts = [sizePart, selectedVariant.color, selectedVariant.texture].filter(Boolean);
+                      itemName = variantParts.length > 0 ? `${material.name} (${variantParts.join(', ')})` : `${material.name} (${selectedVariant.sizeLabel})`;
                     }
                   }
                   
@@ -2077,12 +2085,12 @@ export const MaterialsGrid = () => {
                           <span className="text-xs font-medium text-blue-700">Request quote for pricing</span>
                         </div>
                       ) : material.pricing_type === 'variants' && material.variants && material.variants.length > 0 ? (
-                        /* Multiple Variants - Size Selector */
+                        /* Multiple Variants - show size, color, texture on card; select without opening product */
                         <div className="space-y-2">
                           <div className="flex items-center justify-between">
-                            <span className="text-xs font-medium text-purple-600 bg-purple-50 px-2 py-0.5 rounded">Select Size</span>
+                            <span className="text-xs font-medium text-purple-600 bg-purple-50 px-2 py-0.5 rounded">Select variant</span>
                           </div>
-                          {/* Variant Selector Dropdown */}
+                          {/* Variant Selector: label shows e.g. "2 inch, Yellow, Smooth - KES 120/unit" */}
                           <select
                             value={selectedVariants[material.id] || material.variants[0]?.id || ''}
                             onChange={(e) => {
@@ -2092,11 +2100,16 @@ export const MaterialsGrid = () => {
                             onClick={(e) => e.stopPropagation()}
                             className="w-full h-9 px-2 text-sm rounded-md border border-purple-300 bg-white focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
                           >
-                            {material.variants.map((variant) => (
-                              <option key={variant.id} value={variant.id}>
-                                {variant.sizeLabel} - KES {variant.price.toLocaleString()}/{material.unit}
-                              </option>
-                            ))}
+                            {material.variants.map((variant) => {
+                              const sizePart = [variant.sizeLabel, variant.sizeUnit].filter(Boolean).join(' ');
+                              const parts = [sizePart, variant.color, variant.texture].filter(Boolean);
+                              const label = parts.length > 0 ? parts.join(', ') : variant.sizeLabel || 'Variant';
+                              return (
+                                <option key={variant.id} value={variant.id}>
+                                  {label} - KES {variant.price.toLocaleString()}/{material.unit}
+                                </option>
+                              );
+                            })}
                           </select>
                           {/* Selected Variant Price Display */}
                           {(() => {

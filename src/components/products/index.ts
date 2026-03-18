@@ -28,8 +28,10 @@ export { ProductModal } from './ProductModal';
 export interface ProductVariant {
   id: string;
   size?: string;
+  sizeUnit?: string;
   color?: string;
   colorHex?: string;
+  texture?: string;
   price: number;
   stock: number;
   imageUrl: string;
@@ -60,8 +62,10 @@ export const materialToProduct = (material: any): Product => {
     ? material.variants.map((v: any, index: number) => ({
         id: v.id || `${material.id}-v${index}`,
         size: v.sizeLabel || v.size,
+        sizeUnit: v.sizeUnit,
         color: v.color,
         colorHex: v.colorHex,
+        texture: v.texture,
         price: v.price || material.unit_price || 0,
         stock: v.stock ?? 100,
         imageUrl: v.imageUrl || material.image_url || '',
