@@ -582,86 +582,78 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, is
         headers['Authorization'] = `Bearer ${accessToken}`;
       }
 
-      // Build supplier IDs list - use Supabase client so RLS applies (supplier sees own row and own orders)
-      const orderSupplierIds: string[] = [];
-      const effectiveId = supplierId && supplierId.trim() !== '' ? supplierId : userId;
-      if (effectiveId) orderSupplierIds.push(effectiveId);
-      if (userId && !orderSupplierIds.includes(userId)) orderSupplierIds.push(userId);
+      let purchaseOrders: any[] = [];
 
-      // Resolve supplier table id via Supabase client (RLS allows current user to read own supplier row)
+      // PRIMARY: RPC first – uses auth.uid() server-side, no client supplier ID needed
       try {
-        const { data: supplierRows, error: supplierError } = await supabase
-          .from('suppliers')
-          .select('id, user_id')
-          .or(`user_id.eq.${effectiveId},id.eq.${effectiveId}`);
-        if (!supplierError && supplierRows?.length) {
-          supplierRows.forEach((s: any) => {
-            if (s.id && !orderSupplierIds.includes(s.id)) orderSupplierIds.push(s.id);
-            if (s.user_id && !orderSupplierIds.includes(s.user_id)) orderSupplierIds.push(s.user_id);
-          });
+        const { data: rpcOrders, error: rpcErr } = await supabase.rpc('get_supplier_orders_for_current_user', { _limit: 500 });
+        if (!rpcErr && rpcOrders != null) {
+          const list = Array.isArray(rpcOrders) ? rpcOrders : [];
+          if (list.length > 0) {
+            purchaseOrders = list;
+            console.log('✅ OrderManagement: Loaded', list.length, 'orders via get_supplier_orders_for_current_user RPC');
+          }
+        } else if (rpcErr) {
+          console.warn('OrderManagement: RPC get_supplier_orders_for_current_user failed – run migration 20260420_get_supplier_orders_rpc.sql on Supabase:', rpcErr.message);
         }
-        // Fallback: if Supabase client returned nothing, try fetch with auth (same as before)
-        if (orderSupplierIds.length <= 1 && (supplierError || !supplierRows?.length)) {
-          const supplierResponse = await fetch(
-            `${SUPABASE_URL}/rest/v1/suppliers?or=(user_id.eq.${effectiveId},id.eq.${effectiveId})&select=id,user_id`,
-            { headers, cache: 'no-store' }
-          );
-          if (supplierResponse.ok) {
-            const supplierData = await supplierResponse.json();
-            const arr = Array.isArray(supplierData) ? supplierData : [];
-            arr.forEach((s: any) => {
+      } catch (e) {
+        console.warn('OrderManagement: RPC get_supplier_orders_for_current_user not available – run migration 20260420_get_supplier_orders_rpc.sql on Supabase');
+      }
+
+      // FALLBACK: resolve supplier IDs and fetch via client or REST
+      if (purchaseOrders.length === 0) {
+        const orderSupplierIds: string[] = [];
+        const effectiveId = supplierId && supplierId.trim() !== '' ? supplierId : userId;
+        if (effectiveId) orderSupplierIds.push(effectiveId);
+        if (userId && !orderSupplierIds.includes(userId)) orderSupplierIds.push(userId);
+
+        try {
+          const { data: supplierRows, error: supplierError } = await supabase
+            .from('suppliers')
+            .select('id, user_id')
+            .or(`user_id.eq.${effectiveId},id.eq.${effectiveId}`);
+          if (!supplierError && supplierRows?.length) {
+            supplierRows.forEach((s: any) => {
               if (s.id && !orderSupplierIds.includes(s.id)) orderSupplierIds.push(s.id);
               if (s.user_id && !orderSupplierIds.includes(s.user_id)) orderSupplierIds.push(s.user_id);
             });
           }
-        }
-      } catch (e) {
-        console.log('Supplier lookup failed', e);
-      }
-
-      console.log('🔑 OrderManagement: Supplier IDs to check:', orderSupplierIds);
-
-      let purchaseOrders: any[] = [];
-
-      if (orderSupplierIds.length > 0) {
-        // Fetch orders via Supabase client first (RLS applies - supplier sees own orders)
-        const { data: poData, error: poError } = await supabase
-          .from('purchase_orders')
-          .select('*')
-          .in('supplier_id', orderSupplierIds)
-          .order('created_at', { ascending: false })
-          .limit(500);
-
-        if (!poError && poData != null) {
-          purchaseOrders = Array.isArray(poData) ? poData : [];
-        }
-        // Fallback: if client returned error or empty, try REST fetch
-        if (purchaseOrders.length === 0 && (poError || !poData?.length)) {
-          const supplierIdsParam = orderSupplierIds.join(',');
-          const ordersResponse = await fetch(
-            `${SUPABASE_URL}/rest/v1/purchase_orders?supplier_id=in.(${supplierIdsParam})&select=*&order=created_at.desc&limit=500`,
-            { headers, cache: 'no-store' }
-          );
-          if (ordersResponse.ok) {
-            const ordersPayload = await ordersResponse.json();
-            purchaseOrders = Array.isArray(ordersPayload) ? ordersPayload : (ordersPayload?.data && Array.isArray(ordersPayload.data) ? ordersPayload.data : []);
-          }
-        }
-      }
-
-      // Final fallback: RPC that returns orders for current user as supplier (works even when supplier ID unresolved)
-      if (purchaseOrders.length === 0) {
-        try {
-          const { data: rpcOrders, error: rpcErr } = await supabase.rpc('get_supplier_orders_for_current_user', { _limit: 500 });
-          if (!rpcErr && rpcOrders != null) {
-            const list = Array.isArray(rpcOrders) ? rpcOrders : [];
-            if (list.length > 0) {
-              purchaseOrders = list;
-              console.log('✅ OrderManagement: Loaded', list.length, 'orders via get_supplier_orders_for_current_user RPC');
+          if (orderSupplierIds.length <= 1) {
+            const supplierResponse = await fetch(
+              `${SUPABASE_URL}/rest/v1/suppliers?or=(user_id.eq.${effectiveId},id.eq.${effectiveId})&select=id,user_id`,
+              { headers, cache: 'no-store' }
+            );
+            if (supplierResponse.ok) {
+              const supplierData = await supplierResponse.json();
+              const arr = Array.isArray(supplierData) ? supplierData : [];
+              arr.forEach((s: any) => {
+                if (s.id && !orderSupplierIds.includes(s.id)) orderSupplierIds.push(s.id);
+                if (s.user_id && !orderSupplierIds.includes(s.user_id)) orderSupplierIds.push(s.user_id);
+              });
             }
           }
-        } catch (_) {
-          // RPC may not exist yet; ignore
+        } catch (e) {
+          console.log('Supplier lookup failed', e);
+        }
+
+        if (orderSupplierIds.length > 0) {
+          const { data: poData, error: poError } = await supabase
+            .from('purchase_orders')
+            .select('*')
+            .in('supplier_id', orderSupplierIds)
+            .order('created_at', { ascending: false })
+            .limit(500);
+          if (!poError && poData != null) purchaseOrders = Array.isArray(poData) ? poData : [];
+          if (purchaseOrders.length === 0) {
+            const res = await fetch(
+              `${SUPABASE_URL}/rest/v1/purchase_orders?supplier_id=in.(${orderSupplierIds.join(',')})&select=*&order=created_at.desc&limit=500`,
+              { headers, cache: 'no-store' }
+            );
+            if (res.ok) {
+              const payload = await res.json();
+              purchaseOrders = Array.isArray(payload) ? payload : (payload?.data && Array.isArray(payload.data) ? payload.data : []);
+            }
+          }
         }
       }
 
