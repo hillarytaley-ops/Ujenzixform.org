@@ -361,6 +361,7 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
       });
       
       // Fetch provider names and phone numbers for all provider IDs
+      // Use RPC first so builders get name/phone despite RLS on delivery_providers
       let providerNamesMap = new Map<string, string>();
       let providerPhonesMap = new Map<string, string>();
       if (allProviderIds.size > 0) {
@@ -368,62 +369,68 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
           const providerIdsArray = Array.from(allProviderIds);
           const providerIdsParam = providerIdsArray.join(',');
           const providersController = new AbortController();
-          const providersTimeoutId = setTimeout(() => providersController.abort(), 5000);
+          const providersTimeoutId = setTimeout(() => providersController.abort(), 8000);
           
-          // Fetch provider names and phone from delivery_providers table
-          // PostgREST 'in' operator syntax: id=in.(uuid1,uuid2,uuid3) - no quotes needed for UUIDs
-          let providersRes: Response | null = null;
-          
+          // 1) RPC: get_delivery_provider_names_for_builder (returns name/phone for builders; bypasses RLS)
           try {
-            // Build PostgREST filter: id=in.(uuid1,uuid2,uuid3)
-            // UUIDs don't need quotes in PostgREST
-            const idFilter = providerIdsArray.join(',');
-            const providersUrl = `${SUPABASE_URL}/rest/v1/delivery_providers?id=in.(${idFilter})&select=id,provider_name,phone`;
-            
-            console.log('👤 Fetching providers from delivery_providers:', providerIdsArray.length, 'provider IDs');
-            
-            providersRes = await fetch(providersUrl, {
-              headers,
-              signal: providersController.signal,
-              cache: 'no-store'
-            });
-          } catch (e) {
-            console.error('❌ Error fetching delivery_providers:', e);
-            providersRes = null;
-          }
-          
-          if (providersRes && providersRes.ok) {
-            const providers = await providersRes.json();
-            providers.forEach((p: any) => {
-              providerNamesMap.set(p.id, p.provider_name || 'Delivery Provider');
-              if (p.phone) {
-                providerPhonesMap.set(p.id, p.phone);
+            const rpcRes = await fetch(
+              `${SUPABASE_URL}/rest/v1/rpc/get_delivery_provider_names_for_builder`,
+              {
+                method: 'POST',
+                headers: { ...headers, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ provider_ids: providerIdsArray }),
+                signal: providersController.signal,
+                cache: 'no-store'
               }
-            });
-            console.log('👤 Provider names and phones fetched:', providerNamesMap.size);
-          }
-          
-          // Also try to get from profiles table (in case provider is a user)
-          try {
-            const profilesRes = await fetch(
-              `${SUPABASE_URL}/rest/v1/profiles?user_id=in.(${providerIdsParam})&select=user_id,full_name,phone`,
-              { headers, signal: providersController.signal, cache: 'no-store' }
             );
-            if (profilesRes.ok) {
-              const profiles = await profilesRes.json();
-              profiles.forEach((p: any) => {
-                if (p.user_id) {
-                  if (p.full_name && !providerNamesMap.has(p.user_id)) {
-                    providerNamesMap.set(p.user_id, p.full_name);
-                  }
-                  if (p.phone && !providerPhonesMap.has(p.user_id)) {
-                    providerPhonesMap.set(p.user_id, p.phone);
-                  }
+            if (rpcRes.ok) {
+              const rpcRows = await rpcRes.json();
+              (Array.isArray(rpcRows) ? rpcRows : []).forEach((row: any) => {
+                if (row?.id) {
+                  if (row.provider_name) providerNamesMap.set(row.id, row.provider_name);
+                  if (row.phone) providerPhonesMap.set(row.id, row.phone);
                 }
               });
+              console.log('👤 Provider names/phones from RPC:', providerNamesMap.size);
             }
           } catch (e) {
-            console.log('⚠️ Profiles fetch failed, continuing');
+            console.log('⚠️ get_delivery_provider_names_for_builder RPC failed, trying direct fetch');
+          }
+          
+          // 2) Fallback: direct delivery_providers + profiles (may be blocked by RLS for builders)
+          const missingNames = providerIdsArray.filter((id: string) => !providerNamesMap.has(id));
+          if (missingNames.length > 0) {
+            try {
+              const idFilter = missingNames.join(',');
+              const providersRes = await fetch(
+                `${SUPABASE_URL}/rest/v1/delivery_providers?id=in.(${idFilter})&select=id,provider_name,phone`,
+                { headers, signal: providersController.signal, cache: 'no-store' }
+              );
+              if (providersRes?.ok) {
+                const providers = await providersRes.json();
+                providers.forEach((p: any) => {
+                  if (p.id && !providerNamesMap.has(p.id)) {
+                    if (p.provider_name) providerNamesMap.set(p.id, p.provider_name);
+                    if (p.phone) providerPhonesMap.set(p.id, p.phone);
+                  }
+                });
+              }
+              const profilesRes = await fetch(
+                `${SUPABASE_URL}/rest/v1/profiles?user_id=in.(${missingNames.join(',')})&select=user_id,full_name,phone`,
+                { headers, signal: providersController.signal, cache: 'no-store' }
+              );
+              if (profilesRes?.ok) {
+                const profiles = await profilesRes.json();
+                profiles.forEach((p: any) => {
+                  if (p.user_id && !providerNamesMap.has(p.user_id)) {
+                    if (p.full_name) providerNamesMap.set(p.user_id, p.full_name);
+                    if (p.phone) providerPhonesMap.set(p.user_id, p.phone);
+                  }
+                });
+              }
+            } catch (e) {
+              console.log('⚠️ Direct provider/profile fetch failed');
+            }
           }
           
           clearTimeout(providersTimeoutId);
