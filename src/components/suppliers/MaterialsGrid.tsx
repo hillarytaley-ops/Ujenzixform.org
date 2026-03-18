@@ -27,7 +27,6 @@ import { supabase, SUPABASE_URL, SUPABASE_ANON_KEY } from '@/integrations/supaba
 import { useToast } from '@/hooks/use-toast';
 import { Search, ShoppingCart, Store, Package, Filter, PartyPopper, Plus, Minus, Check, Scale, Camera, ChevronDown, ChevronLeft, ChevronRight, X, Eye, ChevronsLeft, ChevronsRight } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
-import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { QuickPurchaseOrder } from '@/components/builders/QuickPurchaseOrder';
@@ -434,7 +433,19 @@ export const MaterialsGrid = () => {
     window.addEventListener('resize', checkMobile);
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
-  
+
+  // Close color dropdown when clicking outside
+  useEffect(() => {
+    if (openColorPopoverMaterialId == null) return;
+    const onMouseDown = (e: MouseEvent) => {
+      const target = e.target as Node;
+      if (document.querySelector(`[data-color-dropdown="${openColorPopoverMaterialId}"]`)?.contains(target)) return;
+      setOpenColorPopoverMaterialId(null);
+    };
+    document.addEventListener('mousedown', onMouseDown, true);
+    return () => document.removeEventListener('mousedown', onMouseDown, true);
+  }, [openColorPopoverMaterialId]);
+
   const { toast } = useToast();
   const { addToCart, isInCart, getItemQuantity, setIsCartOpen, items: cartItems, getTotalItems } = useCart();
 
@@ -2156,40 +2167,38 @@ export const MaterialsGrid = () => {
                             Select {getVariantDimensionLabel(material.variants)}
                           </span>
                           {getVariantDimensionLabel(material.variants) === 'Color' ? (
-                            <Popover open={openColorPopoverMaterialId === material.id} onOpenChange={(open) => setOpenColorPopoverMaterialId(open ? material.id : null)}>
-                              <PopoverTrigger asChild>
-                                <button
-                                  type="button"
-                                  onClick={(e) => e.stopPropagation()}
-                                  className="h-9 w-full text-sm rounded-md border border-purple-300 bg-white px-3 flex items-center justify-between gap-2 focus:outline-none focus:ring-2 focus:ring-purple-500 text-left"
-                                >
-                                  {(() => {
-                                    const storedKey = selectedVariants[material.id];
-                                    const v = getVariantByKey(material.variants, storedKey) ?? material.variants[0];
-                                    if (!v) return <span className="text-muted-foreground">Select…</span>;
-                                    const sizePart = [v.sizeLabel, v.sizeUnit].filter(Boolean).join(' ');
-                                    const parts = [sizePart, v.color, v.texture].filter(Boolean);
-                                    const label = parts.length > 0 ? parts.join(', ') : v.sizeLabel || 'Variant';
-                                    return (
-                                      <>
-                                        <span className="flex items-center gap-2 min-w-0">
-                                          <span className="h-5 w-5 rounded-full border-2 border-gray-300 flex-shrink-0" style={{ backgroundColor: getVariantSwatchColor(v) }} />
-                                          <span className="truncate">{label} - KES {v.price.toLocaleString()}/{material.unit}</span>
-                                        </span>
-                                        <ChevronDown className="h-4 w-4 flex-shrink-0 opacity-50" />
-                                      </>
-                                    );
-                                  })()}
-                                </button>
-                              </PopoverTrigger>
-                              <PopoverContent
-                                className="w-[var(--radix-popover-trigger-width)] p-1 z-[100]"
-                                align="start"
-                                onClick={(e) => e.stopPropagation()}
+                            <div className="relative" data-color-dropdown={material.id}>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  setOpenColorPopoverMaterialId((prev) => (prev === material.id ? null : material.id));
+                                }}
+                                className="h-9 w-full text-sm rounded-md border border-purple-300 bg-white px-3 flex items-center justify-between gap-2 focus:outline-none focus:ring-2 focus:ring-purple-500 text-left"
                               >
+                                {(() => {
+                                  const storedKey = selectedVariants[material.id];
+                                  const v = getVariantByKey(material.variants, storedKey) ?? material.variants[0];
+                                  if (!v) return <span className="text-muted-foreground">Select…</span>;
+                                  const sizePart = [v.sizeLabel, v.sizeUnit].filter(Boolean).join(' ');
+                                  const parts = [sizePart, v.color, v.texture].filter(Boolean);
+                                  const label = parts.length > 0 ? parts.join(', ') : v.sizeLabel || 'Variant';
+                                  return (
+                                    <>
+                                      <span className="flex items-center gap-2 min-w-0">
+                                        <span className="h-5 w-5 rounded-full border-2 border-gray-300 flex-shrink-0" style={{ backgroundColor: getVariantSwatchColor(v) }} />
+                                        <span className="truncate">{label} - KES {v.price.toLocaleString()}/{material.unit}</span>
+                                      </span>
+                                      <ChevronDown className={`h-4 w-4 flex-shrink-0 opacity-50 transition-transform ${openColorPopoverMaterialId === material.id ? 'rotate-180' : ''}`} />
+                                    </>
+                                  );
+                                })()}
+                              </button>
+                              {openColorPopoverMaterialId === material.id && (
                                 <div
-                                  className="flex flex-col gap-0.5 max-h-60 overflow-auto"
-                                  onPointerDownCapture={(e) => e.stopPropagation()}
+                                  className="absolute left-0 right-0 top-full mt-1 rounded-md border border-purple-200 bg-white shadow-lg z-50 py-1 max-h-60 overflow-auto"
+                                  onClick={(e) => e.stopPropagation()}
                                 >
                                   {material.variants.map((variant, idx) => {
                                     const sizePart = [variant.sizeLabel, variant.sizeUnit].filter(Boolean).join(' ');
@@ -2202,19 +2211,13 @@ export const MaterialsGrid = () => {
                                       <button
                                         key={variant.id ?? variantKey}
                                         type="button"
-                                        onPointerDown={(e) => {
-                                          e.preventDefault();
-                                          e.stopPropagation();
-                                          setSelectedVariants(prev => ({ ...prev, [material.id]: variantKey }));
-                                          setOpenColorPopoverMaterialId(null);
-                                        }}
                                         onClick={(e) => {
                                           e.preventDefault();
                                           e.stopPropagation();
-                                          setSelectedVariants(prev => ({ ...prev, [material.id]: variantKey }));
+                                          setSelectedVariants((prev) => ({ ...prev, [material.id]: variantKey }));
                                           setOpenColorPopoverMaterialId(null);
                                         }}
-                                        className={`flex items-center gap-3 w-full px-3 py-2.5 rounded-md text-sm text-left hover:bg-purple-50 cursor-pointer ${isSelected ? 'bg-purple-100 ring-1 ring-purple-300' : ''}`}
+                                        className={`flex items-center gap-3 w-full px-3 py-2.5 text-sm text-left hover:bg-purple-50 cursor-pointer ${isSelected ? 'bg-purple-100 ring-1 ring-purple-300' : ''}`}
                                       >
                                         <span className="h-6 w-6 rounded-full border-2 border-gray-300 flex-shrink-0" style={{ backgroundColor: getVariantSwatchColor(variant) }} />
                                         <span>{label} - KES {variant.price.toLocaleString()}/{material.unit}</span>
@@ -2223,8 +2226,8 @@ export const MaterialsGrid = () => {
                                     );
                                   })}
                                 </div>
-                              </PopoverContent>
-                            </Popover>
+                              )}
+                            </div>
                           ) : (
                             <select
                               value={selectedVariants[material.id] ?? (material.variants[0] ? getVariantKey(material.variants[0], 0) : '')}
