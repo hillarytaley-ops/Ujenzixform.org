@@ -1301,8 +1301,8 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
                         <div className="text-[9px] text-gray-400 mt-0.5">Phone: Loading...</div>
                       ) : null}
                     </>
-                  ) : order.delivery_provider_id ? (
-                    <div className="text-gray-500 text-[9px]">Provider Assigned<br/>(Details loading...)</div>
+                  ) : (order.delivery_provider_id || order.delivery_provider_name) ? (
+                    <div className="text-gray-500 text-[9px]">{order.delivery_provider_name || 'Provider Assigned'}</div>
                   ) : (
                     <div className="text-gray-500 text-[9px]">Delivery Confirmed</div>
                   )}
@@ -1458,8 +1458,26 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
                           </div>
                         )}
                       </>
-                    ) : order.delivery_provider_id ? (
-                      <p className="text-blue-700">Provider Assigned (Details Loading...)</p>
+                    ) : (order.delivery_provider_name === 'Delivery Provider' || order.delivery_provider_id) ? (
+                      <>
+                        <p className="text-blue-700 font-semibold">{order.delivery_provider_name || 'Delivery Provider'}</p>
+                        {order.delivery_provider_phone && (
+                          <div className="flex items-center gap-2 mt-1">
+                            <p className="text-xs text-blue-600">Phone: {order.delivery_provider_phone}</p>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-6 px-2 text-blue-600 hover:text-blue-800 hover:bg-blue-100"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                window.open(`tel:${order.delivery_provider_phone}`, '_blank');
+                              }}
+                            >
+                              <Phone className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        )}
+                      </>
                     ) : (
                       <p className="text-blue-700">Awaiting Provider Assignment</p>
                     )}
