@@ -621,34 +621,47 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, is
 
       console.log('🔑 OrderManagement: Supplier IDs to check:', orderSupplierIds);
 
-      if (orderSupplierIds.length === 0) {
-        console.log('❌ No supplier IDs found');
-        setOrders([]);
-        return;
-      }
-
-      // Fetch orders via Supabase client first (RLS applies - supplier sees own orders)
       let purchaseOrders: any[] = [];
-      const { data: poData, error: poError } = await supabase
-        .from('purchase_orders')
-        .select('*')
-        .in('supplier_id', orderSupplierIds)
-        .order('created_at', { ascending: false })
-        .limit(500);
 
-      if (!poError && poData != null) {
-        purchaseOrders = Array.isArray(poData) ? poData : [];
+      if (orderSupplierIds.length > 0) {
+        // Fetch orders via Supabase client first (RLS applies - supplier sees own orders)
+        const { data: poData, error: poError } = await supabase
+          .from('purchase_orders')
+          .select('*')
+          .in('supplier_id', orderSupplierIds)
+          .order('created_at', { ascending: false })
+          .limit(500);
+
+        if (!poError && poData != null) {
+          purchaseOrders = Array.isArray(poData) ? poData : [];
+        }
+        // Fallback: if client returned error or empty, try REST fetch
+        if (purchaseOrders.length === 0 && (poError || !poData?.length)) {
+          const supplierIdsParam = orderSupplierIds.join(',');
+          const ordersResponse = await fetch(
+            `${SUPABASE_URL}/rest/v1/purchase_orders?supplier_id=in.(${supplierIdsParam})&select=*&order=created_at.desc&limit=500`,
+            { headers, cache: 'no-store' }
+          );
+          if (ordersResponse.ok) {
+            const ordersPayload = await ordersResponse.json();
+            purchaseOrders = Array.isArray(ordersPayload) ? ordersPayload : (ordersPayload?.data && Array.isArray(ordersPayload.data) ? ordersPayload.data : []);
+          }
+        }
       }
-      // Fallback: if client returned error or empty, try REST fetch (e.g. anon key + auth header)
-      if (purchaseOrders.length === 0 && (poError || !poData?.length)) {
-        const supplierIdsParam = orderSupplierIds.join(',');
-        const ordersResponse = await fetch(
-          `${SUPABASE_URL}/rest/v1/purchase_orders?supplier_id=in.(${supplierIdsParam})&select=*&order=created_at.desc&limit=500`,
-          { headers, cache: 'no-store' }
-        );
-        if (ordersResponse.ok) {
-          const ordersPayload = await ordersResponse.json();
-          purchaseOrders = Array.isArray(ordersPayload) ? ordersPayload : (ordersPayload?.data && Array.isArray(ordersPayload.data) ? ordersPayload.data : []);
+
+      // Final fallback: RPC that returns orders for current user as supplier (works even when supplier ID unresolved)
+      if (purchaseOrders.length === 0) {
+        try {
+          const { data: rpcOrders, error: rpcErr } = await supabase.rpc('get_supplier_orders_for_current_user', { _limit: 500 });
+          if (!rpcErr && rpcOrders != null) {
+            const list = Array.isArray(rpcOrders) ? rpcOrders : [];
+            if (list.length > 0) {
+              purchaseOrders = list;
+              console.log('✅ OrderManagement: Loaded', list.length, 'orders via get_supplier_orders_for_current_user RPC');
+            }
+          }
+        } catch (_) {
+          // RPC may not exist yet; ignore
         }
       }
 
