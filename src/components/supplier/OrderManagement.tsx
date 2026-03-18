@@ -86,6 +86,8 @@ interface Order {
 
 interface OrderManagementProps {
   supplierId: string;
+  /** Orders already loaded by the dashboard – show immediately so tab is not empty while loadOrders runs */
+  initialPurchaseOrders?: any[];
   isDarkMode?: boolean;
   onNavigateToDispatch?: () => void;
 }
@@ -106,7 +108,7 @@ const getStatusConfig = (status: string) => {
   return STATUS_CONFIG[status] || STATUS_CONFIG.pending;
 };
 
-export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, isDarkMode = false, onNavigateToDispatch }) => {
+export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, initialPurchaseOrders, isDarkMode = false, onNavigateToDispatch }) => {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -159,13 +161,23 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, is
     loadOrders(true);
   };
 
+  // Show dashboard-passed orders immediately so the Orders tab is not empty
+  useEffect(() => {
+    if (initialPurchaseOrders?.length) {
+      const quick = transformOrdersQuick(initialPurchaseOrders);
+      setOrders(quick);
+      setLoading(false);
+      console.log('✅ OrderManagement: Showing', quick.length, 'orders from dashboard (initialPurchaseOrders)');
+    }
+  }, [initialPurchaseOrders]);
+
   useEffect(() => {
     loadOrders();
-    // Safety timeout - force loading to false after 5 seconds (reduced from 20)
+    // Safety timeout – force loading false so UI doesn't spin forever if loadOrders hangs
     const safetyTimeout = setTimeout(() => {
       setLoading(false);
-      console.log('⏱️ Orders safety timeout - forcing loading false after 5s');
-    }, 5000);
+      console.log('⏱️ Orders safety timeout - forcing loading false after 15s');
+    }, 15000);
     return () => clearTimeout(safetyTimeout);
   }, [supplierId]);
 
@@ -542,24 +554,21 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, is
       if (!forceFullLoad) setLoading(true);
       console.log('🔍 OrderManagement: Loading orders... supplierId prop:', supplierId);
       
-      // Get auth token and user ID from localStorage first
-      let accessToken = '';
-      let userId = '';
-      try {
-        const stored = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
-        if (stored) {
-          const parsed = JSON.parse(stored);
-          accessToken = parsed.access_token || '';
-          userId = parsed.user?.id || '';
-        }
-      } catch (e) {
-        console.log('Could not get auth from localStorage');
+      // Ensure Supabase has current session (so RPC auth.uid() is set)
+      const { data: { session } } = await supabase.auth.getSession();
+      let userId = session?.user?.id ?? '';
+      let accessToken = session?.access_token ?? '';
+      if (!userId || !accessToken) {
+        try {
+          const stored = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+          if (stored) {
+            const parsed = JSON.parse(stored);
+            if (!userId) userId = parsed.user?.id || '';
+            if (!accessToken) accessToken = parsed.access_token || '';
+          }
+        } catch (_) {}
       }
-      
-      // Also try direct user_id from localStorage
-      if (!userId) {
-        userId = localStorage.getItem('user_id') || '';
-      }
+      if (!userId) userId = localStorage.getItem('user_id') || '';
       
       // Try to use prefetched data first (instant load) unless we're doing a full refresh (enriched from delivery_requests)
       const prefetchedOrders = !forceFullLoad ? getPrefetchedOrders(userId, 'supplier') : null;
@@ -865,7 +874,7 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, is
         });
       }
 
-      setOrders(realOrders);
+      setOrders(prev => (realOrders.length > 0 ? realOrders : prev));
       console.log(`✅ OrderManagement: Loaded ${realOrders.length} orders successfully`);
 
     } catch (error) {

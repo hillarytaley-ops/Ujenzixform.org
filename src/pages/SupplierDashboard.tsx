@@ -626,6 +626,7 @@ const SupplierDashboard = () => {
     averageRating: 0
   });
   const [recentOrders, setRecentOrders] = useState<RecentOrder[]>([]);
+  const [ordersForOrdersTab, setOrdersForOrdersTab] = useState<any[]>([]); // Full orders for OrderManagement (so Orders tab shows immediately)
   const [activeTab, setActiveTab] = useState('overview');
   const [viewOrdersSubTab, setViewOrdersSubTab] = useState('quotes');
   const [showProfileEdit, setShowProfileEdit] = useState(false);
@@ -1480,6 +1481,7 @@ const SupplierDashboard = () => {
           if (ordersResponse.ok) {
             const ordersData = await ordersResponse.json();
             console.log('📊 Dashboard: Orders loaded:', ordersData?.length || 0);
+            if (ordersData?.length) setOrdersForOrdersTab(ordersData);
 
             if (ordersData && ordersData.length > 0) {
               // Fetch buyer profiles to get actual names
@@ -2086,6 +2088,7 @@ const SupplierDashboard = () => {
                   <TabsContent value="orders">
                     <OrderManagement 
                       supplierId={supplierRecordId || user?.id || ''} 
+                      initialPurchaseOrders={ordersForOrdersTab}
                       isDarkMode={isDarkMode} 
                       onNavigateToDispatch={() => setViewOrdersSubTab('dispatch')}
                     />
