@@ -719,19 +719,24 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, is
               }
             });
           }
-          // RPC fallback: suppliers can resolve provider name/phone even when direct table read is blocked by RLS
+          // RPC fallback: suppliers can resolve provider name/phone when direct table read is blocked by RLS.
+          // Never let this block or clear orders: if RPC is missing or fails, keep existing providerNames.
           try {
-            const { data: rpcRows } = await supabase.rpc('get_delivery_provider_names_for_supplier', {
+            const result = await supabase.rpc('get_delivery_provider_names_for_supplier', {
               provider_ids: ids,
             });
-            (rpcRows || []).forEach((row: { id: string; provider_name?: string; phone?: string }) => {
-              if (row?.id && (row.provider_name || row.phone)) {
-                if (row.provider_name) providerNames[row.id] = row.provider_name;
-                if (row.phone) providerPhones[row.id] = row.phone;
-              }
-            });
+            const rpcRows = result?.data;
+            if (Array.isArray(rpcRows) && rpcRows.length > 0) {
+              rpcRows.forEach((row: unknown) => {
+                const r = row as { id?: string; provider_name?: string; phone?: string };
+                if (r?.id && (r.provider_name || r.phone)) {
+                  if (r.provider_name) providerNames[r.id] = r.provider_name;
+                  if (r.phone) providerPhones[r.id] = r.phone;
+                }
+              });
+            }
           } catch (_) {
-            // RPC may not exist or fail; direct fetch + profiles already applied
+            // RPC may not exist or fail; orders still show with direct fetch + profiles
           }
         } catch (e) {
           console.log('Provider names fetch failed');
