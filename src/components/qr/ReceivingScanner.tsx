@@ -632,21 +632,13 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
         // Continue with RPC call even if quick check fails
       }
       
-      // Step 1: Use RPC FIRST (bypasses RLS - delivery providers don't have direct access to material_items)
-      // REST API will fail for delivery providers due to RLS restrictions
-      // RPC uses SECURITY DEFINER and can access material_items regardless of RLS
-      console.log('📦 Using RPC as PRIMARY method (bypasses RLS for delivery providers)...');
-      console.log('⏱️ RPC call started at:', new Date().toISOString());
-      
+      // Find item by QR then update via REST (delivery providers allowed by RLS policy on material_items)
+      console.log('📦 Finding item then updating via REST API...');
       let scanResult: any = null;
       let deliveryRequestUpdated = false;
       const scanStartTime = Date.now();
       let lastError: any = null;
       
-      // NO RPC - Use REST API directly (faster, more reliable, no timeout issues)
-      console.log('🔄 Using REST API directly (no RPC) to process scan...');
-      
-      // REST API implementation (existing REST API logic)
       try {
           // Try different QR code formats to find the item
           // Extract various parts of the QR code for flexible matching
@@ -869,21 +861,21 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
         const itemId = foundItem.id;
         const purchaseOrderId = foundItem.purchase_order_id;
         
-        // First, insert scan event (like RPC function does)
-        console.log('📝 REST API: Inserting scan event...');
+        // Insert scan event
+        console.log('📝 REST: Inserting scan event...');
         let scanEventId: string | null = null;
         try {
           const scanEventResponse = await fetch(
             `${SUPABASE_URL}/rest/v1/qr_scan_events`,
             {
               method: 'POST',
-          headers: {
-            'apikey': ANON_KEY,
-            'Authorization': `Bearer ${accessToken}`,
-            'Content-Type': 'application/json',
-            'Prefer': 'return=representation'
-          },
-          body: JSON.stringify({
+              headers: {
+                'apikey': ANON_KEY,
+                'Authorization': `Bearer ${accessToken}`,
+                'Content-Type': 'application/json',
+                'Prefer': 'return=representation'
+              },
+              body: JSON.stringify({
                 qr_code: foundItem.qr_code || foundVariant,
                 scan_type: 'receiving',
                 scanner_device_id: deviceInfo || null,
@@ -893,36 +885,29 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
                 quantity_scanned: null,
                 notes: notes || null,
                 photo_url: null
-          })
-        }
-      );
-      
+              })
+            }
+          );
           if (scanEventResponse.ok) {
             const scanEventData = await scanEventResponse.json();
             scanEventId = scanEventData[0]?.id || null;
-            console.log('✅ REST API: Scan event inserted');
-          } else {
-            console.warn('⚠️ REST API: Failed to insert scan event (non-critical)');
+            console.log('✅ REST: Scan event inserted');
           }
-        } catch (scanEventError) {
-          console.warn('⚠️ REST API: Error inserting scan event (non-critical):', scanEventError);
-          // Continue anyway - scan event is not critical
+        } catch (e) {
+          console.warn('⚠️ REST: Scan event insert failed (non-critical):', e);
         }
         
-        // Update material_item directly
-        console.log('📝 REST API: Updating material_item...');
-        const updateItemBody: any = {
+        // Update material_item (RLS allows delivery providers for assigned orders)
+        console.log('📝 REST: Updating material_item...');
+        const updateBody: Record<string, unknown> = {
           receive_scanned: true,
           receive_scanned_at: new Date().toISOString(),
           status: 'received',
           updated_at: new Date().toISOString()
         };
+        if (scanEventId) updateBody.receiving_scan_id = scanEventId;
         
-        if (scanEventId) {
-          updateItemBody.receiving_scan_id = scanEventId;
-        }
-        
-        const updateItemResponse = await fetch(
+        const updateRes = await fetch(
           `${SUPABASE_URL}/rest/v1/material_items?id=eq.${itemId}`,
           {
             method: 'PATCH',
@@ -932,157 +917,70 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
               'Content-Type': 'application/json',
               'Prefer': 'return=representation'
             },
-            body: JSON.stringify(updateItemBody)
+            body: JSON.stringify(updateBody)
           }
         );
         
-        if (!updateItemResponse.ok) {
-          const errorText = await updateItemResponse.text();
-          console.error('❌ REST API: Failed to update material_item:', errorText);
+        if (!updateRes.ok) {
+          const errText = await updateRes.text();
+          console.error('❌ REST: Failed to update material_item:', errText);
           throw new Error('Failed to update material_item');
         }
+        console.log('✅ REST: Material item updated');
         
-        console.log('✅ REST API: Material item updated successfully');
-        
-        // Check if all items in the order are received
+        let orderCompleted = false;
         if (purchaseOrderId) {
-          console.log('🔍 REST API: Checking if all items are received for purchase_order:', purchaseOrderId);
-          
           try {
-            // Get all items for this purchase order
-            const allItemsResponse = await fetch(
+            const allItemsRes = await fetch(
               `${SUPABASE_URL}/rest/v1/material_items?purchase_order_id=eq.${purchaseOrderId}&select=id,receive_scanned&limit=1000`,
-            {
-              headers: {
-                'apikey': ANON_KEY,
-                'Authorization': `Bearer ${accessToken}`,
-                'Accept': 'application/json'
+              { headers: { 'apikey': ANON_KEY, 'Authorization': `Bearer ${accessToken}`, 'Accept': 'application/json' } }
+            );
+            if (allItemsRes.ok) {
+              const allItems = await allItemsRes.json();
+              const total = allItems.length;
+              const received = allItems.filter((i: { receive_scanned: boolean }) => i.receive_scanned === true).length;
+              orderCompleted = total > 0 && received === total;
+              if (orderCompleted) {
+                await fetch(
+                  `${SUPABASE_URL}/rest/v1/purchase_orders?id=eq.${purchaseOrderId}`,
+                  { method: 'PATCH', headers: { 'apikey': ANON_KEY, 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ status: 'delivered', delivery_status: 'delivered', delivered_at: new Date().toISOString(), updated_at: new Date().toISOString() }) }
+                );
+                await fetch(
+                  `${SUPABASE_URL}/rest/v1/delivery_requests?purchase_order_id=eq.${purchaseOrderId}`,
+                  { method: 'PATCH', headers: { 'apikey': ANON_KEY, 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ status: 'delivered', delivered_at: new Date().toISOString(), updated_at: new Date().toISOString() }) }
+                );
+                deliveryRequestUpdated = true;
               }
             }
-          );
-          
-            if (allItemsResponse.ok) {
-              const allItems = await allItemsResponse.json();
-              const totalItems = allItems.length;
-              const receivedItems = allItems.filter((item: any) => item.receive_scanned === true).length;
-              
-              console.log(`📊 REST API: Order items status: ${receivedItems}/${totalItems} received`);
-              
-              // If all items are received, update purchase_order and delivery_request
-              if (totalItems > 0 && receivedItems === totalItems) {
-                console.log('✅ REST API: All items received - updating order status to delivered');
-                
-                // Update purchase_order status
-                try {
-                  const updatePOResponse = await fetch(
-                    `${SUPABASE_URL}/rest/v1/purchase_orders?id=eq.${purchaseOrderId}`,
-                {
-                  method: 'PATCH',
-                  headers: {
-                    'apikey': ANON_KEY,
-                    'Authorization': `Bearer ${accessToken}`,
-                    'Content-Type': 'application/json'
-                  },
-                  body: JSON.stringify({
-                    status: 'delivered',
-                    delivery_status: 'delivered',
-                    delivered_at: new Date().toISOString(),
-                    updated_at: new Date().toISOString()
-                  })
-                }
-              );
-              
-                  if (updatePOResponse.ok) {
-                    console.log('✅ REST API: Purchase order status updated to delivered');
-                  }
-                } catch (poError) {
-                  console.warn('⚠️ REST API: Failed to update purchase_order status:', poError);
-                }
-                
-                // Update delivery_request status
-                try {
-                  const updateDRResponse = await fetch(
-                    `${SUPABASE_URL}/rest/v1/delivery_requests?purchase_order_id=eq.${purchaseOrderId}`,
-                {
-                  method: 'PATCH',
-                  headers: {
-                    'apikey': ANON_KEY,
-                    'Authorization': `Bearer ${accessToken}`,
-                    'Content-Type': 'application/json'
-                  },
-                  body: JSON.stringify({
-                    status: 'delivered',
-                        delivered_at: new Date().toISOString(),
-                    updated_at: new Date().toISOString()
-                  })
-                }
-              );
-              
-                  if (updateDRResponse.ok) {
-                    console.log('✅ REST API: Delivery request status updated to delivered');
-                    deliveryRequestUpdated = true;
-                  }
-                } catch (drError) {
-                  console.warn('⚠️ REST API: Failed to update delivery_request status:', drError);
-                }
-              }
-            }
-          } catch (checkError) {
-            console.warn('⚠️ REST API: Failed to check all items status:', checkError);
-            // Continue anyway - the item was updated successfully
+          } catch (e) {
+            console.warn('⚠️ REST: Check all items failed:', e);
           }
         }
         
-        // Check if both dispatch and receive are done (for QR invalidation)
-        // Since we just set receive_scanned to true, check if dispatch_scanned was already true
-        const isInvalidated = foundItem.dispatch_scanned === true; // receive_scanned is now true after our update
-        
-        // If invalidated, update the QR code to mark it as invalidated
+        const isInvalidated = foundItem.dispatch_scanned === true;
         if (isInvalidated) {
           try {
-            const invalidateResponse = await fetch(
+            await fetch(
               `${SUPABASE_URL}/rest/v1/material_items?id=eq.${itemId}`,
-              {
-                method: 'PATCH',
-                headers: {
-                  'apikey': ANON_KEY,
-                  'Authorization': `Bearer ${accessToken}`,
-                  'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                  is_invalidated: true,
-                  invalidated_at: new Date().toISOString(),
-                  status: 'verified'
-                })
-              }
+              { method: 'PATCH', headers: { 'apikey': ANON_KEY, 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ is_invalidated: true, invalidated_at: new Date().toISOString(), status: 'verified' }) }
             );
-            
-            if (invalidateResponse.ok) {
-              console.log('✅ REST API: QR code invalidated');
-            }
-          } catch (invalidateError) {
-            console.warn('⚠️ REST API: Failed to invalidate QR code:', invalidateError);
-            // Continue anyway
-          }
+          } catch (_) {}
         }
         
-        // Create scan result
         scanResult = {
           success: true,
+          order_completed: orderCompleted,
           qr_code: foundItem.qr_code || foundVariant,
           receive_scanned: true,
           status: 'received',
           material_type: foundItem.material_type || 'Material',
-          quantity: foundItem.quantity || 1,
+          quantity: foundItem.quantity ?? 1,
           unit: foundItem.unit || 'unit',
           is_invalidated: isInvalidated
         };
+        deliveryRequestUpdated = true;
         
-        const restApiElapsed = Date.now() - scanStartTime;
-        console.log(`✅ REST API: Scan completed successfully in ${restApiElapsed}ms`);
-        deliveryRequestUpdated = true; // Mark as updated so success flow knows
-        
-        if (isInvalidated) {
+        if (scanResult?.is_invalidated) {
           console.log('✅ QR code invalidated - both dispatch and receive completed');
           toast.success('✅ QR Code Invalidated', {
             description: 'This QR code has been marked as used and cannot be scanned again.',
@@ -1091,12 +989,11 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
         }
         
       } catch (restApiError: any) {
-        console.error('❌ REST API failed:', restApiError);
-        const restApiElapsed = Date.now() - scanStartTime;
-        console.error(`⏱️ REST API failed after ${restApiElapsed}ms`);
+        console.error('❌ Scan failed:', restApiError);
+        const elapsed = Date.now() - scanStartTime;
+        console.error(`⏱️ Failed after ${elapsed}ms`);
         lastError = restApiError;
         
-        // Show error to user
         const errorMessage = lastError?.message || 'Unknown error';
         if (errorMessage.includes('QR_NOT_FOUND') || errorMessage.includes('not found')) {
           toast.error('❓ QR Code Not Found', {
@@ -1107,6 +1004,11 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
           toast.error('Request Timeout', {
             description: 'The scan request took too long. Please check your connection and try again.',
             duration: 5000
+          });
+        } else if (errorMessage.includes('Failed to update material_item')) {
+          toast.error('Scan failed', {
+            description: 'Could not update item. Please try again or contact support.',
+            duration: 6000
           });
         } else {
           toast.error('Failed to process scan', {
