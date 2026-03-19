@@ -1124,23 +1124,22 @@ export const DispatchScanner: React.FC = () => {
           console.log('✅ QR CODE DETECTED!', { decodedText, decodedResult });
           const now = Date.now();
           
-          // Quick debounce: prevent rapid duplicate scans within 3 seconds
-          if (decodedText === lastScannedRef.current && now - lastScanTimeRef.current < 3000) {
-            console.log('⏭️ Skipping duplicate scan (within 3 seconds)');
+          // Quick debounce: prevent rapid duplicate scans within 2 seconds (same code)
+          if (decodedText === lastScannedRef.current && now - lastScanTimeRef.current < 2000) {
+            console.log('⏭️ Skipping duplicate scan (within 2 seconds)');
             return;
           }
-          
-          // Check if this QR code was already processed in this session (never process same code twice)
-          if (recentlyProcessedRef.current.has(decodedText)) {
-            console.log('⏭️ Skipping already processed QR code:', decodedText);
+          const lastProcessedAt = recentlyProcessedRef.current.get(decodedText);
+          // Only skip if this exact code was successfully processed very recently (debounce double-tap)
+          // After 2.5s allow same code again so multiple units with same QR (legacy) can be scanned
+          if (lastProcessedAt != null && now - lastProcessedAt < 2500) {
+            console.log('⏭️ Skipping recently processed QR code (debounce):', decodedText.substring(0, 30));
             return;
           }
+          if (lastProcessedAt != null) recentlyProcessedRef.current.delete(decodedText);
           
           lastScannedRef.current = decodedText;
           lastScanTimeRef.current = now;
-          
-          // Mark as processed (for entire session - never process same code twice)
-          recentlyProcessedRef.current.set(decodedText, now);
           
           // Vibrate on successful scan (mobile)
           if (navigator.vibrate) {
@@ -1319,9 +1318,10 @@ export const DispatchScanner: React.FC = () => {
 
     // ═══════════════════════════════════════════════════════════════════════════
     // VALIDATE: Check if this QR code belongs to the selected order
-    // First check client-side cache, then verify with database if not found
+    // Prefer an unscanned item so multiple units (same or different codes) all get scanned
     // ═══════════════════════════════════════════════════════════════════════════
-    let matchingItem = selectedOrder.items.find(item => item.qr_code === qrCode);
+    let matchingItem = selectedOrder.items.find(item => item.qr_code === qrCode && !item.dispatch_scanned)
+      || selectedOrder.items.find(item => item.qr_code === qrCode);
     
     // If not found in cache, verify with database (QR codes might have been generated after order was loaded)
     if (!matchingItem) {
@@ -1480,6 +1480,17 @@ export const DispatchScanner: React.FC = () => {
                 status: dbItem.dispatch_scanned ? 'dispatched' : 'pending'
               };
               console.log('✅ QR code verified in database - belongs to selected order');
+              // Ensure this item is in the order's list so multiple units (e.g. 2 steel) all appear and can be scanned
+              setSelectedOrder(prev => {
+                if (!prev || prev.items.some(i => i.id === matchingItem!.id || i.qr_code === matchingItem!.qr_code)) return prev;
+                return {
+                  ...prev,
+                  items: [...prev.items, matchingItem!],
+                  total_items: prev.total_items + 1,
+                  pending_items: prev.pending_items + (matchingItem!.dispatch_scanned ? 0 : 1),
+                  dispatched_items: prev.dispatched_items + (matchingItem!.dispatch_scanned ? 1 : 0)
+                };
+              });
             } else {
               // QR code belongs to a different order - fetch the actual order to show better error
               let actualOrderNumber = 'Unknown';
@@ -1891,6 +1902,8 @@ export const DispatchScanner: React.FC = () => {
 
       // If we get here, the scan was successful
       if (scanData && scanData.success !== false) {
+        // Debounce: mark this QR as processed so we don't double-process same sticker within 2.5s
+        recentlyProcessedRef.current.set(qrCode, Date.now());
         // Update local state immediately
         setSelectedOrder(prev => {
           if (!prev) return prev;
