@@ -251,16 +251,16 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
         return;
       }
 
-      // Parallel batch fetch: POs and material_items in one round-trip
+      // Parallel batch fetch: POs and material_items in one round-trip (order_number fallback if po_number missing)
       const [poRes, itemsRes] = await Promise.all([
-        supabase.from('purchase_orders').select('id,po_number,created_at').in('id', poIds),
+        supabase.from('purchase_orders').select('id,po_number,order_number,created_at').in('id', poIds),
         supabase.from('material_items')
           .select('id,purchase_order_id,qr_code,material_type,category,quantity,unit,item_sequence,receive_scanned,receive_scan_count,dispatch_scanned,status,created_at')
           .in('purchase_order_id', poIds)
           .order('item_sequence')
       ]);
-      const poMap = new Map<string, { po_number?: string; created_at?: string }>();
-      (poRes.data || []).forEach((r: any) => poMap.set(r.id, { po_number: r.po_number, created_at: r.created_at }));
+      const poMap = new Map<string, { po_number?: string; order_number?: string; created_at?: string }>();
+      (poRes.data || []).forEach((r: any) => poMap.set(r.id, { po_number: r.po_number, order_number: r.order_number, created_at: r.created_at }));
       const itemsByPo = new Map<string, any[]>();
       (itemsRes.data || []).forEach((row: any) => {
         const pid = row.purchase_order_id;
@@ -301,9 +301,10 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
         const pendingItems = Math.max(0, totalItems - receivedItems);
         const meta = byPoId.get(poId);
         const poMeta = poMap.get(poId);
+        const displayNumber = meta?.order_number || poMeta?.po_number || poMeta?.order_number || `Order ${poId.slice(0, 8)}`;
         orderMap[poId] = {
           id: poId,
-          order_number: meta?.order_number || poMeta?.po_number,
+          order_number: displayNumber,
           buyer_id: '',
           buyer_name: 'Client',
           buyer_email: '',
@@ -316,7 +317,7 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
         };
       }
       const ordersArray = Object.values(orderMap)
-        .filter((o) => o.order_number && o.id)
+        .filter((o) => o.id)
         .sort((a, b) => (b.pending_items > 0 ? 1 : 0) - (a.pending_items > 0 ? 1 : 0) || new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
       setOrders(ordersArray);
     };
