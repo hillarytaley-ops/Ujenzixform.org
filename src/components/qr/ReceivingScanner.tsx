@@ -426,6 +426,11 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
         hasOrdersRef.current = false;
         setOrders([]);
         setLoadingOrders(false);
+        const allowAccess = ['admin', 'delivery_provider', 'delivery'].includes(userRole || '');
+        if (allowAccess) {
+          fetchOrdersRef.current = false;
+          fetchDeliveries();
+        }
       }
       return;
     }
