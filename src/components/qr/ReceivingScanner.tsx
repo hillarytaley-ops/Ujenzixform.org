@@ -257,11 +257,10 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
           .eq('purchase_order_id', poId)
           .order('item_sequence');
         const items = (itemsData || []) as any[];
-        const hasDispatched = items.some((i: any) => i.dispatch_scanned === true);
         const allReceived = items.every(
           (i: any) => i.receive_scanned === true || (i.receive_scan_count ?? 0) >= (i.quantity ?? 1)
         );
-        if (!hasDispatched || allReceived) continue;
+        if (allReceived) continue;
 
         const orderItems: OrderItem[] = items.map((it: any) => ({
           id: it.id,
@@ -528,7 +527,7 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
     if (!matchingItem) {
       const { data: verifyData } = await supabase
         .from('material_items')
-        .select('id,qr_code,material_type,item_sequence,quantity,receive_scanned,receive_scan_count,purchase_order_id')
+        .select('id,qr_code,material_type,item_sequence,quantity,receive_scanned,receive_scan_count,dispatch_scanned,purchase_order_id')
         .eq('qr_code', cleanQRCode)
         .limit(1)
         .maybeSingle();
@@ -557,7 +556,7 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
           item_sequence: verifyData.item_sequence ?? 0,
           receive_scanned: full,
           receive_scan_count: cnt,
-          dispatch_scanned: true,
+          dispatch_scanned: Boolean((verifyData as any).dispatch_scanned),
           status: ''
         };
         setSelectedOrder((prev) =>
@@ -577,6 +576,13 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
     }
     if (isFullyReceived(matchingItem)) {
       toast.warning('Already scanned', { description: 'This item was already received.', duration: 3000 });
+      return;
+    }
+    if (!matchingItem.dispatch_scanned) {
+      toast.error('Not dispatched yet', {
+        description: 'This item has not been scanned for dispatch. Wait for the supplier to dispatch before receiving.',
+        duration: 5000
+      });
       return;
     }
 
