@@ -30,6 +30,7 @@ interface OrderItem {
   item_sequence: number;
   dispatch_scanned: boolean;
   dispatch_scanned_at?: string;
+  dispatch_scan_count?: number; // when quantity > 1, scans until count >= quantity
   status: string;
 }
 
@@ -967,16 +968,19 @@ export const DispatchScanner: React.FC = () => {
           item_sequence: item.item_sequence,
           dispatch_scanned: item.dispatch_scanned || false,
           dispatch_scanned_at: item.dispatch_scanned_at,
+          dispatch_scan_count: item.dispatch_scan_count,
           status: item.status
         };
 
         orderMap[orderId].items.push(orderItem);
-        orderMap[orderId].total_items++;
-        
+        const qty = item.quantity ?? 1;
+        orderMap[orderId].total_items += qty;
         if (item.dispatch_scanned) {
-          orderMap[orderId].dispatched_items++;
+          orderMap[orderId].dispatched_items += qty;
         } else {
-          orderMap[orderId].pending_items++;
+          const scanned = item.dispatch_scan_count ?? 0;
+          orderMap[orderId].dispatched_items += scanned;
+          orderMap[orderId].pending_items += Math.max(0, qty - scanned);
         }
       });
       
@@ -1441,7 +1445,7 @@ export const DispatchScanner: React.FC = () => {
         
         // Check database to see what order this QR code belongs to
         const verifyResponse = await makeRequestWithRetry(
-          `${SUPABASE_URL}/rest/v1/material_items?qr_code=eq.${qrCode}&select=id,purchase_order_id,qr_code,material_type,item_sequence,dispatch_scanned&limit=1`,
+          `${SUPABASE_URL}/rest/v1/material_items?qr_code=eq.${qrCode}&select=id,purchase_order_id,qr_code,material_type,item_sequence,quantity,dispatch_scanned,dispatch_scan_count&limit=1`,
           {
             headers: {
               'apikey': ANON_KEY,
@@ -1467,28 +1471,30 @@ export const DispatchScanner: React.FC = () => {
             
             // Check if it belongs to the selected order (compare by UUID)
             if (dbItem.purchase_order_id === selectedOrder.id) {
-              // QR code belongs to this order - create matching item from DB data
+              const qty = dbItem.quantity ?? 1;
+              const scanned = dbItem.dispatch_scan_count ?? 0;
+              const full = dbItem.dispatch_scanned || false;
               matchingItem = {
                 id: dbItem.id,
                 qr_code: dbItem.qr_code,
                 material_type: dbItem.material_type,
                 item_sequence: dbItem.item_sequence,
-                dispatch_scanned: dbItem.dispatch_scanned || false,
+                dispatch_scanned: full,
+                dispatch_scan_count: scanned,
                 category: '',
-                quantity: 1,
+                quantity: qty,
                 unit: '',
-                status: dbItem.dispatch_scanned ? 'dispatched' : 'pending'
+                status: full ? 'dispatched' : 'pending'
               };
               console.log('✅ QR code verified in database - belongs to selected order');
-              // Ensure this item is in the order's list so multiple units (e.g. 2 steel) all appear and can be scanned
               setSelectedOrder(prev => {
                 if (!prev || prev.items.some(i => i.id === matchingItem!.id || i.qr_code === matchingItem!.qr_code)) return prev;
                 return {
                   ...prev,
                   items: [...prev.items, matchingItem!],
-                  total_items: prev.total_items + 1,
-                  pending_items: prev.pending_items + (matchingItem!.dispatch_scanned ? 0 : 1),
-                  dispatched_items: prev.dispatched_items + (matchingItem!.dispatch_scanned ? 1 : 0)
+                  total_items: prev.total_items + qty,
+                  pending_items: prev.pending_items + (full ? 0 : Math.max(0, qty - scanned)),
+                  dispatched_items: prev.dispatched_items + (full ? qty : scanned)
                 };
               });
             } else {
@@ -1902,25 +1908,37 @@ export const DispatchScanner: React.FC = () => {
 
       // If we get here, the scan was successful
       if (scanData && scanData.success !== false) {
-        // Debounce: mark this QR as processed so we don't double-process same sticker within 2.5s
-        recentlyProcessedRef.current.set(qrCode, Date.now());
-        // Update local state immediately
+        const isPartialDispatch = scanData.new_status === 'partial_dispatch';
+        // Only debounce when fully dispatched so same QR can be scanned again for quantity > 1
+        if (!isPartialDispatch) {
+          recentlyProcessedRef.current.set(qrCode, Date.now());
+        }
+        // Update local state immediately (use response for dispatch_scanned and dispatch_scan_count)
         setSelectedOrder(prev => {
           if (!prev) return prev;
-          
-          const updatedItems = prev.items.map(item => 
-            item.qr_code === qrCode 
-              ? { ...item, dispatch_scanned: true, dispatch_scanned_at: new Date().toISOString(), status: 'dispatched' }
+          const dispatchScanned = scanData.dispatch_scanned === true;
+          const dispatchScanCount = scanData.dispatch_scan_count ?? (dispatchScanned ? (scanData.quantity ?? 1) : 0);
+          const updatedItems = prev.items.map(item =>
+            item.qr_code === qrCode
+              ? {
+                  ...item,
+                  dispatch_scanned: dispatchScanned,
+                  dispatch_scanned_at: dispatchScanned ? new Date().toISOString() : item.dispatch_scanned_at,
+                  dispatch_scan_count: dispatchScanCount,
+                  status: dispatchScanned ? 'dispatched' : item.status
+                }
               : item
           );
-          
           const dispatchedCount = updatedItems.filter(i => i.dispatch_scanned).length;
-          
+          const remainingItems = updatedItems.reduce(
+            (sum, i) => sum + (i.dispatch_scanned ? 0 : Math.max(0, (i.quantity || 1) - (i.dispatch_scan_count || 0))),
+            0
+          );
           return {
             ...prev,
             items: updatedItems,
             dispatched_items: dispatchedCount,
-            pending_items: prev.total_items - dispatchedCount
+            pending_items: remainingItems
           };
         });
 
@@ -1930,14 +1948,20 @@ export const DispatchScanner: React.FC = () => {
           category: scanData.category,
           quantity: scanData.quantity,
           unit: scanData.unit,
-          status: scanData.new_status,
+          status: scanData.new_status ?? scanData.status,
           timestamp: new Date()
         };
 
         setScanResults(prev => [scanResult, ...prev.slice(0, 9)]);
-        
-        // Calculate remaining items
-        const remainingItems = selectedOrder.items.filter(i => !i.dispatch_scanned && i.qr_code !== qrCode).length;
+
+        // Remaining: from updated state (same formula as in setSelectedOrder)
+        const qty = scanData.quantity ?? 1;
+        const count = scanData.dispatch_scan_count ?? (scanData.dispatch_scanned ? qty : 0);
+        const remainingForThis = scanData.dispatch_scanned ? 0 : Math.max(0, qty - count);
+        const remainingOthers = selectedOrder.items
+          .filter(i => i.qr_code !== qrCode)
+          .reduce((s, i) => s + (i.dispatch_scanned ? 0 : Math.max(0, (i.quantity || 1) - (i.dispatch_scan_count || 0))), 0);
+        const remainingItems = remainingForThis + remainingOthers;
         
         // STEP 1: Update delivery_request to 'dispatched' status when supplier dispatches
         // This moves the order to "In Transit" tab for delivery provider
@@ -1982,10 +2006,14 @@ export const DispatchScanner: React.FC = () => {
         }
         
         if (remainingItems === 0) {
-          // All items scanned!
           toast.success('🎉 ALL ITEMS DISPATCHED!', {
             description: `Order #${selectedOrder.order_number} is complete and ready for delivery!`,
             duration: 8000
+          });
+        } else if (isPartialDispatch && qty > 1) {
+          toast.success('✅ Scan recorded', {
+            description: `${scanData.material_type}: Scanned ${count} of ${qty} • ${remainingItems} unit${remainingItems !== 1 ? 's' : ''} remaining`,
+            duration: 3000
           });
         } else {
           toast.success('✅ Item Dispatched', {
@@ -2414,6 +2442,9 @@ export const DispatchScanner: React.FC = () => {
                       </p>
                       <p className="text-xs text-muted-foreground">
                         {item.quantity} {item.unit}
+                        {item.quantity > 1 && (item.dispatch_scan_count ?? 0) > 0 && !item.dispatch_scanned && (
+                          <> • Scanned {item.dispatch_scan_count} of {item.quantity}</>
+                        )}
                       </p>
                     </div>
                   </div>
