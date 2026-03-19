@@ -633,6 +633,11 @@ export const useDeliveryProviderData = () => {
     } catch (e) {
       console.warn('⚡ FAST PATH failed, continuing with full fetch:', e);
     }
+
+    if (fastPathCountRef.current > 0) {
+      console.log('⚡ FAST PATH: Have', fastPathCountRef.current, 'deliveries – skipping slow full fetch');
+      return;
+    }
     
     // Safety timeout - finish loading after 20 seconds max (increased to allow for filtering and po_number fetch)
     const safetyTimeout = setTimeout(() => {
