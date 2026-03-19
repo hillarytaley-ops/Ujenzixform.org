@@ -423,17 +423,14 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
 
   useEffect(() => {
     if (deliveryRequestsFromDashboard !== undefined) {
+      // Dashboard mode: use only the list from parent. Do NOT start fetchDeliveries() when
+      // length is 0, or it can complete after loadFromDashboardList(1 item) and overwrite with [].
       if (deliveryRequestsFromDashboard.length > 0) {
         loadFromDashboardList(deliveryRequestsFromDashboard);
       } else {
         hasOrdersRef.current = false;
         setOrders([]);
         setLoadingOrders(false);
-        const allowAccess = ['admin', 'delivery_provider', 'delivery'].includes(userRole || '');
-        if (allowAccess) {
-          fetchOrdersRef.current = false;
-          fetchDeliveries();
-        }
       }
       return;
     }
