@@ -232,7 +232,7 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
     const orderMap: Record<string, Order> = {};
     for (const poId of poIds) {
       const items = itemsByPo.get(poId) || [];
-      const allReceived = items.every(
+      const allReceived = items.length > 0 && items.every(
         (i: any) => i.receive_scanned === true || (i.receive_scan_count ?? 0) >= (i.quantity ?? 1)
       );
       if (allReceived) continue;
@@ -323,6 +323,9 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
       if (runId === loadRunIdRef.current) {
         hasOrdersRef.current = ordersArray.length > 0;
         setOrders(ordersArray);
+        if (ordersArray.length > 0 && ordersArray.some((o) => o.items.length === 0)) {
+          toast.info('Some orders have no items loaded. Apply migration 20260429 in Supabase for full scan.', { duration: 6000 });
+        }
       }
     } catch (err: any) {
       if (runId !== loadRunIdRef.current) return;
