@@ -692,7 +692,7 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
           try {
             console.log(`🔍 REST API: Trying exact match: ${variant.substring(0, 50)}...`);
             const findItemResponse = await fetch(
-              `${SUPABASE_URL}/rest/v1/material_items?qr_code=eq.${encodeURIComponent(variant)}&select=id,purchase_order_id,receive_scanned,dispatch_scanned,qr_code,material_type,quantity,unit&limit=1`,
+              `${SUPABASE_URL}/rest/v1/material_items?qr_code=eq.${encodeURIComponent(variant)}&select=id,purchase_order_id,receive_scanned,receive_scan_count,dispatch_scanned,qr_code,material_type,quantity,unit&limit=1`,
                 {
                   headers: {
                     'apikey': ANON_KEY,
@@ -729,7 +729,7 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
             // Try matching by PO number first (most specific)
             const poPattern = `PO-${numericPart}`;
             const findItemResponse = await fetch(
-              `${SUPABASE_URL}/rest/v1/material_items?qr_code=ilike.*${encodeURIComponent(poPattern)}*&select=id,purchase_order_id,receive_scanned,dispatch_scanned,qr_code,material_type,quantity,unit&limit=50`,
+              `${SUPABASE_URL}/rest/v1/material_items?qr_code=ilike.*${encodeURIComponent(poPattern)}*&select=id,purchase_order_id,receive_scanned,receive_scan_count,dispatch_scanned,qr_code,material_type,quantity,unit&limit=50`,
               {
                 headers: {
                   'apikey': ANON_KEY,
@@ -744,27 +744,15 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
               console.log(`📊 REST API: Pattern match found ${itemData.length} potential matches for PO ${numericPart}`);
               
               if (itemData && itemData.length > 0) {
-                // Find the best match - prefer ones that match item/unit/date
-                const bestMatch = itemData.find((item: any) => {
+                // Prefer exact qr_code match, then unscanned items (so 2nd scan picks 2nd row)
+                const exactMatch = itemData.find((item: any) => (item.qr_code || '') === cleanQRCode || (item.qr_code || '').trim() === cleanQRCode.trim());
+                const byMatch = exactMatch || itemData.find((item: any) => {
                   const itemQR = item.qr_code || '';
-                  // Match by item number and date if available
-                  if (itemPart && itemQR.includes(itemPart)) {
-                    if (datePart && itemQR.includes(datePart)) {
-                      return true; // Perfect match on item and date
-                    }
-                    return true; // Good match on item
-                  }
+                  if (itemPart && itemQR.includes(itemPart)) return datePart ? itemQR.includes(datePart) : true;
                   return false;
-                }) || itemData.find((item: any) => {
-                  const itemQR = item.qr_code || '';
-                  // Match by date if available
-                  return datePart && itemQR.includes(datePart);
-                }) || itemData.find((item: any) => {
-                  const itemQR = item.qr_code || '';
-                  // Match by item number
-                  return itemPart && itemQR.includes(itemPart);
-                }) || itemData[0]; // Fallback to first result
-                
+                }) || itemData.find((item: any) => datePart && (item.qr_code || '').includes(datePart)) || itemData.find((item: any) => itemPart && (item.qr_code || '').includes(itemPart)) || itemData[0];
+                // When multiple rows (e.g. 2 steel), prefer one not yet received
+                const bestMatch = (byMatch && !byMatch.receive_scanned) ? byMatch : (itemData.find((item: any) => !item.receive_scanned && (item.qr_code === (byMatch?.qr_code) || item.qr_code === cleanQRCode)) || byMatch);
                 foundItem = bestMatch;
                 foundVariant = foundItem.qr_code;
                 console.log(`✅ REST API: Found item with pattern match: ${foundVariant.substring(0, 50)}...`);
@@ -810,7 +798,7 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
                   for (const po of poData) {
                     const itemSeq = parseInt(itemSeqMatch, 10);
                     const itemResponse = await fetch(
-                      `${SUPABASE_URL}/rest/v1/material_items?purchase_order_id=eq.${po.id}&item_sequence=eq.${itemSeq}&select=id,purchase_order_id,receive_scanned,dispatch_scanned,qr_code,material_type,quantity,unit&limit=1`,
+                      `${SUPABASE_URL}/rest/v1/material_items?purchase_order_id=eq.${po.id}&item_sequence=eq.${itemSeq}&select=id,purchase_order_id,receive_scanned,receive_scan_count,dispatch_scanned,qr_code,material_type,quantity,unit&limit=10`,
                       {
                         headers: {
                           'apikey': ANON_KEY,
@@ -823,9 +811,11 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
                     if (itemResponse.ok) {
                       const itemData = await itemResponse.json();
                       if (itemData && itemData.length > 0) {
-                        foundItem = itemData[0];
+                        const exact = itemData.find((i: any) => (i.qr_code || '') === cleanQRCode || (i.qr_code || '').trim() === cleanQRCode.trim());
+                        const unscanned = itemData.find((i: any) => !i.receive_scanned);
+                        foundItem = exact || unscanned || itemData[0];
                         foundVariant = foundItem.qr_code;
-                        console.log(`✅ REST API: Found item by PO ID + item sequence!`);
+                        console.log(`✅ REST API: Found item by PO ID + item sequence! (${itemData.length} rows, picked ${exact ? 'exact' : unscanned ? 'unscanned' : 'first'})`);
                         console.log(`   Database QR code: ${foundItem.qr_code}`);
                         console.log(`   Scanned QR code: ${cleanQRCode.substring(0, 50)}...`);
                         break;
@@ -849,10 +839,13 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
           return;
         }
         
-        if (foundItem.receive_scanned) {
-          console.log('⏭️ Item already received - skipping');
+        const qty = Math.max(1, Number(foundItem.quantity) || 1);
+        const recvCount = Number(foundItem.receive_scan_count) || 0;
+        const fullyReceived = foundItem.receive_scanned === true;
+        if (fullyReceived && recvCount >= qty) {
+          console.log('⏭️ Item already fully received - skipping');
           toast.warning('⚠️ Already Scanned', {
-            description: 'This QR code has already been scanned.',
+            description: 'This QR code has already been scanned and received.',
             duration: 3000
           });
           return;
@@ -897,14 +890,19 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
           console.warn('⚠️ REST: Scan event insert failed (non-critical):', e);
         }
         
-        // Update material_item (RLS allows delivery providers for assigned orders)
-        console.log('📝 REST: Updating material_item...');
+        // Update material_item (support quantity > 1: increment receive_scan_count, set receive_scanned when count >= quantity)
+        const newRecvCount = recvCount + 1;
+        const nowFullyReceived = newRecvCount >= qty;
+        console.log('📝 REST: Updating material_item...', { qty, recvCount, newRecvCount, nowFullyReceived });
         const updateBody: Record<string, unknown> = {
-          receive_scanned: true,
-          receive_scanned_at: new Date().toISOString(),
+          receive_scan_count: newRecvCount,
+          receive_scanned: nowFullyReceived,
           status: 'received',
           updated_at: new Date().toISOString()
         };
+        if (nowFullyReceived) {
+          updateBody.receive_scanned_at = new Date().toISOString();
+        }
         if (scanEventId) updateBody.receiving_scan_id = scanEventId;
         
         const updateRes = await fetch(
@@ -957,7 +955,7 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
           }
         }
         
-        const isInvalidated = foundItem.dispatch_scanned === true;
+        const isInvalidated = foundItem.dispatch_scanned === true && nowFullyReceived;
         if (isInvalidated) {
           try {
             await fetch(
