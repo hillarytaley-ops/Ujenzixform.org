@@ -249,14 +249,31 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
         return;
       }
 
+      // Batch fetch: one query for all POs (only columns that exist – no builder_* to avoid 400)
+      const { data: poRows } = await supabase
+        .from('purchase_orders')
+        .select('id,po_number,created_at')
+        .in('id', poIds);
+      const poMap = new Map<string, { po_number?: string; created_at?: string }>();
+      (poRows || []).forEach((r: any) => poMap.set(r.id, { po_number: r.po_number, created_at: r.created_at }));
+
+      // Batch fetch: all material_items for these POs in one query
+      const { data: allItemsData } = await supabase
+        .from('material_items')
+        .select('id,purchase_order_id,qr_code,material_type,category,quantity,unit,item_sequence,receive_scanned,receive_scan_count,dispatch_scanned,status,created_at')
+        .in('purchase_order_id', poIds)
+        .order('item_sequence');
+      const itemsByPo = new Map<string, any[]>();
+      (allItemsData || []).forEach((row: any) => {
+        const pid = row.purchase_order_id;
+        if (!pid) return;
+        if (!itemsByPo.has(pid)) itemsByPo.set(pid, []);
+        itemsByPo.get(pid)!.push(row);
+      });
+
       const orderMap: Record<string, Order> = {};
       for (const poId of poIds) {
-        const { data: itemsData } = await supabase
-          .from('material_items')
-          .select('id,qr_code,material_type,category,quantity,unit,item_sequence,receive_scanned,receive_scan_count,dispatch_scanned,status,created_at')
-          .eq('purchase_order_id', poId)
-          .order('item_sequence');
-        const items = (itemsData || []) as any[];
+        const items = itemsByPo.get(poId) || [];
         const allReceived = items.every(
           (i: any) => i.receive_scanned === true || (i.receive_scan_count ?? 0) >= (i.quantity ?? 1)
         );
@@ -285,18 +302,18 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
         });
         const pendingItems = Math.max(0, totalItems - receivedItems);
         const meta = byPoId.get(poId);
-        const { data: poRow } = await supabase.from('purchase_orders').select('po_number,builder_name,builder_email,builder_phone,created_at').eq('id', poId).single();
+        const poMeta = poMap.get(poId);
         orderMap[poId] = {
           id: poId,
-          order_number: meta?.order_number || (poRow as any)?.po_number,
+          order_number: meta?.order_number || poMeta?.po_number,
           buyer_id: '',
-          buyer_name: (poRow as any)?.builder_name || 'Client',
-          buyer_email: (poRow as any)?.builder_email || '',
-          buyer_phone: (poRow as any)?.builder_phone || '',
+          buyer_name: 'Client',
+          buyer_email: '',
+          buyer_phone: '',
           total_items: totalItems,
           received_items: receivedItems,
           pending_items: pendingItems,
-          created_at: (poRow as any)?.created_at || poId,
+          created_at: poMeta?.created_at || poId,
           items: orderItems
         };
       }
