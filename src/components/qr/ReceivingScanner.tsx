@@ -228,17 +228,23 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
       const { data: dp } = await supabase.from('delivery_providers').select('id').eq('user_id', user.id).maybeSingle();
       if (dp?.id) providerId = dp.id;
 
+      // Same as dashboard: fetch by status only (no provider filter), then filter client-side.
+      // Avoids RLS + .or() issues that can return 0 rows even when dashboard sees 2.
       const activeStatuses = ['pending', 'requested', 'assigned', 'accepted', 'scheduled', 'dispatched', 'in_transit', 'picked_up', 'out_for_delivery'];
       const { data: drList } = await supabase
         .from('delivery_requests')
         .select('id,purchase_order_id,status,order_number,provider_id')
         .in('status', activeStatuses)
-        .or(`provider_id.eq.${providerId},provider_id.eq.${user.id}`)
         .order('created_at', { ascending: false })
         .limit(100);
 
-      const rows = (drList || []) as Array<{ purchase_order_id: string | null; status: string; order_number?: string; provider_id?: string | null }>;
-      const filtered = rows.filter((d) => d.purchase_order_id);
+      const rowsRaw = (drList || []) as Array<{ purchase_order_id: string | null; status: string; order_number?: string; provider_id?: string | null }>;
+      const pidStr = providerId != null ? String(providerId) : '';
+      const uidStr = user.id != null ? String(user.id) : '';
+      const rows = rowsRaw.filter(
+        (d) => d.purchase_order_id && (pidStr && String(d.provider_id) === pidStr || uidStr && String(d.provider_id) === uidStr)
+      );
+      const filtered = rows;
       const byPoId = new Map<string, { order_number?: string }>();
       filtered.forEach((d) => {
         if (d.purchase_order_id && !byPoId.has(d.purchase_order_id)) {
