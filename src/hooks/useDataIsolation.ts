@@ -857,28 +857,16 @@ export const useDeliveryProviderData = () => {
             console.log('🔍 Starting filtering process for', allDeliveries.length, 'deliveries');
             
             // Filter active deliveries AND filter by provider_id (client-side safety check)
-            // Try RPC first (fast), fallback to table query if RPC not deployed or fails
+            // Use table query only – no RPC, so nothing blocks; fallback to match by user_id
             let providerIdToMatch: string | null = null;
             try {
               console.log('🔍 Looking up delivery_provider for userId:', userId.substring(0, 8));
-              const rpcPromise = (supabase as any).rpc('get_delivery_provider_id_for_user').then((r: any) => r);
-              const result = await Promise.race([
-                rpcPromise,
-                new Promise<{ data: null }>((r) => setTimeout(() => r({ data: null }), 8000))
-              ]).catch(() => ({ data: null, error: true })) as any;
-              const providerId = result?.data ?? (typeof result === 'string' ? result : null);
-              if (providerId && typeof providerId === 'string') {
-                providerIdToMatch = providerId;
-                console.log('🔍 Delivery provider lookup (RPC):', { userId: userId.substring(0, 8), providerId: providerIdToMatch.substring(0, 8) });
+              const { data: dp } = await supabase.from('delivery_providers').select('id').eq('user_id', userId).maybeSingle();
+              if (dp?.id) {
+                providerIdToMatch = dp.id;
+                console.log('🔍 Delivery provider lookup (table):', { userId: userId.substring(0, 8), providerId: providerIdToMatch.substring(0, 8) });
               } else {
-                // Fallback: direct table query (when RPC not deployed or returns null)
-                const { data: dp } = await supabase.from('delivery_providers').select('id').eq('user_id', userId).maybeSingle();
-                if (dp?.id) {
-                  providerIdToMatch = dp.id;
-                  console.log('🔍 Delivery provider lookup (table fallback):', { userId: userId.substring(0, 8), providerId: providerIdToMatch.substring(0, 8) });
-                } else {
-                  console.log('🔍 No delivery_provider found for userId:', userId.substring(0, 8));
-                }
+                console.log('🔍 No delivery_provider row for userId:', userId.substring(0, 8), '- will match by user_id only');
               }
             } catch (e: any) {
               console.warn('⚠️ Exception fetching delivery_provider.id:', e?.message || e);
@@ -906,20 +894,13 @@ export const useDeliveryProviderData = () => {
                                       d.status !== 'completed' && 
                                       d.status !== 'cancelled';
                   
-                  // CRITICAL: delivery_requests.provider_id can be either:
-                  // 1. delivery_provider.id (UUID) - preferred
-                  // 2. user_id (UUID) - fallback if provider lookup failed
-                  // So we match against BOTH providerIdToMatch AND userId as fallback
+                  // CRITICAL: delivery_requests.provider_id can be either delivery_providers.id or user_id (UUID)
+                  // Match BOTH so orders never disappear when lookup fails or DB uses user id
+                  const pid = d.provider_id != null ? String(d.provider_id) : '';
                   let providerMatch = false;
-                  if (providerIdToMatch) {
-                    providerMatch = d.provider_id === providerIdToMatch;
-                  }
-                  // FALLBACK: If provider lookup failed, try matching by user_id directly
-                  // This handles cases where delivery_requests.provider_id = user_id
-                  if (!providerMatch && userId) {
-                    providerMatch = d.provider_id === userId;
-                  }
-                  
+                  if (providerIdToMatch && pid === String(providerIdToMatch)) providerMatch = true;
+                  if (!providerMatch && userId && pid === String(userId)) providerMatch = true;
+
                   if (!providerMatch && statusMatch) {
                     console.warn('🚫 Filtered out delivery_request (wrong provider):', {
                       id: d.id?.substring(0, 8),
@@ -975,26 +956,16 @@ export const useDeliveryProviderData = () => {
           try {
             console.log('📦 Fetching purchase_orders for provider (userId):', userId);
             
-            // Try RPC first, fallback to table query
+            // Table query only – no RPC
             let providerIdForPO: string | null = null;
             try {
-              const rpcRes = await Promise.race([
-                (supabase as any).rpc('get_delivery_provider_id_for_user').then((r: any) => r),
-                new Promise<{ data: null }>((r) => setTimeout(() => r({ data: null }), 8000))
-              ]).catch(() => ({ data: null })) as any;
-              const pid = rpcRes?.data ?? (typeof rpcRes === 'string' ? rpcRes : null);
-              if (pid && typeof pid === 'string') {
-                providerIdForPO = pid;
-                console.log('✅ Found delivery_provider.id for purchase_orders (RPC):', providerIdForPO.substring(0, 8));
+              const { data: dp } = await supabase.from('delivery_providers').select('id').eq('user_id', userId).maybeSingle();
+              if (dp?.id) {
+                providerIdForPO = dp.id;
+                console.log('✅ Found delivery_provider.id for purchase_orders (table):', providerIdForPO.substring(0, 8));
               } else {
-                const { data: dp } = await supabase.from('delivery_providers').select('id').eq('user_id', userId).maybeSingle();
-                if (dp?.id) {
-                  providerIdForPO = dp.id;
-                  console.log('✅ Found delivery_provider.id for purchase_orders (table fallback):', providerIdForPO.substring(0, 8));
-                } else {
-                  providerIdForPO = userId;
-                  console.warn('⚠️ Could not find delivery_provider.id, using userId fallback');
-                }
+                providerIdForPO = userId;
+                console.warn('⚠️ No delivery_provider row, using userId for purchase_orders');
               }
             } catch (e: any) {
               providerIdForPO = userId;
@@ -2210,28 +2181,17 @@ export const useDeliveryProviderData = () => {
             console.log('✅ Using RPC result for delivery history');
           } else {
           // FALLBACK: Manual query (when get_delivered_orders RPC returns empty)
-          // Try provider RPC first, then table query
+          // Table query only – no RPC
           console.log('🚀 fetchDeliveredPOs: FALLBACK - Getting delivery_provider.id...');
           
           let deliveryProviderId: string | null = null;
           try {
-            const rpcRes = await withTimeout(
-              (supabase as any).rpc('get_delivery_provider_id_for_user').then((r: any) => r),
-              8000,
-              { data: null } as any
-            );
-            const pid = (rpcRes && typeof rpcRes === 'object' && rpcRes !== null && 'data' in rpcRes) ? rpcRes.data : (typeof rpcRes === 'string' ? rpcRes : null);
-            if (pid && typeof pid === 'string') {
-              deliveryProviderId = pid;
-              console.log('✅ Found delivery_provider.id (RPC):', deliveryProviderId.substring(0, 8));
+            const { data: dp } = await supabase.from('delivery_providers').select('id').eq('user_id', userId).maybeSingle();
+            if (dp?.id) {
+              deliveryProviderId = dp.id;
+              console.log('✅ Found delivery_provider.id (table):', deliveryProviderId.substring(0, 8));
             } else {
-              const { data: dp } = await supabase.from('delivery_providers').select('id').eq('user_id', userId).maybeSingle();
-              if (dp?.id) {
-                deliveryProviderId = dp.id;
-                console.log('✅ Found delivery_provider.id (table fallback):', deliveryProviderId.substring(0, 8));
-              } else {
-                console.warn('⚠️ Could not get delivery_provider.id, trying fallback queries with user_id directly');
-              }
+              console.warn('⚠️ No delivery_provider row, trying fallback queries with user_id directly');
             }
           } catch (e: any) {
             console.warn('⚠️ Error looking up delivery_provider.id:', e?.message);
@@ -2671,25 +2631,15 @@ export const useDeliveryProviderData = () => {
       const deliveryRequestsHistoryPromise = (async () => {
         try {
           console.log('📦 History: Starting delivery_requests history fetch (running in parallel)...');
-        // Try RPC first, fallback to table query
+        // Table query only – no RPC
         let providerId: string | null = null;
         try {
-          const res = await Promise.race([
-            (supabase as any).rpc('get_delivery_provider_id_for_user').then((r: any) => r),
-            new Promise<{ data: null }>((r) => setTimeout(() => r({ data: null }), 8000))
-          ]).catch(() => ({ data: null })) as any;
-          const pid = res?.data ?? (typeof res === 'string' ? res : null);
-          if (pid && typeof pid === 'string') {
-            providerId = pid;
-            console.log('✅ Found delivery_provider.id for history (RPC):', providerId);
+          const { data: dp } = await supabase.from('delivery_providers').select('id').eq('user_id', userId).maybeSingle();
+          if (dp?.id) {
+            providerId = dp.id;
+            console.log('✅ Found delivery_provider.id for history (table):', providerId);
           } else {
-            const { data: dp } = await supabase.from('delivery_providers').select('id').eq('user_id', userId).maybeSingle();
-            if (dp?.id) {
-              providerId = dp.id;
-              console.log('✅ Found delivery_provider.id for history (table fallback):', providerId);
-            } else {
-              console.warn('⚠️ No delivery_provider found for user_id:', userId);
-            }
+            console.warn('⚠️ No delivery_provider row for user_id:', userId?.substring(0, 8));
           }
         } catch (e) {
           console.warn('⚠️ Exception fetching delivery_provider.id:', e);
