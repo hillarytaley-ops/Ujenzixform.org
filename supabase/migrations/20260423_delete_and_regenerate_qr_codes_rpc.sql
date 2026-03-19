@@ -2,6 +2,10 @@
 -- RPC: Delete selected material_items (QR codes) and create fresh ones
 -- Used from QR Codes Management when user selects items and clicks "Delete & Regenerate"
 -- Created: April 23, 2026
+--
+-- IMPORTANT: This migration only CREATES the function. It does NOT delete any QR codes.
+-- To replace QR codes: open QR Codes Management → click Select → tick the items →
+-- click "Delete & Regenerate (n)". The list will refresh with new codes.
 -- ============================================================
 
 CREATE OR REPLACE FUNCTION public.delete_and_regenerate_qr_codes(_item_ids UUID[])
@@ -19,25 +23,33 @@ DECLARE
   caller_id UUID;
   is_supplier BOOLEAN := FALSE;
   is_admin BOOLEAN := FALSE;
+  my_supplier_id UUID;
 BEGIN
   caller_id := auth.uid();
   IF caller_id IS NULL THEN
     RETURN jsonb_build_object('success', false, 'error', 'Not authenticated', 'error_code', 'UNAUTHORIZED');
   END IF;
 
-  is_admin := public.has_role(caller_id, 'admin');
-  is_supplier := EXISTS (SELECT 1 FROM public.suppliers WHERE user_id = caller_id);
+  -- Admin check (has_role may not exist in all projects)
+  BEGIN
+    is_admin := public.has_role(caller_id, 'admin');
+  EXCEPTION WHEN OTHERS THEN
+    is_admin := EXISTS (SELECT 1 FROM public.profiles WHERE user_id = caller_id AND role = 'admin' LIMIT 1);
+  END;
+  SELECT id INTO my_supplier_id FROM public.suppliers WHERE user_id = caller_id LIMIT 1;
+  is_supplier := (my_supplier_id IS NOT NULL);
 
   IF NOT is_admin AND NOT is_supplier THEN
     RETURN jsonb_build_object('success', false, 'error', 'Only supplier or admin can regenerate QR codes', 'error_code', 'FORBIDDEN');
   END IF;
 
-  -- Create temp table to hold row data for re-insert after delete (avoids unique constraint on purchase_order_id+item_sequence)
-  CREATE TEMP TABLE IF NOT EXISTS _regen_rows (
+  -- Use a unique temp table name so concurrent calls and session reuse don't clash
+  DROP TABLE IF EXISTS _regen_rows;
+  CREATE TEMP TABLE _regen_rows (
     purchase_order_id UUID, item_sequence INT, material_type TEXT, category TEXT,
     quantity NUMERIC, unit TEXT, supplier_id UUID, buyer_id UUID, buyer_name TEXT, buyer_email TEXT, buyer_phone TEXT,
     item_unit_price NUMERIC, item_total_price NUMERIC, item_description TEXT
-  ) ON COMMIT DROP;
+  );
 
   -- Collect old qr_codes and copy row data; verify caller can act
   FOR r IN
@@ -47,7 +59,7 @@ BEGIN
     FROM material_items mi
     WHERE mi.id = ANY(_item_ids)
   LOOP
-    IF NOT is_admin AND r.supplier_id IS DISTINCT FROM (SELECT id FROM public.suppliers WHERE user_id = caller_id LIMIT 1) THEN
+    IF NOT is_admin AND r.supplier_id IS DISTINCT FROM my_supplier_id THEN
       DROP TABLE IF EXISTS _regen_rows;
       RETURN jsonb_build_object('success', false, 'error', 'You can only regenerate QR codes for your own items', 'error_code', 'FORBIDDEN');
     END IF;

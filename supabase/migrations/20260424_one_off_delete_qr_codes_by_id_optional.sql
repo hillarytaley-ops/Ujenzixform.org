@@ -1,0 +1,24 @@
+-- ============================================================
+-- ONE-OFF: Delete specific QR codes (material_items) by ID
+-- Run this in Supabase SQL Editor if you need to remove specific
+-- QR codes without using the app (e.g. replace with fresh ones).
+--
+-- STEP 1: Find the IDs of the QR codes you want to remove:
+--   SELECT id, qr_code, material_type, status FROM material_items
+--   WHERE supplier_id = 'YOUR_SUPPLIER_UUID' ORDER BY created_at DESC;
+--
+-- STEP 2: Replace the UUIDs below with those ids, then run this migration
+--   (or run the DELETE in SQL Editor with your ids).
+--
+-- This only DELETES; it does not create new codes. Use the app
+-- "Delete & Regenerate" to replace with fresh codes.
+-- ============================================================
+
+-- To delete specific QR codes manually in SQL Editor:
+-- 1. Run: SELECT id, qr_code, material_type FROM material_items WHERE ... ;
+-- 2. Then run (replace the two UUIDs with your ids):
+--    UPDATE material_items SET dispatch_scan_id = NULL, receiving_scan_id = NULL, verification_scan_id = NULL WHERE id IN ('id1','id2');
+--    DELETE FROM qr_scan_events WHERE qr_code IN (SELECT qr_code FROM material_items WHERE id IN ('id1','id2'));
+--    DELETE FROM material_items WHERE id IN ('id1','id2');
+-- Or use the app: Select the items and click "Delete & Regenerate".
+SELECT 1;

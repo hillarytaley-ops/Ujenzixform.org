@@ -1972,7 +1972,7 @@ export const EnhancedQRCodeManager: React.FC<EnhancedQRCodeManagerProps> = ({ su
               size="sm"
               onClick={deleteAndRegenerateSelected}
               className="border-amber-300 text-amber-700 hover:bg-amber-50"
-              title="Delete selected QR codes and generate fresh ones"
+              title="Remove selected QR codes and create new ones (list refreshes automatically)"
             >
               <RotateCcw className="h-4 w-4 mr-1" />
               Delete & Regenerate ({selectedItems.size})
