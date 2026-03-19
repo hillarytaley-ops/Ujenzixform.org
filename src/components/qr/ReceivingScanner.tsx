@@ -53,15 +53,27 @@ interface Order {
   items: OrderItem[];
 }
 
+/** Delivery row from dashboard (useDataIsolation) - single source of truth so scanner shows same list as Deliveries tab */
+export interface DeliveryRequestForScanner {
+  id: string;
+  purchase_order_id?: string | null;
+  order_number?: string;
+  status?: string;
+}
+
 interface ReceivingScannerProps {
   /** Called after successful scan. Passes true if the full order was completed (all items received). */
   onDeliveryComplete?: (orderCompleted?: boolean) => void;
+  /** When provided, use this list instead of fetching delivery_requests (same data as dashboard = same orders). */
+  deliveryRequestsFromDashboard?: DeliveryRequestForScanner[];
+  /** Called when user taps Refresh and scanner is using dashboard list – parent should refetch and pass new list. */
+  onRefreshRequested?: () => void;
 }
 
 const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
 const ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
 
-export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryComplete }) => {
+export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryComplete, deliveryRequestsFromDashboard, onRefreshRequested }) => {
   const [step, setStep] = useState<'select-delivery' | 'scanning'>('select-delivery');
   const [orders, setOrders] = useState<Order[]>([]);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
@@ -146,9 +158,16 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
 
   useEffect(() => {
     const allowAccess = ['admin', 'delivery_provider', 'delivery'].includes(userRole || '');
-    if (allowAccess) fetchDeliveries();
-    else setLoadingOrders(false);
-  }, [userRole]);
+    if (!allowAccess) {
+      setLoadingOrders(false);
+      return;
+    }
+    if (deliveryRequestsFromDashboard !== undefined) {
+      loadFromDashboardList(deliveryRequestsFromDashboard);
+    } else {
+      fetchDeliveries();
+    }
+  }, [userRole, deliveryRequestsFromDashboard, loadFromDashboardList, fetchDeliveries]);
 
   useEffect(() => {
     if (!selectedOrder || selectedOrder.items.length === 0) return;
@@ -214,50 +233,80 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
 
   const RECEIVING_FETCH_TIMEOUT_MS = 12000; // 12s max so mobile never hangs forever
 
-  const fetchDeliveries = async () => {
-    if (fetchOrdersRef.current) return;
-    fetchOrdersRef.current = true;
-    setLoadingOrders(true);
-    const run = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user?.id) {
-        setOrders([]);
-        return;
-      }
-      let providerId: string = user.id;
-      const { data: dp } = await supabase.from('delivery_providers').select('id').eq('user_id', user.id).maybeSingle();
-      if (dp?.id) providerId = dp.id;
-
-      // Same as dashboard: fetch by status only (no provider filter), then filter client-side.
-      // Avoids RLS + .or() issues that can return 0 rows even when dashboard sees 2.
-      const activeStatuses = ['pending', 'requested', 'assigned', 'accepted', 'scheduled', 'dispatched', 'in_transit', 'picked_up', 'out_for_delivery'];
-      const { data: drList } = await supabase
-        .from('delivery_requests')
-        .select('id,purchase_order_id,status,order_number,provider_id')
-        .in('status', activeStatuses)
-        .order('created_at', { ascending: false })
-        .limit(100);
-
-      const rowsRaw = (drList || []) as Array<{ purchase_order_id: string | null; status: string; order_number?: string; provider_id?: string | null }>;
-      const pidStr = providerId != null ? String(providerId) : '';
-      const uidStr = user.id != null ? String(user.id) : '';
-      const rows = rowsRaw.filter(
-        (d) => d.purchase_order_id && (pidStr && String(d.provider_id) === pidStr || uidStr && String(d.provider_id) === uidStr)
+  /** Build orders from a list of delivery requests (same PO + material_items fetch and order map). */
+  const buildOrdersFromPoIds = (
+    poIds: string[],
+    byPoId: Map<string, { order_number?: string }>,
+    poMap: Map<string, { po_number?: string; order_number?: string; created_at?: string }>,
+    itemsByPo: Map<string, any[]>
+  ): Order[] => {
+    const orderMap: Record<string, Order> = {};
+    for (const poId of poIds) {
+      const items = itemsByPo.get(poId) || [];
+      const allReceived = items.every(
+        (i: any) => i.receive_scanned === true || (i.receive_scan_count ?? 0) >= (i.quantity ?? 1)
       );
-      const filtered = rows;
-      const byPoId = new Map<string, { order_number?: string }>();
-      filtered.forEach((d) => {
-        if (d.purchase_order_id && !byPoId.has(d.purchase_order_id)) {
-          byPoId.set(d.purchase_order_id, { order_number: d.order_number });
-        }
-      });
-      const poIds = Array.from(byPoId.keys());
-      if (poIds.length === 0) {
-        setOrders([]);
-        return;
-      }
+      if (allReceived) continue;
 
-      // Parallel batch fetch: POs and material_items in one round-trip (order_number fallback if po_number missing)
+      const orderItems: OrderItem[] = items.map((it: any) => ({
+        id: it.id,
+        qr_code: it.qr_code,
+        material_type: it.material_type || '',
+        category: it.category || '',
+        quantity: it.quantity ?? 1,
+        unit: it.unit || '',
+        item_sequence: it.item_sequence ?? 0,
+        receive_scanned: it.receive_scanned === true,
+        receive_scan_count: it.receive_scan_count ?? 0,
+        dispatch_scanned: it.dispatch_scanned === true,
+        status: it.status || ''
+      }));
+      let totalItems = 0;
+      let receivedItems = 0;
+      orderItems.forEach((i) => {
+        const q = i.quantity ?? 1;
+        totalItems += q;
+        const count = i.receive_scan_count ?? 0;
+        receivedItems += i.receive_scanned ? q : Math.min(count, q);
+      });
+      const pendingItems = Math.max(0, totalItems - receivedItems);
+      const meta = byPoId.get(poId);
+      const poMeta = poMap.get(poId);
+      const displayNumber = meta?.order_number || poMeta?.po_number || poMeta?.order_number || `Order ${poId.slice(0, 8)}`;
+      orderMap[poId] = {
+        id: poId,
+        order_number: displayNumber,
+        buyer_id: '',
+        buyer_name: 'Client',
+        buyer_email: '',
+        buyer_phone: '',
+        total_items: totalItems,
+        received_items: receivedItems,
+        pending_items: pendingItems,
+        created_at: poMeta?.created_at || poId,
+        items: orderItems
+      };
+    }
+    return Object.values(orderMap)
+      .filter((o) => o.id)
+      .sort((a, b) => (b.pending_items > 0 ? 1 : 0) - (a.pending_items > 0 ? 1 : 0) || new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+  };
+
+  /** Use dashboard list as single source of truth so scanner shows same orders as Deliveries tab. */
+  const loadFromDashboardList = useCallback(async (list: DeliveryRequestForScanner[]) => {
+    setLoadingOrders(true);
+    const byPoId = new Map<string, { order_number?: string }>();
+    list.forEach((d) => {
+      const poId = d.purchase_order_id;
+      if (poId && !byPoId.has(poId)) byPoId.set(poId, { order_number: d.order_number });
+    });
+    const poIds = Array.from(byPoId.keys());
+    if (poIds.length === 0) {
+      setOrders([]);
+      setLoadingOrders(false);
+      return;
+    }
+    try {
       const [poRes, itemsRes] = await Promise.all([
         supabase.from('purchase_orders').select('id,po_number,order_number,created_at').in('id', poIds),
         supabase.from('material_items')
@@ -274,57 +323,74 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
         if (!itemsByPo.has(pid)) itemsByPo.set(pid, []);
         itemsByPo.get(pid)!.push(row);
       });
+      const ordersArray = buildOrdersFromPoIds(poIds, byPoId, poMap, itemsByPo);
+      setOrders(ordersArray);
+    } catch (err: any) {
+      console.error('Load from dashboard list error:', err);
+      toast.error('Failed to load orders');
+      setOrders([]);
+    } finally {
+      setLoadingOrders(false);
+    }
+  }, []);
 
-      const orderMap: Record<string, Order> = {};
-      for (const poId of poIds) {
-        const items = itemsByPo.get(poId) || [];
-        const allReceived = items.every(
-          (i: any) => i.receive_scanned === true || (i.receive_scan_count ?? 0) >= (i.quantity ?? 1)
-        );
-        if (allReceived) continue;
-
-        const orderItems: OrderItem[] = items.map((it: any) => ({
-          id: it.id,
-          qr_code: it.qr_code,
-          material_type: it.material_type || '',
-          category: it.category || '',
-          quantity: it.quantity ?? 1,
-          unit: it.unit || '',
-          item_sequence: it.item_sequence ?? 0,
-          receive_scanned: it.receive_scanned === true,
-          receive_scan_count: it.receive_scan_count ?? 0,
-          dispatch_scanned: it.dispatch_scanned === true,
-          status: it.status || ''
-        }));
-        let totalItems = 0;
-        let receivedItems = 0;
-        orderItems.forEach((i) => {
-          const q = i.quantity ?? 1;
-          totalItems += q;
-          const count = i.receive_scan_count ?? 0;
-          receivedItems += i.receive_scanned ? q : Math.min(count, q);
-        });
-        const pendingItems = Math.max(0, totalItems - receivedItems);
-        const meta = byPoId.get(poId);
-        const poMeta = poMap.get(poId);
-        const displayNumber = meta?.order_number || poMeta?.po_number || poMeta?.order_number || `Order ${poId.slice(0, 8)}`;
-        orderMap[poId] = {
-          id: poId,
-          order_number: displayNumber,
-          buyer_id: '',
-          buyer_name: 'Client',
-          buyer_email: '',
-          buyer_phone: '',
-          total_items: totalItems,
-          received_items: receivedItems,
-          pending_items: pendingItems,
-          created_at: poMeta?.created_at || poId,
-          items: orderItems
-        };
+  const fetchDeliveries = useCallback(async () => {
+    if (fetchOrdersRef.current) return;
+    fetchOrdersRef.current = true;
+    setLoadingOrders(true);
+    const run = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user?.id) {
+        setOrders([]);
+        return;
       }
-      const ordersArray = Object.values(orderMap)
-        .filter((o) => o.id)
-        .sort((a, b) => (b.pending_items > 0 ? 1 : 0) - (a.pending_items > 0 ? 1 : 0) || new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+      let providerId: string = user.id;
+      const { data: dp } = await supabase.from('delivery_providers').select('id').eq('user_id', user.id).maybeSingle();
+      if (dp?.id) providerId = dp.id;
+
+      const activeStatuses = ['pending', 'requested', 'assigned', 'accepted', 'scheduled', 'dispatched', 'in_transit', 'picked_up', 'out_for_delivery'];
+      const { data: drList } = await supabase
+        .from('delivery_requests')
+        .select('id,purchase_order_id,status,order_number,provider_id')
+        .in('status', activeStatuses)
+        .order('created_at', { ascending: false })
+        .limit(100);
+
+      const rowsRaw = (drList || []) as Array<{ purchase_order_id: string | null; status: string; order_number?: string; provider_id?: string | null }>;
+      const pidStr = providerId != null ? String(providerId) : '';
+      const uidStr = user.id != null ? String(user.id) : '';
+      const rows = rowsRaw.filter(
+        (d) => d.purchase_order_id && (pidStr && String(d.provider_id) === pidStr || uidStr && String(d.provider_id) === uidStr)
+      );
+      const byPoId = new Map<string, { order_number?: string }>();
+      rows.forEach((d) => {
+        if (d.purchase_order_id && !byPoId.has(d.purchase_order_id)) {
+          byPoId.set(d.purchase_order_id, { order_number: d.order_number });
+        }
+      });
+      const poIds = Array.from(byPoId.keys());
+      if (poIds.length === 0) {
+        setOrders([]);
+        return;
+      }
+
+      const [poRes, itemsRes] = await Promise.all([
+        supabase.from('purchase_orders').select('id,po_number,order_number,created_at').in('id', poIds),
+        supabase.from('material_items')
+          .select('id,purchase_order_id,qr_code,material_type,category,quantity,unit,item_sequence,receive_scanned,receive_scan_count,dispatch_scanned,status,created_at')
+          .in('purchase_order_id', poIds)
+          .order('item_sequence')
+      ]);
+      const poMap = new Map<string, { po_number?: string; order_number?: string; created_at?: string }>();
+      (poRes.data || []).forEach((r: any) => poMap.set(r.id, { po_number: r.po_number, order_number: r.order_number, created_at: r.created_at }));
+      const itemsByPo = new Map<string, any[]>();
+      (itemsRes.data || []).forEach((row: any) => {
+        const pid = row.purchase_order_id;
+        if (!pid) return;
+        if (!itemsByPo.has(pid)) itemsByPo.set(pid, []);
+        itemsByPo.get(pid)!.push(row);
+      });
+      const ordersArray = buildOrdersFromPoIds(poIds, byPoId, poMap, itemsByPo);
       setOrders(ordersArray);
     };
     try {
@@ -342,7 +408,8 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
       setLoadingOrders(false);
       fetchOrdersRef.current = false;
     }
-  };
+  }, []);
+
 
   const selectDelivery = (order: Order) => {
     setSelectedOrder(order);
@@ -357,7 +424,22 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
     setScanResults([]);
     setAllItemsScanned(false);
     setStep('select-delivery');
-    fetchDeliveries();
+    if (deliveryRequestsFromDashboard !== undefined) {
+      onRefreshRequested?.();
+      loadFromDashboardList(deliveryRequestsFromDashboard);
+    } else {
+      fetchDeliveries();
+    }
+  };
+
+  const handleRefresh = () => {
+    if (deliveryRequestsFromDashboard !== undefined) {
+      onRefreshRequested?.();
+      loadFromDashboardList(deliveryRequestsFromDashboard);
+    } else {
+      fetchOrdersRef.current = false;
+      fetchDeliveries();
+    }
   };
 
   const startCameraScanning = async () => {
@@ -820,7 +902,7 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
             </h2>
             <p className="text-muted-foreground mt-1">Select a delivery to receive its materials</p>
           </div>
-          <Button variant="outline" onClick={fetchDeliveries} disabled={loadingOrders}>
+          <Button variant="outline" onClick={handleRefresh} disabled={loadingOrders}>
             <RefreshCw className={`h-4 w-4 mr-2 ${loadingOrders ? 'animate-spin' : ''}`} />
             Refresh
           </Button>

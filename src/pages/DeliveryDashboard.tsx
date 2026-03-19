@@ -3064,7 +3064,9 @@ const DeliveryDashboard = () => {
                         </p>
                       </div>
                     </div>
-                    <ReceivingScanner 
+                    <ReceivingScanner
+                      deliveryRequestsFromDashboard={isolatedActiveDeliveries}
+                      onRefreshRequested={refetchData}
                       onDeliveryComplete={async (orderCompleted) => {
                         // Provider Delivered = Supplier Delivered (material_items.receive_scanned)
                         console.log('🔄 Delivery scan complete - orderCompleted:', orderCompleted);
