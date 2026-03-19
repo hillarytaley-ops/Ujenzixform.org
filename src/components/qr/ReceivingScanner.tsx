@@ -157,19 +157,6 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
   }, []);
 
   useEffect(() => {
-    const allowAccess = ['admin', 'delivery_provider', 'delivery'].includes(userRole || '');
-    if (!allowAccess) {
-      setLoadingOrders(false);
-      return;
-    }
-    if (deliveryRequestsFromDashboard !== undefined) {
-      loadFromDashboardList(deliveryRequestsFromDashboard);
-    } else {
-      fetchDeliveries();
-    }
-  }, [userRole, deliveryRequestsFromDashboard, loadFromDashboardList, fetchDeliveries]);
-
-  useEffect(() => {
     if (!selectedOrder || selectedOrder.items.length === 0) return;
     const allReceived = selectedOrder.items.every(
       (i) => i.receive_scanned || (i.receive_scan_count ?? 0) >= (i.quantity ?? 1)
@@ -410,6 +397,18 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
     }
   }, []);
 
+  useEffect(() => {
+    const allowAccess = ['admin', 'delivery_provider', 'delivery'].includes(userRole || '');
+    if (!allowAccess) {
+      setLoadingOrders(false);
+      return;
+    }
+    if (deliveryRequestsFromDashboard !== undefined) {
+      loadFromDashboardList(deliveryRequestsFromDashboard);
+    } else {
+      fetchDeliveries();
+    }
+  }, [userRole, deliveryRequestsFromDashboard, loadFromDashboardList, fetchDeliveries]);
 
   const selectDelivery = (order: Order) => {
     setSelectedOrder(order);
