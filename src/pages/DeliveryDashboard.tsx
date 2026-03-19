@@ -1001,10 +1001,9 @@ const DeliveryDashboard = () => {
       !existingOrderNumbers.some(existing => existing.includes(orderNum.split('-')[1]))
     );
     
+    const DEBUG_AGGRESSIVE = false;
     if (missingAggressiveOrders.length > 0 && user) {
-      console.log('🚨🚨🚨 COMPONENT AGGRESSIVE: Missing', missingAggressiveOrders.length, 'delivered orders. Force-adding...');
-      console.log('🚨 COMPONENT AGGRESSIVE: Missing orders:', missingAggressiveOrders);
-      
+      if (DEBUG_AGGRESSIVE) console.log('Missing delivered orders, force-adding...', missingAggressiveOrders.length);
       const forceAddOrders = async () => {
         try {
           const SUPABASE_URL_AGGRESSIVE = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
@@ -1023,8 +1022,7 @@ const DeliveryDashboard = () => {
           
           // Better approach: Query delivery_requests with status='delivered' for this provider
           // This is more reliable than searching by PO number
-          console.log('🚨 COMPONENT AGGRESSIVE: Querying delivery_requests with status=delivered for provider...');
-          
+          if (DEBUG_AGGRESSIVE) console.log('Querying delivery_requests with status=delivered for provider');
           // First, get provider ID (try user.id first, then lookup delivery_provider)
           let providerIdToQuery = user?.id;
           try {
@@ -1044,15 +1042,15 @@ const DeliveryDashboard = () => {
               const providerData = await providerRes.json();
               if (providerData && providerData.length > 0 && providerData[0].id) {
                 providerIdToQuery = providerData[0].id;
-                console.log('✅ COMPONENT AGGRESSIVE: Found provider ID:', providerIdToQuery?.substring(0, 8));
+                if (DEBUG_AGGRESSIVE) console.log('Found provider ID:', providerIdToQuery?.substring(0, 8));
               }
             }
           } catch (e) {
-            console.warn('⚠️ COMPONENT AGGRESSIVE: Could not lookup provider ID, using user.id');
+            if (DEBUG_AGGRESSIVE) console.warn('Could not lookup provider ID, using user.id');
           }
           
           if (!providerIdToQuery) {
-            console.error('❌ COMPONENT AGGRESSIVE: No provider ID available');
+            if (DEBUG_AGGRESSIVE) console.error('No provider ID available');
             return;
           }
           
@@ -1078,14 +1076,14 @@ const DeliveryDashboard = () => {
               const data = await deliveredRequestsRes.json();
               if (Array.isArray(data)) {
                 deliveredRequests = data;
-                console.log('✅ COMPONENT AGGRESSIVE: Found', deliveredRequests.length, 'delivered delivery_requests (by provider_id)');
+                if (DEBUG_AGGRESSIVE) console.log('Found delivered delivery_requests (by provider_id):', deliveredRequests.length);
               }
             } else {
               const errorText = await deliveredRequestsRes.text();
-              console.warn('⚠️ COMPONENT AGGRESSIVE: Query by provider_id failed:', deliveredRequestsRes.status, errorText.substring(0, 200));
+              if (DEBUG_AGGRESSIVE) console.warn('Query by provider_id failed:', deliveredRequestsRes.status);
             }
           } catch (e) {
-            console.warn('⚠️ COMPONENT AGGRESSIVE: Error querying by provider_id:', e);
+            if (DEBUG_AGGRESSIVE) console.warn('Error querying by provider_id:', e);
           }
           
           // If no results, try querying by user_id (fallback)
@@ -1107,18 +1105,18 @@ const DeliveryDashboard = () => {
                 const data = await deliveredRequestsRes2.json();
                 if (Array.isArray(data)) {
                   deliveredRequests = data;
-                  console.log('✅ COMPONENT AGGRESSIVE: Found', deliveredRequests.length, 'delivered delivery_requests (by user_id fallback)');
+                  if (DEBUG_AGGRESSIVE) console.log('Found delivered delivery_requests (by user_id):', deliveredRequests.length);
                 }
               }
             } catch (e) {
-              console.warn('⚠️ COMPONENT AGGRESSIVE: Error querying by user_id:', e);
+              if (DEBUG_AGGRESSIVE) console.warn('Error querying by user_id:', e);
             }
           }
           
-          console.log('✅ COMPONENT AGGRESSIVE: Total delivered delivery_requests found:', deliveredRequests.length);
+          if (DEBUG_AGGRESSIVE) console.log('Total delivered delivery_requests found:', deliveredRequests.length);
           
           if (!deliveredRequests || deliveredRequests.length === 0) {
-            console.log('⏭️ COMPONENT AGGRESSIVE: No delivered delivery_requests found');
+            if (DEBUG_AGGRESSIVE) console.log('No delivered delivery_requests found');
             return;
           }
           
@@ -1134,7 +1132,7 @@ const DeliveryDashboard = () => {
           }
           
           if (poIds.length === 0) {
-            console.log('⏭️ COMPONENT AGGRESSIVE: No purchase_order_ids found in delivered requests');
+            if (DEBUG_AGGRESSIVE) console.log('No purchase_order_ids found in delivered requests');
             return;
           }
           
@@ -1154,12 +1152,12 @@ const DeliveryDashboard = () => {
           
           if (!purchaseOrdersRes.ok) {
             const errorText = await purchaseOrdersRes.text();
-            console.error('❌ COMPONENT AGGRESSIVE: Failed to query purchase_orders:', purchaseOrdersRes.status, errorText.substring(0, 200));
+            if (DEBUG_AGGRESSIVE) console.error('Failed to query purchase_orders:', purchaseOrdersRes.status);
             return;
           }
           
           const aggressiveOrders = await purchaseOrdersRes.json();
-          console.log('✅ COMPONENT AGGRESSIVE: Found', aggressiveOrders?.length || 0, 'purchase orders');
+          if (DEBUG_AGGRESSIVE) console.log('Found purchase orders:', aggressiveOrders?.length || 0);
           
           // Remove duplicates - NO Map constructor to avoid minification errors
           const seenIds: Record<string, boolean> = {};
@@ -1177,12 +1175,12 @@ const DeliveryDashboard = () => {
           }
           
           if (uniqueAggressiveOrders.length > 0) {
-            console.log('🚨 COMPONENT AGGRESSIVE: Found', uniqueAggressiveOrders.length, 'orders. Force-adding to deliveryHistory...');
+            if (DEBUG_AGGRESSIVE) console.log('Force-adding orders to deliveryHistory:', uniqueAggressiveOrders.length);
             
             // CRITICAL: Fetch delivery_requests to get builder-provided delivery_address
             // The builder fills in delivery_address in delivery_requests table during delivery request
             const aggressivePOIds = uniqueAggressiveOrders.map((po: any) => po.id).filter(Boolean);
-            console.log('🔍 COMPONENT AGGRESSIVE: Fetching delivery_requests for', aggressivePOIds.length, 'purchase_order_ids...');
+            if (DEBUG_AGGRESSIVE) console.log('Fetching delivery_requests for', aggressivePOIds.length, 'purchase_order_ids');
             
             // Fetch delivery_requests asynchronously
             (async () => {
@@ -1217,7 +1215,7 @@ const DeliveryDashboard = () => {
                   
                   if (drResponse.ok) {
                     const drData = await drResponse.json();
-                    console.log('✅ COMPONENT AGGRESSIVE: Fetched', drData.length, 'delivery_requests');
+                    if (DEBUG_AGGRESSIVE) console.log('Fetched delivery_requests:', drData.length);
                     
                     // Map by purchase_order_id - use most recent with valid address
                     drData.forEach((dr: any) => {
@@ -1229,16 +1227,16 @@ const DeliveryDashboard = () => {
                              (!existing.delivery_address || existing.delivery_address === 'To be provided'))) {
                           deliveryRequestsMap[dr.purchase_order_id] = dr;
                           if (dr.delivery_address && dr.delivery_address.trim() && dr.delivery_address !== 'To be provided') {
-                            console.log('✅✅✅ COMPONENT AGGRESSIVE: Found builder-provided address for', dr.purchase_order_id?.substring(0, 8), ':', dr.delivery_address.substring(0, 60));
+                            if (DEBUG_AGGRESSIVE) console.log('Found builder-provided address for', dr.purchase_order_id?.substring(0, 8));
                           }
                         }
                       }
                     });
                   } else {
-                    console.warn('⚠️ COMPONENT AGGRESSIVE: Failed to fetch delivery_requests:', drResponse.status);
+                    if (DEBUG_AGGRESSIVE) console.warn('Failed to fetch delivery_requests:', drResponse.status);
                   }
                 } catch (e: any) {
-                  console.warn('⚠️ COMPONENT AGGRESSIVE: Error fetching delivery_requests:', e?.message);
+                  if (DEBUG_AGGRESSIVE) console.warn('Error fetching delivery_requests:', e?.message);
                 }
               }
               
@@ -1291,16 +1289,16 @@ const DeliveryDashboard = () => {
                       builderProvidedAddress !== 'To be provided' &&
                       builderProvidedAddress !== 'Delivery location') {
                     deliveryAddr = builderProvidedAddress;
-                    console.log('✅✅✅ COMPONENT AGGRESSIVE: Using builder-provided address for', poId?.substring(0, 8), ':', deliveryAddr.substring(0, 60));
+                    if (DEBUG_AGGRESSIVE) console.log('Using builder-provided address for', poId?.substring(0, 8));
                   } else if (po.delivery_address && po.delivery_address.trim() &&
                              po.delivery_address !== 'To be provided' &&
                              po.delivery_address !== 'Delivery location') {
                     deliveryAddr = po.delivery_address;
-                    console.log('✅ COMPONENT AGGRESSIVE: Using delivery_address from purchase_order for', poId?.substring(0, 8));
+                    if (DEBUG_AGGRESSIVE) console.log('Using delivery_address from purchase_order for', poId?.substring(0, 8));
                   } else {
                     deliveryAddr = isPlaceholder ? 'Address to be provided' : 'Delivery address missing - contact support';
                     if (!isPlaceholder) {
-                      console.warn('⚠️ COMPONENT AGGRESSIVE: No valid address for', poId?.substring(0, 8), 'order', poNumber);
+                      if (DEBUG_AGGRESSIVE) console.warn('No valid address for', poId?.substring(0, 8));
                     }
                   }
                   
@@ -1318,7 +1316,7 @@ const DeliveryDashboard = () => {
                   
                   aggressiveHistoryEntries.push(entry);
                 } catch (mapError: any) {
-                  console.error('❌ COMPONENT AGGRESSIVE: Error mapping order:', po?.po_number || po?.id, mapError);
+                  if (DEBUG_AGGRESSIVE) console.error('Error mapping order:', po?.po_number || po?.id, mapError);
                   // Skip this entry on error
                 }
               }
@@ -1338,43 +1336,40 @@ const DeliveryDashboard = () => {
               });
               
               if (newEntries.length > 0) {
-                console.log('✅ COMPONENT AGGRESSIVE: Force-adding', newEntries.length, 'orders to deliveryHistory');
                 setDeliveryHistory(prev => {
                   const combined = [...prev, ...newEntries];
-                  // Re-sort by date string comparison - NO Date constructor
-                  combined.sort((a, b) => {
+                  const byId: Record<string, typeof combined[0]> = {};
+                  combined.forEach(h => {
+                    if (h.id && !byId[h.id]) byId[h.id] = h;
+                  });
+                  const deduped = Object.values(byId);
+                  deduped.sort((a, b) => {
                     try {
-                      // Simple string comparison - ISO dates sort correctly as strings
                       const dateA = a.completed_at || '';
                       const dateB = b.completed_at || '';
-                      // Compare strings directly (ISO format sorts correctly)
                       if (dateB > dateA) return 1;
                       if (dateB < dateA) return -1;
                       return 0;
-                    } catch (sortError) {
-                      console.warn('⚠️ COMPONENT AGGRESSIVE: Sort error:', sortError);
+                    } catch {
                       return 0;
                     }
                   });
-                  console.log('🚨🚨🚨 COMPONENT AGGRESSIVE: Final deliveryHistory count:', combined.length);
-                  return combined;
+                  return deduped;
                 });
-              } else {
-                console.log('⏭️ COMPONENT AGGRESSIVE: All orders were duplicates');
               }
             })(); // End async IIFE
           } else {
-            console.error('❌ COMPONENT AGGRESSIVE: Failed to find any of the 3 known delivered orders!');
+            if (DEBUG_AGGRESSIVE) console.error('Failed to find known delivered orders');
           }
         } catch (aggressiveError: any) {
-          console.error('❌ COMPONENT AGGRESSIVE: Error:', aggressiveError?.message || aggressiveError);
+          if (DEBUG_AGGRESSIVE) console.error('Force-add error:', aggressiveError?.message || aggressiveError);
         }
       };
       
       // Run immediately
       forceAddOrders();
     } else if (missingAggressiveOrders.length === 0) {
-      console.log('✅ COMPONENT AGGRESSIVE: All 3 known delivered orders are already in deliveryHistory!');
+      if (DEBUG_AGGRESSIVE) console.log('All known delivered orders already in deliveryHistory');
     }
   }, [deliveryHistory, user]);
 

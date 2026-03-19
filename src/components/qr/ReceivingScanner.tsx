@@ -178,26 +178,23 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
   const listAvailableCameras = async () => {
     try {
       const devices = await Html5Qrcode.getCameras();
-      console.log('📷 Available cameras:', devices);
-      
       if (devices && devices.length > 0) {
         const cameraList = devices.map(d => ({ id: d.id, label: d.label || `Camera ${d.id}` }));
         setAvailableCameras(cameraList);
-        
-        const backCamera = cameraList.find(d => 
-          d.label.toLowerCase().includes('back') || 
+        const backCamera = cameraList.find(d =>
+          d.label.toLowerCase().includes('back') ||
           d.label.toLowerCase().includes('rear') ||
           d.label.toLowerCase().includes('environment')
         );
-        
-        if (backCamera) {
-          setSelectedCameraId(backCamera.id);
-        } else {
-          setSelectedCameraId(isMobile && cameraList.length > 1 ? cameraList[cameraList.length - 1].id : cameraList[0].id);
-        }
+        if (backCamera) setSelectedCameraId(backCamera.id);
+        else setSelectedCameraId(isMobile && cameraList.length > 1 ? cameraList[cameraList.length - 1].id : cameraList[0].id);
       }
-    } catch (error) {
-      console.error('Error listing cameras:', error);
+    } catch (error: any) {
+      if (error?.name === 'NotAllowedError' || error?.message?.includes('Permission')) {
+        setCameraError('Camera access denied. Allow camera permission in your browser to scan QR codes.');
+        return;
+      }
+      setCameraError(error?.message || 'Could not list cameras.');
     }
   };
 
@@ -561,91 +558,105 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
     }
 
     const qrToSend = matchingItem.qr_code;
+    const itemId = matchingItem.id;
+    const quantity = matchingItem.quantity ?? 1;
+    const currentCount = matchingItem.receive_scan_count ?? 0;
+    const newCount = currentCount + 1;
+    const nowFullyReceived = newCount >= quantity;
     toast.info('Processing scan...', { duration: 2000 });
 
-    const getFreshAccessToken = async (): Promise<string> => {
-      try {
-        const stored = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
-        if (stored) {
-          const parsed = JSON.parse(stored);
-          if (parsed?.access_token) return parsed.access_token;
-        }
-      } catch (_) {}
-      try {
-        const { data } = await supabase.auth.getSession();
-        if (data?.session?.access_token) return data.session.access_token;
-      } catch (_) {}
-      return ANON_KEY;
-    };
-
-    let accessToken = await getFreshAccessToken();
-    const makeRPC = async (body: object): Promise<Response> => {
-      let res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/record_qr_scan`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', apikey: ANON_KEY, Authorization: `Bearer ${accessToken}` },
-        body: JSON.stringify(body)
-      });
-      if (res.status === 401) {
-        accessToken = await getFreshAccessToken();
-        res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/record_qr_scan`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', apikey: ANON_KEY, Authorization: `Bearer ${accessToken}` },
-          body: JSON.stringify(body)
-        });
-      }
-      return res;
-    };
-
-    const requestBody = {
-      _qr_code: qrToSend,
-      _scan_type: 'receiving',
-      _scanner_device_id: navigator.userAgent?.substring(0, 100) || null,
-      _scanner_type: scannerType || 'web_scanner',
-      _material_condition: materialCondition || 'good',
-      _notes: notes?.trim() || null
-    };
-
-    const response = await makeRPC(requestBody);
-    let data: any = null;
     try {
-      const text = await response.text();
-      if (text?.trim().startsWith('{')) data = JSON.parse(text);
-    } catch (_) {}
+      const { data: sessionData } = await supabase.auth.getSession();
+      const accessToken = sessionData?.session?.access_token || ANON_KEY;
 
-    if (!response.ok) {
-      toast.error('Scan failed', { description: data?.error || data?.message || 'Request failed', duration: 5000 });
+      const headers: Record<string, string> = {
+        apikey: ANON_KEY,
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+        Accept: 'application/json'
+      };
+
+      const { data: { user: scanUser } } = await supabase.auth.getUser();
+      const { data: scanEventRows, error: insertError } = await supabase
+        .from('qr_scan_events')
+        .insert({
+          qr_code: qrToSend,
+          scan_type: 'receiving',
+          scanned_by: scanUser?.id || null,
+          scanner_device_id: navigator.userAgent?.substring(0, 100) || null,
+          scanner_type: scannerType || 'web_scanner',
+          material_condition: materialCondition || 'good',
+          notes: notes?.trim() || null
+        })
+        .select('id')
+        .limit(1);
+
+      if (insertError) {
+        toast.error('Scan failed', { description: 'Could not record scan event.', duration: 5000 });
+        return;
+      }
+      const scanEventId = scanEventRows?.[0]?.id ?? null;
+
+      const patchPayload: Record<string, unknown> = {
+        receive_scan_count: newCount,
+        receive_scanned: nowFullyReceived,
+        status: 'received',
+        updated_at: new Date().toISOString()
+      };
+      if (scanEventId) patchPayload.receiving_scan_id = scanEventId;
+      if (nowFullyReceived) patchPayload.receive_scanned_at = new Date().toISOString();
+
+      const { error: updateError } = await supabase
+        .from('material_items')
+        .update(patchPayload)
+        .eq('id', itemId);
+
+      if (updateError) {
+        toast.error('Scan failed', { description: updateError.message || 'Could not update item.', duration: 5000 });
+        return;
+      }
+
+      if (nowFullyReceived) {
+        await supabase
+          .from('material_items')
+          .update({ is_invalidated: true, invalidated_at: new Date().toISOString(), status: 'verified' })
+          .eq('id', itemId);
+      }
+
+      const orderId = selectedOrder.id;
+      const { data: allItems } = await supabase
+        .from('material_items')
+        .select('id,quantity,receive_scanned,receive_scan_count')
+        .eq('purchase_order_id', orderId);
+      const allReceived = (allItems || []).every(
+        (row: any) => row.receive_scanned === true || (row.receive_scan_count ?? 0) >= (row.quantity ?? 1)
+      );
+      if (allReceived && (allItems?.length ?? 0) > 0) {
+        await supabase.from('purchase_orders').update({
+          status: 'delivered',
+          delivery_status: 'delivered',
+          delivered_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        }).eq('id', orderId);
+        await supabase.from('delivery_requests').update({
+          status: 'delivered',
+          delivered_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        }).eq('purchase_order_id', orderId);
+      }
+    } catch (err: any) {
+      toast.error('Scan failed', { description: err?.message || 'Network error.', duration: 5000 });
       return;
     }
 
-    if (data && data.success === false) {
-      const code = data.error_code;
-      if (code === 'ALREADY_RECEIVED') {
-        toast.warning('Already scanned', { description: data.error || 'Item already received.', duration: 3000 });
-        return;
-      }
-      if (code === 'NOT_DISPATCHED') {
-        toast.error('Not dispatched', { description: 'Item has not been dispatched yet.', duration: 5000 });
-        return;
-      }
-      if (code === 'QR_NOT_FOUND') {
-        toast.error('QR not found', { description: data.error || 'QR code not in system.', duration: 5000 });
-        return;
-      }
-      toast.error('Scan failed', { description: data.error || 'Unknown error', duration: 5000 });
-      return;
-    }
-
-    const scanData = data as any;
-    const isPartialReceive = scanData?.new_status === 'partial_receive';
+    const isPartialReceive = !nowFullyReceived && quantity > 1;
     if (!isPartialReceive) recentlyProcessedRef.current.set(qrToSend, Date.now());
 
     setSelectedOrder((prev) => {
       if (!prev) return prev;
-      const recvScanned = scanData?.receive_scanned === true;
-      const recvCount = scanData?.receive_scan_count ?? (recvScanned ? (scanData?.quantity ?? 1) : 0);
       const updatedItems = prev.items.map((item) =>
-        item.qr_code === qrToSend
-          ? { ...item, receive_scanned: recvScanned, receive_scan_count: recvCount, status: recvScanned ? 'received' : item.status }
+        item.id === itemId
+          ? { ...item, receive_scanned: nowFullyReceived, receive_scan_count: newCount, status: nowFullyReceived ? 'received' : item.status }
           : item
       );
       const receivedItems = updatedItems.reduce(
@@ -658,28 +669,26 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
 
     setScanResults((prev) => [
       {
-        qr_code: scanData?.qr_code || qrToSend,
-        material_type: scanData?.material_type || matchingItem!.material_type,
-        category: scanData?.category || '',
-        quantity: scanData?.quantity ?? 1,
-        unit: scanData?.unit || '',
-        status: scanData?.new_status ?? scanData?.status ?? 'received',
+        qr_code: qrToSend,
+        material_type: matchingItem!.material_type,
+        category: matchingItem!.category || '',
+        quantity,
+        unit: matchingItem!.unit || '',
+        status: nowFullyReceived ? 'received' : 'partial_receive',
         timestamp: new Date()
       },
       ...prev.slice(0, 9)
     ]);
 
-    const qty = scanData?.quantity ?? 1;
-    const count = scanData?.receive_scan_count ?? (scanData?.receive_scanned ? qty : 0);
     const remaining = Math.max(0, selectedOrder.pending_items - 1);
-    if (isPartialReceive && qty > 1) {
+    if (isPartialReceive && quantity > 1) {
       toast.success('Scan recorded', {
-        description: `${scanData?.material_type}: Scanned ${count} of ${qty} • ${remaining} unit(s) remaining`,
+        description: `${matchingItem!.material_type}: Scanned ${newCount} of ${quantity} • ${remaining} unit(s) remaining`,
         duration: 3000
       });
     } else {
       toast.success('Item received', {
-        description: `${scanData?.material_type || matchingItem!.material_type} • ${remaining} item(s) remaining`,
+        description: `${matchingItem!.material_type} • ${remaining} item(s) remaining`,
         duration: 3000
       });
     }
