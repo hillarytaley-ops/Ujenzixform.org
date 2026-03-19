@@ -80,6 +80,7 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
   const [loadingOrders, setLoadingOrders] = useState(true);
   const fetchOrdersRef = useRef<boolean>(false);
   const loadRunIdRef = useRef(0);
+  const hasOrdersRef = useRef(false);
 
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const scannerContainerId = 'receiving-qr-scanner';
@@ -284,7 +285,8 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
   const loadFromDashboardList = useCallback(async (list: DeliveryRequestForScanner[]) => {
     loadRunIdRef.current += 1;
     const runId = loadRunIdRef.current;
-    setLoadingOrders(true);
+    const isBackgroundRefresh = hasOrdersRef.current;
+    if (!isBackgroundRefresh) setLoadingOrders(true);
     const byPoId = new Map<string, { order_number?: string }>();
     list.forEach((d) => {
       const poId = d.purchase_order_id;
@@ -292,6 +294,7 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
     });
     const poIds = Array.from(byPoId.keys());
     if (poIds.length === 0) {
+      hasOrdersRef.current = false;
       setOrders([]);
       setLoadingOrders(false);
       return;
@@ -318,10 +321,12 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
     try {
       const ordersArray = await withTimeout(run(), RECEIVING_FETCH_TIMEOUT_MS);
       if (runId === loadRunIdRef.current) {
+        hasOrdersRef.current = ordersArray.length > 0;
         setOrders(ordersArray);
       }
     } catch (err: any) {
       if (runId !== loadRunIdRef.current) return;
+      hasOrdersRef.current = false;
       const isTimeout = err?.message === 'Timeout' || err?.message?.includes('timeout');
       if (isTimeout) {
         toast.error('Load timed out. Tap Refresh to try again.');
