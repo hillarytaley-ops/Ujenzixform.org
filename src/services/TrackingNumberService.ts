@@ -1449,9 +1449,9 @@ class TrackingNumberService {
         // Use anon key
       }
       
-      // Use create_notification RPC (SECURITY DEFINER) - bypasses RLS, allows provider to notify builder
+      // Use send_user_notification RPC (SECURITY DEFINER) - matches schema, allows provider to notify builder
       const notificationPromise = fetch(
-        `${SUPABASE_URL}/rest/v1/rpc/create_notification`,
+        `${SUPABASE_URL}/rest/v1/rpc/send_user_notification`,
         {
           method: 'POST',
           headers: {
@@ -1465,15 +1465,15 @@ class TrackingNumberService {
             p_type: 'delivery_accepted',
             p_title: '🚚 Delivery Provider Assigned!',
             p_message: `Your delivery has been accepted! Track it with: ${notification.trackingNumber}`,
-            p_data: {
+            p_action_url: '/tracking',
+            p_metadata: {
               tracking_number: notification.trackingNumber,
               provider_name: notification.providerName,
               pickup_address: notification.pickupAddress,
               delivery_address: notification.deliveryAddress,
               material_type: notification.materialType,
               estimated_pickup: notification.estimatedPickupDate
-            },
-            p_priority: 'normal'
+            }
           }),
           cache: 'no-store'
         }
