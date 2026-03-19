@@ -79,6 +79,7 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [loadingOrders, setLoadingOrders] = useState(true);
   const fetchOrdersRef = useRef<boolean>(false);
+  const loadRunIdRef = useRef(0);
 
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const scannerContainerId = 'receiving-qr-scanner';
@@ -281,6 +282,8 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
 
   /** Use dashboard list as single source of truth so scanner shows same orders as Deliveries tab. */
   const loadFromDashboardList = useCallback(async (list: DeliveryRequestForScanner[]) => {
+    loadRunIdRef.current += 1;
+    const runId = loadRunIdRef.current;
     setLoadingOrders(true);
     const byPoId = new Map<string, { order_number?: string }>();
     list.forEach((d) => {
@@ -293,7 +296,7 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
       setLoadingOrders(false);
       return;
     }
-    try {
+    const run = async () => {
       const [poRes, itemsRes] = await Promise.all([
         supabase.from('purchase_orders').select('id,po_number,order_number,created_at').in('id', poIds),
         supabase.from('material_items')
@@ -310,14 +313,27 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
         if (!itemsByPo.has(pid)) itemsByPo.set(pid, []);
         itemsByPo.get(pid)!.push(row);
       });
-      const ordersArray = buildOrdersFromPoIds(poIds, byPoId, poMap, itemsByPo);
-      setOrders(ordersArray);
+      return buildOrdersFromPoIds(poIds, byPoId, poMap, itemsByPo);
+    };
+    try {
+      const ordersArray = await withTimeout(run(), RECEIVING_FETCH_TIMEOUT_MS);
+      if (runId === loadRunIdRef.current) {
+        setOrders(ordersArray);
+      }
     } catch (err: any) {
-      console.error('Load from dashboard list error:', err);
-      toast.error('Failed to load orders');
+      if (runId !== loadRunIdRef.current) return;
+      const isTimeout = err?.message === 'Timeout' || err?.message?.includes('timeout');
+      if (isTimeout) {
+        toast.error('Load timed out. Tap Refresh to try again.');
+      } else {
+        console.error('Load from dashboard list error:', err);
+        toast.error('Failed to load orders');
+      }
       setOrders([]);
     } finally {
-      setLoadingOrders(false);
+      if (runId === loadRunIdRef.current) {
+        setLoadingOrders(false);
+      }
     }
   }, []);
 
