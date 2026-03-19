@@ -212,11 +212,13 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
     }
   };
 
+  const RECEIVING_FETCH_TIMEOUT_MS = 12000; // 12s max so mobile never hangs forever
+
   const fetchDeliveries = async () => {
     if (fetchOrdersRef.current) return;
     fetchOrdersRef.current = true;
     setLoadingOrders(true);
-    try {
+    const run = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user?.id) {
         setOrders([]);
@@ -249,22 +251,18 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
         return;
       }
 
-      // Batch fetch: one query for all POs (only columns that exist – no builder_* to avoid 400)
-      const { data: poRows } = await supabase
-        .from('purchase_orders')
-        .select('id,po_number,created_at')
-        .in('id', poIds);
+      // Parallel batch fetch: POs and material_items in one round-trip
+      const [poRes, itemsRes] = await Promise.all([
+        supabase.from('purchase_orders').select('id,po_number,created_at').in('id', poIds),
+        supabase.from('material_items')
+          .select('id,purchase_order_id,qr_code,material_type,category,quantity,unit,item_sequence,receive_scanned,receive_scan_count,dispatch_scanned,status,created_at')
+          .in('purchase_order_id', poIds)
+          .order('item_sequence')
+      ]);
       const poMap = new Map<string, { po_number?: string; created_at?: string }>();
-      (poRows || []).forEach((r: any) => poMap.set(r.id, { po_number: r.po_number, created_at: r.created_at }));
-
-      // Batch fetch: all material_items for these POs in one query
-      const { data: allItemsData } = await supabase
-        .from('material_items')
-        .select('id,purchase_order_id,qr_code,material_type,category,quantity,unit,item_sequence,receive_scanned,receive_scan_count,dispatch_scanned,status,created_at')
-        .in('purchase_order_id', poIds)
-        .order('item_sequence');
+      (poRes.data || []).forEach((r: any) => poMap.set(r.id, { po_number: r.po_number, created_at: r.created_at }));
       const itemsByPo = new Map<string, any[]>();
-      (allItemsData || []).forEach((row: any) => {
+      (itemsRes.data || []).forEach((row: any) => {
         const pid = row.purchase_order_id;
         if (!pid) return;
         if (!itemsByPo.has(pid)) itemsByPo.set(pid, []);
@@ -321,9 +319,17 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
         .filter((o) => o.order_number && o.id)
         .sort((a, b) => (b.pending_items > 0 ? 1 : 0) - (a.pending_items > 0 ? 1 : 0) || new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
       setOrders(ordersArray);
-    } catch (err) {
-      console.error('Fetch deliveries error:', err);
-      toast.error('Failed to load deliveries');
+    };
+    try {
+      await withTimeout(run(), RECEIVING_FETCH_TIMEOUT_MS);
+    } catch (err: any) {
+      const isTimeout = err?.message === 'Timeout' || err?.message?.includes('timeout');
+      if (isTimeout) {
+        toast.error('Load timed out. Tap Refresh to try again.');
+      } else {
+        console.error('Fetch deliveries error:', err);
+        toast.error('Failed to load deliveries');
+      }
       setOrders([]);
     } finally {
       setLoadingOrders(false);
