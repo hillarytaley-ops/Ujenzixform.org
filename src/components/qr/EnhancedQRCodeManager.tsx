@@ -15,7 +15,7 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from '@/components/ui/accordion';
-import { QrCode, Package, Download, DownloadCloud, Maximize2, Truck, Clock, CheckCircle, RefreshCw, User, Mail, Phone, AlertCircle, ShieldCheck, ShieldX, Printer, CheckSquare, Square, Scan } from 'lucide-react';
+import { QrCode, Package, Download, DownloadCloud, Maximize2, Truck, Clock, CheckCircle, RefreshCw, User, Mail, Phone, AlertCircle, ShieldCheck, ShieldX, Printer, CheckSquare, Square, Scan, RotateCcw } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/components/ui/use-toast';
@@ -1238,6 +1238,38 @@ export const EnhancedQRCodeManager: React.FC<EnhancedQRCodeManagerProps> = ({ su
     await printItemsList(selectedItemsList, "Selected QR Codes", `${selectedItemsList.length} selected items`);
   };
 
+  // Delete selected QR codes and generate fresh ones (same items, new codes)
+  const deleteAndRegenerateSelected = async () => {
+    const ids = Array.from(selectedItems);
+    if (ids.length === 0) {
+      toast({ title: "No items selected", description: "Select QR codes to delete and regenerate", variant: "destructive" });
+      return;
+    }
+    toast({ title: "Regenerating QR codes...", description: `Deleting ${ids.length} and creating fresh codes...` });
+    try {
+      const { data, error } = await supabase.rpc('delete_and_regenerate_qr_codes', { _item_ids: ids });
+      if (error) {
+        toast({ title: "Regenerate failed", description: error.message || String(error), variant: "destructive" });
+        return;
+      }
+      const result = data as { success?: boolean; error?: string; error_code?: string; regenerated_count?: number };
+      if (result && result.success === false) {
+        toast({ title: "Regenerate failed", description: result.error || "Unknown error", variant: "destructive" });
+        return;
+      }
+      setSelectedItems(new Set());
+      setSelectionMode(false);
+      setLoading(true);
+      checkAuthAndFetch();
+      toast({
+        title: "QR codes regenerated",
+        description: result?.regenerated_count != null ? `${result.regenerated_count} new QR codes created. List refreshed.` : "Fresh QR codes created. List refreshed.",
+      });
+    } catch (e: any) {
+      toast({ title: "Regenerate failed", description: e?.message || String(e), variant: "destructive" });
+    }
+  };
+
   // Print QR codes for a specific client
   const printClientQRCodes = async (clientGroup: ClientGroup, selectedOnly: boolean = false) => {
     const itemsToPrint = selectedOnly 
@@ -1932,6 +1964,20 @@ export const EnhancedQRCodeManager: React.FC<EnhancedQRCodeManagerProps> = ({ su
             {selectionMode ? <CheckSquare className="h-4 w-4 mr-1" /> : <Square className="h-4 w-4 mr-1" />}
             {selectionMode ? `Selected (${selectedItems.size})` : 'Select'}
           </Button>
+
+          {/* Delete & Regenerate - only when items selected */}
+          {selectionMode && selectedItems.size > 0 && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={deleteAndRegenerateSelected}
+              className="border-amber-300 text-amber-700 hover:bg-amber-50"
+              title="Delete selected QR codes and generate fresh ones"
+            >
+              <RotateCcw className="h-4 w-4 mr-1" />
+              Delete & Regenerate ({selectedItems.size})
+            </Button>
+          )}
 
           {/* Primary Action: Scan to Dispatch */}
           <Button 
