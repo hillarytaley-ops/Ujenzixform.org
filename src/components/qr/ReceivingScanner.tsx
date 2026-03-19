@@ -217,30 +217,52 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
     fetchOrdersRef.current = true;
     setLoadingOrders(true);
     try {
-      const { data: deliveriesData, error: rpcError } = await supabase.rpc('get_active_deliveries_for_provider');
-      if (rpcError || !deliveriesData || !Array.isArray(deliveriesData)) {
-        console.warn('get_active_deliveries_for_provider failed or empty:', rpcError);
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user?.id) {
         setOrders([]);
         return;
       }
-      const deliveries = (deliveriesData as Array<{
-        purchase_order_id: string;
-        order_number: string;
-        _items_count: number;
-        _dispatched_count: number;
-        _received_count: number;
-        _categorized_status: string;
-      }>).filter((d) => d._categorized_status === 'in_transit' && (d._dispatched_count ?? 0) > 0);
+      let providerId: string = user.id;
+      const { data: dp } = await supabase.from('delivery_providers').select('id').eq('user_id', user.id).maybeSingle();
+      if (dp?.id) providerId = dp.id;
+
+      const activeStatuses = ['pending', 'requested', 'assigned', 'accepted', 'scheduled', 'dispatched', 'in_transit', 'picked_up', 'out_for_delivery'];
+      const { data: drList } = await supabase
+        .from('delivery_requests')
+        .select('id,purchase_order_id,status,order_number,provider_id')
+        .in('status', activeStatuses)
+        .or(`provider_id.eq.${providerId},provider_id.eq.${user.id}`)
+        .order('created_at', { ascending: false })
+        .limit(100);
+
+      const rows = (drList || []) as Array<{ purchase_order_id: string | null; status: string; order_number?: string; provider_id?: string | null }>;
+      const filtered = rows.filter((d) => d.purchase_order_id);
+      const byPoId = new Map<string, { order_number?: string }>();
+      filtered.forEach((d) => {
+        if (d.purchase_order_id && !byPoId.has(d.purchase_order_id)) {
+          byPoId.set(d.purchase_order_id, { order_number: d.order_number });
+        }
+      });
+      const poIds = Array.from(byPoId.keys());
+      if (poIds.length === 0) {
+        setOrders([]);
+        return;
+      }
+
       const orderMap: Record<string, Order> = {};
-      for (const d of deliveries) {
-        const poId = d.purchase_order_id;
-        if (!poId) continue;
+      for (const poId of poIds) {
         const { data: itemsData } = await supabase
           .from('material_items')
           .select('id,qr_code,material_type,category,quantity,unit,item_sequence,receive_scanned,receive_scan_count,dispatch_scanned,status,created_at')
           .eq('purchase_order_id', poId)
           .order('item_sequence');
         const items = (itemsData || []) as any[];
+        const hasDispatched = items.some((i: any) => i.dispatch_scanned === true);
+        const allReceived = items.every(
+          (i: any) => i.receive_scanned === true || (i.receive_scan_count ?? 0) >= (i.quantity ?? 1)
+        );
+        if (!hasDispatched || allReceived) continue;
+
         const orderItems: OrderItem[] = items.map((it: any) => ({
           id: it.id,
           qr_code: it.qr_code,
@@ -263,10 +285,11 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
           receivedItems += i.receive_scanned ? q : Math.min(count, q);
         });
         const pendingItems = Math.max(0, totalItems - receivedItems);
+        const meta = byPoId.get(poId);
         const { data: poRow } = await supabase.from('purchase_orders').select('po_number,builder_name,builder_email,builder_phone,created_at').eq('id', poId).single();
         orderMap[poId] = {
           id: poId,
-          order_number: d.order_number || (poRow as any)?.po_number,
+          order_number: meta?.order_number || (poRow as any)?.po_number,
           buyer_id: '',
           buyer_name: (poRow as any)?.builder_name || 'Client',
           buyer_email: (poRow as any)?.builder_email || '',
@@ -274,7 +297,7 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
           total_items: totalItems,
           received_items: receivedItems,
           pending_items: pendingItems,
-          created_at: (poRow as any)?.created_at || d.purchase_order_id,
+          created_at: (poRow as any)?.created_at || poId,
           items: orderItems
         };
       }
