@@ -419,17 +419,23 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
   }, []);
 
   useEffect(() => {
+    if (deliveryRequestsFromDashboard !== undefined) {
+      if (deliveryRequestsFromDashboard.length > 0) {
+        loadFromDashboardList(deliveryRequestsFromDashboard);
+      } else {
+        hasOrdersRef.current = false;
+        setOrders([]);
+        setLoadingOrders(false);
+      }
+      return;
+    }
     const allowAccess = ['admin', 'delivery_provider', 'delivery'].includes(userRole || '');
     if (!allowAccess) {
       setLoadingOrders(false);
       return;
     }
-    if (deliveryRequestsFromDashboard !== undefined) {
-      loadFromDashboardList(deliveryRequestsFromDashboard);
-    } else {
-      fetchDeliveries();
-    }
-  }, [userRole, deliveryRequestsFromDashboard, loadFromDashboardList, fetchDeliveries]);
+    fetchDeliveries();
+  }, [userRole, deliveryRequestsFromDashboard, deliveryRequestsFromDashboard?.length, loadFromDashboardList, fetchDeliveries]);
 
   const selectDelivery = (order: Order) => {
     setSelectedOrder(order);
