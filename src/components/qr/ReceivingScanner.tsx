@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { PackageCheck, Scan, CheckCircle, Camera, Truck, MapPin, Lock, ArrowRight, RotateCcw, Smartphone, Flashlight, AlertCircle, ArrowLeft, RefreshCw, Clock, QrCode, CheckCircle2, Circle, PartyPopper } from 'lucide-react';
+import { PackageCheck, Scan, CheckCircle, Camera, Truck, Lock, ArrowRight, RotateCcw, Smartphone, Flashlight, AlertCircle, ArrowLeft, RefreshCw, Clock, QrCode, CheckCircle2, Circle, PartyPopper, X } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
@@ -173,6 +173,41 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
     return () => {
       stopScanning();
       window.removeEventListener('unhandledrejection', handleUnhandledRejection);
+    };
+  }, []);
+
+  // Match DispatchScanner: video/canvas fill the large viewport (no letterboxing gaps)
+  useEffect(() => {
+    const styleId = 'receiving-scanner-custom-styles';
+    if (document.getElementById(styleId)) return;
+
+    const style = document.createElement('style');
+    style.id = styleId;
+    style.textContent = `
+      #${scannerContainerId} {
+        width: 100% !important;
+        height: 100% !important;
+        min-height: 500px !important;
+      }
+      #${scannerContainerId} video {
+        width: 100% !important;
+        height: 100% !important;
+        object-fit: cover !important;
+      }
+      #${scannerContainerId} canvas {
+        width: 100% !important;
+        height: 100% !important;
+      }
+      #${scannerContainerId} .html5-qrcode-element {
+        width: 100% !important;
+        height: 100% !important;
+      }
+    `;
+    document.head.appendChild(style);
+
+    return () => {
+      const existingStyle = document.getElementById(styleId);
+      if (existingStyle) existingStyle.remove();
     };
   }, []);
 
@@ -547,47 +582,54 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
 
       // Stop any existing scanner
       await stopScanning();
-      
-      // Delay for cleanup and container readiness (html5-qrcode needs stable DOM)
-      await new Promise(resolve => setTimeout(resolve, 300));
+
+      // Short delay for cleanup and container readiness (same as DispatchScanner)
+      await new Promise(resolve => setTimeout(resolve, 100));
 
       // Create new scanner instance
       console.log('🎥 Creating Html5Qrcode instance for container:', scannerContainerId);
-      // Set verbose to false to reduce noise from internal library errors
       scannerRef.current = new Html5Qrcode(scannerContainerId, { verbose: false });
-      
-      // Use facingMode for mobile, or specific camera ID if selected
+
       let cameraConfig: any;
       if (selectedCameraId) {
         cameraConfig = selectedCameraId;
         console.log('📷 Using selected camera ID:', selectedCameraId);
       } else {
-        cameraConfig = { facingMode: facing };
+        cameraConfig = {
+          facingMode: facing,
+          width: { ideal: 1280, min: 640 },
+          height: { ideal: 720, min: 480 },
+        };
         console.log('📷 Using facing mode:', facing);
       }
 
-      // Responsive qrbox - standard size (250x250), adapts to viewport
-      const baseSize = isMobile ? 200 : 250;
-      const scannerFps = isMobile ? 10 : 15;
-      
+      // Match DispatchScanner: qrbox ~70% viewport width, capped 250–400px, higher FPS, native detector when available
+      const viewportWidth = window.innerWidth;
+      const qrboxSize = Math.max(250, Math.min(Math.floor(viewportWidth * 0.7), 400));
+
       const scannerConfig = {
-        fps: scannerFps,
-        qrbox: (viewfinderWidth: number, viewfinderHeight: number) => {
-          const w = Math.max(150, Math.min(baseSize, Math.floor(viewfinderWidth * 0.85)));
-          const h = Math.max(150, Math.min(baseSize, Math.floor(viewfinderHeight * 0.85)));
-          return { width: w, height: h };
+        fps: 30,
+        qrbox: function (viewfinderWidth: number, viewfinderHeight: number) {
+          const maxSize = Math.min(viewfinderWidth, viewfinderHeight) * 0.8;
+          const size = Math.min(qrboxSize, maxSize);
+          return { width: Math.floor(size), height: Math.floor(size) };
         },
+        aspectRatio: 1.0,
         rememberLastUsedCamera: true,
         supportedScanTypes: [],
         formatsToSupport: [Html5QrcodeSupportedFormats.QR_CODE],
-        aspectRatio: isMobile ? 1.0 : 1.333, // 4:3 for desktop
-        disableFlip: false, // Allow flipped images (mirror mode)
+        disableFlip: false,
         experimentalFeatures: {
-          useBarCodeDetectorIfSupported: false // Disable - can cause camera issues on some devices
-        }
+          useBarCodeDetectorIfSupported: true,
+        },
       };
 
-      console.log('🎥 Starting scanner with config:', scannerConfig);
+      console.log('🎥 Starting scanner with config:', {
+        cameraConfig,
+        qrboxSize,
+        viewportWidth,
+        fps: scannerConfig.fps,
+      });
 
       await scannerRef.current.start(
         cameraConfig,
@@ -1350,46 +1392,60 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
         </CardContent>
       </Card>
 
-      {isMobile && (
-        <Alert className="bg-green-50 border-green-200">
-          <Smartphone className="h-4 w-4 text-green-600" />
-          <AlertDescription className="text-green-800 text-sm">
-            <strong>Mobile Device Detected:</strong> {deviceInfo}. Hold your phone steady and ensure good lighting.
-          </AlertDescription>
-        </Alert>
-      )}
-
-      {/* Camera Scanner - only when items remain */}
+      {/* Camera Scanner — layout matches DispatchScanner (large viewport, green card, amber workflow) */}
       {!allItemsScanned && (
-      <Card>
-        <CardHeader>
+      <Card className="border-2 border-green-500 shadow-lg">
+        <CardHeader className="bg-green-50 border-b border-green-200 py-3">
           <CardTitle className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <MapPin className="h-5 w-5 text-green-600" />
-              Delivery Confirmation Scanner
+              <div className="bg-green-600 p-2 rounded-lg">
+                <Camera className="h-5 w-5 text-white" />
+              </div>
+              <div>
+                <span className="text-green-800">📷 Scan Physical QR Codes</span>
+                <p className="text-xs font-normal text-green-600 mt-0.5">
+                  Point camera at QR stickers on delivered materials
+                </p>
+              </div>
             </div>
             {availableCameras.length > 0 && (
-              <Badge variant="outline" className="text-xs">
-                {availableCameras.length} camera{availableCameras.length > 1 ? 's' : ''} available
+              <Badge className="bg-green-600">
+                {availableCameras.length} camera{availableCameras.length > 1 ? 's' : ''}
               </Badge>
             )}
           </CardTitle>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="p-4 space-y-4">
           {!allowAccess && (
-            <div className="p-3 rounded-md bg-yellow-50 text-yellow-700 text-sm">
+            <div className="p-3 rounded-md bg-yellow-50 text-yellow-700 text-sm border border-yellow-200">
               <strong>Access restricted.</strong> Sign in as a delivery provider to confirm deliveries.
             </div>
           )}
 
-          {/* Camera Error Display */}
+          <Alert className="bg-amber-50 border-amber-300">
+            <PackageCheck className="h-4 w-4 text-amber-600" />
+            <AlertDescription className="text-amber-800 text-sm">
+              <strong>Receiving Workflow:</strong> As you deliver each material, scan its QR code sticker. The system
+              will automatically track which items have been received.
+            </AlertDescription>
+          </Alert>
+
+          {isMobile && (
+            <Alert className="bg-blue-50 border-blue-200">
+              <Smartphone className="h-4 w-4 text-blue-600" />
+              <AlertDescription className="text-blue-800 text-sm">
+                <strong>Tip ({deviceInfo}):</strong> Hold phone steady, 6-12 inches from QR code. Ensure good lighting.
+              </AlertDescription>
+            </Alert>
+          )}
+
           {cameraError && (
             <Alert className="bg-red-50 border-red-200">
               <AlertCircle className="h-4 w-4 text-red-600" />
               <AlertDescription className="text-red-800 text-sm">
                 {cameraError}
-                <Button 
-                  variant="link" 
+                <Button
+                  variant="link"
                   className="text-red-700 p-0 h-auto ml-2"
                   onClick={() => {
                     setCameraError(null);
@@ -1401,140 +1457,69 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
               </AlertDescription>
             </Alert>
           )}
-          
-          {/* Camera View - responsive standard size (280-400px, works on all devices) */}
-          <div 
-            className="relative bg-black rounded-lg overflow-hidden mx-auto w-full"
-            style={{ 
-              maxWidth: '400px', 
-              minHeight: isMobile ? '220px' : '260px',
-              aspectRatio: '4/3'
-            }}
+
+          <div
+            className="relative bg-black rounded-xl overflow-hidden w-full"
+            style={{ aspectRatio: '4/3', minHeight: '500px', maxHeight: '70vh' }}
           >
-            {/* Scanner container - html5-qrcode renders video + viewfinder here */}
-            <div 
-              id={scannerContainerId} 
-              className="w-full h-full min-h-[220px]"
-              style={{ minHeight: isMobile ? '220px' : '260px' }}
+            <div
+              id={scannerContainerId}
+              className="w-full h-full"
+              style={{ width: '100%', height: '100%', minHeight: '500px' }}
             />
-            
-            {/* White scan frame - visible border for positioning QR code */}
-            {isScanning && (
-              <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
-                <div 
-                  className="relative border-2 border-white rounded-lg bg-black/30"
-                  style={{ 
-                    width: 'min(85%, 260px)', 
-                    height: 'min(75%, 260px)',
-                    minWidth: '160px',
-                    minHeight: '160px',
-                    boxShadow: 'inset 0 0 0 2px rgba(255,255,255,0.5), 0 0 0 9999px rgba(0,0,0,0.4)'
-                  }}
-                >
-                  {/* Corner brackets - green accent */}
-                  <div className="absolute top-0 left-0 border-t-2 border-l-2 border-green-400 rounded-tl" style={{ width: '25%', height: '25%' }}></div>
-                  <div className="absolute top-0 right-0 border-t-2 border-r-2 border-green-400 rounded-tr" style={{ width: '25%', height: '25%' }}></div>
-                  <div className="absolute bottom-0 left-0 border-b-2 border-l-2 border-green-400 rounded-bl" style={{ width: '25%', height: '25%' }}></div>
-                  <div className="absolute bottom-0 right-0 border-b-2 border-r-2 border-green-400 rounded-br" style={{ width: '25%', height: '25%' }}></div>
-                  
-                  {/* Scanning line animation */}
-                  <div 
-                    className="absolute left-[10%] right-[10%] h-1 bg-gradient-to-r from-transparent via-green-400 to-transparent rounded-full"
-                    style={{
-                      animation: 'scanLine 2s ease-in-out infinite',
-                      top: '50%',
-                      boxShadow: '0 0 10px rgba(74, 222, 128, 0.8)'
-                    }}
-                  ></div>
-                  <style>{`
-                    @keyframes scanLine {
-                      0%, 100% { top: 15%; opacity: 0.6; }
-                      50% { top: 85%; opacity: 1; }
-                    }
-                  `}</style>
-                  
-                  {/* Center target - small dot */}
-                  <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-3 h-3 rounded-full bg-green-400/30 border border-green-400/50"></div>
-                  
-                  {/* Frame border glow effect */}
-                  <div 
-                    className="absolute inset-0 rounded-lg"
-                    style={{
-                      boxShadow: 'inset 0 0 30px rgba(74, 222, 128, 0.15), 0 0 20px rgba(0, 0, 0, 0.5)'
-                    }}
-                  ></div>
-                </div>
-              </div>
-            )}
-            
-            {/* Not scanning overlay */}
+
             {!isScanning && !cameraError && (
-              <div className="absolute inset-0 flex items-center justify-center bg-gray-900/80">
-                <div className="text-center text-white">
-                  <Camera className="h-12 w-12 mx-auto mb-2 opacity-50" />
-                  <p className="text-sm opacity-70">Camera not active</p>
-                  <p className="text-xs opacity-50">Click "Start Scanner" to begin</p>
+              <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-b from-gray-800 to-gray-900">
+                <div className="text-center text-white p-6">
+                  <div className="bg-green-600/20 p-6 rounded-full inline-block mb-4">
+                    <Camera className="h-16 w-16 text-green-400" />
+                  </div>
+                  <h3 className="text-lg font-semibold mb-2">Ready to Scan</h3>
+                  <p className="text-sm opacity-70 mb-4">Tap the button below to activate your camera</p>
+                  <Button
+                    onClick={startCameraScanning}
+                    size="lg"
+                    className="bg-green-600 hover:bg-green-700 text-white px-8 py-6 text-lg"
+                    disabled={!allowAccess}
+                  >
+                    <Camera className="h-6 w-6 mr-2" />
+                    Start Camera Scanner
+                  </Button>
                 </div>
               </div>
             )}
-            
-            {/* Scanning indicator */}
+
             {isScanning && (
-              <div className="absolute bottom-4 left-0 right-0 text-center pointer-events-none">
-                <span className="bg-green-600 text-white text-sm px-3 py-1 rounded-full animate-pulse shadow-lg">
-                  🔍 Scanning for QR codes...
-                </span>
-              </div>
-            )}
-            
-            {/* Scanning tip banner */}
-            {isScanning && (
-              <div className="absolute top-4 left-0 right-0 text-center pointer-events-none">
-                <span className="bg-black/70 text-white text-xs sm:text-sm px-3 py-1.5 rounded-full shadow-lg">
-                  📷 Position QR code within the green frame
-                </span>
-              </div>
+              <>
+                <div className="absolute inset-0 pointer-events-none">
+                  <div className="absolute top-8 left-8 w-16 h-16 border-l-4 border-t-4 border-green-400 rounded-tl-lg" />
+                  <div className="absolute top-8 right-8 w-16 h-16 border-r-4 border-t-4 border-green-400 rounded-tr-lg" />
+                  <div className="absolute bottom-20 left-8 w-16 h-16 border-l-4 border-b-4 border-green-400 rounded-bl-lg" />
+                  <div className="absolute bottom-20 right-8 w-16 h-16 border-r-4 border-b-4 border-green-400 rounded-br-lg" />
+                </div>
+                <div className="absolute bottom-4 left-0 right-0 text-center">
+                  <span className="bg-green-600 text-white text-sm px-4 py-2 rounded-full shadow-lg animate-pulse inline-flex items-center gap-2">
+                    <Scan className="h-4 w-4" />
+                    Scanning... Point at QR code
+                  </span>
+                </div>
+              </>
             )}
           </div>
 
-          {/* Camera Controls */}
-          <div className="flex flex-wrap gap-2">
-            {!isScanning ? (
-              <Button onClick={startCameraScanning} className="flex-1 sm:flex-none bg-green-600 hover:bg-green-700" size="lg">
-                <Camera className="h-5 w-5 mr-2" />
-                Start Scanner
-              </Button>
-            ) : (
-              <Button onClick={() => { stopScanning(); toast.info('Scanner stopped'); }} variant="destructive" className="flex-1 sm:flex-none" size="lg">
-                <RotateCcw className="h-5 w-5 mr-2" />
-                Stop Scanner
-              </Button>
-            )}
-            
-            {availableCameras.length > 1 && (
-              <Button 
-                onClick={toggleCamera} 
-                variant="outline" 
-                size="lg"
-                title="Switch between cameras"
-              >
-                <RotateCcw className="h-5 w-5 mr-2" />
-                {isMobile ? 'Flip' : 'Switch Camera'}
-              </Button>
-            )}
-          </div>
-
-          {/* Camera Selection */}
           {availableCameras.length > 1 && (
             <div className="space-y-2">
               <Label className="text-sm text-muted-foreground">Select Camera</Label>
-              <Select value={selectedCameraId} onValueChange={async (value) => {
-                setSelectedCameraId(value);
-                if (isScanning) {
-                  await stopScanning();
-                  setTimeout(() => startCameraScanning(), 300);
-                }
-              }}>
+              <Select
+                value={selectedCameraId}
+                onValueChange={async (value) => {
+                  setSelectedCameraId(value);
+                  if (isScanning) {
+                    await stopScanning();
+                    setTimeout(() => startCameraScanning(), 300);
+                  }
+                }}
+              >
                 <SelectTrigger>
                   <SelectValue placeholder="Choose camera" />
                 </SelectTrigger>
@@ -1549,30 +1534,44 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
             </div>
           )}
 
-          {/* Mobile Tips */}
+          {isScanning && (
+            <div className="flex flex-wrap gap-2 justify-center">
+              <Button
+                onClick={() => {
+                  stopScanning();
+                  toast.info('Scanner stopped');
+                }}
+                variant="destructive"
+                size="lg"
+              >
+                <X className="h-5 w-5 mr-2" />
+                Stop Scanner
+              </Button>
+              {availableCameras.length > 1 && (
+                <Button onClick={toggleCamera} variant="outline" size="lg">
+                  <RotateCcw className="h-5 w-5 mr-2" />
+                  {isMobile ? 'Flip' : 'Switch Camera'}
+                </Button>
+              )}
+            </div>
+          )}
+
           {isMobile && isScanning && (
             <div className="text-xs text-muted-foreground bg-muted/50 rounded-lg p-3">
-              <p className="font-medium mb-1">📱 Mobile Scanning Tips:</p>
+              <p className="font-medium mb-1">📱 Mobile scanning tips</p>
               <ul className="list-disc list-inside space-y-0.5">
-                <li>Hold phone 6-12 inches from QR code</li>
-                <li>Ensure QR code is well-lit</li>
-                <li>Keep phone steady while scanning</li>
-                <li>Use flash in low light conditions</li>
+                <li>Hold phone 6-12 inches from the QR code</li>
+                <li>Keep the code well-lit and steady</li>
               </ul>
             </div>
           )}
 
-          {/* Desktop/Laptop Tips */}
           {!isMobile && isScanning && (
             <div className="text-xs text-muted-foreground bg-blue-50 dark:bg-blue-900/20 rounded-lg p-3 border border-blue-200 dark:border-blue-800">
-              <p className="font-medium mb-1 text-blue-800 dark:text-blue-200">💻 Laptop/Desktop Scanning Tips:</p>
+              <p className="font-medium mb-1 text-blue-800 dark:text-blue-200">💻 Desktop / laptop tips</p>
               <ul className="list-disc list-inside space-y-0.5 text-blue-700 dark:text-blue-300">
-                <li>Position QR code within the <strong>green frame</strong></li>
-                <li>Hold the QR code <strong>8-15 inches</strong> from the webcam</li>
-                <li>Ensure good lighting - avoid backlighting</li>
-                <li>Keep the QR code <strong>flat and steady</strong></li>
-                <li>If not detecting, try <strong>moving closer or further</strong></li>
-                <li>You can also use "Physical Scanner Input" below for USB scanners</li>
+                <li>Use the green corner guides — stay about 8-15 inches from the webcam</li>
+                <li>Avoid backlighting; try the physical scanner input below if needed</li>
               </ul>
             </div>
           )}
