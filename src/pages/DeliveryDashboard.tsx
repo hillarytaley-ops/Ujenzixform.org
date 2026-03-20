@@ -980,6 +980,48 @@ const DeliveryDashboard = () => {
     unifiedLoading
   });
 
+  /**
+   * Receiving Scanner must use the SAME source as the Deliveries tab (Scheduled + In Transit).
+   * Previously we only passed isolatedActiveDeliveries (useDeliveryProviderData / FAST PATH).
+   * When unified RPC returns rows, the tab shows unifiedScheduled + unifiedInTransit but the
+   * scanner still saw [] → "No Deliveries Found" while the badge showed 2.
+   */
+  const deliveriesForReceivingScanner = useMemo(() => {
+    const mapRow = (d: {
+      id: string;
+      purchase_order_id?: string | null;
+      order_number?: string;
+      status?: string;
+    }) => ({
+      id: d.id,
+      purchase_order_id: d.purchase_order_id ?? undefined,
+      order_number: d.order_number,
+      status: d.status
+    });
+
+    if (hasUnifiedData) {
+      return [...unifiedScheduled, ...(unifiedInTransit || [])]
+        .filter((r) => r.purchase_order_id)
+        .map((r) =>
+          mapRow({
+            id: r.id,
+            purchase_order_id: r.purchase_order_id,
+            order_number: r.order_number,
+            status: r.status
+          })
+        );
+    }
+
+    return (isolatedActiveDeliveries || []).map((d: Record<string, unknown>) =>
+      mapRow({
+        id: String(d.id ?? ''),
+        purchase_order_id: (d.purchase_order_id as string | null | undefined) ?? undefined,
+        order_number: d.order_number as string | undefined,
+        status: d.status as string | undefined
+      })
+    );
+  }, [hasUnifiedData, unifiedScheduled, unifiedInTransit, isolatedActiveDeliveries]);
+
   // ============================================================
   // AGGRESSIVE APPROACH: FORCE-ADD KNOWN DELIVERED ORDERS
   // ============================================================
@@ -3065,8 +3107,11 @@ const DeliveryDashboard = () => {
                       </div>
                     </div>
                     <ReceivingScanner
-                      deliveryRequestsFromDashboard={isolatedActiveDeliveries}
-                      onRefreshRequested={refetchData}
+                      deliveryRequestsFromDashboard={deliveriesForReceivingScanner}
+                      onRefreshRequested={() => {
+                        void refetchData();
+                        void refetchUnified();
+                      }}
                       onDeliveryComplete={async (orderCompleted) => {
                         // Provider Delivered = Supplier Delivered (material_items.receive_scanned)
                         console.log('🔄 Delivery scan complete - orderCompleted:', orderCompleted);
