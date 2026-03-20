@@ -4,9 +4,14 @@
 -- may store auth.users id (user_id) OR delivery_providers.id (see RLS migrations).
 -- Previous RPC only used dp.id = ANY(provider_ids), so lookups returned zero rows.
 -- Adds user_id to RPC output so clients can key names both ways.
+--
+-- DROP required: PostgreSQL cannot CREATE OR REPLACE when OUT/RETURNS row type changes.
 -- ============================================================
 
-CREATE OR REPLACE FUNCTION public.get_delivery_provider_names_for_supplier(provider_ids UUID[])
+DROP FUNCTION IF EXISTS public.get_delivery_provider_names_for_supplier(uuid[]);
+DROP FUNCTION IF EXISTS public.get_delivery_provider_names_for_builder(uuid[]);
+
+CREATE FUNCTION public.get_delivery_provider_names_for_supplier(provider_ids UUID[])
 RETURNS TABLE(id UUID, user_id UUID, provider_name TEXT, phone TEXT)
 LANGUAGE sql
 SECURITY DEFINER
@@ -45,7 +50,9 @@ $$;
 COMMENT ON FUNCTION public.get_delivery_provider_names_for_supplier(UUID[]) IS
   'Names/phones for supplier POs; provider_ids may be delivery_providers.id or auth user_id.';
 
-CREATE OR REPLACE FUNCTION public.get_delivery_provider_names_for_builder(provider_ids UUID[])
+GRANT EXECUTE ON FUNCTION public.get_delivery_provider_names_for_supplier(uuid[]) TO authenticated;
+
+CREATE FUNCTION public.get_delivery_provider_names_for_builder(provider_ids UUID[])
 RETURNS TABLE(id UUID, user_id UUID, provider_name TEXT, phone TEXT)
 LANGUAGE sql
 SECURITY DEFINER
@@ -86,3 +93,5 @@ $$;
 
 COMMENT ON FUNCTION public.get_delivery_provider_names_for_builder(UUID[]) IS
   'Names/phones for builder orders; provider_ids may be dp.id or auth user_id.';
+
+GRANT EXECUTE ON FUNCTION public.get_delivery_provider_names_for_builder(uuid[]) TO authenticated;
