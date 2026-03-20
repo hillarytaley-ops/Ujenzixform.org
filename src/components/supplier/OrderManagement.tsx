@@ -719,6 +719,35 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, in
       } catch (e) {
         console.log('Delivery requests enrichment failed');
       }
+
+      // Per–purchase-order provider display (server join: PO + DR + delivery_providers + profile + auth metadata)
+      const providerDisplayByPoId = new Map<
+        string,
+        { delivery_provider_id?: string; provider_name?: string; phone?: string }
+      >();
+      try {
+        if (orderIds.length > 0) {
+          const { data: dispRows, error: dispErr } = await supabase.rpc(
+            'get_delivery_provider_display_for_supplier_orders',
+            { p_po_ids: orderIds }
+          );
+          if (dispErr) {
+            console.warn('OrderManagement: get_delivery_provider_display_for_supplier_orders:', dispErr.message);
+          }
+          (dispRows || []).forEach((row: any) => {
+            if (row?.purchase_order_id) {
+              providerDisplayByPoId.set(row.purchase_order_id, {
+                delivery_provider_id: row.delivery_provider_id,
+                provider_name: row.provider_name,
+                phone: row.phone,
+              });
+            }
+          });
+        }
+      } catch (e) {
+        console.warn('OrderManagement: provider display by PO RPC failed', e);
+      }
+
       const providerIdsToResolve = new Set<string>();
       purchaseOrders.forEach((po: any) => {
         if (po.delivery_provider_id) providerIdsToResolve.add(po.delivery_provider_id);
@@ -742,9 +771,11 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, in
             if (Array.isArray(rpcRows) && rpcRows.length > 0) {
               rpcRows.forEach((row: unknown) => {
                 const r = row as { id?: string; user_id?: string; provider_name?: string; phone?: string };
-                if (r?.id && r.provider_name) {
-                  providerNames[r.id] = r.provider_name;
-                  if (r.user_id) providerNames[r.user_id] = r.provider_name;
+                if (r?.id) {
+                  if (r.provider_name && r.provider_name !== 'Delivery Provider') {
+                    providerNames[r.id] = r.provider_name;
+                    if (r.user_id) providerNames[r.user_id] = r.provider_name;
+                  }
                   if (r.phone) {
                     providerPhones[r.id] = r.phone;
                     if (r.user_id) providerPhones[r.user_id] = r.phone;
@@ -845,14 +876,24 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, in
           po.status === 'quote_rejected';
         
         const dr = deliveryRequestsByPO.get(po.id);
-        const resolvedProviderId = po.delivery_provider_id || dr?.provider_id;
+        const disp = providerDisplayByPoId.get(po.id);
+        let resolvedProviderId = po.delivery_provider_id || dr?.provider_id;
+        if (disp?.delivery_provider_id) resolvedProviderId = disp.delivery_provider_id;
         const resolvedStatus = po.delivery_status || (dr?.status && ['accepted', 'assigned', 'picked_up', 'in_transit', 'delivered'].includes(dr.status) ? dr.status : undefined);
-        const resolvedProviderPhone = po.delivery_provider_phone || (resolvedProviderId ? providerPhones[resolvedProviderId] : undefined);
+        let resolvedProviderPhone =
+          disp?.phone ||
+          po.delivery_provider_phone ||
+          (resolvedProviderId ? providerPhones[resolvedProviderId] : undefined);
         const poProviderName =
           po.delivery_provider_name && po.delivery_provider_name !== 'Delivery Provider'
             ? po.delivery_provider_name
             : undefined;
+        const dispName =
+          disp?.provider_name && disp.provider_name !== 'Delivery Provider'
+            ? disp.provider_name
+            : undefined;
         const resolvedProviderName =
+          dispName ||
           poProviderName ||
           (resolvedProviderId ? providerNames[resolvedProviderId] : undefined) ||
           (resolvedProviderPhone ? `Driver · ${resolvedProviderPhone}` : undefined) ||

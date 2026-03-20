@@ -351,6 +351,34 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
       } catch (e) {
         console.log('⚠️ Delivery requests fetch timeout, continuing without delivery request data');
       }
+
+      const providerDisplayByOrderId = new Map<
+        string,
+        { delivery_provider_id?: string; provider_name?: string; phone?: string }
+      >();
+      try {
+        const poIds = ordersData.map((o: any) => o.id).filter(Boolean);
+        if (poIds.length > 0) {
+          const { data: dispRows, error: dispErr } = await supabase.rpc(
+            'get_delivery_provider_display_for_builder_orders',
+            { p_po_ids: poIds }
+          );
+          if (dispErr) {
+            console.warn('BuilderOrdersTracker: get_delivery_provider_display_for_builder_orders:', dispErr.message);
+          }
+          (dispRows || []).forEach((row: any) => {
+            if (row?.purchase_order_id) {
+              providerDisplayByOrderId.set(row.purchase_order_id, {
+                delivery_provider_id: row.delivery_provider_id,
+                provider_name: row.provider_name,
+                phone: row.phone,
+              });
+            }
+          });
+        }
+      } catch (e) {
+        console.warn('BuilderOrdersTracker: provider display by PO RPC failed', e);
+      }
       
       // Collect all provider IDs (from purchase_orders and delivery_requests)
       const allProviderIds = new Set<string>();
@@ -484,17 +512,20 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
       // Combine orders with their items and enriched provider information
       const ordersWithItems = ordersData.map((order: any) => {
         const dr = deliveryRequestsMap.get(order.id);
-        
-        // Get provider ID from delivery_request if not in purchase_order
-        const providerId = order.delivery_provider_id || dr?.provider_id;
-        
-        // Get provider name - ignore PO stub "Delivery Provider" so we re-resolve from maps/RPC
+        const disp = providerDisplayByOrderId.get(order.id);
+
+        let providerId = order.delivery_provider_id || dr?.provider_id;
+        if (disp?.delivery_provider_id) providerId = disp.delivery_provider_id;
+
         let providerName =
           order.delivery_provider_name && order.delivery_provider_name !== 'Delivery Provider'
             ? order.delivery_provider_name
             : null;
-        // Get provider phone first (helps display fallback)
         let providerPhone = order.delivery_provider_phone;
+        if (disp?.phone) providerPhone = disp.phone || providerPhone;
+        if (disp?.provider_name && disp.provider_name !== 'Delivery Provider') {
+          providerName = disp.provider_name;
+        }
         if (!providerPhone && providerId) {
           providerPhone = providerPhonesMap.get(providerId) || null;
         }
