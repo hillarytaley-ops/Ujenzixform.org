@@ -1114,7 +1114,37 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, in
     const getDeliveryStatusBadge = (order: Order) => {
       // Check if delivery is required
       const requiresDelivery = order.delivery_required !== false; // Default to true if not specified
-      
+
+      const genericName = (s?: string) => {
+        const t = (s || '').trim().toLowerCase();
+        return !t || t === 'delivery provider' || t === 'assigned driver';
+      };
+
+      /** Best label for provider: real name, else phone, else short fallback */
+      const providerDisplay = (): string => {
+        const name = order.delivery_provider_name?.trim();
+        const phone = order.delivery_provider_phone?.trim();
+        if (name && !genericName(name)) return name;
+        if (phone) return phone;
+        if (order.delivery_provider_id) return 'Provider assigned';
+        return '—';
+      };
+
+      const orderMetaLines = (providerLabel: string) => (
+        <>
+          <p className={`text-[11px] mt-1.5 pt-1.5 border-t border-black/10 ${isDarkMode ? 'border-white/10' : ''}`}>
+            <span className={`font-semibold ${mutedText}`}>Order </span>
+            <span className={`font-mono ${textColor}`}>{order.order_number}</span>
+          </p>
+          <p className={`text-[11px] mt-0.5`}>
+            <span className={`font-semibold ${mutedText}`}>Provider </span>
+            <span className={`font-medium ${textColor}`} title={providerLabel}>
+              {providerLabel}
+            </span>
+          </p>
+        </>
+      );
+
       // If no delivery provider assigned
       if (!order.delivery_provider_id && !order.delivery_provider_name) {
         if (requiresDelivery) {
@@ -1128,6 +1158,10 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, in
                   ? 'Builder accepted - awaiting provider assignment' 
                   : 'Delivery requested - awaiting assignment'}
               </p>
+              <p className={`text-[10px] mt-1 font-mono ${textColor}`}>
+                <span className={`font-semibold ${mutedText}`}>Order </span>
+                {order.order_number}
+              </p>
             </div>
           );
         } else {
@@ -1136,13 +1170,14 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, in
               <Badge variant="outline" className="bg-gray-50 text-gray-600 border-gray-200 text-xs">
                 📦 Pickup Only
               </Badge>
+              <p className={`text-[10px] mt-1 font-mono ${textColor}`}>
+                <span className={`font-semibold ${mutedText}`}>Order </span>
+                {order.order_number}
+              </p>
             </div>
           );
         }
       }
-      
-      // When delivery provider is assigned, show their name instead of "Awaiting Delivery Provider"
-      // This is the key change: display provider name when provider_id exists
       
       // Delivery provider is assigned - show provider name instead of "Awaiting Delivery Provider"
       const deliveryStatusColors: Record<string, string> = {
@@ -1161,12 +1196,26 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, in
       const isAccepted = status === 'accepted' || status === 'picked_up' || status === 'in_transit' || status === 'delivered';
       const isDelivered = status === 'delivered';
       
-      // Get provider name - use delivery_provider_name if available, otherwise show a placeholder
-      const providerName = order.delivery_provider_name || 'Delivery Provider';
+      const pl = providerDisplay();
+      const showPhoneSub =
+        !!order.delivery_provider_phone?.trim() &&
+        pl !== order.delivery_provider_phone.trim();
+
+      const statusHeadline = (
+        <>
+          {status === 'pending' && '⏳ Pending'}
+          {status === 'requested' && '📤 Requested'}
+          {status === 'assigned' && '📋 Assigned'}
+          {status === 'accepted' && '✅ Delivery Confirmed'}
+          {status === 'picked_up' && '📦 Picked Up'}
+          {status === 'in_transit' && '🚚 In Transit'}
+          {status === 'delivered' && '✓ Delivered'}
+          {status === 'cancelled' && '✗ Cancelled'}
+        </>
+      );
       
       return (
-        <div className="space-y-1 min-w-[160px]">
-          {/* Show delivery provider name - replaces "Awaiting Delivery Provider" */}
+        <div className="space-y-1 min-w-[160px] max-w-[220px]">
           <div className={`text-xs p-2 rounded ${
             isDelivered ? 'bg-emerald-50 border border-emerald-200' :
             isInTransit ? 'bg-indigo-50 border border-indigo-200' :
@@ -1178,45 +1227,35 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, in
                 <p className="font-semibold text-indigo-700 mb-1">
                   🚚 In Transit to Destination
                 </p>
-                <p className="font-bold text-indigo-600">{providerName}</p>
+                {orderMetaLines(pl)}
               </>
             ) : isDelivered ? (
               <>
                 <p className="font-semibold text-emerald-700 mb-1">
-                  ✓ Delivered by:
+                  ✓ Delivered
                 </p>
-                <p className="font-bold text-emerald-600">{providerName}</p>
+                {orderMetaLines(pl)}
               </>
             ) : (
               <>
                 <p className={`font-semibold ${isAccepted ? 'text-green-700' : 'text-blue-700'} mb-1`}>
                   {isAccepted ? '✅ Delivery Confirmed' : '📋 Assigned'}
                 </p>
-                <p className="font-medium text-gray-800 mt-1" title={providerName}>
-                  {providerName !== 'Delivery Provider'
-                    ? providerName
-                    : order.delivery_provider_id
-                      ? order.delivery_provider_phone
-                        ? `Driver · ${order.delivery_provider_phone}`
-                        : 'Assigned driver'
-                      : '—'}
-                </p>
+                {orderMetaLines(pl)}
               </>
             )}
-            {order.delivery_provider_phone && (
+            {showPhoneSub && (
               <p className="text-gray-500 text-[10px] mt-1">📞 {order.delivery_provider_phone}</p>
             )}
           </div>
-          {/* Status badge */}
-          <Badge variant="outline" className={`${deliveryStatusColors[status] || deliveryStatusColors.assigned} text-[10px]`}>
-            {status === 'pending' && '⏳ Pending'}
-            {status === 'requested' && '📤 Requested'}
-            {status === 'assigned' && '📋 Assigned'}
-            {status === 'accepted' && '✅ Delivery Confirmed'}
-            {status === 'picked_up' && '📦 Picked Up'}
-            {status === 'in_transit' && '🚚 In Transit'}
-            {status === 'delivered' && '✓ Delivered'}
-            {status === 'cancelled' && '✗ Cancelled'}
+          <Badge
+            variant="outline"
+            title={`${order.order_number} · ${pl}`}
+            className={`${deliveryStatusColors[status] || deliveryStatusColors.assigned} text-[10px] flex flex-col items-stretch gap-0.5 py-1.5 px-2 h-auto text-left font-normal max-w-[220px]`}
+          >
+            <span className="font-medium leading-tight">{statusHeadline}</span>
+            <span className={`font-mono text-[9px] opacity-90 truncate`}>{order.order_number}</span>
+            <span className="text-[9px] opacity-90 truncate leading-tight">{pl}</span>
           </Badge>
         </div>
       );

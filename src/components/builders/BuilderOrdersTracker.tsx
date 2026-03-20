@@ -385,10 +385,17 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
         const poIds = ordersData.map((o: any) => o.id).filter(Boolean);
         if (poIds.length > 0) {
           try {
-            const { data: dispRows, error: dispErr } = await supabase.rpc(
-              'get_delivery_provider_display_for_builder_orders',
-              { p_po_ids: poIds }
-            );
+            // RPC has no AbortSignal; if the DB call stalls, the UI would spin forever — bound wait time.
+            const rpcMs = 6000;
+            const { data: dispRows, error: dispErr } = await Promise.race([
+              supabase.rpc('get_delivery_provider_display_for_builder_orders', { p_po_ids: poIds }),
+              new Promise<{ data: null; error: { message: string } }>((resolve) =>
+                setTimeout(
+                  () => resolve({ data: null, error: { message: `timeout after ${rpcMs}ms` } }),
+                  rpcMs
+                )
+              ),
+            ]);
             if (dispErr) {
               console.warn('BuilderOrdersTracker: get_delivery_provider_display_for_builder_orders:', dispErr.message);
             }
