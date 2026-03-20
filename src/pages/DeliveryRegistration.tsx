@@ -337,6 +337,39 @@ const DeliveryRegistration = () => {
         console.warn("delivery_provider_registrations save error (non-blocking):", regErr);
       }
 
+      // Supplier/builder dashboards read provider_name + phone from delivery_providers (linked by auth user id)
+      try {
+        const displayName =
+          providerType === 'individual'
+            ? fullName.trim()
+            : (companyName.trim() || fullName.trim()) || 'Delivery Provider';
+        const { data: dpExisting } = await supabase
+          .from('delivery_providers')
+          .select('id')
+          .eq('user_id', userId)
+          .maybeSingle();
+        const dpPayload = {
+          provider_name: displayName,
+          provider_type: providerType === 'company' ? ('company' as const) : ('individual' as const),
+          phone: phone.trim(),
+          email: email.trim().toLowerCase(),
+          address: physicalAddress?.trim() || county || null,
+          vehicle_types: vehicleType ? [vehicleType] : (['motorcycle'] as string[]),
+          service_areas: serviceAreas.length > 0 ? serviceAreas : [county].filter(Boolean),
+          driving_license_number: drivingLicense?.trim() || 'Pending',
+          is_verified: true,
+          is_active: true,
+          updated_at: new Date().toISOString(),
+        };
+        if (dpExisting?.id) {
+          await supabase.from('delivery_providers').update(dpPayload).eq('user_id', userId);
+        } else {
+          await supabase.from('delivery_providers').insert({ user_id: userId, ...dpPayload });
+        }
+      } catch (dpSyncErr) {
+        console.warn('delivery_providers row sync after registration (non-blocking):', dpSyncErr);
+      }
+
       // Set user role as delivery
       let roleAssigned = false;
       const { data: existingRole } = await supabase

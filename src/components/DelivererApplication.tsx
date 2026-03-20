@@ -197,15 +197,15 @@ const DelivererApplication = () => {
       // Upload all documents
       const documentPaths = await uploadAllDocuments(profile.id);
 
-      // Create delivery provider application
+      // delivery_providers.user_id must be auth.users.id (FK), not profiles.id — required for RPCs / dashboards
       const { error } = await supabase
         .from('delivery_providers')
         .insert({
-          user_id: profile.id,
-          provider_name: formData.providerName,
+          user_id: user.id,
+          provider_name: formData.providerName.trim(),
           provider_type: formData.providerType,
-          phone: formData.phone,
-          email: formData.email,
+          phone: formData.phone.trim(),
+          email: formData.email?.trim() || null,
           address: formData.address,
           contact_person: formData.contactPerson,
           vehicle_types: formData.vehicleTypes,
@@ -229,6 +229,15 @@ const DelivererApplication = () => {
         });
 
       if (error) throw error;
+
+      await supabase
+        .from('profiles')
+        .update({
+          full_name: formData.providerName.trim(),
+          phone: formData.phone.trim(),
+          updated_at: new Date().toISOString(),
+        })
+        .eq('user_id', user.id);
 
       toast({
         title: "Application Submitted",

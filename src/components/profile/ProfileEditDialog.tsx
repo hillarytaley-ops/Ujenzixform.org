@@ -809,7 +809,9 @@ export const ProfileEditDialog: React.FC<ProfileEditDialogProps> = ({
               'Prefer': 'return=minimal'
             },
             body: JSON.stringify({
-              phone: profile.phone || null,
+              provider_name: profile.full_name?.trim() || null,
+              phone: profile.phone?.trim() || null,
+              email: profile.email?.trim() || null,
               location: profile.location || null,
               updated_at: new Date().toISOString()
             })

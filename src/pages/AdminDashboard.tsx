@@ -3087,21 +3087,29 @@ const AdminDashboard = () => {
                               className="bg-green-600 hover:bg-green-700 flex-1"
                               onClick={async () => {
                                 try {
-                                  await supabase
-                                    .from('delivery_providers')
-                                    .update({ status: 'approved', updated_at: new Date().toISOString() })
-                                    .eq('id', app.id);
-                                  
+                                  const { data, error } = await supabase.rpc(
+                                    'admin_update_delivery_provider_status',
+                                    {
+                                      registration_id: app.id,
+                                      new_status: 'approved',
+                                      admin_notes_text: null,
+                                    }
+                                  );
+                                  if (error) throw error;
+                                  const row = data as { success?: boolean; error?: string } | null;
+                                  if (row && row.success === false) {
+                                    throw new Error(row.error || 'Approval failed');
+                                  }
                                   toast({
                                     title: "✅ Application Approved",
-                                    description: `${app.full_name} has been approved as a delivery provider.`
+                                    description: `${app.full_name} has been approved as a delivery provider. Their name and phone are now synced for orders.`
                                   });
                                   loadDeliveryApplications();
-                                } catch (error) {
+                                } catch (error: unknown) {
                                   toast({
                                     variant: "destructive",
                                     title: "Error",
-                                    description: "Failed to approve application."
+                                    description: error instanceof Error ? error.message : "Failed to approve application."
                                   });
                                 }
                               }}
@@ -3114,21 +3122,29 @@ const AdminDashboard = () => {
                               className="flex-1"
                               onClick={async () => {
                                 try {
-                                  await supabase
-                                    .from('delivery_providers')
-                                    .update({ status: 'rejected', updated_at: new Date().toISOString() })
-                                    .eq('id', app.id);
-                                  
+                                  const { data, error } = await supabase.rpc(
+                                    'admin_update_delivery_provider_status',
+                                    {
+                                      registration_id: app.id,
+                                      new_status: 'rejected',
+                                      admin_notes_text: null,
+                                    }
+                                  );
+                                  if (error) throw error;
+                                  const row = data as { success?: boolean; error?: string } | null;
+                                  if (row && row.success === false) {
+                                    throw new Error(row.error || 'Rejection failed');
+                                  }
                                   toast({
                                     title: "❌ Application Rejected",
                                     description: `${app.full_name}'s application has been rejected.`
                                   });
                                   loadDeliveryApplications();
-                                } catch (error) {
+                                } catch (error: unknown) {
                                   toast({
                                     variant: "destructive",
                                     title: "Error",
-                                    description: "Failed to reject application."
+                                    description: error instanceof Error ? error.message : "Failed to reject application."
                                   });
                                 }
                               }}

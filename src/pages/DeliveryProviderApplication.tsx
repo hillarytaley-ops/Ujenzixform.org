@@ -311,6 +311,15 @@ const DeliveryProviderApplication = () => {
         });
 
       if (error) throw error;
+
+      await supabase
+        .from('profiles')
+        .update({
+          full_name: (companyForm.companyName || companyForm.contactPerson).trim(),
+          phone: companyForm.contactPhone.trim(),
+          updated_at: new Date().toISOString(),
+        })
+        .eq('user_id', currentUser.id);
       
       toast({
         title: "Application Submitted Successfully",
@@ -396,6 +405,15 @@ const DeliveryProviderApplication = () => {
         });
 
       if (error) throw error;
+
+      await supabase
+        .from('profiles')
+        .update({
+          full_name: privateForm.fullName.trim(),
+          phone: privateForm.phoneNumber.trim(),
+          updated_at: new Date().toISOString(),
+        })
+        .eq('user_id', currentUser.id);
       
       toast({
         title: "Application Submitted Successfully",
