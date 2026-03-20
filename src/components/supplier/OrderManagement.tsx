@@ -727,25 +727,29 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, in
       >();
       try {
         if (orderIds.length > 0) {
-          const { data: dispRows, error: dispErr } = await supabase.rpc(
-            'get_delivery_provider_display_for_supplier_orders',
-            { p_po_ids: orderIds }
-          );
-          if (dispErr) {
-            console.warn('OrderManagement: get_delivery_provider_display_for_supplier_orders:', dispErr.message);
-          }
-          (dispRows || []).forEach((row: any) => {
-            if (row?.purchase_order_id) {
-              providerDisplayByPoId.set(row.purchase_order_id, {
-                delivery_provider_id: row.delivery_provider_id,
-                provider_name: row.provider_name,
-                phone: row.phone,
-              });
+          try {
+            const { data: dispRows, error: dispErr } = await supabase.rpc(
+              'get_delivery_provider_display_for_supplier_orders',
+              { p_po_ids: orderIds }
+            );
+            if (dispErr) {
+              console.warn('OrderManagement: get_delivery_provider_display_for_supplier_orders:', dispErr.message);
             }
-          });
+            (dispRows || []).forEach((row: any) => {
+              if (row?.purchase_order_id) {
+                providerDisplayByPoId.set(row.purchase_order_id, {
+                  delivery_provider_id: row.delivery_provider_id,
+                  provider_name: row.provider_name,
+                  phone: row.phone,
+                });
+              }
+            });
+          } catch (rpcEx) {
+            console.warn('OrderManagement: provider display RPC threw (orders still load):', rpcEx);
+          }
         }
       } catch (e) {
-        console.warn('OrderManagement: provider display by PO RPC failed', e);
+        console.warn('OrderManagement: provider display setup failed', e);
       }
 
       const providerIdsToResolve = new Set<string>();

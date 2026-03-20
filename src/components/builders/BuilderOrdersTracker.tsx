@@ -266,14 +266,39 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
       if (accessToken) {
         headers['Authorization'] = `Bearer ${accessToken}`;
       }
-      
+
+      if (!builderId?.trim()) {
+        setOrders([]);
+        setLoading(false);
+        return;
+      }
+
+      // buyer_id on purchase_orders may be auth.users id OR profiles.id — match both
+      const buyerOrClauses: string[] = [`buyer_id.eq.${builderId}`];
+      try {
+        const profRes = await fetch(
+          `${SUPABASE_URL}/rest/v1/profiles?or=(user_id.eq.${builderId},id.eq.${builderId})&select=id,user_id&limit=5`,
+          { headers, cache: 'no-store' }
+        );
+        if (profRes.ok) {
+          const plist = await profRes.json();
+          (Array.isArray(plist) ? plist : []).forEach((p: any) => {
+            if (p?.id) buyerOrClauses.push(`buyer_id.eq.${p.id}`);
+            if (p?.user_id) buyerOrClauses.push(`buyer_id.eq.${p.user_id}`);
+          });
+        }
+      } catch (_) {
+        /* keep single buyer_id.eq */
+      }
+      const buyerOrUnique = [...new Set(buyerOrClauses)];
+      const ordersFilter = `or=(${buyerOrUnique.join(',')})`;
+
       // Fetch purchase orders for this builder with timeout
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 8000); // 8 second timeout
-      
-      // Fetch purchase orders with delivery provider information
+
       const ordersResponse = await fetch(
-        `${SUPABASE_URL}/rest/v1/purchase_orders?buyer_id=eq.${builderId}&select=*&order=created_at.desc`,
+        `${SUPABASE_URL}/rest/v1/purchase_orders?${ordersFilter}&select=*&order=created_at.desc`,
         { headers, signal: controller.signal, cache: 'no-store' }
       );
       clearTimeout(timeoutId);
@@ -359,25 +384,29 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
       try {
         const poIds = ordersData.map((o: any) => o.id).filter(Boolean);
         if (poIds.length > 0) {
-          const { data: dispRows, error: dispErr } = await supabase.rpc(
-            'get_delivery_provider_display_for_builder_orders',
-            { p_po_ids: poIds }
-          );
-          if (dispErr) {
-            console.warn('BuilderOrdersTracker: get_delivery_provider_display_for_builder_orders:', dispErr.message);
-          }
-          (dispRows || []).forEach((row: any) => {
-            if (row?.purchase_order_id) {
-              providerDisplayByOrderId.set(row.purchase_order_id, {
-                delivery_provider_id: row.delivery_provider_id,
-                provider_name: row.provider_name,
-                phone: row.phone,
-              });
+          try {
+            const { data: dispRows, error: dispErr } = await supabase.rpc(
+              'get_delivery_provider_display_for_builder_orders',
+              { p_po_ids: poIds }
+            );
+            if (dispErr) {
+              console.warn('BuilderOrdersTracker: get_delivery_provider_display_for_builder_orders:', dispErr.message);
             }
-          });
+            (dispRows || []).forEach((row: any) => {
+              if (row?.purchase_order_id) {
+                providerDisplayByOrderId.set(row.purchase_order_id, {
+                  delivery_provider_id: row.delivery_provider_id,
+                  provider_name: row.provider_name,
+                  phone: row.phone,
+                });
+              }
+            });
+          } catch (rpcEx) {
+            console.warn('BuilderOrdersTracker: provider display RPC threw (orders still load):', rpcEx);
+          }
         }
       } catch (e) {
-        console.warn('BuilderOrdersTracker: provider display by PO RPC failed', e);
+        console.warn('BuilderOrdersTracker: provider display setup failed', e);
       }
       
       // Collect all provider IDs (from purchase_orders and delivery_requests)

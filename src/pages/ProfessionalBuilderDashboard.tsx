@@ -2407,8 +2407,8 @@ const ProfessionalBuilderDashboardPage = () => {
 
           <TabsContent value="orders">
             {(() => {
-              // Get builderId with localStorage fallback
-              let builderId = user?.id || '';
+              // Prefer profile id (purchase_orders.buyer_id often stores profiles.id); fall back to auth uid
+              let builderId = profile?.id || user?.id || '';
               if (!builderId) {
                 try {
                   const stored = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
