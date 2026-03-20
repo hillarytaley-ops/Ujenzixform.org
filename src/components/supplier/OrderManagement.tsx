@@ -695,21 +695,47 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, in
       // Enrich from delivery_requests so provider-accepted status shows even if purchase_orders wasn't updated
       const orderIds = purchaseOrders.map((po: any) => po.id);
       const orderIdsParam = orderIds.join(',');
-      const deliveryRequestsByPO = new Map<string, { provider_id: string; status: string }>();
+      const deliveryRequestsByPO = new Map<
+        string,
+        { provider_id: string; status: string; updated_at?: string; created_at?: string }
+      >();
       try {
         const drResponse = await fetch(
-          `${SUPABASE_URL}/rest/v1/delivery_requests?purchase_order_id=in.(${orderIdsParam})&select=purchase_order_id,provider_id,status`,
+          `${SUPABASE_URL}/rest/v1/delivery_requests?purchase_order_id=in.(${orderIdsParam})&select=purchase_order_id,provider_id,status,updated_at,created_at`,
           { headers, cache: 'no-store' }
         );
         if (drResponse.ok) {
           const drList = await drResponse.json();
+          const rank = (s: string) => {
+            const x = (s || '').toLowerCase();
+            if (['delivered', 'completed'].includes(x)) return 5;
+            if (['in_transit', 'picked_up'].includes(x)) return 4;
+            if (['accepted', 'assigned'].includes(x)) return 3;
+            if (['pending', 'requested', 'confirmed', 'active'].includes(x)) return 2;
+            return 1;
+          };
           (drList || []).forEach((dr: any) => {
-            if (dr.purchase_order_id && dr.provider_id) {
-              const status = dr.status || 'accepted';
-              const existing = deliveryRequestsByPO.get(dr.purchase_order_id);
-              if (!existing || ['accepted', 'assigned', 'picked_up', 'in_transit', 'delivered'].includes(status)) {
-                deliveryRequestsByPO.set(dr.purchase_order_id, { provider_id: dr.provider_id, status });
-              }
+            if (!dr.purchase_order_id || !dr.provider_id) return;
+            const status = dr.status || 'accepted';
+            const row = {
+              provider_id: dr.provider_id,
+              status,
+              updated_at: dr.updated_at,
+              created_at: dr.created_at,
+            };
+            const existing = deliveryRequestsByPO.get(dr.purchase_order_id);
+            if (!existing) {
+              deliveryRequestsByPO.set(dr.purchase_order_id, row);
+              return;
+            }
+            const rNew = rank(status);
+            const rEx = rank(existing.status);
+            if (rNew > rEx) {
+              deliveryRequestsByPO.set(dr.purchase_order_id, row);
+            } else if (rNew === rEx) {
+              const tNew = new Date(dr.updated_at || dr.created_at || 0).getTime();
+              const tEx = new Date(existing.updated_at || existing.created_at || 0).getTime();
+              if (tNew >= tEx) deliveryRequestsByPO.set(dr.purchase_order_id, row);
             }
           });
           if (deliveryRequestsByPO.size > 0) {
@@ -757,6 +783,10 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, in
         if (po.delivery_provider_id) providerIdsToResolve.add(po.delivery_provider_id);
         const dr = deliveryRequestsByPO.get(po.id);
         if (dr?.provider_id) providerIdsToResolve.add(dr.provider_id);
+      });
+      // RPC may resolve a canonical delivery_providers.id different from PO/DR raw values
+      providerDisplayByPoId.forEach((row) => {
+        if (row.delivery_provider_id) providerIdsToResolve.add(row.delivery_provider_id);
       });
       let providerNames: Record<string, string> = {};
       let providerPhones: Record<string, string> = {};

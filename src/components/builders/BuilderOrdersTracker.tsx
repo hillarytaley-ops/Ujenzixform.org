@@ -369,8 +369,9 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
         const drTimeoutId = setTimeout(() => drController.abort(), 5000);
         
         // Fetch delivery requests that are accepted/assigned for these orders - include provider_id to get provider details
+        // Do not filter by status — some rows use other status values but still carry provider_id
         const drResponse = await fetch(
-          `${SUPABASE_URL}/rest/v1/delivery_requests?purchase_order_id=in.(${orderIdsParam})&status=in.(accepted,assigned,picked_up,in_transit,delivered)&provider_id=not.is.null&select=purchase_order_id,provider_id,status,accepted_at`,
+          `${SUPABASE_URL}/rest/v1/delivery_requests?purchase_order_id=in.(${orderIdsParam})&provider_id=not.is.null&select=purchase_order_id,provider_id,status,accepted_at,updated_at,created_at`,
           { headers, signal: drController.signal, cache: 'no-store' }
         );
         clearTimeout(drTimeoutId);
@@ -378,11 +379,31 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
         if (drResponse.ok) {
           const deliveryRequests = await drResponse.json();
           console.log('🚚 Delivery requests fetched:', deliveryRequests.length);
-          
-          // Map delivery requests to purchase orders
-          deliveryRequests.forEach((dr: any) => {
-            if (dr.purchase_order_id && dr.provider_id) {
+
+          const rank = (s: string) => {
+            const x = (s || '').toLowerCase();
+            if (['delivered', 'completed'].includes(x)) return 5;
+            if (['in_transit', 'picked_up'].includes(x)) return 4;
+            if (['accepted', 'assigned'].includes(x)) return 3;
+            if (['pending', 'requested', 'confirmed', 'active'].includes(x)) return 2;
+            return 1;
+          };
+
+          (deliveryRequests || []).forEach((dr: any) => {
+            if (!dr.purchase_order_id || !dr.provider_id) return;
+            const cur = deliveryRequestsMap.get(dr.purchase_order_id);
+            if (!cur) {
               deliveryRequestsMap.set(dr.purchase_order_id, dr);
+              return;
+            }
+            const rNew = rank(dr.status);
+            const rCur = rank(cur.status);
+            if (rNew > rCur) {
+              deliveryRequestsMap.set(dr.purchase_order_id, dr);
+            } else if (rNew === rCur) {
+              const tNew = new Date(dr.updated_at || dr.created_at || 0).getTime();
+              const tCur = new Date(cur.updated_at || cur.created_at || 0).getTime();
+              if (tNew >= tCur) deliveryRequestsMap.set(dr.purchase_order_id, dr);
             }
           });
         }
@@ -601,6 +622,13 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
             finalProviderName = o;
           }
         }
+
+        const mergedPhone =
+          (providerPhone && String(providerPhone).trim()) ||
+          (order.delivery_provider_phone && String(order.delivery_provider_phone).trim()) ||
+          undefined;
+        const mergedName =
+          (finalProviderName && String(finalProviderName).trim()) || undefined;
         
         // Update delivery_status if delivery_request has more recent status
         let deliveryStatus = order.delivery_status;
@@ -612,10 +640,10 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
         const enrichedOrder = {
           ...order,
           material_items: itemsByOrder.get(order.id) || [],
-          // Enrich with provider information
+          // Enrich with provider information (never wipe PO columns with undefined)
           delivery_provider_id: providerId || order.delivery_provider_id,
-          delivery_provider_name: finalProviderName ?? undefined,
-          delivery_provider_phone: providerPhone ?? order.delivery_provider_phone,
+          delivery_provider_name: mergedName ?? order.delivery_provider_name,
+          delivery_provider_phone: mergedPhone ?? order.delivery_provider_phone,
           delivery_status: deliveryStatus || order.delivery_status
         };
         
