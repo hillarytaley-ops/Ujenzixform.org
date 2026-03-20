@@ -88,6 +88,19 @@ interface BuilderOrdersTrackerProps {
   builderId: string;
 }
 
+/** Real provider name for UI — strips placeholders and legacy "Driver · …" combined labels */
+function providerDisplayName(order: { delivery_provider_name?: string | null }): string {
+  const n = (order.delivery_provider_name || '').trim();
+  const lower = n.toLowerCase();
+  if (!n || lower === 'delivery provider' || lower === 'assigned driver' || lower === 'provider assigned') return '';
+  if (/^driver\s*·\s*/i.test(n)) return '';
+  return n;
+}
+
+function providerDisplayPhone(order: { delivery_provider_phone?: string | null }): string {
+  return (order.delivery_provider_phone || '').trim();
+}
+
 // QR Code Image Component - EXTRA LARGE for easy scanning
 const QRCodeImage: React.FC<{ value: string; size?: number; className?: string }> = ({ value, size = 250, className = '' }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -573,11 +586,20 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
             console.log(`⚠️ No provider name found for providerId: ${providerId} in order ${order.po_number}`);
           }
         }
-        if (!providerName && providerPhone) {
-          providerName = `Driver · ${providerPhone}`;
-        }
-        if (!providerName && providerId) {
-          providerName = 'Assigned driver';
+        // Keep name and phone separate — do not stuff phone into name or use "Assigned driver"
+        let finalProviderName = providerName || null;
+        if (!finalProviderName && order.delivery_provider_name) {
+          const o = String(order.delivery_provider_name).trim();
+          const ol = o.toLowerCase();
+          if (
+            o &&
+            ol !== 'delivery provider' &&
+            ol !== 'assigned driver' &&
+            ol !== 'provider assigned' &&
+            !/^driver\s*·\s*/i.test(o)
+          ) {
+            finalProviderName = o;
+          }
         }
         
         // Update delivery_status if delivery_request has more recent status
@@ -592,7 +614,7 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
           material_items: itemsByOrder.get(order.id) || [],
           // Enrich with provider information
           delivery_provider_id: providerId || order.delivery_provider_id,
-          delivery_provider_name: providerName ?? order.delivery_provider_name,
+          delivery_provider_name: finalProviderName ?? undefined,
           delivery_provider_phone: providerPhone ?? order.delivery_provider_phone,
           delivery_status: deliveryStatus || order.delivery_status
         };
@@ -997,7 +1019,7 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
     // Check if provider has accepted - either by ID/name or by delivery_status
     const hasDeliveryProvider = order.delivery_provider_id || order.delivery_provider_name || 
                                 ['assigned', 'accepted', 'picked_up', 'in_transit', 'delivered'].includes(deliveryStatus);
-    const providerName = order.delivery_provider_name || 'Delivery Provider';
+    const providerName = providerDisplayName(order) || providerDisplayPhone(order) || '';
     const items = order.material_items || [];
     
     // Provider has already accepted – check FIRST so we never show "Awaiting Delivery Request" when provider is set
@@ -1006,10 +1028,10 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
       deliveryStatus === 'accepted' || deliveryStatus === 'assigned' ||
       ['awaiting_delivery_request', 'delivery_requested', 'awaiting_delivery_provider'].includes(status)
     )) {
-      if (providerName && providerName !== 'Delivery Provider') {
+      if (providerName) {
         return `✅ Accepted by ${providerName}`;
       }
-      return '✅ Accepted by Delivery Provider';
+      return '✅ Accepted — details loading';
     }
     
     // Check if items are dispatched, in transit, or received (regardless of order status)
@@ -1020,7 +1042,7 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
     // For orders with dispatched items, show provider name (dispatched orders MUST have a provider)
     if (hasDispatchedItems) {
       if (hasDeliveryProvider) {
-        return `📦 To Be Delivered by ${providerName}`;
+        return providerName ? `📦 To Be Delivered by ${providerName}` : '📦 Dispatched';
       }
       // Even if provider name not in data, show dispatched status (provider exists but name not loaded)
       return '📦 Dispatched';
@@ -1029,7 +1051,7 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
     // For orders with in-transit items, show provider name
     if (hasInTransitItems) {
       if (hasDeliveryProvider) {
-        return `🚚 Being Delivered by ${providerName}`;
+        return providerName ? `🚚 Being Delivered by ${providerName}` : '🚚 In Transit';
       }
       return '🚚 In Transit';
     }
@@ -1037,7 +1059,7 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
     // For orders with received items, show who delivered it
     if (hasReceivedItems) {
       if (hasDeliveryProvider) {
-        return `✅ Was Delivered by ${providerName}`;
+        return providerName ? `✅ Was Delivered by ${providerName}` : '✅ Received';
       }
       return '✅ Received';
     }
@@ -1051,25 +1073,25 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
     }
     if (status === 'quote_responded') {
       if (hasDeliveryProvider) {
-        return `Supplier Responded - To Be Delivered by ${providerName}`;
+        return providerName ? `Supplier Responded - To Be Delivered by ${providerName}` : 'Supplier Responded';
       }
       return 'Supplier Responded';
     }
     if (status === 'quote_revised') {
       if (hasDeliveryProvider) {
-        return `Quote Revised - To Be Delivered by ${providerName}`;
+        return providerName ? `Quote Revised - To Be Delivered by ${providerName}` : 'Quote Revised';
       }
       return 'Quote Revised';
     }
     if (status === 'quote_viewed_by_builder') {
       if (hasDeliveryProvider) {
-        return `Quote Viewed - To Be Delivered by ${providerName}`;
+        return providerName ? `Quote Viewed - To Be Delivered by ${providerName}` : 'Quote Viewed';
       }
       return 'Quote Viewed';
     }
     if (status === 'quote_accepted') {
       if (hasDeliveryProvider) {
-        return `Quote Accepted - To Be Delivered by ${providerName}`;
+        return providerName ? `Quote Accepted - To Be Delivered by ${providerName}` : 'Quote Accepted';
       }
       return 'Quote Accepted';
     }
@@ -1091,7 +1113,7 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
       return '⏳ Awaiting Delivery Provider';
     }
     if (status === 'delivery_assigned') {
-      if (hasDeliveryProvider && providerName && providerName !== 'Delivery Provider') {
+      if (hasDeliveryProvider && providerName) {
         return `✅ To Be Delivered by ${providerName}`;
       }
       return '✅ Delivery Assigned';
@@ -1100,25 +1122,25 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
       return '📦 Ready for Dispatch';
     }
     if (status === 'dispatched') {
-      if (hasDeliveryProvider && providerName && providerName !== 'Delivery Provider') {
+      if (hasDeliveryProvider && providerName) {
         return `📦 Dispatched - Being Delivered by ${providerName}`;
       }
       return '📦 Dispatched';
     }
     if (status === 'in_transit') {
-      if (hasDeliveryProvider && providerName && providerName !== 'Delivery Provider') {
+      if (hasDeliveryProvider && providerName) {
         return `🚚 Being Delivered by ${providerName}`;
       }
       return '🚚 In Transit';
     }
     if (status === 'delivery_arrived') {
-      if (hasDeliveryProvider && providerName && providerName !== 'Delivery Provider') {
+      if (hasDeliveryProvider && providerName) {
         return `📍 Arrived - Delivered by ${providerName}`;
       }
       return '📍 Delivery Arrived';
     }
     if (status === 'received') {
-      if (hasDeliveryProvider && providerName && providerName !== 'Delivery Provider') {
+      if (hasDeliveryProvider && providerName) {
         return `✅ Received - Delivered by ${providerName}`;
       }
       return '✅ Received';
@@ -1150,7 +1172,7 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
     // For quoted orders (supplier has responded) - legacy status
     if (status === 'quoted') {
       if (hasDeliveryProvider) {
-        return `Supplier Responded - To Be Delivered by ${providerName}`;
+        return providerName ? `Supplier Responded - To Be Delivered by ${providerName}` : 'Supplier Responded';
       }
       return 'Supplier Responded';
     }
@@ -1158,14 +1180,13 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
     // For pending and confirmed orders (accepted quotes), show delivery provider status
     if (status === 'pending' || status === 'confirmed') {
       if (hasDeliveryProvider) {
-        // Show provider name if available, otherwise show generic message
-        if (order.delivery_provider_name && order.delivery_provider_name !== 'Delivery Provider') {
-          return `To Be Delivered by ${order.delivery_provider_name}`;
-        } else if (order.delivery_provider_id || ['assigned', 'accepted', 'picked_up', 'in_transit', 'delivered'].includes(deliveryStatus)) {
-          // Provider has accepted but name not loaded yet - show generic message
-          return 'To Be Delivered by Provider';
+        if (providerName) {
+          return `To Be Delivered by ${providerName}`;
         }
-        return `To Be Delivered by ${providerName}`;
+        if (order.delivery_provider_id || ['assigned', 'accepted', 'picked_up', 'in_transit', 'delivered'].includes(deliveryStatus)) {
+          return 'To Be Delivered — details loading';
+        }
+        return 'Awaiting provider details';
       }
       return 'Awaiting Delivery Provider';
     }
@@ -1175,24 +1196,24 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
         return '📦 Ready for Dispatch';
       case 'dispatched':
         // If delivery provider is assigned, show provider name
-        if (hasDeliveryProvider && providerName && providerName !== 'Delivery Provider') {
+        if (hasDeliveryProvider && providerName) {
           return `📦 Dispatched - Being Delivered by ${providerName}`;
         }
         return '📦 Dispatched';
       case 'partially_dispatched':
         // If delivery provider is assigned, show provider name
         if (hasDeliveryProvider) {
-          return `📦 To Be Delivered by ${providerName}`;
+          return providerName ? `📦 To Be Delivered by ${providerName}` : '📦 Partially Dispatched';
         }
         return '📦 Partially Dispatched';
       case 'in_transit':
         // If delivery provider is assigned, show provider name
-        if (hasDeliveryProvider && providerName && providerName !== 'Delivery Provider') {
+        if (hasDeliveryProvider && providerName) {
           return `🚚 Being Delivered by ${providerName}`;
         }
         return '🚚 In Transit';
       case 'delivery_arrived':
-        if (hasDeliveryProvider && providerName && providerName !== 'Delivery Provider') {
+        if (hasDeliveryProvider && providerName) {
           return `📍 Arrived - Delivered by ${providerName}`;
         }
         return '📍 Delivery Arrived';
@@ -1200,13 +1221,13 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
       case 'received':
         // If delivery provider is assigned, show who delivered it
         if (hasDeliveryProvider) {
-          return `✅ Was Delivered by ${providerName}`;
+          return providerName ? `✅ Was Delivered by ${providerName}` : '✅ Received';
         }
         return '✅ Received';
       case 'delivered':
         // If delivery provider is assigned, show who delivered it
         if (hasDeliveryProvider) {
-          return `✅ Was Delivered by ${providerName}`;
+          return providerName ? `✅ Was Delivered by ${providerName}` : '✅ Delivered';
         }
         return '✅ Delivered';
       case 'verified': return '✓ Verified';
@@ -1397,29 +1418,17 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
               
               {/* Show provider details for confirmed deliveries - visible even when collapsed */}
               {/* Show whenever a provider is assigned (delivery_provider_id exists) OR delivery is confirmed */}
-              {(order.delivery_provider_id || order.delivery_provider_name || 
-                order.delivery_status === 'accepted' || order.delivery_status === 'assigned' || 
+              {(order.delivery_provider_id || providerDisplayName(order) || providerDisplayPhone(order) ||
+                order.delivery_status === 'accepted' || order.delivery_status === 'assigned' ||
                 ['confirmed'].includes(order.status)) && (
-                <div className="text-[10px] text-gray-600 text-right max-w-[150px]">
-                  {order.delivery_provider_name && order.delivery_provider_name !== 'Delivery Provider' ? (
-                    <>
-                      <div className="font-medium truncate" title={order.delivery_provider_name}>
-                        {order.delivery_provider_name}
-                      </div>
-                      {order.delivery_provider_phone ? (
-                        <div className="text-[9px] text-gray-500 flex items-center justify-end gap-1 mt-0.5">
-                          <Phone className="h-3 w-3 flex-shrink-0" />
-                          <span className="truncate">{order.delivery_provider_phone}</span>
-                        </div>
-                      ) : order.delivery_provider_id ? (
-                        <div className="text-[9px] text-gray-400 mt-0.5">Contact pending</div>
-                      ) : null}
-                    </>
-                  ) : (order.delivery_provider_id || order.delivery_provider_name) ? (
-                    <div className="text-gray-500 text-[9px]">{order.delivery_provider_name || 'Provider Assigned'}</div>
-                  ) : (
-                    <div className="text-gray-500 text-[9px]">Delivery Confirmed</div>
-                  )}
+                <div className="text-[10px] text-gray-600 text-right max-w-[160px]">
+                  <div className="font-medium truncate" title={providerDisplayName(order) || undefined}>
+                    {providerDisplayName(order) || '—'}
+                  </div>
+                  <div className="text-[9px] text-gray-500 flex items-center justify-end gap-1 mt-0.5">
+                    <Phone className="h-3 w-3 flex-shrink-0" />
+                    <span className="truncate">{providerDisplayPhone(order) || '—'}</span>
+                  </div>
                 </div>
               )}
             </div>
@@ -1456,24 +1465,15 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
                       ? 'Quote Accepted' 
                       : 'Accepted'}
                   </span>
-                  {order.delivery_provider_id || order.delivery_provider_name ? (
-                    <div className="text-[10px] text-green-600 mt-0.5 font-medium text-center">
-                      <div>
-                        To be delivered by:{' '}
-                        {order.delivery_provider_name && order.delivery_provider_name !== 'Delivery Provider'
-                          ? order.delivery_provider_name
-                          : order.delivery_provider_phone
-                            ? `Driver · ${order.delivery_provider_phone}`
-                            : order.delivery_provider_id
-                              ? 'Assigned driver'
-                              : 'Provider'}
+                  {order.delivery_provider_id || providerDisplayName(order) || providerDisplayPhone(order) ? (
+                    <div className="text-[10px] text-green-600 mt-0.5 font-medium text-center space-y-0.5 max-w-[130px]">
+                      <div className="truncate" title={providerDisplayName(order) || undefined}>
+                        {providerDisplayName(order) || '—'}
                       </div>
-                      {order.delivery_provider_phone && (
-                        <div className="text-[9px] text-green-500 mt-0.5 flex items-center justify-center gap-1">
-                          <Phone className="h-3 w-3" />
-                          {order.delivery_provider_phone}
-                        </div>
-                      )}
+                      <div className="text-[9px] text-green-500 flex items-center justify-center gap-1">
+                        <Phone className="h-3 w-3 flex-shrink-0" />
+                        <span className="truncate">{providerDisplayPhone(order) || '—'}</span>
+                      </div>
                     </div>
                   ) : (
                     <span className="text-[10px] text-gray-500 mt-0.5">
@@ -1558,58 +1558,27 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
               {/* Delivery Provider Info - Always show when delivery is confirmed */}
               {(order.delivery_provider_id || order.delivery_provider_name || order.delivery_status === 'accepted' || order.delivery_status === 'assigned' || ['confirmed', 'dispatched', 'in_transit', 'delivered', 'received'].includes(order.status)) && (
                 <div className="flex items-start gap-2 text-sm bg-blue-50 p-3 rounded-lg border border-blue-200">
-                  <Truck className="h-4 w-4 text-blue-600 mt-0.5" />
-                  <div className="flex-1">
-                    <p className="font-medium text-blue-900">Delivery provider</p>
-                    {(order.delivery_provider_name && order.delivery_provider_name !== 'Delivery Provider') ? (
-                      <>
-                        <p className="text-blue-700 font-semibold">{order.delivery_provider_name}</p>
-                        {order.delivery_provider_phone && (
-                          <div className="flex items-center gap-2 mt-1">
-                            <p className="text-xs text-blue-600">Phone: {order.delivery_provider_phone}</p>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-6 px-2 text-blue-600 hover:text-blue-800 hover:bg-blue-100"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                window.open(`tel:${order.delivery_provider_phone}`, '_blank');
-                              }}
-                            >
-                              <Phone className="h-3 w-3" />
-                            </Button>
-                          </div>
-                        )}
-                      </>
-                    ) : (order.delivery_provider_name === 'Delivery Provider' || order.delivery_provider_id) ? (
-                      <>
-                        <p className="text-blue-700 font-semibold">
-                          {order.delivery_provider_name && order.delivery_provider_name !== 'Delivery Provider'
-                            ? order.delivery_provider_name
-                            : order.delivery_provider_phone
-                              ? `Driver · ${order.delivery_provider_phone}`
-                              : 'Assigned driver'}
-                        </p>
-                        {order.delivery_provider_phone && (
-                          <div className="flex items-center gap-2 mt-1">
-                            <p className="text-xs text-blue-600">Phone: {order.delivery_provider_phone}</p>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-6 px-2 text-blue-600 hover:text-blue-800 hover:bg-blue-100"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                window.open(`tel:${order.delivery_provider_phone}`, '_blank');
-                              }}
-                            >
-                              <Phone className="h-3 w-3" />
-                            </Button>
-                          </div>
-                        )}
-                      </>
-                    ) : (
-                      <p className="text-blue-700">Awaiting Provider Assignment</p>
-                    )}
+                  <Truck className="h-4 w-4 text-blue-600 mt-0.5 flex-shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-blue-900 font-semibold truncate" title={providerDisplayName(order) || undefined}>
+                      {providerDisplayName(order) || '—'}
+                    </p>
+                    <div className="flex items-center gap-2 mt-1 flex-wrap">
+                      <p className="text-sm text-blue-800 font-mono">{providerDisplayPhone(order) || '—'}</p>
+                      {providerDisplayPhone(order) ? (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-6 px-2 text-blue-600 hover:text-blue-800 hover:bg-blue-100"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            window.open(`tel:${providerDisplayPhone(order)}`, '_blank');
+                          }}
+                        >
+                          <Phone className="h-3 w-3" />
+                        </Button>
+                      ) : null}
+                    </div>
                   </div>
                 </div>
               )}

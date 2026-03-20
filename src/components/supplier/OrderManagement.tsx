@@ -1110,153 +1110,65 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, in
       );
     }
 
-    // Helper to get delivery status badge - Enhanced to show delivery provider status
+    // Delivery column: only provider display name + phone (order # stays in its own column)
     const getDeliveryStatusBadge = (order: Order) => {
-      // Check if delivery is required
-      const requiresDelivery = order.delivery_required !== false; // Default to true if not specified
+      const requiresDelivery = order.delivery_required !== false;
 
-      const genericName = (s?: string) => {
+      const isJunkName = (s?: string) => {
         const t = (s || '').trim().toLowerCase();
-        return !t || t === 'delivery provider' || t === 'assigned driver';
+        return !t || t === 'delivery provider' || t === 'assigned driver' || t === 'provider assigned';
       };
 
-      /** Best label for provider: real name, else phone, else short fallback */
-      const providerDisplay = (): string => {
-        const name = order.delivery_provider_name?.trim();
-        const phone = order.delivery_provider_phone?.trim();
-        if (name && !genericName(name)) return name;
-        if (phone) return phone;
-        if (order.delivery_provider_id) return 'Provider assigned';
-        return '—';
+      const nameLine = (): string => {
+        const n = order.delivery_provider_name?.trim();
+        if (n && !isJunkName(n) && !/^driver\s*·\s*/i.test(n)) return n;
+        return '';
       };
 
-      const orderMetaLines = (providerLabel: string) => (
-        <>
-          <p className={`text-[11px] mt-1.5 pt-1.5 border-t border-black/10 ${isDarkMode ? 'border-white/10' : ''}`}>
-            <span className={`font-semibold ${mutedText}`}>Order </span>
-            <span className={`font-mono ${textColor}`}>{order.order_number}</span>
-          </p>
-          <p className={`text-[11px] mt-0.5`}>
-            <span className={`font-semibold ${mutedText}`}>Provider </span>
-            <span className={`font-medium ${textColor}`} title={providerLabel}>
-              {providerLabel}
-            </span>
-          </p>
-        </>
-      );
+      const phoneLine = (): string => order.delivery_provider_phone?.trim() || '';
 
-      // If no delivery provider assigned
-      if (!order.delivery_provider_id && !order.delivery_provider_name) {
+      const hasAssignedProvider =
+        !!order.delivery_provider_id ||
+        !!nameLine() ||
+        !!phoneLine();
+
+      if (!hasAssignedProvider) {
         if (requiresDelivery) {
           return (
-            <div className="text-xs">
+            <div className="text-xs max-w-[160px]">
               <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-300 text-xs">
                 ⏳ Awaiting Delivery Provider
               </Badge>
-              <p className={`${mutedText} mt-1 text-[10px]`}>
-                {order.status === 'confirmed' || order.status === 'pending' 
-                  ? 'Builder accepted - awaiting provider assignment' 
-                  : 'Delivery requested - awaiting assignment'}
-              </p>
-              <p className={`text-[10px] mt-1 font-mono ${textColor}`}>
-                <span className={`font-semibold ${mutedText}`}>Order </span>
-                {order.order_number}
-              </p>
-            </div>
-          );
-        } else {
-          return (
-            <div className="text-xs">
-              <Badge variant="outline" className="bg-gray-50 text-gray-600 border-gray-200 text-xs">
-                📦 Pickup Only
-              </Badge>
-              <p className={`text-[10px] mt-1 font-mono ${textColor}`}>
-                <span className={`font-semibold ${mutedText}`}>Order </span>
-                {order.order_number}
-              </p>
             </div>
           );
         }
-      }
-      
-      // Delivery provider is assigned - show provider name instead of "Awaiting Delivery Provider"
-      const deliveryStatusColors: Record<string, string> = {
-        pending: 'bg-gray-100 text-gray-700 border-gray-300',
-        requested: 'bg-yellow-100 text-yellow-700 border-yellow-300',
-        assigned: 'bg-blue-100 text-blue-700 border-blue-300',
-        accepted: 'bg-green-100 text-green-700 border-green-300',
-        picked_up: 'bg-purple-100 text-purple-700 border-purple-300',
-        in_transit: 'bg-indigo-100 text-indigo-700 border-indigo-300',
-        delivered: 'bg-emerald-100 text-emerald-700 border-emerald-300',
-        cancelled: 'bg-red-100 text-red-700 border-red-300'
-      };
-      
-      const status = order.delivery_status || 'assigned';
-      const isInTransit = status === 'in_transit' || status === 'picked_up';
-      const isAccepted = status === 'accepted' || status === 'picked_up' || status === 'in_transit' || status === 'delivered';
-      const isDelivered = status === 'delivered';
-      
-      const pl = providerDisplay();
-      const showPhoneSub =
-        !!order.delivery_provider_phone?.trim() &&
-        pl !== order.delivery_provider_phone.trim();
-
-      const statusHeadline = (
-        <>
-          {status === 'pending' && '⏳ Pending'}
-          {status === 'requested' && '📤 Requested'}
-          {status === 'assigned' && '📋 Assigned'}
-          {status === 'accepted' && '✅ Delivery Confirmed'}
-          {status === 'picked_up' && '📦 Picked Up'}
-          {status === 'in_transit' && '🚚 In Transit'}
-          {status === 'delivered' && '✓ Delivered'}
-          {status === 'cancelled' && '✗ Cancelled'}
-        </>
-      );
-      
-      return (
-        <div className="space-y-1 min-w-[160px] max-w-[220px]">
-          <div className={`text-xs p-2 rounded ${
-            isDelivered ? 'bg-emerald-50 border border-emerald-200' :
-            isInTransit ? 'bg-indigo-50 border border-indigo-200' :
-            isAccepted ? 'bg-green-50 border border-green-200' : 
-            'bg-blue-50 border border-blue-200'
-          }`}>
-            {isInTransit ? (
-              <>
-                <p className="font-semibold text-indigo-700 mb-1">
-                  🚚 In Transit to Destination
-                </p>
-                {orderMetaLines(pl)}
-              </>
-            ) : isDelivered ? (
-              <>
-                <p className="font-semibold text-emerald-700 mb-1">
-                  ✓ Delivered
-                </p>
-                {orderMetaLines(pl)}
-              </>
-            ) : (
-              <>
-                <p className={`font-semibold ${isAccepted ? 'text-green-700' : 'text-blue-700'} mb-1`}>
-                  {isAccepted ? '✅ Delivery Confirmed' : '📋 Assigned'}
-                </p>
-                {orderMetaLines(pl)}
-              </>
-            )}
-            {showPhoneSub && (
-              <p className="text-gray-500 text-[10px] mt-1">📞 {order.delivery_provider_phone}</p>
-            )}
+        return (
+          <div className="text-xs">
+            <Badge variant="outline" className="bg-gray-50 text-gray-600 border-gray-200 text-xs">
+              📦 Pickup Only
+            </Badge>
           </div>
-          <Badge
-            variant="outline"
-            title={`${order.order_number} · ${pl}`}
-            className={`${deliveryStatusColors[status] || deliveryStatusColors.assigned} text-[10px] flex flex-col items-stretch gap-0.5 py-1.5 px-2 h-auto text-left font-normal max-w-[220px]`}
-          >
-            <span className="font-medium leading-tight">{statusHeadline}</span>
-            <span className={`font-mono text-[9px] opacity-90 truncate`}>{order.order_number}</span>
-            <span className="text-[9px] opacity-90 truncate leading-tight">{pl}</span>
-          </Badge>
+        );
+      }
+
+      const nm = nameLine();
+      const ph = phoneLine();
+
+      return (
+        <div
+          className={`text-xs p-2 rounded-md border min-w-[130px] max-w-[200px] ${
+            isDarkMode ? 'bg-slate-800/60 border-slate-600' : 'bg-slate-50 border-slate-200'
+          }`}
+        >
+          <p className={`font-semibold text-sm leading-snug truncate ${textColor}`} title={nm || undefined}>
+            {nm || '—'}
+          </p>
+          <p className={`text-xs mt-1 flex items-center gap-1 ${mutedText}`}>
+            <span aria-hidden>📞</span>
+            <span className="font-mono truncate" title={ph || undefined}>
+              {ph || '—'}
+            </span>
+          </p>
         </div>
       );
     };
