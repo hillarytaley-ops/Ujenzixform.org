@@ -279,7 +279,7 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
       const pendingItems = Math.max(0, totalItems - receivedItems);
       const meta = byPoId.get(poId);
       const poMeta = poMap.get(poId);
-      const displayNumber = meta?.order_number || poMeta?.po_number || poMeta?.order_number || `Order ${poId.slice(0, 8)}`;
+      const displayNumber = meta?.order_number || poMeta?.po_number || `Order ${poId.slice(0, 8)}`;
       orderMap[poId] = {
         id: poId,
         order_number: displayNumber,
@@ -339,7 +339,8 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
         'id,purchase_order_id,qr_code,material_type,category,quantity,unit,item_sequence,receive_scanned,receive_scan_count,dispatch_scanned,status,created_at';
       const [poResp, itemsResp] = await Promise.all([
         fetchWithTimeout(
-          `${SUPABASE_URL}/rest/v1/purchase_orders?id=in.(${poIdsParam})&select=id,po_number,order_number,created_at`,
+          // purchase_orders has po_number, not order_number — selecting a missing column causes PostgREST 400
+          `${SUPABASE_URL}/rest/v1/purchase_orders?id=in.(${poIdsParam})&select=id,po_number,created_at`,
           { headers, cache: 'no-store' },
           RECEIVING_FETCH_TIMEOUT_MS
         ),
@@ -434,7 +435,7 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
       }
 
       const [poRes, itemsRes] = await Promise.all([
-        supabase.from('purchase_orders').select('id,po_number,order_number,created_at').in('id', poIds),
+        supabase.from('purchase_orders').select('id,po_number,created_at').in('id', poIds),
         supabase.from('material_items')
           .select('id,purchase_order_id,qr_code,material_type,category,quantity,unit,item_sequence,receive_scanned,receive_scan_count,dispatch_scanned,status,created_at')
           .in('purchase_order_id', poIds)
