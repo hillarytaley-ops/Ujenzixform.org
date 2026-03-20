@@ -88,11 +88,17 @@ interface BuilderOrdersTrackerProps {
   builderId: string;
 }
 
-/** Real provider name for UI — strips placeholders and legacy "Driver · …" combined labels */
-function providerDisplayName(order: { delivery_provider_name?: string | null }): string {
+/** Real provider name for UI — strips placeholders; keeps "Assigned driver" and falls back when only id is set */
+function providerDisplayName(order: {
+  delivery_provider_name?: string | null;
+  delivery_provider_id?: string | null;
+}): string {
   const n = (order.delivery_provider_name || '').trim();
   const lower = n.toLowerCase();
-  if (!n || lower === 'delivery provider' || lower === 'assigned driver' || lower === 'provider assigned') return '';
+  const hasId = !!order.delivery_provider_id;
+  if (!n) return hasId ? 'Assigned driver' : '';
+  if (lower === 'delivery provider' || lower === 'provider assigned') return hasId ? 'Assigned driver' : '';
+  if (lower === 'assigned driver') return n;
   if (/^driver\s*·\s*/i.test(n)) return '';
   return n;
 }

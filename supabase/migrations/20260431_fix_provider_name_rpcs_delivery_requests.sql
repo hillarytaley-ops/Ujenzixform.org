@@ -3,9 +3,13 @@
 -- when assignment exists only on delivery_requests (PO.delivery_provider_id NULL).
 -- Also ensures COALESCE uses profiles.full_name when provider_name is empty.
 -- Apply after 20260418 and 20260421 RPC migrations.
+-- DROP first: return type (OUT columns) cannot change with CREATE OR REPLACE alone.
 -- ============================================================
 
-CREATE OR REPLACE FUNCTION public.get_delivery_provider_names_for_supplier(provider_ids UUID[])
+DROP FUNCTION IF EXISTS public.get_delivery_provider_names_for_supplier(uuid[]);
+DROP FUNCTION IF EXISTS public.get_delivery_provider_names_for_builder(uuid[]);
+
+CREATE FUNCTION public.get_delivery_provider_names_for_supplier(provider_ids UUID[])
 RETURNS TABLE(id UUID, provider_name TEXT, phone TEXT)
 LANGUAGE sql
 SECURITY DEFINER
@@ -42,7 +46,9 @@ $$;
 COMMENT ON FUNCTION public.get_delivery_provider_names_for_supplier(UUID[]) IS
   'Returns provider_name/phone for IDs assigned on PO or delivery_requests; supplier must own the PO.';
 
-CREATE OR REPLACE FUNCTION public.get_delivery_provider_names_for_builder(provider_ids UUID[])
+GRANT EXECUTE ON FUNCTION public.get_delivery_provider_names_for_supplier(uuid[]) TO authenticated;
+
+CREATE FUNCTION public.get_delivery_provider_names_for_builder(provider_ids UUID[])
 RETURNS TABLE(id UUID, provider_name TEXT, phone TEXT)
 LANGUAGE sql
 SECURITY DEFINER
@@ -81,3 +87,5 @@ $$;
 
 COMMENT ON FUNCTION public.get_delivery_provider_names_for_builder(UUID[]) IS
   'Returns provider_name/phone for builder orders; match PO.delivery_provider_id OR delivery_requests.provider_id.';
+
+GRANT EXECUTE ON FUNCTION public.get_delivery_provider_names_for_builder(uuid[]) TO authenticated;

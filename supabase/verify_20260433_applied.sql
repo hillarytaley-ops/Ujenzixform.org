@@ -1,5 +1,6 @@
 -- ============================================================
--- Verify migrations 20260431–20260433 (provider display RPCs)
+-- Verify provider display + name RPCs (20260431–20260435).
+-- One-shot apply: supabase/migrations/20260435_delivery_provider_rpcs_combined.sql
 -- Run in Supabase SQL Editor on the project your app uses.
 -- ============================================================
 
@@ -16,8 +17,7 @@ WHERE n.nspname = 'public'
   )
 ORDER BY proname;
 
--- Expected: 2 rows. If 0 rows, apply supabase/migrations/20260433_provider_display_by_purchase_order_ids.sql
---          Also apply 20260434_provider_display_profiles_fallback.sql for profiles.id / auth fallbacks.
+-- Expected: 2 rows. If missing: run 20260435_delivery_provider_rpcs_combined.sql (covers 60431–60434).
 
 -- 2) Supplier RPC references purchase_orders + delivery_requests + delivery_providers (sanity check)
 SELECT

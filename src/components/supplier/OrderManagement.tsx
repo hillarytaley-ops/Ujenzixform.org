@@ -1144,15 +1144,18 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, in
     const getDeliveryStatusBadge = (order: Order) => {
       const requiresDelivery = order.delivery_required !== false;
 
-      const isJunkName = (s?: string) => {
-        const t = (s || '').trim().toLowerCase();
-        return !t || t === 'delivery provider' || t === 'assigned driver' || t === 'provider assigned';
-      };
-
       const nameLine = (): string => {
         const n = order.delivery_provider_name?.trim();
-        if (n && !isJunkName(n) && !/^driver\s*·\s*/i.test(n)) return n;
-        return '';
+        const lower = (n || '').toLowerCase();
+        if (!n) {
+          return order.delivery_provider_id ? 'Assigned driver' : '';
+        }
+        if (lower === 'delivery provider' || lower === 'provider assigned') {
+          return order.delivery_provider_id ? 'Assigned driver' : '';
+        }
+        if (lower === 'assigned driver') return n;
+        if (/^driver\s*·\s*/i.test(n)) return '';
+        return n;
       };
 
       const phoneLine = (): string => order.delivery_provider_phone?.trim() || '';
