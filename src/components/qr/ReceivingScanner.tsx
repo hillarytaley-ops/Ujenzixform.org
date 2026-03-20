@@ -81,6 +81,8 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
   const fetchOrdersRef = useRef<boolean>(false);
   const loadRunIdRef = useRef(0);
   const hasOrdersRef = useRef(false);
+  /** Latest dashboard list — effect deps use a stable fingerprint so parent array ref churn does not restart loads forever (stuck "Loading…"). */
+  const deliveryRequestsFromDashboardRef = useRef<DeliveryRequestForScanner[] | undefined>(undefined);
 
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const scannerContainerId = 'receiving-qr-scanner';
@@ -316,22 +318,52 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
       return;
     }
     const run = async () => {
-      const [poRes, itemsRes] = await Promise.all([
-        supabase.from('purchase_orders').select('id,po_number,order_number,created_at').in('id', poIds),
-        supabase.from('material_items')
-          .select('id,purchase_order_id,qr_code,material_type,category,quantity,unit,item_sequence,receive_scanned,receive_scan_count,dispatch_scanned,status,created_at')
-          .in('purchase_order_id', poIds)
-          .order('item_sequence')
+      // REST + user JWT (same pattern as Delivery Dashboard validation) — supabase-js can return 0 rows under RLS while REST with Bearer works.
+      let accessToken = ANON_KEY;
+      try {
+        const stored = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+        if (stored) {
+          const p = JSON.parse(stored);
+          if (p.access_token) accessToken = p.access_token;
+        }
+      } catch {
+        /* ignore */
+      }
+      const headers: Record<string, string> = {
+        apikey: ANON_KEY,
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json'
+      };
+      const poIdsParam = poIds.join(',');
+      const miSelect =
+        'id,purchase_order_id,qr_code,material_type,category,quantity,unit,item_sequence,receive_scanned,receive_scan_count,dispatch_scanned,status,created_at';
+      const [poResp, itemsResp] = await Promise.all([
+        fetchWithTimeout(
+          `${SUPABASE_URL}/rest/v1/purchase_orders?id=in.(${poIdsParam})&select=id,po_number,order_number,created_at`,
+          { headers, cache: 'no-store' },
+          RECEIVING_FETCH_TIMEOUT_MS
+        ),
+        fetchWithTimeout(
+          `${SUPABASE_URL}/rest/v1/material_items?purchase_order_id=in.(${poIdsParam})&select=${miSelect}&order=item_sequence.asc`,
+          { headers, cache: 'no-store' },
+          RECEIVING_FETCH_TIMEOUT_MS
+        )
       ]);
       const poMap = new Map<string, { po_number?: string; order_number?: string; created_at?: string }>();
-      (poRes.data || []).forEach((r: any) => poMap.set(r.id, { po_number: r.po_number, order_number: r.order_number, created_at: r.created_at }));
+      if (poResp.ok) {
+        const rows = (await poResp.json()) as any[];
+        (rows || []).forEach((r: any) => poMap.set(r.id, { po_number: r.po_number, order_number: r.order_number, created_at: r.created_at }));
+      }
       const itemsByPo = new Map<string, any[]>();
-      (itemsRes.data || []).forEach((row: any) => {
-        const pid = row.purchase_order_id;
-        if (!pid) return;
-        if (!itemsByPo.has(pid)) itemsByPo.set(pid, []);
-        itemsByPo.get(pid)!.push(row);
-      });
+      if (itemsResp.ok) {
+        const rows = (await itemsResp.json()) as any[];
+        (rows || []).forEach((row: any) => {
+          const pid = row.purchase_order_id;
+          if (!pid) return;
+          if (!itemsByPo.has(pid)) itemsByPo.set(pid, []);
+          itemsByPo.get(pid)!.push(row);
+        });
+      }
       return buildOrdersFromPoIds(poIds, byPoId, poMap, itemsByPo);
     };
     try {
@@ -437,12 +469,24 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
     }
   }, []);
 
+  deliveryRequestsFromDashboardRef.current = deliveryRequestsFromDashboard;
+  const dashboardListFingerprint =
+    deliveryRequestsFromDashboard === undefined
+      ? '__standalone__'
+      : deliveryRequestsFromDashboard.length === 0
+        ? ''
+        : [...deliveryRequestsFromDashboard]
+            .map((d) => `${d.purchase_order_id || ''}:${d.id}`)
+            .sort()
+            .join('|');
+
   useEffect(() => {
     if (deliveryRequestsFromDashboard !== undefined) {
       // Dashboard mode: use only the list from parent. Do NOT start fetchDeliveries() when
       // length is 0, or it can complete after loadFromDashboardList(1 item) and overwrite with [].
-      if (deliveryRequestsFromDashboard.length > 0) {
-        loadFromDashboardList(deliveryRequestsFromDashboard);
+      const list = deliveryRequestsFromDashboardRef.current;
+      if (list && list.length > 0) {
+        loadFromDashboardList(list);
       } else {
         hasOrdersRef.current = false;
         setOrders([]);
@@ -456,7 +500,7 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
       return;
     }
     fetchDeliveries();
-  }, [userRole, deliveryRequestsFromDashboard, deliveryRequestsFromDashboard?.length, loadFromDashboardList, fetchDeliveries]);
+  }, [userRole, dashboardListFingerprint, loadFromDashboardList, fetchDeliveries]);
 
   const selectDelivery = (order: Order) => {
     setSelectedOrder(order);

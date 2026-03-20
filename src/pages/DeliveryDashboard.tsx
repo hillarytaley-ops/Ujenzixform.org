@@ -981,10 +981,12 @@ const DeliveryDashboard = () => {
   });
 
   /**
-   * Receiving Scanner must use the SAME source as the Deliveries tab (Scheduled + In Transit).
-   * Previously we only passed isolatedActiveDeliveries (useDeliveryProviderData / FAST PATH).
-   * When unified RPC returns rows, the tab shows unifiedScheduled + unifiedInTransit but the
-   * scanner still saw [] → "No Deliveries Found" while the badge showed 2.
+   * Receiving Scanner must use the SAME rows the Deliveries tab shows as "Scheduled".
+   *
+   * IMPORTANT: useDeliveriesUnified currently clears all buckets (RPC disabled), so hasUnifiedData
+   * is almost always false. The tab then uses deliveryCategories.scheduled from validated
+   * activeDeliveries — NOT raw isolatedActiveDeliveries. Passing only isolated left the scanner
+   * empty or out of sync while the tab + badge showed orders.
    */
   const deliveriesForReceivingScanner = useMemo(() => {
     const mapRow = (d: {
@@ -1012,7 +1014,8 @@ const DeliveryDashboard = () => {
         );
     }
 
-    return (isolatedActiveDeliveries || []).map((d: Record<string, unknown>) =>
+    // Legacy = same list as Scheduled sub-tab (validated active deliveries)
+    return deliveryCategories.scheduled.map((d: Record<string, unknown>) =>
       mapRow({
         id: String(d.id ?? ''),
         purchase_order_id: (d.purchase_order_id as string | null | undefined) ?? undefined,
@@ -1020,7 +1023,7 @@ const DeliveryDashboard = () => {
         status: d.status as string | undefined
       })
     );
-  }, [hasUnifiedData, unifiedScheduled, unifiedInTransit, isolatedActiveDeliveries]);
+  }, [hasUnifiedData, unifiedScheduled, unifiedInTransit, deliveryCategories.scheduled]);
 
   // ============================================================
   // AGGRESSIVE APPROACH: FORCE-ADD KNOWN DELIVERED ORDERS
