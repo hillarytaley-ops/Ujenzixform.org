@@ -579,6 +579,46 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
             }
           }
           
+          // 3) Final fallback: if any IDs still unmatched, try profiles directly
+          // (provider_id might be profiles.id or auth.users.id without delivery_providers row)
+          const stillMissing = providerIdsArray.filter((id: string) => !providerNamesMap.has(id) && !providerPhonesMap.has(id));
+          if (stillMissing.length > 0) {
+            try {
+              const missingParam = stillMissing.join(',');
+              const profilesByIdRes = await fetch(
+                `${SUPABASE_URL}/rest/v1/profiles?id=in.(${missingParam})&select=id,user_id,full_name,phone`,
+                { headers, signal: providersController.signal, cache: 'no-store' }
+              );
+              const profilesByUserRes = await fetch(
+                `${SUPABASE_URL}/rest/v1/profiles?user_id=in.(${missingParam})&select=id,user_id,full_name,phone`,
+                { headers, signal: providersController.signal, cache: 'no-store' }
+              );
+              const addProfile = (p: any) => {
+                if (!p) return;
+                const nm = (p.full_name && String(p.full_name).trim()) || '';
+                const ph = (p.phone && String(p.phone).trim()) || '';
+                if (nm && !providerNamesMap.has(p.id)) {
+                  providerNamesMap.set(p.id, nm);
+                  if (p.user_id) providerNamesMap.set(p.user_id, nm);
+                }
+                if (ph && !providerPhonesMap.has(p.id)) {
+                  providerPhonesMap.set(p.id, ph);
+                  if (p.user_id) providerPhonesMap.set(p.user_id, ph);
+                }
+              };
+              if (profilesByIdRes.ok) {
+                const plist = await profilesByIdRes.json();
+                (plist || []).forEach(addProfile);
+              }
+              if (profilesByUserRes.ok) {
+                const plist = await profilesByUserRes.json();
+                (plist || []).forEach(addProfile);
+              }
+            } catch (e) {
+              console.log('⚠️ Profiles fallback for provider IDs failed');
+            }
+          }
+          
           clearTimeout(providersTimeoutId);
         } catch (e) {
           console.log('⚠️ Provider names fetch timeout, continuing without names');
@@ -597,13 +637,24 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
           order.delivery_provider_name && order.delivery_provider_name !== 'Delivery Provider'
             ? order.delivery_provider_name
             : null;
-        let providerPhone = order.delivery_provider_phone;
-        if (disp?.phone) providerPhone = disp.phone || providerPhone;
+        let providerPhone: string | null = null;
+        // Try display RPC phone first
+        if (disp?.phone) {
+          const ph = String(disp.phone).trim();
+          if (ph) providerPhone = ph;
+        }
+        // Fallback to PO phone
+        if (!providerPhone && order.delivery_provider_phone) {
+          const ph = String(order.delivery_provider_phone).trim();
+          if (ph) providerPhone = ph;
+        }
+        // Fallback to enrichment map
+        if (!providerPhone && providerId) {
+          const ph = providerPhonesMap.get(providerId);
+          if (ph && String(ph).trim()) providerPhone = String(ph).trim();
+        }
         if (disp?.provider_name && disp.provider_name !== 'Delivery Provider') {
           providerName = disp.provider_name;
-        }
-        if (!providerPhone && providerId) {
-          providerPhone = providerPhonesMap.get(providerId) || null;
         }
         if (!providerName && providerId) {
           providerName = providerNamesMap.get(providerId) || null;
@@ -611,6 +662,14 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
             console.log(`✅ Found provider name for order ${order.po_number}: ${providerName} (providerId: ${providerId})`);
           } else {
             console.log(`⚠️ No provider name found for providerId: ${providerId} in order ${order.po_number}`);
+          }
+        }
+        // Log phone resolution status
+        if (providerId) {
+          if (providerPhone) {
+            console.log(`✅ Found provider phone for order ${order.po_number}: ${providerPhone} (providerId: ${providerId})`);
+          } else {
+            console.log(`⚠️ No provider phone found for providerId: ${providerId} in order ${order.po_number} - phone may not exist in DB`);
           }
         }
         // Keep name and phone separate — do not stuff phone into name or use "Assigned driver"

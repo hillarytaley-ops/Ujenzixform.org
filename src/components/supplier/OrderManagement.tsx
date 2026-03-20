@@ -810,12 +810,15 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, in
                     providerNames[r.id] = r.provider_name;
                     if (r.user_id) providerNames[r.user_id] = r.provider_name;
                   }
-                  if (r.phone) {
-                    providerPhones[r.id] = r.phone;
-                    if (r.user_id) providerPhones[r.user_id] = r.phone;
+                  // Store phone even if empty string - will filter later; RPC may return empty string for missing phones
+                  const phoneVal = r.phone ? String(r.phone).trim() : '';
+                  if (phoneVal) {
+                    providerPhones[r.id] = phoneVal;
+                    if (r.user_id) providerPhones[r.user_id] = phoneVal;
                   }
                 }
               });
+              console.log(`✅ OrderManagement: RPC returned ${rpcRows.length} provider rows; phones resolved: ${Object.keys(providerPhones).length}`);
             }
           } catch (_) {
             // RPC may not exist yet
@@ -885,6 +888,45 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, in
               }
             });
           }
+          // 3) Fallback: if any provider IDs weren't matched to delivery_providers, try profiles directly
+          // (provider_id on PO/DR might be profiles.id or auth.users.id without a delivery_providers row)
+          const unmatchedIds = ids.filter((id: string) => !providerPhones[id] && !providerNames[id]);
+          if (unmatchedIds.length > 0) {
+            try {
+              const unmatchedParam = unmatchedIds.join(',');
+              const profilesByIdRes = await fetch(
+                `${SUPABASE_URL}/rest/v1/profiles?id=in.(${unmatchedParam})&select=id,user_id,full_name,phone`,
+                { headers, cache: 'no-store' }
+              );
+              const profilesByUserRes = await fetch(
+                `${SUPABASE_URL}/rest/v1/profiles?user_id=in.(${unmatchedParam})&select=id,user_id,full_name,phone`,
+                { headers, cache: 'no-store' }
+              );
+              const addProfile = (p: any) => {
+                if (!p) return;
+                const nm = (p.full_name && String(p.full_name).trim()) || '';
+                const ph = (p.phone && String(p.phone).trim()) || '';
+                if (nm && !providerNames[p.id]) {
+                  providerNames[p.id] = nm;
+                  if (p.user_id) providerNames[p.user_id] = nm;
+                }
+                if (ph && !providerPhones[p.id]) {
+                  providerPhones[p.id] = ph;
+                  if (p.user_id) providerPhones[p.user_id] = ph;
+                }
+              };
+              if (profilesByIdRes.ok) {
+                const plist = await profilesByIdRes.json();
+                (plist || []).forEach(addProfile);
+              }
+              if (profilesByUserRes.ok) {
+                const plist = await profilesByUserRes.json();
+                (plist || []).forEach(addProfile);
+              }
+            } catch (e) {
+              console.log('Profiles fallback for provider IDs failed');
+            }
+          }
         } catch (e) {
           console.log('Provider names fetch failed');
         }
@@ -914,10 +956,19 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, in
         let resolvedProviderId = po.delivery_provider_id || dr?.provider_id;
         if (disp?.delivery_provider_id) resolvedProviderId = disp.delivery_provider_id;
         const resolvedStatus = po.delivery_status || (dr?.status && ['accepted', 'assigned', 'picked_up', 'in_transit', 'delivered'].includes(dr.status) ? dr.status : undefined);
-        let resolvedProviderPhone =
-          disp?.phone ||
-          po.delivery_provider_phone ||
-          (resolvedProviderId ? providerPhones[resolvedProviderId] : undefined);
+        let resolvedProviderPhone: string | undefined = undefined;
+        if (disp?.phone) {
+          const ph = String(disp.phone).trim();
+          if (ph) resolvedProviderPhone = ph;
+        }
+        if (!resolvedProviderPhone && po.delivery_provider_phone) {
+          const ph = String(po.delivery_provider_phone).trim();
+          if (ph) resolvedProviderPhone = ph;
+        }
+        if (!resolvedProviderPhone && resolvedProviderId) {
+          const ph = providerPhones[resolvedProviderId];
+          if (ph && String(ph).trim()) resolvedProviderPhone = String(ph).trim();
+        }
         const poProviderName =
           po.delivery_provider_name && po.delivery_provider_name !== 'Delivery Provider'
             ? po.delivery_provider_name
@@ -1158,7 +1209,15 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, in
         return n;
       };
 
-      const phoneLine = (): string => order.delivery_provider_phone?.trim() || '';
+      const phoneLine = (): string => {
+        const ph = order.delivery_provider_phone?.trim();
+        if (ph) return ph;
+        // If we have provider_id but no phone, it means phone isn't in DB - show helpful message instead of dash
+        if (order.delivery_provider_id) {
+          return ''; // Return empty so UI shows "—" but we know it's a data issue, not a code issue
+        }
+        return '';
+      };
 
       const hasAssignedProvider =
         !!order.delivery_provider_id ||
