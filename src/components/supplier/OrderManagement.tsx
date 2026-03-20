@@ -730,35 +730,7 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, in
       if (providerIdsToResolve.size > 0) {
         try {
           const ids = Array.from(providerIdsToResolve);
-          const fromProviders = await fetch(
-            `${SUPABASE_URL}/rest/v1/delivery_providers?id=in.(${ids.join(',')})&select=id,provider_name,phone`,
-            { headers, cache: 'no-store' }
-          );
-          if (fromProviders.ok) {
-            const arr = await fromProviders.json();
-            (arr || []).forEach((p: any) => {
-              if (p.id) {
-                // CRITICAL: Use provider_name (primary field) - this is what the provider filled in during registration
-                providerNames[p.id] = p.provider_name || 'Delivery Provider';
-                if (p.phone) providerPhones[p.id] = p.phone;
-              }
-            });
-          }
-          const fromProfiles = await fetch(
-            `${SUPABASE_URL}/rest/v1/profiles?user_id=in.(${ids.join(',')})&select=user_id,full_name,phone`,
-            { headers, cache: 'no-store' }
-          );
-          if (fromProfiles.ok) {
-            const arr = await fromProfiles.json();
-            (arr || []).forEach((p: any) => {
-              if (p.user_id && !providerNames[p.user_id]) {
-                providerNames[p.user_id] = p.full_name || 'Delivery Provider';
-                if (p.phone) providerPhones[p.user_id] = p.phone;
-              }
-            });
-          }
-          // RPC fallback: suppliers can resolve provider name/phone when direct table read is blocked by RLS.
-          // Never let this block or clear orders: if RPC is missing or fails, keep existing providerNames.
+          // 1) RPC first — SECURITY DEFINER; includes delivery_requests + profile fallback (migration 20260431+)
           try {
             const result = await supabase.rpc('get_delivery_provider_names_for_supplier', {
               provider_ids: ids,
@@ -767,14 +739,59 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, in
             if (Array.isArray(rpcRows) && rpcRows.length > 0) {
               rpcRows.forEach((row: unknown) => {
                 const r = row as { id?: string; provider_name?: string; phone?: string };
-                if (r?.id && (r.provider_name || r.phone)) {
+                if (r?.id) {
                   if (r.provider_name) providerNames[r.id] = r.provider_name;
                   if (r.phone) providerPhones[r.id] = r.phone;
                 }
               });
             }
           } catch (_) {
-            // RPC may not exist or fail; orders still show with direct fetch + profiles
+            // RPC may not exist yet
+          }
+          // 2) REST: delivery_providers.user_id → profiles.user_id (ids above are provider row UUIDs, not auth users)
+          const fromProviders = await fetch(
+            `${SUPABASE_URL}/rest/v1/delivery_providers?id=in.(${ids.join(',')})&select=id,provider_name,phone,user_id`,
+            { headers, cache: 'no-store' }
+          );
+          if (fromProviders.ok) {
+            const arr = await fromProviders.json();
+            const userIdsForProfiles = new Set<string>();
+            (arr || []).forEach((p: any) => {
+              if (p?.user_id) userIdsForProfiles.add(p.user_id);
+            });
+            let profilesByUserId: Record<string, { full_name?: string; phone?: string }> = {};
+            if (userIdsForProfiles.size > 0) {
+              const uidList = Array.from(userIdsForProfiles).join(',');
+              const profRes = await fetch(
+                `${SUPABASE_URL}/rest/v1/profiles?user_id=in.(${uidList})&select=user_id,full_name,phone`,
+                { headers, cache: 'no-store' }
+              );
+              if (profRes.ok) {
+                const plist = await profRes.json();
+                (plist || []).forEach((pr: any) => {
+                  if (pr.user_id) profilesByUserId[pr.user_id] = pr;
+                });
+              }
+            }
+            (arr || []).forEach((p: any) => {
+              if (!p.id) return;
+              const prof = p.user_id ? profilesByUserId[p.user_id] : undefined;
+              const nm =
+                (p.provider_name && String(p.provider_name).trim()) ||
+                (prof?.full_name && String(prof.full_name).trim()) ||
+                '';
+              const ph =
+                (p.phone && String(p.phone).trim()) ||
+                (prof?.phone && String(prof.phone).trim()) ||
+                '';
+              const bad = (s: string) => !s || s === 'Delivery Provider';
+              if (nm && (!providerNames[p.id] || bad(providerNames[p.id]))) {
+                providerNames[p.id] = nm;
+              }
+              if (ph && !providerPhones[p.id]) {
+                providerPhones[p.id] = ph;
+              }
+            });
           }
         } catch (e) {
           console.log('Provider names fetch failed');

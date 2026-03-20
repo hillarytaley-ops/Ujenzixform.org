@@ -397,34 +397,50 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
             console.log('⚠️ get_delivery_provider_names_for_builder RPC failed, trying direct fetch');
           }
           
-          // 2) Fallback: direct delivery_providers + profiles (may be blocked by RLS for builders)
+          // 2) Fallback: delivery_providers.user_id → profiles (provider IDs are not profile user_ids)
           const missingNames = providerIdsArray.filter((id: string) => !providerNamesMap.has(id));
           if (missingNames.length > 0) {
             try {
               const idFilter = missingNames.join(',');
               const providersRes = await fetch(
-                `${SUPABASE_URL}/rest/v1/delivery_providers?id=in.(${idFilter})&select=id,provider_name,phone`,
+                `${SUPABASE_URL}/rest/v1/delivery_providers?id=in.(${idFilter})&select=id,provider_name,phone,user_id`,
                 { headers, signal: providersController.signal, cache: 'no-store' }
               );
               if (providersRes?.ok) {
                 const providers = await providersRes.json();
-                providers.forEach((p: any) => {
-                  if (p.id && !providerNamesMap.has(p.id)) {
-                    if (p.provider_name) providerNamesMap.set(p.id, p.provider_name);
-                    if (p.phone) providerPhonesMap.set(p.id, p.phone);
-                  }
+                const userIds = new Set<string>();
+                (providers || []).forEach((p: any) => {
+                  if (p?.user_id) userIds.add(p.user_id);
                 });
-              }
-              const profilesRes = await fetch(
-                `${SUPABASE_URL}/rest/v1/profiles?user_id=in.(${missingNames.join(',')})&select=user_id,full_name,phone`,
-                { headers, signal: providersController.signal, cache: 'no-store' }
-              );
-              if (profilesRes?.ok) {
-                const profiles = await profilesRes.json();
-                profiles.forEach((p: any) => {
-                  if (p.user_id && !providerNamesMap.has(p.user_id)) {
-                    if (p.full_name) providerNamesMap.set(p.user_id, p.full_name);
-                    if (p.phone) providerPhonesMap.set(p.user_id, p.phone);
+                const profilesByUserId: Record<string, { full_name?: string; phone?: string }> = {};
+                if (userIds.size > 0) {
+                  const profilesRes = await fetch(
+                    `${SUPABASE_URL}/rest/v1/profiles?user_id=in.(${Array.from(userIds).join(',')})&select=user_id,full_name,phone`,
+                    { headers, signal: providersController.signal, cache: 'no-store' }
+                  );
+                  if (profilesRes?.ok) {
+                    const profiles = await profilesRes.json();
+                    (profiles || []).forEach((pr: any) => {
+                      if (pr.user_id) profilesByUserId[pr.user_id] = pr;
+                    });
+                  }
+                }
+                (providers || []).forEach((p: any) => {
+                  if (!p.id) return;
+                  const prof = p.user_id ? profilesByUserId[p.user_id] : undefined;
+                  const nm =
+                    (p.provider_name && String(p.provider_name).trim()) ||
+                    (prof?.full_name && String(prof.full_name).trim()) ||
+                    '';
+                  const ph =
+                    (p.phone && String(p.phone).trim()) ||
+                    (prof?.phone && String(prof.phone).trim()) ||
+                    '';
+                  if (nm && !providerNamesMap.has(p.id)) {
+                    providerNamesMap.set(p.id, nm);
+                  }
+                  if (ph && !providerPhonesMap.has(p.id)) {
+                    providerPhonesMap.set(p.id, ph);
                   }
                 });
               }

@@ -873,9 +873,34 @@ class TrackingNumberService {
           
           // Extract provider name and phone from delivery_providers
           if (providerData) {
-            // CRITICAL: Use provider_name (primary field) - this is what the provider filled in during registration
-            providerName = providerData.provider_name || 'Delivery Provider';
+            const pn = providerData.provider_name && String(providerData.provider_name).trim();
+            providerName = pn || '';
             providerPhone = providerData.phone || null;
+            if (!providerName && providerData.user_id) {
+              try {
+                const prRes = await fetch(
+                  `${SUPABASE_URL}/rest/v1/profiles?user_id=eq.${providerData.user_id}&select=full_name,phone&limit=1`,
+                  {
+                    headers: {
+                      'apikey': SUPABASE_ANON_KEY,
+                      Authorization: `Bearer ${accessToken}`,
+                      'Content-Type': 'application/json',
+                    },
+                    cache: 'no-store',
+                  }
+                );
+                if (prRes.ok) {
+                  const arr = await prRes.json();
+                  if (Array.isArray(arr) && arr[0]?.full_name) {
+                    providerName = String(arr[0].full_name).trim();
+                    if (!providerPhone && arr[0].phone) providerPhone = arr[0].phone;
+                  }
+                }
+              } catch (_) {
+                /* keep fallback */
+              }
+            }
+            if (!providerName) providerName = 'Delivery Provider';
             console.log('✅ Using provider info from delivery_providers:', { name: providerName, phone: providerPhone });
           } else {
             // Fallback: Try profiles table
@@ -1117,9 +1142,35 @@ class TrackingNumberService {
 
           // Process provider result
           if (providerResult.status === 'fulfilled' && providerResult.value) {
-            // CRITICAL: Use provider_name (primary field) - this is what the provider filled in during registration
-            providerName = providerResult.value.provider_name || 'Delivery Provider';
-            providerPhone = providerResult.value.phone || null;
+            const pv = providerResult.value;
+            const pn = pv.provider_name && String(pv.provider_name).trim();
+            providerName = pn || '';
+            providerPhone = pv.phone || null;
+            if (!providerName && pv.user_id) {
+              try {
+                const prRes = await fetch(
+                  `${SUPABASE_URL}/rest/v1/profiles?user_id=eq.${pv.user_id}&select=full_name,phone&limit=1`,
+                  {
+                    headers: {
+                      'apikey': SUPABASE_ANON_KEY,
+                      Authorization: `Bearer ${accessToken}`,
+                      'Content-Type': 'application/json',
+                    },
+                    cache: 'no-store',
+                  }
+                );
+                if (prRes.ok) {
+                  const arr = await prRes.json();
+                  if (Array.isArray(arr) && arr[0]?.full_name) {
+                    providerName = String(arr[0].full_name).trim();
+                    if (!providerPhone && arr[0].phone) providerPhone = arr[0].phone;
+                  }
+                }
+              } catch (_) {
+                /* use default */
+              }
+            }
+            if (!providerName) providerName = 'Delivery Provider';
             console.log('✅ Step 5: Using provider info from delivery_providers:', { name: providerName, phone: providerPhone });
           } else {
             // Fallback: Try profiles table if delivery_providers didn't work
