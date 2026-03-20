@@ -732,38 +732,58 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, in
           const ids = Array.from(providerIdsToResolve);
           // 1) RPC first — SECURITY DEFINER; includes delivery_requests + profile fallback (migration 20260431+)
           try {
-            const result = await supabase.rpc('get_delivery_provider_names_for_supplier', {
-              provider_ids: ids,
-            });
-            const rpcRows = result?.data;
+            const { data: rpcRows, error: rpcErr } = await supabase.rpc(
+              'get_delivery_provider_names_for_supplier',
+              { provider_ids: ids }
+            );
+            if (rpcErr) {
+              console.warn('OrderManagement: get_delivery_provider_names_for_supplier:', rpcErr.message);
+            }
             if (Array.isArray(rpcRows) && rpcRows.length > 0) {
               rpcRows.forEach((row: unknown) => {
-                const r = row as { id?: string; provider_name?: string; phone?: string };
-                if (r?.id) {
-                  if (r.provider_name) providerNames[r.id] = r.provider_name;
-                  if (r.phone) providerPhones[r.id] = r.phone;
+                const r = row as { id?: string; user_id?: string; provider_name?: string; phone?: string };
+                if (r?.id && r.provider_name) {
+                  providerNames[r.id] = r.provider_name;
+                  if (r.user_id) providerNames[r.user_id] = r.provider_name;
+                  if (r.phone) {
+                    providerPhones[r.id] = r.phone;
+                    if (r.user_id) providerPhones[r.user_id] = r.phone;
+                  }
                 }
               });
             }
           } catch (_) {
             // RPC may not exist yet
           }
-          // 2) REST: delivery_providers.user_id → profiles.user_id (ids above are provider row UUIDs, not auth users)
-          const fromProviders = await fetch(
-            `${SUPABASE_URL}/rest/v1/delivery_providers?id=in.(${ids.join(',')})&select=id,provider_name,phone,user_id`,
+          // 2) REST: by delivery_providers.id OR user_id (PO/DR often store auth user_id)
+          const idParam = ids.join(',');
+          const fromProvidersId = await fetch(
+            `${SUPABASE_URL}/rest/v1/delivery_providers?id=in.(${idParam})&select=id,provider_name,phone,user_id`,
             { headers, cache: 'no-store' }
           );
-          if (fromProviders.ok) {
-            const arr = await fromProviders.json();
+          const fromProvidersUser = await fetch(
+            `${SUPABASE_URL}/rest/v1/delivery_providers?user_id=in.(${idParam})&select=id,provider_name,phone,user_id`,
+            { headers, cache: 'no-store' }
+          );
+          const rowsByDpId = new Map<string, any>();
+          const pushRows = (list: any[]) => {
+            (list || []).forEach((p: any) => {
+              if (p?.id) rowsByDpId.set(p.id, p);
+            });
+          };
+          if (fromProvidersId.ok) pushRows(await fromProvidersId.json());
+          if (fromProvidersUser.ok) pushRows(await fromProvidersUser.json());
+          const arr = Array.from(rowsByDpId.values());
+          if (arr.length > 0) {
             const userIdsForProfiles = new Set<string>();
-            (arr || []).forEach((p: any) => {
+            arr.forEach((p: any) => {
               if (p?.user_id) userIdsForProfiles.add(p.user_id);
             });
-            let profilesByUserId: Record<string, { full_name?: string; phone?: string }> = {};
+            let profilesByUserId: Record<string, { full_name?: string; phone?: string; email?: string }> = {};
             if (userIdsForProfiles.size > 0) {
               const uidList = Array.from(userIdsForProfiles).join(',');
               const profRes = await fetch(
-                `${SUPABASE_URL}/rest/v1/profiles?user_id=in.(${uidList})&select=user_id,full_name,phone`,
+                `${SUPABASE_URL}/rest/v1/profiles?user_id=in.(${uidList})&select=user_id,full_name,phone,email`,
                 { headers, cache: 'no-store' }
               );
               if (profRes.ok) {
@@ -773,12 +793,17 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, in
                 });
               }
             }
-            (arr || []).forEach((p: any) => {
+            arr.forEach((p: any) => {
               if (!p.id) return;
               const prof = p.user_id ? profilesByUserId[p.user_id] : undefined;
+              const emailLocal =
+                prof?.email && String(prof.email).includes('@')
+                  ? String(prof.email).split('@')[0].trim()
+                  : '';
               const nm =
                 (p.provider_name && String(p.provider_name).trim()) ||
                 (prof?.full_name && String(prof.full_name).trim()) ||
+                emailLocal ||
                 '';
               const ph =
                 (p.phone && String(p.phone).trim()) ||
@@ -787,9 +812,11 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, in
               const bad = (s: string) => !s || s === 'Delivery Provider';
               if (nm && (!providerNames[p.id] || bad(providerNames[p.id]))) {
                 providerNames[p.id] = nm;
+                if (p.user_id) providerNames[p.user_id] = nm;
               }
-              if (ph && !providerPhones[p.id]) {
-                providerPhones[p.id] = ph;
+              if (ph) {
+                if (!providerPhones[p.id]) providerPhones[p.id] = ph;
+                if (p.user_id && !providerPhones[p.user_id]) providerPhones[p.user_id] = ph;
               }
             });
           }
@@ -821,10 +848,15 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, in
         const resolvedProviderId = po.delivery_provider_id || dr?.provider_id;
         const resolvedStatus = po.delivery_status || (dr?.status && ['accepted', 'assigned', 'picked_up', 'in_transit', 'delivered'].includes(dr.status) ? dr.status : undefined);
         const resolvedProviderPhone = po.delivery_provider_phone || (resolvedProviderId ? providerPhones[resolvedProviderId] : undefined);
-        // Name: prefer PO column, then RPC/direct lookup; if we have phone but no name, show "Delivery Provider" so we never show "Loading..."
-        const resolvedProviderName = po.delivery_provider_name
-          || (resolvedProviderId ? providerNames[resolvedProviderId] : undefined)
-          || (resolvedProviderPhone ? 'Delivery Provider' : undefined);
+        const poProviderName =
+          po.delivery_provider_name && po.delivery_provider_name !== 'Delivery Provider'
+            ? po.delivery_provider_name
+            : undefined;
+        const resolvedProviderName =
+          poProviderName ||
+          (resolvedProviderId ? providerNames[resolvedProviderId] : undefined) ||
+          (resolvedProviderPhone ? `Driver · ${resolvedProviderPhone}` : undefined) ||
+          (resolvedProviderId ? 'Assigned driver' : undefined);
 
         return {
           id: po.id,
@@ -1116,7 +1148,13 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, in
                   {isAccepted ? '✅ Delivery Confirmed' : '📋 Assigned'}
                 </p>
                 <p className="font-medium text-gray-800 mt-1" title={providerName}>
-                  {providerName !== 'Delivery Provider' ? providerName : (order.delivery_provider_id ? 'Loading…' : '—')}
+                  {providerName !== 'Delivery Provider'
+                    ? providerName
+                    : order.delivery_provider_id
+                      ? order.delivery_provider_phone
+                        ? `Driver · ${order.delivery_provider_phone}`
+                        : 'Assigned driver'
+                      : '—'}
                 </p>
               </>
             )}

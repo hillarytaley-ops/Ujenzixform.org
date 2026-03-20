@@ -386,12 +386,19 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
             if (rpcRes.ok) {
               const rpcRows = await rpcRes.json();
               (Array.isArray(rpcRows) ? rpcRows : []).forEach((row: any) => {
-                if (row?.id) {
-                  if (row.provider_name) providerNamesMap.set(row.id, row.provider_name);
-                  if (row.phone) providerPhonesMap.set(row.id, row.phone);
+                if (row?.id && row.provider_name) {
+                  providerNamesMap.set(row.id, row.provider_name);
+                  if (row.user_id) providerNamesMap.set(row.user_id, row.provider_name);
+                  if (row.phone) {
+                    providerPhonesMap.set(row.id, row.phone);
+                    if (row.user_id) providerPhonesMap.set(row.user_id, row.phone);
+                  }
                 }
               });
               console.log('👤 Provider names/phones from RPC:', providerNamesMap.size);
+            } else {
+              const errText = await rpcRes.text().catch(() => '');
+              console.warn('⚠️ get_delivery_provider_names_for_builder HTTP', rpcRes.status, errText);
             }
           } catch (e) {
             console.log('⚠️ get_delivery_provider_names_for_builder RPC failed, trying direct fetch');
@@ -402,20 +409,32 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
           if (missingNames.length > 0) {
             try {
               const idFilter = missingNames.join(',');
-              const providersRes = await fetch(
+              const resById = await fetch(
                 `${SUPABASE_URL}/rest/v1/delivery_providers?id=in.(${idFilter})&select=id,provider_name,phone,user_id`,
                 { headers, signal: providersController.signal, cache: 'no-store' }
               );
-              if (providersRes?.ok) {
-                const providers = await providersRes.json();
+              const resByUser = await fetch(
+                `${SUPABASE_URL}/rest/v1/delivery_providers?user_id=in.(${idFilter})&select=id,provider_name,phone,user_id`,
+                { headers, signal: providersController.signal, cache: 'no-store' }
+              );
+              const byDp = new Map<string, any>();
+              const addProv = (list: any[]) => {
+                (list || []).forEach((p: any) => {
+                  if (p?.id) byDp.set(p.id, p);
+                });
+              };
+              if (resById.ok) addProv(await resById.json());
+              if (resByUser.ok) addProv(await resByUser.json());
+              const providers = Array.from(byDp.values());
+              if (providers.length > 0) {
                 const userIds = new Set<string>();
-                (providers || []).forEach((p: any) => {
+                providers.forEach((p: any) => {
                   if (p?.user_id) userIds.add(p.user_id);
                 });
-                const profilesByUserId: Record<string, { full_name?: string; phone?: string }> = {};
+                const profilesByUserId: Record<string, { full_name?: string; phone?: string; email?: string }> = {};
                 if (userIds.size > 0) {
                   const profilesRes = await fetch(
-                    `${SUPABASE_URL}/rest/v1/profiles?user_id=in.(${Array.from(userIds).join(',')})&select=user_id,full_name,phone`,
+                    `${SUPABASE_URL}/rest/v1/profiles?user_id=in.(${Array.from(userIds).join(',')})&select=user_id,full_name,phone,email`,
                     { headers, signal: providersController.signal, cache: 'no-store' }
                   );
                   if (profilesRes?.ok) {
@@ -425,22 +444,29 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
                     });
                   }
                 }
-                (providers || []).forEach((p: any) => {
+                providers.forEach((p: any) => {
                   if (!p.id) return;
                   const prof = p.user_id ? profilesByUserId[p.user_id] : undefined;
+                  const emailLocal =
+                    prof?.email && String(prof.email).includes('@')
+                      ? String(prof.email).split('@')[0].trim()
+                      : '';
                   const nm =
                     (p.provider_name && String(p.provider_name).trim()) ||
                     (prof?.full_name && String(prof.full_name).trim()) ||
+                    emailLocal ||
                     '';
                   const ph =
                     (p.phone && String(p.phone).trim()) ||
                     (prof?.phone && String(prof.phone).trim()) ||
                     '';
-                  if (nm && !providerNamesMap.has(p.id)) {
+                  if (nm) {
                     providerNamesMap.set(p.id, nm);
+                    if (p.user_id) providerNamesMap.set(p.user_id, nm);
                   }
-                  if (ph && !providerPhonesMap.has(p.id)) {
+                  if (ph) {
                     providerPhonesMap.set(p.id, ph);
+                    if (p.user_id) providerPhonesMap.set(p.user_id, ph);
                   }
                 });
               }
@@ -462,8 +488,16 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
         // Get provider ID from delivery_request if not in purchase_order
         const providerId = order.delivery_provider_id || dr?.provider_id;
         
-        // Get provider name - prioritize purchase_order, then delivery_request, then lookup
-        let providerName = order.delivery_provider_name;
+        // Get provider name - ignore PO stub "Delivery Provider" so we re-resolve from maps/RPC
+        let providerName =
+          order.delivery_provider_name && order.delivery_provider_name !== 'Delivery Provider'
+            ? order.delivery_provider_name
+            : null;
+        // Get provider phone first (helps display fallback)
+        let providerPhone = order.delivery_provider_phone;
+        if (!providerPhone && providerId) {
+          providerPhone = providerPhonesMap.get(providerId) || null;
+        }
         if (!providerName && providerId) {
           providerName = providerNamesMap.get(providerId) || null;
           if (providerName) {
@@ -472,14 +506,11 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
             console.log(`⚠️ No provider name found for providerId: ${providerId} in order ${order.po_number}`);
           }
         }
-        
-        // Get provider phone - prioritize purchase_order, then lookup
-        let providerPhone = order.delivery_provider_phone;
-        if (!providerPhone && providerId) {
-          providerPhone = providerPhonesMap.get(providerId) || null;
-          if (providerPhone) {
-            console.log(`✅ Found provider phone for order ${order.po_number}: ${providerPhone}`);
-          }
+        if (!providerName && providerPhone) {
+          providerName = `Driver · ${providerPhone}`;
+        }
+        if (!providerName && providerId) {
+          providerName = 'Assigned driver';
         }
         
         // Update delivery_status if delivery_request has more recent status
@@ -494,8 +525,8 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
           material_items: itemsByOrder.get(order.id) || [],
           // Enrich with provider information
           delivery_provider_id: providerId || order.delivery_provider_id,
-          delivery_provider_name: providerName || order.delivery_provider_name,
-          delivery_provider_phone: providerPhone || order.delivery_provider_phone,
+          delivery_provider_name: providerName ?? order.delivery_provider_name,
+          delivery_provider_phone: providerPhone ?? order.delivery_provider_phone,
           delivery_status: deliveryStatus || order.delivery_status
         };
         
@@ -1314,7 +1345,7 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
                           <span className="truncate">{order.delivery_provider_phone}</span>
                         </div>
                       ) : order.delivery_provider_id ? (
-                        <div className="text-[9px] text-gray-400 mt-0.5">Phone: Loading...</div>
+                        <div className="text-[9px] text-gray-400 mt-0.5">Contact pending</div>
                       ) : null}
                     </>
                   ) : (order.delivery_provider_id || order.delivery_provider_name) ? (
@@ -1360,7 +1391,16 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
                   </span>
                   {order.delivery_provider_id || order.delivery_provider_name ? (
                     <div className="text-[10px] text-green-600 mt-0.5 font-medium text-center">
-                      <div>To be delivered by: {order.delivery_provider_name || 'Provider'}</div>
+                      <div>
+                        To be delivered by:{' '}
+                        {order.delivery_provider_name && order.delivery_provider_name !== 'Delivery Provider'
+                          ? order.delivery_provider_name
+                          : order.delivery_provider_phone
+                            ? `Driver · ${order.delivery_provider_phone}`
+                            : order.delivery_provider_id
+                              ? 'Assigned driver'
+                              : 'Provider'}
+                      </div>
                       {order.delivery_provider_phone && (
                         <div className="text-[9px] text-green-500 mt-0.5 flex items-center justify-center gap-1">
                           <Phone className="h-3 w-3" />
@@ -1476,7 +1516,13 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
                       </>
                     ) : (order.delivery_provider_name === 'Delivery Provider' || order.delivery_provider_id) ? (
                       <>
-                        <p className="text-blue-700 font-semibold">{order.delivery_provider_name || 'Delivery Provider'}</p>
+                        <p className="text-blue-700 font-semibold">
+                          {order.delivery_provider_name && order.delivery_provider_name !== 'Delivery Provider'
+                            ? order.delivery_provider_name
+                            : order.delivery_provider_phone
+                              ? `Driver · ${order.delivery_provider_phone}`
+                              : 'Assigned driver'}
+                        </p>
                         {order.delivery_provider_phone && (
                           <div className="flex items-center gap-2 mt-1">
                             <p className="text-xs text-blue-600">Phone: {order.delivery_provider_phone}</p>
