@@ -320,6 +320,34 @@ const DeliveryProviderApplication = () => {
           updated_at: new Date().toISOString(),
         })
         .eq('user_id', currentUser.id);
+
+      // CRITICAL: Create delivery_providers row immediately so supplier/builder dashboards show name/phone
+      // even while application is pending (is_verified=false until admin approves)
+      const displayName = (companyForm.companyName || companyForm.contactPerson).trim() || 'Delivery Provider';
+      const { data: dpExisting } = await supabase
+        .from('delivery_providers')
+        .select('id')
+        .eq('user_id', currentUser.id)
+        .maybeSingle();
+      const dpPayload = {
+        provider_name: displayName,
+        provider_type: 'company' as const,
+        phone: companyForm.contactPhone.trim(),
+        email: companyForm.contactEmail.trim().toLowerCase(),
+        address: companyForm.businessAddress?.trim() || companyForm.operatingAreas[0] || null,
+        contact_person: companyForm.contactPerson.trim(),
+        vehicle_types: ['lorry_medium'] as string[],
+        service_areas: companyForm.operatingAreas.length > 0 ? companyForm.operatingAreas : ['Nairobi'],
+        driving_license_number: 'Company Fleet',
+        is_verified: false,
+        is_active: true,
+        updated_at: new Date().toISOString(),
+      };
+      if (dpExisting?.id) {
+        await supabase.from('delivery_providers').update(dpPayload).eq('user_id', currentUser.id);
+      } else {
+        await supabase.from('delivery_providers').insert({ user_id: currentUser.id, ...dpPayload });
+      }
       
       toast({
         title: "Application Submitted Successfully",
@@ -414,6 +442,33 @@ const DeliveryProviderApplication = () => {
           updated_at: new Date().toISOString(),
         })
         .eq('user_id', currentUser.id);
+
+      // CRITICAL: Create delivery_providers row immediately so supplier/builder dashboards show name/phone
+      // even while application is pending (is_verified=false until admin approves)
+      const displayName = privateForm.fullName.trim() || 'Delivery Provider';
+      const { data: dpExisting } = await supabase
+        .from('delivery_providers')
+        .select('id')
+        .eq('user_id', currentUser.id)
+        .maybeSingle();
+      const dpPayload = {
+        provider_name: displayName,
+        provider_type: 'individual' as const,
+        phone: privateForm.phoneNumber.trim(),
+        email: privateForm.email.trim().toLowerCase(),
+        address: privateForm.address?.trim() || privateForm.availableAreas[0] || null,
+        vehicle_types: [privateForm.vehicleType || 'motorcycle'] as string[],
+        service_areas: privateForm.availableAreas.length > 0 ? privateForm.availableAreas : ['Nairobi'],
+        driving_license_number: privateForm.drivingLicense?.trim() || 'Pending',
+        is_verified: false,
+        is_active: true,
+        updated_at: new Date().toISOString(),
+      };
+      if (dpExisting?.id) {
+        await supabase.from('delivery_providers').update(dpPayload).eq('user_id', currentUser.id);
+      } else {
+        await supabase.from('delivery_providers').insert({ user_id: currentUser.id, ...dpPayload });
+      }
       
       toast({
         title: "Application Submitted Successfully",
