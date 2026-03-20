@@ -1,12 +1,30 @@
 import { defineConfig, loadEnv } from "vite";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
+import { execSync } from "node:child_process";
+
+/** Injected into client bundle for footer “Build:” line (compare to GitHub commit). */
+function resolveAppBuildId(): string {
+  const fromEnv =
+    process.env.VERCEL_GIT_COMMIT_SHA ||
+    process.env.CF_PAGES_COMMIT_SHA ||
+    process.env.GITHUB_SHA;
+  if (fromEnv) return String(fromEnv).slice(0, 7);
+  try {
+    return execSync("git rev-parse --short HEAD", { encoding: "utf-8" }).trim();
+  } catch {
+    return "local";
+  }
+}
 
 export default defineConfig(({ mode }) => {
   // Load env file based on mode (ensures .env.local is properly loaded)
   loadEnv(mode, process.cwd(), '');
   
   return {
+    define: {
+      __APP_BUILD_ID__: JSON.stringify(resolveAppBuildId()),
+    },
     server: {
       host: "::",
       port: 5173,
@@ -94,3 +112,4 @@ export default defineConfig(({ mode }) => {
     },
   };
 });
+

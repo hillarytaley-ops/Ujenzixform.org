@@ -1,0 +1,29 @@
+# Verifies production build on every push to main (catches broken deploys early).
+# Vercel still performs the actual deploy when the Git integration is connected.
+name: Build main
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Production build
+        run: npm run build
+        env:
+          # Vite reads GITHUB_SHA in vite.config.ts for __APP_BUILD_ID__
+          GITHUB_SHA: ${{ github.sha }}

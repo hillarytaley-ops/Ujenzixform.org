@@ -1,5 +1,6 @@
 import { Building2 } from "lucide-react";
 import { Link } from "react-router-dom";
+import { APP_BUILD_ID } from "@/lib/buildInfo";
 import {
   FacebookIcon,
   TwitterIcon,
@@ -154,9 +155,14 @@ const Footer = () => {
         {/* Bottom Bar */}
         <div className="border-t border-gray-800 mt-8 pt-8">
           <div className="flex flex-col md:flex-row justify-between items-center gap-4">
-            <p className="text-gray-400 text-center md:text-left">
-              &copy; {new Date().getFullYear()} UjenziXform. All rights reserved. Made with ❤️ in Kenya 🇰🇪
-            </p>
+            <div className="text-gray-400 text-center md:text-left text-sm space-y-1">
+              <p>
+                &copy; {new Date().getFullYear()} UjenziXform. All rights reserved. Made with ❤️ in Kenya 🇰🇪
+              </p>
+              <p className="text-gray-500 text-xs font-mono" title="Compare this to the latest commit on GitHub to confirm production is updated">
+                Build: {APP_BUILD_ID}
+              </p>
+            </div>
             
             {/* Bottom Social Icons - Mobile Only */}
             <div className="flex gap-3 md:hidden">
