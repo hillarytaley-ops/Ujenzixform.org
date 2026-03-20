@@ -133,6 +133,22 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
     }
   };
 
+  // Helper to get user from localStorage
+  const getUserFromStorage = (): { id: string; accessToken: string } | null => {
+    try {
+      const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+      if (storedSession) {
+        const parsed = JSON.parse(storedSession);
+        if (parsed.user?.id && parsed.access_token) {
+          return { id: parsed.user.id, accessToken: parsed.access_token };
+        }
+      }
+    } catch (e) {
+      console.warn('Could not get user from localStorage');
+    }
+    return null;
+  };
+
   useEffect(() => {
     checkAuth();
     detectDeviceInfo();
@@ -655,12 +671,471 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
       toast.error('No delivery selected');
       return;
     }
+    
+    // Clean QR code
     let cleanQRCode = qrCode.trim();
     if (cleanQRCode.includes('/qr/') || cleanQRCode.includes('?code=')) {
       const urlMatch = cleanQRCode.match(/(?:\/qr\/|[?&]code=)([^&\s]+)/);
       if (urlMatch) cleanQRCode = urlMatch[1];
     }
     try { cleanQRCode = decodeURIComponent(cleanQRCode); } catch (_) {}
+    
+    // Validate QR code belongs to selected order (same as DispatchScanner validation)
+    const isFullyReceived = (i: OrderItem) => i.receive_scanned || (i.receive_scan_count ?? 0) >= (i.quantity ?? 1);
+    let matchingItem: OrderItem | undefined =
+      selectedOrder.items.find((i) => (i.qr_code === cleanQRCode || i.qr_code?.trim() === cleanQRCode.trim()) && !isFullyReceived(i)) ||
+      selectedOrder.items.find((i) => i.qr_code === cleanQRCode || i.qr_code?.trim() === cleanQRCode.trim());
+    
+    // If not found in cache, verify with database (like DispatchScanner)
+    if (!matchingItem) {
+      console.log('⚠️ QR code not found in cached items, verifying with database...');
+      try {
+        const { data: verifyData } = await supabase
+          .from('material_items')
+          .select('id,qr_code,material_type,item_sequence,quantity,receive_scanned,receive_scan_count,dispatch_scanned,purchase_order_id')
+          .eq('qr_code', cleanQRCode)
+          .limit(1)
+          .maybeSingle();
+          
+        if (verifyData) {
+          if (verifyData.purchase_order_id !== selectedOrder.id) {
+            toast.error('Wrong order', {
+              description: `This QR belongs to another delivery. Scan only items for Order #${selectedOrder.order_number}.`,
+              duration: 5000
+            });
+            return;
+          }
+          const q = verifyData.quantity ?? 1;
+          const cnt = verifyData.receive_scan_count ?? 0;
+          const full = verifyData.receive_scanned || cnt >= q;
+          if (full) {
+            toast.warning('Already scanned', { description: 'This item was already received.', duration: 3000 });
+            return;
+          }
+          if (!verifyData.dispatch_scanned) {
+            toast.error('Not dispatched yet', {
+              description: 'This item has not been scanned for dispatch. Wait for the supplier to dispatch before receiving.',
+              duration: 5000
+            });
+            return;
+          }
+          matchingItem = {
+            id: verifyData.id,
+            qr_code: verifyData.qr_code,
+            material_type: verifyData.material_type || '',
+            category: '',
+            quantity: q,
+            unit: '',
+            item_sequence: verifyData.item_sequence ?? 0,
+            receive_scanned: full,
+            receive_scan_count: cnt,
+            dispatch_scanned: Boolean(verifyData.dispatch_scanned),
+            status: ''
+          };
+          setSelectedOrder((prev) =>
+            prev && !prev.items.some((i) => i.id === matchingItem!.id)
+              ? { ...prev, items: [...prev.items, matchingItem!] }
+              : prev
+          );
+        } else {
+          toast.error('Wrong order', {
+            description: `This QR does not belong to Order #${selectedOrder.order_number}.`,
+            duration: 5000
+          });
+          return;
+        }
+      } catch (error) {
+        console.error('Error verifying QR code:', error);
+        toast.error('Scan failed', { description: 'Could not verify QR code.', duration: 5000 });
+        return;
+      }
+    }
+    
+    if (!matchingItem) {
+      toast.error('Wrong order', {
+        description: `This QR does not belong to Order #${selectedOrder.order_number}.`,
+        duration: 5000
+      });
+      return;
+    }
+    
+    // Validate item is not already fully received
+    if (isFullyReceived(matchingItem)) {
+      toast.warning('Already scanned', { description: 'This item was already received.', duration: 3000 });
+      return;
+    }
+    
+    // Validate item was dispatched
+    if (!matchingItem.dispatch_scanned) {
+      toast.error('Not dispatched yet', {
+        description: 'This item has not been scanned for dispatch. Wait for the supplier to dispatch before receiving.',
+        duration: 5000
+      });
+      return;
+    }
+    
+    // Use RPC function (same as DispatchScanner) - this handles all database updates automatically
+    try {
+      console.log('🔍 Processing QR scan for RECEIVING:', cleanQRCode);
+      toast.info('Processing scan...', { duration: 2000 });
+      
+      const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
+      const ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
+      
+      // Helper function to get fresh access token (same as DispatchScanner)
+      const getFreshAccessToken = async (): Promise<string> => {
+        // First, try localStorage (fastest, no network call)
+        try {
+          const stored = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+          if (stored) {
+            const parsed = JSON.parse(stored);
+            if (parsed.access_token) {
+              console.log('📦 Using token from localStorage (fast path)');
+              return parsed.access_token;
+            }
+          }
+        } catch (e) {
+          console.warn('⚠️ Could not get token from localStorage:', e);
+        }
+        
+        // If localStorage doesn't have token, try session with timeout
+        try {
+          const { data: { session }, error: sessionError } = await withTimeout(
+            supabase.auth.getSession(),
+            2000
+          );
+          
+          if (session?.access_token && !sessionError) {
+            return session.access_token;
+          } else {
+            // Try refresh
+            try {
+              const { data: { session: newSession }, error: refreshError } = await withTimeout(
+                supabase.auth.refreshSession(),
+                2000
+              );
+              
+              if (newSession?.access_token && !refreshError) {
+                console.log('✅ Token refreshed successfully');
+                return newSession.access_token;
+              }
+            } catch (refreshErr) {
+              console.warn('⚠️ Token refresh timeout');
+            }
+          }
+        } catch (e) {
+          console.warn('⚠️ Error getting session (timeout expected)');
+        }
+        
+        // Fallback to localStorage again
+        const stored = getUserFromStorage();
+        if (stored?.accessToken) {
+          console.log('📦 Using token from localStorage (fallback)');
+          return stored.accessToken;
+        }
+        
+        // Final fallback: anon key
+        console.warn('⚠️ Using anon key as final fallback');
+        return ANON_KEY;
+      };
+      
+      // Get fresh access token
+      let accessToken = await getFreshAccessToken();
+      
+      // Helper function to make RPC call with retry on 401 and timeout
+      const makeRPCWithRetry = async (url: string, body: any): Promise<Response> => {
+        const fetchWithTimeoutRPC = async (url: string, options: RequestInit, timeout: number = 10000): Promise<Response> => {
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), timeout);
+          try {
+            const response = await fetch(url, { ...options, signal: controller.signal });
+            clearTimeout(timeoutId);
+            return response;
+          } catch (error) {
+            clearTimeout(timeoutId);
+            if (error instanceof Error && error.name === 'AbortError') {
+              throw new Error('Request timeout - please check your connection and try again');
+            }
+            throw error;
+          }
+        };
+
+        let response = await fetchWithTimeoutRPC(url, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'apikey': ANON_KEY,
+            'Authorization': `Bearer ${accessToken}`,
+          },
+          body: JSON.stringify(body)
+        }, 10000);
+        
+        // If 401, refresh token and retry once
+        if (response.status === 401) {
+          console.log('🔄 Got 401 for record_qr_scan, refreshing token and retrying...');
+          accessToken = await getFreshAccessToken();
+          
+          // Retry with fresh token
+          response = await fetchWithTimeoutRPC(url, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'apikey': ANON_KEY,
+              'Authorization': `Bearer ${accessToken}`,
+            },
+            body: JSON.stringify(body)
+          }, 10000);
+        }
+        
+        return response;
+      };
+      
+      // Call record_qr_scan RPC with _scan_type: 'receiving' (same pattern as DispatchScanner)
+      const requestBody: Record<string, any> = {
+        _qr_code: cleanQRCode?.trim() || null,
+        _scan_type: 'receiving',
+        _scanner_device_id: navigator.userAgent?.substring(0, 100) || null,
+        _scanner_type: scannerType || 'web_scanner',
+        _material_condition: materialCondition || 'good',
+        _notes: notes?.trim() || null
+      };
+      
+      console.log('📤 Sending RPC request for receiving scan:', {
+        url: `${SUPABASE_URL}/rest/v1/rpc/record_qr_scan`,
+        body: requestBody
+      });
+      
+      const response = await makeRPCWithRetry(`${SUPABASE_URL}/rest/v1/rpc/record_qr_scan`, requestBody);
+
+      // Read response as text first (don't assume it's JSON)
+      let responseText = '';
+      let data: any = null;
+      
+      try {
+        responseText = await response.text();
+        console.log('📥 Raw response text (length:', responseText.length, '):', responseText.substring(0, 500));
+        
+        // Try to parse as JSON
+        if (responseText && responseText.trim().startsWith('{')) {
+          try {
+            data = JSON.parse(responseText);
+            console.log('📥 Parsed response data:', data);
+          } catch (jsonError) {
+            console.warn('⚠️ Response looks like JSON but failed to parse:', jsonError);
+            data = { rawText: responseText };
+          }
+        } else if (responseText && responseText.trim().startsWith('[')) {
+          // Sometimes Supabase returns arrays
+          try {
+            data = JSON.parse(responseText);
+            console.log('📥 Parsed response array:', data);
+          } catch (jsonError) {
+            console.warn('⚠️ Response looks like array but failed to parse:', jsonError);
+            data = { rawText: responseText };
+          }
+        } else {
+          // Not JSON - might be HTML error page or plain text
+          console.warn('⚠️ Response is not JSON:', responseText.substring(0, 200));
+          data = { 
+            error: 'Non-JSON response from server',
+            rawText: responseText.substring(0, 500),
+            isHtml: responseText.trim().startsWith('<')
+          };
+        }
+      } catch (readError) {
+        console.error('❌ Failed to read response:', {
+          error: readError,
+          status: response.status,
+          statusText: response.statusText
+        });
+        data = { error: 'Failed to read server response', readError: String(readError) };
+      }
+
+      // Check for HTTP errors first
+      if (!response.ok) {
+        console.error('❌ Receiving scan HTTP error:', {
+          status: response.status,
+          statusText: response.statusText,
+          data: data
+        });
+        
+        // Handle different error statuses
+        if (response.status === 400) {
+          let errorMsg = 'Invalid request. Please check the QR code format.';
+          if (data) {
+            if (typeof data === 'string') {
+              errorMsg = data;
+            } else if (data.message) {
+              errorMsg = data.message;
+              if (data.details) errorMsg += ` (${data.details})`;
+            } else if (data.error) {
+              errorMsg = typeof data.error === 'string' ? data.error : JSON.stringify(data.error);
+            } else if (data.error_code) {
+              errorMsg = data.error || 'Invalid QR code';
+            }
+          }
+          toast.error('❌ Invalid Request', {
+            description: errorMsg,
+            duration: 8000
+          });
+        } else if (response.status === 401) {
+          toast.error('🔐 Authentication Error', {
+            description: 'Your session may have expired. Please refresh the page.',
+            duration: 6000
+          });
+        } else if (response.status === 403) {
+          toast.error('🚫 Permission Denied', {
+            description: 'You do not have permission to perform this action.',
+            duration: 6000
+          });
+        } else {
+          const errorMsg = data?.message || data?.error || 
+                          (typeof data === 'string' ? data : 'Unknown error occurred');
+          toast.error(`Failed to record receiving scan (${response.status})`, {
+            description: errorMsg,
+            duration: 6000
+          });
+        }
+        return;
+      }
+
+      // Even if HTTP status is OK, check if the function returned an error
+      const scanData = data as any;
+      if (scanData && scanData.success === false) {
+        console.error('❌ Receiving scan function error:', scanData);
+        
+        // Handle specific error codes
+        const errorCode = scanData.error_code;
+        let errorTitle = 'Scan Failed';
+        let errorDescription = scanData.error || 'Invalid QR code';
+        
+        switch (errorCode) {
+          case 'ALREADY_RECEIVED':
+            errorTitle = '⚠️ Already Scanned';
+            errorDescription = 'This QR code has already been scanned and received.';
+            break;
+          case 'NOT_DISPATCHED':
+            errorTitle = '❌ Not Dispatched Yet';
+            errorDescription = 'This item has not been scanned for dispatch. Wait for the supplier to dispatch before receiving.';
+            break;
+          case 'QR_INVALIDATED':
+            errorTitle = '🚫 QR Code Invalidated';
+            errorDescription = 'This QR code is no longer valid.';
+            break;
+          case 'QR_NOT_FOUND':
+            errorTitle = '❓ QR Code Not Found';
+            errorDescription = 'This QR code is not registered in the system.';
+            break;
+          default:
+            errorTitle = '❌ Scan Failed';
+        }
+        
+        toast.error(errorTitle, { description: errorDescription, duration: 6000 });
+        return;
+      }
+
+      // If we get here, the scan was successful
+      if (scanData && scanData.success !== false) {
+        const isPartialReceive = scanData.new_status === 'partial_receive';
+        // Only debounce when fully received so same QR can be scanned again for quantity > 1
+        if (!isPartialReceive) {
+          recentlyProcessedRef.current.set(cleanQRCode, Date.now());
+        }
+        
+        // Update local state immediately (use response for receive_scanned and receive_scan_count)
+        setSelectedOrder(prev => {
+          if (!prev) return prev;
+          const receiveScanned = scanData.receive_scanned === true;
+          const receiveScanCount = scanData.receive_scan_count ?? (receiveScanned ? (scanData.quantity ?? 1) : 0);
+          const updatedItems = prev.items.map(item =>
+            item.qr_code === cleanQRCode
+              ? {
+                  ...item,
+                  receive_scanned: receiveScanned,
+                  receive_scanned_at: receiveScanned ? new Date().toISOString() : item.receive_scanned_at,
+                  receive_scan_count: receiveScanCount,
+                  status: receiveScanned ? 'received' : item.status
+                }
+              : item
+          );
+          const receivedCount = updatedItems.filter(i => i.receive_scanned).length;
+          const remainingItems = updatedItems.reduce(
+            (sum, i) => sum + (i.receive_scanned ? 0 : Math.max(0, (i.quantity || 1) - (i.receive_scan_count || 0))),
+            0
+          );
+          return {
+            ...prev,
+            items: updatedItems,
+            received_items: receivedCount,
+            pending_items: remainingItems
+          };
+        });
+
+        const scanResult: ScanResult = {
+          qr_code: scanData.qr_code,
+          material_type: scanData.material_type,
+          category: scanData.category || '',
+          quantity: scanData.quantity,
+          unit: scanData.unit || '',
+          status: scanData.new_status ?? scanData.status ?? 'received',
+          timestamp: new Date()
+        };
+
+        setScanResults(prev => [scanResult, ...prev.slice(0, 9)]);
+
+        // Calculate remaining items
+        const qty = scanData.quantity ?? 1;
+        const count = scanData.receive_scan_count ?? (scanData.receive_scanned ? qty : 0);
+        const remainingForThis = scanData.receive_scanned ? 0 : Math.max(0, qty - count);
+        const remainingOthers = selectedOrder.items
+          .filter(i => i.qr_code !== cleanQRCode)
+          .reduce((s, i) => s + (i.receive_scanned ? 0 : Math.max(0, (i.quantity || 1) - (i.receive_scan_count || 0))), 0);
+        const remainingItems = remainingForThis + remainingOthers;
+        
+        // Show success message
+        if (isPartialReceive && qty > 1) {
+          toast.success('Scan recorded', {
+            description: `${scanData.material_type}: Scanned ${count} of ${qty} • ${remainingItems} unit(s) remaining`,
+            duration: 3000
+          });
+        } else {
+          toast.success('Item received', {
+            description: `${scanData.material_type} • ${remainingItems} item(s) remaining`,
+            duration: 3000
+          });
+        }
+        
+        // Check if all items are received - RPC already updated purchase_order and delivery_requests to 'delivered'
+        // But we can show a message if the order is complete
+        if (scanData.order_status === 'delivered' || scanData.purchase_order_status === 'delivered') {
+          toast.success('🎉 Order Delivered!', {
+            description: `Order #${selectedOrder.order_number} is now delivered and moved to Delivery History.`,
+            duration: 8000
+          });
+          onDeliveryComplete?.(true);
+        }
+      }
+    } catch (err: any) {
+      console.error('❌ Receiving scan error:', err);
+      toast.error('Scan failed', { 
+        description: err?.message || 'Network error. Please try again.', 
+        duration: 5000 
+      });
+      return;
+    }
+
+    // Clear manual input
+    setManualQRCode('');
+    setNotes('');
+
+    // Resume scanner if paused
+    try {
+      if (scannerRef.current && isScanning) {
+        const state = scannerRef.current.getState();
+        if (state === Html5QrcodeScannerState.PAUSED) await scannerRef.current.resume();
+      }
+    } catch (_) {}
+  };
 
     const isFullyReceived = (i: OrderItem) => i.receive_scanned || (i.receive_scan_count ?? 0) >= (i.quantity ?? 1);
     let matchingItem: OrderItem | undefined =
