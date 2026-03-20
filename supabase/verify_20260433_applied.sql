@@ -17,6 +17,7 @@ WHERE n.nspname = 'public'
 ORDER BY proname;
 
 -- Expected: 2 rows. If 0 rows, apply supabase/migrations/20260433_provider_display_by_purchase_order_ids.sql
+--          Also apply 20260434_provider_display_profiles_fallback.sql for profiles.id / auth fallbacks.
 
 -- 2) Supplier RPC references purchase_orders + delivery_requests + delivery_providers (sanity check)
 SELECT
@@ -43,3 +44,17 @@ FROM pg_proc p
 JOIN pg_namespace n ON n.oid = p.pronamespace
 WHERE n.nspname = 'public'
   AND p.proname = 'get_delivery_provider_display_for_builder_orders';
+
+-- 4) Optional: 20260434 adds profiles/auth falloffs (search function body)
+SELECT
+  CASE
+    WHEN pg_get_functiondef(p.oid) LIKE '%p_prof%'
+     AND pg_get_functiondef(p.oid) LIKE '%u_auth%'
+    THEN 'OK: display RPCs include 20260434-style profile/auth fallbacks'
+    ELSE 'HINT: Apply 20260434_provider_display_profiles_fallback.sql if provider rows still show empty names'
+  END AS migration_20260434_hints
+FROM pg_proc p
+JOIN pg_namespace n ON n.oid = p.pronamespace
+WHERE n.nspname = 'public'
+  AND p.proname = 'get_delivery_provider_display_for_supplier_orders'
+LIMIT 1;
