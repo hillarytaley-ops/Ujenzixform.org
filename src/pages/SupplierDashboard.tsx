@@ -1883,14 +1883,14 @@ const SupplierDashboard = () => {
             </div>
           </Button>
           <Button 
-            className={`h-auto py-4 transition-all ${activeTab === 'extra' 
+            className={`h-auto py-4 transition-all ${activeTab === 'tracking' 
               ? 'bg-gradient-to-r from-purple-500 to-purple-600 ring-2 ring-purple-300 shadow-lg' 
               : isDarkMode ? 'bg-slate-700 hover:bg-slate-600' : 'bg-gray-100 hover:bg-gray-200 text-gray-700'}`}
-            onClick={() => setActiveTab('extra')}
+            onClick={() => setActiveTab('tracking')}
           >
             <div className="flex flex-col items-center gap-2">
-              <Settings className="h-6 w-6" />
-              <span className="text-xs sm:text-sm">Extra</span>
+              <NavigationIcon className="h-6 w-6" />
+              <span className="text-xs sm:text-sm">Tracking</span>
             </div>
           </Button>
           <Button 
@@ -1924,7 +1924,7 @@ const SupplierDashboard = () => {
             <TabsTrigger value="materials">My Materials</TabsTrigger>
             <TabsTrigger value="view-orders">View Orders</TabsTrigger>
             <TabsTrigger value="scan-qr">QR Codes</TabsTrigger>
-            <TabsTrigger value="extra">Extra</TabsTrigger>
+            <TabsTrigger value="tracking">Tracking</TabsTrigger>
             <TabsTrigger value="analytics">Analytics</TabsTrigger>
             <TabsTrigger value="reports">Reports</TabsTrigger>
           </TabsList>
@@ -2168,116 +2168,33 @@ const SupplierDashboard = () => {
           </TabsContent>
 
           {/* ═══════════════════════════════════════════════════════════════════════════════════ */}
-          {/* EXTRA TAB - Contains: Tracking, Reviews, Support */}
+          {/* TRACKING TAB — shipment / tracking numbers only (orders & quotes live under View Orders) */}
           {/* ═══════════════════════════════════════════════════════════════════════════════════ */}
-          <TabsContent value="extra">
+          <TabsContent value="tracking">
             <Card className={cardBg}>
               <CardHeader>
                 <CardTitle className={`flex items-center gap-2 ${textColor}`}>
-                  <Settings className="h-5 w-5 text-purple-500" />
-                  Additional Features
+                  <NavigationIcon className="h-5 w-5 text-purple-500" />
+                  Delivery tracking
                 </CardTitle>
                 <CardDescription className={mutedText}>
-                  Tracking, reviews, and support services
+                  Live status of tracking numbers for your dispatched shipments. Order counts and dispatch workflows are in{' '}
+                  <button
+                    type="button"
+                    className="text-purple-600 dark:text-purple-400 underline font-medium"
+                    onClick={() => setActiveTab('view-orders')}
+                  >
+                    View Orders
+                  </button>
+                  — numbers here sync from the same backend when tracking records exist.
                 </CardDescription>
               </CardHeader>
-              <CardContent>
-                <Tabs defaultValue="tracking" className="space-y-4">
-                  <TabsList className={`${isDarkMode ? 'bg-slate-700' : 'bg-gray-100'} p-1 rounded-lg`}>
-                    <TabsTrigger value="tracking" className="data-[state=active]:bg-blue-500 data-[state=active]:text-white">
-                      <NavigationIcon className="h-4 w-4 mr-1" />
-                      Tracking
-                    </TabsTrigger>
-                    <TabsTrigger value="reviews" className="data-[state=active]:bg-yellow-500 data-[state=active]:text-white">
-                      <Star className="h-4 w-4 mr-1" />
-                      Reviews
-                    </TabsTrigger>
-                    <TabsTrigger value="support" className="data-[state=active]:bg-purple-500 data-[state=active]:text-white">
-                      <Headphones className="h-4 w-4 mr-1" />
-                      Support
-                    </TabsTrigger>
-                  </TabsList>
-
-                  {/* Tracking Sub-Tab */}
-                  <TabsContent value="tracking">
-                    <div className="space-y-4">
-                      <div className={`p-4 rounded-lg ${isDarkMode ? 'bg-blue-900/20' : 'bg-blue-50'} border ${isDarkMode ? 'border-blue-800' : 'border-blue-200'}`}>
-                        <h4 className={`font-semibold mb-2 flex items-center gap-2 ${textColor}`}>
-                          <NavigationIcon className="h-4 w-4 text-blue-600" />
-                          Delivery Tracking
-                        </h4>
-                        <p className={`text-sm ${mutedText}`}>
-                          Track your material deliveries to customers in real-time
-                        </p>
-                      </div>
-                      <TrackingTab
-                        userId={user?.id || localStorage.getItem('user_id') || ''}
-                        userRole="supplier"
-                        userName={supplierProfile?.company_name || supplierProfile?.full_name || user?.email?.split('@')[0] || 'Supplier'}
-                      />
-                    </div>
-                  </TabsContent>
-
-                  {/* Reviews Sub-Tab */}
-                  <TabsContent value="reviews">
-                    <div className="space-y-6">
-                      {/* Rating Summary */}
-                      {user && <SupplierRatingSummary supplierId={supplierRecordId || user.id} />}
-                      
-                      {/* Reviews List */}
-                      <div className={`p-4 rounded-lg ${isDarkMode ? 'bg-yellow-900/20' : 'bg-yellow-50'} border ${isDarkMode ? 'border-yellow-800' : 'border-yellow-200'}`}>
-                        <h4 className={`font-semibold mb-2 flex items-center gap-2 ${textColor}`}>
-                          <Star className="h-4 w-4 text-yellow-600" />
-                          Customer Reviews
-                        </h4>
-                        <p className={`text-sm ${mutedText}`}>
-                          See what your customers are saying
-                        </p>
-                      </div>
-                      {user && <ReviewsList supplierId={supplierRecordId || user.id} />}
-                    </div>
-                  </TabsContent>
-
-                  {/* Support Sub-Tab */}
-                  <TabsContent value="support">
-                    <div className="space-y-6">
-                      {/* In-App Communication */}
-                      {user && (
-                        <InAppCommunication
-                          userId={user.id}
-                          userName={supplierProfile?.company_name || supplierProfile?.full_name || user.email || 'Supplier'}
-                          userRole="supplier"
-                          isDarkMode={isDarkMode}
-                        />
-                      )}
-
-                      {/* Quick Contact Info */}
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className={`p-4 rounded-lg ${isDarkMode ? 'bg-orange-900/20' : 'bg-orange-50'} border ${isDarkMode ? 'border-orange-800' : 'border-orange-200'}`}>
-                          <h4 className={`font-semibold mb-2 flex items-center gap-2 ${textColor}`}>
-                            <Clock className="h-4 w-4 text-orange-500" />
-                            Support Hours
-                          </h4>
-                          <p className={`text-sm ${mutedText}`}>
-                            Mon - Fri: 8AM - 6PM<br />
-                            Saturday: 9AM - 4PM<br />
-                            Sunday: Closed
-                          </p>
-                        </div>
-                        <div className={`p-4 rounded-lg ${isDarkMode ? 'bg-purple-900/20' : 'bg-purple-50'} border ${isDarkMode ? 'border-purple-800' : 'border-purple-200'}`}>
-                          <h4 className={`font-semibold mb-2 flex items-center gap-2 ${textColor}`}>
-                            <AlertCircle className="h-4 w-4 text-purple-500" />
-                            Supplier Hotline
-                          </h4>
-                          <p className={`text-sm ${mutedText}`}>
-                            Call: +254 700 000 000<br />
-                            Email: suppliers@UjenziXform.co.ke
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  </TabsContent>
-                </Tabs>
+              <CardContent className="space-y-4">
+                <TrackingTab
+                  userId={user?.id || localStorage.getItem('user_id') || ''}
+                  userRole="supplier"
+                  userName={supplierProfile?.company_name || supplierProfile?.full_name || user?.email?.split('@')[0] || 'Supplier'}
+                />
               </CardContent>
             </Card>
           </TabsContent>
@@ -2296,13 +2213,72 @@ const SupplierDashboard = () => {
                   Real-time sales metrics, performance insights, and business analytics
                 </CardDescription>
               </CardHeader>
-              <CardContent>
+              <CardContent className="space-y-10">
                 {user && (
                   <SupplierAnalyticsDashboard 
                     supplierId={supplierRecordId || user.id} 
                     onNavigateToOrders={() => setActiveTab('view-orders')}
                   />
                 )}
+
+                {/* Reviews & reputation (moved from former Extra tab — order metrics stay in View Orders) */}
+                <div className="space-y-4 border-t pt-8">
+                  <div>
+                    <h3 className={`text-lg font-semibold flex items-center gap-2 ${textColor}`}>
+                      <Star className="h-5 w-5 text-yellow-500" />
+                      Customer reviews
+                    </h3>
+                    <p className={`text-sm ${mutedText} mt-1`}>
+                      Ratings and feedback from builders and clients—separate from shipment tracking on the Tracking tab.
+                    </p>
+                  </div>
+                  {user && <SupplierRatingSummary supplierId={supplierRecordId || user.id} />}
+                  {user && <ReviewsList supplierId={supplierRecordId || user.id} />}
+                </div>
+
+                {/* Support & messaging */}
+                <div className="space-y-4 border-t pt-8">
+                  <div>
+                    <h3 className={`text-lg font-semibold flex items-center gap-2 ${textColor}`}>
+                      <Headphones className="h-5 w-5 text-purple-500" />
+                      Support &amp; messages
+                    </h3>
+                    <p className={`text-sm ${mutedText} mt-1`}>
+                      In-app communication and contact options for platform support.
+                    </p>
+                  </div>
+                  {user && (
+                    <InAppCommunication
+                      userId={user.id}
+                      userName={supplierProfile?.company_name || supplierProfile?.full_name || user.email || 'Supplier'}
+                      userRole="supplier"
+                      isDarkMode={isDarkMode}
+                    />
+                  )}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className={`p-4 rounded-lg ${isDarkMode ? 'bg-orange-900/20' : 'bg-orange-50'} border ${isDarkMode ? 'border-orange-800' : 'border-orange-200'}`}>
+                      <h4 className={`font-semibold mb-2 flex items-center gap-2 ${textColor}`}>
+                        <Clock className="h-4 w-4 text-orange-500" />
+                        Support hours
+                      </h4>
+                      <p className={`text-sm ${mutedText}`}>
+                        Mon - Fri: 8AM - 6PM<br />
+                        Saturday: 9AM - 4PM<br />
+                        Sunday: Closed
+                      </p>
+                    </div>
+                    <div className={`p-4 rounded-lg ${isDarkMode ? 'bg-purple-900/20' : 'bg-purple-50'} border ${isDarkMode ? 'border-purple-800' : 'border-purple-200'}`}>
+                      <h4 className={`font-semibold mb-2 flex items-center gap-2 ${textColor}`}>
+                        <AlertCircle className="h-4 w-4 text-purple-500" />
+                        Supplier hotline
+                      </h4>
+                      <p className={`text-sm ${mutedText}`}>
+                        Call: +254 700 000 000<br />
+                        Email: suppliers@UjenziXform.co.ke
+                      </p>
+                    </div>
+                  </div>
+                </div>
               </CardContent>
             </Card>
           </TabsContent>
