@@ -121,8 +121,6 @@ export const DeliveryPromptDialog: React.FC<DeliveryPromptDialogProps> = ({
     deliveryCoordinates: '',
     preferredDate: '',
     preferredTime: '',
-    materialType: 'mixed',
-    totalWeight: '',
     specialInstructions: ''
   });
   const { toast } = useToast();
@@ -229,13 +227,7 @@ export const DeliveryPromptDialog: React.FC<DeliveryPromptDialogProps> = ({
                          purchaseOrder.delivery_address.toLowerCase() !== 'tbd' &&
                          purchaseOrder.delivery_address.toLowerCase() !== 'n/a') 
                          ? purchaseOrder.delivery_address : '',
-        preferredDate: purchaseOrder.delivery_date || '',
-        // Auto-detect material type if single item
-        materialType: purchaseOrder.items?.length === 1 
-          ? detectMaterialType(purchaseOrder.items[0]?.material_name || purchaseOrder.items[0]?.name || '')
-          : 'mixed',
-        // Estimate weight: 50kg per item as default
-        totalWeight: String((purchaseOrder.items?.reduce((sum, item) => sum + (item.quantity || 1), 0) || 1) * 50)
+        preferredDate: purchaseOrder.delivery_date || ''
       }));
     }
   }, [purchaseOrder]);
@@ -488,6 +480,17 @@ export const DeliveryPromptDialog: React.FC<DeliveryPromptDialogProps> = ({
         return;
       }
 
+      // Validate delivery instructions are provided
+      if (!deliveryData.specialInstructions || !deliveryData.specialInstructions.trim()) {
+        toast({
+          title: 'Delivery Instructions Required',
+          description: 'Please describe the products being delivered. You may also include the size of vehicle needed.',
+          variant: 'destructive'
+        });
+        setSubmitting(false);
+        return;
+      }
+
       // Create delivery request payload.
       // CRITICAL: delivery_address is shared DIRECTLY to the delivery provider dashboard (delivery_requests table);
       // the provider who accepts the order sees this address on their dashboard.
@@ -497,9 +500,9 @@ export const DeliveryPromptDialog: React.FC<DeliveryPromptDialogProps> = ({
         pickup_address: pickupAddress,
         delivery_address: fullDeliveryAddress.trim(),
         pickup_date: deliveryData.preferredDate,
-        material_type: deliveryData.materialType,
         quantity: purchaseOrder.items?.length || 1,
-        status: 'pending'
+        status: 'pending',
+        special_instructions: deliveryData.specialInstructions.trim()
       };
 
       // NOTE: delivery_requests table does not have supplier_id or supplier_name columns.
@@ -511,12 +514,6 @@ export const DeliveryPromptDialog: React.FC<DeliveryPromptDialogProps> = ({
       }
       if (deliveryData.preferredTime && deliveryData.preferredTime !== 'anytime') {
         deliveryPayload.preferred_time = deliveryData.preferredTime;
-      }
-      if (deliveryData.totalWeight) {
-        deliveryPayload.weight_kg = parseFloat(deliveryData.totalWeight);
-      }
-      if (deliveryData.specialInstructions) {
-        deliveryPayload.special_instructions = deliveryData.specialInstructions;
       }
 
       console.log('📦 Creating delivery request with payload:', deliveryPayload);
@@ -740,7 +737,7 @@ export const DeliveryPromptDialog: React.FC<DeliveryPromptDialogProps> = ({
               }
               
               // CRITICAL: Cancel all other duplicate delivery requests for this order
-              await cancelDuplicateDeliveryRequests(deliveryRequestId, purchaseOrder.id, deliveryPayload.delivery_address, deliveryPayload.material_type, accessToken);
+              await cancelDuplicateDeliveryRequests(deliveryRequestId, purchaseOrder.id, deliveryPayload.delivery_address, '', accessToken);
             } else {
               console.warn('⚠️ Failed to update existing delivery request');
             }
@@ -904,7 +901,7 @@ export const DeliveryPromptDialog: React.FC<DeliveryPromptDialogProps> = ({
                   }
                 }
                 
-                await cancelDuplicateDeliveryRequests(deliveryRequestId, purchaseOrder.id, deliveryPayload.delivery_address, deliveryPayload.material_type, accessToken);
+                await cancelDuplicateDeliveryRequests(deliveryRequestId, purchaseOrder.id, deliveryPayload.delivery_address, '', accessToken);
               }
             }
           }
@@ -1159,7 +1156,7 @@ export const DeliveryPromptDialog: React.FC<DeliveryPromptDialogProps> = ({
                       }
                     }
                     
-                    await cancelDuplicateDeliveryRequests(deliveryRequestId, purchaseOrder.id, deliveryPayload.delivery_address, deliveryPayload.material_type, accessToken);
+                    await cancelDuplicateDeliveryRequests(deliveryRequestId, purchaseOrder.id, deliveryPayload.delivery_address, '', accessToken);
                   }
                 }
               }
@@ -1187,9 +1184,7 @@ export const DeliveryPromptDialog: React.FC<DeliveryPromptDialogProps> = ({
         pickup_address: pickupAddress,
         delivery_address: fullDeliveryAddress,
         pickup_date: deliveryData.preferredDate,
-        material_type: deliveryData.materialType,
         quantity: purchaseOrder.items?.length || 1,
-        weight_kg: deliveryData.totalWeight ? parseFloat(deliveryData.totalWeight) : undefined,
         special_instructions: deliveryData.specialInstructions
       }).then(notificationResult => {
         console.log(`✅ Delivery providers notified: ${notificationResult.notified}/${notificationResult.totalProviders}`);
@@ -1610,40 +1605,21 @@ export const DeliveryPromptDialog: React.FC<DeliveryPromptDialogProps> = ({
                 </div>
               </div>
 
-              {/* Material & Weight - Compact */}
-              <div className="grid grid-cols-2 gap-2">
-                <div className="space-y-1">
-                  <Label className="text-xs text-gray-500">Material</Label>
-                  <Select value={deliveryData.materialType} onValueChange={(value) => setDeliveryData(prev => ({ ...prev, materialType: value }))}>
-                    <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      {MATERIAL_TYPES.map(type => (
-                        <SelectItem key={type} value={type} className="text-xs">{type}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-xs text-gray-500">Weight (kg)</Label>
-                  <Input
-                    type="number"
-                    placeholder="500"
-                    value={deliveryData.totalWeight}
-                    onChange={(e) => setDeliveryData(prev => ({ ...prev, totalWeight: e.target.value }))}
-                    className="text-xs h-8"
-                  />
-                </div>
-              </div>
-
-              {/* Notes - Compact */}
+              {/* Delivery Instructions - Required */}
               <div className="space-y-1">
-                <Label className="text-xs text-gray-500">Notes (optional)</Label>
-                <Input
-                  placeholder="Special instructions..."
+                <Label className="text-xs text-gray-500">
+                  Delivery Instructions <span className="text-red-500">*</span>
+                </Label>
+                <Textarea
+                  placeholder="Mention products being delivered (e.g., '2 Lever Mortise Locks, steel doors'). You may also include the size of vehicle needed for delivery (e.g., 'Requires pickup truck or small lorry')."
                   value={deliveryData.specialInstructions}
                   onChange={(e) => setDeliveryData(prev => ({ ...prev, specialInstructions: e.target.value }))}
-                  className="text-xs h-8"
+                  className="text-xs min-h-[80px]"
+                  required
                 />
+                <p className="text-xs text-gray-400 mt-1">
+                  Required: Describe the products and optionally specify vehicle size needed
+                </p>
               </div>
             </div>
 
@@ -1653,10 +1629,16 @@ export const DeliveryPromptDialog: React.FC<DeliveryPromptDialogProps> = ({
               </Button>
               <Button
                 onClick={handleRequestDelivery}
-                disabled={submitting || !(hasAddress || hasCoordinates)}
+                disabled={submitting || !(hasAddress || hasCoordinates) || !deliveryData.specialInstructions?.trim()}
                 className="bg-blue-600 hover:bg-blue-700 h-8"
                 size="sm"
-                title={!(hasAddress || hasCoordinates) ? 'Provide delivery address or GPS coordinates to continue' : undefined}
+                title={
+                  !(hasAddress || hasCoordinates)
+                    ? 'Provide delivery address or GPS coordinates to continue'
+                    : !deliveryData.specialInstructions?.trim()
+                    ? 'Delivery instructions are required. Please describe the products being delivered.'
+                    : undefined
+                }
               >
                 {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Truck className="h-4 w-4 mr-1" />Send Request</>}
               </Button>
