@@ -28,24 +28,34 @@ export const DeliveryPayAdminTab: React.FC = () => {
   const fetchData = async () => {
     setLoading(true);
     setError(null);
+    setMigrationNeeded(false);
+    const timeoutMs = 12000;
+    const timeoutPromise = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error('Request timed out')), timeoutMs)
+    );
     try {
-      const { data: payData, error: payErr } = await supabase.rpc('admin_get_all_providers_mileage_pay');
-      if (payErr) throw payErr;
-      setRows((payData as ProviderMileageRow[]) || []);
-      setMigrationNeeded(false);
+      const fetchPromise = (async () => {
+        const { data: payData, error: payErr } = await supabase.rpc('admin_get_all_providers_mileage_pay');
+        if (payErr) throw payErr;
+        setRows((payData as ProviderMileageRow[]) || []);
+        setMigrationNeeded(false);
 
-      const { data: configData } = await supabase
-        .from('delivery_mileage_config')
-        .select('rate_per_km')
-        .order('updated_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      if (configData?.rate_per_km != null) {
-        setRatePerKm(String(configData.rate_per_km));
-      }
+        const { data: configData, error: configErr } = await supabase
+          .from('delivery_mileage_config')
+          .select('rate_per_km')
+          .order('updated_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (configErr) throw configErr;
+        if (configData?.rate_per_km != null) {
+          setRatePerKm(String(configData.rate_per_km));
+        }
+      })();
+      await Promise.race([fetchPromise, timeoutPromise]);
     } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : 'Failed to load data';
-      const isMigrationNeeded = /relation.*does not exist|function.*does not exist/i.test(msg);
+      const msg = (e as { message?: string })?.message ?? String(e);
+      const isMigrationNeeded =
+        /relation.*does not exist|function.*does not exist|timed out|timeout/i.test(msg);
       if (isMigrationNeeded) {
         setRows([]);
         setError(null);
@@ -53,7 +63,6 @@ export const DeliveryPayAdminTab: React.FC = () => {
       } else {
         setError(msg);
         setRows([]);
-        setMigrationNeeded(false);
       }
     } finally {
       setLoading(false);

@@ -28,16 +28,23 @@ export const DeliveryPayTab: React.FC<{ isDarkMode?: boolean }> = ({ isDarkMode 
     if (!user?.id) return;
     setLoading(true);
     setError(null);
+    const timeoutMs = 12000;
+    const timeoutPromise = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error('Request timed out')), timeoutMs)
+    );
     try {
-      const { data, error: err } = await supabase.rpc('get_provider_mileage_pay', {
-        _provider_user_id: user.id,
-      });
-      if (err) throw err;
-      setRows((data as MileageRow[]) || []);
-      setMigrationNeeded(false);
+      const fetchPromise = (async () => {
+        const { data, error: err } = await supabase.rpc('get_provider_mileage_pay', {
+          _provider_user_id: user.id,
+        });
+        if (err) throw err;
+        setRows((data as MileageRow[]) || []);
+        setMigrationNeeded(false);
+      })();
+      await Promise.race([fetchPromise, timeoutPromise]);
     } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : 'Failed to load mileage data';
-      if (/relation.*does not exist|function.*does not exist/i.test(msg)) {
+      const msg = (e as { message?: string })?.message ?? String(e);
+      if (/relation.*does not exist|function.*does not exist|timed out|timeout/i.test(msg)) {
         setError(null);
         setRows([]);
         setMigrationNeeded(true);
