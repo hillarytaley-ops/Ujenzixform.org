@@ -157,7 +157,20 @@ export function BuilderModerationTab() {
           .in('user_id', builderUserIds);
 
         if (profilesErr) {
-          console.warn('Builder stats: profiles fetch failed', profilesErr);
+          if (profilesErr.message?.includes('is_verified') || profilesErr.code === '42703') {
+            const { data: fallbackData } = await supabase
+              .from('profiles')
+              .select('id, user_id')
+              .in('user_id', builderUserIds);
+            setStats(prev => ({
+              ...prev,
+              totalBuilders: fallbackData?.length || 0,
+              verifiedBuilders: 0,
+              pendingVerification: fallbackData?.length || 0
+            }));
+          } else {
+            console.warn('Builder stats: profiles fetch failed', profilesErr);
+          }
         } else {
           const verified = (profilesData || []).filter(p => p.is_verified).length;
           setStats(prev => ({
@@ -219,8 +232,17 @@ export function BuilderModerationTab() {
         query = query.or('is_verified.is.null,is_verified.eq.false');
       }
 
-      const { data, error } = await query;
-
+      let { data, error } = await query;
+      if (error && (error.message?.includes('is_verified') || (error as { code?: string }).code === '42703')) {
+        query = supabase
+          .from('profiles')
+          .select('*')
+          .in('user_id', builderUserIds)
+          .order('created_at', { ascending: false });
+        const res = await query;
+        data = res.data;
+        error = res.error;
+      }
       if (error) throw error;
 
       // Apply search filter
@@ -342,7 +364,17 @@ export function BuilderModerationTab() {
         .update({ is_verified: verify, updated_at: new Date().toISOString() })
         .eq('id', builderId);
 
-      if (error) throw error;
+      if (error) {
+        if (error.message?.includes('is_verified') || (error as { code?: string }).code === '42703') {
+          toast({
+            title: "Database Update Required",
+            description: "Run the migration in supabase/RUN_THESE_MIGRATIONS.sql to add profiles.is_verified.",
+            variant: "destructive",
+          });
+          return;
+        }
+        throw error;
+      }
 
       toast({
         title: verify ? "Builder Verified!" : "Verification Removed",

@@ -1031,3 +1031,17 @@ END;
 $fn$;
 
 GRANT EXECUTE ON FUNCTION public.admin_get_all_users_with_roles() TO authenticated;
+
+-- ===================== PROFILES: is_verified for builder moderation =====================
+-- BuilderModerationTab requires profiles.is_verified. Add if missing.
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                 WHERE table_schema = 'public' AND table_name = 'profiles' AND column_name = 'is_verified') THEN
+    ALTER TABLE public.profiles ADD COLUMN is_verified BOOLEAN DEFAULT FALSE;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                 WHERE table_schema = 'public' AND table_name = 'profiles' AND column_name = 'verified_at') THEN
+    ALTER TABLE public.profiles ADD COLUMN verified_at TIMESTAMPTZ;
+  END IF;
+END $$;
