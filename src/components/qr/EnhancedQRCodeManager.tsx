@@ -177,6 +177,18 @@ export const EnhancedQRCodeManager: React.FC<EnhancedQRCodeManagerProps> = ({ su
     return clientGroup.items.filter(item => selectedItems.has(item.id)).length;
   };
 
+  // Refetch when dashboard resolves supplierId (it loads async after email lookup)
+  useEffect(() => {
+    if (propSupplierId && userRole === 'supplier' && items.length === 0 && !loading) {
+      localStorage.setItem('supplier_id', propSupplierId);
+      setLoading(true);
+      const stored = getUserFromStorage();
+      if (stored?.id) {
+        fetchMaterialItemsFast('supplier', stored.id, propSupplierId);
+      }
+    }
+  }, [propSupplierId, userRole, items.length, loading]);
+
   useEffect(() => {
     // Start loading immediately with fast path
     fastCheckAuthAndFetch();
