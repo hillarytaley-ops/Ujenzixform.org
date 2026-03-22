@@ -80,29 +80,39 @@ export const DeliveryPayAdminTab: React.FC = () => {
       return;
     }
     setSavingRate(true);
+    const timeoutMs = 10000;
+    const timeoutPromise = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error('Save timed out. Run the delivery mileage migration first.')), timeoutMs)
+    );
     try {
-      const { data: existing } = await supabase
-        .from('delivery_mileage_config')
-        .select('id')
-        .limit(1)
-        .maybeSingle();
-      if (existing?.id) {
-        const { error: updateErr } = await supabase
+      const savePromise = (async () => {
+        const { data: existing, error: selErr } = await supabase
           .from('delivery_mileage_config')
-          .update({ rate_per_km: rate, updated_at: new Date().toISOString() })
-          .eq('id', existing.id);
-        if (updateErr) throw updateErr;
-      } else {
-        const { error: insertErr } = await supabase
-          .from('delivery_mileage_config')
-          .insert({ rate_per_km: rate, currency: 'KES' });
-        if (insertErr) throw insertErr;
-      }
-      toast.success(`Rate updated to ${rate} KES/km`);
-      setShowRateForm(false);
-      await fetchData();
+          .select('id')
+          .limit(1)
+          .maybeSingle();
+        if (selErr) throw selErr;
+        if (existing?.id) {
+          const { error: updateErr } = await supabase
+            .from('delivery_mileage_config')
+            .update({ rate_per_km: rate, updated_at: new Date().toISOString() })
+            .eq('id', existing.id);
+          if (updateErr) throw updateErr;
+        } else {
+          const { error: insertErr } = await supabase
+            .from('delivery_mileage_config')
+            .insert({ rate_per_km: rate, currency: 'KES' });
+          if (insertErr) throw insertErr;
+        }
+        toast.success(`Rate updated to ${rate} KES/km`);
+        setShowRateForm(false);
+        void fetchData();
+      })();
+      await Promise.race([savePromise, timeoutPromise]);
     } catch (e: unknown) {
-      toast.error(e instanceof Error ? e.message : 'Failed to save rate');
+      const msg = (e as { message?: string })?.message ?? String(e);
+      toast.error(msg || 'Failed to save rate');
+      setShowRateForm(true);
     } finally {
       setSavingRate(false);
     }
