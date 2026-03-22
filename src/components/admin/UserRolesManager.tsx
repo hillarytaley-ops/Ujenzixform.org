@@ -75,19 +75,26 @@ export const UserRolesManager = () => {
 
   const fetchUsers = async () => {
     setLoading(true);
+    const timeout = (ms: number) => new Promise<never>((_, rej) => setTimeout(() => rej(new Error('Request timed out')), ms));
     try {
       let rows: { user_id: string; role: string; created_at: string; full_name?: string; email?: string }[] = [];
-      const { data: rpcData, error: rpcError } = await supabase.rpc('admin_get_all_users_with_roles');
-      if (rpcError) {
-        const { data: fallbackData, error: fallbackErr } = await supabase.rpc('get_users_with_roles');
-        if (fallbackErr) throw rpcError;
-        rows = (fallbackData || []).map((r: { user_id: string; email?: string; role: string; created_at: string }) => ({
+      const { data: fallbackData, error: fallbackErr } = await Promise.race([
+        supabase.rpc('get_users_with_roles'),
+        timeout(12000),
+      ]);
+      if (!fallbackErr && fallbackData) {
+        rows = fallbackData.map((r: { user_id: string; email?: string; role: string; created_at: string }) => ({
           user_id: r.user_id,
           role: r.role,
           created_at: r.created_at,
           email: r.email,
         }));
       } else {
+        const { data: rpcData, error: rpcError } = await Promise.race([
+          supabase.rpc('admin_get_all_users_with_roles'),
+          timeout(10000),
+        ]);
+        if (rpcError) throw fallbackErr || rpcError;
         rows = rpcData || [];
       }
 
