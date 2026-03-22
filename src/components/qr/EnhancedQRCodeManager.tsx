@@ -178,13 +178,17 @@ export const EnhancedQRCodeManager: React.FC<EnhancedQRCodeManagerProps> = ({ su
   };
 
   // Refetch when dashboard resolves supplierId (it loads async after email lookup)
+  const refetchedForSupplier = useRef<string | null>(null);
   useEffect(() => {
-    if (propSupplierId && userRole === 'supplier' && items.length === 0 && !loading) {
+    if (propSupplierId && userRole === 'supplier' && items.length === 0 && !loading && refetchedForSupplier.current !== propSupplierId) {
+      refetchedForSupplier.current = propSupplierId;
       localStorage.setItem('supplier_id', propSupplierId);
       setLoading(true);
       const stored = getUserFromStorage();
       if (stored?.id) {
         fetchMaterialItemsFast('supplier', stored.id, propSupplierId);
+      } else {
+        setLoading(false);
       }
     }
   }, [propSupplierId, userRole, items.length, loading]);
@@ -527,7 +531,17 @@ export const EnhancedQRCodeManager: React.FC<EnhancedQRCodeManagerProps> = ({ su
     try {
       // Suppliers: use RPC first (no client supplier_id needed, handles profile chain)
       if (role === 'supplier') {
-        const { data: miData, error } = await supabase.rpc('get_supplier_material_items_for_current_user', { _limit: 500 });
+        let miData: any = null, error: any = null;
+        try {
+          const result = await withTimeout(
+            supabase.rpc('get_supplier_material_items_for_current_user', { _limit: 500 }),
+            6000
+          );
+          miData = result?.data ?? null;
+          error = result?.error ?? null;
+        } catch (rpcErr) {
+          error = rpcErr;
+        }
         if (!error && miData && miData.length > 0) {
           setItems(miData);
           groupItemsByClient(miData);
@@ -585,6 +599,8 @@ export const EnhancedQRCodeManager: React.FC<EnhancedQRCodeManagerProps> = ({ su
       else console.log('⚠️ Fast fetch error:', e?.message);
       setItems([]);
       groupItemsByClient([]);
+      setLoading(false);
+    } finally {
       setLoading(false);
     }
   };
