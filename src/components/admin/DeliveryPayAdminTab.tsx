@@ -20,6 +20,7 @@ export const DeliveryPayAdminTab: React.FC = () => {
   const [rows, setRows] = useState<ProviderMileageRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [migrationNeeded, setMigrationNeeded] = useState(false);
   const [ratePerKm, setRatePerKm] = useState<string>('50');
   const [savingRate, setSavingRate] = useState(false);
   const [showRateForm, setShowRateForm] = useState(false);
@@ -31,6 +32,7 @@ export const DeliveryPayAdminTab: React.FC = () => {
       const { data: payData, error: payErr } = await supabase.rpc('admin_get_all_providers_mileage_pay');
       if (payErr) throw payErr;
       setRows((payData as ProviderMileageRow[]) || []);
+      setMigrationNeeded(false);
 
       const { data: configData } = await supabase
         .from('delivery_mileage_config')
@@ -42,8 +44,17 @@ export const DeliveryPayAdminTab: React.FC = () => {
         setRatePerKm(String(configData.rate_per_km));
       }
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : 'Failed to load data');
-      setRows([]);
+      const msg = e instanceof Error ? e.message : 'Failed to load data';
+      const isMigrationNeeded = /relation.*does not exist|function.*does not exist/i.test(msg);
+      if (isMigrationNeeded) {
+        setRows([]);
+        setError(null);
+        setMigrationNeeded(true);
+      } else {
+        setError(msg);
+        setRows([]);
+        setMigrationNeeded(false);
+      }
     } finally {
       setLoading(false);
     }
@@ -108,7 +119,7 @@ export const DeliveryPayAdminTab: React.FC = () => {
       <Card>
         <CardContent className="py-8">
           <div className="flex items-center gap-2 text-amber-600">
-            <AlertCircle className="h-5 w-5" />
+            <AlertCircle className="h-5 w-5 shrink-0" />
             <span>{error}</span>
           </div>
           <Button variant="outline" className="mt-4" onClick={fetchData}>
@@ -172,6 +183,11 @@ export const DeliveryPayAdminTab: React.FC = () => {
           </div>
         </CardHeader>
         <CardContent>
+          {migrationNeeded && (
+            <div className="mb-4 p-4 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-sm">
+              <strong>Setup required.</strong> Run the delivery mileage migration in Supabase SQL Editor to enable this feature. See <code className="bg-amber-100 px-1 rounded">supabase/DELIVERY_MILEAGE_PAY_MIGRATION.sql</code>.
+            </div>
+          )}
           <div className="grid grid-cols-2 gap-4 mb-6">
             <div className="p-4 rounded-lg bg-teal-50 border border-teal-200">
               <p className="text-sm text-gray-600">Total round-trip distance (all providers)</p>

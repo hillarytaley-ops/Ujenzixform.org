@@ -22,6 +22,7 @@ export const DeliveryPayTab: React.FC<{ isDarkMode?: boolean }> = ({ isDarkMode 
   const [rows, setRows] = useState<MileageRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [migrationNeeded, setMigrationNeeded] = useState(false);
 
   const fetchData = async () => {
     if (!user?.id) return;
@@ -33,9 +34,18 @@ export const DeliveryPayTab: React.FC<{ isDarkMode?: boolean }> = ({ isDarkMode 
       });
       if (err) throw err;
       setRows((data as MileageRow[]) || []);
+      setMigrationNeeded(false);
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : 'Failed to load mileage data');
-      setRows([]);
+      const msg = e instanceof Error ? e.message : 'Failed to load mileage data';
+      if (/relation.*does not exist|function.*does not exist/i.test(msg)) {
+        setError(null);
+        setRows([]);
+        setMigrationNeeded(true);
+      } else {
+        setError(msg);
+        setRows([]);
+        setMigrationNeeded(false);
+      }
     } finally {
       setLoading(false);
     }
@@ -97,6 +107,11 @@ export const DeliveryPayTab: React.FC<{ isDarkMode?: boolean }> = ({ isDarkMode 
           </CardDescription>
         </CardHeader>
         <CardContent>
+          {migrationNeeded && (
+            <div className={`mb-4 p-4 rounded-lg border text-sm ${isDarkMode ? 'bg-amber-900/20 border-amber-700 text-amber-200' : 'bg-amber-50 border-amber-200 text-amber-800'}`}>
+              Mileage tracking is being set up. Contact your admin if this message persists.
+            </div>
+          )}
           <div className="grid grid-cols-2 gap-4 mb-6">
             <div className="p-4 rounded-lg bg-teal-500/10 border border-teal-500/20">
               <p className={`text-sm ${mutedText}`}>Total round-trip distance</p>
