@@ -28,7 +28,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { supabase } from "@/integrations/supabase/client";
+import { SUPABASE_URL, SUPABASE_ANON_KEY } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { 
   Search, 
@@ -73,30 +73,52 @@ export const UserRolesManager = () => {
   const [updating, setUpdating] = useState(false);
   const { toast } = useToast();
 
+  const getAuthHeaders = (): Record<string, string> => {
+    const headers: Record<string, string> = {
+      'apikey': SUPABASE_ANON_KEY,
+      'Content-Type': 'application/json',
+    };
+    try {
+      const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+      if (storedSession) {
+        const parsed = JSON.parse(storedSession);
+        if (parsed?.access_token) {
+          headers['Authorization'] = `Bearer ${parsed.access_token}`;
+        }
+      }
+    } catch {
+      // Ignore parse errors
+    }
+    return headers;
+  };
+
   const fetchUsers = async () => {
     setLoading(true);
     try {
-      const { data: rolesData, error: rolesError } = await supabase
-        .from('user_roles')
-        .select('user_id, role, created_at')
-        .order('created_at', { ascending: false });
+      const rolesResponse = await fetch(
+        `${SUPABASE_URL}/rest/v1/user_roles?select=user_id,role,created_at&order=created_at.desc`,
+        { headers: getAuthHeaders() }
+      );
+      if (!rolesResponse.ok) throw new Error(`HTTP ${rolesResponse.status}`);
+      const roles: { user_id: string; role: string; created_at: string }[] = await rolesResponse.json();
 
-      if (rolesError) throw rolesError;
-      const roles = rolesData || [];
-
-      const userIds = [...new Set(roles.map((r: { user_id: string }) => r.user_id))];
+      const userIds = [...new Set(roles.map((r) => r.user_id))];
       let profilesMap: Record<string, { full_name?: string; email?: string }> = {};
       if (userIds.length > 0) {
-        const { data: profilesData } = await supabase
-          .from('profiles')
-          .select('user_id, full_name, email')
-          .in('user_id', userIds);
-        (profilesData || []).forEach((p: { user_id: string; full_name?: string; email?: string }) => {
-          profilesMap[p.user_id] = { full_name: p.full_name, email: p.email };
-        });
+        const inFilter = userIds.join(",");
+        const profilesResponse = await fetch(
+          `${SUPABASE_URL}/rest/v1/profiles?select=user_id,full_name,email&user_id=in.(${inFilter})`,
+          { headers: getAuthHeaders() }
+        );
+        if (profilesResponse.ok) {
+          const profilesData = await profilesResponse.json();
+          (profilesData || []).forEach((p: { user_id: string; full_name?: string; email?: string }) => {
+            profilesMap[p.user_id] = { full_name: p.full_name, email: p.email };
+          });
+        }
       }
 
-      const combinedUsers: UserWithRole[] = roles.map((r: { user_id: string; role: string; created_at: string }) => {
+      const combinedUsers: UserWithRole[] = roles.map((r) => {
         const p = profilesMap[r.user_id];
         return {
           id: r.user_id,
@@ -131,13 +153,15 @@ export const UserRolesManager = () => {
 
     setUpdating(true);
     try {
-      // Update the user's role
-      const { error } = await supabase
-        .from('user_roles')
-        .update({ role: newRole })
-        .eq('user_id', editingUser.id);
-
-      if (error) throw error;
+      const response = await fetch(
+        `${SUPABASE_URL}/rest/v1/user_roles?user_id=eq.${editingUser.id}`,
+        {
+          method: "PATCH",
+          headers: { ...getAuthHeaders(), "Prefer": "return=minimal" },
+          body: JSON.stringify({ role: newRole }),
+        }
+      );
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
       toast({
         title: "✅ Role Updated",
@@ -148,11 +172,12 @@ export const UserRolesManager = () => {
       await fetchUsers();
       setEditingUser(null);
       setNewRole("");
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error updating role:', error);
+      const msg = (error as { message?: string })?.message ?? "Failed to update role";
       toast({
         title: "Error",
-        description: "Failed to update role: " + error.message,
+        description: msg,
         variant: "destructive",
       });
     } finally {

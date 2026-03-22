@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useUrlTabSync } from "@/hooks/useUrlTabSync";
 import { supabase } from "@/integrations/supabase/client";
@@ -855,8 +855,11 @@ const AdminDashboard = () => {
     }
   };
 
-  // Load chat stats for notification badges
-  const loadChatStats = async () => {
+  // Load chat stats for notification badges (memoized to prevent effect loops)
+  const loadChatStatsInFlight = useRef(false);
+  const loadChatStats = useCallback(async () => {
+    if (loadChatStatsInFlight.current) return;
+    loadChatStatsInFlight.current = true;
     try {
       const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
       const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
@@ -867,42 +870,28 @@ const AdminDashboard = () => {
         'Content-Type': 'application/json'
       };
 
-      // Fetch unread chat messages (from clients)
-      const messagesResponse = await fetch(
-        `${SUPABASE_URL}/rest/v1/chat_messages?sender_type=eq.client&read=eq.false&select=id`,
-        { headers }
-      );
-      const unreadMessages = messagesResponse.ok ? await messagesResponse.json() : [];
+      const [messagesResponse, conversationsResponse, feedbackResponse] = await Promise.all([
+        fetch(`${SUPABASE_URL}/rest/v1/chat_messages?sender_type=eq.client&read=eq.false&select=id`, { headers }),
+        fetch(`${SUPABASE_URL}/rest/v1/conversations?status=eq.open&select=id`, { headers }),
+        fetch(`${SUPABASE_URL}/rest/v1/chat_feedback?select=id`, { headers })
+      ]);
 
-      // Fetch open conversations
-      const conversationsResponse = await fetch(
-        `${SUPABASE_URL}/rest/v1/conversations?status=eq.open&select=id`,
-        { headers }
-      );
-      const openConversations = conversationsResponse.ok ? await conversationsResponse.json() : [];
+      const unreadChats = messagesResponse.ok ? (await messagesResponse.json()).length : 0;
+      const openConversations = conversationsResponse.ok ? (await conversationsResponse.json()).length : 0;
+      const pendingFeedback = feedbackResponse.ok ? (await feedbackResponse.json()).length : 0;
 
-      // Fetch unread feedback (not responded to)
-      const feedbackResponse = await fetch(
-        `${SUPABASE_URL}/rest/v1/chat_feedback?select=id`,
-        { headers }
-      );
-      const pendingFeedback = feedbackResponse.ok ? await feedbackResponse.json() : [];
-
-      setChatStats({
-        unreadChats: unreadMessages.length,
-        openConversations: openConversations.length,
-        pendingFeedback: pendingFeedback.length
-      });
-
-      console.log('💬 Chat stats loaded:', {
-        unreadChats: unreadMessages.length,
-        openConversations: openConversations.length,
-        pendingFeedback: pendingFeedback.length
+      setChatStats(prev => {
+        if (prev.unreadChats === unreadChats && prev.openConversations === openConversations && prev.pendingFeedback === pendingFeedback) {
+          return prev;
+        }
+        return { unreadChats, openConversations, pendingFeedback };
       });
     } catch (error) {
       console.error('Error loading chat stats:', error);
+    } finally {
+      loadChatStatsInFlight.current = false;
     }
-  };
+  }, []);
 
   // Track which tabs have been loaded to avoid re-fetching
   const [loadedTabs, setLoadedTabs] = useState<Set<string>>(new Set());
