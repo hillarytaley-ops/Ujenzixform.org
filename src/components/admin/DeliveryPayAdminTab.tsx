@@ -176,8 +176,8 @@ export const DeliveryPayAdminTab: React.FC = () => {
                 </div>
               ) : (
                 <>
-                  <span className="text-sm text-gray-500">
-                    Rate: <strong>{currentRate} KES/km</strong>
+                  <span className="text-sm text-slate-600 dark:text-slate-400">
+                    Rate: <strong className="text-slate-900 dark:text-slate-100">{currentRate} KES/km</strong>
                   </span>
                   <Button variant="outline" size="sm" onClick={() => setShowRateForm(true)}>
                     <Settings className="h-4 w-4 mr-1" />
@@ -193,50 +193,50 @@ export const DeliveryPayAdminTab: React.FC = () => {
         </CardHeader>
         <CardContent>
           {migrationNeeded && (
-            <div className="mb-4 p-4 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-sm">
-              <strong>Setup required.</strong> Run the delivery mileage migration in Supabase SQL Editor to enable this feature. See <code className="bg-amber-100 px-1 rounded">supabase/DELIVERY_MILEAGE_PAY_MIGRATION.sql</code>.
+            <div className="mb-4 p-4 rounded-lg bg-amber-50 border border-amber-200 dark:bg-amber-950/40 dark:border-amber-800 text-amber-900 dark:text-amber-200 text-sm">
+              <strong>Setup required.</strong> Run the delivery mileage migration in Supabase SQL Editor to enable this feature. See <code className="bg-amber-200 dark:bg-amber-900/50 px-1 rounded text-amber-950 dark:text-amber-100">supabase/DELIVERY_MILEAGE_PAY_MIGRATION.sql</code>.
             </div>
           )}
           <div className="grid grid-cols-2 gap-4 mb-6">
-            <div className="p-4 rounded-lg bg-teal-50 border border-teal-200">
-              <p className="text-sm text-gray-600">Total round-trip distance (all providers)</p>
-              <p className="text-2xl font-bold">{grandTotalKm.toFixed(1)} km</p>
+            <div className="p-4 rounded-lg bg-teal-50 border border-teal-200 dark:bg-teal-950/40 dark:border-teal-800">
+              <p className="text-sm text-slate-700 dark:text-slate-300">Total round-trip distance (all providers)</p>
+              <p className="text-2xl font-bold text-slate-900 dark:text-white">{grandTotalKm.toFixed(1)} km</p>
             </div>
-            <div className="p-4 rounded-lg bg-emerald-50 border border-emerald-200">
-              <p className="text-sm text-gray-600">Total mileage pay (all providers)</p>
-              <p className="text-2xl font-bold">KES {grandTotalAmount.toLocaleString()}</p>
+            <div className="p-4 rounded-lg bg-emerald-50 border border-emerald-200 dark:bg-emerald-950/40 dark:border-emerald-800">
+              <p className="text-sm text-slate-700 dark:text-slate-300">Total mileage pay (all providers)</p>
+              <p className="text-2xl font-bold text-slate-900 dark:text-white">KES {grandTotalAmount.toLocaleString()}</p>
             </div>
           </div>
 
           <div>
-            <h4 className="font-medium mb-3">Providers</h4>
+            <h4 className="font-medium mb-3 text-slate-900 dark:text-slate-100">Providers</h4>
             {rows.length === 0 ? (
-              <p className="text-gray-500">No delivered orders yet. Provider mileage will appear here.</p>
+              <p className="text-slate-600 dark:text-slate-400">No delivered orders yet. Provider mileage will appear here.</p>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
-                    <tr className="border-b">
-                      <th className="text-left py-2 text-gray-600">Provider</th>
-                      <th className="text-right py-2 text-gray-600">Deliveries</th>
-                      <th className="text-right py-2 text-gray-600">Round-trip km</th>
-                      <th className="text-right py-2 text-gray-600">Rate (KES/km)</th>
-                      <th className="text-right py-2 text-gray-600">Pay (KES)</th>
+                    <tr className="border-b border-slate-200 dark:border-slate-700">
+                      <th className="text-left py-2 text-slate-700 dark:text-slate-300">Provider</th>
+                      <th className="text-right py-2 text-slate-700 dark:text-slate-300">Deliveries</th>
+                      <th className="text-right py-2 text-slate-700 dark:text-slate-300">Round-trip km</th>
+                      <th className="text-right py-2 text-slate-700 dark:text-slate-300">Rate (KES/km)</th>
+                      <th className="text-right py-2 text-slate-700 dark:text-slate-300">Pay (KES)</th>
                     </tr>
                   </thead>
                   <tbody>
                     {rows.map((r) => (
-                      <tr key={r.provider_id} className="border-b hover:bg-gray-50">
-                        <td className="py-2">
+                      <tr key={r.provider_id} className="border-b border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800/50">
+                        <td className="py-2 text-slate-900 dark:text-slate-100">
                           <div className="flex items-center gap-2">
                             <Route className="h-4 w-4 text-teal-500" />
                             {r.provider_name || `Provider ${r.provider_id?.slice(0, 8)}`}
                           </div>
                         </td>
-                        <td className="text-right py-2">{r.delivery_count}</td>
-                        <td className="text-right py-2">{Number(r.total_round_trip_km || 0).toFixed(1)}</td>
-                        <td className="text-right py-2">{Number(r.rate_per_km || 0)}</td>
-                        <td className="text-right py-2 font-medium">{Number(r.total_amount || 0).toLocaleString()}</td>
+                        <td className="text-right py-2 text-slate-900 dark:text-slate-100">{r.delivery_count}</td>
+                        <td className="text-right py-2 text-slate-900 dark:text-slate-100">{Number(r.total_round_trip_km || 0).toFixed(1)}</td>
+                        <td className="text-right py-2 text-slate-900 dark:text-slate-100">{Number(r.rate_per_km || 0)}</td>
+                        <td className="text-right py-2 font-medium text-slate-900 dark:text-slate-100">{Number(r.total_amount || 0).toLocaleString()}</td>
                       </tr>
                     ))}
                   </tbody>
