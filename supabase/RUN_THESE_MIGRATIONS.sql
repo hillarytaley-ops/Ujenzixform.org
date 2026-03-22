@@ -954,8 +954,13 @@ RETURNS DECIMAL LANGUAGE sql IMMUTABLE AS $$
   SELECT ROUND((6371 * acos(LEAST(1, GREATEST(-1, cos(radians(lat1))*cos(radians(lat2))*cos(radians(lon2)-radians(lon1))+sin(radians(lat1))*sin(radians(lat2))))))::numeric, 2);
 $$;
 
-UPDATE delivery_requests dr SET distance_km = public.haversine_km(dr.pickup_latitude::decimal, dr.pickup_longitude::decimal, dr.delivery_latitude::decimal, dr.delivery_longitude::decimal)
-WHERE dr.distance_km IS NULL AND dr.pickup_latitude IS NOT NULL AND dr.pickup_longitude IS NOT NULL AND dr.delivery_latitude IS NOT NULL AND dr.delivery_longitude IS NOT NULL;
+DO $$ BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'delivery_requests' AND column_name = 'pickup_latitude')
+     AND EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'delivery_requests' AND column_name = 'delivery_latitude') THEN
+    UPDATE delivery_requests dr SET distance_km = public.haversine_km(dr.pickup_latitude::decimal, dr.pickup_longitude::decimal, dr.delivery_latitude::decimal, dr.delivery_longitude::decimal)
+    WHERE dr.distance_km IS NULL AND dr.pickup_latitude IS NOT NULL AND dr.pickup_longitude IS NOT NULL AND dr.delivery_latitude IS NOT NULL AND dr.delivery_longitude IS NOT NULL;
+  END IF;
+END $$;
 
 CREATE OR REPLACE FUNCTION public.get_provider_mileage_pay(_provider_user_id UUID DEFAULT auth.uid())
 RETURNS TABLE(delivery_request_id UUID, purchase_order_id UUID, order_number TEXT, one_way_km DECIMAL, round_trip_km DECIMAL, rate_per_km DECIMAL, amount DECIMAL, delivered_at TIMESTAMPTZ, status TEXT)

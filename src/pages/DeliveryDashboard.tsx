@@ -243,9 +243,7 @@ const DeliveryDashboard = () => {
         d.status === 'delivered' || d.status === 'completed'
       ).length;
       
-      const earnings = dayDeliveries.reduce((sum, d) => 
-        sum + (d.price || d.delivery_fee || d.estimated_cost || 0), 0
-      );
+      const earnings = 0;
       
       trends.push({ date: dayName, deliveries: dayDeliveries.length, completed, earnings });
     }
@@ -888,14 +886,11 @@ const DeliveryDashboard = () => {
         const dte = new Date((d.completed_at || d.delivered_at || d.updated_at || d.created_at) as string);
         return !isNaN(dte.getTime()) && dte.toDateString() === todayStr;
       }).length;
-      const totalEarnings = historyItems.reduce((sum: number, d: Record<string, unknown>) =>
-        sum + (Number(d.final_cost) || Number(d.estimated_cost) || Number(d.price) || Number(d.delivery_fee) || 0), 0
-      );
       setStats(prev => ({
         ...prev,
         totalDeliveries: total,
         completedToday,
-        totalEarnings: prev.totalEarnings || totalEarnings,
+        totalEarnings: prev.totalEarnings,
       }));
     }
   }, [activeDeliveries?.length, deliveryHistory]);
@@ -2172,10 +2167,16 @@ const DeliveryDashboard = () => {
             d.delivered_at && new Date(d.delivered_at).toDateString() === today
           ).length;
 
-          // Use estimated_cost from database, fallback to 2500
-          const totalEarnings = deliveries
-            .filter(d => d.status === 'delivered')
-            .reduce((sum, d) => sum + (d.final_cost || d.estimated_cost || 2500), 0);
+          // Driver earnings = mileage pay only (never order totals)
+          let totalEarnings = 0;
+          try {
+            const { data: mileageRows } = await supabase.rpc('get_provider_mileage_pay', {
+              _provider_user_id: user.id,
+            });
+            totalEarnings = (mileageRows || []).reduce((s: number, r: { amount?: number }) => s + Number(r.amount || 0), 0);
+          } catch {
+            /* RPC may not exist */
+          }
 
           setStats({
             totalDeliveries: deliveries.length,
@@ -2199,7 +2200,7 @@ const DeliveryDashboard = () => {
               customer_phone: '+254 700 000 000',
               status: d.status,
               estimated_time: '30 mins',
-              price: d.estimated_cost || 2500,
+              price: 0,
               distance: 0,
               urgency: d.urgency || 'normal',
               special_instructions: d.special_instructions
@@ -2215,16 +2216,16 @@ const DeliveryDashboard = () => {
               material_type: d.item_description || 'Materials',
               status: d.status,
               completed_at: d.delivered_at || d.updated_at || d.created_at,
-              price: d.final_cost || d.estimated_cost || 2500,
+              price: 0,
               rating: 5
             })));
         } else {
-          // Fallback to placeholder data
+          // Fallback to placeholder data (earnings = 0 until mileage data loads)
           setStats({
             totalDeliveries: 156,
             completedToday: 8,
             pendingDeliveries: 3,
-            totalEarnings: 245000,
+            totalEarnings: 0,
             averageRating: 4.8,
             totalDistance: 2450
           });
@@ -2519,6 +2520,7 @@ const DeliveryDashboard = () => {
                 <div>
                   <p className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>Earnings</p>
                   <p className={`text-xl font-bold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>{formatCurrency(stats.totalEarnings)}</p>
+                  <p className={`text-xs ${isDarkMode ? 'text-gray-500' : 'text-gray-400'}`}>Mileage pay</p>
                 </div>
                 <div className="p-3 bg-emerald-100 rounded-full">
                   <DollarSign className="h-6 w-6 text-emerald-600" />

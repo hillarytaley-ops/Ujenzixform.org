@@ -67,15 +67,21 @@ AS $$
   );
 $$;
 
--- 4. Update distance_km from coordinates where null (one-time backfill)
-UPDATE delivery_requests dr
-SET distance_km = public.haversine_km(
-  dr.pickup_latitude::decimal, dr.pickup_longitude::decimal,
-  dr.delivery_latitude::decimal, dr.delivery_longitude::decimal
-)
-WHERE dr.distance_km IS NULL
-  AND dr.pickup_latitude IS NOT NULL AND dr.pickup_longitude IS NOT NULL
-  AND dr.delivery_latitude IS NOT NULL AND dr.delivery_longitude IS NOT NULL;
+-- 4. Backfill distance_km from coordinates (only if lat/long columns exist)
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'delivery_requests' AND column_name = 'pickup_latitude')
+     AND EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'delivery_requests' AND column_name = 'delivery_latitude') THEN
+    UPDATE delivery_requests dr
+    SET distance_km = public.haversine_km(
+      dr.pickup_latitude::decimal, dr.pickup_longitude::decimal,
+      dr.delivery_latitude::decimal, dr.delivery_longitude::decimal
+    )
+    WHERE dr.distance_km IS NULL
+      AND dr.pickup_latitude IS NOT NULL AND dr.pickup_longitude IS NOT NULL
+      AND dr.delivery_latitude IS NOT NULL AND dr.delivery_longitude IS NOT NULL;
+  END IF;
+END $$;
 
 -- 5. RPC: Get provider mileage and pay summary
 CREATE OR REPLACE FUNCTION public.get_provider_mileage_pay(_provider_user_id UUID DEFAULT auth.uid())

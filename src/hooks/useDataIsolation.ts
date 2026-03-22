@@ -1446,8 +1446,8 @@ export const useDeliveryProviderData = () => {
                 builder_name: po.buyer?.full_name || po.builder_name || 'Builder',
                 builder_phone: po.buyer?.phone || po.builder_phone || '',
                 builder_email: po.buyer?.email || po.builder_email || '',
-                price: po.total_amount || 0,
-                estimated_cost: po.total_amount || 0,
+                price: 0,
+                estimated_cost: 0,
                 created_at: po.created_at,
                 updated_at: po.updated_at,
                 source: 'purchase_orders',
@@ -3308,8 +3308,8 @@ export const useDeliveryProviderData = () => {
           builder_name: po.buyer?.full_name || 'Builder',
           builder_phone: po.buyer?.phone || '',
           builder_email: po.buyer?.email || '',
-          price: po.total_amount || 0,
-          estimated_cost: po.total_amount || 0,
+          price: 0,
+          estimated_cost: 0,
           completed_at: po.delivered_at || po.completed_at || po.updated_at,
           delivered_at: po.delivered_at || po.completed_at || po.updated_at,
           created_at: po.created_at,
@@ -3511,8 +3511,8 @@ export const useDeliveryProviderData = () => {
                   builder_name: 'Builder',
                   builder_phone: '',
                   builder_email: '',
-                  price: po.total_amount || 0,
-                  estimated_cost: po.total_amount || 0,
+                  price: 0,
+                  estimated_cost: 0,
                   completed_at: po.delivered_at || po.updated_at || po.created_at,
                   delivered_at: po.delivered_at || po.updated_at || po.created_at,
                   created_at: po.created_at,
@@ -3606,8 +3606,8 @@ export const useDeliveryProviderData = () => {
                   builder_name: 'Builder',
                   builder_phone: '',
                   builder_email: '',
-                  price: po.total_amount || 0,
-                  estimated_cost: po.total_amount || 0,
+                  price: 0,
+                  estimated_cost: 0,
                   completed_at: po.delivered_at || po.updated_at || po.created_at,
                   delivered_at: po.delivered_at || po.updated_at || po.created_at,
                   created_at: po.created_at,
@@ -3762,8 +3762,8 @@ export const useDeliveryProviderData = () => {
               builder_name: 'Builder',
               builder_phone: '',
               builder_email: '',
-              price: po.total_amount || 0,
-              estimated_cost: po.total_amount || 0,
+              price: 0,
+              estimated_cost: 0,
               completed_at: po.delivered_at || po.updated_at || po.created_at || new Date().toISOString(),
               delivered_at: po.delivered_at || po.updated_at || po.created_at || new Date().toISOString(),
               created_at: po.created_at || new Date().toISOString(),
@@ -3937,9 +3937,18 @@ export const useDeliveryProviderData = () => {
         return dte.toDateString() === todayStr;
       }).length;
 
-      const totalEarnings = historyForStats.reduce((sum: number, d: any) =>
-        sum + (d.final_cost || d.estimated_cost || d.price || d.delivery_fee || 0), 0
-      );
+      // Driver earnings = mileage pay only (never builder-supplier amounts)
+      let totalEarnings = 0;
+      if (user?.id) {
+        try {
+          const { data: mileageRows } = await supabase.rpc('get_provider_mileage_pay', {
+            _provider_user_id: user.id,
+          });
+          totalEarnings = (mileageRows || []).reduce((s: number, r: { amount?: number }) => s + Number(r.amount || 0), 0);
+        } catch {
+          // RPC may not exist; keep 0
+        }
+      }
 
       setStats({
         totalDeliveries: activeCount + historyCount,
