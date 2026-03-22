@@ -551,7 +551,8 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, in
     const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
     
     try {
-      if (!forceFullLoad) setLoading(true);
+      // Don't show spinner when we already have data (initialPurchaseOrders) – do background refresh instead
+      if (!forceFullLoad && !initialPurchaseOrders?.length) setLoading(true);
       console.log('🔍 OrderManagement: Loading orders... supplierId prop:', supplierId);
       
       // Ensure Supabase has current session (so RPC auth.uid() is set)
@@ -670,6 +671,7 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, in
 
       if (purchaseOrders.length === 0) {
         setOrders([]);
+        setLoading(false);
         return;
       }
 
