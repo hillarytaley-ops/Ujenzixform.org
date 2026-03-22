@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
+import { useUrlTabSync } from "@/hooks/useUrlTabSync";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLanguage } from "@/contexts/LanguageContext";
@@ -627,7 +628,8 @@ const SupplierDashboard = () => {
   });
   const [recentOrders, setRecentOrders] = useState<RecentOrder[]>([]);
   const [ordersForOrdersTab, setOrdersForOrdersTab] = useState<any[]>([]); // Full orders for OrderManagement (so Orders tab shows immediately)
-  const [activeTab, setActiveTab] = useState('overview');
+  const SUPPLIER_TABS = ['overview', 'materials', 'view-orders', 'scan-qr', 'tracking', 'analytics', 'reports'];
+  const [activeTab, setActiveTab] = useUrlTabSync(SUPPLIER_TABS, 'overview');
   const [viewOrdersSubTab, setViewOrdersSubTab] = useState('quotes');
   const [showProfileEdit, setShowProfileEdit] = useState(false);
   const [showProfileView, setShowProfileView] = useState(false);

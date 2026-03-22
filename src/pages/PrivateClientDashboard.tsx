@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { useUrlTabSync } from "@/hooks/useUrlTabSync";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -95,7 +96,8 @@ const PrivateClientDashboard = () => {
   const [deliveries, setDeliveries] = useState<DeliveryRequest[]>([]);
   const [showProfileEdit, setShowProfileEdit] = useState(false);
   const [showProfileView, setShowProfileView] = useState(false);
-  const [activeTab, setActiveTab] = useState('orders');
+  const PRIVATE_CLIENT_TABS = ['orders', 'order-tracking', 'deliveries', 'tracking', 'request-delivery', 'payments', 'wishlist', 'monitoring', 'support'];
+  const [activeTab, setActiveTab] = useUrlTabSync(PRIVATE_CLIENT_TABS, 'orders');
   const [stats, setStats] = useState({
     totalOrders: 0,
     pendingOrders: 0,

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { Link } from "react-router-dom";
+import { useUrlTabSync } from "@/hooks/useUrlTabSync";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import Footer from "@/components/Footer";
@@ -206,7 +207,8 @@ const DeliveryDashboard = () => {
   const [isOnline, setIsOnline] = useState(true);
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [showProofCapture, setShowProofCapture] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState("alerts"); // Default to Alerts for new requests
+  const DELIVERY_TABS = ["deliveries", "history", "map", "scanning", "analytics", "notifications", "support"];
+  const [activeTab, setActiveTab] = useUrlTabSync(DELIVERY_TABS, "deliveries");
   const [deliveriesSubTab, setDeliveriesSubTab] = useState("scheduled"); // Sub-tab for Deliveries (scheduled only now)
   const [selectedScheduledOrderId, setSelectedScheduledOrderId] = useState<string>(""); // Selected order from dropdown
   const [showProfileEdit, setShowProfileEdit] = useState(false);

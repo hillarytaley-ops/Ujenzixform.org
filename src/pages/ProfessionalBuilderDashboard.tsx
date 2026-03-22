@@ -3,7 +3,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useNavigate, Link, useSearchParams } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
+import { useUrlTabSync } from "@/hooks/useUrlTabSync";
 import { supabase, SUPABASE_URL, SUPABASE_ANON_KEY } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
@@ -111,8 +112,9 @@ const ProfessionalBuilderDashboardPage = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
 
-  // Active tab state for card navigation
-  const [activeTab, setActiveTab] = useState('projects');
+  // Active tab state - syncs with URL so refresh keeps current tab
+  const BUILDER_TABS = ['projects', 'quotes', 'orders', 'deliveries', 'tracking', 'invoices', 'extras', 'monitoring', 'portfolio', 'team', 'support', 'order-history', 'my-analytics'];
+  const [activeTab, setActiveTab] = useUrlTabSync(BUILDER_TABS, 'projects');
   const [extrasSubTab, setExtrasSubTab] = useState('team'); // Sub-tab for Extras (team or support)
   const [deliveriesSubTab, setDeliveriesSubTab] = useState('request'); // Sub-tab for Deliveries (request, schedule, history)
   const [supplierResponseCount, setSupplierResponseCount] = useState(0); // Count of supplier responses for notification badge
@@ -247,12 +249,6 @@ const ProfessionalBuilderDashboardPage = () => {
     }
   }, [authUser]);
 
-  // Deep-link to Deliveries tab when opened from "Check Address" notification (builder prompted to add address)
-  const [searchParams] = useSearchParams();
-  useEffect(() => {
-    const tab = searchParams.get('tab');
-    if (tab === 'deliveries') setActiveTab('deliveries');
-  }, [searchParams]);
 
   // Fetch "Delivery address needed" prompts (when driver clicked Check Address) so builder sees them
   useEffect(() => {

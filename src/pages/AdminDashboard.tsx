@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
+import { useUrlTabSync } from "@/hooks/useUrlTabSync";
 import { supabase } from "@/integrations/supabase/client";
 import { getAdminClient, isAdminClientAvailable } from "@/integrations/supabase/adminClient";
 import { Button } from "@/components/ui/button";
@@ -404,7 +405,15 @@ const AdminDashboard = () => {
   const [financialFilter, setFinancialFilter] = useState<'all' | 'invoice' | 'payment' | 'purchase_order' | 'purchase_receipt' | 'delivery_order' | 'quotation'>('all');
   const [searchTerm, setSearchTerm] = useState("");
   const [filterRole, setFilterRole] = useState("all");
-  const [activeTab, setActiveTab] = useState("overview");
+  const ADMIN_TABS = [
+    "overview", "orders", "monitoring", "gps", "pages", "registrations",
+    "pending-products", "videos", "material-images", "delivery-apps", "delivery-requests",
+    "monitoring-requests", "camera-assignment", "feedback", "documents", "financial",
+    "ml", "security", "staff", "activity-log", "scanning", "qr-codes", "communications",
+    "builder-moderation", "delivery-analytics", "settings", "careers", "user-roles",
+    "messaging", "analytics", "reviews", "sms-test", "tracking", "voice-calls"
+  ] as const;
+  const [activeTab, setActiveTab] = useUrlTabSync([...ADMIN_TABS], "overview");
   
   // Chat/Communication Stats for badges
   const [chatStats, setChatStats] = useState({
