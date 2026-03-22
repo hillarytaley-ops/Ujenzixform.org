@@ -297,6 +297,8 @@ interface DeliveryApplication {
   created_at: string;
   reviewed_at?: string;
   reviewed_by?: string;
+  _registration_id?: string | null;
+  _source?: string;
 }
 
 // Builder Delivery Requests (materials delivery)
@@ -1797,10 +1799,39 @@ const AdminDashboard = () => {
 
   const loadDeliveryApplications = async () => {
     try {
-      // Use admin client if available
+      // Prefer RPC: bypasses RLS and returns ALL providers (registrations + delivery_providers)
+      const { data: rpcData, error: rpcError } = await supabase.rpc('admin_list_all_delivery_providers');
+
+      if (!rpcError && rpcData && rpcData.length > 0) {
+        const formattedApps: DeliveryApplication[] = rpcData.map((row: any) => ({
+          id: row.registration_id || row.id,
+          full_name: row.full_name || row.provider_name || 'N/A',
+          email: row.email || 'N/A',
+          phone: row.phone || 'N/A',
+          county: row.county || row.address || 'N/A',
+          physical_address: row.address || row.county || 'N/A',
+          vehicle_type: row.vehicle_type || 'N/A',
+          vehicle_registration: '',
+          driving_license_number: '',
+          years_experience: 0,
+          service_areas: row.service_areas || [],
+          availability: 'full_time',
+          has_smartphone: true,
+          background_check_consent: false,
+          status: row.status || 'pending',
+          created_at: row.created_at,
+          reviewed_at: null,
+          reviewed_by: null,
+          _registration_id: row.registration_id,
+          _source: row.source
+        }));
+        setDeliveryApplications(formattedApps);
+        console.log('📦 Loaded', formattedApps.length, 'delivery providers (RPC)');
+        return;
+      }
+
+      // Fallback: direct table (may miss providers due to RLS)
       const client = getAdminClient() || supabase;
-      
-      // Fetch from delivery_provider_registrations (where applications are saved)
       const { data: deliveryApps, error } = await client
         .from('delivery_provider_registrations')
         .select('*')
@@ -1825,16 +1856,17 @@ const AdminDashboard = () => {
           years_experience: app.years_driving_experience || 0,
           service_areas: app.service_areas || [],
           availability: app.available_days?.length > 5 ? 'full_time' : 'part_time',
-          has_smartphone: true, // Not in schema, default to true
+          has_smartphone: true,
           background_check_consent: app.background_check_consent ?? false,
           status: app.status || 'pending',
           created_at: app.created_at,
           reviewed_at: app.reviewed_at,
-          reviewed_by: app.reviewed_by
+          reviewed_by: app.reviewed_by,
+          _registration_id: app.id,
+          _source: 'registration'
         }));
-        
         setDeliveryApplications(formattedApps);
-        console.log('📦 Loaded', formattedApps.length, 'delivery applications');
+        console.log('📦 Loaded', formattedApps.length, 'delivery applications (fallback)');
       }
     } catch (error) {
       console.error('Error loading delivery applications:', error);
@@ -1877,32 +1909,40 @@ const AdminDashboard = () => {
         });
       }
 
-      // Load delivery provider registrations
-      // Try delivery_provider_registrations first (has less strict RLS), fallback to delivery_providers
+      // Load delivery provider registrations - prefer RPC (bypasses RLS, returns all)
       let deliveryData: any[] = [];
-      
-      // First try the registrations table (more accessible)
-      const { data: deliveryRegs, error: deliveryRegsError } = await client
-        .from('delivery_provider_registrations')
-        .select('id, full_name, email, phone, county, vehicle_type, vehicle_registration, service_areas, status, created_at')
-        .order('created_at', { ascending: false })
-        .limit(50);
-      
-      if (!deliveryRegsError && deliveryRegs) {
-        deliveryData = deliveryRegs;
+      const { data: rpcDelivery } = await supabase.rpc('admin_list_all_delivery_providers');
+      if (rpcDelivery && rpcDelivery.length > 0) {
+        deliveryData = rpcDelivery.map((row: any) => ({
+          id: row.id,
+          full_name: row.full_name || row.provider_name,
+          provider_name: row.provider_name,
+          company_name: row.provider_name,
+          email: row.email,
+          phone: row.phone,
+          county: row.county,
+          address: row.address,
+          vehicle_type: row.vehicle_type,
+          service_areas: row.service_areas,
+          status: row.status,
+          is_verified: row.status === 'approved',
+          created_at: row.created_at
+        }));
       } else {
-        // Fallback to delivery_providers table (may fail due to strict RLS)
-        const { data: delivery, error: deliveryError } = await client
-          .from('delivery_providers')
-          .select('*') // Use * to avoid column name issues with RLS
+        const { data: deliveryRegs, error: deliveryRegsError } = await client
+          .from('delivery_provider_registrations')
+          .select('id, full_name, email, phone, county, vehicle_type, vehicle_registration, service_areas, status, created_at')
           .order('created_at', { ascending: false })
           .limit(50);
-        
-        if (deliveryError) {
-          console.error('Error loading delivery registrations:', deliveryError);
-        }
-        if (delivery) {
-          deliveryData = delivery;
+        if (!deliveryRegsError && deliveryRegs) {
+          deliveryData = deliveryRegs;
+        } else {
+          const { data: delivery } = await client
+            .from('delivery_providers')
+            .select('*')
+            .order('created_at', { ascending: false })
+            .limit(50);
+          if (delivery) deliveryData = delivery;
         }
       }
 
@@ -3080,17 +3120,18 @@ const AdminDashboard = () => {
                           </div>
                         </div>
 
-                        {/* Action Buttons */}
-                        {app.status === 'pending' && (
+                        {/* Action Buttons - only for applications from delivery_provider_registrations */}
+                        {app.status === 'pending' && (app._registration_id || app._source === 'registration') && (
                           <div className="flex gap-3 pt-3 border-t border-slate-700">
                             <Button
                               className="bg-green-600 hover:bg-green-700 flex-1"
                               onClick={async () => {
                                 try {
+                                  const regId = app._registration_id || app.id;
                                   const { data, error } = await supabase.rpc(
                                     'admin_update_delivery_provider_status',
                                     {
-                                      registration_id: app.id,
+                                      registration_id: regId,
                                       new_status: 'approved',
                                       admin_notes_text: null,
                                     }
@@ -3122,10 +3163,11 @@ const AdminDashboard = () => {
                               className="flex-1"
                               onClick={async () => {
                                 try {
+                                  const regId = app._registration_id || app.id;
                                   const { data, error } = await supabase.rpc(
                                     'admin_update_delivery_provider_status',
                                     {
-                                      registration_id: app.id,
+                                      registration_id: regId,
                                       new_status: 'rejected',
                                       admin_notes_text: null,
                                     }
