@@ -967,7 +967,7 @@ RETURNS TABLE(delivery_request_id UUID, purchase_order_id UUID, order_number TEX
 LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
   WITH cfg AS (SELECT COALESCE((SELECT rate_per_km FROM delivery_mileage_config ORDER BY updated_at DESC LIMIT 1), 50.00) AS r),
   provider_ids AS (SELECT dp.id FROM delivery_providers dp WHERE dp.user_id = _provider_user_id OR EXISTS (SELECT 1 FROM profiles p WHERE p.id = dp.user_id AND p.user_id = _provider_user_id)),
-  rows AS (SELECT dr.id, dr.purchase_order_id, COALESCE(po.po_number, dr.order_number, 'N/A'), COALESCE(dr.distance_km,0), COALESCE(dr.distance_km,0)*2, (SELECT r FROM cfg), ROUND((COALESCE(dr.distance_km,0)*2*(SELECT r FROM cfg))::numeric,2), dr.delivered_at, dr.status
+  rows AS (SELECT dr.id AS delivery_request_id, dr.purchase_order_id, COALESCE(po.po_number, dr.order_number, 'N/A') AS order_number, COALESCE(dr.distance_km,0) AS one_way_km, COALESCE(dr.distance_km,0)*2 AS round_trip_km, (SELECT r FROM cfg) AS rate_per_km, ROUND((COALESCE(dr.distance_km,0)*2*(SELECT r FROM cfg))::numeric,2) AS amount, dr.delivered_at, dr.status
     FROM delivery_requests dr LEFT JOIN purchase_orders po ON po.id = dr.purchase_order_id
     WHERE (dr.provider_id = ANY(SELECT id FROM provider_ids) OR dr.provider_id = _provider_user_id) AND dr.status IN ('delivered','completed'))
   SELECT * FROM rows ORDER BY delivered_at DESC NULLS LAST, delivery_request_id;
@@ -988,3 +988,46 @@ BEGIN
 END;
 $$;
 GRANT EXECUTE ON FUNCTION public.admin_get_all_providers_mileage_pay() TO authenticated;
+
+-- ===================== 20260450 =====================
+-- RPC for admin to fetch all users with roles (User Role Management)
+-- Allows both user_roles.admin and admin_staff members to view
+-- ============================================================
+
+CREATE OR REPLACE FUNCTION public.admin_get_all_users_with_roles()
+RETURNS TABLE(
+  user_id UUID,
+  role TEXT,
+  created_at TIMESTAMPTZ,
+  full_name TEXT,
+  email TEXT
+)
+LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = public
+AS $fn$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM public.user_roles
+    WHERE user_roles.user_id = auth.uid()
+      AND user_roles.role::text IN ('admin', 'super_admin', 'logistics_officer', 'finance_officer')
+  ) AND NOT EXISTS (
+    SELECT 1 FROM public.admin_staff
+    WHERE admin_staff.user_id = auth.uid()
+       OR (SELECT email FROM auth.users WHERE id = auth.uid()) = admin_staff.email
+  ) THEN
+    RETURN;
+  END IF;
+
+  RETURN QUERY
+  SELECT
+    ur.user_id,
+    ur.role::text,
+    ur.created_at,
+    p.full_name,
+    COALESCE(p.email, 'User ' || LEFT(ur.user_id::text, 8))::TEXT
+  FROM public.user_roles ur
+  LEFT JOIN public.profiles p ON p.user_id = ur.user_id
+  ORDER BY ur.created_at DESC;
+END;
+$fn$;
+
+GRANT EXECUTE ON FUNCTION public.admin_get_all_users_with_roles() TO authenticated;

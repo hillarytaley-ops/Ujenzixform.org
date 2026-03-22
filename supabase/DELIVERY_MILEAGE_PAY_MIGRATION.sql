@@ -7,7 +7,7 @@
 -- ============================================================
 
 -- 1. Add distance_km to delivery_requests (one-way: supplier to delivery)
-DO $$
+DO $do1$
 BEGIN
   IF NOT EXISTS (
     SELECT 1 FROM information_schema.columns
@@ -16,7 +16,7 @@ BEGIN
     ALTER TABLE delivery_requests ADD COLUMN distance_km DECIMAL(10,2);
     COMMENT ON COLUMN delivery_requests.distance_km IS 'One-way distance in km (supplier to delivery point). Round trip = distance_km * 2.';
   END IF;
-END $$;
+END $do1$;
 
 -- 2. Mileage rate config (admin sets rate per km)
 CREATE TABLE IF NOT EXISTS public.delivery_mileage_config (
@@ -54,7 +54,7 @@ CREATE OR REPLACE FUNCTION public.haversine_km(
   lat2 DECIMAL, lon2 DECIMAL
 ) RETURNS DECIMAL
 LANGUAGE sql IMMUTABLE
-AS $$
+AS $haversine$
   SELECT ROUND(
     (6371 * acos(
       LEAST(1, GREATEST(-1,
@@ -64,10 +64,10 @@ AS $$
     ))::numeric,
     2
   );
-$$;
+$haversine$;
 
 -- 4. Backfill distance_km from coordinates (only if lat/long columns exist)
-DO $$
+DO $do2$
 BEGIN
   IF EXISTS (
     SELECT 1 FROM information_schema.columns
@@ -85,7 +85,7 @@ BEGIN
       AND dr.pickup_latitude IS NOT NULL AND dr.pickup_longitude IS NOT NULL
       AND dr.delivery_latitude IS NOT NULL AND dr.delivery_longitude IS NOT NULL;
   END IF;
-END $$;
+END $do2$;
 
 -- 5. RPC: Provider mileage and pay
 CREATE OR REPLACE FUNCTION public.get_provider_mileage_pay(_provider_user_id UUID DEFAULT auth.uid())
@@ -101,7 +101,7 @@ RETURNS TABLE(
   status TEXT
 )
 LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public
-AS $$
+AS $provider_pay$
   WITH cfg AS (
     SELECT COALESCE((SELECT rate_per_km FROM delivery_mileage_config ORDER BY updated_at DESC LIMIT 1), 50.00) AS r
   ),
@@ -127,7 +127,7 @@ AS $$
       AND dr.status IN ('delivered', 'completed')
   )
   SELECT * FROM rows ORDER BY delivered_at DESC NULLS LAST, delivery_request_id;
-$$;
+$provider_pay$;
 
 GRANT EXECUTE ON FUNCTION public.get_provider_mileage_pay(uuid) TO authenticated;
 
@@ -142,7 +142,7 @@ RETURNS TABLE(
   delivery_count BIGINT
 )
 LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = public
-AS $$
+AS $admin_pay$
 BEGIN
   IF NOT EXISTS (
     SELECT 1 FROM user_roles
@@ -186,6 +186,6 @@ BEGIN
   LEFT JOIN profiles p ON p.user_id = dp.user_id OR p.id = dp.user_id
   ORDER BY total_amount DESC NULLS LAST;
 END;
-$$;
+$admin_pay$;
 
 GRANT EXECUTE ON FUNCTION public.admin_get_all_providers_mileage_pay() TO authenticated;
