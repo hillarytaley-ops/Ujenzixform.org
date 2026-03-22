@@ -474,24 +474,18 @@ export const EnhancedQRCodeManager: React.FC<EnhancedQRCodeManagerProps> = ({ su
       console.log('⚡ QR Manager: Using cached auth - userId:', stored.id, 'role:', cachedRole);
       setUserRole(cachedRole);
       
-      // For suppliers, try prefetched data first (instant)
-      if (cachedRole === 'supplier' && (cachedSupplierId || propSupplierId)) {
+      // For suppliers: use RPC (server-side supplier resolution) - no client supplier_id needed
+      if (cachedRole === 'supplier') {
         const supplierId = propSupplierId || cachedSupplierId || stored.id;
         setResolvedSupplierId(supplierId);
-        console.log('⚡ QR Manager: Using cached supplierId:', supplierId);
-        
-        // Try prefetched QR codes first
         const prefetchedQRCodes = getPrefetchedQRCodes(supplierId);
         if (prefetchedQRCodes && prefetchedQRCodes.length > 0) {
-          console.log('⚡ QR Manager: Using prefetched QR codes:', prefetchedQRCodes.length);
           setItems(prefetchedQRCodes);
           groupItemsByClient(prefetchedQRCodes);
           setLoading(false);
-          // Fetch fresh data in background
           fetchMaterialItemsFast(cachedRole, stored.id, supplierId);
           return;
         }
-        
         await fetchMaterialItemsFast(cachedRole, stored.id, supplierId);
         return;
       }
@@ -508,88 +502,77 @@ export const EnhancedQRCodeManager: React.FC<EnhancedQRCodeManagerProps> = ({ su
     await checkAuthAndFetch();
   };
 
-  // Fast fetch that skips supplier lookup if we already have the ID
+  // Fast fetch: suppliers use RPC (server-side resolution), admins use REST
   const fetchMaterialItemsFast = async (role: string, userId: string, supplierId: string | null) => {
-    console.log('⚡ Fast fetch: role=', role, 'userId=', userId, 'supplierId=', supplierId);
-    
     const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
     const apiKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
-    
     const stored = getUserFromStorage();
     const headers: Record<string, string> = { 'apikey': apiKey };
     if (stored?.accessToken) {
       headers['Authorization'] = `Bearer ${stored.accessToken}`;
     }
-    
+
     try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
-      
-      let url: string;
-      if (role === 'supplier' && supplierId) {
-        url = `${SUPABASE_URL}/rest/v1/material_items?supplier_id=eq.${supplierId}&order=created_at.desc&limit=500`;
-      } else if (role === 'admin') {
-        url = `${SUPABASE_URL}/rest/v1/material_items?order=created_at.desc&limit=1000`;
-      } else {
-        console.log('⚠️ Unknown role for fast fetch:', role);
-        setLoading(false);
-        return;
-      }
-      
-      console.log('⚡ Fast fetching from:', url);
-      
-      const response = await fetch(url, { 
-        headers, 
-        signal: controller.signal,
-        cache: 'no-store'
-      });
-      clearTimeout(timeoutId);
-      
-      if (response.ok) {
-        const data = await response.json();
-        console.log('⚡ Fast fetch success:', data?.length || 0, 'items');
-        if (data?.length > 0) {
-          setItems(data);
-          groupItemsByClient(data);
+      // Suppliers: use RPC first (no client supplier_id needed, handles profile chain)
+      if (role === 'supplier') {
+        const { data: miData, error } = await supabase.rpc('get_supplier_material_items_for_current_user', { _limit: 500 });
+        if (!error && miData && miData.length > 0) {
+          setItems(miData);
+          groupItemsByClient(miData);
           setLoading(false);
           return;
         }
-        // Fallback: fetch via RPC (auth.uid()-based) when direct supplier_id query returns empty
-        if (role === 'supplier') {
-          try {
-            const { data: pos } = await supabase.rpc('get_supplier_orders_for_current_user', { _limit: 500 });
-            const orderIds = (pos || []).map((p: any) => p.id).filter(Boolean);
-            if (orderIds.length > 0) {
-              const { data: miData } = await supabase
-                .from('material_items')
-                .select('*')
-                .in('purchase_order_id', orderIds.slice(0, 100))
-                .order('created_at', { ascending: false })
-                .limit(500);
-              if (miData && miData.length > 0) {
-                console.log('⚡ Fallback via RPC+PO: found', miData.length, 'items');
-                setItems(miData);
-                groupItemsByClient(miData);
-                setLoading(false);
-                return;
-              }
+        // Fallback: REST by supplier_id if RPC returns empty (e.g. RPC not deployed yet)
+        if (supplierId) {
+          const controller = new AbortController();
+          setTimeout(() => controller.abort(), 5000);
+          const response = await fetch(
+            `${SUPABASE_URL}/rest/v1/material_items?supplier_id=eq.${supplierId}&order=created_at.desc&limit=500`,
+            { headers, signal: controller.signal, cache: 'no-store' }
+          );
+          if (response.ok) {
+            const data = await response.json();
+            if (data?.length > 0) {
+              setItems(data);
+              groupItemsByClient(data);
+              setLoading(false);
+              return;
             }
-          } catch (e) {
-            console.log('⚠️ Fallback fetch failed:', e);
           }
         }
         setItems([]);
         groupItemsByClient([]);
-      } else {
-        console.log('❌ Fast fetch failed:', response.status);
+        setLoading(false);
+        return;
       }
+
+      // Admin: direct REST
+      if (role === 'admin') {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 5000);
+        const response = await fetch(
+          `${SUPABASE_URL}/rest/v1/material_items?order=created_at.desc&limit=1000`,
+          { headers, signal: controller.signal, cache: 'no-store' }
+        );
+        clearTimeout(timeoutId);
+        if (response.ok) {
+          const data = await response.json();
+          setItems(data || []);
+          groupItemsByClient(data || []);
+        } else {
+          setItems([]);
+          groupItemsByClient([]);
+        }
+        setLoading(false);
+        return;
+      }
+
+      setLoading(false);
     } catch (e: any) {
-      if (e.name === 'AbortError') {
-        console.log('⏱️ Fast fetch timeout');
-      } else {
-        console.log('⚠️ Fast fetch error:', e.message);
-      }
-    } finally {
+      if (e.name === 'AbortError') console.log('⏱️ Fast fetch timeout');
+      else console.log('⚠️ Fast fetch error:', e?.message);
+      setItems([]);
+      groupItemsByClient([]);
       setLoading(false);
     }
   };
@@ -649,10 +632,15 @@ export const EnhancedQRCodeManager: React.FC<EnhancedQRCodeManagerProps> = ({ su
   };
 
   const fetchMaterialItems = async (role: string | null, userId: string) => {
-    console.log('🔍 EnhancedQRCodeManager: Fetching items for role:', role, 'userId (auth.uid):', userId);
-    console.log('🔍 Prop supplierId:', propSupplierId);
-    
     if (role === 'supplier') {
+      // Try RPC first (server-side supplier resolution, no client lookup needed)
+      const { data: miData, error } = await supabase.rpc('get_supplier_material_items_for_current_user', { _limit: 500 });
+      if (!error && miData && miData.length > 0) {
+        setItems(miData);
+        groupItemsByClient(miData);
+        return;
+      }
+
       let supplierData: any = null;
       let finalSupplierId: string | null = propSupplierId || null;
 

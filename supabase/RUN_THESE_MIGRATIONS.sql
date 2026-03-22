@@ -1,6 +1,6 @@
 -- ============================================================
 -- COPY ALL BELOW AND RUN IN SUPABASE SQL EDITOR
--- Run in order: 20260435 → 20260436 → 20260437 → 20260438 → 20260439
+-- Run in order: 20260435 → 20260436 → 20260437 → 20260438 → 20260439 → 20260440
 -- ============================================================
 
 -- ===================== 20260435 =====================
@@ -870,3 +870,53 @@ WHERE po.id = dr.purchase_order_id
   AND po.delivery_provider_id IS NULL
   AND p.full_name IS NOT NULL
   AND trim(p.full_name) <> '';
+
+-- ===================== 20260440 =====================
+-- QR Codes fix: get_supplier_material_items + get_supplier_orders (profile chain)
+-- ============================================================
+
+CREATE OR REPLACE FUNCTION public.get_supplier_orders_for_current_user(_limit integer DEFAULT 500)
+RETURNS SETOF public.purchase_orders
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT po.*
+  FROM purchase_orders po
+  WHERE po.supplier_id IN (
+    SELECT s.id FROM suppliers s
+    WHERE s.user_id = auth.uid()
+       OR EXISTS (SELECT 1 FROM profiles p WHERE p.id = s.user_id AND p.user_id = auth.uid())
+  )
+  ORDER BY po.created_at DESC
+  LIMIT _limit;
+$$;
+
+CREATE OR REPLACE FUNCTION public.get_supplier_material_items_for_current_user(_limit integer DEFAULT 500)
+RETURNS SETOF public.material_items
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT mi.*
+  FROM material_items mi
+  WHERE mi.supplier_id IN (
+    SELECT s.id FROM suppliers s
+    WHERE s.user_id = auth.uid()
+       OR EXISTS (SELECT 1 FROM profiles p WHERE p.id = s.user_id AND p.user_id = auth.uid())
+  )
+  OR mi.purchase_order_id IN (
+    SELECT po.id FROM purchase_orders po
+    WHERE po.supplier_id IN (
+      SELECT s.id FROM suppliers s
+      WHERE s.user_id = auth.uid()
+         OR EXISTS (SELECT 1 FROM profiles p WHERE p.id = s.user_id AND p.user_id = auth.uid())
+    )
+  )
+  ORDER BY mi.created_at DESC
+  LIMIT _limit;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.get_supplier_material_items_for_current_user(integer) TO authenticated;
