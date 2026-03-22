@@ -2927,28 +2927,31 @@ const QRCodeFullDialog: React.FC<{
   item: MaterialItem | null;
   downloadQRCode: (qrCode: string, materialType: string, itemSeq: number) => void;
 }> = ({ isOpen, onClose, item, downloadQRCode }) => {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  
+  const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
+
   useEffect(() => {
-    if (!canvasRef.current || !item?.qr_code || !isOpen) return;
-    const canvas = canvasRef.current;
-    const qrCode = item.qr_code;
-    const drawQR = () => {
-      QRCodeLib.toCanvas(canvas, qrCode, {
-        width: 400,
-        margin: 4,
-        errorCorrectionLevel: 'H',
-        color: { dark: '#000000', light: '#ffffff' }
-      }).catch(err => console.error('QR Code generation error:', err));
-    };
-    const id = setTimeout(drawQR, 80);
-    return () => clearTimeout(id);
+    if (!item?.qr_code || !isOpen) {
+      setQrDataUrl(null);
+      return;
+    }
+    let cancelled = false;
+    QRCodeLib.toDataURL(item.qr_code, {
+      width: 400,
+      margin: 4,
+      errorCorrectionLevel: 'H',
+      color: { dark: '#000000', light: '#ffffff' }
+    }).then((url) => {
+      if (!cancelled) setQrDataUrl(url);
+    }).catch((err) => {
+      if (!cancelled) console.error('QR Code generation error:', err);
+    });
+    return () => { cancelled = true; };
   }, [item?.qr_code, isOpen]);
 
   if (!item) return null;
 
   return (
-    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+    <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-2xl w-[95vw] max-h-[95vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-2xl">
@@ -2981,9 +2984,15 @@ const QRCodeFullDialog: React.FC<{
             </div>
           )}
 
-          {/* MASSIVE QR Code - explicit width/height ensures canvas has size before draw */}
+          {/* MASSIVE QR Code - use img to avoid canvas mount timing issues */}
           <div className="p-6 bg-white rounded-2xl shadow-2xl border-4 border-cyan-300">
-            <canvas ref={canvasRef} width={400} height={400} className="rounded-lg" />
+            {qrDataUrl ? (
+              <img src={qrDataUrl} alt="QR Code" width={400} height={400} className="rounded-lg" />
+            ) : (
+              <div className="w-[400px] h-[400px] rounded-lg bg-gray-100 animate-pulse flex items-center justify-center">
+                <RefreshCw className="h-12 w-12 text-gray-400 animate-spin" />
+              </div>
+            )}
           </div>
           
           {/* Scan Status */}
