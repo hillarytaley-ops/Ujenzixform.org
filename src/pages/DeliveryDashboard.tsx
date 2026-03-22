@@ -313,7 +313,7 @@ const DeliveryDashboard = () => {
     if (isolatedProfile) {
       setProviderProfile(isolatedProfile);
     }
-    // Use isolatedStats when available; fallback: derive from raw data when stats are zero
+    // Use isolatedStats when available; fallback: derive from raw data
     const activeCount = isolatedActiveDeliveries?.length ?? 0;
     const historyCount = isolatedHistory?.length ?? 0;
     const pendingCount = isolatedPendingRequests?.length ?? 0;
@@ -875,6 +875,30 @@ const DeliveryDashboard = () => {
     }
   }, [isolatedProfile, isolatedStats, isolatedActiveDeliveries, isolatedHistory, isolatedPendingRequests]);
 
+  // Keep stats in sync with displayed data (e.g. when aggressive effect adds to deliveryHistory)
+  useEffect(() => {
+    const displayedActive = activeDeliveries?.length ?? 0;
+    const displayedHistory = deliveryHistory?.length ?? 0;
+    const total = displayedActive + displayedHistory;
+    if (total > 0 && stats.totalDeliveries !== total) {
+      const todayStr = new Date().toDateString();
+      const historyItems = deliveryHistory || [];
+      const completedToday = historyItems.filter((d: Record<string, unknown>) => {
+        const dte = new Date((d.completed_at || d.delivered_at || d.updated_at || d.created_at) as string);
+        return !isNaN(dte.getTime()) && dte.toDateString() === todayStr;
+      }).length;
+      const totalEarnings = historyItems.reduce((sum: number, d: Record<string, unknown>) =>
+        sum + (Number(d.final_cost) || Number(d.estimated_cost) || Number(d.price) || Number(d.delivery_fee) || 0), 0
+      );
+      setStats(prev => ({
+        ...prev,
+        totalDeliveries: total,
+        completedToday,
+        totalEarnings: prev.totalEarnings || totalEarnings,
+      }));
+    }
+  }, [activeDeliveries?.length, deliveryHistory]);
+
   // Map unified RPC row to card shape (delivery_location, material_type, etc.)
   // CRITICAL: delivery_address should come from delivery_requests (builder-provided), not purchase_orders
   const toCardDelivery = useCallback((row: UnifiedDeliveryRow): ActiveDelivery & { _items_count?: number; _received_count?: number } => ({
@@ -1070,10 +1094,9 @@ const DeliveryDashboard = () => {
           // Better approach: Query delivery_requests with status='delivered' for this provider
           // This is more reliable than searching by PO number
           if (DEBUG_AGGRESSIVE) console.log('Querying delivery_requests with status=delivered for provider');
-          // First, get provider ID (try user.id first, then lookup delivery_provider)
+          // Resolve provider ID: direct user_id then profile chain (consistent with useDataIsolation)
           let providerIdToQuery = user?.id;
           try {
-            // Try to get delivery_provider.id from user_id
             const providerRes = await fetch(
               `${SUPABASE_URL_AGGRESSIVE}/rest/v1/delivery_providers?user_id=eq.${user?.id}&select=id&limit=1`,
               {
@@ -1087,9 +1110,27 @@ const DeliveryDashboard = () => {
             );
             if (providerRes.ok) {
               const providerData = await providerRes.json();
-              if (providerData && providerData.length > 0 && providerData[0].id) {
+              if (providerData?.length > 0 && providerData[0].id) {
                 providerIdToQuery = providerData[0].id;
-                if (DEBUG_AGGRESSIVE) console.log('Found provider ID:', providerIdToQuery?.substring(0, 8));
+              } else {
+                const profileRes = await fetch(
+                  `${SUPABASE_URL_AGGRESSIVE}/rest/v1/profiles?user_id=eq.${user?.id}&select=id&limit=1`,
+                  { headers: { 'apikey': SUPABASE_ANON_KEY_AGGRESSIVE, 'Authorization': `Bearer ${accessTokenAggressive}`, 'Accept': 'application/json' }, cache: 'no-store' }
+                );
+                if (profileRes.ok) {
+                  const profiles = await profileRes.json();
+                  const profileId = profiles?.[0]?.id;
+                  if (profileId) {
+                    const dpRes = await fetch(
+                      `${SUPABASE_URL_AGGRESSIVE}/rest/v1/delivery_providers?user_id=eq.${profileId}&select=id&limit=1`,
+                      { headers: { 'apikey': SUPABASE_ANON_KEY_AGGRESSIVE, 'Authorization': `Bearer ${accessTokenAggressive}`, 'Accept': 'application/json' }, cache: 'no-store' }
+                    );
+                    if (dpRes.ok) {
+                      const dpData = await dpRes.json();
+                      if (dpData?.[0]?.id) providerIdToQuery = dpData[0].id;
+                    }
+                  }
+                }
               }
             }
           } catch (e) {

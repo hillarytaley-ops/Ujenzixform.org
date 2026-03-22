@@ -382,7 +382,7 @@ export const useDeliveryProviderData = () => {
       console.log('⚡ FAST PATH: Loading accepted orders immediately for provider:', userId);
 
       // Use REST dual-fetch (provider id + user id) so Scheduled/In Transit data is reliable
-      // First, try to get the delivery_provider.id for this user
+      // Resolve delivery_provider.id: try user_id = auth.uid() then profile chain (user_id = profiles.id)
       let providerIdToUse = userId;
       try {
         const providerLookup = await fetch(
@@ -400,7 +400,30 @@ export const useDeliveryProviderData = () => {
           const providers = await providerLookup.json();
           if (Array.isArray(providers) && providers.length > 0) {
             providerIdToUse = providers[0].id;
-            console.log('⚡ FAST PATH: Found delivery_provider.id:', providerIdToUse);
+            console.log('⚡ FAST PATH: Found delivery_provider.id (direct):', providerIdToUse);
+          } else {
+            // Fallback: profile chain – delivery_providers.user_id may reference profiles.id
+            const profileRes = await fetch(
+              `${SUPABASE_URL}/rest/v1/profiles?user_id=eq.${userId}&select=id`,
+              { headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${accessToken}`, 'Accept': 'application/json' }, cache: 'no-store' }
+            );
+            if (profileRes.ok) {
+              const profiles = await profileRes.json();
+              const profileId = Array.isArray(profiles) && profiles[0]?.id ? profiles[0].id : null;
+              if (profileId) {
+                const dpByProfile = await fetch(
+                  `${SUPABASE_URL}/rest/v1/delivery_providers?user_id=eq.${profileId}&select=id`,
+                  { headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${accessToken}`, 'Accept': 'application/json' }, cache: 'no-store' }
+                );
+                if (dpByProfile.ok) {
+                  const dpData = await dpByProfile.json();
+                  if (Array.isArray(dpData) && dpData[0]?.id) {
+                    providerIdToUse = dpData[0].id;
+                    console.log('⚡ FAST PATH: Found delivery_provider.id (profile chain):', providerIdToUse);
+                  }
+                }
+              }
+            }
           }
         }
       } catch (e) {
@@ -862,16 +885,26 @@ export const useDeliveryProviderData = () => {
             console.log('🔍 Starting filtering process for', allDeliveries.length, 'deliveries');
             
             // Filter active deliveries AND filter by provider_id (client-side safety check)
-            // Use table query only – no RPC, so nothing blocks; fallback to match by user_id
+            // Resolve provider id: direct user_id then profile chain for consistency across all providers
             let providerIdToMatch: string | null = null;
             try {
               console.log('🔍 Looking up delivery_provider for userId:', userId.substring(0, 8));
               const { data: dp } = await supabase.from('delivery_providers').select('id').eq('user_id', userId).maybeSingle();
               if (dp?.id) {
                 providerIdToMatch = dp.id;
-                console.log('🔍 Delivery provider lookup (table):', { userId: userId.substring(0, 8), providerId: providerIdToMatch.substring(0, 8) });
+                console.log('🔍 Delivery provider lookup (direct):', { userId: userId.substring(0, 8), providerId: providerIdToMatch.substring(0, 8) });
               } else {
-                console.log('🔍 No delivery_provider row for userId:', userId.substring(0, 8), '- will match by user_id only');
+                const { data: profile } = await supabase.from('profiles').select('id').eq('user_id', userId).maybeSingle();
+                if (profile?.id) {
+                  const { data: dpByProfile } = await supabase.from('delivery_providers').select('id').eq('user_id', profile.id).maybeSingle();
+                  if (dpByProfile?.id) {
+                    providerIdToMatch = dpByProfile.id;
+                    console.log('🔍 Delivery provider lookup (profile chain):', { providerId: providerIdToMatch.substring(0, 8) });
+                  }
+                }
+                if (!providerIdToMatch) {
+                  console.log('🔍 No delivery_provider row - will match by user_id only');
+                }
               }
             } catch (e: any) {
               console.warn('⚠️ Exception fetching delivery_provider.id:', e?.message || e);
