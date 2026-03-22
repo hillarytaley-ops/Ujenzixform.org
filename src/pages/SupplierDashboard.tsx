@@ -644,6 +644,13 @@ const SupplierDashboard = () => {
   const [processingQuote, setProcessingQuote] = useState(false);
   const [loadingQuotes, setLoadingQuotes] = useState(false);
 
+  // Cache resolved supplier ID so QR Manager etc. can use it on next load
+  useEffect(() => {
+    if (supplierRecordId) {
+      localStorage.setItem('supplier_id', supplierRecordId);
+    }
+  }, [supplierRecordId]);
+
   // Show UI immediately - don't wait for data
   useEffect(() => {
     if (user) {
