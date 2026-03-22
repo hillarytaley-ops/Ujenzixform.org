@@ -297,9 +297,9 @@ export const TrackingTab: React.FC<TrackingTabProps> = ({ userId: propUserId, us
       // This provides tracking data even if tracking_numbers table doesn't have entries
       if (userRole === 'supplier') {
         try {
-          const ordersUrl = `${SUPABASE_URL}/rest/v1/purchase_orders?or=(supplier_id.eq.${userId},supplier_id.eq.${supplierId})&delivery_status=neq.pending&select=id,order_number,status,delivery_address,delivery_provider_id,delivery_provider_name,delivery_provider_phone,delivery_vehicle_info,delivery_status,delivery_assigned_at,delivery_accepted_at,estimated_delivery_time,created_at,updated_at&order=created_at.desc`;
+          const ordersUrl = `${SUPABASE_URL}/rest/v1/purchase_orders?or=(supplier_id.eq.${userId},supplier_id.eq.${supplierId})&or=(delivery_required.eq.true,delivery_provider_id.not.is.null)&select=id,po_number,status,buyer_id,delivery_address,delivery_provider_id,delivery_provider_name,delivery_provider_phone,delivery_vehicle_info,delivery_status,delivery_assigned_at,delivery_accepted_at,estimated_delivery_time,created_at,updated_at&order=created_at.desc`;
           
-          console.log('📦 Fetching supplier orders with delivery info...');
+          console.log('📦 Fetching supplier orders with delivery...');
           
           const ordersResponse = await fetch(ordersUrl, {
             headers: {
@@ -312,13 +312,13 @@ export const TrackingTab: React.FC<TrackingTabProps> = ({ userId: propUserId, us
             const ordersData = await ordersResponse.json();
             console.log('📦 Orders with delivery info:', ordersData?.length || 0);
             
-            // Convert orders to tracking number format for display
+            // Convert orders to tracking format (po_number is correct column in purchase_orders)
             const orderTrackingData: TrackingNumber[] = (ordersData || []).map((order: any) => ({
               id: order.id,
-              tracking_number: order.order_number || `ORD-${order.id.slice(0, 8).toUpperCase()}`,
+              tracking_number: order.po_number || `ORD-${order.id.slice(0, 8).toUpperCase()}`,
               delivery_request_id: order.id,
               purchase_order_id: order.id,
-              builder_id: order.builder_id || '',
+              builder_id: order.buyer_id || '',
               delivery_provider_id: order.delivery_provider_id,
               supplier_id: supplierId,
               status: mapDeliveryStatusToTrackingStatus(order.delivery_status || order.status),
@@ -327,7 +327,7 @@ export const TrackingTab: React.FC<TrackingTabProps> = ({ userId: propUserId, us
               last_location_update: null,
               pickup_address: null,
               delivery_address: order.delivery_address || 'Address not specified',
-              materials_description: `Order #${order.order_number || order.id.slice(0, 8)}`,
+              materials_description: `Order #${order.po_number || order.id.slice(0, 8)}`,
               estimated_delivery_date: order.estimated_delivery_time,
               actual_delivery_date: order.status === 'delivered' ? order.updated_at : null,
               provider_name: order.delivery_provider_name,
