@@ -75,36 +75,37 @@ export const UserRolesManager = () => {
 
   const fetchUsers = async () => {
     setLoading(true);
-    const timeout = (ms: number) => new Promise<never>((_, rej) => setTimeout(() => rej(new Error('Request timed out')), ms));
     try {
-      let rows: { user_id: string; role: string; created_at: string; full_name?: string; email?: string }[] = [];
-      const { data: fallbackData, error: fallbackErr } = await Promise.race([
-        supabase.rpc('get_users_with_roles'),
-        timeout(12000),
-      ]);
-      if (!fallbackErr && fallbackData) {
-        rows = fallbackData.map((r: { user_id: string; email?: string; role: string; created_at: string }) => ({
-          user_id: r.user_id,
-          role: r.role,
-          created_at: r.created_at,
-          email: r.email,
-        }));
-      } else {
-        const { data: rpcData, error: rpcError } = await Promise.race([
-          supabase.rpc('admin_get_all_users_with_roles'),
-          timeout(10000),
-        ]);
-        if (rpcError) throw fallbackErr || rpcError;
-        rows = rpcData || [];
+      const { data: rolesData, error: rolesError } = await supabase
+        .from('user_roles')
+        .select('user_id, role, created_at')
+        .order('created_at', { ascending: false });
+
+      if (rolesError) throw rolesError;
+      const roles = rolesData || [];
+
+      const userIds = [...new Set(roles.map((r: { user_id: string }) => r.user_id))];
+      let profilesMap: Record<string, { full_name?: string; email?: string }> = {};
+      if (userIds.length > 0) {
+        const { data: profilesData } = await supabase
+          .from('profiles')
+          .select('user_id, full_name, email')
+          .in('user_id', userIds);
+        (profilesData || []).forEach((p: { user_id: string; full_name?: string; email?: string }) => {
+          profilesMap[p.user_id] = { full_name: p.full_name, email: p.email };
+        });
       }
 
-      const combinedUsers: UserWithRole[] = rows.map((row) => ({
-        id: row.user_id,
-        email: row.email || row.full_name || `User ${row.user_id?.slice(0, 8)}...`,
-        role: row.role,
-        created_at: row.created_at,
-        full_name: row.full_name,
-      }));
+      const combinedUsers: UserWithRole[] = roles.map((r: { user_id: string; role: string; created_at: string }) => {
+        const p = profilesMap[r.user_id];
+        return {
+          id: r.user_id,
+          email: p?.email || p?.full_name || `User ${r.user_id.slice(0, 8)}...`,
+          role: r.role,
+          created_at: r.created_at,
+          full_name: p?.full_name,
+        };
+      });
 
       setUsers(combinedUsers);
     } catch (error: unknown) {
