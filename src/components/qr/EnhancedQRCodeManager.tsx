@@ -548,8 +548,38 @@ export const EnhancedQRCodeManager: React.FC<EnhancedQRCodeManagerProps> = ({ su
       if (response.ok) {
         const data = await response.json();
         console.log('⚡ Fast fetch success:', data?.length || 0, 'items');
-        setItems(data || []);
-        groupItemsByClient(data || []);
+        if (data?.length > 0) {
+          setItems(data);
+          groupItemsByClient(data);
+          setLoading(false);
+          return;
+        }
+        // Fallback: fetch via RPC (auth.uid()-based) when direct supplier_id query returns empty
+        if (role === 'supplier') {
+          try {
+            const { data: pos } = await supabase.rpc('get_supplier_orders_for_current_user', { _limit: 500 });
+            const orderIds = (pos || []).map((p: any) => p.id).filter(Boolean);
+            if (orderIds.length > 0) {
+              const { data: miData } = await supabase
+                .from('material_items')
+                .select('*')
+                .in('purchase_order_id', orderIds.slice(0, 100))
+                .order('created_at', { ascending: false })
+                .limit(500);
+              if (miData && miData.length > 0) {
+                console.log('⚡ Fallback via RPC+PO: found', miData.length, 'items');
+                setItems(miData);
+                groupItemsByClient(miData);
+                setLoading(false);
+                return;
+              }
+            }
+          } catch (e) {
+            console.log('⚠️ Fallback fetch failed:', e);
+          }
+        }
+        setItems([]);
+        groupItemsByClient([]);
       } else {
         console.log('❌ Fast fetch failed:', response.status);
       }
