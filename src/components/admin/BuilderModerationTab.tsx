@@ -143,28 +143,30 @@ export function BuilderModerationTab() {
 
   const fetchStats = async () => {
     try {
-      // Get builder counts
       const { data: roleData } = await supabase
         .from('user_roles')
         .select('user_id')
         .eq('role', 'professional_builder');
 
-      const builderUserIds = (roleData || []).map(r => r.user_id);
+      const builderUserIds = (roleData || []).map(r => r.user_id).filter(Boolean);
 
       if (builderUserIds.length > 0) {
-        const { data: profilesData } = await supabase
+        const { data: profilesData, error: profilesErr } = await supabase
           .from('profiles')
-          .select('is_verified')
+          .select('id, user_id, is_verified')
           .in('user_id', builderUserIds);
 
-        const verified = (profilesData || []).filter(p => p.is_verified).length;
-        
-        setStats(prev => ({
-          ...prev,
-          totalBuilders: profilesData?.length || 0,
-          verifiedBuilders: verified,
-          pendingVerification: (profilesData?.length || 0) - verified
-        }));
+        if (profilesErr) {
+          console.warn('Builder stats: profiles fetch failed', profilesErr);
+        } else {
+          const verified = (profilesData || []).filter(p => p.is_verified).length;
+          setStats(prev => ({
+            ...prev,
+            totalBuilders: profilesData?.length || 0,
+            verifiedBuilders: verified,
+            pendingVerification: (profilesData?.length || 0) - verified
+          }));
+        }
       }
 
       // Get post counts
@@ -267,20 +269,27 @@ export function BuilderModerationTab() {
         throw error;
       }
 
-      // Get builder profiles
-      const builderIds = [...new Set((data || []).map(p => p.builder_id))];
-      const { data: profiles } = await supabase
-        .from('profiles')
-        .select('user_id, full_name, avatar_url')
-        .in('user_id', builderIds);
+      const builderIds = [...new Set((data || []).map(p => p.builder_id).filter(Boolean))];
+      let profilesMap = new Map<string, { user_id?: string; full_name?: string; avatar_url?: string }>();
+      if (builderIds.length > 0) {
+        const { data: profiles } = await supabase
+          .from('profiles')
+          .select('id, user_id, full_name, avatar_url')
+          .or(`user_id.in.(${builderIds.join(',')}),id.in.(${builderIds.join(',')})`);
+        (profiles || []).forEach(p => {
+          const key = p.user_id ?? p.id;
+          if (key) profilesMap.set(key, p);
+        });
+      }
 
-      const profilesMap = new Map((profiles || []).map(p => [p.user_id, p]));
-
-      const postsWithBuilders = (data || []).map(post => ({
-        ...post,
-        builder_name: profilesMap.get(post.builder_id)?.full_name || 'Unknown',
-        builder_avatar: profilesMap.get(post.builder_id)?.avatar_url
-      }));
+      const postsWithBuilders = (data || []).map(post => {
+        const prof = profilesMap.get(post.builder_id);
+        return {
+          ...post,
+          builder_name: prof?.full_name || 'Unknown',
+          builder_avatar: prof?.avatar_url
+        };
+      });
 
       setPosts(postsWithBuilders);
     } catch (error) {

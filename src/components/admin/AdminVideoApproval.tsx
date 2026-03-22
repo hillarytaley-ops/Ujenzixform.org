@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -81,21 +82,16 @@ export function AdminVideoApproval() {
       let profilesMap: Record<string, { name: string; email: string }> = {};
       
       if (builderIds.length > 0) {
-        const profilesRes = await fetch(
-          `${SUPABASE_URL}/rest/v1/profiles?user_id=in.(${builderIds.join(',')})&select=user_id,full_name,email`,
-          {
-            headers: {
-              'apikey': SUPABASE_ANON_KEY,
-              'Authorization': `Bearer ${accessToken || SUPABASE_ANON_KEY}`,
-            }
-          }
-        );
-        const profilesData = await profilesRes.json();
+        const { data: profilesData } = await supabase
+          .from('profiles')
+          .select('id, user_id, full_name, email')
+          .or(`user_id.in.(${builderIds.join(',')}),id.in.(${builderIds.join(',')})`);
         (profilesData || []).forEach((p: any) => {
-          profilesMap[p.user_id] = { name: p.full_name || 'Unknown', email: p.email || '' };
+          const key = p.user_id ?? p.id;
+          if (key) profilesMap[key] = { name: p.full_name || 'Unknown', email: p.email || '' };
         });
       }
-      
+
       const formattedPosts: VideoItem[] = (data || []).map((post: any) => ({
         id: post.id,
         builder_id: post.builder_id,
@@ -153,18 +149,13 @@ export function AdminVideoApproval() {
       let profilesMap: Record<string, { name: string; email: string }> = {};
       
       if (builderIds.length > 0) {
-        const profilesRes = await fetch(
-          `${SUPABASE_URL}/rest/v1/profiles?user_id=in.(${builderIds.join(',')})&select=user_id,full_name,email`,
-          {
-            headers: {
-              'apikey': SUPABASE_ANON_KEY,
-              'Authorization': `Bearer ${accessToken || SUPABASE_ANON_KEY}`,
-            }
-          }
-        );
-        const profilesData = await profilesRes.json();
+        const { data: profilesData } = await supabase
+          .from('profiles')
+          .select('id, user_id, full_name, email')
+          .or(`user_id.in.(${builderIds.join(',')}),id.in.(${builderIds.join(',')})`);
         (profilesData || []).forEach((p: any) => {
-          profilesMap[p.user_id] = { name: p.full_name || 'Unknown', email: p.email || '' };
+          const key = p.user_id ?? p.id;
+          if (key) profilesMap[key] = { name: p.full_name || 'Unknown', email: p.email || '' };
         });
       }
       
