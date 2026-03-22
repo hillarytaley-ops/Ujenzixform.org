@@ -90,6 +90,7 @@ import { AdminScanDashboard } from "@/components/qr/AdminScanDashboard";
 import { EnhancedQRCodeManager } from "@/components/qr/EnhancedQRCodeManager";
 import { AdminChatWidget } from "@/components/chat/AdminChatWidget";
 import { DeliveryAnalytics } from "@/components/admin/DeliveryAnalytics";
+import { DeliveryPayAdminTab } from "@/components/admin/DeliveryPayAdminTab";
 import { MonitoringRequestsManager } from "@/components/admin/MonitoringRequestsManager";
 import { PendingProductsManager } from "@/components/admin/PendingProductsManager";
 import { MaterialImagesManager } from "@/components/admin/MaterialImagesManager";
@@ -410,7 +411,7 @@ const AdminDashboard = () => {
     "pending-products", "videos", "material-images", "delivery-apps", "delivery-requests",
     "monitoring-requests", "camera-assignment", "feedback", "documents", "financial",
     "ml", "security", "staff", "activity-log", "scanning", "qr-codes", "communications",
-    "builder-moderation", "delivery-analytics", "settings", "careers", "user-roles",
+    "builder-moderation", "delivery-analytics", "delivery-pay", "settings", "careers", "user-roles",
     "messaging", "analytics", "reviews", "sms-test", "tracking", "voice-calls"
   ] as const;
   const [activeTab, setActiveTab] = useUrlTabSync([...ADMIN_TABS], "overview");
@@ -4719,6 +4720,11 @@ const AdminDashboard = () => {
               </CardHeader>
             </Card>
             <DeliveryAnalytics />
+          </TabsContent>
+
+          {/* DeliveryPay Tab */}
+          <TabsContent value="delivery-pay" className="space-y-6">
+            <DeliveryPayAdminTab />
           </TabsContent>
 
           {/* Settings Tab */}

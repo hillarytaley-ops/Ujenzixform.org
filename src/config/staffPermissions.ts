@@ -56,6 +56,7 @@ export const ALL_ADMIN_TABS = [
   'scanning',
   'communications',
   'delivery-analytics',
+  'delivery-pay',
   'settings'
 ] as const;
 
@@ -118,6 +119,7 @@ export const STAFF_ROLES: Record<string, StaffRole> = {
       'delivery-apps',
       'delivery-requests',
       'delivery-analytics',
+      'delivery-pay',
       'scanning'
     ],
     canManageStaff: false,
@@ -152,6 +154,7 @@ export const STAFF_ROLES: Record<string, StaffRole> = {
     allowedTabs: [
       'overview',
       'financial',
+      'delivery-pay',
       'delivery-analytics',
       'activity-log'
     ],
@@ -343,6 +346,12 @@ export const TAB_METADATA: Record<AdminTab, { name: string; icon: string; descri
     icon: 'BarChart',
     description: 'Delivery performance metrics',
     category: 'Analytics'
+  },
+  'delivery-pay': {
+    name: 'DeliveryPay',
+    icon: 'DollarSign',
+    description: 'Mileage and pay for delivery providers',
+    category: 'Finance'
   },
   'settings': {
     name: 'Settings',

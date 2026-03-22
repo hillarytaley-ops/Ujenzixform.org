@@ -134,6 +134,7 @@ export const GroupedTabNav: React.FC<GroupedTabNavProps> = ({
         { value: 'tracking', label: 'Tracking Numbers', icon: Navigation },
         { value: 'gps', label: 'GPS Tracking', icon: MapPin },
         { value: 'delivery-analytics', label: 'Delivery Analytics', icon: TrendingUp },
+        { value: 'delivery-pay', label: 'DeliveryPay', icon: DollarSign },
       ],
     },
     {

@@ -106,12 +106,13 @@ function notifyNewDeliveryRequest() {
 import { useToast } from "@/hooks/use-toast";
 import { useDeliveryProviderData, logDataAccessAttempt } from "@/hooks/useDataIsolation";
 import { useDeliveriesUnified, type UnifiedDeliveryRow } from "@/hooks/useDeliveriesUnified";
-import { MessageSquare, User, QrCode, Scan, RefreshCw, Link2 } from "lucide-react";
+import { MessageSquare, User, QrCode, Scan, RefreshCw, Link2, DollarSign } from "lucide-react";
 import { InAppCommunication } from "@/components/communication/InAppCommunication";
 import { ProfileEditDialog } from "@/components/profile/ProfileEditDialog";
 import { ProfileViewDialog } from "@/components/profile/ProfileViewDialog";
 import { ReceivingScanner } from "@/components/qr/ReceivingScanner";
 import { ArrivalScanReminder } from "@/components/delivery/ArrivalScanReminder";
+import { DeliveryPayTab } from "@/components/delivery/DeliveryPayTab";
 
 interface DashboardStats {
   totalDeliveries: number;
@@ -207,7 +208,7 @@ const DeliveryDashboard = () => {
   const [isOnline, setIsOnline] = useState(true);
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [showProofCapture, setShowProofCapture] = useState<string | null>(null);
-  const DELIVERY_TABS = ["deliveries", "history", "map", "scanning", "analytics", "notifications", "support"];
+  const DELIVERY_TABS = ["deliveries", "history", "map", "scanning", "pay", "analytics", "notifications", "support"];
   const [activeTab, setActiveTab] = useUrlTabSync(DELIVERY_TABS, "deliveries");
   const [deliveriesSubTab, setDeliveriesSubTab] = useState("scheduled"); // Sub-tab for Deliveries (scheduled only now)
   const [selectedScheduledOrderId, setSelectedScheduledOrderId] = useState<string>(""); // Selected order from dropdown
@@ -2629,6 +2630,20 @@ const DeliveryDashboard = () => {
           <Button 
             variant="ghost"
             className={`h-auto py-3 px-2 flex flex-col items-center gap-1 transition-all ${
+              activeTab === 'pay' 
+                ? 'bg-gradient-to-r from-teal-500 to-cyan-500 text-white shadow-lg ring-2 ring-teal-300' 
+                : isDarkMode 
+                  ? 'bg-gray-800 text-gray-300 hover:bg-gray-700 border border-gray-700' 
+                  : 'bg-white text-gray-700 hover:bg-teal-50 border border-gray-200 shadow-sm'
+            }`}
+            onClick={() => setActiveTab('pay')}
+          >
+            <DollarSign className="h-5 w-5" />
+            <span className="text-xs font-medium">Pay</span>
+          </Button>
+          <Button 
+            variant="ghost"
+            className={`h-auto py-3 px-2 flex flex-col items-center gap-1 transition-all ${
               activeTab === 'analytics' 
                 ? 'bg-gradient-to-r from-teal-500 to-cyan-500 text-white shadow-lg ring-2 ring-teal-300' 
                 : isDarkMode 
@@ -3250,6 +3265,11 @@ const DeliveryDashboard = () => {
                 </CardContent>
               </Card>
             </div>
+          </TabsContent>
+
+          {/* Pay Tab - Mileage & Pay */}
+          <TabsContent value="pay">
+            <DeliveryPayTab isDarkMode={isDarkMode} />
           </TabsContent>
 
           {/* Support Tab */}

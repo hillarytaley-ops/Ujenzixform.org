@@ -1,6 +1,6 @@
 -- ============================================================
 -- COPY ALL BELOW AND RUN IN SUPABASE SQL EDITOR
--- Run in order: 20260435 → 20260436 → 20260437 → 20260438 → 20260439 → 20260440
+-- Run in order: 20260435 → 20260436 → 20260437 → 20260438 → 20260439 → 20260440 → 20260441
 -- ============================================================
 
 -- ===================== 20260435 =====================
@@ -920,3 +920,66 @@ AS $$
 $$;
 
 GRANT EXECUTE ON FUNCTION public.get_supplier_material_items_for_current_user(integer) TO authenticated;
+
+-- ===================== 20260441 =====================
+-- Delivery Mileage & Pay: config, distance_km, RPCs
+-- ============================================================
+
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'delivery_requests' AND column_name = 'distance_km') THEN
+    ALTER TABLE delivery_requests ADD COLUMN distance_km DECIMAL(10,2);
+  END IF;
+END $$;
+
+CREATE TABLE IF NOT EXISTS public.delivery_mileage_config (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  rate_per_km DECIMAL(10,2) NOT NULL DEFAULT 50.00,
+  currency TEXT NOT NULL DEFAULT 'KES',
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_by UUID REFERENCES auth.users(id)
+);
+INSERT INTO public.delivery_mileage_config (rate_per_km, currency)
+SELECT 50.00, 'KES' WHERE NOT EXISTS (SELECT 1 FROM public.delivery_mileage_config LIMIT 1);
+ALTER TABLE public.delivery_mileage_config ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Admins manage mileage config" ON public.delivery_mileage_config;
+DROP POLICY IF EXISTS "Authenticated read mileage config" ON public.delivery_mileage_config;
+CREATE POLICY "Admins manage mileage config" ON public.delivery_mileage_config FOR ALL
+  USING (EXISTS (SELECT 1 FROM user_roles WHERE user_id = auth.uid() AND role IN ('admin','super_admin','logistics_officer','finance_officer')));
+CREATE POLICY "Authenticated read mileage config" ON public.delivery_mileage_config FOR SELECT USING (auth.uid() IS NOT NULL);
+GRANT SELECT ON public.delivery_mileage_config TO authenticated;
+GRANT INSERT, UPDATE ON public.delivery_mileage_config TO authenticated;
+
+CREATE OR REPLACE FUNCTION public.haversine_km(lat1 DECIMAL, lon1 DECIMAL, lat2 DECIMAL, lon2 DECIMAL)
+RETURNS DECIMAL LANGUAGE sql IMMUTABLE AS $$
+  SELECT ROUND((6371 * acos(LEAST(1, GREATEST(-1, cos(radians(lat1))*cos(radians(lat2))*cos(radians(lon2)-radians(lon1))+sin(radians(lat1))*sin(radians(lat2))))))::numeric, 2);
+$$;
+
+UPDATE delivery_requests dr SET distance_km = public.haversine_km(dr.pickup_latitude::decimal, dr.pickup_longitude::decimal, dr.delivery_latitude::decimal, dr.delivery_longitude::decimal)
+WHERE dr.distance_km IS NULL AND dr.pickup_latitude IS NOT NULL AND dr.pickup_longitude IS NOT NULL AND dr.delivery_latitude IS NOT NULL AND dr.delivery_longitude IS NOT NULL;
+
+CREATE OR REPLACE FUNCTION public.get_provider_mileage_pay(_provider_user_id UUID DEFAULT auth.uid())
+RETURNS TABLE(delivery_request_id UUID, purchase_order_id UUID, order_number TEXT, one_way_km DECIMAL, round_trip_km DECIMAL, rate_per_km DECIMAL, amount DECIMAL, delivered_at TIMESTAMPTZ, status TEXT)
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
+  WITH cfg AS (SELECT COALESCE((SELECT rate_per_km FROM delivery_mileage_config ORDER BY updated_at DESC LIMIT 1), 50.00) AS r),
+  provider_ids AS (SELECT dp.id FROM delivery_providers dp WHERE dp.user_id = _provider_user_id OR EXISTS (SELECT 1 FROM profiles p WHERE p.id = dp.user_id AND p.user_id = _provider_user_id)),
+  rows AS (SELECT dr.id, dr.purchase_order_id, COALESCE(po.po_number, dr.order_number, 'N/A'), COALESCE(dr.distance_km,0), COALESCE(dr.distance_km,0)*2, (SELECT r FROM cfg), ROUND((COALESCE(dr.distance_km,0)*2*(SELECT r FROM cfg))::numeric,2), dr.delivered_at, dr.status
+    FROM delivery_requests dr LEFT JOIN purchase_orders po ON po.id = dr.purchase_order_id
+    WHERE (dr.provider_id = ANY(SELECT id FROM provider_ids) OR dr.provider_id = _provider_user_id) AND dr.status IN ('delivered','completed'))
+  SELECT * FROM rows ORDER BY delivered_at DESC NULLS LAST, delivery_request_id;
+$$;
+GRANT EXECUTE ON FUNCTION public.get_provider_mileage_pay(uuid) TO authenticated;
+
+CREATE OR REPLACE FUNCTION public.admin_get_all_providers_mileage_pay()
+RETURNS TABLE(provider_id UUID, provider_name TEXT, total_round_trip_km DECIMAL, rate_per_km DECIMAL, total_amount DECIMAL, delivery_count BIGINT)
+LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = public AS $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM user_roles WHERE user_id = auth.uid() AND role IN ('admin','super_admin','logistics_officer','finance_officer')) THEN RETURN; END IF;
+  RETURN QUERY
+  WITH cfg AS (SELECT COALESCE((SELECT rate_per_km FROM delivery_mileage_config ORDER BY updated_at DESC LIMIT 1), 50.00) AS r),
+  dr_provider AS (SELECT dr.id, COALESCE(dr.provider_id, po.delivery_provider_id) AS pid, COALESCE(dr.distance_km,0)*2 AS rt_km FROM delivery_requests dr LEFT JOIN purchase_orders po ON po.id = dr.purchase_order_id WHERE dr.status IN ('delivered','completed') AND (dr.provider_id IS NOT NULL OR po.delivery_provider_id IS NOT NULL)),
+  agg AS (SELECT pid, SUM(rt_km) AS total_rt, COUNT(*) AS cnt FROM dr_provider GROUP BY pid)
+  SELECT agg.pid, COALESCE(NULLIF(TRIM(dp.provider_name),''), NULLIF(TRIM(p.full_name),''), 'Provider '||LEFT(agg.pid::text,8)), ROUND(agg.total_rt::numeric,2), (SELECT r FROM cfg), ROUND((agg.total_rt*(SELECT r FROM cfg))::numeric,2), agg.cnt
+  FROM agg LEFT JOIN delivery_providers dp ON dp.id = agg.pid OR dp.user_id = agg.pid LEFT JOIN profiles p ON p.user_id = dp.user_id OR p.id = dp.user_id ORDER BY total_amount DESC NULLS LAST;
+END;
+$$;
+GRANT EXECUTE ON FUNCTION public.admin_get_all_providers_mileage_pay() TO authenticated;
