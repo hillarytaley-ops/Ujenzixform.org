@@ -2930,23 +2930,25 @@ const QRCodeFullDialog: React.FC<{
   const canvasRef = useRef<HTMLCanvasElement>(null);
   
   useEffect(() => {
-    if (canvasRef.current && item?.qr_code && isOpen) {
-      QRCodeLib.toCanvas(canvasRef.current, item.qr_code, {
+    if (!canvasRef.current || !item?.qr_code || !isOpen) return;
+    const canvas = canvasRef.current;
+    const qrCode = item.qr_code;
+    const drawQR = () => {
+      QRCodeLib.toCanvas(canvas, qrCode, {
         width: 400,
         margin: 4,
         errorCorrectionLevel: 'H',
-        color: {
-          dark: '#000000',
-          light: '#ffffff'
-        }
+        color: { dark: '#000000', light: '#ffffff' }
       }).catch(err => console.error('QR Code generation error:', err));
-    }
+    };
+    const id = setTimeout(drawQR, 80);
+    return () => clearTimeout(id);
   }, [item?.qr_code, isOpen]);
 
   if (!item) return null;
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
+    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="max-w-2xl w-[95vw] max-h-[95vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-2xl">
@@ -2979,9 +2981,9 @@ const QRCodeFullDialog: React.FC<{
             </div>
           )}
 
-          {/* MASSIVE QR Code */}
+          {/* MASSIVE QR Code - explicit width/height ensures canvas has size before draw */}
           <div className="p-6 bg-white rounded-2xl shadow-2xl border-4 border-cyan-300">
-            <canvas ref={canvasRef} className="rounded-lg" />
+            <canvas ref={canvasRef} width={400} height={400} className="rounded-lg" />
           </div>
           
           {/* Scan Status */}
