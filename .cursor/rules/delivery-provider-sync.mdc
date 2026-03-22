@@ -1,0 +1,44 @@
+---
+description: Delivery provider name/phone sync for supplier and builder dashboards
+globs: 
+  - "**/Delivery*.tsx"
+  - "**/Deliverer*.tsx"
+  - "**/ProfileEdit*.tsx"
+  - "**/DeliveryProviderSync*.ts"
+---
+
+# Delivery Provider Details Sync
+
+## Rule
+
+**All flows that create or update delivery provider data MUST use `syncDeliveryProviderDetails` from `@/services/DeliveryProviderSyncService`.**
+
+This ensures:
+1. `delivery_providers` has `provider_name` and `phone`
+2. `profiles` has `full_name` and `phone`
+3. Supplier and builder dashboards show the correct provider details instead of "Assigned driver" / dash
+
+## Where to Use
+
+- **Registration flows**: DeliveryProviderApplication, DeliveryRegistration, DelivererApplication
+- **Profile edits**: ProfileEditDialog when `userRole === 'delivery'` or `'delivery_provider'`
+- **Admin approval**: `admin_update_delivery_provider_status` RPC (database-side, already syncs)
+
+## Example
+
+```ts
+const { syncDeliveryProviderDetails } = await import('@/services/DeliveryProviderSyncService');
+await syncDeliveryProviderDetails({
+  userId: user.id,
+  providerName: formData.fullName.trim(),
+  phone: formData.phone.trim(),
+  email: formData.email?.trim(),
+  providerType: 'individual',
+  isVerified: false,
+});
+```
+
+## Do NOT
+
+- Manually insert/update `delivery_providers` without also syncing `profiles`
+- Skip the sync service when adding new registration or profile edit flows

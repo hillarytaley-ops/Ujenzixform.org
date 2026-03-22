@@ -795,29 +795,17 @@ export const ProfileEditDialog: React.FC<ProfileEditDialogProps> = ({
         });
       }
 
-      // Update delivery provider record if applicable (non-blocking)
+      // Sync delivery provider record if applicable (profiles + delivery_providers)
       if (userRole === 'delivery' || userRole === 'delivery_provider') {
-        // Fire and forget - don't block profile save
-        fetch(
-          `${SUPABASE_URL}/rest/v1/delivery_providers?user_id=eq.${profile.user_id}`,
-          {
-            method: 'PATCH',
-            headers: {
-              'Content-Type': 'application/json',
-              'apikey': SUPABASE_ANON_KEY,
-              'Authorization': `Bearer ${accessToken}`,
-              'Prefer': 'return=minimal'
-            },
-            body: JSON.stringify({
-              provider_name: profile.full_name?.trim() || null,
-              phone: profile.phone?.trim() || null,
-              email: profile.email?.trim() || null,
-              location: profile.location || null,
-              updated_at: new Date().toISOString()
-            })
-          }
-        ).then(r => r.ok && console.log('✅ Delivery provider record updated'))
-         .catch(() => console.log('📝 Delivery provider update skipped'));
+        import('@/services/DeliveryProviderSyncService').then(({ syncDeliveryProviderDetails }) =>
+          syncDeliveryProviderDetails({
+            userId: profile.user_id,
+            providerName: profile.full_name?.trim() || 'Delivery Provider',
+            phone: profile.phone?.trim() || '0000000000',
+            email: profile.email?.trim(),
+          })
+        ).then(r => r.success && console.log('✅ Delivery provider record synced'))
+         .catch(() => console.log('📝 Delivery provider sync skipped'));
       }
 
       // Update builder record if applicable (non-blocking)

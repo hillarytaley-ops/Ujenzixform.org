@@ -197,47 +197,50 @@ const DelivererApplication = () => {
       // Upload all documents
       const documentPaths = await uploadAllDocuments(profile.id);
 
-      // delivery_providers.user_id must be auth.users.id (FK), not profiles.id — required for RPCs / dashboards
-      const { error } = await supabase
+      // Sync delivery_providers + profiles so supplier/builder dashboards show name/phone
+      const { syncDeliveryProviderDetails } = await import('@/services/DeliveryProviderSyncService');
+      const { success, error: syncErr } = await syncDeliveryProviderDetails({
+        userId: user.id,
+        providerName: formData.providerName.trim(),
+        phone: formData.phone.trim(),
+        email: formData.email?.trim(),
+        address: formData.address,
+        providerType: formData.providerType,
+        vehicleTypes: formData.vehicleTypes,
+        serviceAreas: formData.serviceAreas,
+        contactPerson: formData.contactPerson,
+        drivingLicenseNumber: formData.drivingLicenseNumber,
+        isVerified: false,
+      });
+      if (!success) throw new Error(syncErr);
+
+      // Insert extra fields not in sync service (documents, rates)
+      const { data: dpRow } = await supabase
         .from('delivery_providers')
-        .insert({
-          user_id: user.id,
-          provider_name: formData.providerName.trim(),
-          provider_type: formData.providerType,
-          phone: formData.phone.trim(),
-          email: formData.email?.trim() || null,
-          address: formData.address,
-          contact_person: formData.contactPerson,
-          vehicle_types: formData.vehicleTypes,
-          service_areas: formData.serviceAreas,
-          capacity_kg: formData.capacityKg ? parseFloat(formData.capacityKg) : null,
-          hourly_rate: formData.hourlyRate ? parseFloat(formData.hourlyRate) : null,
-          per_km_rate: formData.perKmRate ? parseFloat(formData.perKmRate) : null,
-          driving_license_number: formData.drivingLicenseNumber,
-          driving_license_class: formData.drivingLicenseClass,
-          driving_license_expiry: formData.drivingLicenseExpiry || null,
-          driving_license_document_path: documentPaths.drivingLicense_document_path || null,
-          cv_document_path: documentPaths.cv_document_path || null,
-          national_id_document_path: documentPaths.nationalId_document_path || null,
-          good_conduct_document_path: documentPaths.goodConduct_document_path || null,
-          driving_license_verified: false,
-          cv_verified: false,
-          national_id_verified: false,
-          good_conduct_verified: false,
-          is_verified: false,
-          is_active: true
-        });
-
-      if (error) throw error;
-
-      await supabase
-        .from('profiles')
-        .update({
-          full_name: formData.providerName.trim(),
-          phone: formData.phone.trim(),
-          updated_at: new Date().toISOString(),
-        })
-        .eq('user_id', user.id);
+        .select('id')
+        .eq('user_id', user.id)
+        .single();
+      if (dpRow) {
+        await supabase
+          .from('delivery_providers')
+          .update({
+            capacity_kg: formData.capacityKg ? parseFloat(formData.capacityKg) : null,
+            hourly_rate: formData.hourlyRate ? parseFloat(formData.hourlyRate) : null,
+            per_km_rate: formData.perKmRate ? parseFloat(formData.perKmRate) : null,
+            driving_license_class: formData.drivingLicenseClass,
+            driving_license_expiry: formData.drivingLicenseExpiry || null,
+            driving_license_document_path: documentPaths.drivingLicense_document_path || null,
+            cv_document_path: documentPaths.cv_document_path || null,
+            national_id_document_path: documentPaths.nationalId_document_path || null,
+            good_conduct_document_path: documentPaths.goodConduct_document_path || null,
+            driving_license_verified: false,
+            cv_verified: false,
+            national_id_verified: false,
+            good_conduct_verified: false,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('user_id', user.id);
+      }
 
       toast({
         title: "Application Submitted",
