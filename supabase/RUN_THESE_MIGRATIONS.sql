@@ -944,7 +944,7 @@ ALTER TABLE public.delivery_mileage_config ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Admins manage mileage config" ON public.delivery_mileage_config;
 DROP POLICY IF EXISTS "Authenticated read mileage config" ON public.delivery_mileage_config;
 CREATE POLICY "Admins manage mileage config" ON public.delivery_mileage_config FOR ALL
-  USING (EXISTS (SELECT 1 FROM user_roles WHERE user_id = auth.uid() AND role IN ('admin','super_admin','logistics_officer','finance_officer')));
+  USING (EXISTS (SELECT 1 FROM user_roles WHERE user_id = auth.uid() AND role::text IN ('admin','super_admin','logistics_officer','finance_officer')));
 CREATE POLICY "Authenticated read mileage config" ON public.delivery_mileage_config FOR SELECT USING (auth.uid() IS NOT NULL);
 GRANT SELECT ON public.delivery_mileage_config TO authenticated;
 GRANT INSERT, UPDATE ON public.delivery_mileage_config TO authenticated;
@@ -973,7 +973,7 @@ CREATE OR REPLACE FUNCTION public.admin_get_all_providers_mileage_pay()
 RETURNS TABLE(provider_id UUID, provider_name TEXT, total_round_trip_km DECIMAL, rate_per_km DECIMAL, total_amount DECIMAL, delivery_count BIGINT)
 LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = public AS $$
 BEGIN
-  IF NOT EXISTS (SELECT 1 FROM user_roles WHERE user_id = auth.uid() AND role IN ('admin','super_admin','logistics_officer','finance_officer')) THEN RETURN; END IF;
+  IF NOT EXISTS (SELECT 1 FROM user_roles WHERE user_id = auth.uid() AND role::text IN ('admin','super_admin','logistics_officer','finance_officer')) THEN RETURN; END IF;
   RETURN QUERY
   WITH cfg AS (SELECT COALESCE((SELECT rate_per_km FROM delivery_mileage_config ORDER BY updated_at DESC LIMIT 1), 50.00) AS r),
   dr_provider AS (SELECT dr.id, COALESCE(dr.provider_id, po.delivery_provider_id) AS pid, COALESCE(dr.distance_km,0)*2 AS rt_km FROM delivery_requests dr LEFT JOIN purchase_orders po ON po.id = dr.purchase_order_id WHERE dr.status IN ('delivered','completed') AND (dr.provider_id IS NOT NULL OR po.delivery_provider_id IS NOT NULL)),

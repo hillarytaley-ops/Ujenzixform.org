@@ -36,9 +36,10 @@ DROP POLICY IF EXISTS "Admins manage mileage config" ON public.delivery_mileage_
 DROP POLICY IF EXISTS "Authenticated read mileage config" ON public.delivery_mileage_config;
 
 -- Admins can manage
+-- role::text avoids coercing string literals to app_role (enum may not list super_admin, etc.)
 CREATE POLICY "Admins manage mileage config"
   ON public.delivery_mileage_config FOR ALL
-  USING (EXISTS (SELECT 1 FROM user_roles WHERE user_id = auth.uid() AND role IN ('admin', 'super_admin', 'logistics_officer', 'finance_officer')));
+  USING (EXISTS (SELECT 1 FROM user_roles WHERE user_id = auth.uid() AND role::text IN ('admin', 'super_admin', 'logistics_officer', 'finance_officer')));
 
 -- Anyone authenticated can read (for pay display)
 CREATE POLICY "Authenticated read mileage config"
@@ -136,7 +137,7 @@ BEGIN
   IF NOT EXISTS (
     SELECT 1 FROM user_roles
     WHERE user_id = auth.uid()
-      AND role IN ('admin', 'super_admin', 'logistics_officer', 'finance_officer')
+      AND role::text IN ('admin', 'super_admin', 'logistics_officer', 'finance_officer')
   ) THEN
     RETURN;
   END IF;

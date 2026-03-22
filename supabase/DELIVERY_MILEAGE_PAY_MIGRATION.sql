@@ -36,9 +36,10 @@ ALTER TABLE public.delivery_mileage_config ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Admins manage mileage config" ON public.delivery_mileage_config;
 DROP POLICY IF EXISTS "Authenticated read mileage config" ON public.delivery_mileage_config;
 
+-- Use role::text so literals are not coerced to app_role (avoids error if enum lacks super_admin, etc.)
 CREATE POLICY "Admins manage mileage config"
   ON public.delivery_mileage_config FOR ALL
-  USING (EXISTS (SELECT 1 FROM user_roles WHERE user_id = auth.uid() AND role IN ('admin', 'super_admin', 'logistics_officer', 'finance_officer')));
+  USING (EXISTS (SELECT 1 FROM user_roles WHERE user_id = auth.uid() AND role::text IN ('admin', 'super_admin', 'logistics_officer', 'finance_officer')));
 
 CREATE POLICY "Authenticated read mileage config"
   ON public.delivery_mileage_config FOR SELECT
@@ -135,7 +136,7 @@ BEGIN
   IF NOT EXISTS (
     SELECT 1 FROM user_roles
     WHERE user_id = auth.uid()
-      AND role IN ('admin', 'super_admin', 'logistics_officer', 'finance_officer')
+      AND role::text IN ('admin', 'super_admin', 'logistics_officer', 'finance_officer')
   ) THEN
     RETURN;
   END IF;
