@@ -90,7 +90,7 @@ export const DeliveryPayAdminTab: React.FC = () => {
 
   const grandTotalKm = rows.reduce((s, r) => s + Number(r.total_round_trip_km || 0), 0);
   const grandTotalAmount = rows.reduce((s, r) => s + Number(r.total_amount || 0), 0);
-  const currentRate = rows[0]?.rate_per_km ?? parseFloat(ratePerKm) || 50;
+  const currentRate = rows[0]?.rate_per_km ?? (parseFloat(ratePerKm) || 50);
 
   if (loading) {
     return (
