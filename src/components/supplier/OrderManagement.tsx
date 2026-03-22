@@ -754,10 +754,14 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, in
       try {
         if (orderIds.length > 0) {
           try {
-            const { data: dispRows, error: dispErr } = await supabase.rpc(
-              'get_delivery_provider_display_for_supplier_orders',
-              { p_po_ids: orderIds }
-            );
+            // Same timeout as BuilderOrdersTracker; avoids hanging when RPC is slow
+            const rpcMs = 6000;
+            const { data: dispRows, error: dispErr } = await Promise.race([
+              supabase.rpc('get_delivery_provider_display_for_supplier_orders', { p_po_ids: orderIds }),
+              new Promise<{ data: null; error: { message: string } }>((resolve) =>
+                setTimeout(() => resolve({ data: null, error: { message: `timeout after ${rpcMs}ms` } }), rpcMs)
+              ),
+            ]);
             if (dispErr) {
               console.warn('OrderManagement: get_delivery_provider_display_for_supplier_orders:', dispErr.message);
             }
