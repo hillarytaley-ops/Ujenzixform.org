@@ -14,7 +14,7 @@
  * ╚══════════════════════════════════════════════════════════════════════════════════════╝
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -59,6 +59,8 @@ interface InventoryItem {
   selling_price: number; // Selling price to customers
   last_restocked: string;
   status: 'in_stock' | 'low_stock' | 'out_of_stock';
+  /** supplier_id on supplier_product_prices row (for stock_movements / RLS) */
+  row_supplier_id: string;
 }
 
 interface StockMovement {
@@ -83,10 +85,24 @@ interface InventoryStats {
 }
 
 interface InventoryManagerProps {
-  supplierId: string;
+  /** Same ID set as dashboard product count (auth uid, suppliers.id, profile id, etc.) */
+  supplierScopeIds: string[];
 }
 
-export const InventoryManager: React.FC<InventoryManagerProps> = ({ supplierId }) => {
+function uniqueScopeIds(ids: string[]): string[] {
+  return [...new Set(ids.filter(Boolean))];
+}
+
+function supplierPricesFilterParam(scopeIds: string[]): string {
+  const u = uniqueScopeIds(scopeIds);
+  if (u.length === 0) return '';
+  if (u.length === 1) return `supplier_id=eq.${u[0]}`;
+  return `supplier_id=in.(${u.join(',')})`;
+}
+
+export const InventoryManager: React.FC<InventoryManagerProps> = ({ supplierScopeIds }) => {
+  const scopeIds = useMemo(() => uniqueScopeIds(supplierScopeIds), [supplierScopeIds]);
+  const scopeKey = scopeIds.join('|');
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
   const [stockMovements, setStockMovements] = useState<StockMovement[]>([]);
   const [stats, setStats] = useState<InventoryStats>({
@@ -139,6 +155,13 @@ export const InventoryManager: React.FC<InventoryManagerProps> = ({ supplierId }
   };
 
   useEffect(() => {
+    if (scopeIds.length === 0) {
+      setInventory([]);
+      calculateStats([]);
+      setLoading(false);
+      return;
+    }
+
     loadInventory();
     loadStockMovements();
     
@@ -148,37 +171,52 @@ export const InventoryManager: React.FC<InventoryManagerProps> = ({ supplierId }
       console.log('⏱️ Inventory safety timeout - forcing loading false');
     }, 10000);
     
-    // Set up real-time subscription
-    const channel = supabase
-      .channel('inventory-changes')
-      .on('postgres_changes', 
-        { event: '*', schema: 'public', table: 'supplier_product_prices', filter: `supplier_id=eq.${supplierId}` },
+    const channel = supabase.channel(`inventory-changes-${scopeKey.slice(0, 80)}`);
+    scopeIds.forEach((sid) => {
+      channel.on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'supplier_product_prices',
+          filter: `supplier_id=eq.${sid}`,
+        },
         () => {
           console.log('📦 Real-time inventory update received');
           loadInventory();
         }
-      )
-      .subscribe();
+      );
+    });
+    channel.subscribe();
     
     return () => {
       clearTimeout(safetyTimeout);
       supabase.removeChannel(channel);
     };
-  }, [supplierId]);
+  }, [scopeKey]);
 
   const loadInventory = async () => {
+    if (scopeIds.length === 0) {
+      setInventory([]);
+      calculateStats([]);
+      setLoading(false);
+      return;
+    }
+
+    const filterQ = supplierPricesFilterParam(scopeIds);
+
     try {
       setLoading(true);
-      console.log('📦 Loading inventory for supplier:', supplierId);
+      console.log('📦 Loading inventory for supplier scope:', scopeIds);
       
       const { SUPABASE_URL, SUPABASE_ANON_KEY, accessToken } = getSupabaseConfig();
       
-      // Use REST API for faster, more reliable fetching
+      // Use REST API — supplier_id=in.(...) matches dashboard product count query
       let products: any[] = [];
       try {
         const response = await withTimeout(
           fetch(
-            `${SUPABASE_URL}/rest/v1/supplier_product_prices?supplier_id=eq.${supplierId}`,
+            `${SUPABASE_URL}/rest/v1/supplier_product_prices?${filterQ}`,
             {
               headers: {
                 'apikey': SUPABASE_ANON_KEY,
@@ -195,12 +233,14 @@ export const InventoryManager: React.FC<InventoryManagerProps> = ({ supplierId }
         }
       } catch (e) {
         console.log('REST API timeout, trying Supabase client...');
-        // Fallback to Supabase client with timeout
         try {
-          const { data, error } = await withTimeout(
-            supabase.from('supplier_product_prices').select('*').eq('supplier_id', supplierId),
-            5000
-          );
+          let q = supabase.from('supplier_product_prices').select('*');
+          if (scopeIds.length === 1) {
+            q = q.eq('supplier_id', scopeIds[0]);
+          } else {
+            q = q.in('supplier_id', scopeIds);
+          }
+          const { data, error } = await withTimeout(q, 5000);
           if (!error && data) products = data;
         } catch (e2) {
           console.log('Supabase client also timed out');
@@ -265,7 +305,8 @@ export const InventoryManager: React.FC<InventoryManagerProps> = ({ supplierId }
           market_price: p.market_price || 0,
           selling_price: p.price || p.selling_price || 0,
           last_restocked: p.last_restocked || p.updated_at || new Date().toISOString(),
-          status
+          status,
+          row_supplier_id: String(p.supplier_id || scopeIds[0] || ''),
         };
       });
       
@@ -285,13 +326,17 @@ export const InventoryManager: React.FC<InventoryManagerProps> = ({ supplierId }
   };
 
   const loadStockMovements = async () => {
+    if (scopeIds.length === 0) return;
     try {
       const { SUPABASE_URL, SUPABASE_ANON_KEY, accessToken } = getSupabaseConfig();
+      const smFilter =
+        scopeIds.length === 1
+          ? `supplier_id=eq.${scopeIds[0]}`
+          : `supplier_id=in.(${scopeIds.join(',')})`;
       
-      // Use REST API for faster fetching
       const response = await withTimeout(
         fetch(
-          `${SUPABASE_URL}/rest/v1/stock_movements?supplier_id=eq.${supplierId}&order=created_at.desc&limit=50`,
+          `${SUPABASE_URL}/rest/v1/stock_movements?${smFilter}&order=created_at.desc&limit=50`,
           {
             headers: {
               'apikey': SUPABASE_ANON_KEY,
@@ -374,7 +419,7 @@ export const InventoryManager: React.FC<InventoryManagerProps> = ({ supplierId }
       // Log stock movement
       try {
         const movementData = {
-          supplier_id: supplierId,
+          supplier_id: selectedItem.row_supplier_id,
           product_id: selectedItem.product_id,
           product_name: selectedItem.product_name,
           movement_type: updateType === 'add' ? 'in' : updateType === 'remove' ? 'out' : 'adjustment',

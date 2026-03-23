@@ -2125,7 +2125,9 @@ const SupplierDashboard = () => {
 
                   {/* View Inventory Sub-Tab */}
                   <TabsContent value="view-inventory">
-                    {user && <InventoryManager supplierId={supplierRecordId || user.id} />}
+                    {user && (
+                      <InventoryManager supplierScopeIds={analyticsSupplierIds.length > 0 ? analyticsSupplierIds : [user.id]} />
+                    )}
                   </TabsContent>
                 </Tabs>
               </CardContent>
