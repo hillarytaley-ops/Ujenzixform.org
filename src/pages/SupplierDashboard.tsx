@@ -2265,6 +2265,7 @@ const SupplierDashboard = () => {
                   userId={user?.id || localStorage.getItem('user_id') || ''}
                   userRole="supplier"
                   userName={supplierProfile?.company_name || supplierProfile?.full_name || user?.email?.split('@')[0] || 'Supplier'}
+                  supplierScopeIds={analyticsSupplierIds}
                 />
               </CardContent>
             </Card>

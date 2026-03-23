@@ -78,12 +78,19 @@ interface TrackingTabProps {
   userId: string;
   userRole: 'admin' | 'professional_builder' | 'private_client' | 'supplier';
   userName?: string;
+  /** Auth uid + supplier row id + profile id — same as dashboard orders (purchase_orders.supplier_id) */
+  supplierScopeIds?: string[];
 }
 
 const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
 
-export const TrackingTab: React.FC<TrackingTabProps> = ({ userId: propUserId, userRole, userName }) => {
+export const TrackingTab: React.FC<TrackingTabProps> = ({
+  userId: propUserId,
+  userRole,
+  userName,
+  supplierScopeIds,
+}) => {
   const [trackingNumbers, setTrackingNumbers] = useState<TrackingNumber[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -105,7 +112,12 @@ export const TrackingTab: React.FC<TrackingTabProps> = ({ userId: propUserId, us
       const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
       if (storedSession) {
         const parsed = JSON.parse(storedSession);
-        return parsed.user?.id || '';
+        return (
+          parsed.user?.id ||
+          parsed.currentSession?.user?.id ||
+          parsed.session?.user?.id ||
+          ''
+        );
       }
     } catch (e) {}
     
@@ -119,7 +131,12 @@ export const TrackingTab: React.FC<TrackingTabProps> = ({ userId: propUserId, us
       const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
       if (storedSession) {
         const parsed = JSON.parse(storedSession);
-        return parsed.access_token || '';
+        return (
+          parsed.access_token ||
+          parsed.currentSession?.access_token ||
+          parsed.session?.access_token ||
+          ''
+        );
       }
     } catch (e) {}
     return '';
@@ -147,7 +164,21 @@ export const TrackingTab: React.FC<TrackingTabProps> = ({ userId: propUserId, us
   const fetchTrackingNumbers = useCallback(async () => {
     setLoading(true);
     try {
-      const accessToken = getAccessToken();
+      let accessToken = getAccessToken();
+      if (!accessToken) {
+        try {
+          const { data: { session } } = await Promise.race([
+            supabase.auth.getSession(),
+            new Promise<{ data: { session: null } }>((resolve) =>
+              setTimeout(() => resolve({ data: { session: null } }), 5000)
+            ),
+          ]);
+          accessToken = session?.access_token || '';
+        } catch {
+          /* ignore */
+        }
+      }
+      const authHeader = `Bearer ${accessToken || SUPABASE_ANON_KEY}`;
       
       console.log('📦 TrackingTab: Starting fetch for userId:', userId, 'role:', userRole);
       
@@ -162,7 +193,7 @@ export const TrackingTab: React.FC<TrackingTabProps> = ({ userId: propUserId, us
             {
               headers: {
                 'apikey': SUPABASE_ANON_KEY,
-                'Authorization': `Bearer ${accessToken || SUPABASE_ANON_KEY}`,
+                'Authorization': authHeader,
               }
             }
           );
@@ -179,29 +210,58 @@ export const TrackingTab: React.FC<TrackingTabProps> = ({ userId: propUserId, us
         }
       }
       
-      // For suppliers, get their supplier record ID
+      // For suppliers, collect every id that might appear on purchase_orders / tracking_numbers
       if (userRole === 'supplier') {
         try {
-          const supplierResponse = await fetch(
-            `${SUPABASE_URL}/rest/v1/suppliers?user_id=eq.${userId}&select=id`,
-            {
-              headers: {
-                'apikey': SUPABASE_ANON_KEY,
-                'Authorization': `Bearer ${accessToken || SUPABASE_ANON_KEY}`,
-              }
+          const addSupplierRow = async (url: string) => {
+            const res = await fetch(url, {
+              headers: { apikey: SUPABASE_ANON_KEY, Authorization: authHeader },
+            });
+            if (!res.ok) return;
+            const rows = await res.json();
+            if (rows?.[0]?.id) {
+              supplierId = rows[0].id;
+              console.log('📦 Got supplier row id:', supplierId);
             }
+          };
+          await addSupplierRow(
+            `${SUPABASE_URL}/rest/v1/suppliers?user_id=eq.${userId}&select=id,user_id`
           );
-          if (supplierResponse.ok) {
-            const suppliers = await supplierResponse.json();
-            if (suppliers && suppliers.length > 0) {
-              supplierId = suppliers[0].id;
-              console.log('📦 Got supplier ID:', supplierId);
+          if (supplierId === userId) {
+            await addSupplierRow(
+              `${SUPABASE_URL}/rest/v1/suppliers?id=eq.${userId}&select=id,user_id`
+            );
+          }
+          const profRes = await fetch(
+            `${SUPABASE_URL}/rest/v1/profiles?user_id=eq.${userId}&select=id`,
+            { headers: { apikey: SUPABASE_ANON_KEY, Authorization: authHeader } }
+          );
+          if (profRes.ok) {
+            const profs = await profRes.json();
+            const pid = profs?.[0]?.id;
+            if (pid && pid !== userId) {
+              const supByProf = await fetch(
+                `${SUPABASE_URL}/rest/v1/suppliers?user_id=eq.${pid}&select=id,user_id`,
+                { headers: { apikey: SUPABASE_ANON_KEY, Authorization: authHeader } }
+              );
+              if (supByProf.ok) {
+                const sr = await supByProf.json();
+                if (sr?.[0]?.id) {
+                  supplierId = sr[0].id;
+                  console.log('📦 Supplier via profile chain:', supplierId);
+                }
+              }
             }
           }
         } catch (e) {
-          console.log('📦 Could not fetch supplier, using userId');
+          console.log('📦 Could not expand supplier ids, using userId');
         }
       }
+
+      const supplierScope =
+        userRole === 'supplier'
+          ? [...new Set([userId, supplierId, ...(supplierScopeIds || [])].filter(Boolean))]
+          : [];
       
       // Build query based on user role
       // Order by updated_at first (most recently updated), then created_at (newest first)
@@ -213,10 +273,9 @@ export const TrackingTab: React.FC<TrackingTabProps> = ({ userId: propUserId, us
       if (userRole === 'admin') {
         // Admin sees all tracking numbers - no filter needed
         console.log('📦 Admin mode: fetching ALL tracking numbers');
-      } else if (userRole === 'supplier') {
-        // Suppliers see tracking numbers for their orders (where they are the supplier)
-        url += `&or=(supplier_id.eq.${userId},supplier_id.eq.${supplierId})`;
-        console.log('📦 Supplier mode: filtering by userId:', userId, 'and supplierId:', supplierId);
+      } else if (userRole === 'supplier' && supplierScope.length > 0) {
+        url += `&supplier_id=in.(${supplierScope.join(',')})`;
+        console.log('📦 Supplier mode: supplier_id in', supplierScope);
       } else {
         // Builders see their own tracking numbers - check both user_id and profile_id
         // Also try without filter to see if there are any tracking numbers we're missing
@@ -229,7 +288,7 @@ export const TrackingTab: React.FC<TrackingTabProps> = ({ userId: propUserId, us
       const response = await fetch(url, {
         headers: {
           'apikey': SUPABASE_ANON_KEY,
-          'Authorization': `Bearer ${accessToken || SUPABASE_ANON_KEY}`,
+          'Authorization': authHeader,
           'Cache-Control': 'no-cache',
           'Pragma': 'no-cache'
         }
@@ -295,16 +354,18 @@ export const TrackingTab: React.FC<TrackingTabProps> = ({ userId: propUserId, us
       
       // For suppliers, also fetch from purchase_orders that have delivery info
       // This provides tracking data even if tracking_numbers table doesn't have entries
-      if (userRole === 'supplier') {
+      if (userRole === 'supplier' && supplierScope.length > 0) {
         try {
-          const ordersUrl = `${SUPABASE_URL}/rest/v1/purchase_orders?or=(supplier_id.eq.${userId},supplier_id.eq.${supplierId})&or=(delivery_required.eq.true,delivery_provider_id.not.is.null)&select=id,po_number,status,buyer_id,delivery_address,delivery_provider_id,delivery_provider_name,delivery_provider_phone,delivery_vehicle_info,delivery_status,delivery_assigned_at,delivery_accepted_at,estimated_delivery_time,created_at,updated_at&order=created_at.desc`;
+          const inList = supplierScope.join(',');
+          // Single and=(...) — two &or= params are invalid (second overwrites first in PostgREST)
+          const ordersUrl = `${SUPABASE_URL}/rest/v1/purchase_orders?and=(supplier_id.in.(${inList}),or(delivery_required.eq.true,delivery_provider_id.not.is.null))&select=id,po_number,status,buyer_id,supplier_id,delivery_address,delivery_provider_id,delivery_provider_name,delivery_provider_phone,delivery_vehicle_info,delivery_status,delivery_assigned_at,delivery_accepted_at,estimated_delivery_time,created_at,updated_at&order=created_at.desc&limit=300`;
           
-          console.log('📦 Fetching supplier orders with delivery...');
+          console.log('📦 Fetching supplier orders with delivery (scoped)...');
           
           const ordersResponse = await fetch(ordersUrl, {
             headers: {
               'apikey': SUPABASE_ANON_KEY,
-              'Authorization': `Bearer ${accessToken || SUPABASE_ANON_KEY}`,
+              'Authorization': authHeader,
             }
           });
           
@@ -320,7 +381,7 @@ export const TrackingTab: React.FC<TrackingTabProps> = ({ userId: propUserId, us
               purchase_order_id: order.id,
               builder_id: order.buyer_id || '',
               delivery_provider_id: order.delivery_provider_id,
-              supplier_id: supplierId,
+              supplier_id: order.supplier_id || supplierId,
               status: mapDeliveryStatusToTrackingStatus(order.delivery_status || order.status),
               current_latitude: null,
               current_longitude: null,
@@ -401,7 +462,7 @@ export const TrackingTab: React.FC<TrackingTabProps> = ({ userId: propUserId, us
     } finally {
       setLoading(false);
     }
-  }, [userId, userRole, propUserId, getAccessToken]);
+  }, [userId, userRole, propUserId, getAccessToken, supplierScopeIds?.join(',')]);
 
   useEffect(() => {
     if (userId) {
