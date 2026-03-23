@@ -2163,23 +2163,8 @@ const SupplierDashboard = () => {
                   <QrCode className="h-5 w-5 text-cyan-500" />
                   QR Code Management
                 </CardTitle>
-                <CardDescription className={mutedText}>
-                  View and download QR codes for confirmed orders. Attach these to materials before dispatch.
-                </CardDescription>
               </CardHeader>
               <CardContent>
-                <Alert className="mb-4 bg-cyan-50 border-cyan-200">
-                  <QrCode className="h-4 w-4 text-cyan-600" />
-                  <AlertTitle className="text-cyan-800">How QR Codes Work</AlertTitle>
-                  <AlertDescription className="text-cyan-700 text-sm">
-                    <ul className="list-disc ml-4 mt-2 space-y-1">
-                      <li>QR codes are <strong>automatically generated</strong> when a professional builder accepts your quote</li>
-                      <li>Download and print QR codes to attach to each material item</li>
-                      <li>Delivery providers and builders scan these codes to verify materials</li>
-                      <li>Track the full journey: Dispatch → In Transit → Delivered</li>
-                    </ul>
-                  </AlertDescription>
-                </Alert>
                 <EnhancedQRCodeManager supplierId={supplierRecordId || undefined} />
               </CardContent>
             </Card>
