@@ -17,31 +17,55 @@ interface MileageRow {
   status: string | null;
 }
 
+function resolveDeliveryProviderUserId(authUserId?: string | null): string | null {
+  if (authUserId) return authUserId;
+  try {
+    const raw = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+    if (raw) {
+      const p = JSON.parse(raw);
+      const id = p.user?.id || p.currentSession?.user?.id || p.session?.user?.id;
+      if (id) return id;
+    }
+  } catch {
+    /* ignore */
+  }
+  const fallback = localStorage.getItem('user_id');
+  return fallback && fallback.length > 0 ? fallback : null;
+}
+
 export const DeliveryPayTab: React.FC<{ isDarkMode?: boolean }> = ({ isDarkMode }) => {
   const { user } = useAuth();
   const [rows, setRows] = useState<MileageRow[]>([]);
-  const [loading, setLoading] = useState(true);
+  /** false until a real fetch starts — avoids infinite spinner when user?.id is briefly null */
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [migrationNeeded, setMigrationNeeded] = useState(false);
 
   const fetchData = async () => {
-    if (!user?.id) return;
+    const providerUserId = resolveDeliveryProviderUserId(user?.id);
+    if (!providerUserId) {
+      setRows([]);
+      setError(null);
+      setMigrationNeeded(false);
+      setLoading(false);
+      return;
+    }
+
     setLoading(true);
     setError(null);
     const timeoutMs = 12000;
-    const timeoutPromise = new Promise<never>((_, reject) =>
-      setTimeout(() => reject(new Error('Request timed out')), timeoutMs)
-    );
     try {
-      const fetchPromise = (async () => {
-        const { data, error: err } = await supabase.rpc('get_provider_mileage_pay', {
-          _provider_user_id: user.id,
-        });
-        if (err) throw err;
-        setRows((data as MileageRow[]) || []);
-        setMigrationNeeded(false);
-      })();
-      await Promise.race([fetchPromise, timeoutPromise]);
+      const { data, error: err } = await Promise.race([
+        supabase.rpc('get_provider_mileage_pay', {
+          _provider_user_id: providerUserId,
+        }),
+        new Promise<{ data: null; error: { message: string } }>((_, reject) =>
+          setTimeout(() => reject(new Error('Request timed out')), timeoutMs)
+        ),
+      ]);
+      if (err) throw err;
+      setRows((data as MileageRow[]) || []);
+      setMigrationNeeded(false);
     } catch (e: unknown) {
       const msg = (e as { message?: string })?.message ?? String(e);
       if (/relation.*does not exist|function.*does not exist|timed out|timeout/i.test(msg)) {
