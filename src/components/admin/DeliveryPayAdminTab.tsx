@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { DollarSign, Route, RefreshCw, Settings, AlertCircle } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase, SUPABASE_URL, SUPABASE_ANON_KEY } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
 interface ProviderMileageRow {
@@ -28,6 +28,57 @@ function isMissingMigrationError(err: { message?: string; code?: string; details
   return false;
 }
 
+function accessTokenFromStorage(): string | null {
+  try {
+    const raw = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+    if (!raw) return null;
+    const p = JSON.parse(raw) as Record<string, unknown>;
+    return (
+      (p.access_token as string) ||
+      ((p.currentSession as { access_token?: string })?.access_token) ||
+      ((p.session as { access_token?: string })?.access_token) ||
+      null
+    );
+  } catch {
+    return null;
+  }
+}
+
+/** Same approach as DeliveryPayTab: native fetch avoids hung supabase-js RPC. */
+const ADMIN_MILEAGE_FETCH_MS = 60000;
+
+async function postAdminMileagePayRpc(signal: AbortSignal): Promise<Response> {
+  const token = accessTokenFromStorage();
+  const headers: Record<string, string> = {
+    apikey: SUPABASE_ANON_KEY,
+    'Content-Type': 'application/json',
+  };
+  if (token) headers.Authorization = `Bearer ${token}`;
+  return fetch(`${SUPABASE_URL}/rest/v1/rpc/admin_get_all_providers_mileage_pay`, {
+    method: 'POST',
+    headers,
+    body: '{}',
+    signal,
+  });
+}
+
+async function fetchRatePerKmRest(): Promise<number | null> {
+  const token = accessTokenFromStorage();
+  const headers: Record<string, string> = {
+    apikey: SUPABASE_ANON_KEY,
+    Accept: 'application/json',
+  };
+  if (token) headers.Authorization = `Bearer ${token}`;
+  const res = await fetch(
+    `${SUPABASE_URL}/rest/v1/delivery_mileage_config?select=rate_per_km&order=updated_at.desc&limit=1`,
+    { headers }
+  );
+  if (!res.ok) return null;
+  const data = (await res.json()) as { rate_per_km?: number }[];
+  const row = Array.isArray(data) ? data[0] : null;
+  return row?.rate_per_km != null ? Number(row.rate_per_km) : null;
+}
+
 export const DeliveryPayAdminTab: React.FC = () => {
   const [rows, setRows] = useState<ProviderMileageRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -41,51 +92,69 @@ export const DeliveryPayAdminTab: React.FC = () => {
     setLoading(true);
     setError(null);
     setMigrationNeeded(false);
-    const timeoutMs = 12000;
-    const timeoutPromise = new Promise<never>((_, reject) =>
-      setTimeout(() => reject(new Error('Request timed out')), timeoutMs)
-    );
+    const controller = new AbortController();
+    const timeoutId = window.setTimeout(() => controller.abort(), ADMIN_MILEAGE_FETCH_MS);
     try {
-      const fetchPromise = (async () => {
-        const { data: payData, error: payErr } = await supabase.rpc('admin_get_all_providers_mileage_pay');
-        if (payErr) {
-          if (isMissingMigrationError(payErr)) {
-            setRows([]);
-            setMigrationNeeded(true);
-            return;
-          }
-          throw payErr;
-        }
-        setRows((payData as ProviderMileageRow[]) || []);
-        setMigrationNeeded(false);
+      const res = await postAdminMileagePayRpc(controller.signal);
+      window.clearTimeout(timeoutId);
 
-        const { data: configData, error: configErr } = await supabase
-          .from('delivery_mileage_config')
-          .select('rate_per_km')
-          .order('updated_at', { ascending: false })
-          .limit(1)
-          .maybeSingle();
-        if (configErr) {
-          if (isMissingMigrationError(configErr)) {
-            setMigrationNeeded(true);
-            return;
-          }
-          console.warn('delivery_mileage_config fetch:', configErr);
-        } else if (configData?.rate_per_km != null) {
-          setRatePerKm(String(configData.rate_per_km));
+      const text = await res.text();
+      let parsed: { code?: string; message?: string; details?: string } = {};
+      if (text.startsWith('{')) {
+        try {
+          parsed = JSON.parse(text) as typeof parsed;
+        } catch {
+          /* ignore */
         }
-      })();
-      await Promise.race([fetchPromise, timeoutPromise]);
+      }
+
+      if (res.status === 401) {
+        throw new Error('Session expired or not signed in. Sign out and sign back in, then open DeliveryPay again.');
+      }
+
+      if (!res.ok) {
+        const synthetic = {
+          message: `${parsed.message ?? ''} ${text}`,
+          code: parsed.code,
+          details: parsed.details,
+        };
+        if (isMissingMigrationError(synthetic)) {
+          setRows([]);
+          setMigrationNeeded(true);
+          return;
+        }
+        throw new Error(parsed.message || text || `HTTP ${res.status}`);
+      }
+
+      let payData: ProviderMileageRow[] = [];
+      if (text) {
+        try {
+          const j = JSON.parse(text) as unknown;
+          payData = Array.isArray(j) ? j : [];
+        } catch {
+          throw new Error('Invalid response from admin mileage pay RPC');
+        }
+      }
+      setRows(payData);
+      setMigrationNeeded(false);
+
+      try {
+        const rate = await fetchRatePerKmRest();
+        if (rate != null) setRatePerKm(String(rate));
+      } catch {
+        /* rate is optional */
+      }
     } catch (e: unknown) {
-      const msg = (e as { message?: string })?.message ?? String(e);
-      if (/timed out|timeout/i.test(msg)) {
+      window.clearTimeout(timeoutId);
+      const err = e instanceof Error ? e : new Error(String(e));
+      if (err.name === 'AbortError' || /aborted/i.test(err.message)) {
         setRows([]);
         setError(
-          'Request timed out. Your migration may already be applied — check your connection and tap Refresh. In Supabase: Settings → API → Reload schema if the RPC was just created.'
+          'Request timed out after 60s. If Supabase shows outstanding invoices or the project was paused, fix that first. Otherwise try Refresh or restart the Supabase project briefly.'
         );
         setMigrationNeeded(false);
       } else {
-        setError(msg);
+        setError(err.message);
         setRows([]);
       }
     } finally {
@@ -104,9 +173,9 @@ export const DeliveryPayAdminTab: React.FC = () => {
       return;
     }
     setSavingRate(true);
-    const timeoutMs = 10000;
+    const timeoutMs = 30000;
     const timeoutPromise = new Promise<never>((_, reject) =>
-      setTimeout(() => reject(new Error('Save timed out. Run the delivery mileage migration first.')), timeoutMs)
+      setTimeout(() => reject(new Error('Save timed out. Check connection and Supabase project status, then try again.')), timeoutMs)
     );
     try {
       const savePromise = (async () => {
