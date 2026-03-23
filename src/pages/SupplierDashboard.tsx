@@ -2261,13 +2261,7 @@ const SupplierDashboard = () => {
           {/* ═══════════════════════════════════════════════════════════════════════════════════ */}
           <TabsContent value="scan-qr">
             <Card className={cardBg}>
-              <CardHeader>
-                <CardTitle className={`flex items-center gap-2 ${textColor}`}>
-                  <QrCode className="h-5 w-5 text-cyan-500" />
-                  QR Code Management
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
+              <CardContent className="pt-6">
                 <EnhancedQRCodeManager
                   supplierId={supplierRecordId || undefined}
                   supplierScopeIds={analyticsSupplierIds}
