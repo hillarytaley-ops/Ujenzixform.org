@@ -2148,25 +2148,63 @@ const SupplierDashboard = () => {
               </CardHeader>
               <CardContent>
                 <Tabs value={viewOrdersSubTab} onValueChange={setViewOrdersSubTab} className="space-y-4">
-                  <TabsList className={`${isDarkMode ? 'bg-slate-700' : 'bg-gray-100'} p-1 rounded-lg`}>
-                    <TabsTrigger value="quotes" className="data-[state=active]:bg-amber-500 data-[state=active]:text-white">
-                      <FileCheck className="h-4 w-4 mr-1" />
-                      Quotes
-                      {quoteRequests.filter(q => q.status === 'pending').length > 0 && (
-                        <span className="ml-1 bg-red-500 text-white text-xs rounded-full px-1.5 py-0.5">
-                          {quoteRequests.filter(q => q.status === 'pending').length}
-                        </span>
-                      )}
-                    </TabsTrigger>
-                    <TabsTrigger value="orders" className="data-[state=active]:bg-blue-500 data-[state=active]:text-white">
-                      <Package className="h-4 w-4 mr-1" />
-                      Orders
-                    </TabsTrigger>
-                    <TabsTrigger value="dispatch" className="data-[state=active]:bg-teal-500 data-[state=active]:text-white">
-                      <Truck className="h-4 w-4 mr-1" />
-                      Dispatch
-                    </TabsTrigger>
-                  </TabsList>
+                  <div
+                    className={`rounded-xl border-2 shadow-md p-3 sm:p-4 ${
+                      isDarkMode
+                        ? 'border-blue-500/40 bg-gradient-to-br from-slate-800 to-slate-900'
+                        : 'border-blue-300 bg-gradient-to-br from-blue-50 via-white to-slate-50'
+                    }`}
+                  >
+                    <p
+                      className={`text-xs sm:text-sm font-semibold uppercase tracking-wide mb-2 sm:mb-3 ${
+                        isDarkMode ? 'text-blue-300' : 'text-blue-800'
+                      }`}
+                    >
+                      Workspace — choose a section
+                    </p>
+                    <TabsList
+                      className={`grid w-full grid-cols-3 gap-2 sm:gap-3 h-auto p-0 bg-transparent`}
+                    >
+                      <TabsTrigger
+                        value="quotes"
+                        className={`min-h-[3rem] sm:min-h-[3.25rem] px-2 sm:px-4 py-3 text-sm sm:text-base font-semibold rounded-lg border-2 shadow-sm transition-all
+                          data-[state=active]:border-amber-500 data-[state=active]:bg-amber-500 data-[state=active]:text-white data-[state=active]:shadow-md
+                          data-[state=inactive]:border-slate-200 data-[state=inactive]:bg-white data-[state=inactive]:text-slate-800
+                          dark:data-[state=inactive]:border-slate-600 dark:data-[state=inactive]:bg-slate-800 dark:data-[state=inactive]:text-slate-100
+                          flex flex-wrap items-center justify-center gap-1.5`}
+                      >
+                        <FileCheck className="h-5 w-5 sm:h-6 sm:w-6 shrink-0" />
+                        <span className="whitespace-nowrap">Quotes</span>
+                        {quoteRequests.filter(q => q.status === 'pending').length > 0 && (
+                          <span className="bg-red-500 text-white text-xs font-bold rounded-full min-w-[1.25rem] px-1.5 py-0.5">
+                            {quoteRequests.filter(q => q.status === 'pending').length}
+                          </span>
+                        )}
+                      </TabsTrigger>
+                      <TabsTrigger
+                        value="orders"
+                        className={`min-h-[3rem] sm:min-h-[3.25rem] px-2 sm:px-4 py-3 text-sm sm:text-base font-semibold rounded-lg border-2 shadow-sm transition-all
+                          data-[state=active]:border-blue-600 data-[state=active]:bg-blue-600 data-[state=active]:text-white data-[state=active]:shadow-md
+                          data-[state=inactive]:border-slate-200 data-[state=inactive]:bg-white data-[state=inactive]:text-slate-800
+                          dark:data-[state=inactive]:border-slate-600 dark:data-[state=inactive]:bg-slate-800 dark:data-[state=inactive]:text-slate-100
+                          flex items-center justify-center gap-2`}
+                      >
+                        <Package className="h-5 w-5 sm:h-6 sm:w-6 shrink-0" />
+                        <span>Orders</span>
+                      </TabsTrigger>
+                      <TabsTrigger
+                        value="dispatch"
+                        className={`min-h-[3rem] sm:min-h-[3.25rem] px-2 sm:px-4 py-3 text-sm sm:text-base font-semibold rounded-lg border-2 shadow-sm transition-all
+                          data-[state=active]:border-teal-600 data-[state=active]:bg-teal-600 data-[state=active]:text-white data-[state=active]:shadow-md
+                          data-[state=inactive]:border-slate-200 data-[state=inactive]:bg-white data-[state=inactive]:text-slate-800
+                          dark:data-[state=inactive]:border-slate-600 dark:data-[state=inactive]:bg-slate-800 dark:data-[state=inactive]:text-slate-100
+                          flex items-center justify-center gap-2`}
+                      >
+                        <Truck className="h-5 w-5 sm:h-6 sm:w-6 shrink-0" />
+                        <span>Dispatch</span>
+                      </TabsTrigger>
+                    </TabsList>
+                  </div>
 
                   {/* Quotes Sub-Tab */}
                   <TabsContent value="quotes">
