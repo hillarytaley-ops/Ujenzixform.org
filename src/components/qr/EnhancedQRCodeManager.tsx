@@ -86,9 +86,25 @@ interface OrderGroup {
 
 interface EnhancedQRCodeManagerProps {
   supplierId?: string; // Optional: pass supplier ID directly to skip lookup
+  /** Same IDs used for dashboard orders (auth uid + supplier row id, etc.) — fixes REST fallback when RPC is empty */
+  supplierScopeIds?: string[];
 }
 
-export const EnhancedQRCodeManager: React.FC<EnhancedQRCodeManagerProps> = ({ supplierId: propSupplierId }) => {
+function materialItemsSupplierFilter(
+  primarySupplierId: string | null,
+  userId: string,
+  scopeIds?: string[]
+): string {
+  const unique = [...new Set([...(scopeIds || []), primarySupplierId, userId].filter(Boolean))] as string[];
+  if (unique.length === 0) return '';
+  if (unique.length === 1) return `supplier_id=eq.${unique[0]}`;
+  return `supplier_id=in.(${unique.join(',')})`;
+}
+
+export const EnhancedQRCodeManager: React.FC<EnhancedQRCodeManagerProps> = ({
+  supplierId: propSupplierId,
+  supplierScopeIds,
+}) => {
   const [items, setItems] = useState<MaterialItem[]>([]);
   const [clientGroups, setClientGroups] = useState<ClientGroup[]>([]);
   const [orderGroups, setOrderGroups] = useState<OrderGroup[]>([]);
@@ -183,13 +199,11 @@ export const EnhancedQRCodeManager: React.FC<EnhancedQRCodeManagerProps> = ({ su
     if (propSupplierId && userRole === 'supplier' && items.length === 0 && !loading && refetchedForSupplier.current !== propSupplierId) {
       refetchedForSupplier.current = propSupplierId;
       localStorage.setItem('supplier_id', propSupplierId);
-      setLoading(true);
+      // Do not set loading=true — initial load already finished; avoids infinite spinner if this fetch hangs
       void (async () => {
         const auth = await resolveQrAuth();
         if (auth?.id) {
           await fetchMaterialItemsFast('supplier', auth.id, propSupplierId, auth.accessToken);
-        } else {
-          setLoading(false);
         }
       })();
     }
@@ -580,12 +594,13 @@ export const EnhancedQRCodeManager: React.FC<EnhancedQRCodeManagerProps> = ({ su
           setLoading(false);
           return;
         }
-        // Fallback: REST by supplier_id if RPC returns empty (e.g. RPC not deployed yet)
-        if (supplierId) {
+        // Fallback: REST by supplier_id (in.) — PO rows may use supplier row id or auth uid
+        const miFilter = materialItemsSupplierFilter(supplierId, userId, supplierScopeIds);
+        if (miFilter) {
           const controller = new AbortController();
-          setTimeout(() => controller.abort(), 5000);
+          setTimeout(() => controller.abort(), 8000);
           const response = await fetch(
-            `${SUPABASE_URL}/rest/v1/material_items?supplier_id=eq.${supplierId}&order=created_at.desc&limit=500`,
+            `${SUPABASE_URL}/rest/v1/material_items?${miFilter}&order=created_at.desc&limit=500`,
             { headers, signal: controller.signal, cache: 'no-store' }
           );
           if (response.ok) {
@@ -802,11 +817,16 @@ export const EnhancedQRCodeManager: React.FC<EnhancedQRCodeManagerProps> = ({ su
         
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 8000);
-        
-        const response = await fetch(
-          `${SUPABASE_URL}/rest/v1/material_items?supplier_id=eq.${finalSupplierId}&order=created_at.desc&limit=1000`,
-          { headers, signal: controller.signal, cache: 'no-store' }
-        );
+
+        const miFilter =
+          materialItemsSupplierFilter(finalSupplierId, userId, supplierScopeIds) ||
+          (finalSupplierId ? `supplier_id=eq.${finalSupplierId}` : '');
+        const response = miFilter
+          ? await fetch(
+              `${SUPABASE_URL}/rest/v1/material_items?${miFilter}&order=created_at.desc&limit=1000`,
+              { headers, signal: controller.signal, cache: 'no-store' }
+            )
+          : ({ ok: false } as Response);
         clearTimeout(timeoutId);
         
         if (response.ok) {

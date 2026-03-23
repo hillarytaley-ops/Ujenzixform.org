@@ -2230,7 +2230,10 @@ const SupplierDashboard = () => {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <EnhancedQRCodeManager supplierId={supplierRecordId || undefined} />
+                <EnhancedQRCodeManager
+                  supplierId={supplierRecordId || undefined}
+                  supplierScopeIds={analyticsSupplierIds}
+                />
               </CardContent>
             </Card>
           </TabsContent>
