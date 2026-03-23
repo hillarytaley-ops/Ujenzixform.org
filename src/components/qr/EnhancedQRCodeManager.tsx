@@ -184,12 +184,14 @@ export const EnhancedQRCodeManager: React.FC<EnhancedQRCodeManagerProps> = ({ su
       refetchedForSupplier.current = propSupplierId;
       localStorage.setItem('supplier_id', propSupplierId);
       setLoading(true);
-      const stored = getUserFromStorage();
-      if (stored?.id) {
-        fetchMaterialItemsFast('supplier', stored.id, propSupplierId);
-      } else {
-        setLoading(false);
-      }
+      void (async () => {
+        const auth = await resolveQrAuth();
+        if (auth?.id) {
+          await fetchMaterialItemsFast('supplier', auth.id, propSupplierId, auth.accessToken);
+        } else {
+          setLoading(false);
+        }
+      })();
     }
   }, [propSupplierId, userRole, items.length, loading]);
 
@@ -197,11 +199,11 @@ export const EnhancedQRCodeManager: React.FC<EnhancedQRCodeManagerProps> = ({ su
     // Start loading immediately with fast path
     fastCheckAuthAndFetch();
     
-    // Safety timeout - force loading to false after 8 seconds (reduced from 15)
+    // Backstop if auth/RPC still wedges (primary fixes: resolveQrAuth + RPC timeouts)
     const safetyTimeout = setTimeout(() => {
       setLoading(false);
-      console.log('⏱️ QR Manager safety timeout - forcing loading false');
-    }, 8000);
+      console.warn('⏱️ QR Manager safety timeout — clearing loading state');
+    }, 22000);
     
     // Delay real-time subscription setup to not block initial load
     let subscription: any = null;
@@ -459,14 +461,42 @@ export const EnhancedQRCodeManager: React.FC<EnhancedQRCodeManagerProps> = ({ su
       const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
       if (storedSession) {
         const parsed = JSON.parse(storedSession);
-        if (parsed.user?.id && parsed.access_token) {
-          return { id: parsed.user.id, accessToken: parsed.access_token };
+        const uid =
+          parsed.user?.id ||
+          parsed.currentSession?.user?.id ||
+          parsed.session?.user?.id;
+        const tok =
+          parsed.access_token ||
+          parsed.currentSession?.access_token ||
+          parsed.session?.access_token;
+        if (uid && tok) {
+          return { id: uid, accessToken: tok };
         }
       }
     } catch (e) {
       console.warn('Could not get user from localStorage');
     }
     return null;
+  };
+
+  /** localStorage first, then bounded getSession() — avoids hanging forever on auth */
+  const resolveQrAuth = async (): Promise<{ id: string; accessToken: string } | null> => {
+    const fromLs = getUserFromStorage();
+    if (fromLs?.id && fromLs?.accessToken) return fromLs;
+    try {
+      const { data: { session } } = await Promise.race([
+        supabase.auth.getSession(),
+        new Promise<{ data: { session: null } }>((resolve) =>
+          setTimeout(() => resolve({ data: { session: null } }), 5000)
+        ),
+      ]);
+      if (session?.user?.id && session.access_token) {
+        return { id: session.user.id, accessToken: session.access_token };
+      }
+    } catch {
+      /* ignore */
+    }
+    return fromLs;
   };
 
   // Helper function to add timeout to any promise
@@ -477,55 +507,57 @@ export const EnhancedQRCodeManager: React.FC<EnhancedQRCodeManagerProps> = ({ su
     ]);
   };
 
-  // FAST PATH: Use localStorage first, skip slow Supabase auth calls
+  // FAST PATH: localStorage + bounded getSession, then RPC with timeouts
   const fastCheckAuthAndFetch = async () => {
     console.log('⚡ QR Manager: Fast path starting...');
-    
-    // Try localStorage first (instant)
-    const stored = getUserFromStorage();
+
     const cachedRole = localStorage.getItem('user_role');
     const cachedSupplierId = localStorage.getItem('supplier_id');
-    
-    if (stored?.id && cachedRole) {
-      console.log('⚡ QR Manager: Using cached auth - userId:', stored.id, 'role:', cachedRole);
+    const auth = await resolveQrAuth();
+
+    if (auth?.id && cachedRole) {
+      console.log('⚡ QR Manager: Using auth - userId:', auth.id, 'role:', cachedRole);
       setUserRole(cachedRole);
-      
-      // For suppliers: use RPC (server-side supplier resolution) - no client supplier_id needed
+
       if (cachedRole === 'supplier') {
-        const supplierId = propSupplierId || cachedSupplierId || stored.id;
+        const supplierId = propSupplierId || cachedSupplierId || auth.id;
         setResolvedSupplierId(supplierId);
         const prefetchedQRCodes = getPrefetchedQRCodes(supplierId);
         if (prefetchedQRCodes && prefetchedQRCodes.length > 0) {
           setItems(prefetchedQRCodes);
           groupItemsByClient(prefetchedQRCodes);
           setLoading(false);
-          fetchMaterialItemsFast(cachedRole, stored.id, supplierId);
+          void fetchMaterialItemsFast(cachedRole, auth.id, supplierId, auth.accessToken);
           return;
         }
-        await fetchMaterialItemsFast(cachedRole, stored.id, supplierId);
+        await fetchMaterialItemsFast(cachedRole, auth.id, supplierId, auth.accessToken);
         return;
       }
-      
-      // For admin, fetch directly
+
       if (cachedRole === 'admin') {
-        await fetchMaterialItemsFast(cachedRole, stored.id, null);
+        await fetchMaterialItemsFast(cachedRole, auth.id, null, auth.accessToken);
         return;
       }
     }
-    
-    // Fallback to full auth check if no cache
+
     console.log('⚠️ QR Manager: No cache, using full auth check...');
     await checkAuthAndFetch();
   };
 
   // Fast fetch: suppliers use RPC (server-side resolution), admins use REST
-  const fetchMaterialItemsFast = async (role: string, userId: string, supplierId: string | null) => {
+  const fetchMaterialItemsFast = async (
+    role: string,
+    userId: string,
+    supplierId: string | null,
+    forcedAccessToken?: string
+  ) => {
     const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
     const apiKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
     const stored = getUserFromStorage();
+    const token = forcedAccessToken || stored?.accessToken;
     const headers: Record<string, string> = { 'apikey': apiKey };
-    if (stored?.accessToken) {
-      headers['Authorization'] = `Bearer ${stored.accessToken}`;
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
     }
 
     try {
@@ -661,8 +693,18 @@ export const EnhancedQRCodeManager: React.FC<EnhancedQRCodeManagerProps> = ({ su
 
   const fetchMaterialItems = async (role: string | null, userId: string) => {
     if (role === 'supplier') {
-      // Try RPC first (server-side supplier resolution, no client lookup needed)
-      const { data: miData, error } = await supabase.rpc('get_supplier_material_items_for_current_user', { _limit: 500 });
+      let miData: any[] | null = null;
+      let error: any = null;
+      try {
+        const result = await withTimeout(
+          supabase.rpc('get_supplier_material_items_for_current_user', { _limit: 500 }),
+          8000
+        );
+        miData = (result?.data as any[]) ?? null;
+        error = result?.error ?? null;
+      } catch (e) {
+        error = e;
+      }
       if (!error && miData && miData.length > 0) {
         setItems(miData);
         groupItemsByClient(miData);

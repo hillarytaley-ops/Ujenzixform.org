@@ -555,17 +555,28 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, in
       if (!forceFullLoad && !initialPurchaseOrders?.length) setLoading(true);
       console.log('🔍 OrderManagement: Loading orders... supplierId prop:', supplierId);
       
-      // Ensure Supabase has current session (so RPC auth.uid() is set)
-      const { data: { session } } = await supabase.auth.getSession();
-      let userId = session?.user?.id ?? '';
-      let accessToken = session?.access_token ?? '';
+      // Bounded wait — getSession() can hang indefinitely in some browsers/tabs
+      let userId = '';
+      let accessToken = '';
+      try {
+        const sessionResult = await Promise.race([
+          supabase.auth.getSession(),
+          new Promise<{ data: { session: null } }>((resolve) =>
+            setTimeout(() => resolve({ data: { session: null } }), 5000)
+          ),
+        ]);
+        userId = sessionResult.data.session?.user?.id ?? '';
+        accessToken = sessionResult.data.session?.access_token ?? '';
+      } catch {
+        /* use localStorage below */
+      }
       if (!userId || !accessToken) {
         try {
           const stored = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
           if (stored) {
             const parsed = JSON.parse(stored);
-            if (!userId) userId = parsed.user?.id || '';
-            if (!accessToken) accessToken = parsed.access_token || '';
+            if (!userId) userId = parsed.user?.id || parsed.currentSession?.user?.id || '';
+            if (!accessToken) accessToken = parsed.access_token || parsed.currentSession?.access_token || '';
           }
         } catch (_) {}
       }
@@ -596,7 +607,13 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, in
 
       // PRIMARY: RPC first – uses auth.uid() server-side, no client supplier ID needed
       try {
-        const { data: rpcOrders, error: rpcErr } = await supabase.rpc('get_supplier_orders_for_current_user', { _limit: 500 });
+        const rpcMs = 12000;
+        const { data: rpcOrders, error: rpcErr } = await Promise.race([
+          supabase.rpc('get_supplier_orders_for_current_user', { _limit: 500 }),
+          new Promise<{ data: null; error: { message: string } }>((resolve) =>
+            setTimeout(() => resolve({ data: null, error: { message: `RPC timeout after ${rpcMs}ms` } }), rpcMs)
+          ),
+        ]);
         if (!rpcErr && rpcOrders != null) {
           const list = Array.isArray(rpcOrders) ? rpcOrders : [];
           if (list.length > 0) {
@@ -801,10 +818,13 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, in
           const ids = Array.from(providerIdsToResolve);
           // 1) RPC first — SECURITY DEFINER; includes delivery_requests + profile fallback (migration 20260431+)
           try {
-            const { data: rpcRows, error: rpcErr } = await supabase.rpc(
-              'get_delivery_provider_names_for_supplier',
-              { provider_ids: ids }
-            );
+            const nameRpcMs = 8000;
+            const { data: rpcRows, error: rpcErr } = await Promise.race([
+              supabase.rpc('get_delivery_provider_names_for_supplier', { provider_ids: ids }),
+              new Promise<{ data: null; error: { message: string } }>((resolve) =>
+                setTimeout(() => resolve({ data: null, error: { message: `timeout after ${nameRpcMs}ms` } }), nameRpcMs)
+              ),
+            ]);
             if (rpcErr) {
               console.warn('OrderManagement: get_delivery_provider_names_for_supplier:', rpcErr.message);
             }
