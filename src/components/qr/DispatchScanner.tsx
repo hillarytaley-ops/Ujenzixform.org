@@ -1,4 +1,4 @@
-import React, { useRef, useState, useEffect, useCallback } from 'react';
+import React, { useRef, useState, useEffect, useCallback, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -65,7 +65,28 @@ interface ScanResult {
 // MAIN COMPONENT
 // ═══════════════════════════════════════════════════════════════════════════════
 
-export const DispatchScanner: React.FC = () => {
+export interface DispatchScannerProps {
+  /** Same IDs as supplier dashboard (auth uid + suppliers.id, profile id, …) — avoids wrong single-id queries */
+  supplierScopeIds?: string[];
+  /** Preferred suppliers.id when known */
+  primarySupplierId?: string;
+}
+
+function buildSupplierInFilter(ids: string[]): string {
+  const u = [...new Set(ids.filter(Boolean))];
+  if (u.length === 0) return '';
+  if (u.length === 1) return `supplier_id=eq.${u[0]}`;
+  return `supplier_id=in.(${u.join(',')})`;
+}
+
+export const DispatchScanner: React.FC<DispatchScannerProps> = ({
+  supplierScopeIds: supplierScopeIdsProp,
+  primarySupplierId: primarySupplierIdProp,
+}) => {
+  const supplierScopeKey = useMemo(
+    () => [...new Set((supplierScopeIdsProp || []).filter(Boolean))].sort().join('|'),
+    [supplierScopeIdsProp]
+  );
   // ─────────────────────────────────────────────────────────────────────────────
   // STATE - Order Selection
   // ─────────────────────────────────────────────────────────────────────────────
@@ -74,7 +95,7 @@ export const DispatchScanner: React.FC = () => {
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [loadingOrders, setLoadingOrders] = useState(true);
   const [supplierId, setSupplierId] = useState<string | null>(null);
-  const fetchOrdersRef = useRef<boolean>(false); // Prevent multiple simultaneous calls
+  const fetchOrdersGen = useRef(0);
 
   // ─────────────────────────────────────────────────────────────────────────────
   // STATE - Scanner
@@ -112,9 +133,22 @@ export const DispatchScanner: React.FC = () => {
   // EFFECTS
   // ─────────────────────────────────────────────────────────────────────────────
   useEffect(() => {
-    checkAuth();
+    // Dashboard passes resolved scope — skip slow supplier lookup
+    const scope = (supplierScopeIdsProp || []).filter(Boolean);
+    if (scope.length > 0) {
+      const raw = localStorage.getItem('user_role');
+      setUserRole(raw ? raw.toLowerCase().trim() : null);
+      setSupplierId(primarySupplierIdProp || scope[0]);
+    } else {
+      void checkAuth();
+    }
     detectDeviceInfo();
     listAvailableCameras();
+
+    const loadingSafety = window.setTimeout(() => {
+      setLoadingOrders(false);
+      console.warn('⏱️ DispatchScanner: loading safety timeout');
+    }, 16000);
     
     // Add global error handler to catch unhandled promise rejections from html5-qrcode library
     const handleUnhandledRejection = (event: PromiseRejectionEvent) => {
@@ -147,19 +181,18 @@ export const DispatchScanner: React.FC = () => {
     
     window.addEventListener('unhandledrejection', handleUnhandledRejection);
     
-    // Note: fetchOrders has its own timeout (20s) and will set loadingOrders(false) in finally block
-    // No need for safety timeout since fetchOrders handles its own completion
     return () => {
+      window.clearTimeout(loadingSafety);
       stopScanning();
       window.removeEventListener('unhandledrejection', handleUnhandledRejection);
     };
-  }, []);
+  }, [supplierScopeKey, primarySupplierIdProp]);
 
   useEffect(() => {
     if (supplierId) {
-      fetchOrders();
+      void fetchOrders();
     }
-  }, [supplierId]);
+  }, [supplierId, supplierScopeKey]);
 
   // Add custom styles to ensure video fills container and remove dark space
   useEffect(() => {
@@ -283,7 +316,8 @@ export const DispatchScanner: React.FC = () => {
     console.log('🔐 Dispatch Scanner: Starting auth check...');
     
     try {
-      const localRole = localStorage.getItem('user_role');
+      const localRoleRaw = localStorage.getItem('user_role');
+      const localRole = localRoleRaw ? localRoleRaw.toLowerCase().trim() : null;
       if (localRole) {
         setUserRole(localRole);
         console.log('📋 Role from localStorage:', localRole);
@@ -318,7 +352,8 @@ export const DispatchScanner: React.FC = () => {
             supabase.from('user_roles').select('role').eq('user_id', userId).maybeSingle(),
             3000
           );
-          role = roleData?.role || null;
+          const r = roleData?.role || null;
+          role = r ? r.toLowerCase().trim() : null;
           console.log('🔑 Role from database:', role);
         } catch {
           console.log('⚠️ Role lookup timeout');
@@ -546,27 +581,23 @@ export const DispatchScanner: React.FC = () => {
       }
     } catch (err) {
       console.error('Auth check failed:', err);
-      const localRole = localStorage.getItem('user_role');
-      setUserRole(localRole || null);
+      const lr = localStorage.getItem('user_role');
+      setUserRole(lr ? lr.toLowerCase().trim() : null);
       setLoadingOrders(false);
     }
   };
 
   const fetchOrders = async () => {
-    if (!supplierId) {
-      console.log('❌ No supplierId, cannot fetch orders');
+    const storageUserId = getUserFromStorage()?.id || null;
+    const scopeIds = [...new Set([supplierId, ...(supplierScopeIdsProp || []), storageUserId].filter(Boolean))] as string[];
+    if (scopeIds.length === 0) {
+      console.log('❌ No supplier scope, cannot fetch orders');
       setLoadingOrders(false);
       return;
     }
-    
-    // Prevent multiple simultaneous calls
-    if (fetchOrdersRef.current) {
-      console.log('⚠️ fetchOrders already in progress, skipping...');
-      return;
-    }
-    
-    console.log('📦 Fetching orders for supplier:', supplierId);
-    fetchOrdersRef.current = true;
+
+    const gen = ++fetchOrdersGen.current;
+    console.log('📦 Fetching orders for supplier scope:', scopeIds);
     setLoadingOrders(true);
     
     try {
@@ -716,57 +747,24 @@ export const DispatchScanner: React.FC = () => {
         controller.abort();
       }, 20000);
       
-      console.log('📦 Fetching material_items for supplier...');
-      // Fetch material items for this supplier
+      const miFilter = buildSupplierInFilter(scopeIds);
+      console.log('📦 Fetching material_items for supplier scope...');
       const itemsResponse = await fetch(
-        `${SUPABASE_URL}/rest/v1/material_items?supplier_id=eq.${supplierId}&order=created_at.desc&limit=1000`,
+        `${SUPABASE_URL}/rest/v1/material_items?${miFilter}&order=created_at.desc&limit=1000`,
         { headers, signal: controller.signal, cache: 'no-store' }
       );
       console.log('✅ Material items response status:', itemsResponse.status);
       
-      // Fetch purchase_orders for this supplier
-      // Orders are shown for dispatch if they have material_items that need to be dispatched
-      // Delivery_requests are fetched for info only (to show delivery provider details if available)
-      console.log('📦 Fetching purchase_orders for supplier:', supplierId);
+      console.log('📦 Fetching purchase_orders for supplier scope');
       let allOrdersData: any[] = [];
       
-      // Get userId for supplier_id matching (supplier lookup might have timed out)
-      let userId: string | null = null;
-      try {
-        const stored = getUserFromStorage();
-        userId = stored?.id || null;
-      } catch {
-        // Ignore
-      }
-      
-      // Try multiple supplier_id variations since the lookup might have timing issues
-      const supplierIdsToTry = [
-        supplierId,
-        userId
-      ].filter(Boolean) as string[];
-      
-      // Fetch purchase_orders for this supplier (with various statuses that might need dispatch)
-      const orderPromises = supplierIdsToTry.map((sid) => {
-        return fetch(
-          `${SUPABASE_URL}/rest/v1/purchase_orders?supplier_id=eq.${sid}&order=created_at.desc&limit=1000`,
-          { headers, signal: controller.signal, cache: 'no-store' }
-        );
-      });
-      
-      const orderResponses = await Promise.all(orderPromises);
-      
-      const seenOrderIds = new Set<string>();
-      for (const response of orderResponses) {
-        if (response.ok) {
-          const chunkData = await response.json();
-          // Deduplicate orders
-          chunkData.forEach((order: any) => {
-            if (!seenOrderIds.has(order.id)) {
-              seenOrderIds.add(order.id);
-              allOrdersData.push(order);
-            }
-          });
-        }
+      const poFilter = buildSupplierInFilter(scopeIds);
+      const poResponse = await fetch(
+        `${SUPABASE_URL}/rest/v1/purchase_orders?${poFilter}&order=created_at.desc&limit=1000`,
+        { headers, signal: controller.signal, cache: 'no-store' }
+      );
+      if (poResponse.ok) {
+        allOrdersData = await poResponse.json();
       }
       
       console.log('✅ Purchase orders fetched for supplier:', allOrdersData.length);
@@ -887,7 +885,7 @@ export const DispatchScanner: React.FC = () => {
                 category: item.category || 'General',
                 quantity: item.quantity || 1,
                 unit: item.unit || 'units',
-                supplier_id: supplierId,
+                supplier_id: scopeIds[0],
                 buyer_id: order.buyer_id || order.builder_id,
                 buyer_name: order.builder_name || 'Unknown Client',
                 buyer_email: order.builder_email || '',
@@ -1017,9 +1015,10 @@ export const DispatchScanner: React.FC = () => {
       toast.error('Failed to load orders');
       // Don't clear orders on error - keep existing orders visible
     } finally {
-      setLoadingOrders(false);
-      fetchOrdersRef.current = false;
-      console.log('✅ fetchOrders completed, loadingOrders set to false');
+      if (gen === fetchOrdersGen.current) {
+        setLoadingOrders(false);
+        console.log('✅ fetchOrders completed, loadingOrders set to false');
+      }
     }
   };
 
@@ -2072,8 +2071,8 @@ export const DispatchScanner: React.FC = () => {
   // ─────────────────────────────────────────────────────────────────────────────
   // ACCESS CONTROL
   // ─────────────────────────────────────────────────────────────────────────────
-  const isBuilder = userRole === 'builder';
-  const allowAccess = ['supplier', 'admin'].includes(userRole || '');
+  const isBuilder = (userRole || '').toLowerCase() === 'builder';
+  const allowAccess = ['supplier', 'admin'].includes((userRole || '').toLowerCase());
 
   if (isBuilder) {
     return (

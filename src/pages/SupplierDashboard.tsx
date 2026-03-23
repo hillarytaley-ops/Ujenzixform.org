@@ -2286,7 +2286,12 @@ const SupplierDashboard = () => {
                           </ol>
                         </AlertDescription>
                       </Alert>
-                      <DispatchScanner />
+                      {user && (
+                        <DispatchScanner
+                          supplierScopeIds={analyticsSupplierIds.length > 0 ? analyticsSupplierIds : [user.id]}
+                          primarySupplierId={supplierRecordId || undefined}
+                        />
+                      )}
                     </div>
                   </TabsContent>
                 </Tabs>
