@@ -2090,20 +2090,56 @@ const SupplierDashboard = () => {
               </CardHeader>
               <CardContent>
                 <Tabs defaultValue="add-products" className="space-y-4">
-                  <TabsList className={`${isDarkMode ? 'bg-slate-700' : 'bg-gray-100'} p-1 rounded-lg`}>
-                    <TabsTrigger value="add-products" className="data-[state=active]:bg-orange-500 data-[state=active]:text-white">
-                      <Plus className="h-4 w-4 mr-1" />
-                      Add Products
-                    </TabsTrigger>
-                    <TabsTrigger value="my-products" className="data-[state=active]:bg-orange-500 data-[state=active]:text-white">
-                      <Package className="h-4 w-4 mr-1" />
-                      My Products
-                    </TabsTrigger>
-                    <TabsTrigger value="view-inventory" className="data-[state=active]:bg-emerald-500 data-[state=active]:text-white">
-                      <Boxes className="h-4 w-4 mr-1" />
-                      View Inventory
-                    </TabsTrigger>
-                  </TabsList>
+                  <div
+                    className={`rounded-xl border-2 shadow-md p-3 sm:p-4 ${
+                      isDarkMode
+                        ? 'border-orange-500/35 bg-gradient-to-br from-slate-800 to-slate-900'
+                        : 'border-orange-200 bg-gradient-to-br from-orange-50 via-white to-amber-50'
+                    }`}
+                  >
+                    <p
+                      className={`text-xs sm:text-sm font-semibold uppercase tracking-wide mb-2 sm:mb-3 ${
+                        isDarkMode ? 'text-orange-300' : 'text-orange-800'
+                      }`}
+                    >
+                      Materials — choose a section
+                    </p>
+                    <TabsList className="grid w-full grid-cols-1 min-[480px]:grid-cols-3 gap-2 sm:gap-3 h-auto p-0 bg-transparent">
+                      <TabsTrigger
+                        value="add-products"
+                        className={`min-h-[3rem] sm:min-h-[3.25rem] px-2 sm:px-4 py-3 text-sm sm:text-base font-semibold rounded-lg border-2 shadow-sm transition-all
+                          data-[state=active]:border-orange-500 data-[state=active]:bg-orange-500 data-[state=active]:text-white data-[state=active]:shadow-md
+                          data-[state=inactive]:border-slate-200 data-[state=inactive]:bg-white data-[state=inactive]:text-slate-800
+                          dark:data-[state=inactive]:border-slate-600 dark:data-[state=inactive]:bg-slate-800 dark:data-[state=inactive]:text-slate-100
+                          flex items-center justify-center gap-2`}
+                      >
+                        <Plus className="h-5 w-5 sm:h-6 sm:w-6 shrink-0" />
+                        <span className="whitespace-nowrap">Add Products</span>
+                      </TabsTrigger>
+                      <TabsTrigger
+                        value="my-products"
+                        className={`min-h-[3rem] sm:min-h-[3.25rem] px-2 sm:px-4 py-3 text-sm sm:text-base font-semibold rounded-lg border-2 shadow-sm transition-all
+                          data-[state=active]:border-amber-600 data-[state=active]:bg-amber-600 data-[state=active]:text-white data-[state=active]:shadow-md
+                          data-[state=inactive]:border-slate-200 data-[state=inactive]:bg-white data-[state=inactive]:text-slate-800
+                          dark:data-[state=inactive]:border-slate-600 dark:data-[state=inactive]:bg-slate-800 dark:data-[state=inactive]:text-slate-100
+                          flex items-center justify-center gap-2`}
+                      >
+                        <Package className="h-5 w-5 sm:h-6 sm:w-6 shrink-0" />
+                        <span className="whitespace-nowrap">My Products</span>
+                      </TabsTrigger>
+                      <TabsTrigger
+                        value="view-inventory"
+                        className={`min-h-[3rem] sm:min-h-[3.25rem] px-2 sm:px-4 py-3 text-sm sm:text-base font-semibold rounded-lg border-2 shadow-sm transition-all
+                          data-[state=active]:border-emerald-600 data-[state=active]:bg-emerald-600 data-[state=active]:text-white data-[state=active]:shadow-md
+                          data-[state=inactive]:border-slate-200 data-[state=inactive]:bg-white data-[state=inactive]:text-slate-800
+                          dark:data-[state=inactive]:border-slate-600 dark:data-[state=inactive]:bg-slate-800 dark:data-[state=inactive]:text-slate-100
+                          flex items-center justify-center gap-2`}
+                      >
+                        <Boxes className="h-5 w-5 sm:h-6 sm:w-6 shrink-0" />
+                        <span className="whitespace-nowrap">View Inventory</span>
+                      </TabsTrigger>
+                    </TabsList>
+                  </div>
 
                   {/* Add Products Sub-Tab */}
                   <TabsContent value="add-products">
