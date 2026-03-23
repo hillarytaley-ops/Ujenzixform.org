@@ -83,6 +83,48 @@ import { GRNView } from "@/components/delivery/GRNView";
 import { InvoiceManagement } from "@/components/invoices/InvoiceManagement";
 import { MissingDeliveryAddressAlert } from "@/components/builders/MissingDeliveryAddressAlert";
 
+type PurchaseOrderProjectRow = {
+  project_id?: string | null;
+  total_amount?: number | null;
+  status?: string | null;
+};
+
+/** Count POs and sum "spent" per builder_projects.id (purchase_orders.project_id). */
+function aggregatePurchaseStatsByProject(
+  orders: PurchaseOrderProjectRow[]
+): Map<string, { orderCount: number; spentConfirmed: number }> {
+  const map = new Map<string, { orderCount: number; spentConfirmed: number }>();
+  const spentStatuses = new Set(['completed', 'delivered', 'confirmed']);
+  for (const o of orders) {
+    const pid = o.project_id;
+    if (!pid || typeof pid !== 'string') continue;
+    const cur = map.get(pid) ?? { orderCount: 0, spentConfirmed: 0 };
+    cur.orderCount += 1;
+    if (spentStatuses.has(String(o.status ?? '').toLowerCase())) {
+      cur.spentConfirmed += Number(o.total_amount ?? 0);
+    }
+    map.set(pid, cur);
+  }
+  return map;
+}
+
+function mergeProjectsWithPurchaseAggregates(
+  projects: any[],
+  stats: Map<string, { orderCount: number; spentConfirmed: number }>
+): any[] {
+  return projects.map((p) => {
+    const s = stats.get(p.id);
+    const orderCount = s != null ? s.orderCount : Number(p.total_orders) || 0;
+    const spentFromPo = s?.spentConfirmed ?? 0;
+    const spentStored = Number(p.spent || 0);
+    return {
+      ...p,
+      total_orders: orderCount,
+      spent: spentFromPo > 0 ? spentFromPo : spentStored,
+    };
+  });
+}
+
 const ProfessionalBuilderDashboardPage = () => {
   // Use AuthContext for reliable user data
   const { user: authUser, isAuthenticated, signOut } = useAuth();
@@ -710,7 +752,7 @@ const ProfessionalBuilderDashboardPage = () => {
         console.log('📊 Projects fetch error:', projectsResult.error.message);
       } else {
         console.log('📊 Stats: Projects loaded:', projectsData?.length || 0);
-        if (projectsData) setProjects(projectsData);
+        // Projects list + per-project order counts come from fetchProjects() (REST + purchase_orders merge)
       }
 
       // Calculate stats
@@ -970,8 +1012,10 @@ const ProfessionalBuilderDashboardPage = () => {
       const fetchTimeout = setTimeout(() => controller.abort(), 8000);
       
       console.log('📁 Making REST API request...');
-      const response = await fetch(
-        `${SUPABASE_URL}/rest/v1/builder_projects?builder_id=eq.${userId}&select=id,name,location,status,budget,spent,progress,created_at&order=created_at.desc`,
+      const projectSelect =
+        'id,name,location,status,budget,spent,progress,created_at,start_date,end_date,description,total_orders';
+      let response = await fetch(
+        `${SUPABASE_URL}/rest/v1/builder_projects?builder_id=eq.${userId}&select=${projectSelect}&order=created_at.desc`,
         {
           headers: {
             'apikey': SUPABASE_ANON_KEY,
@@ -982,6 +1026,20 @@ const ProfessionalBuilderDashboardPage = () => {
           signal: controller.signal
         }
       );
+      if (!response.ok && response.status === 400) {
+        response = await fetch(
+          `${SUPABASE_URL}/rest/v1/builder_projects?builder_id=eq.${userId}&select=id,name,location,status,budget,spent,progress,created_at,start_date,end_date,description&order=created_at.desc`,
+          {
+            headers: {
+              'apikey': SUPABASE_ANON_KEY,
+              'Authorization': `Bearer ${accessToken || SUPABASE_ANON_KEY}`,
+              'Content-Type': 'application/json',
+              'Prefer': 'return=representation'
+            },
+            signal: controller.signal
+          }
+        );
+      }
       
       clearTimeout(fetchTimeout);
       clearTimeout(safetyTimeout);
@@ -996,14 +1054,52 @@ const ProfessionalBuilderDashboardPage = () => {
         return;
       }
       
-      const data = await response.json();
+      let data = await response.json();
       console.log('📁 Query completed successfully');
       console.log('📁 Raw data received:', data);
       
       if (data && Array.isArray(data)) {
-        console.log('📁 Projects data received:', data);
-        setProjects(data);
-        console.log('📁 Loaded', data.length, 'projects and updated state');
+        let projectRows = data as any[];
+        try {
+          const buyerIds = new Set<string>([userId]);
+          const { data: prof } = await supabase
+            .from('profiles')
+            .select('id')
+            .eq('user_id', userId)
+            .maybeSingle();
+          if (prof?.id) buyerIds.add(prof.id);
+
+          const inList = Array.from(buyerIds).join(',');
+          const ordersUrl = `${SUPABASE_URL}/rest/v1/purchase_orders?buyer_id=in.(${inList})&select=project_id,total_amount,status`;
+          const orderCtrl = new AbortController();
+          const orderT = window.setTimeout(() => orderCtrl.abort(), 8000);
+          try {
+            const ordersRes = await fetch(ordersUrl, {
+              headers: {
+                apikey: SUPABASE_ANON_KEY,
+                Authorization: `Bearer ${accessToken || SUPABASE_ANON_KEY}`,
+                Accept: 'application/json',
+              },
+              signal: orderCtrl.signal,
+            });
+            if (ordersRes.ok) {
+              const orderRows = (await ordersRes.json()) as PurchaseOrderProjectRow[];
+              const stats = aggregatePurchaseStatsByProject(Array.isArray(orderRows) ? orderRows : []);
+              projectRows = mergeProjectsWithPurchaseAggregates(projectRows, stats);
+              console.log('📁 Merged per-project order counts from purchase_orders');
+            } else {
+              console.warn('📁 purchase_orders merge skipped:', ordersRes.status);
+            }
+          } finally {
+            window.clearTimeout(orderT);
+          }
+        } catch (mergeErr) {
+          console.warn('📁 Per-project order merge failed (non-fatal):', mergeErr);
+        }
+
+        console.log('📁 Projects data received:', projectRows);
+        setProjects(projectRows);
+        console.log('📁 Loaded', projectRows.length, 'projects and updated state');
       } else {
         console.log('📁 No projects data returned (data is null or not array)');
         setProjects([]);
