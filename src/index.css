@@ -237,3 +237,8 @@ p, span, div, h1, h2, h3, h4, h5, h6, label, button {
   fill: rgba(0, 0, 0, 0.4) !important;
   stroke: none !important;
 }
+
+/* Leaflet: Tailwind preflight max-width on img breaks map tile alignment */
+.leaflet-container img.leaflet-tile {
+  max-width: none !important;
+}

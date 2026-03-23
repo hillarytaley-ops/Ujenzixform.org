@@ -110,6 +110,7 @@ import { SMSTestPanel } from "@/components/admin/SMSTestPanel";
 import { Camera, UserCog, MessageCircle, Link2, Navigation as NavigationIcon } from "lucide-react";
 import { CameraAssignment } from "@/components/admin/CameraAssignment";
 import { TrackingTab } from "@/components/tracking/TrackingTab";
+import { KenyaDeliveryMap } from "@/components/admin/KenyaDeliveryMap";
 import {
   Table,
   TableBody,
@@ -2578,7 +2579,7 @@ const AdminDashboard = () => {
                       GPS Delivery Tracking
                     </CardTitle>
                     <CardDescription className="text-gray-400 mt-1">
-                      Real-time location tracking of all delivery vehicles
+                      Live OpenStreetMap view (Nairobi). Pin positions are sample placements until GPS devices stream coordinates.
                     </CardDescription>
                   </div>
                   <div className="flex items-center gap-2">
@@ -2594,60 +2595,22 @@ const AdminDashboard = () => {
                 </div>
               </CardHeader>
               <CardContent>
-                {/* Map Placeholder */}
-                <div className="relative bg-slate-800 rounded-lg overflow-hidden border border-slate-700 mb-6">
-                  <div className="aspect-[16/9] bg-gradient-to-br from-green-900/20 to-blue-900/20 flex items-center justify-center relative">
-                    {/* Simulated Map Background */}
-                    <div className="absolute inset-0 opacity-30">
-                      <div className="absolute top-1/4 left-1/4 w-2 h-2 bg-green-500 rounded-full animate-ping"></div>
-                      <div className="absolute top-1/3 left-1/2 w-2 h-2 bg-blue-500 rounded-full animate-ping" style={{animationDelay: '0.5s'}}></div>
-                      <div className="absolute top-2/3 left-1/3 w-2 h-2 bg-yellow-500 rounded-full animate-ping" style={{animationDelay: '1s'}}></div>
-                      <div className="absolute top-1/2 right-1/4 w-2 h-2 bg-green-500 rounded-full animate-ping" style={{animationDelay: '1.5s'}}></div>
-                      <div className="absolute bottom-1/4 right-1/3 w-2 h-2 bg-blue-500 rounded-full animate-ping" style={{animationDelay: '2s'}}></div>
-                      
-                      {/* Grid lines */}
-                      <div className="absolute inset-0 grid grid-cols-8 grid-rows-6">
-                        {Array.from({length: 48}).map((_, i) => (
-                          <div key={i} className="border border-slate-700/30"></div>
-                        ))}
-                      </div>
-                    </div>
-                    
-                    <div className="text-center z-10">
-                      <MapPin className="h-16 w-16 text-green-500 mx-auto mb-3" />
-                      <p className="text-white text-lg font-medium">Kenya Map View</p>
-                      <p className="text-gray-400 text-sm">Nairobi Metropolitan Area</p>
-                      <p className="text-xs text-gray-500 mt-2">
-                        Connect GPS devices to enable real-time tracking
-                      </p>
-                    </div>
-                  </div>
-                  
-                  {/* Map Controls */}
-                  <div className="absolute top-4 right-4 flex flex-col gap-2">
-                    <Button size="sm" variant="secondary" className="bg-slate-800/80">
-                      <span className="text-lg">+</span>
-                    </Button>
-                    <Button size="sm" variant="secondary" className="bg-slate-800/80">
-                      <span className="text-lg">−</span>
-                    </Button>
-                  </div>
-                  
-                  {/* Legend */}
-                  <div className="absolute bottom-4 left-4 bg-slate-900/90 p-3 rounded-lg">
+                <div className="relative mb-6 rounded-lg overflow-hidden border border-slate-700">
+                  <KenyaDeliveryMap />
+                  <div className="pointer-events-none absolute bottom-10 left-3 z-[1100] bg-slate-900/95 p-3 rounded-lg border border-slate-700/80 shadow-lg">
                     <p className="text-xs text-gray-400 mb-2">Legend</p>
                     <div className="space-y-1">
                       <div className="flex items-center gap-2">
-                        <div className="w-3 h-3 bg-green-500 rounded-full"></div>
-                        <span className="text-xs text-gray-300">Active Delivery</span>
+                        <div className="w-3 h-3 bg-green-500 rounded-full shrink-0" />
+                        <span className="text-xs text-gray-300">En route</span>
                       </div>
                       <div className="flex items-center gap-2">
-                        <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
-                        <span className="text-xs text-gray-300">Returning</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <div className="w-3 h-3 bg-yellow-500 rounded-full"></div>
+                        <div className="w-3 h-3 bg-yellow-500 rounded-full shrink-0" />
                         <span className="text-xs text-gray-300">Loading</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <div className="w-3 h-3 bg-blue-500 rounded-full shrink-0" />
+                        <span className="text-xs text-gray-300">Returning</span>
                       </div>
                     </div>
                   </div>
