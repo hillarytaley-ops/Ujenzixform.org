@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -105,6 +105,10 @@ export const EnhancedQRCodeManager: React.FC<EnhancedQRCodeManagerProps> = ({
   supplierId: propSupplierId,
   supplierScopeIds,
 }) => {
+  const supplierScopeKey = useMemo(
+    () => [...new Set((supplierScopeIds || []).filter(Boolean) as string[])].sort().join('|'),
+    [supplierScopeIds]
+  );
   const [items, setItems] = useState<MaterialItem[]>([]);
   const [clientGroups, setClientGroups] = useState<ClientGroup[]>([]);
   const [orderGroups, setOrderGroups] = useState<OrderGroup[]>([]);
@@ -193,32 +197,7 @@ export const EnhancedQRCodeManager: React.FC<EnhancedQRCodeManagerProps> = ({
     return clientGroup.items.filter(item => selectedItems.has(item.id)).length;
   };
 
-  // Refetch when dashboard resolves supplierId (it loads async after email lookup)
-  const refetchedForSupplier = useRef<string | null>(null);
   useEffect(() => {
-    if (propSupplierId && userRole === 'supplier' && items.length === 0 && !loading && refetchedForSupplier.current !== propSupplierId) {
-      refetchedForSupplier.current = propSupplierId;
-      localStorage.setItem('supplier_id', propSupplierId);
-      // Do not set loading=true — initial load already finished; avoids infinite spinner if this fetch hangs
-      void (async () => {
-        const auth = await resolveQrAuth();
-        if (auth?.id) {
-          await fetchMaterialItemsFast('supplier', auth.id, propSupplierId, auth.accessToken);
-        }
-      })();
-    }
-  }, [propSupplierId, userRole, items.length, loading]);
-
-  useEffect(() => {
-    // Start loading immediately with fast path
-    fastCheckAuthAndFetch();
-    
-    // Backstop if auth/RPC still wedges (primary fixes: resolveQrAuth + RPC timeouts)
-    const safetyTimeout = setTimeout(() => {
-      setLoading(false);
-      console.warn('⏱️ QR Manager safety timeout — clearing loading state');
-    }, 22000);
-    
     // Delay real-time subscription setup to not block initial load
     let subscription: any = null;
     let purchaseOrdersSubscription: any = null;
@@ -456,7 +435,6 @@ export const EnhancedQRCodeManager: React.FC<EnhancedQRCodeManagerProps> = ({
     }, 500); // Short delay to not block initial load
     
     return () => {
-      clearTimeout(safetyTimeout);
       clearTimeout(subscriptionTimeout);
       if (subscription) {
         subscription.unsubscribe();
@@ -525,7 +503,8 @@ export const EnhancedQRCodeManager: React.FC<EnhancedQRCodeManagerProps> = ({
   const fastCheckAuthAndFetch = async () => {
     console.log('⚡ QR Manager: Fast path starting...');
 
-    const cachedRole = localStorage.getItem('user_role');
+    const rawRole = localStorage.getItem('user_role');
+    const cachedRole = rawRole ? rawRole.toLowerCase().trim() : null;
     const cachedSupplierId = localStorage.getItem('supplier_id');
     const auth = await resolveQrAuth();
 
@@ -536,20 +515,26 @@ export const EnhancedQRCodeManager: React.FC<EnhancedQRCodeManagerProps> = ({
       if (cachedRole === 'supplier') {
         const supplierId = propSupplierId || cachedSupplierId || auth.id;
         setResolvedSupplierId(supplierId);
-        const prefetchedQRCodes = getPrefetchedQRCodes(supplierId);
-        if (prefetchedQRCodes && prefetchedQRCodes.length > 0) {
-          setItems(prefetchedQRCodes);
-          groupItemsByClient(prefetchedQRCodes);
-          setLoading(false);
-          void fetchMaterialItemsFast(cachedRole, auth.id, supplierId, auth.accessToken);
-          return;
+        try {
+          const prefetchedQRCodes = getPrefetchedQRCodes(supplierId);
+          if (Array.isArray(prefetchedQRCodes) && prefetchedQRCodes.length > 0) {
+            setItems(prefetchedQRCodes);
+            groupItemsByClient(prefetchedQRCodes);
+            setLoading(false);
+            void fetchMaterialItemsFast('supplier', auth.id, supplierId, auth.accessToken).catch((err) =>
+              console.warn('QR background refresh failed', err)
+            );
+            return;
+          }
+        } catch (prefetchErr) {
+          console.warn('QR prefetch cache apply failed', prefetchErr);
         }
-        await fetchMaterialItemsFast(cachedRole, auth.id, supplierId, auth.accessToken);
+        await fetchMaterialItemsFast('supplier', auth.id, supplierId, auth.accessToken);
         return;
       }
 
       if (cachedRole === 'admin') {
-        await fetchMaterialItemsFast(cachedRole, auth.id, null, auth.accessToken);
+        await fetchMaterialItemsFast('admin', auth.id, null, auth.accessToken);
         return;
       }
     }
@@ -557,6 +542,42 @@ export const EnhancedQRCodeManager: React.FC<EnhancedQRCodeManagerProps> = ({
     console.log('⚠️ QR Manager: No cache, using full auth check...');
     await checkAuthAndFetch();
   };
+
+  // Re-run when supplier row id / scope list updates (tab mounts after dashboard resolution, or ID arrives late)
+  useEffect(() => {
+    let cancelled = false;
+    const safetyTimeout = window.setTimeout(() => {
+      if (!cancelled) {
+        setLoading(false);
+        console.warn('⏱️ QR Manager load safety timeout — clearing spinner');
+      }
+    }, 12000);
+
+    const run = async () => {
+      try {
+        await fastCheckAuthAndFetch();
+      } catch (e) {
+        console.error('QR Manager: load failed', e);
+        if (!cancelled) {
+          try {
+            setItems([]);
+            groupItemsByClient([]);
+          } catch {
+            /* ignore */
+          }
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+    void run();
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(safetyTimeout);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- reload when supplier scope identity changes; fetch closes over latest props
+  }, [propSupplierId, supplierScopeKey]);
 
   // Fast fetch: suppliers use RPC (server-side resolution), admins use REST
   const fetchMaterialItemsFast = async (
@@ -694,6 +715,7 @@ export const EnhancedQRCodeManager: React.FC<EnhancedQRCodeManagerProps> = ({
         }
       }
 
+      if (role) role = role.toLowerCase().trim();
       setUserRole(role);
       console.log('🔑 QR Manager: Final user role:', role);
 
