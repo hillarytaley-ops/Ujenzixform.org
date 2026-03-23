@@ -1,8 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { Route, DollarSign, RefreshCw, Package, AlertCircle } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
+import { SUPABASE_URL, SUPABASE_ANON_KEY } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 
 interface MileageRow {
@@ -33,16 +32,67 @@ function resolveDeliveryProviderUserId(authUserId?: string | null): string | nul
   return fallback && fallback.length > 0 ? fallback : null;
 }
 
+function accessTokenFromStorage(): string | null {
+  try {
+    const raw = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+    if (!raw) return null;
+    const p = JSON.parse(raw);
+    return (
+      p.access_token ||
+      p.currentSession?.access_token ||
+      p.session?.access_token ||
+      null
+    );
+  } catch {
+    return null;
+  }
+}
+
+/** Native fetch bypasses Supabase client global fetch wrapper — avoids stuck RPC promises. */
+async function fetchMileagePayRest(
+  providerUserId: string,
+  accessToken: string | null,
+  signal: AbortSignal
+): Promise<MileageRow[]> {
+  const headers: Record<string, string> = {
+    apikey: SUPABASE_ANON_KEY,
+    'Content-Type': 'application/json',
+  };
+  if (accessToken) headers.Authorization = `Bearer ${accessToken}`;
+
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/get_provider_mileage_pay`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ _provider_user_id: providerUserId }),
+    signal,
+  });
+
+  const text = await res.text();
+  if (!res.ok) {
+    const err = new Error(text || `HTTP ${res.status}`);
+    (err as Error & { httpStatus?: number }).httpStatus = res.status;
+    throw err;
+  }
+  if (!text) return [];
+  try {
+    const data = JSON.parse(text) as unknown;
+    return Array.isArray(data) ? (data as MileageRow[]) : [];
+  } catch {
+    throw new Error('Invalid mileage pay response');
+  }
+}
+
 export const DeliveryPayTab: React.FC<{ isDarkMode?: boolean }> = ({ isDarkMode }) => {
-  const { user } = useAuth();
+  const { user, session, loading: authLoading } = useAuth();
   const [rows, setRows] = useState<MileageRow[]>([]);
-  /** false until a real fetch starts — avoids infinite spinner when user?.id is briefly null */
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [migrationNeeded, setMigrationNeeded] = useState(false);
+  const requestGen = useRef(0);
 
-  const fetchData = async () => {
-    const providerUserId = resolveDeliveryProviderUserId(user?.id);
+  const fetchData = useCallback(async () => {
+    const uid = user?.id ?? session?.user?.id ?? null;
+    const providerUserId = resolveDeliveryProviderUserId(uid);
     if (!providerUserId) {
       setRows([]);
       setError(null);
@@ -51,24 +101,34 @@ export const DeliveryPayTab: React.FC<{ isDarkMode?: boolean }> = ({ isDarkMode 
       return;
     }
 
+    const gen = ++requestGen.current;
     setLoading(true);
     setError(null);
-    const timeoutMs = 12000;
+
+    const token = session?.access_token ?? accessTokenFromStorage();
+    const controller = new AbortController();
+    const rpcTimeoutMs = 10000;
+    const timeoutId = window.setTimeout(() => controller.abort(), rpcTimeoutMs);
+
     try {
-      const { data, error: err } = await Promise.race([
-        supabase.rpc('get_provider_mileage_pay', {
-          _provider_user_id: providerUserId,
-        }),
-        new Promise<{ data: null; error: { message: string } }>((_, reject) =>
-          setTimeout(() => reject(new Error('Request timed out')), timeoutMs)
-        ),
-      ]);
-      if (err) throw err;
-      setRows((data as MileageRow[]) || []);
+      const data = await fetchMileagePayRest(providerUserId, token, controller.signal);
+      window.clearTimeout(timeoutId);
+      if (gen !== requestGen.current) return;
+      setRows(data);
       setMigrationNeeded(false);
     } catch (e: unknown) {
-      const msg = (e as { message?: string })?.message ?? String(e);
-      if (/relation.*does not exist|function.*does not exist|timed out|timeout/i.test(msg)) {
+      window.clearTimeout(timeoutId);
+      if (gen !== requestGen.current) return;
+      const msg = (e as { message?: string; name?: string })?.message ?? String(e);
+      const aborted = (e as { name?: string })?.name === 'AbortError' || /aborted|AbortError/i.test(msg);
+      if (aborted || /timed out|timeout/i.test(msg)) {
+        setError(null);
+        setRows([]);
+        setMigrationNeeded(true);
+      } else if (
+        /relation.*does not exist|function.*does not exist|PGRST202|PGRST116|404/i.test(msg) ||
+        (e as Error & { httpStatus?: number })?.httpStatus === 404
+      ) {
         setError(null);
         setRows([]);
         setMigrationNeeded(true);
@@ -78,13 +138,27 @@ export const DeliveryPayTab: React.FC<{ isDarkMode?: boolean }> = ({ isDarkMode 
         setMigrationNeeded(false);
       }
     } finally {
-      setLoading(false);
+      if (gen === requestGen.current) setLoading(false);
     }
-  };
+  }, [user?.id, session?.user?.id, session?.access_token]);
 
   useEffect(() => {
-    fetchData();
-  }, [user?.id]);
+    if (authLoading) return;
+
+    let cancelled = false;
+    const safety = window.setTimeout(() => {
+      if (!cancelled) setLoading(false);
+    }, 14000);
+
+    void fetchData();
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(safety);
+      requestGen.current += 1;
+      setLoading(false);
+    };
+  }, [authLoading, fetchData]);
 
   const totalRoundTripKm = rows.reduce((s, r) => s + Number(r.round_trip_km || 0), 0);
   const totalAmount = rows.reduce((s, r) => s + Number(r.amount || 0), 0);
@@ -115,7 +189,7 @@ export const DeliveryPayTab: React.FC<{ isDarkMode?: boolean }> = ({ isDarkMode 
           </div>
           <button
             type="button"
-            onClick={fetchData}
+            onClick={() => void fetchData()}
             className="mt-4 text-teal-600 hover:underline"
           >
             Try again
@@ -205,7 +279,7 @@ export const DeliveryPayTab: React.FC<{ isDarkMode?: boolean }> = ({ isDarkMode 
           <div className="mt-4 flex justify-end">
             <button
               type="button"
-              onClick={fetchData}
+              onClick={() => void fetchData()}
               className="flex items-center gap-2 text-sm text-teal-600 hover:text-teal-700"
             >
               <RefreshCw className="h-4 w-4" />
