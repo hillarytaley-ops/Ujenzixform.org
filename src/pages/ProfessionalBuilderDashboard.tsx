@@ -126,6 +126,22 @@ function mergeProjectsWithPurchaseAggregates(
 }
 
 /** Runs after projects list is shown — never block loading spinner on this. */
+/** Card date: prefer start → end → expected end → created (many rows only have created_at / expected_end_date). */
+function formatProjectCardDate(p: {
+  start_date?: string | null;
+  end_date?: string | null;
+  expected_end_date?: string | null;
+  created_at?: string | null;
+}): string {
+  const candidates = [p.start_date, p.end_date, p.expected_end_date, p.created_at];
+  for (const raw of candidates) {
+    if (raw == null || raw === '') continue;
+    const d = new Date(raw);
+    if (!Number.isNaN(d.getTime())) return d.toLocaleDateString();
+  }
+  return 'No date';
+}
+
 async function mergeProjectRowsWithPurchaseOrders(
   projectRows: any[],
   userId: string,
@@ -1072,7 +1088,7 @@ const ProfessionalBuilderDashboardPage = () => {
       
       console.log('📁 Making REST API request...');
       const projectSelect =
-        'id,name,location,status,budget,spent,progress,created_at,start_date,end_date,description,total_orders';
+        'id,name,location,status,budget,spent,progress,created_at,start_date,end_date,expected_end_date,description,total_orders';
       let response = await fetch(
         `${SUPABASE_URL}/rest/v1/builder_projects?builder_id=eq.${userId}&select=${projectSelect}&order=created_at.desc`,
         {
@@ -1091,7 +1107,7 @@ const ProfessionalBuilderDashboardPage = () => {
         const retryT = window.setTimeout(() => retryCtrl.abort(), 8000);
         try {
           response = await fetch(
-            `${SUPABASE_URL}/rest/v1/builder_projects?builder_id=eq.${userId}&select=id,name,location,status,budget,spent,progress,created_at,start_date,end_date,description&order=created_at.desc`,
+            `${SUPABASE_URL}/rest/v1/builder_projects?builder_id=eq.${userId}&select=id,name,location,status,budget,spent,progress,created_at,start_date,end_date,expected_end_date,description&order=created_at.desc`,
             {
               headers: {
                 'apikey': SUPABASE_ANON_KEY,
@@ -2399,7 +2415,7 @@ const ProfessionalBuilderDashboardPage = () => {
                               <div className="flex items-center justify-between pt-3 border-t text-xs text-gray-500">
                                 <span className="flex items-center gap-1">
                                   <Calendar className="h-3 w-3" />
-                                  {project.start_date ? new Date(project.start_date).toLocaleDateString() : 'No date'}
+                                  {formatProjectCardDate(project)}
                                 </span>
                                 <span className="flex items-center gap-1">
                                   <Package className="h-3 w-3" />
