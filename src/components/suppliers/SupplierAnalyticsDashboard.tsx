@@ -19,7 +19,7 @@
  * ╚══════════════════════════════════════════════════════════════════════════════════════╝
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -131,6 +131,21 @@ function supplierFilterQueryParam(ids: string[]): string {
   return `supplier_id=in.(${unique.join(',')})`;
 }
 
+const SESSION_WAIT_MS = 5000;
+
+async function getSessionWithTimeout() {
+  type SessionPayload = Awaited<ReturnType<typeof supabase.auth.getSession>>;
+  const timedOut: SessionPayload = { data: { session: null }, error: null };
+  try {
+    return await Promise.race<SessionPayload>([
+      supabase.auth.getSession(),
+      new Promise((resolve) => setTimeout(() => resolve(timedOut), SESSION_WAIT_MS)),
+    ]);
+  } catch {
+    return timedOut;
+  }
+}
+
 export const SupplierAnalyticsDashboard: React.FC<SupplierAnalyticsDashboardProps> = ({
   supplierId,
   supplierIds = [],
@@ -145,16 +160,20 @@ export const SupplierAnalyticsDashboard: React.FC<SupplierAnalyticsDashboardProp
   const [topProducts, setTopProducts] = useState<ProductPerformance[]>([]);
   const [recentOrders, setRecentOrders] = useState<any[]>([]);
   const { toast } = useToast();
+  const loadGenerationRef = useRef(0);
 
-  const supplierScopeKey = supplierIds.length > 0 ? supplierIds.join(',') : supplierId;
+  const supplierScopeKey = useMemo(() => {
+    const raw = supplierIds.length > 0 ? supplierIds : supplierId ? [supplierId] : [];
+    return [...new Set(raw.filter(Boolean))].sort().join(',');
+  }, [supplierIds, supplierId]);
 
   useEffect(() => {
     loadAnalytics();
-    // Safety timeout - force loading to false after 10 seconds
+    // Backstop if anything before fetch timeouts still hangs (e.g. sync work)
     const safetyTimeout = setTimeout(() => {
       setLoading(false);
-      console.log('⏱️ Analytics safety timeout - forcing loading false');
-    }, 10000);
+      console.warn('⏱️ Analytics safety timeout — clearing loading state');
+    }, 25000);
     return () => clearTimeout(safetyTimeout);
   }, [supplierId, supplierScopeKey, timeRange]);
 
@@ -172,18 +191,23 @@ export const SupplierAnalyticsDashboard: React.FC<SupplierAnalyticsDashboardProp
   };
 
   const loadAnalytics = async () => {
+    const generation = ++loadGenerationRef.current;
+    const finishIfCurrent = () => {
+      if (generation === loadGenerationRef.current) setLoading(false);
+    };
+
     const scopeIds = resolveScopeIds();
     if (scopeIds.length === 0) {
-      setLoading(false);
       setMetrics(null);
+      finishIfCurrent();
       return;
     }
 
     try {
-      setLoading(true);
+      if (generation === loadGenerationRef.current) setLoading(true);
       console.log('📊 Loading analytics for supplier scope:', scopeIds);
 
-      const { data: { session } } = await supabase.auth.getSession();
+      const { data: { session } } = await getSessionWithTimeout();
       const token = session?.access_token || SUPABASE_ANON_KEY;
       const restHeaders: Record<string, string> = {
         apikey: SUPABASE_ANON_KEY,
@@ -198,6 +222,8 @@ export const SupplierAnalyticsDashboard: React.FC<SupplierAnalyticsDashboardProp
       ]);
 
       console.log('📊 Analytics data loaded:', { orders: ordersData.length, products: productsData.length, quotes: quotesData.length });
+
+      if (generation !== loadGenerationRef.current) return;
 
       // Calculate metrics
       const calculatedMetrics = calculateMetrics(ordersData, quotesData);
@@ -220,10 +246,9 @@ export const SupplierAnalyticsDashboard: React.FC<SupplierAnalyticsDashboardProp
 
     } catch (error) {
       console.error('Error loading analytics:', error);
-      // Load mock data as fallback
-      loadMockData();
+      if (generation === loadGenerationRef.current) loadMockData();
     } finally {
-      setLoading(false);
+      finishIfCurrent();
     }
   };
 
