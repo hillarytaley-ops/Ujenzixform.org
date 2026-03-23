@@ -16,6 +16,18 @@ interface ProviderMileageRow {
   delivery_count: number;
 }
 
+/** True only when DB really lacks migration objects — not timeouts or generic failures */
+function isMissingMigrationError(err: { message?: string; code?: string; details?: string } | null): boolean {
+  if (!err) return false;
+  const msg = `${err.message ?? ''} ${err.details ?? ''}`.toLowerCase();
+  const code = String(err.code ?? '');
+  if (code === 'PGRST202') return true;
+  if (code === '42883' || code === '42P01') return true;
+  if (/function .* does not exist|relation .* does not exist|could not find the function/i.test(msg)) return true;
+  if (/schema cache/i.test(msg)) return true;
+  return false;
+}
+
 export const DeliveryPayAdminTab: React.FC = () => {
   const [rows, setRows] = useState<ProviderMileageRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -36,7 +48,14 @@ export const DeliveryPayAdminTab: React.FC = () => {
     try {
       const fetchPromise = (async () => {
         const { data: payData, error: payErr } = await supabase.rpc('admin_get_all_providers_mileage_pay');
-        if (payErr) throw payErr;
+        if (payErr) {
+          if (isMissingMigrationError(payErr)) {
+            setRows([]);
+            setMigrationNeeded(true);
+            return;
+          }
+          throw payErr;
+        }
         setRows((payData as ProviderMileageRow[]) || []);
         setMigrationNeeded(false);
 
@@ -46,20 +65,25 @@ export const DeliveryPayAdminTab: React.FC = () => {
           .order('updated_at', { ascending: false })
           .limit(1)
           .maybeSingle();
-        if (configErr) throw configErr;
-        if (configData?.rate_per_km != null) {
+        if (configErr) {
+          if (isMissingMigrationError(configErr)) {
+            setMigrationNeeded(true);
+            return;
+          }
+          console.warn('delivery_mileage_config fetch:', configErr);
+        } else if (configData?.rate_per_km != null) {
           setRatePerKm(String(configData.rate_per_km));
         }
       })();
       await Promise.race([fetchPromise, timeoutPromise]);
     } catch (e: unknown) {
       const msg = (e as { message?: string })?.message ?? String(e);
-      const isMigrationNeeded =
-        /relation.*does not exist|function.*does not exist|timed out|timeout/i.test(msg);
-      if (isMigrationNeeded) {
+      if (/timed out|timeout/i.test(msg)) {
         setRows([]);
-        setError(null);
-        setMigrationNeeded(true);
+        setError(
+          'Request timed out. Your migration may already be applied — check your connection and tap Refresh. In Supabase: Settings → API → Reload schema if the RPC was just created.'
+        );
+        setMigrationNeeded(false);
       } else {
         setError(msg);
         setRows([]);
@@ -203,8 +227,14 @@ export const DeliveryPayAdminTab: React.FC = () => {
         </CardHeader>
         <CardContent>
           {migrationNeeded && (
-            <div className="mb-4 p-4 rounded-lg bg-amber-50 border border-amber-200 dark:bg-amber-950/40 dark:border-amber-800 text-amber-900 dark:text-amber-200 text-sm">
-              <strong>Setup required.</strong> Run the delivery mileage migration in Supabase SQL Editor to enable this feature. See <code className="bg-amber-200 dark:bg-amber-900/50 px-1 rounded text-amber-950 dark:text-amber-100">supabase/DELIVERY_MILEAGE_PAY_MIGRATION.sql</code>.
+            <div className="mb-4 p-4 rounded-lg bg-amber-50 border border-amber-200 dark:bg-amber-950/40 dark:border-amber-800 text-amber-900 dark:text-amber-200 text-sm space-y-2">
+              <p>
+                <strong>Setup required.</strong> Run the delivery mileage migration in Supabase SQL Editor. See{' '}
+                <code className="bg-amber-200 dark:bg-amber-900/50 px-1 rounded text-amber-950 dark:text-amber-100">supabase/DELIVERY_MILEAGE_PAY_MIGRATION.sql</code>.
+              </p>
+              <p className="text-amber-800/90 dark:text-amber-300/90 text-xs">
+                If you already ran it, open <strong>Supabase → Project Settings → API</strong> and click <strong>Reload schema</strong> so PostgREST picks up the new RPC, then use Refresh above.
+              </p>
             </div>
           )}
           <div className="grid grid-cols-2 gap-4 mb-6">
