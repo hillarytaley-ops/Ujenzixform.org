@@ -738,10 +738,26 @@ const SupplierDashboard = () => {
       const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
       if (storedSession) {
         const parsed = JSON.parse(storedSession);
-        accessToken = parsed.access_token;
+        accessToken =
+          parsed.access_token ||
+          parsed.currentSession?.access_token ||
+          parsed.session?.access_token ||
+          null;
       }
     } catch (e) {
       console.warn('Could not get session from localStorage');
+    }
+
+    try {
+      const { data: { session } } = await Promise.race([
+        supabase.auth.getSession(),
+        new Promise<{ data: { session: null } }>((resolve) =>
+          setTimeout(() => resolve({ data: { session: null } }), 5000)
+        ),
+      ]);
+      if (!accessToken && session?.access_token) accessToken = session.access_token;
+    } catch {
+      /* ignore */
     }
     
     const headers: Record<string, string> = {
@@ -817,38 +833,81 @@ const SupplierDashboard = () => {
       } catch (e) {
         console.warn('Supplier lookup by direct id failed');
       }
-      
-      const supplierIdsArray = Array.from(supplierIds);
-      console.log('🔍 Looking for quotes with supplier_id in:', supplierIdsArray);
 
-      // STEP 2: Fetch ALL pending/quoted purchase_orders and filter client-side
-      // This ensures we don't miss any due to ID mismatches
-      let allQuotes: any[] = [];
+      // Profile chain (same as dashboard order stats) — purchase_orders.supplier_id may match profile.id
       try {
-        // Include both new status flow and legacy statuses for backward compatibility
-        const quotesResponse = await fetch(
-          `${SUPABASE_URL}/rest/v1/purchase_orders?status=in.(quote_created,quote_received_by_supplier,quote_responded,quote_revised,quote_viewed_by_builder,quote_accepted,quote_rejected,pending,quoted,rejected,confirmed)&order=created_at.desc&limit=100`,
+        const profileResponse = await fetch(
+          `${SUPABASE_URL}/rest/v1/profiles?user_id=eq.${userId}&select=id`,
           { headers, cache: 'no-store' }
         );
-        
-        if (quotesResponse.ok) {
-          allQuotes = await quotesResponse.json();
-          console.log('📋 Total quotes in system:', allQuotes.length);
+        if (profileResponse.ok) {
+          const profileData = await profileResponse.json();
+          const profileRow = profileData?.[0];
+          if (profileRow?.id) {
+            if (profileRow.id !== userId) supplierIds.add(profileRow.id);
+            const supRes = await fetch(
+              `${SUPABASE_URL}/rest/v1/suppliers?user_id=eq.${profileRow.id}&select=id,user_id`,
+              { headers, cache: 'no-store' }
+            );
+            if (supRes.ok) {
+              const supRows = await supRes.json();
+              if (supRows?.[0]) {
+                supplierIds.add(supRows[0].id);
+                if (supRows[0].user_id) supplierIds.add(supRows[0].user_id);
+              }
+            }
+          }
         }
       } catch (e) {
-        console.error('Failed to fetch quotes');
+        console.warn('Quote fetch: profile/supplier chain lookup failed');
       }
-      
-      // Filter quotes that match any of our supplier IDs
-      const purchaseOrderQuotes = allQuotes.filter(q => supplierIdsArray.includes(q.supplier_id));
-      console.log('📋 Quotes matching this supplier:', purchaseOrderQuotes.length);
-      
-      // DEBUG: Show all quotes and their supplier_ids
-      console.log('🔎 DEBUG - All quotes breakdown:');
-      allQuotes.forEach((q: any) => {
-        const matches = supplierIdsArray.includes(q.supplier_id);
-        console.log(`   ${q.po_number}: supplier_id=${q.supplier_id} ${matches ? '✓ MATCH' : '✗'}`);
+
+      // IDs already resolved for dashboard orders (avoids mismatch with quote fetch)
+      resolvedSupplierIds.forEach((id) => {
+        if (id) supplierIds.add(id);
       });
+      if (supplierRecordId) supplierIds.add(supplierRecordId);
+
+      const supplierIdsArray = Array.from(supplierIds).filter(Boolean);
+      console.log('🔍 Looking for quotes with supplier_id in:', supplierIdsArray);
+
+      // STEP 2: Fetch this supplier's quote-related POs (do NOT use global limit=100 — misses older quotes)
+      const quoteStatuses =
+        'quote_created,quote_received_by_supplier,quote_responded,quote_revised,quote_viewed_by_builder,quote_accepted,quote_rejected,pending,quoted,rejected,confirmed,processing,order_created,awaiting_delivery_request';
+      let purchaseOrderQuotes: any[] = [];
+      try {
+        if (supplierIdsArray.length > 0) {
+          const inList = supplierIdsArray.join(',');
+          const quotesResponse = await fetch(
+            `${SUPABASE_URL}/rest/v1/purchase_orders?supplier_id=in.(${inList})&status=in.(${quoteStatuses})&order=created_at.desc&limit=500`,
+            { headers, cache: 'no-store' }
+          );
+          if (quotesResponse.ok) {
+            purchaseOrderQuotes = await quotesResponse.json();
+            console.log('📋 Quotes from supplier-scoped query:', purchaseOrderQuotes.length);
+          }
+        }
+      } catch (e) {
+        console.error('Failed to fetch quotes (supplier-scoped)');
+      }
+
+      // Fallback: legacy global slice + client filter (if scoped query empty but IDs exist)
+      let allQuotes: any[] = purchaseOrderQuotes;
+      if (purchaseOrderQuotes.length === 0 && supplierIdsArray.length > 0) {
+        try {
+          const quotesResponse = await fetch(
+            `${SUPABASE_URL}/rest/v1/purchase_orders?status=in.(${quoteStatuses})&order=created_at.desc&limit=300`,
+            { headers, cache: 'no-store' }
+          );
+          if (quotesResponse.ok) {
+            allQuotes = await quotesResponse.json();
+            purchaseOrderQuotes = allQuotes.filter((q: any) => supplierIdsArray.includes(q.supplier_id));
+            console.log('📋 Quotes via fallback filter:', purchaseOrderQuotes.length, 'of', allQuotes.length);
+          }
+        } catch (e) {
+          console.error('Failed to fetch quotes (fallback)');
+        }
+      }
 
       // Transform purchase_orders to match quote display format
       const transformedPOQuotes = (purchaseOrderQuotes || []).map(po => ({
@@ -968,6 +1027,12 @@ const SupplierDashboard = () => {
       subscription.unsubscribe();
     };
   }, [user?.id]);
+
+  // Reload quotes when dashboard finishes resolving supplier IDs (same IDs used for orders)
+  useEffect(() => {
+    if (!user?.id || resolvedSupplierIds.length === 0) return;
+    fetchQuoteRequests();
+  }, [resolvedSupplierIds.join(',')]);
 
   const handleQuoteAction = async (action: 'approve' | 'reject') => {
     if (!selectedQuote) return;
