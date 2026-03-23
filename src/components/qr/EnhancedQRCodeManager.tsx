@@ -1970,19 +1970,15 @@ export const EnhancedQRCodeManager: React.FC<EnhancedQRCodeManagerProps> = ({ su
 
   return (
     <div className="space-y-6">
-      {/* Header with Download All and View Toggle */}
+      {/* Title + utility actions */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h2 className="text-2xl font-bold flex items-center gap-2">
             <QrCode className="h-7 w-7 text-cyan-500" />
             QR Codes Management
           </h2>
-          <p className="text-muted-foreground mt-1">
-            {awaitingDispatchOrders.length} awaiting dispatch • {dispatchedOrders.length} dispatched • {inTransitOrders.length} in transit • {deliveredOrders.length} delivered
-          </p>
         </div>
         <div className="flex gap-2 flex-wrap items-center">
-          {/* Refresh Button */}
           <Button 
             variant="outline"
             size="sm"
@@ -1996,8 +1992,6 @@ export const EnhancedQRCodeManager: React.FC<EnhancedQRCodeManagerProps> = ({ su
             <RefreshCw className="h-4 w-4 mr-1" />
             Refresh
           </Button>
-          
-          {/* Selection Mode Toggle */}
           <Button 
             variant={selectionMode ? 'default' : 'outline'}
             size="sm"
@@ -2010,8 +2004,6 @@ export const EnhancedQRCodeManager: React.FC<EnhancedQRCodeManagerProps> = ({ su
             {selectionMode ? <CheckSquare className="h-4 w-4 mr-1" /> : <Square className="h-4 w-4 mr-1" />}
             {selectionMode ? `Selected (${selectedItems.size})` : 'Select'}
           </Button>
-
-          {/* Delete & Regenerate - only when items selected */}
           {selectionMode && selectedItems.size > 0 && (
             <Button
               variant="outline"
@@ -2024,60 +2016,69 @@ export const EnhancedQRCodeManager: React.FC<EnhancedQRCodeManagerProps> = ({ su
               Delete & Regenerate ({selectedItems.size})
             </Button>
           )}
+        </div>
+      </div>
 
-          {/* Primary Action: Scan to Dispatch */}
+      {/* Scan to Dispatch + status tabs — single control bar */}
+      <div
+        className="flex flex-row items-stretch rounded-lg border border-cyan-200 dark:border-cyan-800 bg-muted/40 dark:bg-muted/20 shadow-sm overflow-hidden"
+        role="toolbar"
+        aria-label="Dispatch scan and order status filters"
+      >
+        <Button
+          type="button"
+          size="sm"
+          onClick={() => navigate('/supplier-dispatch-scanner')}
+          className="inline-flex items-center rounded-none h-auto min-h-10 px-4 py-2.5 shrink-0 border-0 border-r border-cyan-200 dark:border-cyan-800 bg-green-600 hover:bg-green-700 text-white shadow-none"
+        >
+          <Scan className="h-4 w-4 sm:h-5 sm:w-5 mr-2 shrink-0" />
+          <span className="font-semibold whitespace-nowrap">Scan to Dispatch</span>
+        </Button>
+        <div className="flex flex-1 min-w-0 overflow-x-auto divide-x divide-cyan-200 dark:divide-cyan-800">
           <Button 
-            size="lg"
-            onClick={() => navigate('/supplier-dispatch-scanner')}
-            className="bg-green-600 hover:bg-green-700 text-white shadow-lg"
+            type="button"
+            variant={viewMode === 'awaiting_dispatch' ? 'default' : 'ghost'}
+            size="sm"
+            onClick={() => setViewMode('awaiting_dispatch')}
+            className={`rounded-none flex-1 min-w-[9.5rem] justify-center h-auto min-h-10 py-2.5 ${viewMode === 'awaiting_dispatch' ? 'bg-amber-600 hover:bg-amber-600 text-white' : ''}`}
+            title="Orders awaiting dispatch - Print labels and scan QR codes"
           >
-            <Scan className="h-5 w-5 mr-2" />
-            Scan to Dispatch
+            <Clock className="h-4 w-4 mr-1 shrink-0" />
+            Awaiting Dispatch ({awaitingDispatchOrders.length})
           </Button>
-
-          {/* View Mode Toggle - Status-based sections */}
-          <div className="flex rounded-lg border overflow-hidden">
-            <Button 
-              variant={viewMode === 'awaiting_dispatch' ? 'default' : 'ghost'}
-              size="sm"
-              onClick={() => setViewMode('awaiting_dispatch')}
-              className={viewMode === 'awaiting_dispatch' ? 'bg-amber-600' : ''}
-              title="Orders awaiting dispatch - Print labels and scan QR codes"
-            >
-              <Clock className="h-4 w-4 mr-1" />
-              Awaiting Dispatch ({awaitingDispatchOrders.length})
-            </Button>
-            <Button 
-              variant={viewMode === 'dispatched' ? 'default' : 'ghost'}
-              size="sm"
-              onClick={() => setViewMode('dispatched')}
-              className={viewMode === 'dispatched' ? 'bg-green-600' : ''}
-              title="Orders that have been dispatched - QR codes scanned"
-            >
-              <Truck className="h-4 w-4 mr-1" />
-              Dispatched ({dispatchedOrders.length})
-            </Button>
-            <Button 
-              variant={viewMode === 'in_transit' ? 'default' : 'ghost'}
-              size="sm"
-              onClick={() => setViewMode('in_transit')}
-              className={viewMode === 'in_transit' ? 'bg-blue-600' : ''}
-              title="Orders in transit to destination"
-            >
-              <Package className="h-4 w-4 mr-1" />
-              In Transit ({inTransitOrders.length})
-            </Button>
-            <Button 
-              variant={viewMode === 'delivered' ? 'default' : 'ghost'}
-              size="sm"
-              onClick={() => setViewMode('delivered')}
-              className={viewMode === 'delivered' ? 'bg-purple-600' : ''}
-              title="Orders delivered and received"
-            >
-              <CheckCircle className="h-4 w-4 mr-1" />
-              Delivered ({deliveredOrders.length})
-            </Button>
-          </div>
+          <Button 
+            type="button"
+            variant={viewMode === 'dispatched' ? 'default' : 'ghost'}
+            size="sm"
+            onClick={() => setViewMode('dispatched')}
+            className={`rounded-none flex-1 min-w-[8.5rem] justify-center h-auto min-h-10 py-2.5 ${viewMode === 'dispatched' ? 'bg-green-600 hover:bg-green-600 text-white' : ''}`}
+            title="Orders that have been dispatched - QR codes scanned"
+          >
+            <Truck className="h-4 w-4 mr-1 shrink-0" />
+            Dispatched ({dispatchedOrders.length})
+          </Button>
+          <Button 
+            type="button"
+            variant={viewMode === 'in_transit' ? 'default' : 'ghost'}
+            size="sm"
+            onClick={() => setViewMode('in_transit')}
+            className={`rounded-none flex-1 min-w-[8rem] justify-center h-auto min-h-10 py-2.5 ${viewMode === 'in_transit' ? 'bg-blue-600 hover:bg-blue-600 text-white' : ''}`}
+            title="Orders in transit to destination"
+          >
+            <Package className="h-4 w-4 mr-1 shrink-0" />
+            In Transit ({inTransitOrders.length})
+          </Button>
+          <Button 
+            type="button"
+            variant={viewMode === 'delivered' ? 'default' : 'ghost'}
+            size="sm"
+            onClick={() => setViewMode('delivered')}
+            className={`rounded-none flex-1 min-w-[8rem] justify-center h-auto min-h-10 py-2.5 ${viewMode === 'delivered' ? 'bg-purple-600 hover:bg-purple-600 text-white' : ''}`}
+            title="Orders delivered and received"
+          >
+            <CheckCircle className="h-4 w-4 mr-1 shrink-0" />
+            Delivered ({deliveredOrders.length})
+          </Button>
         </div>
       </div>
 
