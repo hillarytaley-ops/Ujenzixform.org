@@ -63,6 +63,31 @@ const AVAILABLE_ROLES = [
   { value: 'professional_builder', label: 'Professional Builder', icon: HardHat, color: 'bg-blue-500' },
 ];
 
+/** user_roles.role is often `delivery`; UI and some code use `delivery_provider` */
+function isDeliveryRole(role: string): boolean {
+  const r = (role || '').toLowerCase().trim();
+  return r === 'delivery' || r === 'delivery_provider';
+}
+
+function userMatchesRoleFilter(userRole: string, filter: string): boolean {
+  if (filter === 'all') return true;
+  if (filter === 'delivery_provider') return isDeliveryRole(userRole);
+  return userRole === filter;
+}
+
+function roleCountForCard(roleValue: string, allUsers: UserWithRole[]): number {
+  if (roleValue === 'delivery_provider') {
+    return allUsers.filter((u) => isDeliveryRole(u.role)).length;
+  }
+  return allUsers.filter((u) => u.role === roleValue).length;
+}
+
+/** Compare saved role string vs Select value (delivery ↔ delivery_provider) */
+function rolesEquivalent(a: string, b: string): boolean {
+  if (a === b) return true;
+  return isDeliveryRole(a) && isDeliveryRole(b);
+}
+
 export const UserRolesManager = () => {
   const [users, setUsers] = useState<UserWithRole[]>([]);
   const [loading, setLoading] = useState(true);
@@ -189,12 +214,13 @@ export const UserRolesManager = () => {
     const matchesSearch = 
       user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
       (user.full_name?.toLowerCase().includes(searchTerm.toLowerCase()));
-    const matchesRole = roleFilter === "all" || user.role === roleFilter;
+    const matchesRole = userMatchesRoleFilter(user.role, roleFilter);
     return matchesSearch && matchesRole;
   });
 
   const getRoleBadge = (role: string) => {
-    const roleConfig = AVAILABLE_ROLES.find(r => r.value === role);
+    const lookupKey = isDeliveryRole(role) ? 'delivery_provider' : role;
+    const roleConfig = AVAILABLE_ROLES.find(r => r.value === lookupKey);
     if (!roleConfig) return <Badge variant="outline">{role}</Badge>;
     
     const Icon = roleConfig.icon;
@@ -208,7 +234,7 @@ export const UserRolesManager = () => {
 
   const roleCounts = AVAILABLE_ROLES.map(role => ({
     ...role,
-    count: users.filter(u => u.role === role.value).length
+    count: roleCountForCard(role.value, users)
   }));
 
   return (
@@ -319,7 +345,7 @@ export const UserRolesManager = () => {
                                 size="sm"
                                 onClick={() => {
                                   setEditingUser(user);
-                                  setNewRole(user.role);
+                                  setNewRole(isDeliveryRole(user.role) ? 'delivery_provider' : user.role);
                                 }}
                               >
                                 <Edit className="h-4 w-4 mr-1" />
@@ -360,7 +386,7 @@ export const UserRolesManager = () => {
                                 </Button>
                                 <Button 
                                   onClick={handleUpdateRole}
-                                  disabled={updating || newRole === user.role}
+                                  disabled={updating || rolesEquivalent(newRole, user.role)}
                                 >
                                   {updating ? (
                                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />
