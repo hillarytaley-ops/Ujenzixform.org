@@ -125,6 +125,65 @@ function mergeProjectsWithPurchaseAggregates(
   });
 }
 
+/** Runs after projects list is shown — never block loading spinner on this. */
+async function mergeProjectRowsWithPurchaseOrders(
+  projectRows: any[],
+  userId: string,
+  accessToken: string | null
+): Promise<any[]> {
+  const buyerIds = new Set<string>([userId]);
+  const profCtrl = new AbortController();
+  const profT = window.setTimeout(() => profCtrl.abort(), 4000);
+  try {
+    const profRes = await fetch(
+      `${SUPABASE_URL}/rest/v1/profiles?user_id=eq.${userId}&select=id&limit=1`,
+      {
+        headers: {
+          apikey: SUPABASE_ANON_KEY,
+          Authorization: `Bearer ${accessToken || SUPABASE_ANON_KEY}`,
+          Accept: 'application/json',
+        },
+        signal: profCtrl.signal,
+      }
+    );
+    if (profRes.ok) {
+      const profRows = (await profRes.json()) as { id?: string }[];
+      const pid = Array.isArray(profRows) && profRows[0]?.id;
+      if (pid) buyerIds.add(pid);
+    }
+  } catch {
+    /* optional */
+  } finally {
+    window.clearTimeout(profT);
+  }
+
+  const inList = Array.from(buyerIds).join(',');
+  const ordersUrl = `${SUPABASE_URL}/rest/v1/purchase_orders?buyer_id=in.(${inList})&select=project_id,total_amount,status`;
+  const orderCtrl = new AbortController();
+  const orderT = window.setTimeout(() => orderCtrl.abort(), 8000);
+  try {
+    const ordersRes = await fetch(ordersUrl, {
+      headers: {
+        apikey: SUPABASE_ANON_KEY,
+        Authorization: `Bearer ${accessToken || SUPABASE_ANON_KEY}`,
+        Accept: 'application/json',
+      },
+      signal: orderCtrl.signal,
+    });
+    if (!ordersRes.ok) {
+      console.warn('📁 purchase_orders merge skipped:', ordersRes.status);
+      return projectRows;
+    }
+    const orderRows = (await ordersRes.json()) as PurchaseOrderProjectRow[];
+    const stats = aggregatePurchaseStatsByProject(Array.isArray(orderRows) ? orderRows : []);
+    return mergeProjectsWithPurchaseAggregates(projectRows, stats);
+  } catch {
+    return projectRows;
+  } finally {
+    window.clearTimeout(orderT);
+  }
+}
+
 const ProfessionalBuilderDashboardPage = () => {
   // Use AuthContext for reliable user data
   const { user: authUser, isAuthenticated, signOut } = useAuth();
@@ -1027,22 +1086,28 @@ const ProfessionalBuilderDashboardPage = () => {
         }
       );
       if (!response.ok && response.status === 400) {
-        response = await fetch(
-          `${SUPABASE_URL}/rest/v1/builder_projects?builder_id=eq.${userId}&select=id,name,location,status,budget,spent,progress,created_at,start_date,end_date,description&order=created_at.desc`,
-          {
-            headers: {
-              'apikey': SUPABASE_ANON_KEY,
-              'Authorization': `Bearer ${accessToken || SUPABASE_ANON_KEY}`,
-              'Content-Type': 'application/json',
-              'Prefer': 'return=representation'
-            },
-            signal: controller.signal
-          }
-        );
+        clearTimeout(fetchTimeout);
+        const retryCtrl = new AbortController();
+        const retryT = window.setTimeout(() => retryCtrl.abort(), 8000);
+        try {
+          response = await fetch(
+            `${SUPABASE_URL}/rest/v1/builder_projects?builder_id=eq.${userId}&select=id,name,location,status,budget,spent,progress,created_at,start_date,end_date,description&order=created_at.desc`,
+            {
+              headers: {
+                'apikey': SUPABASE_ANON_KEY,
+                'Authorization': `Bearer ${accessToken || SUPABASE_ANON_KEY}`,
+                'Content-Type': 'application/json',
+                'Prefer': 'return=representation'
+              },
+              signal: retryCtrl.signal
+            }
+          );
+        } finally {
+          window.clearTimeout(retryT);
+        }
+      } else {
+        clearTimeout(fetchTimeout);
       }
-      
-      clearTimeout(fetchTimeout);
-      clearTimeout(safetyTimeout);
       
       console.log('📁 Response status:', response.status);
       
@@ -1050,7 +1115,6 @@ const ProfessionalBuilderDashboardPage = () => {
         const errorText = await response.text();
         console.error('📁 REST API error:', response.status, errorText);
         setProjects([]);
-        setLoadingProjects(false);
         return;
       }
       
@@ -1059,56 +1123,24 @@ const ProfessionalBuilderDashboardPage = () => {
       console.log('📁 Raw data received:', data);
       
       if (data && Array.isArray(data)) {
-        let projectRows = data as any[];
-        try {
-          const buyerIds = new Set<string>([userId]);
-          const { data: prof } = await supabase
-            .from('profiles')
-            .select('id')
-            .eq('user_id', userId)
-            .maybeSingle();
-          if (prof?.id) buyerIds.add(prof.id);
-
-          const inList = Array.from(buyerIds).join(',');
-          const ordersUrl = `${SUPABASE_URL}/rest/v1/purchase_orders?buyer_id=in.(${inList})&select=project_id,total_amount,status`;
-          const orderCtrl = new AbortController();
-          const orderT = window.setTimeout(() => orderCtrl.abort(), 8000);
-          try {
-            const ordersRes = await fetch(ordersUrl, {
-              headers: {
-                apikey: SUPABASE_ANON_KEY,
-                Authorization: `Bearer ${accessToken || SUPABASE_ANON_KEY}`,
-                Accept: 'application/json',
-              },
-              signal: orderCtrl.signal,
-            });
-            if (ordersRes.ok) {
-              const orderRows = (await ordersRes.json()) as PurchaseOrderProjectRow[];
-              const stats = aggregatePurchaseStatsByProject(Array.isArray(orderRows) ? orderRows : []);
-              projectRows = mergeProjectsWithPurchaseAggregates(projectRows, stats);
-              console.log('📁 Merged per-project order counts from purchase_orders');
-            } else {
-              console.warn('📁 purchase_orders merge skipped:', ordersRes.status);
-            }
-          } finally {
-            window.clearTimeout(orderT);
-          }
-        } catch (mergeErr) {
-          console.warn('📁 Per-project order merge failed (non-fatal):', mergeErr);
-        }
-
-        console.log('📁 Projects data received:', projectRows);
+        const projectRows = data as any[];
         setProjects(projectRows);
-        console.log('📁 Loaded', projectRows.length, 'projects and updated state');
+        console.log('📁 Loaded', projectRows.length, 'projects (order stats merge in background)');
+        void mergeProjectRowsWithPurchaseOrders(projectRows, userId, accessToken)
+          .then((merged) => {
+            setProjects(merged);
+            console.log('📁 Merged per-project order counts from purchase_orders');
+          })
+          .catch((err) => console.warn('📁 Per-project order merge failed (non-fatal):', err));
       } else {
         console.log('📁 No projects data returned (data is null or not array)');
         setProjects([]);
       }
     } catch (error: any) {
       console.error('📁 Error fetching projects:', error);
-      clearTimeout(safetyTimeout);
       setProjects([]);
     } finally {
+      clearTimeout(safetyTimeout);
       setLoadingProjects(false);
     }
   };
