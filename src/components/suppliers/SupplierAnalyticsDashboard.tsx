@@ -26,7 +26,7 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase, SUPABASE_URL, SUPABASE_ANON_KEY } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import {
   TrendingUp,
@@ -67,8 +67,18 @@ import {
   AreaChart
 } from 'recharts';
 
+export interface SupplierAnalyticsSummaryStats {
+  totalOrders: number;
+  totalRevenue: number;
+  totalCustomers: number;
+}
+
 interface SupplierAnalyticsDashboardProps {
   supplierId: string;
+  /** When set (e.g. from Supplier Dashboard), matches stats queries that use supplier_id=in.(...) */
+  supplierIds?: string[];
+  /** KPI figures aligned with the dashboard summary row */
+  summaryStats?: SupplierAnalyticsSummaryStats;
   onNavigateToOrders?: () => void;
 }
 
@@ -114,7 +124,19 @@ interface CategoryData {
 
 const CHART_COLORS = ['#2563eb', '#16a34a', '#dc2626', '#ca8a04', '#9333ea', '#0891b2', '#be123c', '#15803d'];
 
-export const SupplierAnalyticsDashboard: React.FC<SupplierAnalyticsDashboardProps> = ({ supplierId, onNavigateToOrders }) => {
+function supplierFilterQueryParam(ids: string[]): string {
+  const unique = [...new Set(ids.filter(Boolean))];
+  if (unique.length === 0) return '';
+  if (unique.length === 1) return `supplier_id=eq.${unique[0]}`;
+  return `supplier_id=in.(${unique.join(',')})`;
+}
+
+export const SupplierAnalyticsDashboard: React.FC<SupplierAnalyticsDashboardProps> = ({
+  supplierId,
+  supplierIds = [],
+  summaryStats,
+  onNavigateToOrders
+}) => {
   const [loading, setLoading] = useState(true);
   const [timeRange, setTimeRange] = useState('30days');
   const [metrics, setMetrics] = useState<SalesMetrics | null>(null);
@@ -124,6 +146,8 @@ export const SupplierAnalyticsDashboard: React.FC<SupplierAnalyticsDashboardProp
   const [recentOrders, setRecentOrders] = useState<any[]>([]);
   const { toast } = useToast();
 
+  const supplierScopeKey = supplierIds.length > 0 ? supplierIds.join(',') : supplierId;
+
   useEffect(() => {
     loadAnalytics();
     // Safety timeout - force loading to false after 10 seconds
@@ -132,7 +156,7 @@ export const SupplierAnalyticsDashboard: React.FC<SupplierAnalyticsDashboardProp
       console.log('⏱️ Analytics safety timeout - forcing loading false');
     }, 10000);
     return () => clearTimeout(safetyTimeout);
-  }, [supplierId, timeRange]);
+  }, [supplierId, supplierScopeKey, timeRange]);
 
   // Helper function to add timeout to any promise
   const withTimeout = <T,>(promise: Promise<T>, ms: number): Promise<T> => {
@@ -142,16 +166,35 @@ export const SupplierAnalyticsDashboard: React.FC<SupplierAnalyticsDashboardProp
     ]);
   };
 
+  const resolveScopeIds = (): string[] => {
+    if (supplierIds.length > 0) return [...new Set(supplierIds.filter(Boolean))];
+    return supplierId ? [supplierId] : [];
+  };
+
   const loadAnalytics = async () => {
+    const scopeIds = resolveScopeIds();
+    if (scopeIds.length === 0) {
+      setLoading(false);
+      setMetrics(null);
+      return;
+    }
+
     try {
       setLoading(true);
-      console.log('📊 Loading analytics for supplier:', supplierId);
+      console.log('📊 Loading analytics for supplier scope:', scopeIds);
+
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token || SUPABASE_ANON_KEY;
+      const restHeaders: Record<string, string> = {
+        apikey: SUPABASE_ANON_KEY,
+        Authorization: `Bearer ${token}`,
+      };
 
       // Load real data from database with timeouts
       const [ordersData, productsData, quotesData] = await Promise.all([
-        withTimeout(loadOrdersData(), 5000).catch(() => []),
-        withTimeout(loadProductsData(), 5000).catch(() => []),
-        withTimeout(loadQuotesData(), 5000).catch(() => [])
+        withTimeout(loadOrdersData(scopeIds, restHeaders), 5000).catch(() => []),
+        withTimeout(loadProductsData(scopeIds, restHeaders), 5000).catch(() => []),
+        withTimeout(loadQuotesData(scopeIds, restHeaders), 5000).catch(() => [])
       ]);
 
       console.log('📊 Analytics data loaded:', { orders: ordersData.length, products: productsData.length, quotes: quotesData.length });
@@ -184,30 +227,14 @@ export const SupplierAnalyticsDashboard: React.FC<SupplierAnalyticsDashboardProp
     }
   };
 
-  const loadOrdersData = async () => {
+  const loadOrdersData = async (scopeIds: string[], headers: Record<string, string>) => {
     try {
-      // Get access token for REST API
-      const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
-      let accessToken = '';
-      if (storedSession) {
-        try {
-          const parsed = JSON.parse(storedSession);
-          accessToken = parsed.access_token || '';
-        } catch (e) {}
-      }
+      const filter = supplierFilterQueryParam(scopeIds);
+      if (!filter) return [];
 
-      const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
-      const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
-
-      // Use REST API for faster, more reliable fetching
       const response = await fetch(
-        `${SUPABASE_URL}/rest/v1/purchase_orders?supplier_id=eq.${supplierId}&order=created_at.desc`,
-        {
-          headers: {
-            'apikey': SUPABASE_ANON_KEY,
-            'Authorization': `Bearer ${accessToken || SUPABASE_ANON_KEY}`,
-          },
-        }
+        `${SUPABASE_URL}/rest/v1/purchase_orders?${filter}&order=created_at.desc`,
+        { headers }
       );
 
       if (response.ok) {
@@ -222,29 +249,14 @@ export const SupplierAnalyticsDashboard: React.FC<SupplierAnalyticsDashboardProp
     }
   };
 
-  const loadProductsData = async () => {
+  const loadProductsData = async (scopeIds: string[], headers: Record<string, string>) => {
     try {
-      const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
-      let accessToken = '';
-      if (storedSession) {
-        try {
-          const parsed = JSON.parse(storedSession);
-          accessToken = parsed.access_token || '';
-        } catch (e) {}
-      }
+      const filter = supplierFilterQueryParam(scopeIds);
+      if (!filter) return [];
 
-      const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
-      const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
-
-      // Fetch supplier product prices
       const response = await fetch(
-        `${SUPABASE_URL}/rest/v1/supplier_product_prices?supplier_id=eq.${supplierId}`,
-        {
-          headers: {
-            'apikey': SUPABASE_ANON_KEY,
-            'Authorization': `Bearer ${accessToken || SUPABASE_ANON_KEY}`,
-          },
-        }
+        `${SUPABASE_URL}/rest/v1/supplier_product_prices?${filter}`,
+        { headers }
       );
 
       if (response.ok) {
@@ -260,12 +272,7 @@ export const SupplierAnalyticsDashboard: React.FC<SupplierAnalyticsDashboardProp
             const idsParam = productIds.map((id: string) => `"${id}"`).join(',');
             const materialsResponse = await fetch(
               `${SUPABASE_URL}/rest/v1/admin_material_images?id=in.(${idsParam})&select=id,name,category,unit`,
-              {
-                headers: {
-                  'apikey': SUPABASE_ANON_KEY,
-                  'Authorization': `Bearer ${accessToken || SUPABASE_ANON_KEY}`,
-                },
-              }
+              { headers }
             );
             
             if (materialsResponse.ok) {
@@ -298,29 +305,14 @@ export const SupplierAnalyticsDashboard: React.FC<SupplierAnalyticsDashboardProp
     }
   };
 
-  const loadQuotesData = async () => {
+  const loadQuotesData = async (scopeIds: string[], headers: Record<string, string>) => {
     try {
-      const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
-      let accessToken = '';
-      if (storedSession) {
-        try {
-          const parsed = JSON.parse(storedSession);
-          accessToken = parsed.access_token || '';
-        } catch (e) {}
-      }
+      const filter = supplierFilterQueryParam(scopeIds);
+      if (!filter) return [];
 
-      const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
-      const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
-
-      // Use OR filter for multiple statuses
       const response = await fetch(
-        `${SUPABASE_URL}/rest/v1/purchase_orders?supplier_id=eq.${supplierId}&status=in.(pending,quoted)`,
-        {
-          headers: {
-            'apikey': SUPABASE_ANON_KEY,
-            'Authorization': `Bearer ${accessToken || SUPABASE_ANON_KEY}`,
-          },
-        }
+        `${SUPABASE_URL}/rest/v1/purchase_orders?${filter}&status=in.(pending,quoted)`,
+        { headers }
       );
 
       if (response.ok) {
@@ -336,10 +328,9 @@ export const SupplierAnalyticsDashboard: React.FC<SupplierAnalyticsDashboardProp
   };
 
   const calculateMetrics = (orders: any[], quotes: any[]): SalesMetrics => {
-    // Filter confirmed/completed orders for revenue calculation
-    const confirmedOrders = orders.filter(o => ['confirmed', 'completed', 'delivered'].includes(o.status));
-    const totalRevenue = confirmedOrders.reduce((sum, o) => sum + (parseFloat(o.total_amount) || 0), 0);
-    const totalOrders = confirmedOrders.length;
+    // Match SupplierDashboard stats: all orders count toward revenue and order totals
+    const totalRevenue = orders.reduce((sum, o) => sum + (parseFloat(o.total_amount) || 0), 0);
+    const totalOrders = orders.length;
     const averageOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0;
     const totalQuotes = quotes.length;
     const acceptedQuotes = orders.filter(o => o.status === 'confirmed').length;
@@ -719,45 +710,58 @@ export const SupplierAnalyticsDashboard: React.FC<SupplierAnalyticsDashboardProp
     );
   }
 
+  const summaryLooksReady =
+    !!summaryStats &&
+    (summaryStats.totalOrders > 0 ||
+      summaryStats.totalRevenue > 0 ||
+      summaryStats.totalCustomers > 0);
+
+  const displayMetrics: SalesMetrics | null =
+    metrics && summaryStats && summaryLooksReady
+      ? {
+          ...metrics,
+          totalRevenue: summaryStats.totalRevenue,
+          totalOrders: summaryStats.totalOrders,
+          totalCustomers: summaryStats.totalCustomers,
+          averageOrderValue:
+            summaryStats.totalOrders > 0
+              ? summaryStats.totalRevenue / summaryStats.totalOrders
+              : 0,
+        }
+      : metrics;
+
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h2 className="text-2xl font-bold">Analytics Dashboard</h2>
-          <p className="text-muted-foreground">Track your sales performance and business metrics</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Select value={timeRange} onValueChange={setTimeRange}>
-            <SelectTrigger className="w-[150px]">
-              <SelectValue placeholder="Time range" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="7days">Last 7 days</SelectItem>
-              <SelectItem value="30days">Last 30 days</SelectItem>
-              <SelectItem value="90days">Last 90 days</SelectItem>
-              <SelectItem value="year">This year</SelectItem>
-            </SelectContent>
-          </Select>
-          <Button variant="outline" size="icon" onClick={loadAnalytics}>
-            <RefreshCw className="h-4 w-4" />
-          </Button>
-        </div>
+      <div className="flex flex-row justify-end items-center gap-2">
+        <Select value={timeRange} onValueChange={setTimeRange}>
+          <SelectTrigger className="w-[150px]">
+            <SelectValue placeholder="Time range" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="7days">Last 7 days</SelectItem>
+            <SelectItem value="30days">Last 30 days</SelectItem>
+            <SelectItem value="90days">Last 90 days</SelectItem>
+            <SelectItem value="year">This year</SelectItem>
+          </SelectContent>
+        </Select>
+        <Button variant="outline" size="icon" onClick={loadAnalytics}>
+          <RefreshCw className="h-4 w-4" />
+        </Button>
       </div>
 
-      {/* Key Metrics */}
-      {metrics && (
+      {/* Key Metrics — revenue/orders/customers match dashboard summary when summaryStats is passed */}
+      {displayMetrics && (
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
           <Card>
             <CardContent className="pt-4">
               <div className="flex items-center justify-between">
                 <DollarSign className="h-5 w-5 text-green-600" />
-                <Badge variant={metrics.revenueChange >= 0 ? 'default' : 'destructive'} className="text-xs">
-                  {metrics.revenueChange >= 0 ? '+' : ''}{metrics.revenueChange}%
+                <Badge variant={displayMetrics.revenueChange >= 0 ? 'default' : 'destructive'} className="text-xs">
+                  {displayMetrics.revenueChange >= 0 ? '+' : ''}{displayMetrics.revenueChange}%
                 </Badge>
               </div>
               <div className="mt-2">
-                <p className="text-2xl font-bold">{formatCurrency(metrics.totalRevenue)}</p>
+                <p className="text-2xl font-bold">{formatCurrency(displayMetrics.totalRevenue)}</p>
                 <p className="text-xs text-muted-foreground">Total Revenue</p>
               </div>
             </CardContent>
@@ -767,12 +771,12 @@ export const SupplierAnalyticsDashboard: React.FC<SupplierAnalyticsDashboardProp
             <CardContent className="pt-4">
               <div className="flex items-center justify-between">
                 <ShoppingCart className="h-5 w-5 text-blue-600" />
-                <Badge variant={metrics.ordersChange >= 0 ? 'default' : 'destructive'} className="text-xs">
-                  {metrics.ordersChange >= 0 ? '+' : ''}{metrics.ordersChange}%
+                <Badge variant={displayMetrics.ordersChange >= 0 ? 'default' : 'destructive'} className="text-xs">
+                  {displayMetrics.ordersChange >= 0 ? '+' : ''}{displayMetrics.ordersChange}%
                 </Badge>
               </div>
               <div className="mt-2">
-                <p className="text-2xl font-bold">{metrics.totalOrders}</p>
+                <p className="text-2xl font-bold">{displayMetrics.totalOrders}</p>
                 <p className="text-xs text-muted-foreground">Total Orders</p>
               </div>
             </CardContent>
@@ -782,12 +786,12 @@ export const SupplierAnalyticsDashboard: React.FC<SupplierAnalyticsDashboardProp
             <CardContent className="pt-4">
               <div className="flex items-center justify-between">
                 <BarChart3 className="h-5 w-5 text-purple-600" />
-                <Badge variant={metrics.aovChange >= 0 ? 'default' : 'destructive'} className="text-xs">
-                  {metrics.aovChange >= 0 ? '+' : ''}{metrics.aovChange}%
+                <Badge variant={displayMetrics.aovChange >= 0 ? 'default' : 'destructive'} className="text-xs">
+                  {displayMetrics.aovChange >= 0 ? '+' : ''}{displayMetrics.aovChange}%
                 </Badge>
               </div>
               <div className="mt-2">
-                <p className="text-2xl font-bold">{formatCurrency(metrics.averageOrderValue)}</p>
+                <p className="text-2xl font-bold">{formatCurrency(displayMetrics.averageOrderValue)}</p>
                 <p className="text-xs text-muted-foreground">Avg Order Value</p>
               </div>
             </CardContent>
@@ -797,12 +801,12 @@ export const SupplierAnalyticsDashboard: React.FC<SupplierAnalyticsDashboardProp
             <CardContent className="pt-4">
               <div className="flex items-center justify-between">
                 <MessageSquare className="h-5 w-5 text-orange-600" />
-                <Badge variant={metrics.quotesChange >= 0 ? 'default' : 'destructive'} className="text-xs">
-                  {metrics.quotesChange >= 0 ? '+' : ''}{metrics.quotesChange}%
+                <Badge variant={displayMetrics.quotesChange >= 0 ? 'default' : 'destructive'} className="text-xs">
+                  {displayMetrics.quotesChange >= 0 ? '+' : ''}{displayMetrics.quotesChange}%
                 </Badge>
               </div>
               <div className="mt-2">
-                <p className="text-2xl font-bold">{metrics.totalQuotes}</p>
+                <p className="text-2xl font-bold">{displayMetrics.totalQuotes}</p>
                 <p className="text-xs text-muted-foreground">Quote Requests</p>
               </div>
             </CardContent>
@@ -812,12 +816,12 @@ export const SupplierAnalyticsDashboard: React.FC<SupplierAnalyticsDashboardProp
             <CardContent className="pt-4">
               <div className="flex items-center justify-between">
                 <CheckCircle className="h-5 w-5 text-green-600" />
-                <Badge variant={metrics.conversionChange >= 0 ? 'default' : 'destructive'} className="text-xs">
-                  {metrics.conversionChange >= 0 ? '+' : ''}{metrics.conversionChange}%
+                <Badge variant={displayMetrics.conversionChange >= 0 ? 'default' : 'destructive'} className="text-xs">
+                  {displayMetrics.conversionChange >= 0 ? '+' : ''}{displayMetrics.conversionChange}%
                 </Badge>
               </div>
               <div className="mt-2">
-                <p className="text-2xl font-bold">{metrics.quoteConversionRate.toFixed(1)}%</p>
+                <p className="text-2xl font-bold">{displayMetrics.quoteConversionRate.toFixed(1)}%</p>
                 <p className="text-xs text-muted-foreground">Conversion Rate</p>
               </div>
             </CardContent>
@@ -828,11 +832,11 @@ export const SupplierAnalyticsDashboard: React.FC<SupplierAnalyticsDashboardProp
               <div className="flex items-center justify-between">
                 <Users className="h-5 w-5 text-cyan-600" />
                 <Badge className="text-xs bg-cyan-100 text-cyan-800">
-                  {metrics.repeatCustomerRate.toFixed(0)}% repeat
+                  {displayMetrics.repeatCustomerRate.toFixed(0)}% repeat
                 </Badge>
               </div>
               <div className="mt-2">
-                <p className="text-2xl font-bold">{metrics.totalCustomers}</p>
+                <p className="text-2xl font-bold">{displayMetrics.totalCustomers}</p>
                 <p className="text-xs text-muted-foreground">Total Customers</p>
               </div>
             </CardContent>

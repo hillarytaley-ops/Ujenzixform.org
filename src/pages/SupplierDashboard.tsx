@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Link } from "react-router-dom";
 import { useUrlTabSync } from "@/hooks/useUrlTabSync";
 import { supabase } from "@/integrations/supabase/client";
@@ -618,6 +618,8 @@ const SupplierDashboard = () => {
   const [loading, setLoading] = useState(true);
   const [supplierProfile, setSupplierProfile] = useState<any>(null);
   const [supplierRecordId, setSupplierRecordId] = useState<string | null>(null); // Actual supplier table ID
+  /** Same ID list used for dashboard stats queries (user id + supplier row id, etc.) — keeps Analytics tab in sync */
+  const [resolvedSupplierIds, setResolvedSupplierIds] = useState<string[]>([]);
   const [stats, setStats] = useState<DashboardStats>({
     totalProducts: 0,
     totalOrders: 0,
@@ -643,6 +645,12 @@ const SupplierDashboard = () => {
   });
   const [processingQuote, setProcessingQuote] = useState(false);
   const [loadingQuotes, setLoadingQuotes] = useState(false);
+
+  const analyticsSupplierIds = useMemo(() => {
+    if (resolvedSupplierIds.length > 0) return resolvedSupplierIds;
+    if (!user?.id) return [];
+    return supplierRecordId ? [...new Set([user.id, supplierRecordId])] : [user.id];
+  }, [resolvedSupplierIds, user?.id, supplierRecordId]);
 
   // Cache resolved supplier ID so QR Manager etc. can use it on next load
   useEffect(() => {
@@ -1492,6 +1500,7 @@ const SupplierDashboard = () => {
         }
         
         console.log('📊 Dashboard: Final supplier IDs for stats query:', orderSupplierIds);
+        setResolvedSupplierIds([...orderSupplierIds]);
 
         // Fetch ALL orders for this supplier (not just 10) for accurate stats
         try {
@@ -2225,7 +2234,13 @@ const SupplierDashboard = () => {
               <CardContent className="space-y-10">
                 {user && (
                   <SupplierAnalyticsDashboard 
-                    supplierId={supplierRecordId || user.id} 
+                    supplierId={supplierRecordId || user.id}
+                    supplierIds={analyticsSupplierIds}
+                    summaryStats={{
+                      totalOrders: stats.totalOrders,
+                      totalRevenue: stats.totalRevenue,
+                      totalCustomers: stats.totalCustomers,
+                    }}
                     onNavigateToOrders={() => setActiveTab('view-orders')}
                   />
                 )}
