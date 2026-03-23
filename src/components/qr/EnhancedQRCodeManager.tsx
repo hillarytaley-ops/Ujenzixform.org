@@ -19,7 +19,8 @@ import { QrCode, Package, Download, DownloadCloud, Maximize2, Truck, Clock, Chec
 import { useNavigate } from 'react-router-dom';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/components/ui/use-toast';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase, SUPABASE_URL, SUPABASE_ANON_KEY } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
 import QRCodeLib from 'qrcode';
 import { getPrefetchedQRCodes } from '@/services/dataPrefetch';
 
@@ -101,10 +102,41 @@ function materialItemsSupplierFilter(
   return `supplier_id=in.(${unique.join(',')})`;
 }
 
+/** Bypasses Supabase JS client (global fetch wrapper) — same approach as Delivery Pay tab. */
+async function postgrestRpcJson<T>(
+  functionName: string,
+  body: Record<string, unknown>,
+  accessToken: string | null,
+  signal: AbortSignal
+): Promise<{ data: T | null; error: Error | null }> {
+  const headers: Record<string, string> = {
+    apikey: SUPABASE_ANON_KEY,
+    'Content-Type': 'application/json',
+  };
+  if (accessToken) headers.Authorization = `Bearer ${accessToken}`;
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/${functionName}`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(body),
+    signal,
+  });
+  const text = await res.text();
+  if (!res.ok) {
+    return { data: null, error: new Error(text || `HTTP ${res.status}`) };
+  }
+  if (!text) return { data: null, error: null };
+  try {
+    return { data: JSON.parse(text) as T, error: null };
+  } catch {
+    return { data: null, error: new Error('Invalid RPC response') };
+  }
+}
+
 export const EnhancedQRCodeManager: React.FC<EnhancedQRCodeManagerProps> = ({
   supplierId: propSupplierId,
   supplierScopeIds,
 }) => {
+  const { loading: authLoading } = useAuth();
   const supplierScopeKey = useMemo(
     () => [...new Set((supplierScopeIds || []).filter(Boolean) as string[])].sort().join('|'),
     [supplierScopeIds]
@@ -545,13 +577,15 @@ export const EnhancedQRCodeManager: React.FC<EnhancedQRCodeManagerProps> = ({
 
   // Re-run when supplier row id / scope list updates (tab mounts after dashboard resolution, or ID arrives late)
   useEffect(() => {
+    if (authLoading) return;
+
     let cancelled = false;
     const safetyTimeout = window.setTimeout(() => {
       if (!cancelled) {
         setLoading(false);
         console.warn('⏱️ QR Manager load safety timeout — clearing spinner');
       }
-    }, 12000);
+    }, 10000);
 
     const run = async () => {
       try {
@@ -575,9 +609,10 @@ export const EnhancedQRCodeManager: React.FC<EnhancedQRCodeManagerProps> = ({
     return () => {
       cancelled = true;
       window.clearTimeout(safetyTimeout);
+      setLoading(false);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- reload when supplier scope identity changes; fetch closes over latest props
-  }, [propSupplierId, supplierScopeKey]);
+  }, [authLoading, propSupplierId, supplierScopeKey]);
 
   // Fast fetch: suppliers use RPC (server-side resolution), admins use REST
   const fetchMaterialItemsFast = async (
@@ -599,14 +634,20 @@ export const EnhancedQRCodeManager: React.FC<EnhancedQRCodeManagerProps> = ({
       // Suppliers: use RPC first (no client supplier_id needed, handles profile chain)
       if (role === 'supplier') {
         let miData: any = null, error: any = null;
+        const ac = new AbortController();
+        const rpcT = window.setTimeout(() => ac.abort(), 8000);
         try {
-          const result = await withTimeout(
-            supabase.rpc('get_supplier_material_items_for_current_user', { _limit: 500 }),
-            6000
+          const r = await postgrestRpcJson<any[]>(
+            'get_supplier_material_items_for_current_user',
+            { _limit: 500 },
+            token,
+            ac.signal
           );
-          miData = result?.data ?? null;
-          error = result?.error ?? null;
+          window.clearTimeout(rpcT);
+          if (r.error) error = r.error;
+          else miData = Array.isArray(r.data) ? r.data : null;
         } catch (rpcErr) {
+          window.clearTimeout(rpcT);
           error = rpcErr;
         }
         if (!error && miData && miData.length > 0) {
@@ -732,14 +773,21 @@ export const EnhancedQRCodeManager: React.FC<EnhancedQRCodeManagerProps> = ({
     if (role === 'supplier') {
       let miData: any[] | null = null;
       let error: any = null;
+      const storedTok = getUserFromStorage()?.accessToken;
+      const ac = new AbortController();
+      const rpcT = window.setTimeout(() => ac.abort(), 8000);
       try {
-        const result = await withTimeout(
-          supabase.rpc('get_supplier_material_items_for_current_user', { _limit: 500 }),
-          8000
+        const r = await postgrestRpcJson<any[]>(
+          'get_supplier_material_items_for_current_user',
+          { _limit: 500 },
+          storedTok,
+          ac.signal
         );
-        miData = (result?.data as any[]) ?? null;
-        error = result?.error ?? null;
+        window.clearTimeout(rpcT);
+        if (r.error) error = r.error;
+        else miData = Array.isArray(r.data) ? r.data : null;
       } catch (e) {
+        window.clearTimeout(rpcT);
         error = e;
       }
       if (!error && miData && miData.length > 0) {
@@ -2028,7 +2076,7 @@ export const EnhancedQRCodeManager: React.FC<EnhancedQRCodeManagerProps> = ({
     }
   };
 
-  if (loading) {
+  if (authLoading || loading) {
     return (
       <div className="flex items-center justify-center py-12">
         <RefreshCw className="h-8 w-8 animate-spin text-cyan-500" />
