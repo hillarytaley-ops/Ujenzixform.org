@@ -99,7 +99,7 @@ RETURNS TABLE(
 LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public
 AS $$
   WITH cfg AS (
-    SELECT COALESCE((SELECT rate_per_km FROM delivery_mileage_config ORDER BY updated_at DESC LIMIT 1), 50.00) AS r
+    SELECT COALESCE((SELECT dmc.rate_per_km FROM delivery_mileage_config AS dmc ORDER BY dmc.updated_at DESC LIMIT 1), 50.00) AS r
   ),
   provider_ids AS (
     SELECT dp.id FROM delivery_providers dp
@@ -149,7 +149,7 @@ BEGIN
   END IF;
   RETURN QUERY
   WITH cfg AS (
-    SELECT COALESCE((SELECT rate_per_km FROM delivery_mileage_config ORDER BY updated_at DESC LIMIT 1), 50.00) AS r
+    SELECT COALESCE((SELECT dmc.rate_per_km FROM delivery_mileage_config AS dmc ORDER BY dmc.updated_at DESC LIMIT 1), 50.00) AS r
   ),
   dr_provider AS (
     SELECT
@@ -165,22 +165,32 @@ BEGIN
     SELECT pid, SUM(rt_km) AS total_rt, COUNT(*) AS cnt
     FROM dr_provider
     GROUP BY pid
+  ),
+  ranked AS (
+    SELECT
+      agg.pid AS q_provider_id,
+      COALESCE(
+        NULLIF(TRIM(dp.provider_name), ''),
+        NULLIF(TRIM(p.full_name), ''),
+        'Provider ' || LEFT(agg.pid::text, 8)
+      ) AS q_provider_name,
+      ROUND(agg.total_rt::numeric, 2) AS q_total_round_trip_km,
+      (SELECT r FROM cfg) AS q_rate,
+      ROUND((agg.total_rt * (SELECT r FROM cfg))::numeric, 2) AS q_total_pay,
+      agg.cnt AS q_delivery_count
+    FROM agg
+    LEFT JOIN delivery_providers dp ON dp.id = agg.pid OR dp.user_id = agg.pid
+    LEFT JOIN profiles p ON p.user_id = dp.user_id OR p.id = dp.user_id
   )
   SELECT
-    agg.pid AS provider_id,
-    COALESCE(
-      NULLIF(TRIM(dp.provider_name), ''),
-      NULLIF(TRIM(p.full_name), ''),
-      'Provider ' || LEFT(agg.pid::text, 8)
-    ) AS provider_name,
-    ROUND(agg.total_rt::numeric, 2) AS total_round_trip_km,
-    (SELECT r FROM cfg) AS rate_per_km,
-    ROUND((agg.total_rt * (SELECT r FROM cfg))::numeric, 2) AS total_amount,
-    agg.cnt AS delivery_count
-  FROM agg
-  LEFT JOIN delivery_providers dp ON dp.id = agg.pid OR dp.user_id = agg.pid
-  LEFT JOIN profiles p ON p.user_id = dp.user_id OR p.id = dp.user_id
-  ORDER BY total_amount DESC NULLS LAST;
+    ranked.q_provider_id,
+    ranked.q_provider_name,
+    ranked.q_total_round_trip_km,
+    ranked.q_rate,
+    ranked.q_total_pay,
+    ranked.q_delivery_count
+  FROM ranked
+  ORDER BY ranked.q_total_pay DESC NULLS LAST;
 END;
 $$;
 

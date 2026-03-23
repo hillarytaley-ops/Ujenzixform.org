@@ -965,7 +965,7 @@ END $$;
 CREATE OR REPLACE FUNCTION public.get_provider_mileage_pay(_provider_user_id UUID DEFAULT auth.uid())
 RETURNS TABLE(delivery_request_id UUID, purchase_order_id UUID, order_number TEXT, one_way_km DECIMAL, round_trip_km DECIMAL, rate_per_km DECIMAL, amount DECIMAL, delivered_at TIMESTAMPTZ, status TEXT)
 LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
-  WITH cfg AS (SELECT COALESCE((SELECT rate_per_km FROM delivery_mileage_config ORDER BY updated_at DESC LIMIT 1), 50.00) AS r),
+  WITH cfg AS (SELECT COALESCE((SELECT dmc.rate_per_km FROM delivery_mileage_config AS dmc ORDER BY dmc.updated_at DESC LIMIT 1), 50.00) AS r),
   provider_ids AS (SELECT dp.id FROM delivery_providers dp WHERE dp.user_id = _provider_user_id OR EXISTS (SELECT 1 FROM profiles p WHERE p.id = dp.user_id AND p.user_id = _provider_user_id)),
   rows AS (SELECT dr.id AS delivery_request_id, dr.purchase_order_id, COALESCE(po.po_number, dr.order_number, 'N/A') AS order_number, COALESCE(dr.distance_km,0) AS one_way_km, COALESCE(dr.distance_km,0)*2 AS round_trip_km, (SELECT r FROM cfg) AS rate_per_km, ROUND((COALESCE(dr.distance_km,0)*2*(SELECT r FROM cfg))::numeric,2) AS amount, dr.delivered_at, dr.status
     FROM delivery_requests dr LEFT JOIN purchase_orders po ON po.id = dr.purchase_order_id
@@ -980,11 +980,11 @@ LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = public AS $$
 BEGIN
   IF NOT EXISTS (SELECT 1 FROM user_roles WHERE user_id = auth.uid() AND role::text IN ('admin','super_admin','logistics_officer','finance_officer')) THEN RETURN; END IF;
   RETURN QUERY
-  WITH cfg AS (SELECT COALESCE((SELECT rate_per_km FROM delivery_mileage_config ORDER BY updated_at DESC LIMIT 1), 50.00) AS r),
+  WITH cfg AS (SELECT COALESCE((SELECT dmc.rate_per_km FROM delivery_mileage_config AS dmc ORDER BY dmc.updated_at DESC LIMIT 1), 50.00) AS r),
   dr_provider AS (SELECT dr.id, COALESCE(dr.provider_id, po.delivery_provider_id) AS pid, COALESCE(dr.distance_km,0)*2 AS rt_km FROM delivery_requests dr LEFT JOIN purchase_orders po ON po.id = dr.purchase_order_id WHERE dr.status IN ('delivered','completed') AND (dr.provider_id IS NOT NULL OR po.delivery_provider_id IS NOT NULL)),
-  agg AS (SELECT pid, SUM(rt_km) AS total_rt, COUNT(*) AS cnt FROM dr_provider GROUP BY pid)
-  SELECT agg.pid, COALESCE(NULLIF(TRIM(dp.provider_name),''), NULLIF(TRIM(p.full_name),''), 'Provider '||LEFT(agg.pid::text,8)), ROUND(agg.total_rt::numeric,2), (SELECT r FROM cfg), ROUND((agg.total_rt*(SELECT r FROM cfg))::numeric,2), agg.cnt
-  FROM agg LEFT JOIN delivery_providers dp ON dp.id = agg.pid OR dp.user_id = agg.pid LEFT JOIN profiles p ON p.user_id = dp.user_id OR p.id = dp.user_id ORDER BY total_amount DESC NULLS LAST;
+  agg AS (SELECT pid, SUM(rt_km) AS total_rt, COUNT(*) AS cnt FROM dr_provider GROUP BY pid),
+  ranked AS (SELECT agg.pid AS q_provider_id, COALESCE(NULLIF(TRIM(dp.provider_name),''), NULLIF(TRIM(p.full_name),''), 'Provider '||LEFT(agg.pid::text,8)) AS q_provider_name, ROUND(agg.total_rt::numeric,2) AS q_total_round_trip_km, (SELECT r FROM cfg) AS q_rate, ROUND((agg.total_rt*(SELECT r FROM cfg))::numeric,2) AS q_total_pay, agg.cnt AS q_delivery_count FROM agg LEFT JOIN delivery_providers dp ON dp.id = agg.pid OR dp.user_id = agg.pid LEFT JOIN profiles p ON p.user_id = dp.user_id OR p.id = dp.user_id)
+  SELECT ranked.q_provider_id, ranked.q_provider_name, ranked.q_total_round_trip_km, ranked.q_rate, ranked.q_total_pay, ranked.q_delivery_count FROM ranked ORDER BY ranked.q_total_pay DESC NULLS LAST;
 END;
 $$;
 GRANT EXECUTE ON FUNCTION public.admin_get_all_providers_mileage_pay() TO authenticated;
