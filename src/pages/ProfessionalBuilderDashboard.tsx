@@ -451,7 +451,8 @@ const ProfessionalBuilderDashboardPage = () => {
 
   /** Load monitoring rows for the signed-in builder; supports legacy `requester_id` if `user_id` is empty. */
   const refreshMonitoringRequests = useCallback(async () => {
-    const userId = getUserId();
+    const { data: { session } } = await supabase.auth.getSession();
+    const userId = session?.user?.id || getUserId();
     if (!userId) return;
 
     const { data, error } = await supabase
@@ -470,6 +471,8 @@ const ProfessionalBuilderDashboardPage = () => {
         .order("created_at", { ascending: false });
       if (!legacyErr && Array.isArray(legacy) && legacy.length > 0) {
         rows = legacy;
+      } else if (legacyErr && !String(legacyErr.message || "").includes("requester_id")) {
+        console.warn("📹 Monitoring legacy load:", legacyErr.message);
       }
     }
 
@@ -1496,6 +1499,29 @@ const ProfessionalBuilderDashboardPage = () => {
 
     setSubmittingRequest(true);
     console.log('📹 Submitting monitoring request...');
+
+    const { data: { session: submitSession } } = await supabase.auth.getSession();
+    const submitUserId = submitSession?.user?.id || getUserId();
+    if (!submitUserId) {
+      setSubmittingRequest(false);
+      toast({
+        title: "Session required",
+        description: "Please sign in again to submit a monitoring request.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const accessToken = await getAccessToken();
+    if (!accessToken) {
+      setSubmittingRequest(false);
+      toast({
+        title: "Session required",
+        description: "Could not verify your session. Please refresh the page or sign in again.",
+        variant: "destructive",
+      });
+      return;
+    }
     
     // Safety timeout
     const safetyTimeout = setTimeout(() => {
@@ -1509,20 +1535,9 @@ const ProfessionalBuilderDashboardPage = () => {
     }, 25000);
 
     try {
-      // Get access token from localStorage
-      let accessToken = SUPABASE_ANON_KEY;
-      try {
-        const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
-        if (storedSession) {
-          const parsed = JSON.parse(storedSession);
-          accessToken = parsed?.access_token || SUPABASE_ANON_KEY;
-        }
-      } catch (e) {
-        console.log('📹 Using anon key for monitoring request');
-      }
 
       const requestData = {
-        user_id: user?.id || authUser?.id,
+        user_id: submitUserId,
         contact_name: profile?.full_name || profile?.company_name || user?.email?.split('@')[0] || 'User',
         contact_email: user?.email || authUser?.email || '',
         contact_phone: profile?.phone || 'N/A',
@@ -1548,8 +1563,8 @@ const ProfessionalBuilderDashboardPage = () => {
           headers: {
             'Content-Type': 'application/json',
             'apikey': SUPABASE_ANON_KEY,
-            'Authorization': `Bearer ${accessToken}`,
-            'Prefer': 'return=representation'
+            Authorization: `Bearer ${accessToken}`,
+            Prefer: 'return=representation',
           },
           body: JSON.stringify(requestData),
           signal: controller.signal

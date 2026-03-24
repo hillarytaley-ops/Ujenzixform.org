@@ -557,7 +557,7 @@ const Monitoring = () => {
           .from('monitoring_service_requests')
           .select('*')
           .eq('user_id', authUser.id)
-          .in('status', ['approved', 'active'])
+          .in('status', ['approved', 'active', 'completed', 'in_progress'])
           .order('created_at', { ascending: false })
           .limit(1);
         
