@@ -20,6 +20,7 @@ import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Textarea } from '@/components/ui/textarea';
 import { useCart, CartItem } from '@/contexts/CartContext';
+import { catalogMaterialIdFromCartLineId } from '@/utils/cartLineId';
 import { useToast } from '@/hooks/use-toast';
 import { 
   Scale, 
@@ -350,7 +351,7 @@ export const CartPriceComparisonAll: React.FC<CartPriceComparisonAllProps> = ({
           project_name: `Quote Request - ${new Date().toLocaleDateString()}`,
           status: 'pending',
           items: items.map(item => ({
-            material_id: item.id,
+            material_id: catalogMaterialIdFromCartLineId(item.id),
             material_name: item.name,
             category: item.category,
             quantity: item.quantity,

@@ -24,6 +24,7 @@ import {
   Building2,
   FolderPlus
 } from 'lucide-react';
+import { catalogMaterialIdFromCartLineId } from '@/utils/cartLineId';
 
 interface Project {
   id: string;
@@ -243,7 +244,7 @@ export function QuoteCart({
           project_name: finalProjectName,
           special_instructions: notes,
           items: supplierItems.map(item => ({
-            material_id: item.id,
+            material_id: catalogMaterialIdFromCartLineId(item.id),
             material_name: item.name,
             category: item.category,
             quantity: item.quantity,

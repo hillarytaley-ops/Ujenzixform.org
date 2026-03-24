@@ -33,6 +33,7 @@ import { MultiSupplierQuoteDialog } from './MultiSupplierQuoteDialog';
 import { DeliveryPromptDialog } from '@/components/builders/DeliveryPromptDialog';
 import { MonitoringServicePrompt } from '@/components/builders/MonitoringServicePrompt';
 import { setCartProjectContext, clearCartProjectContext } from '@/utils/builderCartProject';
+import { catalogMaterialIdFromCartLineId } from '@/utils/cartLineId';
 
 // Project interface for project selection
 interface BuilderProject {
@@ -340,7 +341,7 @@ export const CartSidebar: React.FC = () => {
           project_name: projectName,
           status: 'pending',
           items: supplierItems.map(item => ({
-            material_id: item.id,
+            material_id: catalogMaterialIdFromCartLineId(item.id),
             material_name: item.name,
             category: item.category,
             quantity: item.quantity,
@@ -480,7 +481,9 @@ export const CartSidebar: React.FC = () => {
       let supplierName: string | null = null;
       
       // Collect product IDs from cart
-      const productIds = items.map(item => item.id).filter(Boolean);
+      const productIds = items
+        .map((item) => catalogMaterialIdFromCartLineId(item.id))
+        .filter(Boolean);
       console.log('🛒 Cart product IDs:', productIds);
       
       // STEP 1: Check if any item already has a valid supplier_id from user selection
@@ -585,7 +588,7 @@ export const CartSidebar: React.FC = () => {
         project_name: projectName,
         status: 'confirmed',
         items: items.map(item => ({
-          material_id: item.id,
+          material_id: catalogMaterialIdFromCartLineId(item.id),
           material_name: item.name,
           category: item.category,
           quantity: item.quantity,

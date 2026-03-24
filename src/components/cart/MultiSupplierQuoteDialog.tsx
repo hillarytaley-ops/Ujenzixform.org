@@ -38,6 +38,7 @@ import {
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { CartItem } from '@/contexts/CartContext';
+import { catalogMaterialIdFromCartLineId } from '@/utils/cartLineId';
 import { getCartProjectId, getCartProjectName } from '@/utils/builderCartProject';
 
 interface Supplier {
@@ -277,7 +278,7 @@ export const MultiSupplierQuoteDialog: React.FC<MultiSupplierQuoteDialogProps> =
               : `Multi-Quote Request - ${new Date().toLocaleDateString()}`,
           status: 'pending',
           items: cartItems.map(item => ({
-            material_id: item.id,
+            material_id: catalogMaterialIdFromCartLineId(item.id),
             material_name: item.name,
             category: item.category,
             quantity: item.quantity,

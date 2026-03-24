@@ -21,6 +21,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useCart } from '@/contexts/CartContext';
 import { useToast } from '@/hooks/use-toast';
+import { buildMaterialCartLineId } from '@/utils/cartLineId';
 import { 
   Scale, 
   Store, 
@@ -42,6 +43,8 @@ interface Material {
   image_url?: string;
   in_stock: boolean;
   supplier_id?: string;
+  pricing_type?: 'single' | 'variants';
+  variants?: { id?: string; sizeLabel?: string; color?: string; texture?: string; price?: number }[];
   supplier?: {
     company_name: string;
     location?: string;
@@ -78,8 +81,14 @@ export const PriceComparisonModal: React.FC<PriceComparisonModalProps> = ({
     : 0;
 
   const handleBuyNow = (material: Material) => {
+    const lineId = buildMaterialCartLineId(
+      material.id,
+      material.pricing_type,
+      material.variants,
+      undefined
+    );
     addToCart({
-      id: material.id,
+      id: lineId,
       name: material.name,
       category: material.category,
       unit: material.unit,

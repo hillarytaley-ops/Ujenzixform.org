@@ -42,6 +42,7 @@ import { FileText, BookOpen } from 'lucide-react';
 import { ProductModal, materialToProduct, Product } from '@/components/products';
 import { useAuth } from '@/contexts/AuthContext';
 import { getCartProjectId, getCartProjectName } from '@/utils/builderCartProject';
+import { buildMaterialCartLineId } from '@/utils/cartLineId';
 
 // iOS/Safari compatibility check
 const isIOSSafari = () => {
@@ -469,17 +470,24 @@ export const MaterialsGrid = () => {
       }
     }
     
+    const quoteLineId = buildMaterialCartLineId(
+      material.id,
+      material.pricing_type,
+      material.variants,
+      selectedVariants[material.id]
+    );
+
     setQuoteCartItems(prev => {
-      const existing = prev.find(item => item.id === material.id);
+      const existing = prev.find(item => item.id === quoteLineId);
       if (existing) {
         return prev.map(item => 
-          item.id === material.id 
+          item.id === quoteLineId 
             ? { ...item, quantity: item.quantity + qty }
             : item
         );
       }
       return [...prev, {
-        id: material.id,
+        id: quoteLineId,
         name: itemName,
         category: material.category,
         unit: material.unit,
@@ -1965,8 +1973,14 @@ export const MaterialsGrid = () => {
                 // Category default images will only be used in onError handler when actual image fails
                 const imageUrl = material.image_url || '';
                 const currentQty = getQuantity(material.id);
-                const itemInCart = isInCart(material.id);
-                const cartQty = getItemQuantity(material.id);
+                const cartLineId = buildMaterialCartLineId(
+                  material.id,
+                  material.pricing_type,
+                  material.variants,
+                  selectedVariants[material.id]
+                );
+                const itemInCart = isInCart(cartLineId);
+                const cartQty = getItemQuantity(cartLineId);
 
                 const handleAddToCart = () => {
                   try {
@@ -2026,7 +2040,7 @@ export const MaterialsGrid = () => {
                     console.log('🛒 Adding to cart:', itemName, 'qty:', qtyToAdd, 'price:', unitPrice);
                     
                     addToCart({
-                      id: material.id,
+                      id: cartLineId,
                       name: itemName,
                       category: material.category ?? '',
                       unit: material.unit ?? 'piece',
