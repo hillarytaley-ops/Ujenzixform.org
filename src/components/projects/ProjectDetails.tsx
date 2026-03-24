@@ -97,6 +97,8 @@ interface ProjectDetailsProps {
   onBack: () => void;
   onUpdate?: (project: Project) => void;
   userId: string;
+  /** profiles.id — purchase_orders.buyer_id often matches this (same as Orders tab) */
+  profileIdForOrders?: string | null;
   /** When the builder has only one project, POs without project_id still belong here */
   builderHasSingleProject?: boolean;
 }
@@ -106,6 +108,7 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
   onBack,
   onUpdate,
   userId,
+  profileIdForOrders = null,
   builderHasSingleProject = false,
 }) => {
   const [orders, setOrders] = useState<Order[]>([]);
@@ -150,7 +153,11 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
     
     try {
       const accessToken = await getAccessToken();
-      const buyerIds = await fetchPurchaseBuyerIdsForBuilder(userId, accessToken || null);
+      const buyerIds = await fetchPurchaseBuyerIdsForBuilder(
+        userId,
+        accessToken || null,
+        profileIdForOrders ? [profileIdForOrders] : null
+      );
       const buyerIn = buyerIds.join(',');
       
       // Orders: many rows have project_id NULL but project_name like "Site - Quote from …"

@@ -7,9 +7,15 @@ export function normalizeProjectName(n: string | null | undefined): string {
 /** purchase_orders.buyer_id may be auth.users.id or profiles.id */
 export async function fetchPurchaseBuyerIdsForBuilder(
   userId: string,
-  accessToken: string | null
+  accessToken: string | null,
+  /** e.g. profiles.id from dashboard — Orders tab uses this first; merge must query the same ids */
+  extraSeeds?: string[] | null
 ): Promise<string[]> {
-  const ids = new Set<string>([userId]);
+  const ids = new Set<string>();
+  if (userId?.trim()) ids.add(userId.trim());
+  for (const s of extraSeeds ?? []) {
+    if (s && typeof s === "string" && s.trim()) ids.add(s.trim());
+  }
   const ctrl = new AbortController();
   const t = window.setTimeout(() => ctrl.abort(), 5000);
   try {

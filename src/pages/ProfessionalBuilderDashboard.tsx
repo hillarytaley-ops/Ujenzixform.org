@@ -174,7 +174,9 @@ function dedupeProjectsById(rows: any[]): any[] {
  */
 function aggregatePurchaseStatsByProject(
   orders: PurchaseOrderProjectRow[],
-  projects: { id: string; name?: string | null }[]
+  projects: { id: string; name?: string | null }[],
+  /** When PO has no project_id/name match, attribute to this project (header / cart selection) */
+  orphanProjectIdHint?: string | null
 ): Map<string, { orderCount: number; orderValueSum: number }> {
   const nameToIds = new Map<string, string[]>();
   for (const p of projects) {
@@ -199,6 +201,14 @@ function aggregatePurchaseStatsByProject(
     // Generic quotes with no project hint: only safe when there is a single project.
     if (!pid && projects.length === 1) {
       pid = projects[0].id;
+    }
+    if (
+      !pid &&
+      projects.length > 1 &&
+      orphanProjectIdHint &&
+      projects.some((p) => p.id === orphanProjectIdHint)
+    ) {
+      pid = orphanProjectIdHint;
     }
     if (!pid) continue;
 
@@ -303,7 +313,9 @@ async function mergeProjectRowsWithPurchaseOrders(
   projectRows: any[],
   userId: string,
   accessTokenFromProjectsFetch: string | null,
-  previousMergedCards?: any[] | null
+  previousMergedCards?: any[] | null,
+  extraBuyerSeeds?: string[] | null,
+  orphanProjectIdHint?: string | null
 ): Promise<any[]> {
   let token = accessTokenFromProjectsFetch;
   if (!token) {
@@ -317,7 +329,11 @@ async function mergeProjectRowsWithPurchaseOrders(
     }
   }
 
-  const buyerIds = await fetchPurchaseBuyerIdsForBuilder(userId, token);
+  const buyerIds = await fetchPurchaseBuyerIdsForBuilder(
+    userId,
+    token,
+    extraBuyerSeeds
+  );
   if (buyerIds.length === 0) return projectRows;
 
   const inList = buyerIds.join(",");
@@ -356,7 +372,8 @@ async function mergeProjectRowsWithPurchaseOrders(
     console.log("📁 PO merge: loaded", list.length, "rows for buyer_id in", buyerIds.length, "ids");
     const stats = aggregatePurchaseStatsByProject(
       list,
-      projectRows.map((p) => ({ id: p.id, name: p.name }))
+      projectRows.map((p) => ({ id: p.id, name: p.name })),
+      orphanProjectIdHint
     );
     const merged = mergeProjectsWithPurchaseAggregates(
       projectRows,
@@ -776,7 +793,8 @@ const ProfessionalBuilderDashboardPage = () => {
       const { data: statsSession } = await supabase.auth.getSession();
       const poBuyerIds = await fetchPurchaseBuyerIdsForBuilder(
         userId,
-        statsSession?.session?.access_token ?? null
+        statsSession?.session?.access_token ?? null,
+        profile?.id ? [profile.id] : null
       );
       
       // Fetch purchase orders (buyer_id may be auth uid or profiles.id)
@@ -958,7 +976,8 @@ const ProfessionalBuilderDashboardPage = () => {
       const { data: delSession } = await supabase.auth.getSession();
       const deliveryPoBuyerIds = await fetchPurchaseBuyerIdsForBuilder(
         userId,
-        delSession?.session?.access_token ?? null
+        delSession?.session?.access_token ?? null,
+        profile?.id ? [profile.id] : null
       );
       const ordersResult = await withTimeout(
         supabase
@@ -1140,11 +1159,20 @@ const ProfessionalBuilderDashboardPage = () => {
         const projectRows = data as any[];
         setProjects(projectRows);
         console.log('📁 Loaded', projectRows.length, 'projects (order stats merge in background)');
+        const purchaseExtraSeeds = [profile?.id].filter(
+          (id): id is string => typeof id === "string" && id.length > 0
+        );
+        const orphanForPoMerge =
+          selectedProjectForOrder && selectedProjectForOrder !== "none"
+            ? selectedProjectForOrder
+            : getCartProjectId();
         void mergeProjectRowsWithPurchaseOrders(
           projectRows,
           userId,
           accessToken,
-          projectRows
+          projectRows,
+          purchaseExtraSeeds,
+          orphanForPoMerge || null
         )
           .then((merged) => {
             setProjects(merged);
@@ -1204,7 +1232,7 @@ const ProfessionalBuilderDashboardPage = () => {
     }, 500);
     
     return () => clearTimeout(timer);
-  }, [authUser]);
+  }, [authUser, profile?.id]);
 
   // Get current GPS location for project
   const getProjectLocation = async () => {
@@ -1528,21 +1556,37 @@ const ProfessionalBuilderDashboardPage = () => {
     const userId = getUserId();
     if (!userId) return;
 
-    console.log('🔔 Setting up real-time subscriptions for builder:', userId);
+    const profileBuyerId = profile?.id;
+    console.log('🔔 Setting up real-time subscriptions for builder:', userId, profileBuyerId || '');
 
-    const channel = supabase
-      .channel('builder-dashboard-updates')
-      .on('postgres_changes',
+    const onPurchaseOrderChange = (payload: unknown) => {
+      console.log('🛒 Order change detected:', payload);
+      loadRealStats(userId);
+      void fetchProjects();
+      fetchSupplierResponseCount(userId);
+      toast({
+        title: "Order Updated",
+        description: "Your order status has been updated.",
+      });
+    };
+
+    let channel = supabase
+      .channel(`builder-dashboard-updates-${userId}`)
+      .on(
+        'postgres_changes',
         { event: '*', schema: 'public', table: 'purchase_orders', filter: `buyer_id=eq.${userId}` },
-        (payload) => {
-          console.log('🛒 Order change detected:', payload);
-          loadRealStats(userId);
-          toast({
-            title: "Order Updated",
-            description: "Your order status has been updated.",
-          });
-        }
-      )
+        onPurchaseOrderChange
+      );
+
+    if (profileBuyerId && profileBuyerId !== userId) {
+      channel = channel.on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'purchase_orders', filter: `buyer_id=eq.${profileBuyerId}` },
+        onPurchaseOrderChange
+      );
+    }
+
+    channel
       .on('postgres_changes',
         { event: '*', schema: 'public', table: 'builder_projects', filter: `builder_id=eq.${userId}` },
         (payload) => {
@@ -1562,13 +1606,6 @@ const ProfessionalBuilderDashboardPage = () => {
         }
       )
       .on('postgres_changes',
-        { event: '*', schema: 'public', table: 'purchase_orders', filter: `buyer_id=eq.${userId}` },
-        (payload) => {
-          console.log('📋 Purchase order change detected (for supplier responses):', payload);
-          fetchSupplierResponseCount(userId); // Refresh supplier response count
-        }
-      )
-      .on('postgres_changes',
         { event: '*', schema: 'public', table: 'deliveries', filter: `builder_id=eq.${userId}` },
         (payload) => {
           console.log('🚚 Delivery change detected:', payload);
@@ -1580,7 +1617,7 @@ const ProfessionalBuilderDashboardPage = () => {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [authUser]);
+  }, [authUser, profile?.id]);
 
   // Fetch supplier response count on mount and when user changes
   useEffect(() => {
@@ -1588,9 +1625,9 @@ const ProfessionalBuilderDashboardPage = () => {
     if (userId) {
       fetchSupplierResponseCount(userId);
       
-      // Set up real-time subscription for purchase_orders changes to update count
-      const channel = supabase
-        .channel('supplier-responses-count')
+      const profileBuyerId = profile?.id;
+      let channel = supabase
+        .channel(`supplier-responses-count-${userId}`)
         .on('postgres_changes',
           {
             event: '*',
@@ -1601,14 +1638,29 @@ const ProfessionalBuilderDashboardPage = () => {
           () => {
             fetchSupplierResponseCount(userId);
           }
-        )
-        .subscribe();
+        );
+
+      if (profileBuyerId && profileBuyerId !== userId) {
+        channel = channel.on('postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'purchase_orders',
+            filter: `buyer_id=eq.${profileBuyerId}`
+          },
+          () => {
+            fetchSupplierResponseCount(userId);
+          }
+        );
+      }
+
+      channel.subscribe();
 
       return () => {
         supabase.removeChannel(channel);
       };
     }
-  }, [authUser]);
+  }, [authUser, profile?.id]);
 
   const handleMonitoringRequest = async () => {
     if (!monitoringRequest.projectName || !monitoringRequest.projectLocation) {
@@ -2042,6 +2094,7 @@ const ProfessionalBuilderDashboardPage = () => {
                   }}
                   onUpdate={handleProjectUpdate}
                   userId={getUserId()}
+                  profileIdForOrders={profile?.id}
                   builderHasSingleProject={projects.length === 1}
                 />
               </div>
