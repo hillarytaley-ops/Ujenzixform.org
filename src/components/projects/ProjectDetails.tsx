@@ -32,6 +32,11 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { supabase, SUPABASE_URL, SUPABASE_ANON_KEY } from '@/integrations/supabase/client';
 import { Link, useNavigate } from 'react-router-dom';
+import {
+  fetchPurchaseBuyerIdsForBuilder,
+  purchaseOrderBelongsToProject,
+  monitoringRequestBelongsToProject,
+} from '@/utils/builderProjectPurchaseOrders';
 
 interface Project {
   id: string;
@@ -125,6 +130,13 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
   const fetchProjectData = async (showRefresh = false) => {
     if (showRefresh) setRefreshing(true);
     else setLoading(true);
+
+    if (!userId?.trim()) {
+      console.warn('📁 ProjectDetails: missing userId, skip load');
+      setLoading(false);
+      setRefreshing(false);
+      return;
+    }
     
     // Safety timeout - always clear loading after 5 seconds
     const safetyTimeout = setTimeout(() => {
@@ -135,13 +147,15 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
     
     try {
       const accessToken = await getAccessToken();
+      const buyerIds = await fetchPurchaseBuyerIdsForBuilder(userId, accessToken || null);
+      const buyerIn = buyerIds.join(',');
       
-      // Fetch orders for this project with timeout
+      // Orders: many rows have project_id NULL but project_name like "Site - Quote from …"
       try {
         const controller1 = new AbortController();
-        const timeout1 = setTimeout(() => controller1.abort(), 3000);
+        const timeout1 = setTimeout(() => controller1.abort(), 12000);
         const ordersResponse = await fetch(
-          `${SUPABASE_URL}/rest/v1/purchase_orders?project_id=eq.${project.id}&order=created_at.desc`,
+          `${SUPABASE_URL}/rest/v1/purchase_orders?buyer_id=in.(${buyerIn})&select=*&order=created_at.desc`,
           {
             headers: {
               'apikey': SUPABASE_ANON_KEY,
@@ -154,7 +168,12 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
         
         if (ordersResponse.ok) {
           const ordersData = await ordersResponse.json();
-          setOrders(ordersData);
+          const rows = Array.isArray(ordersData) ? ordersData : [];
+          setOrders(
+            rows.filter((o: { project_id?: string | null; project_name?: string | null }) =>
+              purchaseOrderBelongsToProject(o, project.id, project.name)
+            )
+          );
         }
       } catch (e: any) {
         if (e.name !== 'AbortError') {
@@ -188,12 +207,12 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
         }
       }
       
-      // Fetch monitoring requests for this project with timeout
+      // Monitoring: often no project_id on row; match user + project name like dashboard
       try {
         const controller3 = new AbortController();
-        const timeout3 = setTimeout(() => controller3.abort(), 3000);
+        const timeout3 = setTimeout(() => controller3.abort(), 12000);
         const monitoringResponse = await fetch(
-          `${SUPABASE_URL}/rest/v1/monitoring_service_requests?project_id=eq.${project.id}&order=created_at.desc`,
+          `${SUPABASE_URL}/rest/v1/monitoring_service_requests?user_id=eq.${userId}&order=created_at.desc`,
           {
             headers: {
               'apikey': SUPABASE_ANON_KEY,
@@ -206,7 +225,12 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
         
         if (monitoringResponse.ok) {
           const monitoringData = await monitoringResponse.json();
-          setMonitoringRequests(monitoringData);
+          const mrows = Array.isArray(monitoringData) ? monitoringData : [];
+          setMonitoringRequests(
+            mrows.filter((m: { project_id?: string | null; project_name?: string | null }) =>
+              monitoringRequestBelongsToProject(m, project.id, project.name)
+            )
+          );
         }
       } catch (e: any) {
         if (e.name !== 'AbortError') {
@@ -243,19 +267,25 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
 
   useEffect(() => {
     fetchProjectData();
-  }, [project.id]);
+  }, [project.id, project.name, userId]);
 
-  // Calculate spending breakdown
+  // Materials value: all active pipeline + fulfilled (excludes cancelled / draft)
   const materialsSpent = orders
-    .filter(o => ['confirmed', 'dispatched', 'in_transit', 'delivered'].includes(o.status))
-    .reduce((sum, o) => sum + (o.total_amount || 0), 0);
+    .filter((o) => {
+      const st = String(o.status ?? '').toLowerCase();
+      return !['cancelled', 'rejected', 'draft'].includes(st);
+    })
+    .reduce((sum, o) => sum + (Number(o.total_amount) || 0), 0);
   
   const deliverySpent = deliveries
     .filter(d => ['accepted', 'in_transit', 'delivered', 'completed'].includes(d.status))
     .reduce((sum, d) => sum + (d.estimated_cost || 0), 0);
   
   const monitoringSpent = monitoringRequests
-    .filter(m => ['approved', 'active', 'completed'].includes(m.status))
+    .filter((m) => {
+      const st = String(m.status ?? '').toLowerCase();
+      return ['approved', 'active', 'completed', 'in_progress'].includes(st);
+    })
     .reduce((sum, m) => sum + ((m.camera_count || 1) * 5000), 0);
   
   const totalSpent = materialsSpent + deliverySpent + monitoringSpent;

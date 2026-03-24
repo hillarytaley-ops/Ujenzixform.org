@@ -83,6 +83,10 @@ import {
   setCartProjectContext,
   clearCartProjectContext,
 } from "@/utils/builderCartProject";
+import {
+  normalizeProjectName,
+  fetchPurchaseBuyerIdsForBuilder,
+} from "@/utils/builderProjectPurchaseOrders";
 import { DeliveryNoteWorkflow } from "@/components/delivery/DeliveryNoteWorkflow";
 import { GRNView } from "@/components/delivery/GRNView";
 import { InvoiceManagement } from "@/components/invoices/InvoiceManagement";
@@ -94,10 +98,6 @@ type PurchaseOrderProjectRow = {
   total_amount?: number | null;
   status?: string | null;
 };
-
-function normalizeProjectName(n: string | null | undefined): string {
-  return (n ?? '').trim().toLowerCase().replace(/\s+/g, ' ');
-}
 
 /**
  * purchase_orders.project_name is often "My Site - Quote from Supplier Co" while
@@ -131,41 +131,6 @@ function resolveProjectIdForOrder(
     if (normOrder.startsWith(pn + " -") || normOrder.startsWith(pn + " —")) return p.id;
   }
   return null;
-}
-
-/** All buyer_id values that may appear on purchase_orders for this auth user. */
-async function fetchPurchaseBuyerIdsForBuilder(
-  userId: string,
-  accessToken: string | null
-): Promise<string[]> {
-  const ids = new Set<string>([userId]);
-  const ctrl = new AbortController();
-  const t = window.setTimeout(() => ctrl.abort(), 5000);
-  try {
-    const res = await fetch(
-      `${SUPABASE_URL}/rest/v1/profiles?or=(user_id.eq.${userId},id.eq.${userId})&select=id,user_id&limit=20`,
-      {
-        headers: {
-          apikey: SUPABASE_ANON_KEY,
-          Authorization: `Bearer ${accessToken || SUPABASE_ANON_KEY}`,
-          Accept: "application/json",
-        },
-        signal: ctrl.signal,
-      }
-    );
-    if (res.ok) {
-      const rows = (await res.json()) as { id?: string; user_id?: string }[];
-      for (const p of Array.isArray(rows) ? rows : []) {
-        if (p?.id) ids.add(p.id);
-        if (p?.user_id) ids.add(p.user_id);
-      }
-    }
-  } catch {
-    /* optional */
-  } finally {
-    window.clearTimeout(t);
-  }
-  return [...ids];
 }
 
 /** Dedupe REST rows (e.g. duplicate ids). */
