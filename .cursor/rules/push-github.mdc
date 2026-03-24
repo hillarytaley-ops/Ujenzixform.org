@@ -1,0 +1,14 @@
+---
+description: After code changes, commit and push to GitHub unless the user explicitly says not to
+alwaysApply: true
+---
+
+# Push changes to GitHub
+
+When you complete substantive edits in this repo (code, migrations the user cares about, config that should be versioned):
+
+1. Run `git status`, stage the relevant files, and commit with a clear message.
+2. Push to the current branch (usually `main`) on `origin` — e.g. `git push origin main`.
+3. Do this in the same session as the edits; do not leave fixes only local unless the user explicitly asks not to push or not to commit.
+
+If push fails (auth, conflicts), fix or report and retry; do not assume the user will push manually.
