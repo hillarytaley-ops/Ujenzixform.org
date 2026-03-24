@@ -99,6 +99,75 @@ function normalizeProjectName(n: string | null | undefined): string {
   return (n ?? '').trim().toLowerCase().replace(/\s+/g, ' ');
 }
 
+/**
+ * purchase_orders.project_name is often "My Site - Quote from Supplier Co" while
+ * builder_projects.name is "My Site". Match UUID first, then exact name, then prefix before " - ".
+ */
+function resolveProjectIdForOrder(
+  o: PurchaseOrderProjectRow,
+  projects: { id: string; name?: string | null }[],
+  nameToIds: Map<string, string[]>
+): string | null {
+  let pid: string | null =
+    o.project_id && typeof o.project_id === "string" ? o.project_id.trim() : null;
+  if (pid) return pid;
+
+  const normOrder = normalizeProjectName(o.project_name);
+  if (!normOrder) return null;
+
+  const exact = nameToIds.get(normOrder);
+  if (exact?.length === 1) return exact[0];
+
+  const sorted = [...projects]
+    .filter((p) => p.name && String(p.name).trim())
+    .sort(
+      (a, b) =>
+        normalizeProjectName(b.name).length - normalizeProjectName(a.name).length
+    );
+  for (const p of sorted) {
+    const pn = normalizeProjectName(p.name);
+    if (!pn) continue;
+    if (normOrder === pn) return p.id;
+    if (normOrder.startsWith(pn + " -") || normOrder.startsWith(pn + " —")) return p.id;
+  }
+  return null;
+}
+
+/** All buyer_id values that may appear on purchase_orders for this auth user. */
+async function fetchPurchaseBuyerIdsForBuilder(
+  userId: string,
+  accessToken: string | null
+): Promise<string[]> {
+  const ids = new Set<string>([userId]);
+  const ctrl = new AbortController();
+  const t = window.setTimeout(() => ctrl.abort(), 5000);
+  try {
+    const res = await fetch(
+      `${SUPABASE_URL}/rest/v1/profiles?or=(user_id.eq.${userId},id.eq.${userId})&select=id,user_id&limit=20`,
+      {
+        headers: {
+          apikey: SUPABASE_ANON_KEY,
+          Authorization: `Bearer ${accessToken || SUPABASE_ANON_KEY}`,
+          Accept: "application/json",
+        },
+        signal: ctrl.signal,
+      }
+    );
+    if (res.ok) {
+      const rows = (await res.json()) as { id?: string; user_id?: string }[];
+      for (const p of Array.isArray(rows) ? rows : []) {
+        if (p?.id) ids.add(p.id);
+        if (p?.user_id) ids.add(p.user_id);
+      }
+    }
+  } catch {
+    /* optional */
+  } finally {
+    window.clearTimeout(t);
+  }
+  return [...ids];
+}
+
 /** Dedupe REST rows (e.g. duplicate ids). */
 function dedupeProjectsById(rows: any[]): any[] {
   const seen = new Set<string>();
@@ -111,13 +180,13 @@ function dedupeProjectsById(rows: any[]): any[] {
 }
 
 /**
- * Count POs and sum spend per builder_projects.id.
- * Uses project_id; if missing, matches project_name only when exactly one project has that name.
+ * Count POs and sum order value per builder_projects.id.
+ * Uses project_id; if missing, matches project_name (including "Name - Quote from …" from cart).
  */
 function aggregatePurchaseStatsByProject(
   orders: PurchaseOrderProjectRow[],
   projects: { id: string; name?: string | null }[]
-): Map<string, { orderCount: number; spentConfirmed: number }> {
+): Map<string, { orderCount: number; orderValueSum: number }> {
   const nameToIds = new Map<string, string[]>();
   for (const p of projects) {
     const key = normalizeProjectName(p.name);
@@ -127,33 +196,19 @@ function aggregatePurchaseStatsByProject(
     nameToIds.set(key, arr);
   }
 
-  const map = new Map<string, { orderCount: number; spentConfirmed: number }>();
-  const spentStatuses = new Set([
-    'completed',
-    'delivered',
-    'confirmed',
-    'shipped',
-    'paid',
-    'processing',
-  ]);
-  const skipOrder = new Set(['cancelled', 'rejected', 'draft']);
+  const map = new Map<string, { orderCount: number; orderValueSum: number }>();
+  const skipOrder = new Set(["cancelled", "rejected", "draft"]);
 
   for (const o of orders) {
-    const st = String(o.status ?? '').toLowerCase();
+    const st = String(o.status ?? "").toLowerCase();
     if (skipOrder.has(st)) continue;
 
-    let pid: string | null = o.project_id && typeof o.project_id === 'string' ? o.project_id : null;
-    if (!pid && o.project_name) {
-      const ids = nameToIds.get(normalizeProjectName(o.project_name));
-      if (ids?.length === 1) pid = ids[0];
-    }
+    const pid = resolveProjectIdForOrder(o, projects, nameToIds);
     if (!pid) continue;
 
-    const cur = map.get(pid) ?? { orderCount: 0, spentConfirmed: 0 };
+    const cur = map.get(pid) ?? { orderCount: 0, orderValueSum: 0 };
     cur.orderCount += 1;
-    if (spentStatuses.has(st)) {
-      cur.spentConfirmed += Number(o.total_amount ?? 0);
-    }
+    cur.orderValueSum += Number(o.total_amount ?? 0);
     map.set(pid, cur);
   }
   return map;
@@ -161,17 +216,17 @@ function aggregatePurchaseStatsByProject(
 
 function mergeProjectsWithPurchaseAggregates(
   projects: any[],
-  stats: Map<string, { orderCount: number; spentConfirmed: number }>
+  stats: Map<string, { orderCount: number; orderValueSum: number }>
 ): any[] {
   return projects.map((p) => {
     const s = stats.get(p.id);
     const orderCount = s != null ? s.orderCount : Number(p.total_orders) || 0;
-    const spentFromPo = s?.spentConfirmed ?? 0;
+    const valueFromPo = s?.orderValueSum ?? 0;
     const spentStored = Number(p.spent || 0);
     return {
       ...p,
       total_orders: orderCount,
-      spent: Math.max(spentFromPo, spentStored),
+      spent: Math.max(valueFromPo, spentStored),
     };
   });
 }
@@ -235,33 +290,8 @@ async function mergeProjectRowsWithPurchaseOrders(
   userId: string,
   accessToken: string | null
 ): Promise<any[]> {
-  const buyerIds = new Set<string>([userId]);
-  const profCtrl = new AbortController();
-  const profT = window.setTimeout(() => profCtrl.abort(), 4000);
-  try {
-    const profRes = await fetch(
-      `${SUPABASE_URL}/rest/v1/profiles?user_id=eq.${userId}&select=id&limit=1`,
-      {
-        headers: {
-          apikey: SUPABASE_ANON_KEY,
-          Authorization: `Bearer ${accessToken || SUPABASE_ANON_KEY}`,
-          Accept: 'application/json',
-        },
-        signal: profCtrl.signal,
-      }
-    );
-    if (profRes.ok) {
-      const profRows = (await profRes.json()) as { id?: string }[];
-      const pid = Array.isArray(profRows) && profRows[0]?.id;
-      if (pid) buyerIds.add(pid);
-    }
-  } catch {
-    /* optional */
-  } finally {
-    window.clearTimeout(profT);
-  }
-
-  const inList = Array.from(buyerIds).join(',');
+  const buyerIds = await fetchPurchaseBuyerIdsForBuilder(userId, accessToken);
+  const inList = buyerIds.join(",");
   const ordersUrl = `${SUPABASE_URL}/rest/v1/purchase_orders?buyer_id=in.(${inList})&select=project_id,project_name,total_amount,status`;
   const orderCtrl = new AbortController();
   const orderT = window.setTimeout(() => orderCtrl.abort(), 8000);
@@ -685,10 +715,20 @@ const ProfessionalBuilderDashboardPage = () => {
 
     try {
       console.log('📊 Loading real stats for builder:', userId);
+
+      const { data: statsSession } = await supabase.auth.getSession();
+      const poBuyerIds = await fetchPurchaseBuyerIdsForBuilder(
+        userId,
+        statsSession?.session?.access_token ?? null
+      );
       
-      // Fetch purchase orders using Supabase client with timeout (increased to 10s)
+      // Fetch purchase orders (buyer_id may be auth uid or profiles.id)
       const ordersResult = await withTimeout(
-        supabase.from('purchase_orders').select('*').eq('buyer_id', userId).order('created_at', { ascending: false }),
+        supabase
+          .from('purchase_orders')
+          .select('*')
+          .in('buyer_id', poBuyerIds)
+          .order('created_at', { ascending: false }),
         10000,
         { data: null, error: { message: 'Timeout' } }
       );
@@ -858,8 +898,18 @@ const ProfessionalBuilderDashboardPage = () => {
 
       // Also fetch from purchase_orders with delivery info (increased to 10s)
       let orderDeliveries: any[] = [];
+      const { data: delSession } = await supabase.auth.getSession();
+      const deliveryPoBuyerIds = await fetchPurchaseBuyerIdsForBuilder(
+        userId,
+        delSession?.session?.access_token ?? null
+      );
       const ordersResult = await withTimeout(
-        supabase.from('purchase_orders').select('*').eq('buyer_id', userId).in('status', ['confirmed', 'shipped', 'delivered']).order('created_at', { ascending: false }),
+        supabase
+          .from('purchase_orders')
+          .select('*')
+          .in('buyer_id', deliveryPoBuyerIds)
+          .in('status', ['confirmed', 'shipped', 'delivered'])
+          .order('created_at', { ascending: false }),
         10000,
         { data: [], error: null }
       );
