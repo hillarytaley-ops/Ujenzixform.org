@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -205,6 +205,29 @@ function projectCardProgressPercent(project: {
   const spent = Number(project.spent) || 0;
   if (budget > 0) return Math.min(100, Math.round((spent / budget) * 100));
   return 0;
+}
+
+/** Normalize DB status strings for comparisons (case, spaces). */
+function normMonitoringStatus(s: string | null | undefined): string {
+  return String(s ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, "_");
+}
+
+function isMonitoringApprovedStatus(s: string | null | undefined): boolean {
+  const n = normMonitoringStatus(s);
+  return (
+    n === "approved" ||
+    n === "completed" ||
+    n === "active" ||
+    n === "in_progress"
+  );
+}
+
+function isMonitoringPendingOrQuotedStatus(s: string | null | undefined): boolean {
+  const n = normMonitoringStatus(s);
+  return n === "pending" || n === "quoted" || n === "reviewing";
 }
 
 async function mergeProjectRowsWithPurchaseOrders(
@@ -426,6 +449,39 @@ const ProfessionalBuilderDashboardPage = () => {
     return '';
   };
 
+  /** Load monitoring rows for the signed-in builder; supports legacy `requester_id` if `user_id` is empty. */
+  const refreshMonitoringRequests = useCallback(async () => {
+    const userId = getUserId();
+    if (!userId) return;
+
+    const { data, error } = await supabase
+      .from("monitoring_service_requests")
+      .select("*")
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false });
+
+    let rows: any[] = Array.isArray(data) ? data : [];
+
+    if (!error && rows.length === 0) {
+      const { data: legacy, error: legacyErr } = await supabase
+        .from("monitoring_service_requests")
+        .select("*")
+        .eq("requester_id", userId)
+        .order("created_at", { ascending: false });
+      if (!legacyErr && Array.isArray(legacy) && legacy.length > 0) {
+        rows = legacy;
+      }
+    }
+
+    if (error && rows.length === 0) {
+      console.warn("📹 Monitoring load error:", error.message);
+      return;
+    }
+
+    setMonitoringRequests(rows);
+    console.log("📹 Monitoring requests loaded:", rows.length);
+  }, [authUser?.id]);
+
   // Set user from AuthContext when available
   useEffect(() => {
     if (authUser) {
@@ -477,176 +533,53 @@ const ProfessionalBuilderDashboardPage = () => {
     return () => clearInterval(interval);
   }, [authUser?.id, user?.id]);
 
-  // Fetch monitoring requests directly - run on mount and when authUser changes
   useEffect(() => {
-    const loadMonitoringData = async () => {
-      // Get user ID from multiple sources
-      let userId = authUser?.id || '';
-      
-      if (!userId) {
-        try {
-          const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
-          if (storedSession) {
-            const parsed = JSON.parse(storedSession);
-            userId = parsed.user?.id || '';
-          }
-        } catch (e) {}
-      }
-      
-      console.log('📹 DIRECT: userId =', userId || 'EMPTY');
-      
-      if (!userId) {
-        console.log('📹 DIRECT: No user ID yet, will retry...');
-        return;
-      }
-      
-      console.log('📹 DIRECT: Loading monitoring requests for:', userId);
-      
-      try {
-        // Get fresh access token using getAccessToken (handles refresh automatically)
-        let accessToken = await getAccessToken();
-        
-        if (!accessToken) {
-          console.log('📹 DIRECT: No access token available, using Supabase client fallback');
-          // Fallback to Supabase client directly
-          const { data, error } = await supabase
-            .from('monitoring_service_requests')
-            .select('*')
-            .eq('user_id', userId)
-            .order('created_at', { ascending: false });
-          
-          if (error) {
-            console.error('📹 DIRECT: Supabase error:', error.message);
-          } else {
-            console.log('📹 DIRECT: Supabase got', data?.length || 0, 'requests');
-            if (data && data.length > 0) {
-              setMonitoringRequests(data);
-              console.log('📹 DIRECT: ✅ State updated via Supabase');
-            }
-          }
-          return;
-        }
-        
-        console.log('📹 DIRECT: Using token length:', accessToken?.length || 0);
-        
-        // Try REST API first
-        const response = await fetch(
-          `${SUPABASE_URL}/rest/v1/monitoring_service_requests?user_id=eq.${userId}&order=created_at.desc`,
-          {
-            headers: {
-              'apikey': SUPABASE_ANON_KEY,
-              'Authorization': `Bearer ${accessToken}`,
-            }
-          }
-        );
-        
-        console.log('📹 DIRECT: Response status:', response.status);
-        
-        if (response.ok) {
-          const data = await response.json();
-          console.log('📹 DIRECT: Got', data?.length || 0, 'monitoring requests');
-          console.log('📹 DIRECT: First request:', data?.[0]?.project_name, data?.[0]?.status);
-          if (data && data.length > 0) {
-            setMonitoringRequests(data);
-            console.log('📹 DIRECT: ✅ State updated with', data.length, 'requests');
-          }
-        } else if (response.status === 401) {
-          // JWT expired - refresh token and retry once
-          console.log('📹 DIRECT: JWT expired, refreshing token and retrying...');
-          try {
-            // Force refresh by getting a new session
-            const { data: { session: newSession } } = await supabase.auth.getSession();
-            if (newSession?.access_token) {
-              const retryResponse = await fetch(
-                `${SUPABASE_URL}/rest/v1/monitoring_service_requests?user_id=eq.${userId}&order=created_at.desc`,
-                {
-                  headers: {
-                    'apikey': SUPABASE_ANON_KEY,
-                    'Authorization': `Bearer ${newSession.access_token}`,
-                  }
-                }
-              );
-              
-              if (retryResponse.ok) {
-                const data = await retryResponse.json();
-                console.log('📹 DIRECT: Retry successful, got', data?.length || 0, 'requests');
-                if (data && data.length > 0) {
-                  setMonitoringRequests(data);
-                  console.log('📹 DIRECT: ✅ State updated after retry');
-                }
-                return;
-              }
-            }
-          } catch (retryError) {
-            console.error('📹 DIRECT: Retry failed:', retryError);
-          }
-          
-          // If retry failed, fallback to Supabase client
-          console.log('📹 DIRECT: Retry failed, using Supabase client fallback');
-          const { data, error } = await supabase
-            .from('monitoring_service_requests')
-            .select('*')
-            .eq('user_id', userId)
-            .order('created_at', { ascending: false });
-          
-          if (error) {
-            console.error('📹 DIRECT: Supabase error:', error.message);
-          } else {
-            console.log('📹 DIRECT: Supabase got', data?.length || 0, 'requests');
-            if (data && data.length > 0) {
-              setMonitoringRequests(data);
-              console.log('📹 DIRECT: ✅ State updated via Supabase');
-            }
-          }
-          } else if (response.status === 401) {
-            // This is handled in the 401 block above, but log for debugging
-            const errorText = await response.text();
-            console.log('📹 DIRECT: REST failed with 401:', errorText);
-          // Fallback to Supabase client
-          const { data, error } = await supabase
-            .from('monitoring_service_requests')
-            .select('*')
-            .eq('user_id', userId)
-            .order('created_at', { ascending: false });
-          
-          if (error) {
-            console.error('📹 DIRECT: Supabase error:', error.message);
-          } else {
-            console.log('📹 DIRECT: Supabase got', data?.length || 0, 'requests');
-            if (data && data.length > 0) {
-              setMonitoringRequests(data);
-              console.log('📹 DIRECT: ✅ State updated via Supabase');
-            }
-          }
-        }
-      } catch (e) {
-        console.error('📹 DIRECT: Error:', e);
-        // Final fallback to Supabase client
-        try {
-          const { data, error } = await supabase
-            .from('monitoring_service_requests')
-            .select('*')
-            .eq('user_id', userId)
-            .order('created_at', { ascending: false });
-          
-          if (!error && data && data.length > 0) {
-            setMonitoringRequests(data);
-            console.log('📹 DIRECT: ✅ State updated via Supabase (final fallback)');
-          }
-        } catch (fallbackError) {
-          console.error('📹 DIRECT: Final fallback also failed:', fallbackError);
-        }
-      }
-    };
-    
-    // Run immediately
-    loadMonitoringData();
-    
-    // Also set up a retry after 2 seconds in case auth isn't ready yet
-    const retryTimeout = setTimeout(loadMonitoringData, 2000);
-    
+    void refreshMonitoringRequests();
+    const retryTimeout = setTimeout(() => void refreshMonitoringRequests(), 2000);
     return () => clearTimeout(retryTimeout);
-  }, [authUser]);
+  }, [refreshMonitoringRequests]);
+
+  useEffect(() => {
+    if (activeTab !== "monitoring") return;
+    void refreshMonitoringRequests();
+  }, [activeTab, refreshMonitoringRequests]);
+
+  useEffect(() => {
+    const userId = getUserId();
+    if (!userId) return;
+    const channel = supabase
+      .channel(`builder-monitoring-${userId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "monitoring_service_requests",
+          filter: `user_id=eq.${userId}`,
+        },
+        () => {
+          void refreshMonitoringRequests();
+        }
+      )
+      .subscribe();
+    return () => {
+      void supabase.removeChannel(channel);
+    };
+  }, [authUser?.id, refreshMonitoringRequests]);
+
+  useEffect(() => {
+    const refreshIfMonitoringTab = () => {
+      if (activeTab !== "monitoring") return;
+      if (document.visibilityState !== "visible") return;
+      void refreshMonitoringRequests();
+    };
+    window.addEventListener("focus", refreshIfMonitoringTab);
+    document.addEventListener("visibilitychange", refreshIfMonitoringTab);
+    return () => {
+      window.removeEventListener("focus", refreshIfMonitoringTab);
+      document.removeEventListener("visibilitychange", refreshIfMonitoringTab);
+    };
+  }, [activeTab, refreshMonitoringRequests]);
 
   useEffect(() => {
     // Safety timeout - show UI after 2 seconds max
@@ -720,126 +653,7 @@ const ProfessionalBuilderDashboardPage = () => {
       // Role already verified by RoleProtectedRoute, skip redundant check
       console.log('📋 Profile setup complete, data loading in background');
 
-      // Fetch monitoring requests using REST API for reliability
-      const fetchMonitoringRequests = async () => {
-        try {
-          let accessToken = await getAccessToken();
-          console.log('📹 Fetching monitoring requests for user:', userId);
-          
-          if (!accessToken) {
-            // Fallback to Supabase client if no token
-            const { data, error } = await supabase
-              .from('monitoring_service_requests')
-              .select('*')
-              .eq('user_id', userId)
-              .order('created_at', { ascending: false });
-            
-            if (error) {
-              console.log('📹 Supabase client fallback error:', error.message);
-            } else if (data && data.length > 0) {
-              console.log('📹 Monitoring requests (fallback):', data.length);
-              setMonitoringRequests(data);
-            }
-            return;
-          }
-          
-          const response = await fetch(
-            `${SUPABASE_URL}/rest/v1/monitoring_service_requests?user_id=eq.${userId}&order=created_at.desc`,
-            {
-              headers: {
-                'apikey': SUPABASE_ANON_KEY,
-                'Authorization': `Bearer ${accessToken}`,
-              }
-            }
-          );
-          
-          if (response.ok) {
-            const data = await response.json();
-            console.log('📹 Monitoring requests loaded:', data?.length || 0, 'requests');
-            if (data && data.length > 0) {
-              console.log('📹 First request status:', data[0].status, 'access_code:', data[0].access_code);
-              setMonitoringRequests(data);
-            }
-          } else if (response.status === 401) {
-            // JWT expired - refresh token and retry once
-            console.log('📹 JWT expired, refreshing token and retrying...');
-            try {
-              const { data: { session: newSession } } = await supabase.auth.getSession();
-              if (newSession?.access_token) {
-                const retryResponse = await fetch(
-                  `${SUPABASE_URL}/rest/v1/monitoring_service_requests?user_id=eq.${userId}&order=created_at.desc`,
-                  {
-                    headers: {
-                      'apikey': SUPABASE_ANON_KEY,
-                      'Authorization': `Bearer ${newSession.access_token}`,
-                    }
-                  }
-                );
-                
-                if (retryResponse.ok) {
-                  const data = await retryResponse.json();
-                  console.log('📹 Retry successful, got', data?.length || 0, 'requests');
-                  if (data && data.length > 0) {
-                    setMonitoringRequests(data);
-                  }
-                  return;
-                }
-              }
-            } catch (retryError) {
-              console.error('📹 Retry failed:', retryError);
-            }
-            
-            // If retry failed, fallback to Supabase client
-            console.log('📹 Retry failed, using Supabase client fallback');
-            const { data, error } = await supabase
-              .from('monitoring_service_requests')
-              .select('*')
-              .eq('user_id', userId)
-              .order('created_at', { ascending: false });
-            
-            if (error) {
-              console.log('📹 Supabase client fallback error:', error.message);
-            } else if (data && data.length > 0) {
-              console.log('📹 Monitoring requests (fallback):', data.length);
-              setMonitoringRequests(data);
-            }
-          } else {
-            console.log('📹 Monitoring requests fetch failed:', response.status);
-            // Fallback to Supabase client
-            const { data, error } = await supabase
-              .from('monitoring_service_requests')
-              .select('*')
-              .eq('user_id', userId)
-              .order('created_at', { ascending: false });
-            
-            if (error) {
-              console.log('📹 Supabase client fallback error:', error.message);
-            } else if (data && data.length > 0) {
-              console.log('📹 Monitoring requests (fallback):', data.length);
-              setMonitoringRequests(data);
-            }
-          }
-        } catch (e) {
-          console.error('📹 Error fetching monitoring requests:', e);
-          // Final fallback to Supabase client
-          try {
-            const { data, error } = await supabase
-              .from('monitoring_service_requests')
-              .select('*')
-              .eq('user_id', userId)
-              .order('created_at', { ascending: false });
-            
-            if (!error && data && data.length > 0) {
-              setMonitoringRequests(data);
-              console.log('📹 Monitoring requests loaded via Supabase (final fallback)');
-            }
-          } catch (fallbackError) {
-            console.error('📹 Final fallback also failed:', fallbackError);
-          }
-        }
-      };
-      
-      fetchMonitoringRequests();
+      void refreshMonitoringRequests();
 
     } catch (error) {
       console.error('Auth error:', error);
@@ -1768,18 +1582,7 @@ const ProfessionalBuilderDashboardPage = () => {
         additionalNotes: ''
       });
 
-      // Refresh monitoring requests in background (non-blocking)
-      fetch(
-        `${SUPABASE_URL}/rest/v1/monitoring_service_requests?user_id=eq.${user?.id || authUser?.id}&order=created_at.desc`,
-        {
-          headers: {
-            'apikey': SUPABASE_ANON_KEY,
-            'Authorization': `Bearer ${accessToken}`
-          }
-        }
-      ).then(res => res.json()).then(data => {
-        if (Array.isArray(data)) setMonitoringRequests(data);
-      }).catch(err => console.error('Error refreshing monitoring requests:', err));
+      void refreshMonitoringRequests();
 
     } catch (error: any) {
       clearTimeout(safetyTimeout);
@@ -3214,7 +3017,7 @@ const ProfessionalBuilderDashboardPage = () => {
                     <div>
                       <p className="text-sm text-green-700 font-medium">Active Cameras</p>
                       <p className="text-3xl font-bold text-green-800">
-                        {monitoringRequests.filter(r => r.status === 'approved').reduce((sum, r) => sum + (r.assigned_cameras?.length || r.camera_count || 0), 0)}
+                        {monitoringRequests.filter(r => isMonitoringApprovedStatus(r.status)).reduce((sum, r) => sum + (r.assigned_cameras?.length || r.camera_count || 0), 0)}
                       </p>
                     </div>
                     <div className="p-3 bg-green-500 rounded-full">
@@ -3231,7 +3034,7 @@ const ProfessionalBuilderDashboardPage = () => {
                     <div>
                       <p className="text-sm text-amber-700 font-medium">Pending Approval</p>
                       <p className="text-3xl font-bold text-amber-800">
-                        {monitoringRequests.filter(r => r.status === 'pending' || r.status === 'quoted').length}
+                        {monitoringRequests.filter(r => isMonitoringPendingOrQuotedStatus(r.status)).length}
                       </p>
                     </div>
                     <div className="p-3 bg-amber-500 rounded-full">
@@ -3248,17 +3051,17 @@ const ProfessionalBuilderDashboardPage = () => {
                     <div>
                       <p className="text-sm text-blue-700 font-medium">Access Keys</p>
                       <p className="text-3xl font-bold text-blue-800">
-                        {monitoringRequests.filter(r => r.status === 'approved' && r.access_code).length}
+                        {monitoringRequests.filter(r => isMonitoringApprovedStatus(r.status) && r.access_code).length}
                       </p>
                     </div>
                     <div className="p-3 bg-blue-500 rounded-full">
                       <Eye className="h-6 w-6 text-white" />
                     </div>
                   </div>
-                  {monitoringRequests.filter(r => r.status === 'approved' && r.access_code).length > 0 && (
+                  {monitoringRequests.filter(r => isMonitoringApprovedStatus(r.status) && r.access_code).length > 0 && (
                     <div className="mt-3 p-2 bg-white rounded border border-blue-200">
                       <p className="text-xs text-gray-500 mb-1">Your Access Codes:</p>
-                      {monitoringRequests.filter(r => r.status === 'approved' && r.access_code).map(r => (
+                      {monitoringRequests.filter(r => isMonitoringApprovedStatus(r.status) && r.access_code).map(r => (
                         <div key={r.id} className="flex items-center justify-between text-sm">
                           <span className="font-mono font-bold text-blue-700">{r.access_code}</span>
                           <Button 
@@ -3487,17 +3290,19 @@ const ProfessionalBuilderDashboardPage = () => {
                 {monitoringRequests.length > 0 ? (
                   <div className="space-y-4">
                     <h4 className="font-semibold text-gray-700">Your Monitoring Requests</h4>
-                    {monitoringRequests.map((request) => (
+                    {monitoringRequests.map((request) => {
+                      const st = normMonitoringStatus(request.status);
+                      return (
                       <div key={request.id} className={`border rounded-lg p-4 transition-colors ${
-                        request.status === 'quoted' ? 'border-blue-300 bg-blue-50' : 'hover:bg-gray-50'
+                        st === 'quoted' ? 'border-blue-300 bg-blue-50' : 'hover:bg-gray-50'
                       }`}>
                         <div className="flex items-start justify-between">
                           <div className="flex items-start gap-3">
                             <div className={`p-2 rounded-lg ${
-                              request.status === 'approved' ? 'bg-green-100 text-green-600' :
-                              request.status === 'rejected' ? 'bg-red-100 text-red-600' :
-                              request.status === 'quoted' ? 'bg-blue-100 text-blue-600' :
-                              request.status === 'completed' ? 'bg-purple-100 text-purple-600' :
+                              st === 'completed' ? 'bg-purple-100 text-purple-600' :
+                              isMonitoringApprovedStatus(request.status) ? 'bg-green-100 text-green-600' :
+                              st === 'rejected' ? 'bg-red-100 text-red-600' :
+                              st === 'quoted' ? 'bg-blue-100 text-blue-600' :
                               'bg-amber-100 text-amber-600'
                             }`}>
                               <Video className="h-5 w-5" />
@@ -3519,20 +3324,20 @@ const ProfessionalBuilderDashboardPage = () => {
                             </div>
                           </div>
                           <Badge className={`${
-                            request.status === 'approved' ? 'bg-green-100 text-green-700 border-green-300' :
-                            request.status === 'rejected' ? 'bg-red-100 text-red-700 border-red-300' :
-                            request.status === 'quoted' ? 'bg-blue-100 text-blue-700 border-blue-300' :
-                            request.status === 'completed' ? 'bg-purple-100 text-purple-700 border-purple-300' :
+                            st === 'completed' ? 'bg-purple-100 text-purple-700 border-purple-300' :
+                            isMonitoringApprovedStatus(request.status) ? 'bg-green-100 text-green-700 border-green-300' :
+                            st === 'rejected' ? 'bg-red-100 text-red-700 border-red-300' :
+                            st === 'quoted' ? 'bg-blue-100 text-blue-700 border-blue-300' :
                             'bg-amber-100 text-amber-700 border-amber-300'
                           }`}>
-                            {request.status === 'quoted' ? '💰 Quote Received' : 
-                             request.status === 'approved' ? '✅ Active' :
-                             request.status?.charAt(0).toUpperCase() + request.status?.slice(1)}
+                            {st === 'quoted' ? '💰 Quote Received' :
+                             isMonitoringApprovedStatus(request.status) ? '✅ Active' :
+                             (request.status ? String(request.status).charAt(0).toUpperCase() + String(request.status).slice(1) : 'Status')}
                           </Badge>
                         </div>
                         
                         {/* Quote Section - Show when admin has sent a quote */}
-                        {request.status === 'quoted' && request.quote_amount && (
+                        {st === 'quoted' && request.quote_amount && (
                           <div className="mt-4 p-4 bg-white border-2 border-blue-200 rounded-lg">
                             <div className="flex items-center justify-between mb-3">
                               <h6 className="font-semibold text-blue-800">📋 Quote from UjenziXform</h6>
@@ -3568,13 +3373,7 @@ const ProfessionalBuilderDashboardPage = () => {
                                       title: "Quote Accepted! 🎉",
                                       description: "Your monitoring service is now active. You can access your cameras.",
                                     });
-                                    // Refresh the list
-                                    const { data } = await supabase
-                                      .from('monitoring_service_requests')
-                                      .select('*')
-                                      .eq('user_id', user?.id)
-                                      .order('created_at', { ascending: false });
-                                    if (data) setMonitoringRequests(data);
+                                    void refreshMonitoringRequests();
                                   } catch (error) {
                                     console.error('Error accepting quote:', error);
                                     toast({
@@ -3602,13 +3401,7 @@ const ProfessionalBuilderDashboardPage = () => {
                                       title: "Quote Declined",
                                       description: "You can request a new quote anytime.",
                                     });
-                                    // Refresh the list
-                                    const { data } = await supabase
-                                      .from('monitoring_service_requests')
-                                      .select('*')
-                                      .eq('user_id', user?.id)
-                                      .order('created_at', { ascending: false });
-                                    if (data) setMonitoringRequests(data);
+                                    void refreshMonitoringRequests();
                                   } catch (error) {
                                     console.error('Error rejecting quote:', error);
                                     toast({
@@ -3627,7 +3420,7 @@ const ProfessionalBuilderDashboardPage = () => {
                         )}
                         
                         {/* Approved - Show access info */}
-                        {request.status === 'approved' && (
+                        {isMonitoringApprovedStatus(request.status) && (
                           <div className="mt-4 p-4 bg-green-50 border border-green-200 rounded-lg">
                             <div className="flex items-center gap-2 mb-2">
                               <CheckCircle className="h-5 w-5 text-green-600" />
@@ -3665,7 +3458,7 @@ const ProfessionalBuilderDashboardPage = () => {
                         )}
                         
                         {/* Pending - Waiting for admin */}
-                        {request.status === 'pending' && (
+                        {st === 'pending' && (
                           <div className="mt-3 p-3 bg-amber-50 border border-amber-200 rounded-lg">
                             <p className="text-sm text-amber-700 flex items-center gap-2">
                               <Clock className="h-4 w-4" />
@@ -3675,7 +3468,7 @@ const ProfessionalBuilderDashboardPage = () => {
                         )}
                         
                         {/* Rejected */}
-                        {request.status === 'rejected' && request.admin_notes && (
+                        {st === 'rejected' && request.admin_notes && (
                           <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-lg">
                             <p className="text-sm text-red-700">
                               <span className="font-medium">Reason:</span> {request.admin_notes}
@@ -3683,7 +3476,8 @@ const ProfessionalBuilderDashboardPage = () => {
                           </div>
                         )}
                       </div>
-                    ))}
+                    );
+                    })}
                   </div>
                 ) : (
                   <div className="text-center py-12 text-gray-500">
