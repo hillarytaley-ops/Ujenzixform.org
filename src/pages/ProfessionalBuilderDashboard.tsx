@@ -212,17 +212,31 @@ function aggregatePurchaseStatsByProject(
 
 function mergeProjectsWithPurchaseAggregates(
   projects: any[],
-  stats: Map<string, { orderCount: number; orderValueSum: number }>
+  stats: Map<string, { orderCount: number; orderValueSum: number }>,
+  /** When a later PO fetch returns no rows (e.g. RLS without JWT), keep prior merged card stats. */
+  previous?: any[] | null
 ): any[] {
+  const prevById = new Map<string, any>(
+    (previous ?? []).map((x: any) => [x.id, x])
+  );
   return projects.map((p) => {
     const s = stats.get(p.id);
-    const orderCount = s != null ? s.orderCount : Number(p.total_orders) || 0;
-    const valueFromPo = s?.orderValueSum ?? 0;
+    const prev = prevById.get(p.id);
+    const orderCount =
+      s != null
+        ? s.orderCount
+        : Math.max(Number(p.total_orders) || 0, Number(prev?.total_orders) || 0);
     const spentStored = Number(p.spent || 0);
+    const valueFromPo = s != null ? s.orderValueSum : 0;
+    const prevSpent = Number(prev?.spent || 0);
+    const spent =
+      s != null
+        ? Math.max(valueFromPo, spentStored)
+        : Math.max(spentStored, prevSpent);
     return {
       ...p,
       total_orders: orderCount,
-      spent: Math.max(valueFromPo, spentStored),
+      spent,
     };
   });
 }
@@ -288,7 +302,8 @@ function isMonitoringPendingOrQuotedStatus(s: string | null | undefined): boolea
 async function mergeProjectRowsWithPurchaseOrders(
   projectRows: any[],
   userId: string,
-  accessTokenFromProjectsFetch: string | null
+  accessTokenFromProjectsFetch: string | null,
+  previousMergedCards?: any[] | null
 ): Promise<any[]> {
   let token = accessTokenFromProjectsFetch;
   if (!token) {
@@ -343,7 +358,11 @@ async function mergeProjectRowsWithPurchaseOrders(
       list,
       projectRows.map((p) => ({ id: p.id, name: p.name }))
     );
-    const merged = mergeProjectsWithPurchaseAggregates(projectRows, stats);
+    const merged = mergeProjectsWithPurchaseAggregates(
+      projectRows,
+      stats,
+      previousMergedCards
+    );
     console.log(
       "📁 PO merge: sample card",
       merged[0]?.name,
@@ -1121,18 +1140,19 @@ const ProfessionalBuilderDashboardPage = () => {
         const projectRows = data as any[];
         setProjects(projectRows);
         console.log('📁 Loaded', projectRows.length, 'projects (order stats merge in background)');
-        const runMerge = (tokenOverride: string | null) =>
-          mergeProjectRowsWithPurchaseOrders(projectRows, userId, tokenOverride)
-            .then((merged) => {
-              setProjects(merged);
-              console.log('📁 Merged per-project order counts from purchase_orders');
-            })
-            .catch((err) =>
-              console.warn('📁 Per-project order merge failed (non-fatal):', err)
-            );
-        void runMerge(accessToken);
-        // Client session can lag; retry with null so merge prefers fresh getSession()
-        window.setTimeout(() => void runMerge(null), 2800);
+        void mergeProjectRowsWithPurchaseOrders(
+          projectRows,
+          userId,
+          accessToken,
+          projectRows
+        )
+          .then((merged) => {
+            setProjects(merged);
+            console.log('📁 Merged per-project order counts from purchase_orders');
+          })
+          .catch((err) =>
+            console.warn('📁 Per-project order merge failed (non-fatal):', err)
+          );
       } else {
         console.log('📁 No projects data returned (data is null or not array)');
         setProjects([]);
