@@ -85,22 +85,68 @@ import { MissingDeliveryAddressAlert } from "@/components/builders/MissingDelive
 
 type PurchaseOrderProjectRow = {
   project_id?: string | null;
+  project_name?: string | null;
   total_amount?: number | null;
   status?: string | null;
 };
 
-/** Count POs and sum "spent" per builder_projects.id (purchase_orders.project_id). */
+function normalizeProjectName(n: string | null | undefined): string {
+  return (n ?? '').trim().toLowerCase().replace(/\s+/g, ' ');
+}
+
+/** Dedupe REST rows (e.g. duplicate ids). */
+function dedupeProjectsById(rows: any[]): any[] {
+  const seen = new Set<string>();
+  return rows.filter((p) => {
+    const id = p?.id;
+    if (!id || typeof id !== 'string' || seen.has(id)) return false;
+    seen.add(id);
+    return true;
+  });
+}
+
+/**
+ * Count POs and sum spend per builder_projects.id.
+ * Uses project_id; if missing, matches project_name only when exactly one project has that name.
+ */
 function aggregatePurchaseStatsByProject(
-  orders: PurchaseOrderProjectRow[]
+  orders: PurchaseOrderProjectRow[],
+  projects: { id: string; name?: string | null }[]
 ): Map<string, { orderCount: number; spentConfirmed: number }> {
+  const nameToIds = new Map<string, string[]>();
+  for (const p of projects) {
+    const key = normalizeProjectName(p.name);
+    if (!key) continue;
+    const arr = nameToIds.get(key) ?? [];
+    arr.push(p.id);
+    nameToIds.set(key, arr);
+  }
+
   const map = new Map<string, { orderCount: number; spentConfirmed: number }>();
-  const spentStatuses = new Set(['completed', 'delivered', 'confirmed']);
+  const spentStatuses = new Set([
+    'completed',
+    'delivered',
+    'confirmed',
+    'shipped',
+    'paid',
+    'processing',
+  ]);
+  const skipOrder = new Set(['cancelled', 'rejected', 'draft']);
+
   for (const o of orders) {
-    const pid = o.project_id;
-    if (!pid || typeof pid !== 'string') continue;
+    const st = String(o.status ?? '').toLowerCase();
+    if (skipOrder.has(st)) continue;
+
+    let pid: string | null = o.project_id && typeof o.project_id === 'string' ? o.project_id : null;
+    if (!pid && o.project_name) {
+      const ids = nameToIds.get(normalizeProjectName(o.project_name));
+      if (ids?.length === 1) pid = ids[0];
+    }
+    if (!pid) continue;
+
     const cur = map.get(pid) ?? { orderCount: 0, spentConfirmed: 0 };
     cur.orderCount += 1;
-    if (spentStatuses.has(String(o.status ?? '').toLowerCase())) {
+    if (spentStatuses.has(st)) {
       cur.spentConfirmed += Number(o.total_amount ?? 0);
     }
     map.set(pid, cur);
@@ -120,7 +166,7 @@ function mergeProjectsWithPurchaseAggregates(
     return {
       ...p,
       total_orders: orderCount,
-      spent: spentFromPo > 0 ? spentFromPo : spentStored,
+      spent: Math.max(spentFromPo, spentStored),
     };
   });
 }
@@ -174,7 +220,7 @@ async function mergeProjectRowsWithPurchaseOrders(
   }
 
   const inList = Array.from(buyerIds).join(',');
-  const ordersUrl = `${SUPABASE_URL}/rest/v1/purchase_orders?buyer_id=in.(${inList})&select=project_id,total_amount,status`;
+  const ordersUrl = `${SUPABASE_URL}/rest/v1/purchase_orders?buyer_id=in.(${inList})&select=project_id,project_name,total_amount,status`;
   const orderCtrl = new AbortController();
   const orderT = window.setTimeout(() => orderCtrl.abort(), 8000);
   try {
@@ -191,7 +237,10 @@ async function mergeProjectRowsWithPurchaseOrders(
       return projectRows;
     }
     const orderRows = (await ordersRes.json()) as PurchaseOrderProjectRow[];
-    const stats = aggregatePurchaseStatsByProject(Array.isArray(orderRows) ? orderRows : []);
+    const stats = aggregatePurchaseStatsByProject(
+      Array.isArray(orderRows) ? orderRows : [],
+      projectRows.map((p) => ({ id: p.id, name: p.name }))
+    );
     return mergeProjectsWithPurchaseAggregates(projectRows, stats);
   } catch {
     return projectRows;
@@ -1134,7 +1183,8 @@ const ProfessionalBuilderDashboardPage = () => {
         return;
       }
       
-      let data = await response.json();
+      const rawData = await response.json();
+      const data = Array.isArray(rawData) ? dedupeProjectsById(rawData) : rawData;
       console.log('📁 Query completed successfully');
       console.log('📁 Raw data received:', data);
       
@@ -2351,19 +2401,33 @@ const ProfessionalBuilderDashboardPage = () => {
                       
                       {/* Project Cards */}
                       <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-                        {projects.map((project) => (
+                        {projects.map((project, projectIdx) => (
                           <Card 
-                            key={project.id} 
+                            key={project.id ? String(project.id) : `project-${projectIdx}`} 
                             className="border-2 hover:border-blue-300 hover:shadow-lg transition-all cursor-pointer"
                             onClick={() => setSelectedProject(project)}
                           >
                             <CardContent className="p-5">
                               <div className="flex items-start justify-between mb-3">
-                                <div className="flex-1">
-                                  <h3 className="font-bold text-lg">{project.name}</h3>
-                                  <p className="text-sm text-gray-500 flex items-center gap-1">
-                                    <MapPin className="h-3 w-3" />
-                                    {project.location}
+                                <div className="flex-1 min-w-0">
+                                  <h3 className="font-bold text-lg truncate">{project.name}</h3>
+                                  {project.id && (
+                                    <p className="text-[11px] text-gray-400 font-mono truncate" title={String(project.id)}>
+                                      Ref {String(project.id).replace(/-/g, '').slice(0, 8)}…
+                                    </p>
+                                  )}
+                                  {project.created_at && (
+                                    <p className="text-[11px] text-gray-400">
+                                      Added{' '}
+                                      {new Date(project.created_at).toLocaleString(undefined, {
+                                        dateStyle: 'medium',
+                                        timeStyle: 'short',
+                                      })}
+                                    </p>
+                                  )}
+                                  <p className="text-sm text-gray-500 flex items-center gap-1 mt-1">
+                                    <MapPin className="h-3 w-3 shrink-0" />
+                                    <span className="truncate">{project.location}</span>
                                   </p>
                                 </div>
                                 <Badge 
