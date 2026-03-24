@@ -168,7 +168,11 @@ function aggregatePurchaseStatsByProject(
     const st = String(o.status ?? "").toLowerCase();
     if (skipOrder.has(st)) continue;
 
-    const pid = resolveProjectIdForOrder(o, projects, nameToIds);
+    let pid = resolveProjectIdForOrder(o, projects, nameToIds);
+    // Orders titled "Quote Request - …" often have no project_id/name link; single-project builders still expect totals.
+    if (!pid && projects.length === 1) {
+      pid = projects[0].id;
+    }
     if (!pid) continue;
 
     const cur = map.get(pid) ?? { orderCount: 0, orderValueSum: 0 };
@@ -253,36 +257,30 @@ function isMonitoringPendingOrQuotedStatus(s: string | null | undefined): boolea
 async function mergeProjectRowsWithPurchaseOrders(
   projectRows: any[],
   userId: string,
-  accessToken: string | null
+  _accessToken: string | null
 ): Promise<any[]> {
-  const buyerIds = await fetchPurchaseBuyerIdsForBuilder(userId, accessToken);
-  const inList = buyerIds.join(",");
-  const ordersUrl = `${SUPABASE_URL}/rest/v1/purchase_orders?buyer_id=in.(${inList})&select=project_id,project_name,total_amount,status`;
-  const orderCtrl = new AbortController();
-  const orderT = window.setTimeout(() => orderCtrl.abort(), 8000);
+  const { data: sessionData } = await supabase.auth.getSession();
+  const token = sessionData?.session?.access_token ?? null;
+  const buyerIds = await fetchPurchaseBuyerIdsForBuilder(userId, token);
+  if (buyerIds.length === 0) return projectRows;
+
   try {
-    const ordersRes = await fetch(ordersUrl, {
-      headers: {
-        apikey: SUPABASE_ANON_KEY,
-        Authorization: `Bearer ${accessToken || SUPABASE_ANON_KEY}`,
-        Accept: 'application/json',
-      },
-      signal: orderCtrl.signal,
-    });
-    if (!ordersRes.ok) {
-      console.warn('📁 purchase_orders merge skipped:', ordersRes.status);
+    const { data: orderRows, error } = await supabase
+      .from("purchase_orders")
+      .select("project_id,project_name,total_amount,status")
+      .in("buyer_id", buyerIds);
+    if (error) {
+      console.warn("📁 purchase_orders merge skipped:", error.message);
       return projectRows;
     }
-    const orderRows = (await ordersRes.json()) as PurchaseOrderProjectRow[];
     const stats = aggregatePurchaseStatsByProject(
-      Array.isArray(orderRows) ? orderRows : [],
+      Array.isArray(orderRows) ? (orderRows as PurchaseOrderProjectRow[]) : [],
       projectRows.map((p) => ({ id: p.id, name: p.name }))
     );
     return mergeProjectsWithPurchaseAggregates(projectRows, stats);
-  } catch {
+  } catch (e) {
+    console.warn("📁 purchase_orders merge error:", e);
     return projectRows;
-  } finally {
-    window.clearTimeout(orderT);
   }
 }
 
@@ -1934,6 +1932,7 @@ const ProfessionalBuilderDashboardPage = () => {
                   }}
                   onUpdate={handleProjectUpdate}
                   userId={getUserId()}
+                  builderHasSingleProject={projects.length === 1}
                 />
               </div>
             ) : (

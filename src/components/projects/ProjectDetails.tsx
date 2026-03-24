@@ -97,13 +97,16 @@ interface ProjectDetailsProps {
   onBack: () => void;
   onUpdate?: (project: Project) => void;
   userId: string;
+  /** When the builder has only one project, POs without project_id still belong here */
+  builderHasSingleProject?: boolean;
 }
 
 export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
   project,
   onBack,
   onUpdate,
-  userId
+  userId,
+  builderHasSingleProject = false,
 }) => {
   const [orders, setOrders] = useState<Order[]>([]);
   const [deliveries, setDeliveries] = useState<Delivery[]>([]);
@@ -170,9 +173,15 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
           const ordersData = await ordersResponse.json();
           const rows = Array.isArray(ordersData) ? ordersData : [];
           setOrders(
-            rows.filter((o: { project_id?: string | null; project_name?: string | null }) =>
-              purchaseOrderBelongsToProject(o, project.id, project.name)
-            )
+            rows.filter((o: { project_id?: string | null; project_name?: string | null }) => {
+              const pid =
+                o.project_id && typeof o.project_id === "string"
+                  ? o.project_id.trim()
+                  : "";
+              if (pid && pid !== project.id) return false;
+              if (purchaseOrderBelongsToProject(o, project.id, project.name)) return true;
+              return Boolean(builderHasSingleProject && !pid);
+            })
           );
         }
       } catch (e: any) {
@@ -227,9 +236,15 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
           const monitoringData = await monitoringResponse.json();
           const mrows = Array.isArray(monitoringData) ? monitoringData : [];
           setMonitoringRequests(
-            mrows.filter((m: { project_id?: string | null; project_name?: string | null }) =>
-              monitoringRequestBelongsToProject(m, project.id, project.name)
-            )
+            mrows.filter((m: { project_id?: string | null; project_name?: string | null }) => {
+              const mid =
+                m.project_id && typeof m.project_id === "string"
+                  ? String(m.project_id).trim()
+                  : "";
+              if (mid && mid !== project.id) return false;
+              if (monitoringRequestBelongsToProject(m, project.id, project.name)) return true;
+              return Boolean(builderHasSingleProject && !mid);
+            })
           );
         }
       } catch (e: any) {
@@ -267,7 +282,7 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
 
   useEffect(() => {
     fetchProjectData();
-  }, [project.id, project.name, userId]);
+  }, [project.id, project.name, userId, builderHasSingleProject]);
 
   // Materials value: all active pipeline + fulfilled (excludes cancelled / draft)
   const materialsSpent = orders
