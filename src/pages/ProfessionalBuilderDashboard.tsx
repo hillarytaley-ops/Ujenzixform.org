@@ -254,30 +254,56 @@ function isMonitoringPendingOrQuotedStatus(s: string | null | undefined): boolea
   return n === "pending" || n === "quoted" || n === "reviewing";
 }
 
+/**
+ * Merge PO stats onto project cards. Uses the same Bearer token as builder_projects REST
+ * (localStorage session often works before the Supabase client's in-memory session is ready).
+ */
 async function mergeProjectRowsWithPurchaseOrders(
   projectRows: any[],
   userId: string,
-  _accessToken: string | null
+  accessTokenFromProjectsFetch: string | null
 ): Promise<any[]> {
   const { data: sessionData } = await supabase.auth.getSession();
-  const token = sessionData?.session?.access_token ?? null;
+  const token =
+    accessTokenFromProjectsFetch || sessionData?.session?.access_token || null;
+
   const buyerIds = await fetchPurchaseBuyerIdsForBuilder(userId, token);
   if (buyerIds.length === 0) return projectRows;
 
+  const inList = buyerIds.join(",");
+  // project_id omitted: older DBs without migration still merge via name + sole-project fallback
+  const selectCols = "project_name,total_amount,status";
+  const ordersUrl = `${SUPABASE_URL}/rest/v1/purchase_orders?buyer_id=in.(${inList})&select=${selectCols}`;
+
   try {
-    const { data: orderRows, error } = await supabase
-      .from("purchase_orders")
-      .select("project_id,project_name,total_amount,status")
-      .in("buyer_id", buyerIds);
-    if (error) {
-      console.warn("📁 purchase_orders merge skipped:", error.message);
+    const ordersRes = await fetch(ordersUrl, {
+      headers: {
+        apikey: SUPABASE_ANON_KEY,
+        Authorization: `Bearer ${token || SUPABASE_ANON_KEY}`,
+        Accept: "application/json",
+      },
+    });
+    if (!ordersRes.ok) {
+      console.warn("📁 purchase_orders merge HTTP:", ordersRes.status);
       return projectRows;
     }
+    const orderRows = (await ordersRes.json()) as PurchaseOrderProjectRow[];
+    const list = Array.isArray(orderRows) ? orderRows : [];
+    console.log("📁 PO merge: loaded", list.length, "rows for buyer_id in", buyerIds.length, "ids");
     const stats = aggregatePurchaseStatsByProject(
-      Array.isArray(orderRows) ? (orderRows as PurchaseOrderProjectRow[]) : [],
+      list,
       projectRows.map((p) => ({ id: p.id, name: p.name }))
     );
-    return mergeProjectsWithPurchaseAggregates(projectRows, stats);
+    const merged = mergeProjectsWithPurchaseAggregates(projectRows, stats);
+    console.log(
+      "📁 PO merge: sample card",
+      merged[0]?.name,
+      "orders",
+      merged[0]?.total_orders,
+      "spent",
+      merged[0]?.spent
+    );
+    return merged;
   } catch (e) {
     console.warn("📁 purchase_orders merge error:", e);
     return projectRows;
@@ -952,31 +978,27 @@ const ProfessionalBuilderDashboardPage = () => {
       // Use REST API directly with fetch to bypass Supabase client issues
       console.log('📁 Fetching projects via REST API for userId:', userId);
       
-      // Get access token from localStorage first (fast path)
+      // Align with Supabase client storage, then localStorage (same JWT builder_projects + PO merge must use)
       let accessToken: string | null = null;
       try {
-        const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
-        if (storedSession) {
-          const parsed = JSON.parse(storedSession);
-          accessToken = parsed.access_token || null;
-          console.log('📁 Got token from localStorage');
-        }
+        const { data: sess } = await supabase.auth.getSession();
+        accessToken = sess?.session?.access_token ?? null;
+        if (accessToken) console.log("📁 Got token from supabase.auth.getSession()");
       } catch (e) {
-        console.warn('📁 Failed to get token from localStorage:', e);
+        console.warn("📁 getSession failed:", e);
       }
-      
-      // If no token in localStorage, try to get from Supabase (with timeout)
       if (!accessToken) {
         try {
-          const sessionPromise = supabase.auth.getSession();
-          const timeoutPromise = new Promise((_, reject) => 
-            setTimeout(() => reject(new Error('Session timeout')), 2000)
+          const storedSession = localStorage.getItem(
+            "sb-wuuyjjpgzgeimiptuuws-auth-token"
           );
-          const sessionResult = await Promise.race([sessionPromise, timeoutPromise]) as any;
-          accessToken = sessionResult?.data?.session?.access_token || null;
-          console.log('📁 Got token from Supabase session');
+          if (storedSession) {
+            const parsed = JSON.parse(storedSession);
+            accessToken = parsed.access_token || null;
+            console.log("📁 Got token from localStorage");
+          }
         } catch (e) {
-          console.warn('📁 Failed to get token from Supabase, using anon key');
+          console.warn("📁 Failed to parse auth from localStorage:", e);
         }
       }
       
@@ -1041,12 +1063,18 @@ const ProfessionalBuilderDashboardPage = () => {
         const projectRows = data as any[];
         setProjects(projectRows);
         console.log('📁 Loaded', projectRows.length, 'projects (order stats merge in background)');
-        void mergeProjectRowsWithPurchaseOrders(projectRows, userId, accessToken)
-          .then((merged) => {
-            setProjects(merged);
-            console.log('📁 Merged per-project order counts from purchase_orders');
-          })
-          .catch((err) => console.warn('📁 Per-project order merge failed (non-fatal):', err));
+        const runMerge = (tokenOverride: string | null) =>
+          mergeProjectRowsWithPurchaseOrders(projectRows, userId, tokenOverride)
+            .then((merged) => {
+              setProjects(merged);
+              console.log('📁 Merged per-project order counts from purchase_orders');
+            })
+            .catch((err) =>
+              console.warn('📁 Per-project order merge failed (non-fatal):', err)
+            );
+        void runMerge(accessToken);
+        // Client session can lag; retry with null so merge prefers fresh getSession()
+        window.setTimeout(() => void runMerge(null), 2800);
       } else {
         console.log('📁 No projects data returned (data is null or not array)');
         setProjects([]);
