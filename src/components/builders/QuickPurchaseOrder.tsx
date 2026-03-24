@@ -10,6 +10,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { getCartProjectId, getCartProjectName } from '@/utils/builderCartProject';
 import { ShoppingCart, Package, Plus, Trash2, Send, Loader2, CheckCircle, Users, Store, MapPin, Star } from 'lucide-react';
 
 interface QuickPurchaseOrderProps {
@@ -135,6 +136,11 @@ export const QuickPurchaseOrder: React.FC<QuickPurchaseOrderProps> = ({ builderI
   }, []);
 
   useEffect(() => {
+    const n = getCartProjectName();
+    if (n) setProjectName((prev) => (prev.trim() ? prev : n));
+  }, []);
+
+  useEffect(() => {
     if (defaultSupplierUserIds && defaultSupplierUserIds.length > 0 && suppliers.length > 0) {
       const matched = suppliers.filter(s => s.user_id && defaultSupplierUserIds.includes(s.user_id));
       if (matched.length > 0) {
@@ -238,59 +244,69 @@ export const QuickPurchaseOrder: React.FC<QuickPurchaseOrderProps> = ({ builderI
     setSubmitting(true);
 
     try {
-      // Create purchase order in database
+      const targetSuppliers =
+        selectedSuppliers.length > 0 ? selectedSuppliers : suppliers.map((s) => s.id);
+      if (targetSuppliers.length === 0) {
+        toast({
+          title: 'No suppliers available',
+          description: 'Please try again later.',
+          variant: 'destructive',
+        });
+        setSubmitting(false);
+        return;
+      }
+
+      const cartPid = getCartProjectId();
+      const cartPname = getCartProjectName();
+      const displayProjectName =
+        cartPname != null ? `${cartPname} (${projectName.trim()})` : projectName.trim();
+
+      const itemsJson = validItems.map((item) => ({
+        material_name: item.material,
+        category: item.category,
+        quantity: parseFloat(item.quantity),
+        unit: item.unit,
+        notes: item.notes || undefined,
+      }));
+
+      const poNumber = `QPO-${Date.now()}-${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
+      const primarySupplierId = targetSuppliers[0];
+
+      const insertPayload: Record<string, unknown> = {
+        po_number: poNumber,
+        buyer_id: builderId,
+        supplier_id: primarySupplierId,
+        total_amount: 0,
+        delivery_address: deliveryAddress.trim() || 'To be confirmed',
+        delivery_date:
+          deliveryDate ||
+          new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+        status: 'pending',
+        project_name: displayProjectName,
+        special_instructions: additionalNotes || null,
+        items: itemsJson,
+      };
+      if (cartPid) insertPayload.project_id = cartPid;
+
       const { data: orderData, error: orderError } = await supabase
         .from('purchase_orders')
-        .insert({
-          builder_id: builderId,
-          project_name: projectName,
-          delivery_address: deliveryAddress,
-          delivery_date: deliveryDate || null,
-          status: 'pending',
-          notes: additionalNotes,
-          created_at: new Date().toISOString()
-        })
+        .insert(insertPayload as any)
         .select()
         .single();
 
       if (orderError) throw orderError;
 
-      // Add order items
-      const itemsToInsert = validItems.map(item => ({
+      const quoteRequests = targetSuppliers.map((supplierId) => ({
         order_id: orderData.id,
-        material_name: item.material,
-        category: item.category,
-        quantity: parseFloat(item.quantity),
-        unit: item.unit,
-        notes: item.notes
+        supplier_id: supplierId,
+        status: 'pending',
+        created_at: new Date().toISOString(),
       }));
 
-      const { error: itemsError } = await supabase
-        .from('order_items')
-        .insert(itemsToInsert);
+      await supabase.from('quote_requests').insert(quoteRequests);
 
-      if (itemsError) throw itemsError;
-
-      // Send to selected suppliers or all if none selected
-      const targetSuppliers = selectedSuppliers.length > 0 
-        ? selectedSuppliers 
-        : suppliers.map(s => s.id);
-
-      // Create quote requests for selected suppliers
-      if (targetSuppliers.length > 0) {
-        const quoteRequests = targetSuppliers.map(supplierId => ({
-          order_id: orderData.id,
-          supplier_id: supplierId,
-          status: 'pending',
-          created_at: new Date().toISOString()
-        }));
-
-        await supabase.from('quote_requests').insert(quoteRequests);
-      }
-
-      const supplierCount = selectedSuppliers.length > 0 
-        ? selectedSuppliers.length 
-        : 'all available';
+      const supplierCount =
+        targetSuppliers.length > 0 ? targetSuppliers.length : 'all available';
 
       toast({
         title: '✅ Purchase Order Created!',

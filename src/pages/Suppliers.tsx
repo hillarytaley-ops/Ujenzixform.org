@@ -37,6 +37,7 @@ import { FloatingCartButton } from "@/components/cart/FloatingCartButton";
 import { supabase, SUPABASE_URL, SUPABASE_ANON_KEY } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { DashboardLoader } from "@/components/ui/DashboardLoader";
+import { setCartProjectContext, clearCartProjectContext } from "@/utils/builderCartProject";
 
 const Suppliers = () => {
   const [user, setUser] = useState<any>(null);
@@ -54,13 +55,14 @@ const Suppliers = () => {
   const projectIdFromUrl = searchParams.get('project_id');
   const [selectedProjectName, setSelectedProjectName] = useState<string | null>(null);
   
-  // Store project_id in localStorage so cart can use it and fetch project name
+  // Store project_id in localStorage so cart can use it and fetch project name.
+  // Do NOT clear cart_project_id when opening /suppliers?from=dashboard without project_id — the builder may have
+  // chosen a project in the dashboard header; clearing here broke linking POs to projects.
   useEffect(() => {
     if (projectIdFromUrl) {
-      localStorage.setItem('cart_project_id', projectIdFromUrl);
+      setCartProjectContext(projectIdFromUrl, null);
       console.log('📁 Project ID from URL stored for cart:', projectIdFromUrl);
-      
-      // Fetch project name for display
+
       const fetchProjectName = async () => {
         try {
           const response = await fetch(
@@ -75,20 +77,24 @@ const Suppliers = () => {
           if (response.ok) {
             const data = await response.json();
             if (data && data.length > 0) {
-              setSelectedProjectName(data[0].name);
+              const nm = data[0].name;
+              setSelectedProjectName(nm);
+              if (nm) setCartProjectContext(projectIdFromUrl, nm);
             }
           }
         } catch (error) {
           console.error('Error fetching project name:', error);
         }
       };
-      fetchProjectName();
-    } else {
-      // Clear project_id if not in URL (user might be ordering without a project)
-      localStorage.removeItem('cart_project_id');
+      void fetchProjectName();
+    } else if (!isFromDashboard) {
+      clearCartProjectContext();
       setSelectedProjectName(null);
+    } else {
+      const storedName = localStorage.getItem('cart_project_name');
+      if (storedName) setSelectedProjectName(storedName);
     }
-  }, [projectIdFromUrl]);
+  }, [projectIdFromUrl, isFromDashboard]);
 
   // Detect mobile device
   useEffect(() => {

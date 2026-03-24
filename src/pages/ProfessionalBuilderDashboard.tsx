@@ -78,6 +78,11 @@ import { ProfileEditDialog } from "@/components/profile/ProfileEditDialog";
 import { ProfileViewDialog } from "@/components/profile/ProfileViewDialog";
 import { ProjectDetails } from "@/components/projects/ProjectDetails";
 import { MapLocationPicker } from "@/components/location/MapLocationPicker";
+import {
+  getCartProjectId,
+  setCartProjectContext,
+  clearCartProjectContext,
+} from "@/utils/builderCartProject";
 import { DeliveryNoteWorkflow } from "@/components/delivery/DeliveryNoteWorkflow";
 import { GRNView } from "@/components/delivery/GRNView";
 import { InvoiceManagement } from "@/components/invoices/InvoiceManagement";
@@ -186,6 +191,20 @@ function formatProjectCardDate(p: {
     if (!Number.isNaN(d.getTime())) return d.toLocaleDateString();
   }
   return 'No date';
+}
+
+/** Prefer stored progress; if zero and budget exists, reflect spend vs budget on the card. */
+function projectCardProgressPercent(project: {
+  progress?: number | null;
+  budget?: number | null;
+  spent?: number | null;
+}): number {
+  const stored = Math.min(100, Math.max(0, Math.round(Number(project.progress) || 0)));
+  if (stored > 0) return stored;
+  const budget = Number(project.budget) || 0;
+  const spent = Number(project.spent) || 0;
+  if (budget > 0) return Math.min(100, Math.round((spent / budget) * 100));
+  return 0;
 }
 
 async function mergeProjectRowsWithPurchaseOrders(
@@ -1215,6 +1234,17 @@ const ProfessionalBuilderDashboardPage = () => {
   useEffect(() => {
     console.log('📁 Projects state changed:', projects.length, 'projects', projects);
   }, [projects]);
+
+  // Restore header project selector from cart (e.g. after refresh) when it matches a loaded project
+  useEffect(() => {
+    if (projects.length === 0) return;
+    setSelectedProjectForOrder((prev) => {
+      if (prev) return prev;
+      const id = getCartProjectId();
+      if (id && projects.some((p) => p.id === id)) return id;
+      return prev;
+    });
+  }, [projects]);
   
   // Debug: Log when selectedProject changes
   useEffect(() => {
@@ -1809,10 +1839,11 @@ const ProfessionalBuilderDashboardPage = () => {
                   onValueChange={(value) => {
                     if (value === 'none') {
                       setSelectedProjectForOrder(null);
-                      localStorage.removeItem('cart_project_id');
+                      clearCartProjectContext();
                     } else {
                       setSelectedProjectForOrder(value);
-                      localStorage.setItem('cart_project_id', value);
+                      const proj = projects.find((p) => p.id === value);
+                      setCartProjectContext(value, proj?.name ?? null);
                     }
                   }}
                 >
@@ -2448,12 +2479,12 @@ const ProfessionalBuilderDashboardPage = () => {
                                 <div className="mb-3">
                                   <div className="flex justify-between text-xs mb-1">
                                     <span className="text-gray-500">Progress</span>
-                                    <span className="font-semibold">{project.progress || 0}%</span>
+                                    <span className="font-semibold">{projectCardProgressPercent(project)}%</span>
                                   </div>
                                   <div className="w-full bg-gray-200 rounded-full h-2">
                                     <div 
                                       className="bg-blue-600 h-2 rounded-full transition-all"
-                                      style={{ width: `${project.progress || 0}%` }}
+                                      style={{ width: `${projectCardProgressPercent(project)}%` }}
                                     />
                                   </div>
                                 </div>

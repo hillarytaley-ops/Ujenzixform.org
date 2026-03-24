@@ -41,6 +41,7 @@ import { MobileBookView } from './MobileBookView';
 import { FileText, BookOpen } from 'lucide-react';
 import { ProductModal, materialToProduct, Product } from '@/components/products';
 import { useAuth } from '@/contexts/AuthContext';
+import { getCartProjectId, getCartProjectName } from '@/utils/builderCartProject';
 
 // iOS/Safari compatibility check
 const isIOSSafari = () => {
@@ -1409,12 +1410,16 @@ export const MaterialsGrid = () => {
 
       const qty = getQuantity(material.id) || 1;
       const poNumber = `QR-${Date.now()}-${Math.random().toString(36).substr(2, 5).toUpperCase()}`;
+      const cartPid = getCartProjectId();
+      const cartPname = getCartProjectName();
+      const projectName =
+        cartPname != null
+          ? `${cartPname} — Quote: ${material.name}`
+          : `Quote Request - ${material.category || 'Materials'}`;
+
+      console.log('Creating quote request:', { poNumber, buyerId: user.id, supplierId, material: material.name, qty, cartPid });
       
-      console.log('Creating quote request:', { poNumber, buyerId: user.id, supplierId, material: material.name, qty });
-      
-      const { data: orderData, error: orderError } = await supabase
-        .from('purchase_orders')
-        .insert({
+      const insertRow: Record<string, unknown> = {
           po_number: poNumber,
           buyer_id: user.id,
           supplier_id: supplierId,
@@ -1422,7 +1427,7 @@ export const MaterialsGrid = () => {
           delivery_address: 'To be confirmed',
           delivery_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
           status: 'pending', // Quote requests start as pending
-          project_name: `Quote Request - ${material.category || 'Materials'}`,
+          project_name: projectName,
           items: [{
             material_id: material.id,
             material_name: material.name,
@@ -1431,7 +1436,12 @@ export const MaterialsGrid = () => {
             unit: material.unit,
             unit_price: material.unit_price
           }]
-        })
+      };
+      if (cartPid) insertRow.project_id = cartPid;
+
+      const { data: orderData, error: orderError } = await supabase
+        .from('purchase_orders')
+        .insert(insertRow as any)
         .select()
         .single();
         

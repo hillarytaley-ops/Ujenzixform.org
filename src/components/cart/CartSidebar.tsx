@@ -32,6 +32,7 @@ import { CartPriceComparisonAll } from './CartPriceComparisonAll';
 import { MultiSupplierQuoteDialog } from './MultiSupplierQuoteDialog';
 import { DeliveryPromptDialog } from '@/components/builders/DeliveryPromptDialog';
 import { MonitoringServicePrompt } from '@/components/builders/MonitoringServicePrompt';
+import { setCartProjectContext, clearCartProjectContext } from '@/utils/builderCartProject';
 
 // Project interface for project selection
 interface BuilderProject {
@@ -146,6 +147,8 @@ export const CartSidebar: React.FC = () => {
         if (storedProjectId && projectsData.some((p: BuilderProject) => p.id === storedProjectId)) {
           console.log('📁 Cart: Pre-selecting project from localStorage:', storedProjectId);
           setSelectedProjectId(storedProjectId);
+          const match = projectsData.find((p: BuilderProject) => p.id === storedProjectId);
+          if (match?.name) setCartProjectContext(storedProjectId, match.name);
         }
       } else if (error) {
         console.warn('Cart: builder_projects load failed:', error.message);
@@ -837,7 +840,16 @@ export const CartSidebar: React.FC = () => {
                 </div>
                 <Select
                   value={selectedProjectId || ''}
-                  onValueChange={(value) => setSelectedProjectId(value || null)}
+                  onValueChange={(value) => {
+                    const id = value || null;
+                    setSelectedProjectId(id);
+                    if (id) {
+                      const p = projects.find((x) => x.id === id);
+                      setCartProjectContext(id, p?.name ?? null);
+                    } else {
+                      clearCartProjectContext();
+                    }
+                  }}
                 >
                   <SelectTrigger className="w-full bg-white border-blue-200">
                     <SelectValue placeholder="Select a project (optional)" />
