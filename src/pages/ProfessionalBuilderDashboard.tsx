@@ -263,9 +263,17 @@ async function mergeProjectRowsWithPurchaseOrders(
   userId: string,
   accessTokenFromProjectsFetch: string | null
 ): Promise<any[]> {
-  const { data: sessionData } = await supabase.auth.getSession();
-  const token =
-    accessTokenFromProjectsFetch || sessionData?.session?.access_token || null;
+  let token = accessTokenFromProjectsFetch;
+  if (!token) {
+    try {
+      token = await Promise.race([
+        supabase.auth.getSession().then((r) => r.data?.session?.access_token ?? null),
+        new Promise<null>((resolve) => setTimeout(() => resolve(null), 2500)),
+      ]);
+    } catch {
+      token = null;
+    }
+  }
 
   const buyerIds = await fetchPurchaseBuyerIdsForBuilder(userId, token);
   if (buyerIds.length === 0) return projectRows;
@@ -968,43 +976,52 @@ const ProfessionalBuilderDashboardPage = () => {
     console.log('📁 Fetching projects for:', userId);
     setLoadingProjects(true);
     
-    // Safety timeout - don't hang forever
+    // Safety: never block UI forever if network/auth stalls (was 10s — too aggressive for slow links)
     const safetyTimeout = setTimeout(() => {
       console.log('📁 Projects fetch safety timeout');
       setLoadingProjects(false);
-    }, 10000); // Increased to 10 seconds
+    }, 45000);
     
     try {
       // Use REST API directly with fetch to bypass Supabase client issues
       console.log('📁 Fetching projects via REST API for userId:', userId);
       
-      // Align with Supabase client storage, then localStorage (same JWT builder_projects + PO merge must use)
+      // CRITICAL: read localStorage first. await supabase.auth.getSession() can hang on some
+      // browsers/networks and never resolve — that left projects stuck empty after safety timeout.
       let accessToken: string | null = null;
       try {
-        const { data: sess } = await supabase.auth.getSession();
-        accessToken = sess?.session?.access_token ?? null;
-        if (accessToken) console.log("📁 Got token from supabase.auth.getSession()");
+        const storedSession = localStorage.getItem(
+          "sb-wuuyjjpgzgeimiptuuws-auth-token"
+        );
+        if (storedSession) {
+          const parsed = JSON.parse(storedSession);
+          accessToken = parsed.access_token || null;
+          if (accessToken) console.log("📁 Got token from localStorage (fast path)");
+        }
       } catch (e) {
-        console.warn("📁 getSession failed:", e);
+        console.warn("📁 Failed to parse auth from localStorage:", e);
       }
       if (!accessToken) {
         try {
-          const storedSession = localStorage.getItem(
-            "sb-wuuyjjpgzgeimiptuuws-auth-token"
+          const sessPromise = supabase.auth.getSession();
+          const timeoutMs = 2500;
+          const timeoutPromise = new Promise<null>((resolve) =>
+            setTimeout(() => resolve(null), timeoutMs)
           );
-          if (storedSession) {
-            const parsed = JSON.parse(storedSession);
-            accessToken = parsed.access_token || null;
-            console.log("📁 Got token from localStorage");
-          }
+          const raced = await Promise.race([
+            sessPromise.then((r) => r.data?.session?.access_token ?? null),
+            timeoutPromise,
+          ]);
+          accessToken = raced;
+          if (accessToken) console.log("📁 Got token from getSession (raced)");
+          else console.warn("📁 No JWT yet from getSession within", timeoutMs, "ms");
         } catch (e) {
-          console.warn("📁 Failed to parse auth from localStorage:", e);
+          console.warn("📁 getSession failed:", e);
         }
       }
       
-      // Use REST API with fetch and AbortController for timeout
       const controller = new AbortController();
-      const fetchTimeout = setTimeout(() => controller.abort(), 8000);
+      const fetchTimeout = setTimeout(() => controller.abort(), 25000);
       
       console.log('📁 Making REST API request...');
       const projectSelect =
@@ -1024,7 +1041,7 @@ const ProfessionalBuilderDashboardPage = () => {
       if (!response.ok && response.status === 400) {
         clearTimeout(fetchTimeout);
         const retryCtrl = new AbortController();
-        const retryT = window.setTimeout(() => retryCtrl.abort(), 8000);
+        const retryT = window.setTimeout(() => retryCtrl.abort(), 25000);
         try {
           response = await fetch(
             `${SUPABASE_URL}/rest/v1/builder_projects?builder_id=eq.${userId}&select=id,name,location,status,budget,spent,progress,created_at,start_date,end_date,expected_end_date,description&order=created_at.desc`,
@@ -1081,7 +1098,11 @@ const ProfessionalBuilderDashboardPage = () => {
       }
     } catch (error: any) {
       console.error('📁 Error fetching projects:', error);
-      setProjects([]);
+      if (error?.name !== 'AbortError') {
+        setProjects([]);
+      } else {
+        console.warn('📁 Projects fetch aborted (timeout) — keeping prior list if any');
+      }
     } finally {
       clearTimeout(safetyTimeout);
       setLoadingProjects(false);
