@@ -53,7 +53,10 @@ export function purchaseOrderBelongsToProject(
   const on = normalizeProjectName(o.project_name);
   if (!pn || !on) return false;
   if (on === pn) return true;
-  return on.startsWith(pn + " -") || on.startsWith(pn + " —");
+  if (on.startsWith(pn + " -") || on.startsWith(pn + " —")) return true;
+  // e.g. "Moi's Bridge — Quote: nails" when project name is "Moi's Bridge"
+  if (pn.length >= 3 && on.includes(pn)) return true;
+  return false;
 }
 
 export function monitoringRequestBelongsToProject(
@@ -66,5 +69,7 @@ export function monitoringRequestBelongsToProject(
   const mn = normalizeProjectName(m.project_name);
   if (!pn || !mn) return false;
   if (mn === pn) return true;
-  return mn.startsWith(pn + " -") || mn.startsWith(pn + " —");
+  if (mn.startsWith(pn + " -") || mn.startsWith(pn + " —")) return true;
+  if (pn.length >= 3 && mn.includes(pn)) return true;
+  return false;
 }

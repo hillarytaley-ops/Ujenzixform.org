@@ -133,6 +133,30 @@ function resolveProjectIdForOrder(
   return null;
 }
 
+/**
+ * If project_name contains a builder_projects.name (e.g. "Moi's Bridge — Quote: …"),
+ * attribute the PO to that project. Longest matching name wins to reduce ambiguity.
+ */
+function resolveOrphanOrderByProjectNameSubstring(
+  o: PurchaseOrderProjectRow,
+  projects: { id: string; name?: string | null }[]
+): string | null {
+  const on = normalizeProjectName(o.project_name);
+  if (!on || projects.length === 0) return null;
+  const candidates: { id: string; len: number }[] = [];
+  for (const p of projects) {
+    const pn = normalizeProjectName(p.name);
+    if (pn.length < 3) continue;
+    if (on.includes(pn)) {
+      candidates.push({ id: p.id, len: pn.length });
+    }
+  }
+  if (candidates.length === 0) return null;
+  const maxLen = Math.max(...candidates.map((c) => c.len));
+  const atMax = candidates.filter((c) => c.len === maxLen);
+  return atMax.length === 1 ? atMax[0].id : null;
+}
+
 /** Dedupe REST rows (e.g. duplicate ids). */
 function dedupeProjectsById(rows: any[]): any[] {
   const seen = new Set<string>();
@@ -169,7 +193,10 @@ function aggregatePurchaseStatsByProject(
     if (skipOrder.has(st)) continue;
 
     let pid = resolveProjectIdForOrder(o, projects, nameToIds);
-    // Orders titled "Quote Request - …" often have no project_id/name link; single-project builders still expect totals.
+    if (!pid) {
+      pid = resolveOrphanOrderByProjectNameSubstring(o, projects);
+    }
+    // Generic quotes with no project hint: only safe when there is a single project.
     if (!pid && projects.length === 1) {
       pid = projects[0].id;
     }
@@ -279,18 +306,32 @@ async function mergeProjectRowsWithPurchaseOrders(
   if (buyerIds.length === 0) return projectRows;
 
   const inList = buyerIds.join(",");
-  // project_id omitted: older DBs without migration still merge via name + sole-project fallback
-  const selectCols = "project_name,total_amount,status";
-  const ordersUrl = `${SUPABASE_URL}/rest/v1/purchase_orders?buyer_id=in.(${inList})&select=${selectCols}`;
+  const selectWithProject = "project_id,project_name,total_amount,status";
+  const selectFallback = "project_name,total_amount,status";
 
   try {
-    const ordersRes = await fetch(ordersUrl, {
-      headers: {
-        apikey: SUPABASE_ANON_KEY,
-        Authorization: `Bearer ${token || SUPABASE_ANON_KEY}`,
-        Accept: "application/json",
-      },
-    });
+    let ordersRes = await fetch(
+      `${SUPABASE_URL}/rest/v1/purchase_orders?buyer_id=in.(${inList})&select=${selectWithProject}`,
+      {
+        headers: {
+          apikey: SUPABASE_ANON_KEY,
+          Authorization: `Bearer ${token || SUPABASE_ANON_KEY}`,
+          Accept: "application/json",
+        },
+      }
+    );
+    if (!ordersRes.ok && ordersRes.status === 400) {
+      ordersRes = await fetch(
+        `${SUPABASE_URL}/rest/v1/purchase_orders?buyer_id=in.(${inList})&select=${selectFallback}`,
+        {
+          headers: {
+            apikey: SUPABASE_ANON_KEY,
+            Authorization: `Bearer ${token || SUPABASE_ANON_KEY}`,
+            Accept: "application/json",
+          },
+        }
+      );
+    }
     if (!ordersRes.ok) {
       console.warn("📁 purchase_orders merge HTTP:", ordersRes.status);
       return projectRows;
