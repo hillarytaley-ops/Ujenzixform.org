@@ -595,9 +595,18 @@ const ProfessionalBuilderDashboardPage = () => {
    * hides them (e.g. user_id stored as profiles.id, or legacy requester_id/email-only linkage).
    */
   const refreshMonitoringRequests = useCallback(async () => {
-    const { data: { session } } = await supabase.auth.getSession();
-    const userId = session?.user?.id || getUserId();
-    if (!userId) return;
+    let sessionUid = "";
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      sessionUid = session?.user?.id || "";
+    } catch (e) {
+      console.warn("📹 Monitoring: getSession failed", e);
+    }
+    const userId = authUser?.id || sessionUid || getUserId();
+    if (!userId) {
+      console.warn("📹 Monitoring: skip refresh (no user id yet)");
+      return;
+    }
 
     const { rows: raw, usedRpc } = await fetchMyMonitoringServiceRequests(supabase);
     const rows = [...raw].sort(
@@ -3716,10 +3725,22 @@ const ProfessionalBuilderDashboardPage = () => {
                     })}
                   </div>
                 ) : (
-                  <div className="text-center py-12 text-gray-500">
+                  <div className="text-center py-12 text-gray-500 max-w-lg mx-auto">
                     <Video className="h-16 w-16 mx-auto mb-4 text-gray-300" />
-                    <p className="text-lg font-medium">No monitoring requests yet</p>
-                    <p className="text-sm mb-4">Request camera monitoring for your construction sites</p>
+                    <p className="text-lg font-medium">No site monitoring requests for your account</p>
+                    <p className="text-sm mb-3">
+                      This tab lists only <span className="font-medium text-gray-700">your</span> camera / site
+                      monitoring requests. The admin panel shows <span className="font-medium text-gray-700">all</span>{" "}
+                      builders’ requests — a large total there does not mean they belong to you.
+                    </p>
+                    <p className="text-sm mb-4 text-gray-600">
+                      Supplier <span className="font-medium">material quotes</span> live under the{" "}
+                      <span className="font-medium">Quotes</span> tab, not here.
+                    </p>
+                    <p className="text-xs text-gray-400">
+                      Requests are matched to your login by user id or contact email. If something is missing after you
+                      submitted it, ask support to verify the row in Supabase.
+                    </p>
                   </div>
                 )}
               </CardContent>
