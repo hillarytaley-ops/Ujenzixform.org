@@ -43,7 +43,10 @@ import {
   PanelLeft
 } from "lucide-react";
 import { supabase } from '@/integrations/supabase/client';
-import { fetchMyMonitoringServiceRequests } from '@/utils/myMonitoringServiceRequests';
+import {
+  fetchMyMonitoringServiceRequests,
+  monitoringRestOpts,
+} from '@/utils/myMonitoringServiceRequests';
 import { useToast } from '@/hooks/use-toast';
 import { DeliveryRouteTracker } from '@/components/delivery/DeliveryRouteTracker';
 import { CameraAccessRequest } from '@/components/builders/CameraAccessRequest';
@@ -553,7 +556,15 @@ const Monitoring = () => {
       if (isBuilderRole) {
         console.log('🔐 Monitoring - Checking monitoring requests for builder:', authUser.id);
         
-        const { rows: allMonitoring } = await fetchMyMonitoringServiceRequests(supabase);
+        const { rows: allMonitoring } = await fetchMyMonitoringServiceRequests(
+          supabase,
+          monitoringRestOpts(
+            'https://wuuyjjpgzgeimiptuuws.supabase.co',
+            ANON_KEY,
+            userId,
+            accessToken
+          )
+        );
         const approved = allMonitoring
           .filter((r: { status?: string }) =>
             ['approved', 'active', 'completed', 'in_progress'].includes(String(r.status || ''))

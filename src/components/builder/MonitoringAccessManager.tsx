@@ -52,8 +52,11 @@ import {
   Plus,
   ArrowRight
 } from "lucide-react";
-import { supabase } from '@/integrations/supabase/client';
-import { fetchMyMonitoringServiceRequests } from '@/utils/myMonitoringServiceRequests';
+import { supabase, SUPABASE_URL, SUPABASE_ANON_KEY } from '@/integrations/supabase/client';
+import {
+  fetchMyMonitoringServiceRequests,
+  monitoringRestOpts,
+} from '@/utils/myMonitoringServiceRequests';
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -151,7 +154,10 @@ export const MonitoringAccessManager: React.FC = () => {
     
     setLoading(true);
     try {
-      const { rows: data } = await fetchMyMonitoringServiceRequests(supabase as any);
+      const { rows: data } = await fetchMyMonitoringServiceRequests(
+        supabase as any,
+        monitoringRestOpts(SUPABASE_URL, SUPABASE_ANON_KEY, user?.id)
+      );
 
       // Transform to MonitoringProject format
       const transformedProjects: MonitoringProject[] = (data || []).map((req: any) => ({

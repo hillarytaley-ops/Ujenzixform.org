@@ -32,13 +32,13 @@ import {
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase, SUPABASE_URL, SUPABASE_ANON_KEY } from '@/integrations/supabase/client';
+import { fetchMyMonitoringServiceRequests, monitoringRestOpts } from '@/utils/myMonitoringServiceRequests';
 import { Link, useNavigate } from 'react-router-dom';
 import {
   fetchPurchaseBuyerIdsForBuilder,
   resolvePurchaseOrderToProjectId,
 } from '@/utils/builderProjectPurchaseOrders';
 import { getAccessTokenWithPersistenceFallback } from '@/utils/supabaseAccessToken';
-import { fetchMyMonitoringServiceRequests } from '@/utils/myMonitoringServiceRequests';
 
 interface Project {
   id: string;
@@ -324,9 +324,12 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
 
       if (!isCurrent() || loadSig.aborted) return;
       
-      // Monitoring: RPC bypasses RLS drift; match project name / id like dashboard
+      // Monitoring: direct REST (same pattern as PO fetch) + match project name / id
       try {
-        const { rows: mrows } = await fetchMyMonitoringServiceRequests(supabase);
+        const { rows: mrows } = await fetchMyMonitoringServiceRequests(
+          supabase,
+          monitoringRestOpts(SUPABASE_URL, SUPABASE_ANON_KEY, userId, accessToken || undefined)
+        );
         if (isCurrent()) {
           setMonitoringRequests(
             mrows.filter((m: { project_id?: string | null; project_name?: string | null }) => {

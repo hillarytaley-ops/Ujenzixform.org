@@ -5,8 +5,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useNavigate, Link } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
-import { fetchMyMonitoringServiceRequests } from "@/utils/myMonitoringServiceRequests";
+import { supabase, SUPABASE_URL, SUPABASE_ANON_KEY } from "@/integrations/supabase/client";
+import {
+  fetchMyMonitoringServiceRequests,
+  monitoringRestOpts,
+} from "@/utils/myMonitoringServiceRequests";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import Footer from "@/components/Footer";
@@ -260,9 +263,12 @@ const PrivateClientDashboard = () => {
         console.error('📦 DIRECT: Orders error:', e);
       }
       
-      // Fetch monitoring requests (RPC when deployed — survives RLS / legacy user_id issues)
+      // Fetch monitoring requests (direct REST bypasses supabase-js global fetch timeout)
       try {
-        const { rows: data } = await fetchMyMonitoringServiceRequests(supabase);
+        const { rows: data } = await fetchMyMonitoringServiceRequests(
+          supabase,
+          monitoringRestOpts(SUPABASE_URL, SUPABASE_ANON_KEY, userId, accessToken)
+        );
         console.log('📹 DIRECT: Got', data?.length || 0, 'monitoring requests');
         if (data && data.length > 0) {
           console.log('📹 DIRECT: First request:', (data[0] as any).project_name, (data[0] as any).status);
@@ -523,7 +529,10 @@ const PrivateClientDashboard = () => {
 
       try {
         console.log('📹 Fetching monitoring requests for user:', user.id);
-        const { rows: data } = await fetchMyMonitoringServiceRequests(supabase);
+        const { rows: data } = await fetchMyMonitoringServiceRequests(
+          supabase,
+          monitoringRestOpts(SUPABASE_URL, SUPABASE_ANON_KEY, user.id, accessToken)
+        );
         console.log('📹 Monitoring requests loaded:', data?.length || 0, 'requests');
         if (data && data.length > 0) {
           console.log(
@@ -591,7 +600,17 @@ const PrivateClientDashboard = () => {
       });
 
       // Refresh monitoring requests
-      const { rows: newData } = await fetchMyMonitoringServiceRequests(supabase);
+      let at = "";
+      try {
+        const raw = localStorage.getItem("sb-wuuyjjpgzgeimiptuuws-auth-token");
+        if (raw) at = JSON.parse(raw).access_token || "";
+      } catch {
+        /* noop */
+      }
+      const { rows: newData } = await fetchMyMonitoringServiceRequests(
+        supabase,
+        monitoringRestOpts(SUPABASE_URL, SUPABASE_ANON_KEY, user.id, at)
+      );
       setMonitoringRequests(newData || []);
 
     } catch (error: any) {
@@ -1684,7 +1703,17 @@ const PrivateClientDashboard = () => {
                                       description: "Your monitoring service is now active. You can access your cameras.",
                                     });
                                     // Refresh the list
-                                    const { rows } = await fetchMyMonitoringServiceRequests(supabase);
+                                    let tok = "";
+                                    try {
+                                      const r = localStorage.getItem("sb-wuuyjjpgzgeimiptuuws-auth-token");
+                                      if (r) tok = JSON.parse(r).access_token || "";
+                                    } catch {
+                                      /* noop */
+                                    }
+                                    const { rows } = await fetchMyMonitoringServiceRequests(
+                                      supabase,
+                                      monitoringRestOpts(SUPABASE_URL, SUPABASE_ANON_KEY, user?.id, tok)
+                                    );
                                     setMonitoringRequests(rows || []);
                                   } catch (error) {
                                     console.error('Error accepting quote:', error);
@@ -1714,7 +1743,17 @@ const PrivateClientDashboard = () => {
                                       description: "You can request a new quote anytime.",
                                     });
                                     // Refresh the list
-                                    const { rows } = await fetchMyMonitoringServiceRequests(supabase);
+                                    let tok2 = "";
+                                    try {
+                                      const r = localStorage.getItem("sb-wuuyjjpgzgeimiptuuws-auth-token");
+                                      if (r) tok2 = JSON.parse(r).access_token || "";
+                                    } catch {
+                                      /* noop */
+                                    }
+                                    const { rows } = await fetchMyMonitoringServiceRequests(
+                                      supabase,
+                                      monitoringRestOpts(SUPABASE_URL, SUPABASE_ANON_KEY, user?.id, tok2)
+                                    );
                                     setMonitoringRequests(rows || []);
                                   } catch (error) {
                                     console.error('Error rejecting quote:', error);

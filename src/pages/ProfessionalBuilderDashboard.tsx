@@ -92,7 +92,10 @@ import { DeliveryNoteWorkflow } from "@/components/delivery/DeliveryNoteWorkflow
 import { GRNView } from "@/components/delivery/GRNView";
 import { InvoiceManagement } from "@/components/invoices/InvoiceManagement";
 import { MissingDeliveryAddressAlert } from "@/components/builders/MissingDeliveryAddressAlert";
-import { fetchMyMonitoringServiceRequests } from "@/utils/myMonitoringServiceRequests";
+import {
+  fetchMyMonitoringServiceRequests,
+  monitoringRestOpts,
+} from "@/utils/myMonitoringServiceRequests";
 
 type PurchaseOrderProjectRow = {
   project_id?: string | null;
@@ -608,7 +611,11 @@ const ProfessionalBuilderDashboardPage = () => {
       return;
     }
 
-    const { rows: raw, usedRpc } = await fetchMyMonitoringServiceRequests(supabase);
+    const accessToken = await getAccessToken();
+    const { rows: raw, usedRpc } = await fetchMyMonitoringServiceRequests(
+      supabase,
+      monitoringRestOpts(SUPABASE_URL, SUPABASE_ANON_KEY, userId, accessToken)
+    );
     const rows = [...raw].sort(
       (a: any, b: any) =>
         new Date(String(b.created_at || 0)).getTime() -
