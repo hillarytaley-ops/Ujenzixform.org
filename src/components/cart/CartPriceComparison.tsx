@@ -21,6 +21,7 @@ import { Separator } from '@/components/ui/separator';
 import { useCart } from '@/contexts/CartContext';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { catalogMaterialIdFromCartLineId } from '@/utils/cartLineId';
 import { 
   Scale, 
   Store, 
@@ -100,12 +101,11 @@ export const CartPriceComparison: React.FC<CartPriceComparisonProps> = ({
       const suppliersByUserIdMap = new Map((suppliersData || []).map((s: any) => [s.user_id, s]));
       console.log('📦 Suppliers loaded:', suppliersData?.length, 'entries');
 
-      // 2. Get the EXACT product ID we're comparing
-      // The cart item ID should match either admin_material_images.id or materials.id
-      const productId = cartItem.id;
+      // 2. Catalog UUID (cart line id may be `uuid::v:idx:n` for marketplace variants)
+      const catalogProductId = catalogMaterialIdFromCartLineId(cartItem.id);
       const productName = cartItem.name;
       
-      console.log('🔍 Looking for prices for product:', productId, productName);
+      console.log('🔍 Looking for prices for product:', catalogProductId, productName);
 
       const alternativesWithPrices: AlternativePrice[] = [];
 
@@ -113,7 +113,7 @@ export const CartPriceComparison: React.FC<CartPriceComparisonProps> = ({
       const { data: supplierPricesData, error: pricesError } = await supabase
         .from('supplier_product_prices')
         .select('product_id, price, in_stock, supplier_id')
-        .eq('product_id', productId)  // EXACT match on product ID
+        .eq('product_id', catalogProductId)
         .gt('price', 0);
 
       if (pricesError) {
@@ -126,7 +126,7 @@ export const CartPriceComparison: React.FC<CartPriceComparisonProps> = ({
       const { data: adminMaterial } = await supabase
         .from('admin_material_images')
         .select('id, name, image_url')
-        .eq('id', productId)
+        .eq('id', catalogProductId)
         .maybeSingle();
 
       // Add supplier prices for this exact product - ONLY from registered suppliers

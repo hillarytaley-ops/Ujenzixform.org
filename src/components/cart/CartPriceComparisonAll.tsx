@@ -126,12 +126,14 @@ export const CartPriceComparisonAll: React.FC<CartPriceComparisonAllProps> = ({
         if (s.user_id) suppliersMap.set(s.user_id, s);
       });
 
-      // Fetch prices
-      const productIds = items.map(item => item.id);
+      // Fetch prices — cart lines use `catalogUuid::v:idx:n` for variants; supplier_product_prices.product_id is catalog UUID only.
+      const productIds = [
+        ...new Set(items.map((item) => catalogMaterialIdFromCartLineId(item.id))),
+      ];
       let pricesData: any[] = [];
       
       try {
-        const productIdsParam = productIds.map(id => `"${id}"`).join(',');
+        const productIdsParam = productIds.join(',');
         const pricesResponse = await fetch(
           `${SUPABASE_URL}/rest/v1/supplier_product_prices?select=product_id,supplier_id,price,in_stock&product_id=in.(${productIdsParam})`,
           { headers: { 'apikey': apiKey }, cache: 'no-store' }
@@ -170,7 +172,8 @@ export const CartPriceComparisonAll: React.FC<CartPriceComparisonAllProps> = ({
 
       // Build comparisons
       const comparisonResults: ProductComparison[] = items.map(item => {
-        const productPrices = pricesData.filter((p: any) => p.product_id === item.id);
+        const catalogProductId = catalogMaterialIdFromCartLineId(item.id);
+        const productPrices = pricesData.filter((p: any) => p.product_id === catalogProductId);
         
         const alternatives: SupplierPrice[] = productPrices.map((p: any) => {
           const supplier = suppliersMap.get(p.supplier_id);
