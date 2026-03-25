@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
@@ -132,8 +133,13 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
   const { toast } = useToast();
   const navigate = useNavigate();
 
-  /** Avoids setState from fetch A after fetch B started (e.g. attributionProjects ref changes when PO merge updates projects). */
-  const fetchGenerationRef = useRef(0);
+  /**
+   * Sequence: ignore stale setState from an older fetch after a newer one started.
+   * Pending: always clear loading when the last in-flight fetch finishes (avoids stuck spinner if an
+   * older run's `finally` skipped clearing because gen !== ref).
+   */
+  const loadSeqRef = useRef(0);
+  const pendingLoadsRef = useRef(0);
 
   const attributionKey = useMemo(
     () =>
@@ -145,9 +151,6 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
 
   // Fetch project data with timeouts
   const fetchProjectData = async (showRefresh = false) => {
-    if (showRefresh) setRefreshing(true);
-    else setLoading(true);
-
     if (!userId?.trim()) {
       console.warn('📁 ProjectDetails: missing userId, skip load');
       setLoading(false);
@@ -155,8 +158,13 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
       return;
     }
 
-    const gen = ++fetchGenerationRef.current;
-    const stale = () => gen !== fetchGenerationRef.current;
+    pendingLoadsRef.current += 1;
+    loadSeqRef.current += 1;
+    const seq = loadSeqRef.current;
+    const isCurrent = () => seq === loadSeqRef.current;
+
+    if (showRefresh) setRefreshing(true);
+    else setLoading(true);
 
     try {
       const accessToken = await getAccessTokenWithPersistenceFallback();
@@ -168,7 +176,7 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
         profileIdForOrders ? [profileIdForOrders] : null
       );
 
-      if (stale()) return;
+      if (!isCurrent()) return;
 
       // Prefer direct REST first — Supabase client uses a 15s global fetch wrapper; the old 5s "safety"
       // timeout cleared loading before PO rows returned, leaving an empty Orders tab.
@@ -199,7 +207,7 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
           }
         }
 
-        if (stale()) return;
+        if (!isCurrent()) return;
 
         if (orderRows.length === 0 && buyerIds.length > 0) {
           const { data: clientOrders, error: clientPoErr } = await supabase
@@ -214,7 +222,7 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
           }
         }
 
-        if (stale()) return;
+        if (!isCurrent()) return;
 
         let matched = orderRows.filter((o) => {
           return resolvePurchaseOrderToProjectId(o, attributionProjects) === project.id;
@@ -245,7 +253,7 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
           }
         }
 
-        if (!stale()) {
+        if (isCurrent()) {
           setOrders(matched);
           console.log(
             '📁 ProjectDetails: orders',
@@ -283,7 +291,7 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
         
         if (deliveriesResponse.ok) {
           const deliveriesData = await deliveriesResponse.json();
-          if (!stale()) setDeliveries(deliveriesData);
+          if (isCurrent()) setDeliveries(deliveriesData);
         }
       } catch (e: any) {
         if (e.name !== 'AbortError') {
@@ -310,7 +318,7 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
         if (monitoringResponse.ok) {
           const monitoringData = await monitoringResponse.json();
           const mrows = Array.isArray(monitoringData) ? monitoringData : [];
-          if (!stale()) {
+          if (isCurrent()) {
             setMonitoringRequests(
               mrows.filter((m: { project_id?: string | null; project_name?: string | null }) => {
                 return resolvePurchaseOrderToProjectId(m, attributionProjects) === project.id;
@@ -335,13 +343,18 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
         });
       }
     } finally {
-      if (gen === fetchGenerationRef.current) {
+      pendingLoadsRef.current -= 1;
+      if (pendingLoadsRef.current <= 0) {
+        pendingLoadsRef.current = 0;
         setLoading(false);
         setRefreshing(false);
         console.log('📁 ProjectDetails: Loading complete, component should be visible');
       }
     }
   };
+
+  const fetchProjectDataRef = useRef(fetchProjectData);
+  fetchProjectDataRef.current = fetchProjectData;
 
   const getAccessToken = () => getAccessTokenWithPersistenceFallback();
 
@@ -354,6 +367,55 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
     profileIdForOrders,
     attributionKey,
   ]);
+
+  /** Refetch when new/updated POs arrive for this builder (keeps details in sync with cart/checkout). */
+  useEffect(() => {
+    if (!userId?.trim() || !project.id) return;
+
+    let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+    const scheduleRefetch = () => {
+      if (debounceTimer != null) clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => {
+        debounceTimer = null;
+        void fetchProjectDataRef.current(true);
+      }, 450);
+    };
+
+    let channel = supabase
+      .channel(`project-details-po-${project.id}-${userId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'purchase_orders',
+          filter: `buyer_id=eq.${userId}`,
+        },
+        scheduleRefetch
+      );
+
+    const pid = profileIdForOrders?.trim();
+    if (pid && pid !== userId) {
+      channel = channel.on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'purchase_orders',
+          filter: `buyer_id=eq.${pid}`,
+        },
+        scheduleRefetch
+      );
+    }
+
+    channel.subscribe();
+    return () => {
+      if (debounceTimer != null) clearTimeout(debounceTimer);
+      void supabase.removeChannel(channel);
+    };
+  }, [userId, profileIdForOrders, project.id]);
+
+  const dashboardOrderHint = Number(project.total_orders) || 0;
 
   // Materials value: all active pipeline + fulfilled (excludes cancelled / draft)
   const materialsSpent = orders
@@ -590,6 +652,20 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
           </CardContent>
         )}
       </Card>
+
+      {!loading &&
+        dashboardOrderHint > 0 &&
+        orders.length === 0 && (
+          <Alert className="border-amber-200 bg-amber-50 text-amber-950">
+            <AlertTitle className="text-amber-900">Orders not listed yet</AlertTitle>
+            <AlertDescription className="text-amber-900/90">
+              Your project list shows {dashboardOrderHint} linked material order
+              {dashboardOrderHint === 1 ? '' : 's'}, but this screen could not load those rows (session,
+              link rules, or network). Tap <strong>Refresh</strong> above or open the{' '}
+              <strong>Quotes</strong> / <strong>Orders</strong> tabs from the main dashboard menu.
+            </AlertDescription>
+          </Alert>
+        )}
 
       {/* Spending Breakdown */}
       <div className="grid md:grid-cols-3 gap-4">
