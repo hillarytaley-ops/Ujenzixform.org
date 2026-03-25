@@ -21,6 +21,11 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Textarea } from '@/components/ui/textarea';
 import { useCart, CartItem } from '@/contexts/CartContext';
 import { catalogMaterialIdFromCartLineId } from '@/utils/cartLineId';
+import {
+  getCartProjectId,
+  getCartProjectName,
+  getCartProjectLocation,
+} from '@/utils/builderCartProject';
 import { useToast } from '@/hooks/use-toast';
 import { 
   Scale, 
@@ -319,6 +324,20 @@ export const CartPriceComparisonAll: React.FC<CartPriceComparisonAllProps> = ({
       return;
     }
 
+    const cartPid = getCartProjectId();
+    if (!cartPid) {
+      toast({
+        title: 'Select a project first',
+        description:
+          'Choose a project on the builder dashboard or tap Order Materials on a project card so quotes link to the right site.',
+        variant: 'destructive',
+      });
+      setSending(false);
+      return;
+    }
+    const cartPname = getCartProjectName();
+    const cartPloc = getCartProjectLocation();
+
     let successCount = 0;
     let lastError: string | null = null;
 
@@ -346,9 +365,14 @@ export const CartPriceComparisonAll: React.FC<CartPriceComparisonAllProps> = ({
           buyer_id: userId,
           supplier_id: supplierId,
           total_amount: totalAmount,
-          delivery_address: 'To be provided',
+          project_id: cartPid,
+          delivery_address: cartPname
+            ? `${cartPname} - ${cartPloc || 'Site'}`
+            : 'To be provided',
           delivery_date: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-          project_name: `Quote Request - ${new Date().toLocaleDateString()}`,
+          project_name: cartPname
+            ? `${cartPname} — Price comparison quote`
+            : `Quote Request - ${new Date().toLocaleDateString()}`,
           status: 'pending',
           items: items.map(item => ({
             material_id: catalogMaterialIdFromCartLineId(item.id),

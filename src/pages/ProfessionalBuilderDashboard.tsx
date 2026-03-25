@@ -1804,7 +1804,11 @@ const ProfessionalBuilderDashboardPage = () => {
                     } else {
                       setSelectedProjectForOrder(value);
                       const proj = projects.find((p) => p.id === value);
-                      setCartProjectContext(value, proj?.name ?? null);
+                      setCartProjectContext(
+                        value,
+                        proj?.name ?? null,
+                        proj?.location ?? null
+                      );
                     }
                   }}
                 >
@@ -2510,7 +2514,14 @@ const ProfessionalBuilderDashboardPage = () => {
                                 </Button>
                                 <Link 
                                   to={`/suppliers?from=dashboard&project_id=${project.id}`}
-                                  onClick={(e) => e.stopPropagation()}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setCartProjectContext(
+                                      project.id,
+                                      project.name,
+                                      project.location ?? null
+                                    );
+                                  }}
                                 >
                                   <Button 
                                     className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"

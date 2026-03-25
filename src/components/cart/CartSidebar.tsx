@@ -149,7 +149,8 @@ export const CartSidebar: React.FC = () => {
           console.log('📁 Cart: Pre-selecting project from localStorage:', storedProjectId);
           setSelectedProjectId(storedProjectId);
           const match = projectsData.find((p: BuilderProject) => p.id === storedProjectId);
-          if (match?.name) setCartProjectContext(storedProjectId, match.name);
+          if (match?.name)
+            setCartProjectContext(storedProjectId, match.name, match.location ?? null);
         }
       } else if (error) {
         console.warn('Cart: builder_projects load failed:', error.message);
@@ -242,6 +243,20 @@ export const CartSidebar: React.FC = () => {
         title: '⚠️ Professional Builder Required',
         description: 'Only Professional Builders can request quotes. Please register as a Professional Builder or Private Client to purchase.',
         variant: 'destructive'
+      });
+      return;
+    }
+
+    if (
+      (currentRole === 'professional_builder' || currentRole === 'admin') &&
+      projects.length > 0 &&
+      !selectedProjectId
+    ) {
+      toast({
+        title: 'Select a project',
+        description:
+          'Pick the project this quote is for (above) so costs show on the correct project card.',
+        variant: 'destructive',
       });
       return;
     }
@@ -848,7 +863,7 @@ export const CartSidebar: React.FC = () => {
                     setSelectedProjectId(id);
                     if (id) {
                       const p = projects.find((x) => x.id === id);
-                      setCartProjectContext(id, p?.name ?? null);
+                      setCartProjectContext(id, p?.name ?? null, p?.location ?? null);
                     } else {
                       clearCartProjectContext();
                     }

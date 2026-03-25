@@ -39,7 +39,11 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { CartItem } from '@/contexts/CartContext';
 import { catalogMaterialIdFromCartLineId } from '@/utils/cartLineId';
-import { getCartProjectId, getCartProjectName } from '@/utils/builderCartProject';
+import {
+  getCartProjectId,
+  getCartProjectName,
+  getCartProjectLocation,
+} from '@/utils/builderCartProject';
 
 interface Supplier {
   id: string;
@@ -244,6 +248,20 @@ export const MultiSupplierQuoteDialog: React.FC<MultiSupplierQuoteDialogProps> =
 
     console.log('📤 Sending quotes as user:', userId);
 
+    const cartPid = getCartProjectId();
+    if (!cartPid) {
+      toast({
+        title: 'Select a project first',
+        description:
+          'Choose a project on the dashboard or open Order Materials from a project card before sending quotes.',
+        variant: 'destructive',
+      });
+      setSending(false);
+      return;
+    }
+    const cartPname = getCartProjectName();
+    const cartPloc = getCartProjectLocation();
+
     let successCount = 0;
     const failedSuppliers: string[] = [];
 
@@ -263,14 +281,16 @@ export const MultiSupplierQuoteDialog: React.FC<MultiSupplierQuoteDialogProps> =
 
         console.log(`📤 Sending quote to ${supplierName} (supplier_id: ${validSupplierId}, user_id: ${supplier?.user_id})`);
 
-        const cartPid = getCartProjectId();
-        const cartPname = getCartProjectName();
         const quotePayload: Record<string, unknown> = {
           po_number: poNumber,
           buyer_id: userId,
           supplier_id: validSupplierId,
           total_amount: totalAmount,
-          delivery_address: 'To be provided',
+          project_id: cartPid,
+          delivery_address:
+            cartPname != null
+              ? `${cartPname} - ${cartPloc || 'Site'}`
+              : 'To be provided',
           delivery_date: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 14 days
           project_name:
             cartPname != null
@@ -289,7 +309,6 @@ export const MultiSupplierQuoteDialog: React.FC<MultiSupplierQuoteDialogProps> =
           })),
           created_at: new Date().toISOString(),
         };
-        if (cartPid) quotePayload.project_id = cartPid;
 
         try {
           const controller = new AbortController();

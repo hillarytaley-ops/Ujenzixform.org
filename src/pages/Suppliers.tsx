@@ -65,21 +65,26 @@ const Suppliers = () => {
 
       const fetchProjectName = async () => {
         try {
+          const { data: sess } = await supabase.auth.getSession();
+          const token = sess?.session?.access_token;
           const response = await fetch(
-            `${SUPABASE_URL}/rest/v1/builder_projects?id=eq.${projectIdFromUrl}&select=name&limit=1`,
+            `${SUPABASE_URL}/rest/v1/builder_projects?id=eq.${projectIdFromUrl}&select=name,location&limit=1`,
             {
               headers: {
-                'apikey': SUPABASE_ANON_KEY,
-                'Content-Type': 'application/json',
-              }
+                apikey: SUPABASE_ANON_KEY,
+                Authorization: `Bearer ${token || SUPABASE_ANON_KEY}`,
+                "Content-Type": "application/json",
+              },
             }
           );
           if (response.ok) {
             const data = await response.json();
             if (data && data.length > 0) {
-              const nm = data[0].name;
-              setSelectedProjectName(nm);
-              if (nm) setCartProjectContext(projectIdFromUrl, nm);
+              const row = data[0];
+              const nm = row.name as string | undefined;
+              const loc = row.location as string | undefined;
+              setSelectedProjectName(nm ?? null);
+              setCartProjectContext(projectIdFromUrl, nm ?? null, loc ?? null);
             }
           }
         } catch (error) {

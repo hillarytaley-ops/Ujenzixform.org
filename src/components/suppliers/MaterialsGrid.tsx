@@ -41,7 +41,11 @@ import { MobileBookView } from './MobileBookView';
 import { FileText, BookOpen } from 'lucide-react';
 import { ProductModal, materialToProduct, Product } from '@/components/products';
 import { useAuth } from '@/contexts/AuthContext';
-import { getCartProjectId, getCartProjectName } from '@/utils/builderCartProject';
+import {
+  getCartProjectId,
+  getCartProjectName,
+  getCartProjectLocation,
+} from '@/utils/builderCartProject';
 import { buildMaterialCartLineId } from '@/utils/cartLineId';
 
 // iOS/Safari compatibility check
@@ -1416,14 +1420,29 @@ export const MaterialsGrid = () => {
         return;
       }
 
+      const cartPid = getCartProjectId();
+      if (!cartPid) {
+        toast({
+          title: 'Select a project for this quote',
+          description:
+            'Open Order Materials from that project’s card, or choose a project in the dashboard header, then request quotes.',
+          variant: 'destructive',
+        });
+        return;
+      }
+
       const qty = getQuantity(material.id) || 1;
       const poNumber = `QR-${Date.now()}-${Math.random().toString(36).substr(2, 5).toUpperCase()}`;
-      const cartPid = getCartProjectId();
       const cartPname = getCartProjectName();
+      const cartPloc = getCartProjectLocation();
       const projectName =
         cartPname != null
           ? `${cartPname} — Quote: ${material.name}`
           : `Quote Request - ${material.category || 'Materials'}`;
+      const deliveryAddress =
+        cartPname != null
+          ? `${cartPname} - ${cartPloc || 'Site'}`
+          : 'To be confirmed';
 
       console.log('Creating quote request:', { poNumber, buyerId: user.id, supplierId, material: material.name, qty, cartPid });
       
@@ -1432,10 +1451,11 @@ export const MaterialsGrid = () => {
           buyer_id: user.id,
           supplier_id: supplierId,
           total_amount: material.unit_price * qty,
-          delivery_address: 'To be confirmed',
+          delivery_address: deliveryAddress,
           delivery_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
           status: 'pending', // Quote requests start as pending
           project_name: projectName,
+          project_id: cartPid,
           items: [{
             material_id: material.id,
             material_name: material.name,
@@ -1445,7 +1465,6 @@ export const MaterialsGrid = () => {
             unit_price: material.unit_price
           }]
       };
-      if (cartPid) insertRow.project_id = cartPid;
 
       const { data: orderData, error: orderError } = await supabase
         .from('purchase_orders')
@@ -1552,6 +1571,18 @@ export const MaterialsGrid = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
         window.location.href = '/auth?lite=1&redirect=' + encodeURIComponent('/suppliers?tab=purchase');
+        return;
+      }
+      if (
+        (userRole === 'professional_builder' || userRole === 'admin') &&
+        !getCartProjectId()
+      ) {
+        toast({
+          title: 'Select a project first',
+          description:
+            'Use Order Materials on a project card or the dashboard project menu, then open multi-supplier quote.',
+          variant: 'destructive',
+        });
         return;
       }
       const visibleItems = filteredMaterials.slice(visibleStart, visibleEnd);
