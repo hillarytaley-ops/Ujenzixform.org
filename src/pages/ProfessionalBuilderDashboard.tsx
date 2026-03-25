@@ -87,6 +87,7 @@ import {
   fetchPurchaseBuyerIdsForBuilder,
   resolvePurchaseOrderToProjectId,
 } from "@/utils/builderProjectPurchaseOrders";
+import { formatKesCompact } from "@/utils/kesFormat";
 import { DeliveryNoteWorkflow } from "@/components/delivery/DeliveryNoteWorkflow";
 import { GRNView } from "@/components/delivery/GRNView";
 import { InvoiceManagement } from "@/components/invoices/InvoiceManagement";
@@ -2441,7 +2442,9 @@ const ProfessionalBuilderDashboardPage = () => {
                         <div className="bg-purple-50 p-4 rounded-lg">
                           <p className="text-sm text-purple-700">Total Budget</p>
                           <p className="text-xl font-bold text-purple-800">
-                            KES {(projects.reduce((sum, p) => sum + (p.budget || 0), 0) / 1000000).toFixed(1)}M
+                            {formatKesCompact(
+                              projects.reduce((sum, p) => sum + (p.budget || 0), 0)
+                            )}
                           </p>
                         </div>
                       </div>
@@ -2511,13 +2514,15 @@ const ProfessionalBuilderDashboardPage = () => {
                                 <div className="bg-gray-50 p-2 rounded">
                                   <p className="text-xs text-gray-500">Budget</p>
                                   <p className="font-semibold text-sm">
-                                    {project.budget ? `KES ${(project.budget / 1000000).toFixed(1)}M` : 'Not set'}
+                                    {project.budget != null && Number(project.budget) > 0
+                                      ? formatKesCompact(project.budget)
+                                      : "Not set"}
                                   </p>
                                 </div>
                                 <div className="bg-gray-50 p-2 rounded">
                                   <p className="text-xs text-gray-500">Spent</p>
                                   <p className="font-semibold text-sm text-blue-600">
-                                    KES {((project.spent || 0) / 1000000).toFixed(1)}M
+                                    {formatKesCompact(project.spent)}
                                   </p>
                                 </div>
                               </div>
