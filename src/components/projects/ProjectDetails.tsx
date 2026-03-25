@@ -99,7 +99,7 @@ interface ProjectDetailsProps {
   /** profiles.id — purchase_orders.buyer_id often matches this (same as Orders tab) */
   profileIdForOrders?: string | null;
   /** All builder projects — same attribution rules as dashboard cards (no header-based dumping) */
-  attributionProjects: { id: string; name?: string | null }[];
+  attributionProjects: { id: string; name?: string | null; location?: string | null }[];
 }
 
 export const ProjectDetails: React.FC<ProjectDetailsProps> = ({

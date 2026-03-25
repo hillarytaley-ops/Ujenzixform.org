@@ -95,6 +95,7 @@ import { MissingDeliveryAddressAlert } from "@/components/builders/MissingDelive
 type PurchaseOrderProjectRow = {
   project_id?: string | null;
   project_name?: string | null;
+  delivery_address?: string | null;
   total_amount?: number | null;
   status?: string | null;
 };
@@ -112,13 +113,17 @@ function dedupeProjectsById(rows: any[]): any[] {
 
 /**
  * Count POs and sum order value per builder_projects.id.
- * Uses project_id; if missing, matches project_name (including "Name - Quote from …" from cart).
+ * Uses project_id, project_name, delivery_address (Cart: "Name - Location"), then fuzzy name rules.
  */
 function aggregatePurchaseStatsByProject(
   orders: PurchaseOrderProjectRow[],
-  projects: { id: string; name?: string | null }[]
+  projects: { id: string; name?: string | null; location?: string | null }[]
 ): Map<string, { orderCount: number; orderValueSum: number }> {
-  const projectList = projects.map((p) => ({ id: p.id, name: p.name }));
+  const projectList = projects.map((p) => ({
+    id: p.id,
+    name: p.name,
+    location: p.location ?? null,
+  }));
   const map = new Map<string, { orderCount: number; orderValueSum: number }>();
   const skipOrder = new Set(["cancelled", "rejected", "draft"]);
 
@@ -253,23 +258,34 @@ async function mergeProjectRowsWithPurchaseOrders(
   if (buyerIds.length === 0) return projectRows;
 
   const inList = buyerIds.join(",");
-  const selectWithProject = "project_id,project_name,total_amount,status";
+  const selectWithDelivery =
+    "project_id,project_name,total_amount,status,delivery_address";
+  const selectNoDelivery = "project_id,project_name,total_amount,status";
   const selectFallback = "project_name,total_amount,status";
 
   try {
-    let ordersRes = await fetch(
-      `${SUPABASE_URL}/rest/v1/purchase_orders?buyer_id=in.(${inList})&select=${selectWithProject}`,
-      {
-        headers: {
-          apikey: SUPABASE_ANON_KEY,
-          Authorization: `Bearer ${token || SUPABASE_ANON_KEY}`,
-          Accept: "application/json",
-        },
-      }
-    );
-    if (!ordersRes.ok && ordersRes.status === 400) {
-      ordersRes = await fetch(
-        `${SUPABASE_URL}/rest/v1/purchase_orders?buyer_id=in.(${inList})&select=${selectFallback}`,
+    let list: PurchaseOrderProjectRow[] = [];
+
+    const { data: clientRows, error: clientErr } = await supabase
+      .from("purchase_orders")
+      .select(selectWithDelivery)
+      .in("buyer_id", buyerIds);
+    if (!clientErr && Array.isArray(clientRows) && clientRows.length > 0) {
+      list = clientRows as PurchaseOrderProjectRow[];
+      console.log(
+        "📁 PO merge: Supabase client",
+        list.length,
+        "rows (buyer_id in",
+        buyerIds.length,
+        "ids)"
+      );
+    } else if (clientErr) {
+      console.warn("📁 PO merge: Supabase client error:", clientErr.message);
+    }
+
+    if (list.length === 0) {
+      let ordersRes = await fetch(
+        `${SUPABASE_URL}/rest/v1/purchase_orders?buyer_id=in.(${inList})&select=${selectWithDelivery}`,
         {
           headers: {
             apikey: SUPABASE_ANON_KEY,
@@ -278,18 +294,51 @@ async function mergeProjectRowsWithPurchaseOrders(
           },
         }
       );
+      if (!ordersRes.ok && ordersRes.status === 400) {
+        ordersRes = await fetch(
+          `${SUPABASE_URL}/rest/v1/purchase_orders?buyer_id=in.(${inList})&select=${selectNoDelivery}`,
+          {
+            headers: {
+              apikey: SUPABASE_ANON_KEY,
+              Authorization: `Bearer ${token || SUPABASE_ANON_KEY}`,
+              Accept: "application/json",
+            },
+          }
+        );
+      }
+      if (!ordersRes.ok && ordersRes.status === 400) {
+        ordersRes = await fetch(
+          `${SUPABASE_URL}/rest/v1/purchase_orders?buyer_id=in.(${inList})&select=${selectFallback}`,
+          {
+            headers: {
+              apikey: SUPABASE_ANON_KEY,
+              Authorization: `Bearer ${token || SUPABASE_ANON_KEY}`,
+              Accept: "application/json",
+            },
+          }
+        );
+      }
+      if (!ordersRes.ok) {
+        console.warn("📁 purchase_orders merge HTTP:", ordersRes.status);
+        return projectRows;
+      }
+      const orderRows = (await ordersRes.json()) as PurchaseOrderProjectRow[];
+      list = Array.isArray(orderRows) ? orderRows : [];
+      console.log(
+        "📁 PO merge: REST loaded",
+        list.length,
+        "rows for buyer_id in",
+        buyerIds.length,
+        "ids"
+      );
     }
-    if (!ordersRes.ok) {
-      console.warn("📁 purchase_orders merge HTTP:", ordersRes.status);
-      return projectRows;
-    }
-    const orderRows = (await ordersRes.json()) as PurchaseOrderProjectRow[];
-    const list = Array.isArray(orderRows) ? orderRows : [];
-    console.log("📁 PO merge: loaded", list.length, "rows for buyer_id in", buyerIds.length, "ids");
-    const stats = aggregatePurchaseStatsByProject(
-      list,
-      projectRows.map((p) => ({ id: p.id, name: p.name }))
-    );
+
+    const projectMeta = projectRows.map((p) => ({
+      id: p.id,
+      name: p.name,
+      location: p.location,
+    }));
+    const stats = aggregatePurchaseStatsByProject(list, projectMeta);
     const merged = mergeProjectsWithPurchaseAggregates(
       projectRows,
       stats,
@@ -350,7 +399,12 @@ const ProfessionalBuilderDashboardPage = () => {
   // Projects state - start with loading false to show empty state immediately
   const [projects, setProjects] = useState<any[]>([]);
   const projectAttributionList = useMemo(
-    () => projects.map((p: any) => ({ id: p.id, name: p.name })),
+    () =>
+      projects.map((p: any) => ({
+        id: p.id,
+        name: p.name,
+        location: p.location ?? null,
+      })),
     [projects]
   );
   const [loadingProjects, setLoadingProjects] = useState(true); // Will be set to false quickly

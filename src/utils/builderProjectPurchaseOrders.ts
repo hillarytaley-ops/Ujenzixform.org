@@ -7,6 +7,8 @@ export function normalizeProjectName(n: string | null | undefined): string {
 type PoProjectRow = {
   project_id?: string | null;
   project_name?: string | null;
+  /** Cart/checkout: `${name} - ${location}(…)` — reliable link when project_id was missing */
+  delivery_address?: string | null;
 };
 
 function resolveProjectIdForOrderRow(
@@ -93,12 +95,49 @@ function resolveOrphanByUniqueProjectPrefix(
 }
 
 /**
- * Single canonical match: project_id, then name rules, substring (longest wins), unique multi-word prefix.
+ * Checkout sets delivery_address to "Project Name - Location (optional addr)" (see CartSidebar).
+ * 1) First segment vs project name (exact). 2) "Name - Location" vs project name + location.
+ */
+function resolveProjectFromDeliveryAddress(
+  o: PoProjectRow,
+  projects: { id: string; name?: string | null; location?: string | null }[]
+): string | null {
+  const raw = (o.delivery_address ?? "").trim();
+  if (!raw || projects.length === 0) return null;
+
+  const dashSplit = raw.split(/\s+-\s+/);
+  let head = dashSplit[0]?.trim() ?? "";
+  if (!head) head = raw.split(" — ")[0]?.trim() ?? "";
+  if (!head || head.length < 2) return null;
+
+  const normHead = normalizeProjectName(head);
+  let matches = projects.filter(
+    (p) => normalizeProjectName(p.name) === normHead
+  );
+  if (matches.length === 1) return matches[0].id;
+
+  if (dashSplit.length >= 2) {
+    const rest = (dashSplit[1] || "").split("(")[0].trim();
+    const combo = normalizeProjectName(`${dashSplit[0]} - ${rest}`);
+    matches = projects.filter((p) => {
+      const loc = (p.location ?? "").trim();
+      if (!loc) return false;
+      return normalizeProjectName(`${p.name} - ${loc}`) === combo;
+    });
+    if (matches.length === 1) return matches[0].id;
+  }
+
+  return null;
+}
+
+/**
+ * Single canonical match: project_id, then project_name rules, delivery_address head segment,
+ * substring (longest wins), unique multi-word prefix.
  * Never uses header/cart selection. With exactly one project, unmatched rows still map to that project.
  */
 export function resolvePurchaseOrderToProjectId(
   o: PoProjectRow,
-  projects: { id: string; name?: string | null }[]
+  projects: { id: string; name?: string | null; location?: string | null }[]
 ): string | null {
   if (projects.length === 0) return null;
 
@@ -112,6 +151,7 @@ export function resolvePurchaseOrderToProjectId(
   }
 
   let pid = resolveProjectIdForOrderRow(o, projects, nameToIds);
+  if (!pid) pid = resolveProjectFromDeliveryAddress(o, projects);
   if (!pid) pid = resolveOrphanOrderByProjectNameSubstring(o, projects);
   if (!pid) pid = resolveOrphanByUniqueProjectPrefix(o, projects);
   if (!pid && projects.length === 1) pid = projects[0].id;
