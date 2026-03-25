@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -84,8 +84,8 @@ import {
   clearCartProjectContext,
 } from "@/utils/builderCartProject";
 import {
-  normalizeProjectName,
   fetchPurchaseBuyerIdsForBuilder,
+  resolvePurchaseOrderToProjectId,
 } from "@/utils/builderProjectPurchaseOrders";
 import { DeliveryNoteWorkflow } from "@/components/delivery/DeliveryNoteWorkflow";
 import { GRNView } from "@/components/delivery/GRNView";
@@ -98,64 +98,6 @@ type PurchaseOrderProjectRow = {
   total_amount?: number | null;
   status?: string | null;
 };
-
-/**
- * purchase_orders.project_name is often "My Site - Quote from Supplier Co" while
- * builder_projects.name is "My Site". Match UUID first, then exact name, then prefix before " - ".
- */
-function resolveProjectIdForOrder(
-  o: PurchaseOrderProjectRow,
-  projects: { id: string; name?: string | null }[],
-  nameToIds: Map<string, string[]>
-): string | null {
-  let pid: string | null =
-    o.project_id && typeof o.project_id === "string" ? o.project_id.trim() : null;
-  if (pid) return pid;
-
-  const normOrder = normalizeProjectName(o.project_name);
-  if (!normOrder) return null;
-
-  const exact = nameToIds.get(normOrder);
-  if (exact?.length === 1) return exact[0];
-
-  const sorted = [...projects]
-    .filter((p) => p.name && String(p.name).trim())
-    .sort(
-      (a, b) =>
-        normalizeProjectName(b.name).length - normalizeProjectName(a.name).length
-    );
-  for (const p of sorted) {
-    const pn = normalizeProjectName(p.name);
-    if (!pn) continue;
-    if (normOrder === pn) return p.id;
-    if (normOrder.startsWith(pn + " -") || normOrder.startsWith(pn + " —")) return p.id;
-  }
-  return null;
-}
-
-/**
- * If project_name contains a builder_projects.name (e.g. "Moi's Bridge — Quote: …"),
- * attribute the PO to that project. Longest matching name wins to reduce ambiguity.
- */
-function resolveOrphanOrderByProjectNameSubstring(
-  o: PurchaseOrderProjectRow,
-  projects: { id: string; name?: string | null }[]
-): string | null {
-  const on = normalizeProjectName(o.project_name);
-  if (!on || projects.length === 0) return null;
-  const candidates: { id: string; len: number }[] = [];
-  for (const p of projects) {
-    const pn = normalizeProjectName(p.name);
-    if (pn.length < 3) continue;
-    if (on.includes(pn)) {
-      candidates.push({ id: p.id, len: pn.length });
-    }
-  }
-  if (candidates.length === 0) return null;
-  const maxLen = Math.max(...candidates.map((c) => c.len));
-  const atMax = candidates.filter((c) => c.len === maxLen);
-  return atMax.length === 1 ? atMax[0].id : null;
-}
 
 /** Dedupe REST rows (e.g. duplicate ids). */
 function dedupeProjectsById(rows: any[]): any[] {
@@ -174,19 +116,9 @@ function dedupeProjectsById(rows: any[]): any[] {
  */
 function aggregatePurchaseStatsByProject(
   orders: PurchaseOrderProjectRow[],
-  projects: { id: string; name?: string | null }[],
-  /** When PO has no project_id/name match, attribute to this project (header / cart selection) */
-  orphanProjectIdHint?: string | null
+  projects: { id: string; name?: string | null }[]
 ): Map<string, { orderCount: number; orderValueSum: number }> {
-  const nameToIds = new Map<string, string[]>();
-  for (const p of projects) {
-    const key = normalizeProjectName(p.name);
-    if (!key) continue;
-    const arr = nameToIds.get(key) ?? [];
-    arr.push(p.id);
-    nameToIds.set(key, arr);
-  }
-
+  const projectList = projects.map((p) => ({ id: p.id, name: p.name }));
   const map = new Map<string, { orderCount: number; orderValueSum: number }>();
   const skipOrder = new Set(["cancelled", "rejected", "draft"]);
 
@@ -194,22 +126,7 @@ function aggregatePurchaseStatsByProject(
     const st = String(o.status ?? "").toLowerCase();
     if (skipOrder.has(st)) continue;
 
-    let pid = resolveProjectIdForOrder(o, projects, nameToIds);
-    if (!pid) {
-      pid = resolveOrphanOrderByProjectNameSubstring(o, projects);
-    }
-    // Generic quotes with no project hint: only safe when there is a single project.
-    if (!pid && projects.length === 1) {
-      pid = projects[0].id;
-    }
-    if (
-      !pid &&
-      projects.length > 1 &&
-      orphanProjectIdHint &&
-      projects.some((p) => p.id === orphanProjectIdHint)
-    ) {
-      pid = orphanProjectIdHint;
-    }
+    const pid = resolvePurchaseOrderToProjectId(o, projectList);
     if (!pid) continue;
 
     const cur = map.get(pid) ?? { orderCount: 0, orderValueSum: 0 };
@@ -314,8 +231,7 @@ async function mergeProjectRowsWithPurchaseOrders(
   userId: string,
   accessTokenFromProjectsFetch: string | null,
   previousMergedCards?: any[] | null,
-  extraBuyerSeeds?: string[] | null,
-  orphanProjectIdHint?: string | null
+  extraBuyerSeeds?: string[] | null
 ): Promise<any[]> {
   let token = accessTokenFromProjectsFetch;
   if (!token) {
@@ -372,8 +288,7 @@ async function mergeProjectRowsWithPurchaseOrders(
     console.log("📁 PO merge: loaded", list.length, "rows for buyer_id in", buyerIds.length, "ids");
     const stats = aggregatePurchaseStatsByProject(
       list,
-      projectRows.map((p) => ({ id: p.id, name: p.name })),
-      orphanProjectIdHint
+      projectRows.map((p) => ({ id: p.id, name: p.name }))
     );
     const merged = mergeProjectsWithPurchaseAggregates(
       projectRows,
@@ -434,6 +349,10 @@ const ProfessionalBuilderDashboardPage = () => {
 
   // Projects state - start with loading false to show empty state immediately
   const [projects, setProjects] = useState<any[]>([]);
+  const projectAttributionList = useMemo(
+    () => projects.map((p: any) => ({ id: p.id, name: p.name })),
+    [projects]
+  );
   const [loadingProjects, setLoadingProjects] = useState(true); // Will be set to false quickly
   const [creatingProject, setCreatingProject] = useState(false); // Separate state for creation
   const [showCreateProject, setShowCreateProject] = useState(false);
@@ -1162,17 +1081,12 @@ const ProfessionalBuilderDashboardPage = () => {
         const purchaseExtraSeeds = [profile?.id].filter(
           (id): id is string => typeof id === "string" && id.length > 0
         );
-        const orphanForPoMerge =
-          selectedProjectForOrder && selectedProjectForOrder !== "none"
-            ? selectedProjectForOrder
-            : getCartProjectId();
         void mergeProjectRowsWithPurchaseOrders(
           projectRows,
           userId,
           accessToken,
           projectRows,
-          purchaseExtraSeeds,
-          orphanForPoMerge || null
+          purchaseExtraSeeds
         )
           .then((merged) => {
             setProjects(merged);
@@ -2095,7 +2009,7 @@ const ProfessionalBuilderDashboardPage = () => {
                   onUpdate={handleProjectUpdate}
                   userId={getUserId()}
                   profileIdForOrders={profile?.id}
-                  builderHasSingleProject={projects.length === 1}
+                  attributionProjects={projectAttributionList}
                 />
               </div>
             ) : (

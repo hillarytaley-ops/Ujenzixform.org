@@ -4,6 +4,120 @@ export function normalizeProjectName(n: string | null | undefined): string {
   return (n ?? "").trim().toLowerCase().replace(/\s+/g, " ");
 }
 
+type PoProjectRow = {
+  project_id?: string | null;
+  project_name?: string | null;
+};
+
+function resolveProjectIdForOrderRow(
+  o: PoProjectRow,
+  projects: { id: string; name?: string | null }[],
+  nameToIds: Map<string, string[]>
+): string | null {
+  let pid: string | null =
+    o.project_id && typeof o.project_id === "string" ? o.project_id.trim() : null;
+  if (pid) return pid;
+
+  const normOrder = normalizeProjectName(o.project_name);
+  if (!normOrder) return null;
+
+  const exact = nameToIds.get(normOrder);
+  if (exact?.length === 1) return exact[0];
+
+  const sorted = [...projects]
+    .filter((p) => p.name && String(p.name).trim())
+    .sort(
+      (a, b) =>
+        normalizeProjectName(b.name).length - normalizeProjectName(a.name).length
+    );
+  for (const p of sorted) {
+    const pn = normalizeProjectName(p.name);
+    if (!pn) continue;
+    if (normOrder === pn) return p.id;
+    if (normOrder.startsWith(pn + " -") || normOrder.startsWith(pn + " —")) return p.id;
+  }
+  return null;
+}
+
+function resolveOrphanOrderByProjectNameSubstring(
+  o: PoProjectRow,
+  projects: { id: string; name?: string | null }[]
+): string | null {
+  const on = normalizeProjectName(o.project_name);
+  if (!on || projects.length === 0) return null;
+  const candidates: { id: string; len: number }[] = [];
+  for (const p of projects) {
+    const pn = normalizeProjectName(p.name);
+    if (pn.length < 3) continue;
+    if (on.includes(pn)) {
+      candidates.push({ id: p.id, len: pn.length });
+    }
+  }
+  if (candidates.length === 0) return null;
+  const maxLen = Math.max(...candidates.map((c) => c.len));
+  const atMax = candidates.filter((c) => c.len === maxLen);
+  return atMax.length === 1 ? atMax[0].id : null;
+}
+
+function resolveOrphanByUniqueProjectPrefix(
+  o: PoProjectRow,
+  projects: { id: string; name?: string | null }[]
+): string | null {
+  const on = normalizeProjectName(o.project_name);
+  if (!on || projects.length === 0) return null;
+
+  const prefixToIds = new Map<string, Set<string>>();
+  for (const p of projects) {
+    const full = normalizeProjectName(p.name);
+    const parts = full.split(" ").filter(Boolean);
+    if (parts.length < 2) continue;
+    const prefix = parts.slice(0, -1).join(" ");
+    if (prefix.length < 8) continue;
+    if (!prefixToIds.has(prefix)) prefixToIds.set(prefix, new Set());
+    prefixToIds.get(prefix)!.add(p.id);
+  }
+
+  const matchedIds = new Set<string>();
+  for (const [prefix, idSet] of prefixToIds) {
+    if (idSet.size !== 1) continue;
+    if (
+      on.includes(prefix) ||
+      on.startsWith(prefix + " -") ||
+      on.startsWith(prefix + " —")
+    ) {
+      matchedIds.add([...idSet][0]);
+    }
+  }
+  if (matchedIds.size === 1) return [...matchedIds][0];
+  return null;
+}
+
+/**
+ * Single canonical match: project_id, then name rules, substring (longest wins), unique multi-word prefix.
+ * Never uses header/cart selection. With exactly one project, unmatched rows still map to that project.
+ */
+export function resolvePurchaseOrderToProjectId(
+  o: PoProjectRow,
+  projects: { id: string; name?: string | null }[]
+): string | null {
+  if (projects.length === 0) return null;
+
+  const nameToIds = new Map<string, string[]>();
+  for (const p of projects) {
+    const key = normalizeProjectName(p.name);
+    if (!key) continue;
+    const arr = nameToIds.get(key) ?? [];
+    arr.push(p.id);
+    nameToIds.set(key, arr);
+  }
+
+  let pid = resolveProjectIdForOrderRow(o, projects, nameToIds);
+  if (!pid) pid = resolveOrphanOrderByProjectNameSubstring(o, projects);
+  if (!pid) pid = resolveOrphanByUniqueProjectPrefix(o, projects);
+  if (!pid && projects.length === 1) pid = projects[0].id;
+  return pid;
+}
+
 /** purchase_orders.buyer_id may be auth.users.id or profiles.id */
 export async function fetchPurchaseBuyerIdsForBuilder(
   userId: string,

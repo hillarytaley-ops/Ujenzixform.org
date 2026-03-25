@@ -34,8 +34,7 @@ import { supabase, SUPABASE_URL, SUPABASE_ANON_KEY } from '@/integrations/supaba
 import { Link, useNavigate } from 'react-router-dom';
 import {
   fetchPurchaseBuyerIdsForBuilder,
-  purchaseOrderBelongsToProject,
-  monitoringRequestBelongsToProject,
+  resolvePurchaseOrderToProjectId,
 } from '@/utils/builderProjectPurchaseOrders';
 
 interface Project {
@@ -99,8 +98,8 @@ interface ProjectDetailsProps {
   userId: string;
   /** profiles.id — purchase_orders.buyer_id often matches this (same as Orders tab) */
   profileIdForOrders?: string | null;
-  /** When the builder has only one project, POs without project_id still belong here */
-  builderHasSingleProject?: boolean;
+  /** All builder projects — same attribution rules as dashboard cards (no header-based dumping) */
+  attributionProjects: { id: string; name?: string | null }[];
 }
 
 export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
@@ -109,7 +108,7 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
   onUpdate,
   userId,
   profileIdForOrders = null,
-  builderHasSingleProject = false,
+  attributionProjects,
 }) => {
   const [orders, setOrders] = useState<Order[]>([]);
   const [deliveries, setDeliveries] = useState<Delivery[]>([]);
@@ -181,13 +180,7 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
           const rows = Array.isArray(ordersData) ? ordersData : [];
           setOrders(
             rows.filter((o: { project_id?: string | null; project_name?: string | null }) => {
-              const pid =
-                o.project_id && typeof o.project_id === "string"
-                  ? o.project_id.trim()
-                  : "";
-              if (pid && pid !== project.id) return false;
-              if (purchaseOrderBelongsToProject(o, project.id, project.name)) return true;
-              return Boolean(builderHasSingleProject && !pid);
+              return resolvePurchaseOrderToProjectId(o, attributionProjects) === project.id;
             })
           );
         }
@@ -244,13 +237,7 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
           const mrows = Array.isArray(monitoringData) ? monitoringData : [];
           setMonitoringRequests(
             mrows.filter((m: { project_id?: string | null; project_name?: string | null }) => {
-              const mid =
-                m.project_id && typeof m.project_id === "string"
-                  ? String(m.project_id).trim()
-                  : "";
-              if (mid && mid !== project.id) return false;
-              if (monitoringRequestBelongsToProject(m, project.id, project.name)) return true;
-              return Boolean(builderHasSingleProject && !mid);
+              return resolvePurchaseOrderToProjectId(m, attributionProjects) === project.id;
             })
           );
         }
@@ -289,7 +276,13 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
 
   useEffect(() => {
     fetchProjectData();
-  }, [project.id, project.name, userId, builderHasSingleProject]);
+  }, [
+    project.id,
+    project.name,
+    userId,
+    profileIdForOrders,
+    attributionProjects,
+  ]);
 
   // Materials value: all active pipeline + fulfilled (excludes cancelled / draft)
   const materialsSpent = orders
