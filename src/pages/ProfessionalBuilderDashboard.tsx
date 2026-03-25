@@ -589,7 +589,7 @@ const ProfessionalBuilderDashboardPage = () => {
     return '';
   };
 
-  /** Load monitoring rows for the signed-in builder (user_id OR requester_id); dedupe by id. */
+  /** Load monitoring rows for the signed-in builder. Always filter by user_id; merge requester_id only if column exists. */
   const refreshMonitoringRequests = useCallback(async () => {
     const { data: { session } } = await supabase.auth.getSession();
     const userId = session?.user?.id || getUserId();
@@ -607,38 +607,30 @@ const ProfessionalBuilderDashboardPage = () => {
       );
     };
 
-    const { data, error } = await supabase
+    const byUser = await supabase
       .from("monitoring_service_requests")
       .select("*")
-      .or(`user_id.eq.${userId},requester_id.eq.${userId}`)
+      .eq("user_id", userId)
       .order("created_at", { ascending: false });
 
-    let rows: any[] = Array.isArray(data) ? data : [];
+    let rows: any[] = mergeById(Array.isArray(byUser.data) ? byUser.data : []);
+    if (byUser.error) {
+      console.warn("📹 Monitoring user_id load:", byUser.error.message);
+    }
 
-    if (error) {
-      console.warn("📹 Monitoring combined load error:", error.message);
-      const [byUser, byReq] = await Promise.all([
-        supabase
-          .from("monitoring_service_requests")
-          .select("*")
-          .eq("user_id", userId)
-          .order("created_at", { ascending: false }),
-        supabase
-          .from("monitoring_service_requests")
-          .select("*")
-          .eq("requester_id", userId)
-          .order("created_at", { ascending: false }),
-      ]);
-      rows = mergeById([
-        ...(Array.isArray(byUser.data) ? byUser.data : []),
-        ...(Array.isArray(byReq.data) ? byReq.data : []),
-      ]);
-      if (byUser.error) console.warn("📹 Monitoring user_id load:", byUser.error.message);
-      if (byReq.error && !String(byReq.error.message || "").includes("requester_id")) {
-        console.warn("📹 Monitoring requester_id load:", byReq.error.message);
-      }
-    } else {
-      rows = mergeById(rows);
+    const byReq = await supabase
+      .from("monitoring_service_requests")
+      .select("*")
+      .eq("requester_id", userId)
+      .order("created_at", { ascending: false });
+
+    if (!byReq.error && Array.isArray(byReq.data) && byReq.data.length > 0) {
+      rows = mergeById([...rows, ...byReq.data]);
+    } else if (
+      byReq.error &&
+      !/requester_id|42703|does not exist/i.test(String(byReq.error.message || byReq.error.code || ""))
+    ) {
+      console.warn("📹 Monitoring requester_id load:", byReq.error.message);
     }
 
     setMonitoringRequests(rows);
@@ -720,18 +712,6 @@ const ProfessionalBuilderDashboardPage = () => {
           schema: "public",
           table: "monitoring_service_requests",
           filter: `user_id=eq.${userId}`,
-        },
-        () => {
-          void refreshMonitoringRequests();
-        }
-      )
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "monitoring_service_requests",
-          filter: `requester_id=eq.${userId}`,
         },
         () => {
           void refreshMonitoringRequests();
