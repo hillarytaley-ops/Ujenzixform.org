@@ -598,23 +598,19 @@ const ProfessionalBuilderDashboardPage = () => {
    * hides them (e.g. user_id stored as profiles.id, or legacy requester_id/email-only linkage).
    */
   const refreshMonitoringRequests = useCallback(async () => {
-    let sessionUid = "";
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      sessionUid = session?.user?.id || "";
-    } catch (e) {
-      console.warn("📹 Monitoring: getSession failed", e);
-    }
-    const userId = authUser?.id || sessionUid || getUserId();
+    // Do NOT await supabase.auth.getSession() here — it uses the client global fetch wrapper and can hang
+    // indefinitely on some devices; projects use localStorage token (fast path) for the same reason.
+    const userId = authUser?.id || getUserId();
     if (!userId) {
       console.warn("📹 Monitoring: skip refresh (no user id yet)");
       return;
     }
 
-    const accessToken = await getAccessToken();
+    console.log("📹 Monitoring: fetching for user", userId.slice(0, 8) + "…");
+    // Token from localStorage via monitoringRestOpts only (avoids getSession hang).
     const { rows: raw, usedRpc } = await fetchMyMonitoringServiceRequests(
       supabase,
-      monitoringRestOpts(SUPABASE_URL, SUPABASE_ANON_KEY, userId, accessToken)
+      monitoringRestOpts(SUPABASE_URL, SUPABASE_ANON_KEY, userId)
     );
     const rows = [...raw].sort(
       (a: any, b: any) =>
@@ -625,7 +621,7 @@ const ProfessionalBuilderDashboardPage = () => {
     console.log(
       "📹 Monitoring requests loaded:",
       rows.length,
-      usedRpc ? "(rpc)" : "(table)"
+      usedRpc ? "(direct)" : "(table)"
     );
   }, [authUser?.id]);
 
