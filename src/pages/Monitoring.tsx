@@ -554,8 +554,9 @@ const Monitoring = () => {
       const isBuilderRole = ['builder', 'professional_builder', 'private_client'].includes(dbRole);
       
       if (isBuilderRole) {
-        console.log('🔐 Monitoring - Checking monitoring requests for builder:', authUser.id);
-        
+        // Approved subscription does NOT unlock live cameras — user must enter access code (or ?access_code=).
+        console.log('🔐 Monitoring - Builder context (code required for camera access):', authUser.id);
+
         const { rows: allMonitoring } = await fetchMyMonitoringServiceRequests(
           supabase,
           monitoringRestOpts(
@@ -575,17 +576,14 @@ const Monitoring = () => {
               new Date(String(a.created_at || 0)).getTime()
           );
         const monitoringData = approved.slice(0, 1);
-        
-        console.log('🔐 Monitoring - Approved among my requests:', monitoringData.length);
-        
-        if (monitoringData.length > 0) {
-          console.log('✅ Monitoring - Builder has approved access!');
-          setHasMonitoringAccess(true);
-          setMonitoringRequest(monitoringData[0]);
-        } else {
-          console.log('⚠️ Monitoring - Builder has no approved monitoring requests');
-          setHasMonitoringAccess(false);
-        }
+
+        setMonitoringRequest(monitoringData.length > 0 ? monitoringData[0] : null);
+
+        console.log(
+          monitoringData.length > 0
+            ? '🔐 Monitoring - Approved service on file; enter access code to open cameras'
+            : '⚠️ Monitoring - No approved monitoring requests'
+        );
       } else if (dbRole === 'admin') {
         // Admins always have access
         setHasMonitoringAccess(true);
@@ -953,8 +951,16 @@ const Monitoring = () => {
                           Already Have an Access Code?
                         </h4>
                         <p className="text-sm text-slate-400 mb-4">
-                          Enter your access code below to view your assigned cameras
+                          Enter your access code below to view your assigned cameras. Signing in alone does not unlock
+                          live feeds — the code is required for every session unless you use an invite link with the code in the URL.
                         </p>
+                        {monitoringRequest?.project_name && (
+                          <p className="text-sm text-cyan-200/90 mb-4">
+                            Active monitoring on file for{' '}
+                            <span className="font-semibold">{monitoringRequest.project_name}</span> — use the code issued for
+                            that site.
+                          </p>
+                        )}
                         <div className="flex gap-3">
                           <Input
                             placeholder="Enter your access code (e.g., 2K4KVUH1)"
