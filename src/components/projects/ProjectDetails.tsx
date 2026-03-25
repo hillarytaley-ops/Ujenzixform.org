@@ -36,6 +36,7 @@ import {
   fetchPurchaseBuyerIdsForBuilder,
   resolvePurchaseOrderToProjectId,
 } from '@/utils/builderProjectPurchaseOrders';
+import { getAccessTokenWithPersistenceFallback } from '@/utils/supabaseAccessToken';
 
 interface Project {
   id: string;
@@ -151,39 +152,68 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
     }, 5000);
     
     try {
-      const accessToken = await getAccessToken();
+      const accessToken = await getAccessTokenWithPersistenceFallback();
+      const bearer = accessToken || SUPABASE_ANON_KEY;
+
       const buyerIds = await fetchPurchaseBuyerIdsForBuilder(
         userId,
         accessToken || null,
         profileIdForOrders ? [profileIdForOrders] : null
       );
-      const buyerIn = buyerIds.join(',');
-      
-      // Orders: many rows have project_id NULL but project_name like "Site - Quote from …"
+
+      // Orders: use Supabase client session first; REST used anon JWT when getSession() was empty → RLS returned 0 rows.
+      let orderRows: Order[] = [];
       try {
-        const controller1 = new AbortController();
-        const timeout1 = setTimeout(() => controller1.abort(), 12000);
-        const ordersResponse = await fetch(
-          `${SUPABASE_URL}/rest/v1/purchase_orders?buyer_id=in.(${buyerIn})&select=*&order=created_at.desc`,
-          {
-            headers: {
-              'apikey': SUPABASE_ANON_KEY,
-              'Authorization': `Bearer ${accessToken || SUPABASE_ANON_KEY}`
-            },
-            signal: controller1.signal
+        if (buyerIds.length > 0) {
+          const { data: clientOrders, error: clientPoErr } = await supabase
+            .from('purchase_orders')
+            .select('*')
+            .in('buyer_id', buyerIds)
+            .order('created_at', { ascending: false });
+          if (!clientPoErr && Array.isArray(clientOrders) && clientOrders.length > 0) {
+            orderRows = clientOrders as Order[];
+          } else if (clientPoErr) {
+            console.warn('📁 ProjectDetails: purchase_orders client:', clientPoErr.message);
           }
-        );
-        clearTimeout(timeout1);
-        
-        if (ordersResponse.ok) {
-          const ordersData = await ordersResponse.json();
-          const rows = Array.isArray(ordersData) ? ordersData : [];
-          setOrders(
-            rows.filter((o: { project_id?: string | null; project_name?: string | null }) => {
-              return resolvePurchaseOrderToProjectId(o, attributionProjects) === project.id;
-            })
-          );
         }
+
+        if (orderRows.length === 0 && buyerIds.length > 0) {
+          const controller1 = new AbortController();
+          const timeout1 = setTimeout(() => controller1.abort(), 12000);
+          const ordersResponse = await fetch(
+            `${SUPABASE_URL}/rest/v1/purchase_orders?buyer_id=in.(${buyerIds.join(',')})&select=*&order=created_at.desc`,
+            {
+              headers: {
+                apikey: SUPABASE_ANON_KEY,
+                Authorization: `Bearer ${bearer}`,
+              },
+              signal: controller1.signal,
+            }
+          );
+          clearTimeout(timeout1);
+          if (ordersResponse.ok) {
+            const ordersData = await ordersResponse.json();
+            orderRows = Array.isArray(ordersData) ? (ordersData as Order[]) : [];
+          }
+        }
+
+        let matched = orderRows.filter((o) => {
+          return resolvePurchaseOrderToProjectId(o, attributionProjects) === project.id;
+        });
+
+        // Rows linked by project_id in DB but missed by name/delivery heuristics
+        if (matched.length === 0) {
+          const { data: byProjectId, error: pidErr } = await supabase
+            .from('purchase_orders')
+            .select('*')
+            .eq('project_id', project.id)
+            .order('created_at', { ascending: false });
+          if (!pidErr && Array.isArray(byProjectId) && byProjectId.length > 0) {
+            matched = byProjectId as Order[];
+          }
+        }
+
+        setOrders(matched);
       } catch (e: any) {
         if (e.name !== 'AbortError') {
           console.warn('📁 Failed to fetch orders:', e);
@@ -199,7 +229,7 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
           {
             headers: {
               'apikey': SUPABASE_ANON_KEY,
-              'Authorization': `Bearer ${accessToken || SUPABASE_ANON_KEY}`
+              'Authorization': `Bearer ${bearer}`,
             },
             signal: controller2.signal
           }
@@ -225,7 +255,7 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
           {
             headers: {
               'apikey': SUPABASE_ANON_KEY,
-              'Authorization': `Bearer ${accessToken || SUPABASE_ANON_KEY}`
+              'Authorization': `Bearer ${bearer}`,
             },
             signal: controller3.signal
           }
@@ -265,14 +295,7 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
     }
   };
 
-  const getAccessToken = async (): Promise<string> => {
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      return session?.access_token || '';
-    } catch {
-      return '';
-    }
-  };
+  const getAccessToken = () => getAccessTokenWithPersistenceFallback();
 
   useEffect(() => {
     fetchProjectData();
