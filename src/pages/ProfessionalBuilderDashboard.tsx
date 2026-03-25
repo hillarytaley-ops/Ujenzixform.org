@@ -589,36 +589,56 @@ const ProfessionalBuilderDashboardPage = () => {
     return '';
   };
 
-  /** Load monitoring rows for the signed-in builder; supports legacy `requester_id` if `user_id` is empty. */
+  /** Load monitoring rows for the signed-in builder (user_id OR requester_id); dedupe by id. */
   const refreshMonitoringRequests = useCallback(async () => {
     const { data: { session } } = await supabase.auth.getSession();
     const userId = session?.user?.id || getUserId();
     if (!userId) return;
 
+    const mergeById = (a: any[]) => {
+      const m = new Map<string, any>();
+      for (const r of a) {
+        if (r?.id) m.set(String(r.id), r);
+      }
+      return [...m.values()].sort(
+        (x, y) =>
+          new Date(y.created_at || 0).getTime() -
+          new Date(x.created_at || 0).getTime()
+      );
+    };
+
     const { data, error } = await supabase
       .from("monitoring_service_requests")
       .select("*")
-      .eq("user_id", userId)
+      .or(`user_id.eq.${userId},requester_id.eq.${userId}`)
       .order("created_at", { ascending: false });
 
     let rows: any[] = Array.isArray(data) ? data : [];
 
-    if (!error && rows.length === 0) {
-      const { data: legacy, error: legacyErr } = await supabase
-        .from("monitoring_service_requests")
-        .select("*")
-        .eq("requester_id", userId)
-        .order("created_at", { ascending: false });
-      if (!legacyErr && Array.isArray(legacy) && legacy.length > 0) {
-        rows = legacy;
-      } else if (legacyErr && !String(legacyErr.message || "").includes("requester_id")) {
-        console.warn("📹 Monitoring legacy load:", legacyErr.message);
+    if (error) {
+      console.warn("📹 Monitoring combined load error:", error.message);
+      const [byUser, byReq] = await Promise.all([
+        supabase
+          .from("monitoring_service_requests")
+          .select("*")
+          .eq("user_id", userId)
+          .order("created_at", { ascending: false }),
+        supabase
+          .from("monitoring_service_requests")
+          .select("*")
+          .eq("requester_id", userId)
+          .order("created_at", { ascending: false }),
+      ]);
+      rows = mergeById([
+        ...(Array.isArray(byUser.data) ? byUser.data : []),
+        ...(Array.isArray(byReq.data) ? byReq.data : []),
+      ]);
+      if (byUser.error) console.warn("📹 Monitoring user_id load:", byUser.error.message);
+      if (byReq.error && !String(byReq.error.message || "").includes("requester_id")) {
+        console.warn("📹 Monitoring requester_id load:", byReq.error.message);
       }
-    }
-
-    if (error && rows.length === 0) {
-      console.warn("📹 Monitoring load error:", error.message);
-      return;
+    } else {
+      rows = mergeById(rows);
     }
 
     setMonitoringRequests(rows);
@@ -688,8 +708,9 @@ const ProfessionalBuilderDashboardPage = () => {
   }, [activeTab, refreshMonitoringRequests]);
 
   useEffect(() => {
-    const userId = getUserId();
+    const userId = authUser?.id || getUserId();
     if (!userId) return;
+
     const channel = supabase
       .channel(`builder-monitoring-${userId}`)
       .on(
@@ -704,11 +725,33 @@ const ProfessionalBuilderDashboardPage = () => {
           void refreshMonitoringRequests();
         }
       )
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "monitoring_service_requests",
+          filter: `requester_id=eq.${userId}`,
+        },
+        () => {
+          void refreshMonitoringRequests();
+        }
+      )
       .subscribe();
+
     return () => {
       void supabase.removeChannel(channel);
     };
   }, [authUser?.id, refreshMonitoringRequests]);
+
+  /** Polling backup: realtime can miss updates; keep Monitor tab aligned with admin. */
+  useEffect(() => {
+    if (activeTab !== "monitoring") return;
+    const t = window.setInterval(() => {
+      void refreshMonitoringRequests();
+    }, 20000);
+    return () => clearInterval(t);
+  }, [activeTab, refreshMonitoringRequests]);
 
   useEffect(() => {
     const refreshIfMonitoringTab = () => {
