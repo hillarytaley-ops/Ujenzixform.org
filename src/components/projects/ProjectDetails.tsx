@@ -329,7 +329,7 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
         const unlink3 = linkChildToLoad(controller3);
         const timeout3 = setTimeout(() => controller3.abort(), 12000);
         const monitoringResponse = await fetch(
-          `${SUPABASE_URL}/rest/v1/monitoring_service_requests?user_id=eq.${userId}&order=created_at.desc`,
+          `${SUPABASE_URL}/rest/v1/monitoring_service_requests?order=created_at.desc`,
           {
             headers: {
               'apikey': SUPABASE_ANON_KEY,

@@ -589,50 +589,24 @@ const ProfessionalBuilderDashboardPage = () => {
     return '';
   };
 
-  /** Load monitoring rows for the signed-in builder. Always filter by user_id; merge requester_id only if column exists. */
+  /** Load monitoring rows visible to the signed-in user via RLS (user_id and/or requester_id). Do not .eq(user_id) here — that hid legacy rows where requester_id was set but user_id was null. */
   const refreshMonitoringRequests = useCallback(async () => {
     const { data: { session } } = await supabase.auth.getSession();
     const userId = session?.user?.id || getUserId();
     if (!userId) return;
 
-    const mergeById = (a: any[]) => {
-      const m = new Map<string, any>();
-      for (const r of a) {
-        if (r?.id) m.set(String(r.id), r);
-      }
-      return [...m.values()].sort(
-        (x, y) =>
-          new Date(y.created_at || 0).getTime() -
-          new Date(x.created_at || 0).getTime()
-      );
-    };
-
-    const byUser = await supabase
+    const { data, error } = await supabase
       .from("monitoring_service_requests")
       .select("*")
-      .eq("user_id", userId)
       .order("created_at", { ascending: false });
 
-    let rows: any[] = mergeById(Array.isArray(byUser.data) ? byUser.data : []);
-    if (byUser.error) {
-      console.warn("📹 Monitoring user_id load:", byUser.error.message);
+    if (error) {
+      console.warn("📹 Monitoring load:", error.message);
+      setMonitoringRequests([]);
+      return;
     }
 
-    const byReq = await supabase
-      .from("monitoring_service_requests")
-      .select("*")
-      .eq("requester_id", userId)
-      .order("created_at", { ascending: false });
-
-    if (!byReq.error && Array.isArray(byReq.data) && byReq.data.length > 0) {
-      rows = mergeById([...rows, ...byReq.data]);
-    } else if (
-      byReq.error &&
-      !/requester_id|42703|does not exist/i.test(String(byReq.error.message || byReq.error.code || ""))
-    ) {
-      console.warn("📹 Monitoring requester_id load:", byReq.error.message);
-    }
-
+    const rows = Array.isArray(data) ? data : [];
     setMonitoringRequests(rows);
     console.log("📹 Monitoring requests loaded:", rows.length);
   }, [authUser?.id]);
@@ -711,7 +685,6 @@ const ProfessionalBuilderDashboardPage = () => {
           event: "*",
           schema: "public",
           table: "monitoring_service_requests",
-          filter: `user_id=eq.${userId}`,
         },
         () => {
           void refreshMonitoringRequests();

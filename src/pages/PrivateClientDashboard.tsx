@@ -262,7 +262,7 @@ const PrivateClientDashboard = () => {
       // Fetch monitoring requests
       try {
         const response = await fetch(
-          `${SUPABASE_URL}/rest/v1/monitoring_service_requests?user_id=eq.${userId}&order=created_at.desc`,
+          `${SUPABASE_URL}/rest/v1/monitoring_service_requests?order=created_at.desc`,
           {
             headers: {
               'apikey': ANON_KEY,
@@ -542,7 +542,7 @@ const PrivateClientDashboard = () => {
         console.log('📹 Fetching monitoring requests for user:', user.id);
         
         const response = await fetch(
-          `https://wuuyjjpgzgeimiptuuws.supabase.co/rest/v1/monitoring_service_requests?user_id=eq.${user.id}&order=created_at.desc`,
+          `https://wuuyjjpgzgeimiptuuws.supabase.co/rest/v1/monitoring_service_requests?order=created_at.desc`,
           {
             headers: {
               'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo',
@@ -564,7 +564,6 @@ const PrivateClientDashboard = () => {
           const { data: monitoringData, error: monitoringError } = await supabase
             .from('monitoring_service_requests')
             .select('*')
-            .eq('user_id', user.id)
             .order('created_at', { ascending: false });
           
           if (monitoringError) {
@@ -633,7 +632,6 @@ const PrivateClientDashboard = () => {
       const { data: newData } = await supabase
         .from('monitoring_service_requests')
         .select('*')
-        .eq('user_id', user.id)
         .order('created_at', { ascending: false });
       
       if (newData) setMonitoringRequests(newData);
@@ -1731,7 +1729,6 @@ const PrivateClientDashboard = () => {
                                     const { data } = await supabase
                                       .from('monitoring_service_requests')
                                       .select('*')
-                                      .eq('user_id', user?.id)
                                       .order('created_at', { ascending: false });
                                     if (data) setMonitoringRequests(data);
                                   } catch (error) {
@@ -1765,7 +1762,6 @@ const PrivateClientDashboard = () => {
                                     const { data } = await supabase
                                       .from('monitoring_service_requests')
                                       .select('*')
-                                      .eq('user_id', user?.id)
                                       .order('created_at', { ascending: false });
                                     if (data) setMonitoringRequests(data);
                                   } catch (error) {
