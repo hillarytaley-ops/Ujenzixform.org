@@ -134,12 +134,12 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
   const navigate = useNavigate();
 
   /**
-   * Sequence: ignore stale setState from an older fetch after a newer one started.
-   * Pending: always clear loading when the last in-flight fetch finishes (avoids stuck spinner if an
-   * older run's `finally` skipped clearing because gen !== ref).
+   * Monotonic load generation: stale runs must not apply setState.
+   * Master AbortController: starting a new load aborts the previous one (fixes stuck spinner when
+   * two loads overlapped and the first hung on supabase.from — pendingRefs could stay > 0 forever).
    */
   const loadSeqRef = useRef(0);
-  const pendingLoadsRef = useRef(0);
+  const loadAbortRef = useRef<AbortController | null>(null);
 
   const attributionKey = useMemo(
     () =>
@@ -158,7 +158,11 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
       return;
     }
 
-    pendingLoadsRef.current += 1;
+    loadAbortRef.current?.abort();
+    const loadAc = new AbortController();
+    loadAbortRef.current = loadAc;
+    const loadSig = loadAc.signal;
+
     loadSeqRef.current += 1;
     const seq = loadSeqRef.current;
     const isCurrent = () => seq === loadSeqRef.current;
@@ -166,8 +170,34 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
     if (showRefresh) setRefreshing(true);
     else setLoading(true);
 
+    const linkChildToLoad = (child: AbortController) => {
+      const onAbort = () => child.abort();
+      if (loadSig.aborted) {
+        child.abort();
+        return () => {};
+      }
+      loadSig.addEventListener('abort', onAbort);
+      return () => loadSig.removeEventListener('abort', onAbort);
+    };
+
+    let watchdog: ReturnType<typeof setTimeout> | null = setTimeout(() => {
+      if (seq !== loadSeqRef.current) return;
+      console.warn('📁 ProjectDetails: watchdog (24s) — aborting load and clearing spinner');
+      loadAc.abort();
+      setLoading(false);
+      setRefreshing(false);
+    }, 24000);
+
+    const clearWatchdog = () => {
+      if (watchdog != null) {
+        clearTimeout(watchdog);
+        watchdog = null;
+      }
+    };
+
     try {
       const accessToken = await getAccessTokenWithPersistenceFallback();
+      if (loadSig.aborted) return;
       const bearer = accessToken || SUPABASE_ANON_KEY;
 
       const buyerIds = await fetchPurchaseBuyerIdsForBuilder(
@@ -176,14 +206,14 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
         profileIdForOrders ? [profileIdForOrders] : null
       );
 
-      if (!isCurrent()) return;
+      if (!isCurrent() || loadSig.aborted) return;
 
-      // Prefer direct REST first — Supabase client uses a 15s global fetch wrapper; the old 5s "safety"
-      // timeout cleared loading before PO rows returned, leaving an empty Orders tab.
+      // REST only for POs — supabase-js global fetch can hang and overlapped loads broke pendingRef logic.
       let orderRows: Order[] = [];
       try {
         if (buyerIds.length > 0) {
           const controller1 = new AbortController();
+          const unlink1 = linkChildToLoad(controller1);
           const timeout1 = setTimeout(() => controller1.abort(), 14000);
           try {
             const ordersResponse = await fetch(
@@ -204,25 +234,11 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
             }
           } finally {
             clearTimeout(timeout1);
+            unlink1();
           }
         }
 
-        if (!isCurrent()) return;
-
-        if (orderRows.length === 0 && buyerIds.length > 0) {
-          const { data: clientOrders, error: clientPoErr } = await supabase
-            .from('purchase_orders')
-            .select('*')
-            .in('buyer_id', buyerIds)
-            .order('created_at', { ascending: false });
-          if (!clientPoErr && Array.isArray(clientOrders) && clientOrders.length > 0) {
-            orderRows = clientOrders as Order[];
-          } else if (clientPoErr) {
-            console.warn('📁 ProjectDetails: purchase_orders client:', clientPoErr.message);
-          }
-        }
-
-        if (!isCurrent()) return;
+        if (!isCurrent() || loadSig.aborted) return;
 
         let matched = orderRows.filter((o) => {
           return resolvePurchaseOrderToProjectId(o, attributionProjects) === project.id;
@@ -230,6 +246,7 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
 
         if (matched.length === 0) {
           const controllerPid = new AbortController();
+          const unlinkP = linkChildToLoad(controllerPid);
           const tPid = setTimeout(() => controllerPid.abort(), 12000);
           try {
             const pidRes = await fetch(
@@ -250,6 +267,7 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
             }
           } finally {
             clearTimeout(tPid);
+            unlinkP();
           }
         }
 
@@ -272,11 +290,14 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
           console.warn('📁 Failed to fetch orders:', e);
         }
       }
-      
+
+      if (!isCurrent() || loadSig.aborted) return;
+
       // Fetch deliveries for this project with timeout
       try {
         const controller2 = new AbortController();
-        const timeout2 = setTimeout(() => controller2.abort(), 3000);
+        const unlink2 = linkChildToLoad(controller2);
+        const timeout2 = setTimeout(() => controller2.abort(), 8000);
         const deliveriesResponse = await fetch(
           `${SUPABASE_URL}/rest/v1/delivery_requests?project_id=eq.${project.id}&order=created_at.desc`,
           {
@@ -288,6 +309,7 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
           }
         );
         clearTimeout(timeout2);
+        unlink2();
         
         if (deliveriesResponse.ok) {
           const deliveriesData = await deliveriesResponse.json();
@@ -298,10 +320,13 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
           console.warn('📁 Failed to fetch deliveries:', e);
         }
       }
+
+      if (!isCurrent() || loadSig.aborted) return;
       
       // Monitoring: often no project_id on row; match user + project name like dashboard
       try {
         const controller3 = new AbortController();
+        const unlink3 = linkChildToLoad(controller3);
         const timeout3 = setTimeout(() => controller3.abort(), 12000);
         const monitoringResponse = await fetch(
           `${SUPABASE_URL}/rest/v1/monitoring_service_requests?user_id=eq.${userId}&order=created_at.desc`,
@@ -314,6 +339,7 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
           }
         );
         clearTimeout(timeout3);
+        unlink3();
         
         if (monitoringResponse.ok) {
           const monitoringData = await monitoringResponse.json();
@@ -343,9 +369,8 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
         });
       }
     } finally {
-      pendingLoadsRef.current -= 1;
-      if (pendingLoadsRef.current <= 0) {
-        pendingLoadsRef.current = 0;
+      clearWatchdog();
+      if (seq === loadSeqRef.current) {
         setLoading(false);
         setRefreshing(false);
         console.log('📁 ProjectDetails: Loading complete, component should be visible');
@@ -378,7 +403,7 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
       debounceTimer = setTimeout(() => {
         debounceTimer = null;
         void fetchProjectDataRef.current(true);
-      }, 450);
+      }, 900);
     };
 
     let channel = supabase
