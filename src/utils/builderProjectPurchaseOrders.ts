@@ -95,6 +95,37 @@ function resolveOrphanByUniqueProjectPrefix(
 }
 
 /**
+ * Quote / cart rows often set project_name to "Moi's Bridge - Quote from …" while
+ * builder_projects.name is "Moi's Bridge Project". `on.includes(fullProjectName)` fails;
+ * but normalized project name may start with the quote's leading segment.
+ */
+function resolveWhenOrderHeadIsPrefixOfProjectName(
+  o: PoProjectRow,
+  projects: { id: string; name?: string | null }[]
+): string | null {
+  const raw = (o.project_name ?? "").trim();
+  if (!raw || projects.length === 0) return null;
+
+  const withAsciiDash = raw.replace(/[–—]/g, "-");
+  const head =
+    withAsciiDash.split(/\s+-\s+/)[0]?.trim() ||
+    raw.split(/\s+—\s+/)[0]?.trim() ||
+    raw.split(" — ")[0]?.trim() ||
+    "";
+  if (!head) return null;
+
+  const h = normalizeProjectName(head);
+  if (h.length < 6) return null;
+
+  const matches = projects.filter((p) => {
+    const pn = normalizeProjectName(p.name);
+    if (!pn) return false;
+    return pn.startsWith(h) || h === pn;
+  });
+  return matches.length === 1 ? matches[0].id : null;
+}
+
+/**
  * Checkout sets delivery_address to "Project Name - Location (optional addr)" (see CartSidebar).
  * 1) First segment vs project name (exact). 2) "Name - Location" vs project name + location.
  */
@@ -152,6 +183,7 @@ export function resolvePurchaseOrderToProjectId(
 
   let pid = resolveProjectIdForOrderRow(o, projects, nameToIds);
   if (!pid) pid = resolveProjectFromDeliveryAddress(o, projects);
+  if (!pid) pid = resolveWhenOrderHeadIsPrefixOfProjectName(o, projects);
   if (!pid) pid = resolveOrphanOrderByProjectNameSubstring(o, projects);
   if (!pid) pid = resolveOrphanByUniqueProjectPrefix(o, projects);
   if (!pid && projects.length === 1) pid = projects[0].id;
@@ -216,6 +248,15 @@ export function purchaseOrderBelongsToProject(
   if (on.startsWith(pn + " -") || on.startsWith(pn + " —")) return true;
   // e.g. "Moi's Bridge — Quote: nails" when project name is "Moi's Bridge"
   if (pn.length >= 3 && on.includes(pn)) return true;
+  // Quote title "Moi's Bridge - …" vs saved name "Moi's Bridge Project"
+  const head =
+    (o.project_name ?? "")
+      .trim()
+      .replace(/[–—]/g, "-")
+      .split(/\s+-\s+/)[0]
+      ?.trim() || "";
+  const h = normalizeProjectName(head);
+  if (h.length >= 6 && pn.startsWith(h)) return true;
   return false;
 }
 

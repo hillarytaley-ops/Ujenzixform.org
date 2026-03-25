@@ -510,7 +510,10 @@ const ProfessionalBuilderDashboardPage = () => {
 
   // Helper to get user ID reliably (from AuthContext or localStorage)
   // Function to fetch supplier response count (quotes that suppliers have responded to)
-  const fetchSupplierResponseCount = async (builderId: string) => {
+  const fetchSupplierResponseCount = async (
+    builderId: string,
+    profileBuyerId?: string | null
+  ) => {
     if (!builderId) {
       setSupplierResponseCount(0);
       return;
@@ -541,15 +544,25 @@ const ProfessionalBuilderDashboardPage = () => {
       const statusFilter = ['quote_responded', 'quote_revised', 'quote_viewed_by_builder', 'quoted'];
       const statusParam = statusFilter.join(','); // PostgREST in() expects unquoted values
       
-      // Try buyer_id first
+      const buyerIds = new Set<string>([builderId]);
+      if (profileBuyerId && profileBuyerId !== builderId) {
+        buyerIds.add(profileBuyerId);
+      }
+      const buyerIn = [...buyerIds].join(',');
+
       const response = await fetch(
-        `${SUPABASE_URL}/rest/v1/purchase_orders?buyer_id=eq.${builderId}&status=in.(${statusParam})&supplier_id=not.is.null&select=id&limit=1000`,
+        `${SUPABASE_URL}/rest/v1/purchase_orders?buyer_id=in.(${buyerIn})&status=in.(${statusParam})&supplier_id=not.is.null&select=id&limit=1000`,
         { headers, cache: 'no-store' }
       );
 
       if (response.ok) {
         const data = await response.json();
-        const count = Array.isArray(data) ? data.length : 0;
+        const seen = new Set<string>();
+        for (const row of Array.isArray(data) ? data : []) {
+          const id = (row as { id?: string })?.id;
+          if (id) seen.add(id);
+        }
+        const count = seen.size;
         setSupplierResponseCount(count);
         console.log('📊 Supplier response count:', count);
       } else {
@@ -1581,7 +1594,7 @@ const ProfessionalBuilderDashboardPage = () => {
       console.log('🛒 Order change detected:', payload);
       loadRealStats(userId);
       void fetchProjects();
-      fetchSupplierResponseCount(userId);
+      fetchSupplierResponseCount(userId, profileBuyerId);
       toast({
         title: "Order Updated",
         description: "Your order status has been updated.",
@@ -1641,7 +1654,7 @@ const ProfessionalBuilderDashboardPage = () => {
   useEffect(() => {
     const userId = getUserId();
     if (userId) {
-      fetchSupplierResponseCount(userId);
+      fetchSupplierResponseCount(userId, profile?.id);
       
       const profileBuyerId = profile?.id;
       let channel = supabase
@@ -1654,7 +1667,7 @@ const ProfessionalBuilderDashboardPage = () => {
             filter: `buyer_id=eq.${userId}`
           },
           () => {
-            fetchSupplierResponseCount(userId);
+            fetchSupplierResponseCount(userId, profileBuyerId);
           }
         );
 
@@ -1667,7 +1680,7 @@ const ProfessionalBuilderDashboardPage = () => {
             filter: `buyer_id=eq.${profileBuyerId}`
           },
           () => {
-            fetchSupplierResponseCount(userId);
+            fetchSupplierResponseCount(userId, profileBuyerId);
           }
         );
       }
