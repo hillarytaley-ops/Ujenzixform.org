@@ -142,6 +142,51 @@ function aggregatePurchaseStatsByProject(
   return map;
 }
 
+/** Server-side per-project PO stats (works when direct purchase_orders SELECT is blocked). */
+async function fetchBuilderProjectPurchaseStatsRpc(): Promise<
+  Map<string, { orderCount: number; orderValueSum: number }>
+> {
+  const map = new Map<string, { orderCount: number; orderValueSum: number }>();
+  try {
+    const { data, error } = await supabase.rpc("builder_project_purchase_stats");
+    if (error) {
+      console.warn("📁 builder_project_purchase_stats RPC:", error.message);
+      return map;
+    }
+    for (const row of data ?? []) {
+      const r = row as {
+        project_id?: string | null;
+        order_count?: number | string | null;
+        order_value_sum?: number | string | null;
+      };
+      const pid = r.project_id;
+      if (!pid) continue;
+      map.set(pid, {
+        orderCount: Number(r.order_count) || 0,
+        orderValueSum: Number(r.order_value_sum) || 0,
+      });
+    }
+  } catch (e) {
+    console.warn("📁 RPC stats error:", e);
+  }
+  return map;
+}
+
+function mergePurchaseStatsMaps(
+  a: Map<string, { orderCount: number; orderValueSum: number }>,
+  b: Map<string, { orderCount: number; orderValueSum: number }>
+): Map<string, { orderCount: number; orderValueSum: number }> {
+  const out = new Map(a);
+  for (const [pid, v] of b) {
+    const cur = out.get(pid) ?? { orderCount: 0, orderValueSum: 0 };
+    out.set(pid, {
+      orderCount: Math.max(cur.orderCount, v.orderCount),
+      orderValueSum: Math.max(cur.orderValueSum, v.orderValueSum),
+    });
+  }
+  return out;
+}
+
 function mergeProjectsWithPurchaseAggregates(
   projects: any[],
   stats: Map<string, { orderCount: number; orderValueSum: number }>,
@@ -250,12 +295,13 @@ async function mergeProjectRowsWithPurchaseOrders(
     }
   }
 
+  const statsFromRpc = await fetchBuilderProjectPurchaseStatsRpc();
+
   const buyerIds = await fetchPurchaseBuyerIdsForBuilder(
     userId,
     token,
     extraBuyerSeeds
   );
-  if (buyerIds.length === 0) return projectRows;
 
   const inList = buyerIds.join(",");
   const selectWithDelivery =
@@ -266,71 +312,73 @@ async function mergeProjectRowsWithPurchaseOrders(
   try {
     let list: PurchaseOrderProjectRow[] = [];
 
-    const { data: clientRows, error: clientErr } = await supabase
-      .from("purchase_orders")
-      .select(selectWithDelivery)
-      .in("buyer_id", buyerIds);
-    if (!clientErr && Array.isArray(clientRows) && clientRows.length > 0) {
-      list = clientRows as PurchaseOrderProjectRow[];
-      console.log(
-        "📁 PO merge: Supabase client",
-        list.length,
-        "rows (buyer_id in",
-        buyerIds.length,
-        "ids)"
-      );
-    } else if (clientErr) {
-      console.warn("📁 PO merge: Supabase client error:", clientErr.message);
-    }
+    if (buyerIds.length > 0) {
+      const { data: clientRows, error: clientErr } = await supabase
+        .from("purchase_orders")
+        .select(selectWithDelivery)
+        .in("buyer_id", buyerIds);
+      if (!clientErr && Array.isArray(clientRows) && clientRows.length > 0) {
+        list = clientRows as PurchaseOrderProjectRow[];
+        console.log(
+          "📁 PO merge: Supabase client",
+          list.length,
+          "rows (buyer_id in",
+          buyerIds.length,
+          "ids)"
+        );
+      } else if (clientErr) {
+        console.warn("📁 PO merge: Supabase client error:", clientErr.message);
+      }
 
-    if (list.length === 0) {
-      let ordersRes = await fetch(
-        `${SUPABASE_URL}/rest/v1/purchase_orders?buyer_id=in.(${inList})&select=${selectWithDelivery}`,
-        {
-          headers: {
-            apikey: SUPABASE_ANON_KEY,
-            Authorization: `Bearer ${token || SUPABASE_ANON_KEY}`,
-            Accept: "application/json",
-          },
+      if (list.length === 0) {
+        let ordersRes = await fetch(
+          `${SUPABASE_URL}/rest/v1/purchase_orders?buyer_id=in.(${inList})&select=${selectWithDelivery}`,
+          {
+            headers: {
+              apikey: SUPABASE_ANON_KEY,
+              Authorization: `Bearer ${token || SUPABASE_ANON_KEY}`,
+              Accept: "application/json",
+            },
+          }
+        );
+        if (!ordersRes.ok && ordersRes.status === 400) {
+          ordersRes = await fetch(
+            `${SUPABASE_URL}/rest/v1/purchase_orders?buyer_id=in.(${inList})&select=${selectNoDelivery}`,
+            {
+              headers: {
+                apikey: SUPABASE_ANON_KEY,
+                Authorization: `Bearer ${token || SUPABASE_ANON_KEY}`,
+                Accept: "application/json",
+              },
+            }
+          );
         }
-      );
-      if (!ordersRes.ok && ordersRes.status === 400) {
-        ordersRes = await fetch(
-          `${SUPABASE_URL}/rest/v1/purchase_orders?buyer_id=in.(${inList})&select=${selectNoDelivery}`,
-          {
-            headers: {
-              apikey: SUPABASE_ANON_KEY,
-              Authorization: `Bearer ${token || SUPABASE_ANON_KEY}`,
-              Accept: "application/json",
-            },
-          }
-        );
+        if (!ordersRes.ok && ordersRes.status === 400) {
+          ordersRes = await fetch(
+            `${SUPABASE_URL}/rest/v1/purchase_orders?buyer_id=in.(${inList})&select=${selectFallback}`,
+            {
+              headers: {
+                apikey: SUPABASE_ANON_KEY,
+                Authorization: `Bearer ${token || SUPABASE_ANON_KEY}`,
+                Accept: "application/json",
+              },
+            }
+          );
+        }
+        if (ordersRes.ok) {
+          const orderRows = (await ordersRes.json()) as PurchaseOrderProjectRow[];
+          list = Array.isArray(orderRows) ? orderRows : [];
+          console.log(
+            "📁 PO merge: REST loaded",
+            list.length,
+            "rows for buyer_id in",
+            buyerIds.length,
+            "ids"
+          );
+        } else {
+          console.warn("📁 purchase_orders merge HTTP:", ordersRes.status);
+        }
       }
-      if (!ordersRes.ok && ordersRes.status === 400) {
-        ordersRes = await fetch(
-          `${SUPABASE_URL}/rest/v1/purchase_orders?buyer_id=in.(${inList})&select=${selectFallback}`,
-          {
-            headers: {
-              apikey: SUPABASE_ANON_KEY,
-              Authorization: `Bearer ${token || SUPABASE_ANON_KEY}`,
-              Accept: "application/json",
-            },
-          }
-        );
-      }
-      if (!ordersRes.ok) {
-        console.warn("📁 purchase_orders merge HTTP:", ordersRes.status);
-        return projectRows;
-      }
-      const orderRows = (await ordersRes.json()) as PurchaseOrderProjectRow[];
-      list = Array.isArray(orderRows) ? orderRows : [];
-      console.log(
-        "📁 PO merge: REST loaded",
-        list.length,
-        "rows for buyer_id in",
-        buyerIds.length,
-        "ids"
-      );
     }
 
     const projectMeta = projectRows.map((p) => ({
@@ -338,7 +386,8 @@ async function mergeProjectRowsWithPurchaseOrders(
       name: p.name,
       location: p.location,
     }));
-    const stats = aggregatePurchaseStatsByProject(list, projectMeta);
+    const statsFromRows = aggregatePurchaseStatsByProject(list, projectMeta);
+    const stats = mergePurchaseStatsMaps(statsFromRows, statsFromRpc);
     const merged = mergeProjectsWithPurchaseAggregates(
       projectRows,
       stats,

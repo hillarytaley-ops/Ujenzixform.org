@@ -4460,6 +4460,14 @@ export type Database = {
         Args: { application_id: string; approval_notes?: string }
         Returns: Json
       }
+      builder_project_purchase_stats: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          project_id: string
+          order_count: number
+          order_value_sum: number
+        }[]
+      }
       audit_supplier_select_attempts: {
         Args: Record<PropertyKey, never>
         Returns: undefined
