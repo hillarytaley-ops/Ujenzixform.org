@@ -43,6 +43,7 @@ import {
   PanelLeft
 } from "lucide-react";
 import { supabase } from '@/integrations/supabase/client';
+import { fetchMyMonitoringServiceRequests } from '@/utils/myMonitoringServiceRequests';
 import { useToast } from '@/hooks/use-toast';
 import { DeliveryRouteTracker } from '@/components/delivery/DeliveryRouteTracker';
 import { CameraAccessRequest } from '@/components/builders/CameraAccessRequest';
@@ -552,23 +553,26 @@ const Monitoring = () => {
       if (isBuilderRole) {
         console.log('🔐 Monitoring - Checking monitoring requests for builder:', authUser.id);
         
-        // Use limit(1) instead of maybeSingle() to handle multiple approved requests
-        const { data: monitoringData, error: monitoringError } = await supabase
-          .from('monitoring_service_requests')
-          .select('*')
-          .in('status', ['approved', 'active', 'completed', 'in_progress'])
-          .order('created_at', { ascending: false })
-          .limit(1);
+        const { rows: allMonitoring } = await fetchMyMonitoringServiceRequests(supabase);
+        const approved = allMonitoring
+          .filter((r: { status?: string }) =>
+            ['approved', 'active', 'completed', 'in_progress'].includes(String(r.status || ''))
+          )
+          .sort(
+            (a: { created_at?: string }, b: { created_at?: string }) =>
+              new Date(String(b.created_at || 0)).getTime() -
+              new Date(String(a.created_at || 0)).getTime()
+          );
+        const monitoringData = approved.slice(0, 1);
         
-        console.log('🔐 Monitoring - Found requests:', monitoringData?.length || 0, 'error:', monitoringError?.message);
+        console.log('🔐 Monitoring - Approved among my requests:', monitoringData.length);
         
-        if (monitoringData && monitoringData.length > 0 && !monitoringError) {
+        if (monitoringData.length > 0) {
           console.log('✅ Monitoring - Builder has approved access!');
           setHasMonitoringAccess(true);
           setMonitoringRequest(monitoringData[0]);
         } else {
           console.log('⚠️ Monitoring - Builder has no approved monitoring requests');
-          // Builders without approved monitoring access can still request it
           setHasMonitoringAccess(false);
         }
       } else if (dbRole === 'admin') {

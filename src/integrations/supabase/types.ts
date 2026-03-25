@@ -5066,6 +5066,10 @@ export type Database = {
           security_message: string
         }[]
       }
+      get_my_monitoring_service_requests: {
+        Args: Record<PropertyKey, never>
+        Returns: Record<string, unknown>[]
+      }
       get_my_provider_profile: {
         Args: Record<PropertyKey, never>
         Returns: {

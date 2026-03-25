@@ -38,6 +38,7 @@ import {
   resolvePurchaseOrderToProjectId,
 } from '@/utils/builderProjectPurchaseOrders';
 import { getAccessTokenWithPersistenceFallback } from '@/utils/supabaseAccessToken';
+import { fetchMyMonitoringServiceRequests } from '@/utils/myMonitoringServiceRequests';
 
 interface Project {
   id: string;
@@ -323,34 +324,15 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
 
       if (!isCurrent() || loadSig.aborted) return;
       
-      // Monitoring: often no project_id on row; match user + project name like dashboard
+      // Monitoring: RPC bypasses RLS drift; match project name / id like dashboard
       try {
-        const controller3 = new AbortController();
-        const unlink3 = linkChildToLoad(controller3);
-        const timeout3 = setTimeout(() => controller3.abort(), 12000);
-        const monitoringResponse = await fetch(
-          `${SUPABASE_URL}/rest/v1/monitoring_service_requests?order=created_at.desc`,
-          {
-            headers: {
-              'apikey': SUPABASE_ANON_KEY,
-              'Authorization': `Bearer ${bearer}`,
-            },
-            signal: controller3.signal
-          }
-        );
-        clearTimeout(timeout3);
-        unlink3();
-        
-        if (monitoringResponse.ok) {
-          const monitoringData = await monitoringResponse.json();
-          const mrows = Array.isArray(monitoringData) ? monitoringData : [];
-          if (isCurrent()) {
-            setMonitoringRequests(
-              mrows.filter((m: { project_id?: string | null; project_name?: string | null }) => {
-                return resolvePurchaseOrderToProjectId(m, attributionProjects) === project.id;
-              })
-            );
-          }
+        const { rows: mrows } = await fetchMyMonitoringServiceRequests(supabase);
+        if (isCurrent()) {
+          setMonitoringRequests(
+            mrows.filter((m: { project_id?: string | null; project_name?: string | null }) => {
+              return resolvePurchaseOrderToProjectId(m, attributionProjects) === project.id;
+            })
+          );
         }
       } catch (e: any) {
         if (e.name !== 'AbortError') {

@@ -92,6 +92,7 @@ import { DeliveryNoteWorkflow } from "@/components/delivery/DeliveryNoteWorkflow
 import { GRNView } from "@/components/delivery/GRNView";
 import { InvoiceManagement } from "@/components/invoices/InvoiceManagement";
 import { MissingDeliveryAddressAlert } from "@/components/builders/MissingDeliveryAddressAlert";
+import { fetchMyMonitoringServiceRequests } from "@/utils/myMonitoringServiceRequests";
 
 type PurchaseOrderProjectRow = {
   project_id?: string | null;
@@ -589,26 +590,27 @@ const ProfessionalBuilderDashboardPage = () => {
     return '';
   };
 
-  /** Load monitoring rows visible to the signed-in user via RLS (user_id and/or requester_id). Do not .eq(user_id) here — that hid legacy rows where requester_id was set but user_id was null. */
+  /**
+   * Load monitoring rows. Prefer SECURITY DEFINER RPC so we still get rows when RLS/policy drift
+   * hides them (e.g. user_id stored as profiles.id, or legacy requester_id/email-only linkage).
+   */
   const refreshMonitoringRequests = useCallback(async () => {
     const { data: { session } } = await supabase.auth.getSession();
     const userId = session?.user?.id || getUserId();
     if (!userId) return;
 
-    const { data, error } = await supabase
-      .from("monitoring_service_requests")
-      .select("*")
-      .order("created_at", { ascending: false });
-
-    if (error) {
-      console.warn("📹 Monitoring load:", error.message);
-      setMonitoringRequests([]);
-      return;
-    }
-
-    const rows = Array.isArray(data) ? data : [];
+    const { rows: raw, usedRpc } = await fetchMyMonitoringServiceRequests(supabase);
+    const rows = [...raw].sort(
+      (a: any, b: any) =>
+        new Date(String(b.created_at || 0)).getTime() -
+        new Date(String(a.created_at || 0)).getTime()
+    );
     setMonitoringRequests(rows);
-    console.log("📹 Monitoring requests loaded:", rows.length);
+    console.log(
+      "📹 Monitoring requests loaded:",
+      rows.length,
+      usedRpc ? "(rpc)" : "(table)"
+    );
   }, [authUser?.id]);
 
   // Set user from AuthContext when available

@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useNavigate, Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
+import { fetchMyMonitoringServiceRequests } from "@/utils/myMonitoringServiceRequests";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import Footer from "@/components/Footer";
@@ -259,28 +260,14 @@ const PrivateClientDashboard = () => {
         console.error('📦 DIRECT: Orders error:', e);
       }
       
-      // Fetch monitoring requests
+      // Fetch monitoring requests (RPC when deployed — survives RLS / legacy user_id issues)
       try {
-        const response = await fetch(
-          `${SUPABASE_URL}/rest/v1/monitoring_service_requests?order=created_at.desc`,
-          {
-            headers: {
-              'apikey': ANON_KEY,
-              'Authorization': `Bearer ${accessToken || ANON_KEY}`,
-            }
-          }
-        );
-        
-        if (response.ok) {
-          const data = await response.json();
-          console.log('📹 DIRECT: Got', data?.length || 0, 'monitoring requests');
-          if (data && data.length > 0) {
-            console.log('📹 DIRECT: First request:', data[0].project_name, data[0].status);
-          }
-          setMonitoringRequests(data || []);
-        } else {
-          console.log('📹 DIRECT: Response status:', response.status);
+        const { rows: data } = await fetchMyMonitoringServiceRequests(supabase);
+        console.log('📹 DIRECT: Got', data?.length || 0, 'monitoring requests');
+        if (data && data.length > 0) {
+          console.log('📹 DIRECT: First request:', (data[0] as any).project_name, (data[0] as any).status);
         }
+        setMonitoringRequests(data || []);
       } catch (e) {
         console.error('📹 DIRECT: Error:', e);
       }
@@ -534,44 +521,19 @@ const PrivateClientDashboard = () => {
         }
       }
 
-      // Fetch monitoring requests using REST API for reliability
       try {
-        const { data: { session } } = await supabase.auth.getSession();
-        const accessToken = session?.access_token || '';
-        
         console.log('📹 Fetching monitoring requests for user:', user.id);
-        
-        const response = await fetch(
-          `https://wuuyjjpgzgeimiptuuws.supabase.co/rest/v1/monitoring_service_requests?order=created_at.desc`,
-          {
-            headers: {
-              'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo',
-              'Authorization': `Bearer ${accessToken}`,
-            }
-          }
-        );
-        
-        if (response.ok) {
-          const data = await response.json();
-          console.log('📹 Monitoring requests loaded:', data?.length || 0, 'requests');
-          if (data && data.length > 0) {
-            console.log('📹 First request status:', data[0].status, 'access_code:', data[0].access_code);
-            setMonitoringRequests(data);
-          }
-        } else {
-          console.log('📹 Monitoring requests fetch failed:', response.status);
-          // Fallback to Supabase client
-          const { data: monitoringData, error: monitoringError } = await supabase
-            .from('monitoring_service_requests')
-            .select('*')
-            .order('created_at', { ascending: false });
-          
-          if (monitoringError) {
-            console.log('📹 Supabase fallback error:', monitoringError.message);
-          } else if (monitoringData) {
-            setMonitoringRequests(monitoringData);
-          }
+        const { rows: data } = await fetchMyMonitoringServiceRequests(supabase);
+        console.log('📹 Monitoring requests loaded:', data?.length || 0, 'requests');
+        if (data && data.length > 0) {
+          console.log(
+            '📹 First request status:',
+            (data[0] as any).status,
+            'access_code:',
+            (data[0] as any).access_code
+          );
         }
+        setMonitoringRequests(data || []);
       } catch (e) {
         console.error('📹 Error fetching monitoring requests:', e);
       }
@@ -629,12 +591,8 @@ const PrivateClientDashboard = () => {
       });
 
       // Refresh monitoring requests
-      const { data: newData } = await supabase
-        .from('monitoring_service_requests')
-        .select('*')
-        .order('created_at', { ascending: false });
-      
-      if (newData) setMonitoringRequests(newData);
+      const { rows: newData } = await fetchMyMonitoringServiceRequests(supabase);
+      setMonitoringRequests(newData || []);
 
     } catch (error: any) {
       console.error('Error submitting monitoring request:', error);
@@ -1726,11 +1684,8 @@ const PrivateClientDashboard = () => {
                                       description: "Your monitoring service is now active. You can access your cameras.",
                                     });
                                     // Refresh the list
-                                    const { data } = await supabase
-                                      .from('monitoring_service_requests')
-                                      .select('*')
-                                      .order('created_at', { ascending: false });
-                                    if (data) setMonitoringRequests(data);
+                                    const { rows } = await fetchMyMonitoringServiceRequests(supabase);
+                                    setMonitoringRequests(rows || []);
                                   } catch (error) {
                                     console.error('Error accepting quote:', error);
                                     toast({
@@ -1759,11 +1714,8 @@ const PrivateClientDashboard = () => {
                                       description: "You can request a new quote anytime.",
                                     });
                                     // Refresh the list
-                                    const { data } = await supabase
-                                      .from('monitoring_service_requests')
-                                      .select('*')
-                                      .order('created_at', { ascending: false });
-                                    if (data) setMonitoringRequests(data);
+                                    const { rows } = await fetchMyMonitoringServiceRequests(supabase);
+                                    setMonitoringRequests(rows || []);
                                   } catch (error) {
                                     console.error('Error rejecting quote:', error);
                                     toast({
