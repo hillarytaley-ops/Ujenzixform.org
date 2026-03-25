@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -132,6 +132,17 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
   const { toast } = useToast();
   const navigate = useNavigate();
 
+  /** Avoids setState from fetch A after fetch B started (e.g. attributionProjects ref changes when PO merge updates projects). */
+  const fetchGenerationRef = useRef(0);
+
+  const attributionKey = useMemo(
+    () =>
+      attributionProjects
+        .map((p) => `${p.id}|${p.name ?? ''}|${p.location ?? ''}`)
+        .join(';;'),
+    [attributionProjects]
+  );
+
   // Fetch project data with timeouts
   const fetchProjectData = async (showRefresh = false) => {
     if (showRefresh) setRefreshing(true);
@@ -143,14 +154,10 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
       setRefreshing(false);
       return;
     }
-    
-    // Safety timeout - always clear loading after 5 seconds
-    const safetyTimeout = setTimeout(() => {
-      console.log('📁 ProjectDetails: Safety timeout - clearing loading state');
-      setLoading(false);
-      setRefreshing(false);
-    }, 5000);
-    
+
+    const gen = ++fetchGenerationRef.current;
+    const stale = () => gen !== fetchGenerationRef.current;
+
     try {
       const accessToken = await getAccessTokenWithPersistenceFallback();
       const bearer = accessToken || SUPABASE_ANON_KEY;
@@ -161,10 +168,40 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
         profileIdForOrders ? [profileIdForOrders] : null
       );
 
-      // Orders: use Supabase client session first; REST used anon JWT when getSession() was empty → RLS returned 0 rows.
+      if (stale()) return;
+
+      // Prefer direct REST first — Supabase client uses a 15s global fetch wrapper; the old 5s "safety"
+      // timeout cleared loading before PO rows returned, leaving an empty Orders tab.
       let orderRows: Order[] = [];
       try {
         if (buyerIds.length > 0) {
+          const controller1 = new AbortController();
+          const timeout1 = setTimeout(() => controller1.abort(), 14000);
+          try {
+            const ordersResponse = await fetch(
+              `${SUPABASE_URL}/rest/v1/purchase_orders?buyer_id=in.(${buyerIds.join(',')})&select=*&order=created_at.desc`,
+              {
+                headers: {
+                  apikey: SUPABASE_ANON_KEY,
+                  Authorization: `Bearer ${bearer}`,
+                },
+                signal: controller1.signal,
+              }
+            );
+            if (ordersResponse.ok) {
+              const ordersData = await ordersResponse.json();
+              orderRows = Array.isArray(ordersData) ? (ordersData as Order[]) : [];
+            } else {
+              console.warn('📁 ProjectDetails: purchase_orders REST', ordersResponse.status);
+            }
+          } finally {
+            clearTimeout(timeout1);
+          }
+        }
+
+        if (stale()) return;
+
+        if (orderRows.length === 0 && buyerIds.length > 0) {
           const { data: clientOrders, error: clientPoErr } = await supabase
             .from('purchase_orders')
             .select('*')
@@ -177,43 +214,51 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
           }
         }
 
-        if (orderRows.length === 0 && buyerIds.length > 0) {
-          const controller1 = new AbortController();
-          const timeout1 = setTimeout(() => controller1.abort(), 12000);
-          const ordersResponse = await fetch(
-            `${SUPABASE_URL}/rest/v1/purchase_orders?buyer_id=in.(${buyerIds.join(',')})&select=*&order=created_at.desc`,
-            {
-              headers: {
-                apikey: SUPABASE_ANON_KEY,
-                Authorization: `Bearer ${bearer}`,
-              },
-              signal: controller1.signal,
-            }
-          );
-          clearTimeout(timeout1);
-          if (ordersResponse.ok) {
-            const ordersData = await ordersResponse.json();
-            orderRows = Array.isArray(ordersData) ? (ordersData as Order[]) : [];
-          }
-        }
+        if (stale()) return;
 
         let matched = orderRows.filter((o) => {
           return resolvePurchaseOrderToProjectId(o, attributionProjects) === project.id;
         });
 
-        // Rows linked by project_id in DB but missed by name/delivery heuristics
         if (matched.length === 0) {
-          const { data: byProjectId, error: pidErr } = await supabase
-            .from('purchase_orders')
-            .select('*')
-            .eq('project_id', project.id)
-            .order('created_at', { ascending: false });
-          if (!pidErr && Array.isArray(byProjectId) && byProjectId.length > 0) {
-            matched = byProjectId as Order[];
+          const controllerPid = new AbortController();
+          const tPid = setTimeout(() => controllerPid.abort(), 12000);
+          try {
+            const pidRes = await fetch(
+              `${SUPABASE_URL}/rest/v1/purchase_orders?project_id=eq.${project.id}&select=*&order=created_at.desc`,
+              {
+                headers: {
+                  apikey: SUPABASE_ANON_KEY,
+                  Authorization: `Bearer ${bearer}`,
+                },
+                signal: controllerPid.signal,
+              }
+            );
+            if (pidRes.ok) {
+              const pidData = await pidRes.json();
+              if (Array.isArray(pidData) && pidData.length > 0) {
+                matched = pidData as Order[];
+              }
+            }
+          } finally {
+            clearTimeout(tPid);
           }
         }
 
-        setOrders(matched);
+        if (!stale()) {
+          setOrders(matched);
+          console.log(
+            '📁 ProjectDetails: orders',
+            matched.length,
+            'matched for project',
+            project.id,
+            '(fetched',
+            orderRows.length,
+            'buyer POs; buyerIds',
+            buyerIds.length,
+            ')'
+          );
+        }
       } catch (e: any) {
         if (e.name !== 'AbortError') {
           console.warn('📁 Failed to fetch orders:', e);
@@ -238,7 +283,7 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
         
         if (deliveriesResponse.ok) {
           const deliveriesData = await deliveriesResponse.json();
-          setDeliveries(deliveriesData);
+          if (!stale()) setDeliveries(deliveriesData);
         }
       } catch (e: any) {
         if (e.name !== 'AbortError') {
@@ -265,11 +310,13 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
         if (monitoringResponse.ok) {
           const monitoringData = await monitoringResponse.json();
           const mrows = Array.isArray(monitoringData) ? monitoringData : [];
-          setMonitoringRequests(
-            mrows.filter((m: { project_id?: string | null; project_name?: string | null }) => {
-              return resolvePurchaseOrderToProjectId(m, attributionProjects) === project.id;
-            })
-          );
+          if (!stale()) {
+            setMonitoringRequests(
+              mrows.filter((m: { project_id?: string | null; project_name?: string | null }) => {
+                return resolvePurchaseOrderToProjectId(m, attributionProjects) === project.id;
+              })
+            );
+          }
         }
       } catch (e: any) {
         if (e.name !== 'AbortError') {
@@ -288,10 +335,11 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
         });
       }
     } finally {
-      clearTimeout(safetyTimeout);
-      setLoading(false);
-      setRefreshing(false);
-      console.log('📁 ProjectDetails: Loading complete, component should be visible');
+      if (gen === fetchGenerationRef.current) {
+        setLoading(false);
+        setRefreshing(false);
+        console.log('📁 ProjectDetails: Loading complete, component should be visible');
+      }
     }
   };
 
@@ -304,7 +352,7 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
     project.name,
     userId,
     profileIdForOrders,
-    attributionProjects,
+    attributionKey,
   ]);
 
   // Materials value: all active pipeline + fulfilled (excludes cancelled / draft)
