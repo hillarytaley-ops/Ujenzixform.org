@@ -1,10 +1,9 @@
 # Edge / laptop worker — Python 3.10–3.13 (3.11/3.12 recommended on Windows)
-# Pin supabase: newer releases can pull pyiceberg (needs MSVC on Windows).
+# supabase 2.3.4 requires httpx<0.26; gotrue 2.9+ needs httpx with proxy= → deadlock unless gotrue is pinned.
 python-dotenv>=1.0.0
 supabase==2.3.4
-# gotrue passes httpx.Client(proxy=...); httpx 0.25 only has proxies= → TypeError. Use 0.27.x (before 0.28 API break).
-httpx==0.27.2
-httpcore>=1.0.5,<1.1
+gotrue==2.4.2
+httpx>=0.24,<0.26
 # numpy 2.x wheels cover Python 3.13; numpy<2 on 3.13 often falls back to Meson source builds (fails without C tooling)
 opencv-python-headless>=4.10.0.84
 numpy>=2.1.0,<3.0.0

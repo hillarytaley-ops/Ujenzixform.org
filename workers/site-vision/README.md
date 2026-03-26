@@ -64,7 +64,7 @@ Keep the laptop **plugged in** and **not sleeping** if this runs 24/7.
 
 ## Troubleshooting
 
-- **`Client.__init__() got an unexpected keyword argument 'proxy'`:** your `httpx` is too old for the installed `gotrue`. Run `pip install --no-cache-dir "httpx==0.27.2"` (or reinstall from `requirements.txt`).
+- **`Client.__init__() got an unexpected keyword argument 'proxy'`:** pip installed a **new** `gotrue` (e.g. 2.9) while `supabase 2.3.4` keeps **`httpx<0.26`**. Reinstall from `requirements.txt` — we pin **`gotrue==2.4.2`** so it matches `httpx` 0.25.x.
 - **`Failed building wheel for pyiceberg` (Windows):** use the pinned `supabase==2.3.4` in `requirements.txt` (already set). Remove the old venv and reinstall: `Remove-Item -Recurse -Force .venv` then `python -m venv .venv` and `.\.venv\Scripts\pip.exe install --no-cache-dir -r requirements.txt`. Do not upgrade `supabase` blindly on Windows unless you install [Visual Studio Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/).
 - `Cannot open stream`: test the URL with VLC/FFplay; add credentials to the URL if required.
 - No rows in app: ensure you are logged into Supabase as **authenticated** on Analytics (localStorage-only admin may not pass RLS for `site_vision_events`).
