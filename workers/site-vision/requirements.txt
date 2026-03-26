@@ -1,8 +1,10 @@
 # Edge / laptop worker — install on Python 3.10+
+# Pin supabase: newer releases can pull pyiceberg etc., which needs MSVC C++ build tools on Windows.
 python-dotenv>=1.0.0
-supabase>=2.3.0
+supabase==2.3.4
+httpx>=0.24.0,<0.28.0
 opencv-python-headless>=4.8.0
-numpy>=1.24.0
+numpy>=1.24.0,<2.0.0
 
 # Optional: better detections (downloads ~6MB model on first run). Set USE_YOLO=1
 # ultralytics>=8.0.0
