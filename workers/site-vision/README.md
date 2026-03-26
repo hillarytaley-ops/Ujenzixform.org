@@ -4,6 +4,11 @@ Pulls **active** cameras from Supabase (`cameras` with `stream_url` set), sample
 
 The UjenziXform app reads that table on **Analytics → Site vision** (no service key in the browser).
 
+**Plain-language downloads (paragraph format, `.txt`):**
+
+- [`SITE_VISION_WORKER_LAYMANS_GUIDE.txt`](./SITE_VISION_WORKER_LAYMANS_GUIDE.txt) — what the worker does and how to run it.
+- [`CAMERAS_AND_SITE_SETUP_GUIDE.txt`](./CAMERAS_AND_SITE_SETUP_GUIDE.txt) — recommended cameras, how to connect streams, site PC setup, and what is still pending.
+
 ## Python version (Windows)
 
 Use **64-bit Python 3.11 or 3.12** from [python.org](https://www.python.org/downloads/) if you hit **numpy / Meson** build errors. **3.13** is OK with the pinned **numpy 2.x** wheels in `requirements.txt`.

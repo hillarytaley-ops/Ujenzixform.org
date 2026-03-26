@@ -1,0 +1,164 @@
+================================================================================
+CAMERAS, NETWORK, AND YOUR UJENZIXFORM SITE — PLAIN-LANGUAGE GUIDE
+================================================================================
+
+This document suggests the kind of cameras that work well with UjenziXform
+Monitoring and the site vision worker, explains in simple terms how to connect
+them and link them to your project database, and lists what is still pending
+or limited in the product today.
+
+You can save this file, open it in Notepad or Word, and export to PDF from
+Word or your printer dialog if you need a PDF copy.
+
+
+WHAT KIND OF CAMERAS TO RECOMMEND
+--------------------------------------------------------------------------------
+
+The app and the Python worker need a direct video stream address (usually
+RTSP, or sometimes an HLS link ending in .m3u8). They cannot use a normal
+“watch in browser only” gallery page like many GoPro cloud share links.
+
+For construction sites, the practical recommendation is IP security cameras or
+a small NVR (network video recorder) kit from brands that clearly document
+RTSP or ONVIF streaming. Examples of families people often use are Hikvision,
+Dahua, Reolink, Ubiquiti UniFi Protect, and similar professional or prosumer
+IP cameras. You do not have to pick one brand forever; what matters is that
+the device gives you a stream URL you can test in VLC.
+
+Look for cameras that support wired Ethernet or solid Wi‑Fi on site, outdoor
+rating if they sit outside, night vision if you need dusk and night coverage,
+and resolution that matches your budget (1080p is often enough for activity and
+motion alerts). PoE (power over Ethernet) is helpful on sites so you run one
+cable for power and data to each camera.
+
+Avoid relying only on consumer cloud-only cameras that never expose RTSP or
+only give a web page with no stream URL. If a salesperson cannot show you an
+RTSP or HLS URL for live video, assume the site vision worker will not work
+with that product without extra middleware you would have to build yourself.
+
+
+HOW CAMERAS CONNECT TO THE “LINK” (STREAM URL IN THE APP)
+--------------------------------------------------------------------------------
+
+In UjenziXform, each camera row in the database has a field called stream_url.
+That field must hold the same address you would paste into VLC under “Open
+Network Stream.” There is no magic conversion from a GoPro share page to that
+address; you obtain it from the camera or NVR manufacturer’s app, web interface,
+or manual.
+
+Typical steps on many systems are: install the camera on the local network,
+log into its web page or app, find a section named live view, streaming, RTSP,
+or network stream, and copy the example URL. It often looks like rtsp://
+followed by a username, password, IP address, port 554, and a path. Replace
+the example IP with your camera’s actual address on the LAN. If the password
+contains special characters, you may need to encode them for use inside a URL;
+your installer or the manual can help.
+
+Once you have a URL that plays in VLC, open your Supabase project, go to Table
+Editor, open the cameras table, and paste that URL into stream_url for the
+matching camera name or project. The Monitoring page in the app uses this same
+data so builders and admins can open the live view. The site vision worker on
+the PC reads the same table and pulls frames from the same URL for motion and
+optional AI events.
+
+If you add cameras through your admin Monitoring tools in the app, those
+screens should save stream_url in the same way; the important part is that the
+saved value is a real stream, not a marketing web link.
+
+
+HOW TO LINK CAMERAS TO THE PROJECT SITE PC
+--------------------------------------------------------------------------------
+
+The PC or mini computer that runs main.py should live on the same local network
+as the cameras whenever you use private addresses such as 192.168.x.x. That
+usually means the site office container, site Wi‑Fi, or a VLAN that reaches the
+NVR and cameras. Plug the PC into Ethernet if possible; Wi‑Fi on rough sites
+can drop and interrupt streams.
+
+Give the PC a fixed IP or DHCP reservation if you use firewall rules. Ensure
+nothing blocks outbound HTTPS to your Supabase project so the worker can write
+events. Inbound access from the public internet to the PC is not required for
+the worker; it only needs to reach Supabase and the cameras on the LAN.
+
+If you must run the worker in the cloud instead of on site, then your cameras
+cannot use private IPs only. You would need either public stream URLs (some
+cloud NVR products provide HLS links) or a VPN from the cloud server into the
+site network. That is more advanced; the default story for ten cameras is still
+“small PC on the same LAN as the cameras.”
+
+
+CLEAR STEPS IN ORDER (CHECKLIST STYLE IN WORDS)
+--------------------------------------------------------------------------------
+
+First, choose IP cameras or an NVR that exposes RTSP or HLS and install them on
+the construction site network according to the manufacturer instructions.
+
+Second, on a laptop on that same network, open VLC and test each stream URL until
+live video plays reliably.
+
+Third, in Supabase, create or edit rows in the cameras table: set name,
+location, project if you use it, stream_url to the VLC-tested URL, and
+is_active to true for cameras you want the worker and app to use.
+
+Fourth, on the site PC, install Python, the worker virtual environment, and
+dependencies as described in workers/site-vision/README.md. Create the .env
+file with your Supabase URL and service role key.
+
+Fifth, apply the database migration for site_vision_events if you have not
+already, so the worker has a table to insert events.
+
+Sixth, run python main.py (or the Windows path to python in .venv) and watch
+the console. If you see “cannot open stream,” return to VLC testing and fix
+stream_url until frames read successfully.
+
+Seventh, in the web app, open Monitoring to confirm live playback for users,
+and Analytics then Site vision to confirm events appear when the worker is
+running and streams work.
+
+
+WHAT IS STILL PENDING OR LIMITED (HONEST LIST)
+--------------------------------------------------------------------------------
+
+The site vision worker today uses motion between frames and optional YOLO for
+generic object classes. It does not yet include a custom-trained model for every
+construction material label or a certified PPE compliance product; those would
+be future work or a separate vendor integration.
+
+GoPro cloud gallery URLs are not supported as stream_url; users must supply true
+streams or different hardware.
+
+The Analytics vision tab depends on authenticated Supabase users for reading
+events; some admin-only browser sessions may not see rows until that access
+story is tightened in the product.
+
+Snapshots uploaded to storage for every alert are not fully wired in the
+current worker; image_ref exists in the database for future use.
+
+Running the worker 24/7 on battery-only laptops without sleep disabled is
+operationally fragile; a small desktop or mini PC is still the more reliable
+recommendation for production.
+
+Hardening options such as inserting events only through a signed Edge Function
+instead of the service role on the laptop are documented as possible next steps
+but are not required for a first pilot.
+
+Multi-tenant strict separation of which builder sees which camera is only as
+strong as your RLS policies and app rules; the current database policies for
+cameras and vision events may be broad during early rollout and may need
+tightening for strict privacy later.
+
+
+ONE-PARAGRAPH SUMMARY
+--------------------------------------------------------------------------------
+
+Recommend IP cameras or NVRs that publish RTSP or HLS URLs, put those exact URLs
+into Supabase cameras.stream_url after VLC proves they work, run the vision
+worker on a PC on the same LAN as the cameras with Supabase credentials in .env,
+and use Monitoring plus Analytics to view live video and generated events.
+Several product features remain basic or future work, including deep material
+recognition, GoPro cloud pages, optional snapshot storage, and stricter access
+controls, which you should plan for if you move from pilot to full production.
+
+================================================================================
+End of guide
+================================================================================
