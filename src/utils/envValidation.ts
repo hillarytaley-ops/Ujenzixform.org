@@ -47,6 +47,11 @@ const ENV_CONFIG: EnvConfig[] = [
     key: 'VITE_SENTRY_DSN',
     required: false,
     description: 'Sentry DSN for error tracking'
+  },
+  {
+    key: 'VITE_SENTRY_DEV_ENABLED',
+    required: false,
+    description: 'Set to "true" to send Sentry events from non-production builds'
   }
 ];
 

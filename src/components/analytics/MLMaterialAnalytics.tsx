@@ -30,6 +30,7 @@ import {
   ExternalLink,
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { refreshSessionIfNeeded } from '@/lib/supabaseSession';
 import { useToast } from '@/hooks/use-toast';
 
 interface MaterialUsage {
@@ -296,6 +297,7 @@ export const MLMaterialAnalytics: React.FC<MaterialAnalytics> = ({ projectId, us
   const loadAnalytics = async () => {
     try {
       setLoading(true);
+      await refreshSessionIfNeeded();
 
       const [materialsRes, camerasRes] = await Promise.all([
         supabase.from('materials').select('category, unit_price, in_stock').limit(200),

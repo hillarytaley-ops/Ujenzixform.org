@@ -64,6 +64,8 @@ Get from: [Sentry Project Settings](https://sentry.io/settings/)
 
 ```env
 VITE_SENTRY_DSN=https://...@sentry.io/...
+# Optional: send errors from local/dev builds (default is production-only)
+VITE_SENTRY_DEV_ENABLED=true
 ```
 
 ### Analytics - Google Analytics
