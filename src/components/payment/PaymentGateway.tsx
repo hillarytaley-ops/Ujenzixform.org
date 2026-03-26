@@ -9,7 +9,6 @@ import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import {
   CreditCard,
-  Smartphone,
   Globe,
   Lock,
   CheckCircle,
@@ -20,6 +19,9 @@ import {
   Banknote
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
+import { getPaystackPublicKey, openPaystackCheckout } from '@/lib/paystack';
+import type { PaystackCurrency } from '@/lib/paystack';
 
 interface PaymentGatewayProps {
   amount: number;
@@ -30,7 +32,14 @@ interface PaymentGatewayProps {
   onCancel?: () => void;
 }
 
-type PaymentMethod = 'mpesa' | 'card' | 'international';
+type PaymentMethod = 'paystack' | 'card' | 'international';
+
+const PAYSTACK_CURRENCIES: PaystackCurrency[] = ['KES', 'NGN', 'GHS', 'ZAR', 'USD'];
+
+function toPaystackCurrency(code: string): PaystackCurrency {
+  const c = code.toUpperCase() as PaystackCurrency;
+  return PAYSTACK_CURRENCIES.includes(c) ? c : 'USD';
+}
 
 export const PaymentGateway: React.FC<PaymentGatewayProps> = ({
   amount,
@@ -40,12 +49,9 @@ export const PaymentGateway: React.FC<PaymentGatewayProps> = ({
   onSuccess,
   onCancel
 }) => {
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('mpesa');
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('paystack');
   const [processing, setProcessing] = useState(false);
   const { toast } = useToast();
-
-  // M-Pesa Form State
-  const [mpesaPhone, setMpesaPhone] = useState('');
 
   // Card Form State
   const [cardDetails, setCardDetails] = useState({
@@ -59,84 +65,95 @@ export const PaymentGateway: React.FC<PaymentGatewayProps> = ({
   // International Payment State
   const [internationalMethod, setInternationalMethod] = useState<'stripe' | 'paypal'>('stripe');
 
-  const handleMpesaPayment = async () => {
-    if (!mpesaPhone || mpesaPhone.length < 10) {
+  const handlePaystackPayment = async () => {
+    const pk = getPaystackPublicKey();
+    if (!pk) {
       toast({
-        title: 'Invalid Phone Number',
-        description: 'Please enter a valid M-Pesa phone number',
-        variant: 'destructive'
+        title: 'Paystack not configured',
+        description: 'Set VITE_PAYSTACK_PUBLIC_KEY in your environment.',
+        variant: 'destructive',
       });
       return;
     }
 
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    let email = user?.email?.trim() || '';
+    if (!email && user?.id) {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('email')
+        .eq('user_id', user.id)
+        .maybeSingle();
+      email = ((profile as { email?: string } | null)?.email || '').trim();
+    }
+    if (!email) {
+      toast({
+        title: 'Email required',
+        description: 'Sign in with an email address or add one to your profile to pay with Paystack.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setProcessing(true);
+    const ref = `${orderId.replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 60)}_${Date.now()}`;
+
     try {
-      setProcessing(true);
-
-      // Format phone number (add 254 if needed)
-      const formattedPhone = mpesaPhone.startsWith('0') 
-        ? `254${mpesaPhone.slice(1)}`
-        : mpesaPhone.startsWith('254')
-        ? mpesaPhone
-        : `254${mpesaPhone}`;
-
-      console.log('💳 Initiating M-Pesa STK Push...');
-      console.log('Phone:', formattedPhone);
-      console.log('Amount:', amount);
-
-      // In production, integrate with Safaricom M-Pesa API
-      /* Production Code:
-      const response = await fetch('/api/mpesa/stk-push', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          phone: formattedPhone,
-          amount: amount,
-          accountReference: orderId,
-          transactionDesc: description
-        })
+      await openPaystackCheckout({
+        publicKey: pk,
+        email,
+        amountMajor: amount,
+        currency: toPaystackCurrency(currency),
+        reference: ref,
+        metadata: { orderId, description },
+        onSuccess: async (paystackRef) => {
+          try {
+            const { data, error } = await supabase.functions.invoke('verify-paystack', {
+              body: { reference: paystackRef },
+            });
+            if (error) throw error;
+            if (!data?.success) {
+              throw new Error(data?.message || data?.error || 'Verification failed');
+            }
+            toast({
+              title: 'Payment successful',
+              description: `${currency} ${amount.toLocaleString()} — verified with Paystack.`,
+            });
+            onSuccess({
+              method: 'paystack',
+              amount,
+              currency,
+              reference: paystackRef,
+              transactionId: data.transactionId,
+              timestamp: new Date().toISOString(),
+            });
+          } catch (e) {
+            toast({
+              title: 'Verification failed',
+              description: e instanceof Error ? e.message : 'Could not confirm payment',
+              variant: 'destructive',
+            });
+          } finally {
+            setProcessing(false);
+          }
+        },
+        onClose: () => {
+          setProcessing(false);
+          toast({
+            title: 'Payment window closed',
+            description: 'No charge was completed.',
+          });
+        },
       });
-
-      const result = await response.json();
-      if (result.success) {
-        // Poll for payment status
-        await pollMpesaStatus(result.checkoutRequestID);
-      }
-      */
-
-      // Simulate M-Pesa STK Push
-      toast({
-        title: '📱 M-Pesa Prompt Sent',
-        description: `Check your phone ${formattedPhone} and enter your M-Pesa PIN`,
-        duration: 5000
-      });
-
-      // Simulate payment processing
-      setTimeout(() => {
-        toast({
-          title: '✅ Payment Successful!',
-          description: `KES ${amount.toLocaleString()} paid via M-Pesa`,
-        });
-
-        onSuccess({
-          method: 'mpesa',
-          phone: formattedPhone,
-          amount,
-          currency,
-          transactionId: `MPESA${Date.now()}`,
-          timestamp: new Date().toISOString()
-        });
-
-        setProcessing(false);
-      }, 3000);
-
-    } catch (error) {
-      console.error('M-Pesa error:', error);
-      toast({
-        title: 'Payment Failed',
-        description: 'M-Pesa payment failed. Please try again.',
-        variant: 'destructive'
-      });
+    } catch (e) {
       setProcessing(false);
+      toast({
+        title: 'Paystack error',
+        description: e instanceof Error ? e.message : 'Could not open checkout',
+        variant: 'destructive',
+      });
     }
   };
 
@@ -312,9 +329,9 @@ export const PaymentGateway: React.FC<PaymentGatewayProps> = ({
         {/* Payment Methods Tabs */}
         <Tabs value={paymentMethod} onValueChange={(v) => setPaymentMethod(v as PaymentMethod)} className="w-full">
           <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="mpesa" className="flex items-center gap-2">
-              <Smartphone className="h-4 w-4" />
-              M-Pesa
+            <TabsTrigger value="paystack" className="flex items-center gap-2">
+              <Zap className="h-4 w-4" />
+              Paystack
             </TabsTrigger>
             <TabsTrigger value="card" className="flex items-center gap-2">
               <CreditCard className="h-4 w-4" />
@@ -326,63 +343,48 @@ export const PaymentGateway: React.FC<PaymentGatewayProps> = ({
             </TabsTrigger>
           </TabsList>
 
-          {/* M-Pesa Payment */}
-          <TabsContent value="mpesa" className="space-y-4">
+          {/* Paystack — card, bank, and other channels enabled in your Paystack dashboard */}
+          <TabsContent value="paystack" className="space-y-4">
             <Alert className="bg-green-50 border-green-200">
-              <Smartphone className="h-4 w-4 text-green-600" />
-              <AlertTitle>M-Pesa - Kenya's #1 Mobile Money</AlertTitle>
+              <CreditCard className="h-4 w-4 text-green-600" />
+              <AlertTitle>Paystack</AlertTitle>
               <AlertDescription>
-                Enter your Safaricom M-Pesa number. You'll receive a prompt to enter your PIN.
+                Pay securely via Paystack (cards, bank transfer, and other methods you enable in Paystack). You must be
+                signed in with an email address.
               </AlertDescription>
             </Alert>
 
             <div className="space-y-4">
-              <div>
-                <Label htmlFor="mpesa-phone">M-Pesa Phone Number *</Label>
-                <Input
-                  id="mpesa-phone"
-                  type="tel"
-                  placeholder="0712 345 678 or 254712345678"
-                  value={mpesaPhone}
-                  onChange={(e) => setMpesaPhone(e.target.value)}
-                  className="text-lg"
-                />
-                <p className="text-xs text-muted-foreground mt-1">
-                  Safaricom M-Pesa registered number
-                </p>
-              </div>
-
               <div className="bg-muted p-4 rounded-lg space-y-2">
-                <h4 className="font-semibold text-sm">Payment Process:</h4>
+                <h4 className="font-semibold text-sm">How it works</h4>
                 <ol className="text-xs space-y-1 list-decimal list-inside text-muted-foreground">
-                  <li>Click "Pay with M-Pesa" below</li>
-                  <li>Check your phone for M-Pesa prompt</li>
-                  <li>Enter your M-Pesa PIN</li>
-                  <li>Payment confirmed instantly!</li>
+                  <li>Click pay below to open the Paystack checkout</li>
+                  <li>Choose your payment method in Paystack</li>
+                  <li>We verify the transaction automatically when you complete payment</li>
                 </ol>
               </div>
 
               <Button
                 className="w-full bg-green-600 hover:bg-green-700 text-white py-6 text-lg"
-                onClick={handleMpesaPayment}
+                onClick={handlePaystackPayment}
                 disabled={processing}
               >
                 {processing ? (
                   <>
                     <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
-                    Waiting for M-Pesa PIN...
+                    Processing…
                   </>
                 ) : (
                   <>
-                    <Smartphone className="h-5 w-5 mr-2" />
-                    Pay KES {amount.toLocaleString()} with M-Pesa
+                    <Zap className="h-5 w-5 mr-2" />
+                    Pay {currency} {amount.toLocaleString()} with Paystack
                   </>
                 )}
               </Button>
 
               <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
                 <Shield className="h-3 w-3" />
-                <span>Powered by Safaricom M-Pesa • Secure & Instant</span>
+                <span>Secured by Paystack</span>
               </div>
             </div>
           </TabsContent>

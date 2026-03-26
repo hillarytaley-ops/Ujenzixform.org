@@ -64,11 +64,21 @@ const KenyanPaymentGateway: React.FC<KenyanPaymentGatewayProps> = ({
 
   const handleProviderSelect = (providerId: string) => {
     setSelectedProvider(providerId);
+    const p = providers.find((x) => x.id === providerId);
+    if (p?.type === 'paystack') {
+      setStep('confirm');
+      return;
+    }
     setStep('details');
   };
 
   const handleDetailsSubmit = () => {
     if (!selectedProviderData) return;
+
+    if (selectedProviderData.type === 'paystack') {
+      setStep('confirm');
+      return;
+    }
 
     // Validate required fields
     if (selectedProviderData.type === 'mobile_money' && !phoneNumber) {
@@ -140,6 +150,8 @@ const KenyanPaymentGateway: React.FC<KenyanPaymentGatewayProps> = ({
 
   const getProviderIcon = (type: string) => {
     switch (type) {
+      case 'paystack':
+        return <CreditCard className="h-5 w-5" />;
       case 'mobile_money':
         return <Smartphone className="h-5 w-5" />;
       case 'bank':
@@ -154,6 +166,8 @@ const KenyanPaymentGateway: React.FC<KenyanPaymentGatewayProps> = ({
 
   const getProviderTypeLabel = (type: string) => {
     switch (type) {
+      case 'paystack':
+        return 'Paystack';
       case 'mobile_money':
         return 'Mobile Money';
       case 'bank':
@@ -234,6 +248,15 @@ const KenyanPaymentGateway: React.FC<KenyanPaymentGatewayProps> = ({
           {selectedProviderData?.name} - {getProviderTypeLabel(selectedProviderData?.type || '')}
         </p>
       </div>
+
+      {selectedProviderData?.type === 'paystack' && (
+        <Alert>
+          <Info className="h-4 w-4" />
+          <AlertDescription>
+            You will complete payment in a secure Paystack window (card, bank, or other channels Paystack enables for your account).
+          </AlertDescription>
+        </Alert>
+      )}
 
       {selectedProviderData?.type === 'mobile_money' && (
         <div className="space-y-2">
@@ -352,10 +375,11 @@ const KenyanPaymentGateway: React.FC<KenyanPaymentGatewayProps> = ({
       <Alert>
         <Info className="h-4 w-4" />
         <AlertDescription>
-          {selectedProviderData?.type === 'mobile_money' 
-            ? `You will receive a payment prompt on ${phoneNumber}. Enter your PIN to complete the transaction.`
-            : `Your payment will be processed through ${selectedProviderData?.name}. This may take a few minutes.`
-          }
+          {selectedProviderData?.type === 'paystack'
+            ? 'Click confirm to open Paystack. After you pay, we verify the transaction automatically.'
+            : selectedProviderData?.type === 'mobile_money'
+              ? `You will receive a payment prompt on ${phoneNumber}. Enter your PIN to complete the transaction.`
+              : `Your payment will be processed through ${selectedProviderData?.name}. This may take a few minutes.`}
         </AlertDescription>
       </Alert>
 
@@ -393,6 +417,12 @@ const KenyanPaymentGateway: React.FC<KenyanPaymentGatewayProps> = ({
       <p className="text-muted-foreground">
         Please wait while we process your payment...
       </p>
+      {selectedProviderData?.type === 'paystack' && (
+        <Alert>
+          <CreditCard className="h-4 w-4" />
+          <AlertDescription>Complete payment in the Paystack window. Do not close this page until you are done.</AlertDescription>
+        </Alert>
+      )}
       {selectedProviderData?.type === 'mobile_money' && (
         <Alert>
           <Smartphone className="h-4 w-4" />
@@ -440,10 +470,10 @@ const KenyanPaymentGateway: React.FC<KenyanPaymentGatewayProps> = ({
       <CardHeader>
         <CardTitle className="flex items-center space-x-2">
           <CreditCard className="h-5 w-5" />
-          <span>Kenyan Payment Gateway</span>
+          <span>Secure checkout</span>
         </CardTitle>
         <CardDescription>
-          Secure payments across Kenya
+          Payments processed with Paystack
         </CardDescription>
       </CardHeader>
       <CardContent>
