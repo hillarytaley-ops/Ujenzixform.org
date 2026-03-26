@@ -4,6 +4,10 @@ Pulls **active** cameras from Supabase (`cameras` with `stream_url` set), sample
 
 The UjenziXform app reads that table on **Analytics → Site vision** (no service key in the browser).
 
+## Python version (Windows)
+
+Use **64-bit Python 3.11 or 3.12** from [python.org](https://www.python.org/downloads/) if you hit **numpy / Meson** build errors. **3.13** is OK with the pinned **numpy 2.x** wheels in `requirements.txt`.
+
 ## Prerequisites
 
 1. Apply the Supabase migration: `supabase/migrations/20260326120000_site_vision_events.sql` (or push migrations from CI).

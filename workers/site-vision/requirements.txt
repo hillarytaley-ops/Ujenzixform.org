@@ -1,10 +1,11 @@
-# Edge / laptop worker — install on Python 3.10+
-# Pin supabase: newer releases can pull pyiceberg etc., which needs MSVC C++ build tools on Windows.
+# Edge / laptop worker — Python 3.10–3.13 (3.11/3.12 recommended on Windows)
+# Pin supabase: newer releases can pull pyiceberg (needs MSVC on Windows).
 python-dotenv>=1.0.0
 supabase==2.3.4
 httpx>=0.24.0,<0.28.0
-opencv-python-headless>=4.8.0
-numpy>=1.24.0,<2.0.0
+# numpy 2.x wheels cover Python 3.13; numpy<2 on 3.13 often falls back to Meson source builds (fails without C tooling)
+opencv-python-headless>=4.10.0.84
+numpy>=2.1.0,<3.0.0
 
 # Optional: better detections (downloads ~6MB model on first run). Set USE_YOLO=1
 # ultralytics>=8.0.0
