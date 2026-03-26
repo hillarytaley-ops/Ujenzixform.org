@@ -6,7 +6,8 @@ import AnimatedSection from '@/components/AnimatedSection';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
-import { Brain, BarChart3, TrendingUp, Zap } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { Brain, BarChart3, TrendingUp, Zap, Video } from 'lucide-react';
 
 const Analytics = () => {
   const [user, setUser] = useState<any>(null);
@@ -133,9 +134,12 @@ const Analytics = () => {
             </h1>
             
             <p className="text-xl md:text-2xl mb-8 opacity-90 max-w-4xl mx-auto leading-relaxed">
-              <strong>Smart Construction Intelligence:</strong> Analyze material usage patterns, predict future needs, 
-              optimize costs with AI, detect wastage early, get ML-powered recommendations, and make data-driven 
-              decisions for your construction projects.
+              <strong>Smart construction intelligence:</strong> Combine catalog analytics with{' '}
+              <Link to="/monitoring" className="text-blue-300 underline-offset-4 hover:underline">
+                Monitoring cameras
+              </Link>{' '}
+              for site vision — material cues, deliveries, and staff safety signals — plus forecasts and cost
+              optimization.
             </p>
 
             {/* Stats */}
@@ -183,7 +187,7 @@ const Analytics = () => {
 
         {/* ML Features Showcase */}
         <AnimatedSection animation="fadeInUp">
-          <div className="mt-12 grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="mt-12 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
             <div className="bg-white p-6 rounded-lg shadow-lg border border-gray-200">
               <div className="p-3 bg-blue-100 rounded-full w-fit mb-4">
                 <Brain className="h-6 w-6 text-blue-600" />
@@ -215,6 +219,20 @@ const Analytics = () => {
                 AI-powered recommendations to reduce material costs by 15-20% through 
                 bulk purchasing, supplier selection, and waste reduction.
               </p>
+            </div>
+
+            <div className="bg-white p-6 rounded-lg shadow-lg border border-gray-200">
+              <div className="p-3 bg-orange-100 rounded-full w-fit mb-4">
+                <Video className="h-6 w-6 text-orange-600" />
+              </div>
+              <h3 className="text-lg font-bold mb-2">Site vision</h3>
+              <p className="text-sm text-muted-foreground mb-3">
+                Uses the same cameras as Monitoring to surface material sightings, perimeter activity, and PPE-style
+                staff safety checks — with live video for verification.
+              </p>
+              <Button variant="outline" size="sm" asChild>
+                <Link to="/monitoring">Open Monitoring</Link>
+              </Button>
             </div>
           </div>
         </AnimatedSection>
