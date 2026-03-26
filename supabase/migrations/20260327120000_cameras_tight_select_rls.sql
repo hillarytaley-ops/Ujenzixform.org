@@ -1,6 +1,6 @@
 -- Tighten cameras SELECT: remove world-readable policy and anon SELECT grant.
 -- Admins keep full access via existing cameras_admin_manage (FOR ALL).
--- Project owners (projects.owner_id = auth.uid()) can read cameras on their project.
+-- Project builders: projects.builder_id may be auth.users id OR profiles.id (join profiles.user_id).
 
 DROP POLICY IF EXISTS "cameras_view_all" ON public.cameras;
 
@@ -18,7 +18,14 @@ USING (
     AND EXISTS (
       SELECT 1 FROM public.projects p
       WHERE p.id = cameras.project_id
-        AND p.owner_id = (SELECT auth.uid())
+        AND (
+          p.builder_id = (SELECT auth.uid())
+          OR EXISTS (
+            SELECT 1 FROM public.profiles pr
+            WHERE pr.id = p.builder_id
+              AND pr.user_id = (SELECT auth.uid())
+          )
+        )
     )
   )
 );
