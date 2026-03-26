@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Package, ShoppingCart } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { useCart } from '@/contexts/CartContext';
 
 // Ultra-safe demo materials - guaranteed to work on iPhone
 // Using AUTHENTIC KENYAN CONSTRUCTION IMAGES - Real industry photos
@@ -217,6 +219,8 @@ export const MaterialsGridSafe = () => {
   const [user, setUser] = useState<any>(null);
   const [userRole, setUserRole] = useState<string | null>(null);
   const { toast } = useToast();
+  const navigate = useNavigate();
+  const { addToCart, setIsCartOpen } = useCart();
 
   useEffect(() => {
     checkAuth();
@@ -252,10 +256,10 @@ export const MaterialsGridSafe = () => {
 
     if (userRole === 'builder' || userRole === 'professional_builder') {
       toast({
-        title: 'Quote Request Initiated',
-        description: `Requesting quote for ${material.name}. The supplier will contact you shortly.`,
+        title: 'Open full marketplace for quotes',
+        description: `Use the main materials grid to add "${material.name}" to your quote cart and submit to suppliers.`,
       });
-      // TODO: Implement actual quote request to backend
+      navigate('/suppliers?from=dashboard');
     } else {
       toast({
         title: 'Professional Builders Only',
@@ -271,16 +275,32 @@ export const MaterialsGridSafe = () => {
       return;
     }
 
-    if (userRole === 'private_client' || userRole === 'builder') {
+    if (
+      userRole === 'private_client' ||
+      userRole === 'builder' ||
+      userRole === 'professional_builder'
+    ) {
+      addToCart(
+        {
+          id: `safe-${material.id}`,
+          name: material.name,
+          category: material.category,
+          unit: material.unit || 'unit',
+          unit_price: material.unit_price,
+          image_url: material.image_url,
+          supplier_name: material.supplier_name,
+        },
+        1
+      );
+      setIsCartOpen(true);
       toast({
-        title: 'Purchase Initiated',
-        description: `Adding ${material.name} to your cart. Proceed to checkout.`,
+        title: 'Added to cart',
+        description: `${material.name} — open the cart to review and checkout.`,
       });
-      // TODO: Implement actual buy now functionality
     } else {
       toast({
-        title: 'Private Builders Only',
-        description: 'Buy Now is available for Private Builders. Please use Request Quote instead.',
+        title: 'Sign in as a builder',
+        description: 'Buy Now is for signed-in builders and private clients. Suppliers should use the supplier dashboard.',
         variant: 'destructive'
       });
     }

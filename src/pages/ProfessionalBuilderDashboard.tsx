@@ -1450,12 +1450,9 @@ const ProfessionalBuilderDashboardPage = () => {
         progress: 0
       };
       
-      // Note: client_name column may not exist in database schema cache
-      // Temporarily excluded until migration is confirmed to have run
-      // TODO: Re-enable client_name once database migration 20260219_project_orders_tracking.sql is confirmed
-      // if (newProject.client_name?.trim()) {
-      //   projectData.client_name = newProject.client_name.trim();
-      // }
+      if (newProject.client_name?.trim()) {
+        projectData.client_name = newProject.client_name.trim();
+      }
 
       // Include GPS coordinates if available (for delivery location)
       if (newProject.latitude && newProject.longitude) {

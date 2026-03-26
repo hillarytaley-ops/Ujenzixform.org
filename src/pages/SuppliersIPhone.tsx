@@ -7,6 +7,8 @@ import { Package, Shield, Database, Users, FileText, Truck, Building, UserPlus }
 import Navigation from "@/components/Navigation";
 import Footer from "@/components/Footer";
 import { MaterialsGridSafe } from "@/components/suppliers/MaterialsGridSafe";
+import { CartSidebar } from "@/components/cart/CartSidebar";
+import { FloatingCartButton } from "@/components/cart/FloatingCartButton";
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from "@/hooks/use-toast";
 import { DashboardLoader } from "@/components/ui/DashboardLoader";
@@ -147,7 +149,9 @@ const SuppliersIPhone = () => {
   return (
     <div className="min-h-screen bg-background">
       <Navigation />
-      
+      <CartSidebar />
+      <FloatingCartButton />
+
       <div className="container mx-auto px-4 py-8">
         {/* Admin Header */}
         {isAdmin && (

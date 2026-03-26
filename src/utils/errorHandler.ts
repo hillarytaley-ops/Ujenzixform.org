@@ -3,6 +3,8 @@
  * Provides user-friendly error messages and logging
  */
 
+import { captureError } from '@/lib/sentry';
+
 // Error types for categorization
 export type ErrorType = 
   | 'AUTH'
@@ -168,10 +170,25 @@ export function logError(error: unknown, context?: string): void {
     timestamp: new Date().toISOString(),
   });
 
-  // TODO: Send to error tracking service (Sentry, LogRocket, etc.)
-  // if (process.env.NODE_ENV === 'production') {
-  //   sendToErrorTracking(errorDetails);
-  // }
+  if (import.meta.env.VITE_SENTRY_DSN) {
+    try {
+      const err =
+        error instanceof Error
+          ? error
+          : new Error(
+              typeof error === 'string'
+                ? error
+                : `${errorDetails.message}${errorDetails.code ? ` (${errorDetails.code})` : ''}`
+            );
+      captureError(err, {
+        context: context ?? 'logError',
+        errorType: errorDetails.type,
+        code: errorDetails.code,
+      });
+    } catch {
+      // capture failed — console log above is enough
+    }
+  }
 }
 
 /**

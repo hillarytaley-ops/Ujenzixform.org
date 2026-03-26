@@ -20,6 +20,13 @@ import { RegistrationRecord } from '../types';
 import { StatsCard, StatsGrid } from '../components/StatsCard';
 import { DataTable, StatusBadge, Column, RowAction } from '../components/DataTable';
 import { useConfirmDialog } from '../components/ConfirmDialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from '@/components/ui/dialog';
 
 interface RegistrationsTabProps {
   registrations: RegistrationRecord[];
@@ -35,7 +42,11 @@ export const RegistrationsTab: React.FC<RegistrationsTabProps> = ({
   onUpdateStatus,
 }) => {
   const [activeSubTab, setActiveSubTab] = useState('all');
+  const [detailReg, setDetailReg] = useState<RegistrationRecord | null>(null);
   const { openDialog, DialogComponent } = useConfirmDialog();
+
+  const formatList = (items?: string[]) =>
+    items && items.length > 0 ? items.join(', ') : '—';
 
   // Filter registrations by type
   const builders = useMemo(
@@ -187,7 +198,7 @@ export const RegistrationsTab: React.FC<RegistrationsTabProps> = ({
     {
       label: 'View Details',
       icon: Eye,
-      onClick: () => {}, // TODO: Implement view details modal
+      onClick: (row) => setDetailReg(row),
     },
     {
       label: 'Approve',
@@ -207,6 +218,77 @@ export const RegistrationsTab: React.FC<RegistrationsTabProps> = ({
   return (
     <div className="space-y-6">
       {DialogComponent}
+
+      <Dialog open={detailReg != null} onOpenChange={(open) => !open && setDetailReg(null)}>
+        <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto border-slate-700 bg-slate-950 text-slate-100">
+          <DialogHeader>
+            <DialogTitle className="text-white">Registration details</DialogTitle>
+            <DialogDescription className="text-slate-400">
+              {detailReg?.name} · {detailReg?.type}
+            </DialogDescription>
+          </DialogHeader>
+          {detailReg && (
+            <dl className="space-y-3 text-sm">
+              <div>
+                <dt className="text-slate-500">Status</dt>
+                <dd className="mt-0.5">
+                  <StatusBadge status={detailReg.status} />
+                </dd>
+              </div>
+              <div>
+                <dt className="text-slate-500">Email</dt>
+                <dd className="mt-0.5 text-white">{detailReg.email}</dd>
+              </div>
+              <div>
+                <dt className="text-slate-500">Phone</dt>
+                <dd className="mt-0.5 text-white">{detailReg.phone || '—'}</dd>
+              </div>
+              <div>
+                <dt className="text-slate-500">Company</dt>
+                <dd className="mt-0.5 text-white">{detailReg.company_name || '—'}</dd>
+              </div>
+              <div>
+                <dt className="text-slate-500">County</dt>
+                <dd className="mt-0.5 text-white">{detailReg.county || '—'}</dd>
+              </div>
+              <div>
+                <dt className="text-slate-500">Submitted</dt>
+                <dd className="mt-0.5 text-white">
+                  {new Date(detailReg.created_at).toLocaleString()}
+                </dd>
+              </div>
+              {detailReg.type === 'builder' && (
+                <div>
+                  <dt className="text-slate-500">Builder category</dt>
+                  <dd className="mt-0.5 text-white">{detailReg.builder_category || '—'}</dd>
+                </div>
+              )}
+              {detailReg.type === 'supplier' && (
+                <div>
+                  <dt className="text-slate-500">Material categories</dt>
+                  <dd className="mt-0.5 text-white">{formatList(detailReg.material_categories)}</dd>
+                </div>
+              )}
+              {detailReg.type === 'delivery' && (
+                <>
+                  <div>
+                    <dt className="text-slate-500">Vehicle type</dt>
+                    <dd className="mt-0.5 text-white">{detailReg.vehicle_type || '—'}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-slate-500">Service areas</dt>
+                    <dd className="mt-0.5 text-white">{formatList(detailReg.service_areas)}</dd>
+                  </div>
+                </>
+              )}
+              <div>
+                <dt className="text-slate-500">Record ID</dt>
+                <dd className="mt-0.5 font-mono text-xs text-slate-300 break-all">{detailReg.id}</dd>
+              </div>
+            </dl>
+          )}
+        </DialogContent>
+      </Dialog>
 
       {/* Stats Overview */}
       <StatsGrid columns={4}>

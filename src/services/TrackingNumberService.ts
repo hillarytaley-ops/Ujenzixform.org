@@ -1563,9 +1563,38 @@ class TrackingNumberService {
         ========================================
       `);
 
-      // TODO: Send SMS notification if phone available
-      // TODO: Send Email notification if email available
-      // These would integrate with actual SMS/Email services
+      if (notification.builderPhone?.trim()) {
+        try {
+          const { error: smsErr } = await supabase.functions.invoke('send-sms', {
+            body: {
+              to: notification.builderPhone.trim(),
+              message: `UjenziXform: Delivery accepted. Track: ${notification.trackingNumber}. Open the app for details.`,
+            },
+          });
+          if (smsErr) {
+            console.warn('⚠️ SMS edge function:', smsErr.message);
+          }
+        } catch (e) {
+          console.warn('⚠️ SMS notification failed:', e);
+        }
+      }
+
+      if (notification.builderEmail?.trim()) {
+        try {
+          const { error: emailErr } = await supabase.functions.invoke('send-email', {
+            body: {
+              to: notification.builderEmail.trim(),
+              subject: 'Delivery assigned — your tracking number',
+              html: `<p>Your delivery has been accepted.</p><p>Tracking number: <strong>${notification.trackingNumber}</strong></p><p>Open UjenziXform for live updates.</p>`,
+            },
+          });
+          if (emailErr) {
+            console.warn('⚠️ Email edge function:', emailErr.message);
+          }
+        } catch (e) {
+          console.warn('⚠️ Email notification failed:', e);
+        }
+      }
 
     } catch (error) {
       console.error('Error notifying builder:', error);

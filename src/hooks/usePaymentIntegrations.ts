@@ -111,6 +111,10 @@ export const usePaymentIntegrations = () => {
       return await simulateAirtelMoneyPayment(request, paymentId);
     }
 
+    if (provider.type === 'mobile_money') {
+      return await simulateGenericMobileMoneyPayment(provider, request, paymentId);
+    }
+
     throw new Error('Mobile money provider not implemented');
   };
 
@@ -171,6 +175,33 @@ export const usePaymentIntegrations = () => {
             status: success ? 'SUCCESS' : 'FAILED',
             message: success ? 'Transaction successful' : 'Insufficient balance'
           }
+        });
+      }, 2000);
+    });
+  };
+
+  /** Sandbox-style path for other mobile wallets until a live integration exists */
+  const simulateGenericMobileMoneyPayment = async (
+    provider: PaymentProvider,
+    request: PaymentRequest,
+    paymentId: string
+  ) => {
+    return new Promise<any>((resolve) => {
+      setTimeout(() => {
+        const success = Math.random() > 0.2;
+        resolve({
+          success,
+          simulated: true,
+          transactionId: success ? `MM_${provider.id}_${Date.now()}` : null,
+          response: {
+            provider: provider.id,
+            reference: request.reference,
+            paymentId,
+            status: success ? 'SUCCESS' : 'FAILED',
+            message: success
+              ? 'Simulated mobile money success (configure provider integration for production)'
+              : 'Simulated decline',
+          },
         });
       }, 2000);
     });
