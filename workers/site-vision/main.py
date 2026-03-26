@@ -16,10 +16,50 @@ import numpy as np
 from dotenv import load_dotenv
 from supabase import create_client
 
-load_dotenv()
+# Load .env from this folder (works even if you run python from another cwd)
+_ENV_DIR = os.path.dirname(os.path.abspath(__file__))
+load_dotenv(os.path.join(_ENV_DIR, ".env"))
 
-SUPABASE_URL = os.environ["SUPABASE_URL"]
-SUPABASE_SERVICE_ROLE_KEY = os.environ["SUPABASE_SERVICE_ROLE_KEY"]
+
+def _require_env(name: str) -> str:
+    v = os.environ.get(name, "").strip()
+    if not v:
+        env_path = os.path.join(_ENV_DIR, ".env")
+        raise SystemExit(
+            f"Missing {name}. Copy .env.example to .env in:\n  {_ENV_DIR}\n"
+            f"and set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY.\n"
+            f"(.env file found: {os.path.isfile(env_path)})"
+        )
+    # Strip wrapping quotes from .env (e.g. SUPABASE_URL="https://...")
+    if (v.startswith('"') and v.endswith('"')) or (v.startswith("'") and v.endswith("'")):
+        v = v[1:-1].strip()
+    return v
+
+
+def _normalize_supabase_url(raw: str) -> str:
+    u = raw.strip().rstrip("/")
+    if not u.startswith("http://") and not u.startswith("https://"):
+        u = "https://" + u
+    return u
+
+
+def _validate_supabase_url(url: str) -> None:
+    from urllib.parse import urlparse
+
+    p = urlparse(url)
+    if p.scheme not in ("http", "https") or not p.netloc:
+        raise SystemExit(
+            "SUPABASE_URL is not a valid URL.\n"
+            "Use exactly the Project URL from Supabase → Settings → API, e.g.\n"
+            "  https://abcdefghijklmnop.supabase.co\n"
+            "No /rest/v1 path, no quotes, no spaces. Do not paste the service_role key here."
+        )
+
+
+_raw_url = _require_env("SUPABASE_URL")
+SUPABASE_URL = _normalize_supabase_url(_raw_url)
+_validate_supabase_url(SUPABASE_URL)
+SUPABASE_SERVICE_ROLE_KEY = _require_env("SUPABASE_SERVICE_ROLE_KEY")
 SAMPLE_INTERVAL_SEC = float(os.environ.get("SAMPLE_INTERVAL_SEC", "5"))
 MOTION_THRESHOLD = float(os.environ.get("MOTION_THRESHOLD", "25"))
 MIN_EVENT_GAP_SEC = float(os.environ.get("MIN_EVENT_GAP_SEC", "20"))
@@ -44,7 +84,24 @@ def _can_emit(camera_id: str, event_type: str) -> bool:
 
 
 def get_supabase():
-    return create_client(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
+    try:
+        return create_client(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
+    except Exception as e:
+        err = str(e).lower()
+        if "invalid url" in err or "invalidurl" in err.replace(" ", ""):
+            raise SystemExit(
+                "Supabase client rejected SUPABASE_URL.\n\n"
+                "Fix your .env:\n"
+                "  SUPABASE_URL=https://YOUR-REF.supabase.co\n"
+                "  SUPABASE_SERVICE_ROLE_KEY=eyJ... (long JWT, service_role only)\n\n"
+                "Common mistakes:\n"
+                "  • Pasted the JWT into SUPABASE_URL (swap the two lines)\n"
+                "  • Left placeholder text like YOUR_PROJECT_REF\n"
+                "  • Included /rest/v1 or other path — use the short Project URL only\n"
+                "  • Extra spaces or broken line in the middle of the URL\n\n"
+                f"After normalizing, URL host is: {SUPABASE_URL!r}\n"
+            ) from e
+        raise
 
 
 def load_cameras(sb) -> list[dict[str, Any]]:
