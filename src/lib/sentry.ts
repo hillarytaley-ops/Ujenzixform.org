@@ -117,6 +117,7 @@ export const initSentry = () => {
  * Capture a custom error with context
  */
 export const captureError = (error: Error, context?: Record<string, unknown>) => {
+  if (!SENTRY_DSN) return;
   Sentry.captureException(error, {
     extra: context,
   });
@@ -126,6 +127,7 @@ export const captureError = (error: Error, context?: Record<string, unknown>) =>
  * Capture a custom message
  */
 export const captureMessage = (message: string, level: Sentry.SeverityLevel = 'info') => {
+  if (!SENTRY_DSN) return;
   Sentry.captureMessage(message, level);
 };
 
@@ -134,6 +136,7 @@ export const captureMessage = (message: string, level: Sentry.SeverityLevel = 'i
  * Call this after user logs in
  */
 export const setUserContext = (user: { id: string; email?: string; role?: string }) => {
+  if (!SENTRY_DSN) return;
   Sentry.setUser({
     id: user.id,
     email: user.email,
@@ -146,6 +149,7 @@ export const setUserContext = (user: { id: string; email?: string; role?: string
  * Clear user context on logout
  */
 export const clearUserContext = () => {
+  if (!SENTRY_DSN) return;
   Sentry.setUser(null);
 };
 
@@ -157,6 +161,7 @@ export const addBreadcrumb = (
   category: string,
   data?: Record<string, unknown>
 ) => {
+  if (!SENTRY_DSN) return;
   Sentry.addBreadcrumb({
     message,
     category,
@@ -169,6 +174,7 @@ export const addBreadcrumb = (
  * Start a performance transaction
  */
 export const startTransaction = (name: string, op: string) => {
+  if (!SENTRY_DSN) return undefined;
   return Sentry.startInactiveSpan({
     name,
     op,

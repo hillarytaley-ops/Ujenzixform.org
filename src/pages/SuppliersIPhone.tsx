@@ -188,7 +188,7 @@ const SuppliersIPhone = () => {
           <div className="grid grid-cols-2 gap-4">
             <Card 
               className="cursor-pointer shadow-md"
-              onClick={() => toast({ title: 'Applications', description: 'Supplier applications - coming soon on mobile' })}
+              onClick={() => navigate('/admin-dashboard?tab=registrations')}
             >
               <CardContent className="p-6 text-center">
                 <FileText className="h-8 w-8 mx-auto mb-2 text-blue-600" />
@@ -199,7 +199,7 @@ const SuppliersIPhone = () => {
 
             <Card 
               className="cursor-pointer shadow-md"
-              onClick={() => toast({ title: 'Users', description: 'User management - coming soon on mobile' })}
+              onClick={() => navigate('/admin-dashboard?tab=user-roles')}
             >
               <CardContent className="p-6 text-center">
                 <Users className="h-8 w-8 mx-auto mb-2 text-green-600" />
@@ -221,7 +221,7 @@ const SuppliersIPhone = () => {
 
             <Card 
               className="cursor-pointer shadow-md"
-              onClick={() => toast({ title: 'Security', description: 'Security dashboard - coming soon on mobile' })}
+              onClick={() => navigate('/admin-dashboard?tab=security')}
             >
               <CardContent className="p-6 text-center">
                 <Shield className="h-8 w-8 mx-auto mb-2 text-red-600" />
@@ -236,7 +236,7 @@ const SuppliersIPhone = () => {
         {isAdmin && (
           <div className="mt-6 p-4 bg-blue-50 rounded-lg">
             <p className="text-sm text-center text-muted-foreground">
-              💡 For full admin features (Applications, User Management, etc.), please use desktop browser
+              Tip: Applications, users, and security open the full admin dashboard. Use landscape or desktop for dense tables.
             </p>
           </div>
         )}

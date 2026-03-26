@@ -33,14 +33,10 @@ import { LanguageToggle } from "@/components/ui/language-toggle";
 import { LoginPortal } from "@/components/LoginPortal";
 import { ContactBuilderDialog } from "@/components/builders/ContactBuilderDialog";
 import { BuilderProfileEdit } from "@/components/builders/BuilderProfileEdit";
-// Builder components temporarily disabled for debugging
-// import ProfessionalBuilderDashboard from "@/components/ProfessionalBuilderDashboard";
-// import PrivateBuilderDirectPurchase from "@/components/PrivateBuilderDirectPurchase";
-// import { MonitoringServiceRequest } from "@/components/builders/MonitoringServiceRequest";
-// import { BuilderWorkflowDashboard } from "@/components/builders/BuilderWorkflowDashboard";
-// import { BuilderProjectManager } from "@/components/builders/BuilderProjectManager";
-// import { BuilderMaterialManager } from "@/components/builders/BuilderMaterialManager";
-// import { BuilderDeliveryTracker } from "@/components/builders/BuilderDeliveryTracker";
+import { MonitoringServiceRequest } from "@/components/builders/MonitoringServiceRequest";
+import { BuilderWorkflowDashboard } from "@/components/builders/BuilderWorkflowDashboard";
+import { BuilderProjectManager } from "@/components/builders/BuilderProjectManager";
+import { BuilderDeliveryTracker } from "@/components/builders/BuilderDeliveryTracker";
 import { UserProfile } from "@/types/userProfile";
 import { useToast } from "@/hooks/use-toast";
 import { ErrorBoundary } from "@/components/ui/error-boundary";
@@ -458,10 +454,7 @@ const Builders = () => {
                 </TabsContent>
 
                 <TabsContent value="projects" className="space-y-6">
-                  <div className="p-8 text-center border rounded-lg">
-                    <h2 className="text-2xl font-bold">Project Manager</h2>
-                    <p className="text-muted-foreground">Coming soon...</p>
-                  </div>
+                  <BuilderProjectManager />
                 </TabsContent>
 
                 <TabsContent value="materials" className="space-y-6">
@@ -478,24 +471,36 @@ const Builders = () => {
                 </TabsContent>
 
                 <TabsContent value="deliveries" className="space-y-6">
-                  <div className="p-8 text-center border rounded-lg">
-                    <h2 className="text-2xl font-bold">Delivery Tracker</h2>
-                    <p className="text-muted-foreground">Coming soon...</p>
-                  </div>
+                  <BuilderDeliveryTracker />
                 </TabsContent>
 
                 <TabsContent value="monitoring" className="space-y-6">
-                  <div className="p-8 text-center border rounded-lg">
-                    <h2 className="text-2xl font-bold">Monitoring Service Request</h2>
-                    <p className="text-muted-foreground">Coming soon...</p>
-                  </div>
+                  <MonitoringServiceRequest />
                 </TabsContent>
 
                 <TabsContent value="legacy" className="space-y-6">
-                  <div className="p-8 text-center border rounded-lg">
-                    <h2 className="text-2xl font-bold">Legacy Tools</h2>
-                    <p className="text-muted-foreground">Coming soon...</p>
-                  </div>
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <FileText className="h-5 w-5" />
+                        More tools
+                      </CardTitle>
+                      <CardDescription>
+                        Quick links to scanners, tracking, and feedback.
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="flex flex-wrap gap-3">
+                      <Link to="/scanners">
+                        <Button variant="outline">QR &amp; scanners</Button>
+                      </Link>
+                      <Link to="/tracking">
+                        <Button variant="outline">Shipment tracking</Button>
+                      </Link>
+                      <Link to="/feedback">
+                        <Button variant="outline">Feedback</Button>
+                      </Link>
+                    </CardContent>
+                  </Card>
                 </TabsContent>
               </Tabs>
             </div>
@@ -538,17 +543,11 @@ const Builders = () => {
                 </TabsList>
 
                 <TabsContent value="workflow" className="space-y-6">
-                  <div className="p-8 text-center border rounded-lg">
-                    <h2 className="text-2xl font-bold">Private Workflow Dashboard</h2>
-                    <p className="text-muted-foreground">Coming soon...</p>
-                  </div>
+                  <BuilderWorkflowDashboard />
                 </TabsContent>
 
                 <TabsContent value="projects" className="space-y-6">
-                  <div className="p-8 text-center border rounded-lg">
-                    <h2 className="text-2xl font-bold">Private Project Manager</h2>
-                    <p className="text-muted-foreground">Coming soon...</p>
-                  </div>
+                  <BuilderProjectManager />
                 </TabsContent>
 
                 <TabsContent value="direct-purchase" className="space-y-6">
@@ -619,10 +618,7 @@ const Builders = () => {
                 </TabsContent>
 
                 <TabsContent value="monitoring" className="space-y-6">
-                  <div className="p-8 text-center border rounded-lg">
-                    <h2 className="text-2xl font-bold">Private Monitoring</h2>
-                    <p className="text-muted-foreground">Coming soon...</p>
-                  </div>
+                  <MonitoringServiceRequest />
                 </TabsContent>
               </Tabs>
             </div>

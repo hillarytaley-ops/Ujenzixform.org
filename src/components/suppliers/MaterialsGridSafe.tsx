@@ -255,11 +255,11 @@ export const MaterialsGridSafe = () => {
     }
 
     if (userRole === 'builder' || userRole === 'professional_builder') {
+      navigate('/suppliers?tab=purchase&intent=quote');
       toast({
-        title: 'Open full marketplace for quotes',
-        description: `Use the main materials grid to add "${material.name}" to your quote cart and submit to suppliers.`,
+        title: 'Marketplace',
+        description: `Continue in the full suppliers page to request a quote for "${material.name}".`,
       });
-      navigate('/suppliers?from=dashboard');
     } else {
       toast({
         title: 'Professional Builders Only',

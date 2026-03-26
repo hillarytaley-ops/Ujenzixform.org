@@ -14,6 +14,7 @@
  * DO NOT REMOVE OR MODIFY THESE PROPERTIES - THEY PREVENT RECURRING SCROLLING ISSUES
  */
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useSecureDeliveryData } from '@/hooks/useSecureDeliveryData';
 import DeliveryReviewForm from './DeliveryReviewForm';
@@ -81,6 +82,7 @@ const statusConfig = {
 };
 
 const DeliveryTracker: React.FC = () => {
+  const navigate = useNavigate();
   const [trackingNumber, setTrackingNumber] = useState('');
   const [delivery, setDelivery] = useState<Delivery | null>(null);
   const [updates, setUpdates] = useState<DeliveryUpdate[]>([]);
@@ -542,7 +544,10 @@ const DeliveryTracker: React.FC = () => {
                     <Download className="h-4 w-4 mr-2" />
                     Export Deliveries
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => toast({ title: "Analytics", description: "Analytics view coming soon" })} className="hover:bg-muted cursor-pointer">
+                  <DropdownMenuItem
+                    onClick={() => navigate('/admin-dashboard?tab=delivery-analytics')}
+                    className="hover:bg-muted cursor-pointer"
+                  >
                     <MapIcon className="h-4 w-4 mr-2" />
                     View Analytics
                   </DropdownMenuItem>

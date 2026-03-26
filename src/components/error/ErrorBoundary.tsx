@@ -2,6 +2,7 @@ import React, { Component, ErrorInfo, ReactNode } from 'react';
 import { AlertTriangle, RefreshCw, Home, Bug } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { captureError } from '@/lib/sentry';
 
 interface Props {
   children: ReactNode;
@@ -97,10 +98,16 @@ export class ErrorBoundary extends Component<Props, State> {
   }
 
   logErrorToService = (error: Error, errorInfo: ErrorInfo) => {
-    // Integration point for error tracking services
-    // Example: Sentry.captureException(error, { extra: errorInfo });
-    
-    // For now, store in localStorage for debugging
+    try {
+      captureError(error, {
+        componentStack: errorInfo.componentStack,
+        source: 'ErrorBoundary',
+      });
+    } catch {
+      // Sentry optional
+    }
+
+    // Also store in localStorage for debugging
     try {
       const errorLog = {
         timestamp: new Date().toISOString(),

@@ -35,6 +35,16 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 
 interface BuilderVideo {
   id: string;
@@ -78,6 +88,15 @@ export const BuilderVideoGallery = ({
   const [loading, setLoading] = useState(true);
   const [selectedVideo, setSelectedVideo] = useState<BuilderVideo | null>(null);
   const [videoToDelete, setVideoToDelete] = useState<string | null>(null);
+  const [editOpen, setEditOpen] = useState(false);
+  const [editDraft, setEditDraft] = useState({
+    id: '',
+    title: '',
+    description: '',
+    project_type: '',
+    project_location: '',
+  });
+  const [savingEdit, setSavingEdit] = useState(false);
   const [filterType, setFilterType] = useState<string>("all");
   const { toast } = useToast();
 
@@ -277,6 +296,80 @@ export const BuilderVideoGallery = ({
       );
     } catch (error) {
       console.error('Error recording view:', error);
+    }
+  };
+
+  const openEditDialog = (video: BuilderVideo) => {
+    setEditDraft({
+      id: video.id,
+      title: video.title,
+      description: video.description || '',
+      project_type: video.project_type || '',
+      project_location: video.project_location || '',
+    });
+    setEditOpen(true);
+  };
+
+  const saveVideoEdits = async () => {
+    if (!editDraft.id || !editDraft.title.trim()) {
+      toast({
+        title: 'Title required',
+        description: 'Please enter a title for this video.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    setSavingEdit(true);
+    try {
+      const { error } = await supabase
+        .from('builder_videos')
+        .update({
+          title: editDraft.title.trim(),
+          description: editDraft.description.trim() || null,
+          project_type: editDraft.project_type.trim() || null,
+          project_location: editDraft.project_location.trim() || null,
+        })
+        .eq('id', editDraft.id);
+
+      if (error) throw error;
+
+      setVideos((prev) =>
+        prev.map((v) =>
+          v.id === editDraft.id
+            ? {
+                ...v,
+                title: editDraft.title.trim(),
+                description: editDraft.description.trim() || null,
+                project_type: editDraft.project_type.trim() || null,
+                project_location: editDraft.project_location.trim() || null,
+              }
+            : v
+        )
+      );
+      if (selectedVideo?.id === editDraft.id) {
+        setSelectedVideo((s) =>
+          s
+            ? {
+                ...s,
+                title: editDraft.title.trim(),
+                description: editDraft.description.trim() || null,
+                project_type: editDraft.project_type.trim() || null,
+                project_location: editDraft.project_location.trim() || null,
+              }
+            : null
+        );
+      }
+      toast({ title: 'Saved', description: 'Video details updated.' });
+      setEditOpen(false);
+    } catch (error) {
+      console.error('Error updating video:', error);
+      toast({
+        title: 'Update failed',
+        description: 'Could not save changes. Try again.',
+        variant: 'destructive',
+      });
+    } finally {
+      setSavingEdit(false);
     }
   };
 
@@ -535,7 +628,7 @@ export const BuilderVideoGallery = ({
                     variant="outline"
                     size="sm"
                     className="flex-1"
-                    onClick={() => toast({ title: "Edit coming soon" })}
+                    onClick={() => openEditDialog(video)}
                   >
                     <Edit className="h-4 w-4 mr-1" />
                     Edit
@@ -565,6 +658,59 @@ export const BuilderVideoGallery = ({
           onVideoUpdate={fetchVideos}
         />
       )}
+
+      <Dialog open={editOpen} onOpenChange={setEditOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Edit video details</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <div className="space-y-1">
+              <Label htmlFor="edit-title">Title</Label>
+              <Input
+                id="edit-title"
+                value={editDraft.title}
+                onChange={(e) => setEditDraft((d) => ({ ...d, title: e.target.value }))}
+              />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="edit-desc">Description</Label>
+              <Textarea
+                id="edit-desc"
+                rows={3}
+                value={editDraft.description}
+                onChange={(e) => setEditDraft((d) => ({ ...d, description: e.target.value }))}
+              />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="edit-type">Project type</Label>
+              <Input
+                id="edit-type"
+                value={editDraft.project_type}
+                onChange={(e) => setEditDraft((d) => ({ ...d, project_type: e.target.value }))}
+                placeholder="e.g. Residential"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="edit-loc">Location</Label>
+              <Input
+                id="edit-loc"
+                value={editDraft.project_location}
+                onChange={(e) => setEditDraft((d) => ({ ...d, project_location: e.target.value }))}
+                placeholder="e.g. Nairobi"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditOpen(false)} disabled={savingEdit}>
+              Cancel
+            </Button>
+            <Button onClick={saveVideoEdits} disabled={savingEdit}>
+              {savingEdit ? 'Saving…' : 'Save'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Delete Confirmation Dialog */}
       <AlertDialog open={!!videoToDelete} onOpenChange={(open) => !open && setVideoToDelete(null)}>

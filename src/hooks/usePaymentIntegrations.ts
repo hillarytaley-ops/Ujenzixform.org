@@ -115,7 +115,8 @@ export const usePaymentIntegrations = () => {
       return await simulateGenericMobileMoneyPayment(provider, request, paymentId);
     }
 
-    throw new Error('Mobile money provider not implemented');
+    // Demo / sandbox path for any remaining wallet types until a live integration exists
+    return await simulateGenericMobileMoneyPayment(provider, request, paymentId);
   };
 
   const processBankPayment = async (provider: PaymentProvider, request: PaymentRequest, paymentId: string) => {

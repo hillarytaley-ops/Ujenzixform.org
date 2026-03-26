@@ -99,13 +99,56 @@ export const GRNView: React.FC<GRNViewProps> = ({ userId, userRole }) => {
   }, [userId, userRole]);
 
   const handleDownloadGRN = (grn: GRN) => {
-    // Generate PDF or print GRN
+    const itemsHtml = (Array.isArray(grn.items) ? grn.items : [])
+      .map(
+        (row: Record<string, unknown>, i: number) =>
+          `<tr><td>${i + 1}</td><td>${escapeHtml(String(row.description ?? row.name ?? row.material ?? 'Item'))}</td><td>${escapeHtml(String(row.quantity ?? row.qty ?? '—'))}</td></tr>`
+      )
+      .join('');
+
+    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"/><title>${escapeHtml(grn.grn_number)}</title>
+      <style>
+        body{font-family:system-ui,sans-serif;padding:24px;color:#111}
+        h1{font-size:1.25rem;margin:0 0 8px}
+        table{width:100%;border-collapse:collapse;margin-top:16px;font-size:14px}
+        th,td{border:1px solid #ccc;padding:8px;text-align:left}
+        th{background:#f4f4f5}
+        .meta{color:#555;font-size:13px;margin-bottom:4px}
+      </style></head><body>
+      <h1>Goods Received Note</h1>
+      <p class="meta"><strong>GRN:</strong> ${escapeHtml(grn.grn_number)}</p>
+      <p class="meta"><strong>PO:</strong> ${escapeHtml(grn.purchase_order?.po_number || 'N/A')}</p>
+      <p class="meta"><strong>Received:</strong> ${escapeHtml(new Date(grn.received_date).toLocaleString())}</p>
+      <p class="meta"><strong>Total quantity:</strong> ${grn.total_quantity}</p>
+      <p class="meta"><strong>Status:</strong> ${escapeHtml(grn.status)}</p>
+      <table><thead><tr><th>#</th><th>Description</th><th>Qty</th></tr></thead><tbody>${itemsHtml || '<tr><td colspan="3">No line items</td></tr>'}</tbody></table>
+      <script>window.onload=function(){window.print();}</script>
+      </body></html>`;
+
+    const w = window.open('', '_blank');
+    if (!w) {
+      toast({
+        title: 'Pop-up blocked',
+        description: 'Allow pop-ups for this site to print or save as PDF.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    w.document.write(html);
+    w.document.close();
     toast({
-      title: "Download GRN",
-      description: `Downloading ${grn.grn_number}...`,
+      title: 'GRN ready',
+      description: 'Use your browser print dialog to save as PDF or print.',
     });
-    // TODO: Implement PDF generation
   };
+
+  function escapeHtml(s: string) {
+    return s
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
 
   if (loading) {
     return (

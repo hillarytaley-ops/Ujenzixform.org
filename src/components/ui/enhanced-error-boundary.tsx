@@ -3,6 +3,7 @@ import { AlertCircle, RefreshCw, Home, ArrowLeft, Bug, Copy, CheckCircle } from 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
+import { captureError } from "@/lib/sentry";
 
 // Error types for better categorization
 type ErrorType = 'network' | 'auth' | 'validation' | 'notfound' | 'permission' | 'unknown';
@@ -133,20 +134,17 @@ export class EnhancedErrorBoundary extends React.Component<EnhancedErrorBoundary
   }
 
   logError = (error: Error, errorInfo: React.ErrorInfo) => {
-    // In production, send to error tracking service
     const errorReport = {
       message: error.message,
       stack: error.stack,
       componentStack: errorInfo.componentStack,
       timestamp: new Date().toISOString(),
       url: window.location.href,
-      userAgent: navigator.userAgent
+      userAgent: navigator.userAgent,
     };
-    
+
     console.log('📊 Error Report:', errorReport);
-    
-    // Could send to Supabase or external service
-    // supabase.from('error_logs').insert(errorReport);
+    captureError(error, { ...errorReport, source: 'EnhancedErrorBoundary' });
   };
 
   handleReset = () => {

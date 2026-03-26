@@ -12,10 +12,7 @@
 
 import { supabase } from '@/integrations/supabase/client';
 import notificationService from './NotificationService';
-
-// Constants
-const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
+import { sendEmailViaEdgeFunction } from '@/lib/email';
 
 export interface DeliveryRequestDetails {
   id?: string;
@@ -50,23 +47,6 @@ interface NotificationResult {
 }
 
 /**
- * Fetch with timeout helper
- */
-async function fetchWithTimeout(url: string, options: RequestInit, timeout: number): Promise<Response> {
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), timeout);
-  
-  try {
-    const response = await fetch(url, { ...options, signal: controller.signal });
-    clearTimeout(timeoutId);
-    return response;
-  } catch (error) {
-    clearTimeout(timeoutId);
-    throw error;
-  }
-}
-
-/**
  * Service to notify all registered delivery providers about new delivery requests
  */
 class DeliveryProviderNotificationService {
@@ -77,42 +57,51 @@ class DeliveryProviderNotificationService {
   async getActiveProviders(): Promise<DeliveryProvider[]> {
     try {
       console.log('🚚 Fetching active delivery providers...');
-      
-      // Try using native fetch first (faster)
-      const response = await fetchWithTimeout(
-        `${SUPABASE_URL}/rest/v1/delivery_providers?is_active=eq.true&select=id,user_id,provider_name,phone,email,is_active,is_verified,service_areas`,
-        {
-          headers: {
-            'apikey': SUPABASE_ANON_KEY,
-            'Content-Type': 'application/json'
-          }
-        },
-        8000
-      );
-      
-      if (response.ok) {
-        const providers = await response.json();
-        console.log(`✅ Found ${providers?.length || 0} active delivery providers`);
-        return providers || [];
-      }
-      
-      // Fallback to Supabase client
       const { data, error } = await supabase
         .from('delivery_providers')
         .select('id, user_id, provider_name, phone, email, is_active, is_verified, service_areas')
         .eq('is_active', true);
-      
+
       if (error) {
         console.error('❌ Error fetching providers:', error);
         return [];
       }
-      
-      console.log(`✅ Found ${data?.length || 0} active delivery providers (via Supabase client)`);
+
+      console.log(`✅ Found ${data?.length || 0} active delivery providers`);
       return data || [];
-      
-    } catch (error: any) {
-      console.error('❌ Error fetching delivery providers:', error?.message || error);
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : String(error);
+      console.error('❌ Error fetching delivery providers:', msg);
       return [];
+    }
+  }
+
+  /**
+   * Email alert when the edge/API route is configured (/api/send-email).
+   */
+  async sendEmailNotification(
+    email: string,
+    requestDetails: DeliveryRequestDetails
+  ): Promise<boolean> {
+    const safe = (s: string) =>
+      s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    try {
+      const subject = 'UjenziXform: New delivery request';
+      const html = `
+        <p>A new delivery job is available.</p>
+        <ul>
+          <li><strong>Pickup:</strong> ${safe(requestDetails.pickup_address)}</li>
+          <li><strong>Delivery:</strong> ${safe(requestDetails.delivery_address)}</li>
+          <li><strong>Date:</strong> ${safe(new Date(requestDetails.pickup_date).toLocaleString())}</li>
+          <li><strong>Material:</strong> ${safe(requestDetails.material_type || 'Construction materials')}</li>
+        </ul>
+        <p>Sign in to the delivery dashboard to accept.</p>
+      `;
+      const { success } = await sendEmailViaEdgeFunction({ to: email, subject, html });
+      return success;
+    } catch (e: unknown) {
+      console.warn('⚠️ Email notification error:', e instanceof Error ? e.message : e);
+      return false;
     }
   }
 
@@ -260,6 +249,7 @@ class DeliveryProviderNotificationService {
           const notificationResults = {
             inApp: false,
             sms: false,
+            email: false,
             queued: false
           };
 
@@ -279,7 +269,15 @@ class DeliveryProviderNotificationService {
             );
           }
 
-          // 3. Queue the provider for this request
+          // 3. Email (when address is on file and API route is configured)
+          if (provider.email?.includes('@')) {
+            notificationResults.email = await this.sendEmailNotification(
+              provider.email,
+              requestDetails
+            );
+          }
+
+          // 4. Queue the provider for this request
           if (requestDetails.id) {
             notificationResults.queued = await this.queueProviderNotification(
               provider.id,
@@ -288,7 +286,11 @@ class DeliveryProviderNotificationService {
             );
           }
 
-          const success = notificationResults.inApp || notificationResults.sms || notificationResults.queued;
+          const success =
+            notificationResults.inApp ||
+            notificationResults.sms ||
+            notificationResults.email ||
+            notificationResults.queued;
           
           if (success) {
             console.log(`✅ Notified provider: ${provider.provider_name} (${provider.phone || 'no phone'})`);
