@@ -69,7 +69,9 @@ need tighter connection to the real backend in every branch of the UI.
 
 Payment integrations include paths where a mobile money provider is described
 as not implemented yet, so users in those flows may hit errors until that work is
-completed.
+completed. Product priority: treat a full Paystack (or other gateway) rollout as
+the last major payment fix after other app gaps are closed, so checkout can stay
+on the current simulated or partial flows until then.
 
 The suppliers experience on small iPhone-oriented screens still shows “coming
 soon” for several sections instead of full feature parity with desktop.
