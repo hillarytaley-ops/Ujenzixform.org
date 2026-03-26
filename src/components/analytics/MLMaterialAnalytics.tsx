@@ -178,23 +178,100 @@ function buildSiteVisionEvents(
   };
 }
 
+type VisionDisplayMode = 'live_db' | 'empty_cameras' | 'demo';
+
+function mapDbEventTypeToVisionKind(eventType: string): VisionEventKind {
+  const t = eventType.toLowerCase().replace(/_/g, '');
+  if (/(vehicle|truck|car|bus)/.test(t)) return 'vehicle';
+  if (/(material)/.test(t)) return 'material';
+  if (/(person|safety|ppe|staff|hardhat|helmet)/.test(t)) return 'safety';
+  return 'perimeter';
+}
+
+function mapDbRowToSiteVisionEvent(row: {
+  id: string;
+  occurred_at: string;
+  event_type: string;
+  label: string | null;
+  payload: unknown;
+  confidence: number | null;
+  camera_id: string;
+  cameras: { name: string; location: string | null } | null;
+}): SiteVisionEvent {
+  const payload = row.payload && typeof row.payload === 'object' && !Array.isArray(row.payload) ? row.payload : {};
+  const p = payload as Record<string, unknown>;
+  const notes = p.notes ?? p.detail;
+  const detail =
+    typeof notes === 'string'
+      ? notes
+      : row.label
+        ? String(row.label)
+        : 'Vision worker event';
+
+  return {
+    id: row.id,
+    at: row.occurred_at,
+    cameraId: row.camera_id,
+    cameraName: row.cameras?.name ?? 'Camera',
+    location: row.cameras?.location ?? null,
+    kind: mapDbEventTypeToVisionKind(row.event_type),
+    title: row.label || row.event_type.replace(/_/g, ' '),
+    detail,
+    confidence: row.confidence != null ? Number(row.confidence) : 75,
+  };
+}
+
+function filterEventsSince(events: SiteVisionEvent[], sinceMs: number) {
+  return events.filter((e) => new Date(e.at).getTime() >= sinceMs);
+}
+
 export const MLMaterialAnalytics: React.FC<MaterialAnalytics> = ({ projectId, userId }) => {
   const [loading, setLoading] = useState(true);
   const [materialUsage, setMaterialUsage] = useState<MaterialUsage[]>([]);
   const [insights, setInsights] = useState<MLInsight[]>([]);
   const [predictions, setPredictions] = useState<any>(null);
   const [cameras, setCameras] = useState<CameraRow[]>([]);
-  const [visionDemo, setVisionDemo] = useState(false);
+  const [dbVisionEvents, setDbVisionEvents] = useState<SiteVisionEvent[]>([]);
+  const [visionDisplayMode, setVisionDisplayMode] = useState<VisionDisplayMode>('demo');
   const { toast } = useToast();
 
   useEffect(() => {
     loadAnalytics();
   }, [projectId, userId]);
 
-  const visionBlock = useMemo(
-    () => buildSiteVisionEvents(cameras, visionDemo),
-    [cameras, visionDemo]
-  );
+  const visionBlock = useMemo(() => {
+    const dayAgo = Date.now() - 86400000;
+    const activeCamerasCount =
+      cameras.filter((c) => c.is_active !== false).length || (visionDisplayMode === 'demo' ? 2 : 0);
+
+    if (visionDisplayMode === 'live_db') {
+      const events = dbVisionEvents;
+      return {
+        events,
+        events24h: filterEventsSince(events, dayAgo),
+        activeCameras: Math.max(activeCamerasCount, 1),
+        demo: false,
+        mode: 'live_db' as const,
+      };
+    }
+    if (visionDisplayMode === 'empty_cameras') {
+      return {
+        events: [],
+        events24h: [],
+        activeCameras: activeCamerasCount,
+        demo: false,
+        mode: 'empty_cameras' as const,
+      };
+    }
+    const built = buildSiteVisionEvents(cameras, true);
+    return {
+      events: built.events,
+      events24h: built.events,
+      activeCameras: built.activeCameras,
+      demo: built.demo,
+      mode: 'demo' as const,
+    };
+  }, [cameras, visionDisplayMode, dbVisionEvents]);
 
   const materialDetections = useMemo(() => {
     const counts: Record<string, number> = {};
@@ -209,12 +286,12 @@ export const MLMaterialAnalytics: React.FC<MaterialAnalytics> = ({ projectId, us
   }, [visionBlock.events]);
 
   const safetyScore = useMemo(() => {
-    const safety = visionBlock.events.filter((e) => e.kind === 'safety');
+    const safety = visionBlock.events24h.filter((e) => e.kind === 'safety');
     if (safety.length === 0) return { pct: 0, ok: 0, warn: 0 };
     const ok = safety.filter((e) => !e.title.toLowerCase().includes('unauthorised')).length;
     const pct = Math.round((ok / safety.length) * 100);
     return { pct, ok, warn: safety.length - ok };
-  }, [visionBlock.events]);
+  }, [visionBlock.events24h]);
 
   const loadAnalytics = async () => {
     try {
@@ -230,23 +307,51 @@ export const MLMaterialAnalytics: React.FC<MaterialAnalytics> = ({ projectId, us
       }
 
       let camRows = (camerasRes.data || []) as CameraRow[];
-      let demo = false;
       if (camerasRes.error) {
         console.warn('Cameras fetch for ML vision (optional):', camerasRes.error);
         camRows = [];
-        demo = true;
-      } else if (camRows.length === 0) {
-        demo = true;
       }
 
       setCameras(camRows);
-      setVisionDemo(demo);
+
+      const since = new Date(Date.now() - 7 * 86400000).toISOString();
+      const veRes = await supabase
+        .from('site_vision_events')
+        .select(
+          `id, occurred_at, event_type, label, payload, confidence, camera_id,
+           cameras ( name, location )`
+        )
+        .gte('occurred_at', since)
+        .order('occurred_at', { ascending: false })
+        .limit(500);
+
+      if (veRes.error) {
+        console.warn('site_vision_events (run migration if missing):', veRes.error);
+      }
+
+      const mapped = (veRes.data || []).map((row) => mapDbRowToSiteVisionEvent(row as any));
+
+      let mode: VisionDisplayMode = 'demo';
+      if (mapped.length > 0) {
+        mode = 'live_db';
+        setDbVisionEvents(mapped);
+      } else {
+        setDbVisionEvents([]);
+        mode = camRows.length > 0 ? 'empty_cameras' : 'demo';
+      }
+      setVisionDisplayMode(mode);
 
       const processedData = processMaterialData(materialsRes.data || []);
       setMaterialUsage(processedData);
 
-      const visionPreview = buildSiteVisionEvents(camRows, demo);
-      const mlInsights = generateMLInsights(processedData, visionPreview.activeCameras);
+      const activeCamCount =
+        mode === 'live_db'
+          ? Math.max(1, camRows.filter((c) => c.is_active !== false).length)
+          : mode === 'empty_cameras'
+            ? Math.max(0, camRows.filter((c) => c.is_active !== false).length)
+            : buildSiteVisionEvents(camRows, true).activeCameras;
+
+      const mlInsights = generateMLInsights(processedData, Math.max(1, activeCamCount));
       setInsights(mlInsights);
 
       setPredictions(generatePredictions(processedData));
@@ -517,7 +622,7 @@ export const MLMaterialAnalytics: React.FC<MaterialAnalytics> = ({ projectId, us
         </TabsList>
 
         <TabsContent value="vision" className="space-y-4">
-          {visionBlock.demo && (
+          {visionBlock.mode === 'demo' && (
             <Alert>
               <Video className="h-4 w-4" />
               <AlertTitle>Demo site vision</AlertTitle>
@@ -531,6 +636,34 @@ export const MLMaterialAnalytics: React.FC<MaterialAnalytics> = ({ projectId, us
                     Configure cameras
                     <ExternalLink className="h-3.5 w-3.5 ml-1.5" />
                   </Link>
+                </Button>
+              </AlertDescription>
+            </Alert>
+          )}
+
+          {visionBlock.mode === 'live_db' && (
+            <Alert className="border-green-200 bg-green-50">
+              <CheckCircle className="h-4 w-4 text-green-700" />
+              <AlertTitle className="text-green-900">Live vision data</AlertTitle>
+              <AlertDescription className="text-green-900/90">
+                Events below are loaded from <code className="text-xs bg-white/80 px-1 rounded">site_vision_events</code>{' '}
+                (edge or cloud worker). Open Monitoring for raw video to verify alerts.
+              </AlertDescription>
+            </Alert>
+          )}
+
+          {visionBlock.mode === 'empty_cameras' && (
+            <Alert>
+              <Activity className="h-4 w-4" />
+              <AlertTitle>Cameras configured — no vision rows yet</AlertTitle>
+              <AlertDescription className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                <span>
+                  Run the site vision worker on your laptop or mini PC (see{' '}
+                  <code className="text-xs bg-muted px-1 rounded">workers/site-vision</code> in the repo). It writes to
+                  this database using the service role key.
+                </span>
+                <Button size="sm" variant="outline" asChild className="shrink-0">
+                  <Link to="/monitoring">Monitoring</Link>
                 </Button>
               </AlertDescription>
             </Alert>
@@ -553,7 +686,7 @@ export const MLMaterialAnalytics: React.FC<MaterialAnalytics> = ({ projectId, us
                   Material events (24h)
                 </div>
                 <div className="text-2xl font-bold">
-                  {visionBlock.events.filter((e) => e.kind === 'material').length}
+                  {visionBlock.events24h.filter((e) => e.kind === 'material').length}
                 </div>
               </CardContent>
             </Card>
@@ -564,7 +697,7 @@ export const MLMaterialAnalytics: React.FC<MaterialAnalytics> = ({ projectId, us
                   Staff / PPE checks
                 </div>
                 <div className="text-2xl font-bold">
-                  {visionBlock.events.filter((e) => e.kind === 'safety').length}
+                  {visionBlock.events24h.filter((e) => e.kind === 'safety').length}
                 </div>
               </CardContent>
             </Card>
@@ -1128,8 +1261,13 @@ export const MLMaterialAnalytics: React.FC<MaterialAnalytics> = ({ projectId, us
               <div>
                 <div className="font-semibold">Analytics stack</div>
                 <div className="text-sm text-muted-foreground">
-                  {materialUsage.length} catalog categories · {visionBlock.activeCameras} camera(s) for vision · Refresh
-                  to re-sync
+                  {materialUsage.length} catalog categories · {visionBlock.activeCameras} camera(s) · vision:{' '}
+                  {visionBlock.mode === 'live_db'
+                    ? 'database events'
+                    : visionBlock.mode === 'empty_cameras'
+                      ? 'awaiting worker'
+                      : 'demo'}
+                  . Refresh to re-sync.
                 </div>
               </div>
             </div>

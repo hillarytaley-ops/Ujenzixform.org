@@ -240,6 +240,63 @@ export type Database = {
           },
         ]
       }
+      site_vision_events: {
+        Row: {
+          id: string
+          camera_id: string
+          project_id: string | null
+          occurred_at: string
+          event_type: string
+          label: string | null
+          payload: Json
+          confidence: number | null
+          image_ref: string | null
+          source_worker: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          camera_id: string
+          project_id?: string | null
+          occurred_at?: string
+          event_type: string
+          label?: string | null
+          payload?: Json
+          confidence?: number | null
+          image_ref?: string | null
+          source_worker?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          camera_id?: string
+          project_id?: string | null
+          occurred_at?: string
+          event_type?: string
+          label?: string | null
+          payload?: Json
+          confidence?: number | null
+          image_ref?: string | null
+          source_worker?: string | null
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "site_vision_events_camera_id_fkey"
+            columns: ["camera_id"]
+            isOneToOne: false
+            referencedRelation: "cameras"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "site_vision_events_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       contact_access_audit: {
         Row: {
           access_granted: boolean | null

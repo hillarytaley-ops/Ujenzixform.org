@@ -1,0 +1,8 @@
+# Edge / laptop worker — install on Python 3.10+
+python-dotenv>=1.0.0
+supabase>=2.3.0
+opencv-python-headless>=4.8.0
+numpy>=1.24.0
+
+# Optional: better detections (downloads ~6MB model on first run). Set USE_YOLO=1
+# ultralytics>=8.0.0
