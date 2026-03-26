@@ -11,6 +11,7 @@ Welcome to the MradiPro documentation. This folder contains comprehensive docume
 | Document | Description |
 |----------|-------------|
 | [Complete Workflow Documentation](./MRADIPRO_COMPLETE_WORKFLOW_DOCUMENTATION.md) | Full platform overview with all workflows |
+| [Pending & future work (plain text, printable)](./UJENZIXFORM_PENDING_AND_FUTURE_WORK.txt) | Layman summary of gaps, TODOs, and roadmap-style items |
 
 ### Workflow Documentation
 

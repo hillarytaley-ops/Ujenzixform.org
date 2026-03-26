@@ -8,6 +8,7 @@ The UjenziXform app reads that table on **Analytics → Site vision** (no servic
 
 - [`SITE_VISION_WORKER_LAYMANS_GUIDE.txt`](./SITE_VISION_WORKER_LAYMANS_GUIDE.txt) — what the worker does and how to run it.
 - [`CAMERAS_AND_SITE_SETUP_GUIDE.txt`](./CAMERAS_AND_SITE_SETUP_GUIDE.txt) — recommended cameras, how to connect streams, site PC setup, and what is still pending.
+- App-wide pending items: [`docs/UJENZIXFORM_PENDING_AND_FUTURE_WORK.txt`](../docs/UJENZIXFORM_PENDING_AND_FUTURE_WORK.txt)
 
 ## Python version (Windows)
 

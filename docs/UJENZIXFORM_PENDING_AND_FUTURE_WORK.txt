@@ -1,0 +1,104 @@
+================================================================================
+UJENZIXFORM — WORK STILL PENDING OR INCOMPLETE (PLAIN-LANGUAGE SUMMARY)
+================================================================================
+
+This note lists areas of the application that are partly done, marked as future
+work in code, or still thin compared to a full production product. It is written
+in paragraph form so you can open it in Notepad or Word, share it, or print or
+save as PDF from your editor or printer dialog.
+
+The list reflects the codebase and product discussions as of early 2026. It is
+not a promise of delivery order; use it as a planning checklist.
+
+
+SITE VISION AND MACHINE LEARNING
+--------------------------------------------------------------------------------
+
+The site vision pipeline is a working skeleton: a database table for events, a
+Python worker that can read camera streams, motion detection, and optional YOLO
+for generic object classes. What is not yet delivered as a finished product is
+custom-trained computer vision for every construction material label, and any
+certified workplace PPE compliance product. Those would require more data,
+model work, or a third-party integration.
+
+The database includes a field for image references, but the worker does not yet
+fully attach saved thumbnail images to every alert in a polished way. Events
+today are mostly metadata plus optional payloads.
+
+Writing events with the Supabase service role on a laptop is acceptable for a
+pilot; a stricter design might later route inserts through a signed HTTP edge
+function so the long-lived key never sits on a field PC. That hardening step
+remains optional.
+
+Consumer-style links such as GoPro cloud gallery pages are still not valid
+stream addresses for the worker. The product still assumes you supply RTSP, HLS
+with a real stream URL, or another format OpenCV and VLC can open directly.
+
+
+MONITORING AND ACCESS CONTROL
+--------------------------------------------------------------------------------
+
+Row-level security for cameras has historically been permissive in some
+migrations to unblock development. Tightening who may see which camera or
+project, especially for multi-tenant privacy, may still be required before you
+treat Monitoring as fully production-grade for sensitive sites.
+
+The Analytics site vision screen reads events as an authenticated Supabase user.
+Some administrator sessions that rely only on browser local storage without a
+normal Supabase JWT may not see the same rows. Aligning admin sign-in with
+database rules is still an area to clarify for a consistent experience.
+
+
+BROADER APPLICATION FEATURES
+--------------------------------------------------------------------------------
+
+Central error reporting to a service such as Sentry is referenced in code but
+not fully wired; today errors are mostly console and user-facing toasts.
+
+Parts of delivery and tracking logic still have placeholders for SMS and email
+notifications when phone or email is available; those channels may not fire in
+every path until implemented end to end.
+
+In the admin dashboard, some registration workflows still lack a full “view
+details” experience for every row. The professional builder dashboard may defer
+re-enabling certain client name fields until a specific database migration is
+confirmed on all environments.
+
+On supplier-facing material grids, quote request and buy-now flows may still
+need tighter connection to the real backend in every branch of the UI.
+
+Payment integrations include paths where a mobile money provider is described
+as not implemented yet, so users in those flows may hit errors until that work is
+completed.
+
+The suppliers experience on small iPhone-oriented screens still shows “coming
+soon” for several sections instead of full feature parity with desktop.
+
+
+OPERATIONS AND DOCUMENTATION
+--------------------------------------------------------------------------------
+
+The site vision worker is documented to run as a manual Python process. There
+is no single packaged recipe in the repository for running it as a Windows
+service, scheduled task, or Docker container on site hardware; operations teams
+would add that themselves or ask for it in a future iteration.
+
+The application has many detailed markdown documents in the docs folder, but
+there is no single short “operations manual” that merges vision, monitoring,
+payments, and admin into one printable booklet unless you assemble it from
+several files.
+
+
+CLOSING SUMMARY
+--------------------------------------------------------------------------------
+
+In one sentence, the platform is broad and usable for real pilots, but site
+vision is still a motion-first pipeline rather than a full smart-site product,
+security and notification layers deserve another pass for strict production,
+several UI and payment paths still carry TODO markers, and running the vision
+worker reliably on site is still partly an operational responsibility outside
+the web deployment on Vercel.
+
+================================================================================
+End of document
+================================================================================
