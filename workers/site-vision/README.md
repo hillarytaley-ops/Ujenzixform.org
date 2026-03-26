@@ -24,6 +24,53 @@ Those are **HTML share pages** for humans in a browser. **OpenCV cannot use them
 
 Update the **`cameras.stream_url`** in Supabase to that direct URL.
 
+### Step-by-step: replace GoPro gallery links with a real stream
+
+**1. Confirm in VLC (before touching the database)**  
+[VLC](https://www.videolan.org/) → **Media** → **Open Network Stream** → paste the URL → **Play**.  
+If you only see a webpage, login, or error — that URL is **not** a stream. Keep looking until VLC shows **live video**.
+
+**2. IP / security cameras (Hikvision, Dahua, Reolink, Ubiquiti, etc.)**  
+These usually expose **RTSP**. The format is in the **manual** or the vendor app (often under *Device info / Network / RTSP*). Typical patterns (yours may differ):
+
+| Vendor (example) | RTSP URL pattern (example only) |
+|--------------------|----------------------------------|
+| Many Hikvision     | `rtsp://USER:PASS@192.168.1.64:554/Streaming/Channels/101` |
+| Many Dahua         | `rtsp://USER:PASS@192.168.1.108:554/cam/realmonitor?channel=1&subtype=0` |
+| Some Reolink       | `rtsp://USER:PASS@192.168.1.100:554/h264Preview_01_main` |
+
+- Use the camera or NVR **LAN IP** if the worker PC is on the **same site Wi‑Fi**.  
+- Put **username and password** in the URL if the device requires auth (special characters in passwords may need [URL-encoding](https://developer.mozilla.org/en-US/docs/Glossary/Percent-encoding)).
+
+**3. NVR / cloud that outputs HLS**  
+Some systems give an **`.m3u8`** link (Apple HLS). That often works in VLC and with OpenCV. Use the **exact** URL the NVR/software provides for “streaming” or “live view”, not the admin web page.
+
+**4. GoPro (`gopro.com/v/...`) — important limitation**  
+The **web gallery link is not a stream** and is not meant for OpenCV. Options:
+
+- **GoPro “Live” / streaming** (model-dependent): stream to **YouTube**, **Facebook**, or a custom **RTMP** endpoint you control; then use whatever **playback URL** that platform exposes (often still not trivial for a worker — many are browser-only).  
+- **Practical for construction CV:** add **IP cameras** or an **NVR** with RTSP on site, and point `stream_url` at those.  
+- **USB / webcam GoPro** on the **same PC** as the worker is a different setup (local device), not a `gopro.com` URL.
+
+**5. Put the working URL into Supabase**
+
+1. Open [Supabase Dashboard](https://supabase.com/dashboard) → your project.  
+2. **Table Editor** → **`cameras`**.  
+3. Find the row (e.g. “Entrance”, “Moama”).  
+4. Edit **`stream_url`**: paste the URL that **worked in VLC**.  
+5. Save. Keep **`is_active`** = true if you want the worker to use it.
+
+Alternatively: **SQL** → New query (replace UUID and URL):
+
+```sql
+update public.cameras
+set stream_url = 'rtsp://user:pass@192.168.1.64:554/Streaming/Channels/101'
+where id = 'YOUR-CAMERA-UUID';
+```
+
+**6. Restart the worker**  
+Stop with Ctrl+C, then run `python main.py` again (or `.venv\Scripts\python.exe main.py` on Windows).
+
 ## Setup
 
 ```bash
