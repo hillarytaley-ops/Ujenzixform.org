@@ -1,0 +1,165 @@
+================================================================================
+SITE VISION WORKER — PLAIN-LANGUAGE GUIDE
+UjenziXform / MradiPro · workers/site-vision
+================================================================================
+
+You can save this file from your project folder or from GitHub and open it in
+Notepad, Word, or any text editor. To make a PDF, open it in Word (or print
+from Notepad) and choose Print → Save as PDF.
+
+
+WHAT THIS THING IS
+--------------------------------------------------------------------------------
+
+You have a small program that runs on a laptop or mini PC at the site (or
+office). It looks up your cameras in the database (Supabase). For each camera,
+it tries to grab a snapshot from the video stream — not from a normal website
+link. It notices movement and can optionally use AI to spot people or vehicles.
+It then writes short notes into the database, such as “something moved on
+camera X at this time.” Your website (Analytics) reads those notes so you see
+charts and lists. The website itself does not process the video; only this
+worker program does the heavy lifting with the camera feeds.
+
+
+PYTHON VERSION
+--------------------------------------------------------------------------------
+
+The program is written in Python. On Windows, Python 3.11 or 3.12 is usually
+the smoothest choice. Python 3.13 can work if you follow the install steps in
+the README (correct package versions matter).
+
+
+BEFORE YOU START (PREREQUISITES)
+--------------------------------------------------------------------------------
+
+Someone needs to have added a database table for “vision events” in Supabase
+(using the migration in the project). Without that table, the program has
+nowhere to save its notes. That table must exist in your Supabase project.
+
+Your camera links must be real video addresses — similar to a direct TV
+channel address. That usually means RTSP, or a special web link ending in .m3u8
+(HLS). It cannot be a normal “watch in browser” page, such as a GoPro share
+link. Those pages are built for humans in a browser, not for this program.
+
+
+GOPRO / GOPRO.COM LINKS
+--------------------------------------------------------------------------------
+
+A GoPro share page is like a YouTube watch page: it is meant for people
+clicking in a browser. The worker needs something closer to the raw video feed
+that a player would use behind the scenes. GoPro’s public gallery link is
+usually not that kind of simple address. So you cannot paste the same link you
+might email to a friend and expect this script to open the video automatically.
+
+
+STEP-BY-STEP (SIMPLE VERSION)
+--------------------------------------------------------------------------------
+
+First, test any candidate URL in VLC. VLC is a free video player. Use Media →
+Open Network Stream, paste the URL, and press Play. If you see live camera
+video, the URL is probably suitable. If you get a webpage, a login screen, or
+an error, it is not a direct stream — keep looking.
+
+Many IP security cameras expose an RTSP address: a long rtsp:// line that
+includes IP address, username, and password. You find the exact format in the
+camera manual or in the vendor’s app, often under device or network settings.
+The project README lists example patterns; your camera may use a slightly
+different path.
+
+Some NVRs or cloud systems give an HLS link ending in .m3u8. The same rule
+applies: if VLC plays it reliably, you can try it in the worker.
+
+For GoPro specifically, the cloud gallery link is not a stream this tool can
+use. Real options include using other cameras that support RTSP, or setting up
+a more complex live-stream pipeline. For most construction-site setups, adding
+IP cameras on the local network is the practical approach.
+
+When you have a URL that works in VLC, save it in Supabase. Open your Supabase
+project, go to Table Editor, open the cameras table, select each camera row,
+and paste the working URL into the stream_url field. Save the row.
+
+Finally, restart the worker program: stop it with Ctrl+C if it is running, then
+start it again (for example python main.py or .venv\Scripts\python.exe main.py
+on Windows) so it picks up the new URLs.
+
+
+SETUP AND RUN (WHAT THE COMMANDS MEAN)
+--------------------------------------------------------------------------------
+
+A virtual environment (venv) is a private toolbox for this project so Python
+libraries you install here do not clash with other projects on the same
+computer.
+
+The command pip install -r requirements.txt installs the listed libraries,
+including OpenCV and the Supabase client.
+
+The file .env is a small local file that should hold your Supabase project URL
+and the service role key. That key is secret and must never be put in the
+public website or in browser-visible environment variables on Vercel.
+
+Running python main.py starts the worker. Leave that terminal window open while
+you want the worker to keep running.
+
+
+ENVIRONMENT SETTINGS (THE “KNOBS”)
+--------------------------------------------------------------------------------
+
+You can adjust how many seconds pass between full rounds of checking all
+cameras, how sensitive motion detection is (higher values mean fewer motion
+events), and how long to wait before recording a similar event again so the
+database is not flooded. YOLO is an optional add-on for smarter detection of
+people and vehicles; it is off unless you enable it and install the extra
+package.
+
+
+SECURITY
+--------------------------------------------------------------------------------
+
+The Supabase service role key is like a master key to your database. Only this
+worker (or other trusted server-side tools you control) should ever see it.
+Never embed it in the React app or in client-side Vercel settings.
+
+
+OPERATIONS (MANY CAMERAS AND NETWORK)
+--------------------------------------------------------------------------------
+
+If you have many cameras — for example around ten — the worker normally does
+one pass per camera per cycle. That is expected. If the PC becomes slow or hot,
+increase the interval between cycles so it rests longer between rounds.
+
+If you use RTSP with local addresses such as 192.168.x.x, the computer running
+the script should be on the same Wi-Fi or LAN as those cameras so it can reach
+them.
+
+If your stream URL is a public HLS link on the internet, the worker can run on
+any machine that can reach that URL, not necessarily on the construction site.
+
+
+TROUBLESHOOTING (BRIEF)
+--------------------------------------------------------------------------------
+
+A “proxy” related error usually means incompatible library versions; reinstall
+using the pinned requirements.txt as documented.
+
+A pyiceberg build error on Windows means do not upgrade Supabase to the latest
+version without developer build tools; use the versions pinned in requirements.
+
+“Cannot open stream” means the URL is wrong for OpenCV, or the network blocks
+access; confirm with VLC and fix stream_url in the database.
+
+If the Analytics page shows no vision data, you might be using an admin session
+that never signed in through Supabase; row-level security may block reads unless
+you use a normal authenticated user.
+
+
+ONE-SENTENCE SUMMARY
+--------------------------------------------------------------------------------
+
+A small Python job on a PC reads real video stream URLs from your database,
+watches for motion, saves short events to Supabase, and your Analytics page
+displays them — but the URLs must be real streams (verify in VLC), not GoPro
+gallery web pages.
+
+================================================================================
+End of guide
+================================================================================
