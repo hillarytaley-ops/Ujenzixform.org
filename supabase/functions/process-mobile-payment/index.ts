@@ -40,10 +40,6 @@ serve(async (req) => {
     // Process payment based on provider
     let result;
     switch (paymentRequest.provider) {
-      case 'paystack':
-        throw new Error(
-          'Paystack is initialized in the browser; verify with the verify-paystack function using the transaction reference after checkout.'
-        );
       case 'mpesa':
         result = await processMpesaPayment(paymentRequest);
         break;

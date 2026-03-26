@@ -39,12 +39,6 @@ const ENV_CONFIG: EnvConfig[] = [
     validator: (v) => v.startsWith('pk_')
   },
   {
-    key: 'VITE_PAYSTACK_PUBLIC_KEY',
-    required: false,
-    description: 'Paystack public key for checkout (pk_test_… / pk_live_…)',
-    validator: (v) => v.startsWith('pk_test_') || v.startsWith('pk_live_')
-  },
-  {
     key: 'VITE_GOOGLE_MAPS_API_KEY',
     required: false,
     description: 'Google Maps API key for location services'
