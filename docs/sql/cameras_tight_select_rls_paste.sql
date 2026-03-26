@@ -1,5 +1,10 @@
 -- Paste into Supabase Dashboard → SQL Editor → Run.
 -- Idempotent (safe to run again). Uses projects.builder_id + profiles.user_id (no owner_id).
+--
+-- Edge cases (not covered here — add policies later if you need them):
+--   • Cameras with project_id NULL → admin-only (via cameras_admin_manage).
+--   • Suppliers/partners viewing project cameras → needs a clear schema link
+--     (e.g. project.supplier_id or monitoring request) before extending this policy.
 
 DROP POLICY IF EXISTS "cameras_select_project_owner_or_admin" ON public.cameras;
 DROP POLICY IF EXISTS "cameras_view_all" ON public.cameras;

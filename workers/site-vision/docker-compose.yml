@@ -1,0 +1,9 @@
+# Site vision worker — docker compose up -d
+# Requires .env next to this file (see .env.example).
+
+services:
+  site-vision:
+    build: .
+    restart: unless-stopped
+    env_file:
+      - .env

@@ -181,8 +181,8 @@ const DeliverySignIn = () => {
    * 2. Be shown the sign-in form (not authenticated)
    * 3. Be redirected to their correct portal (wrong role)
    * 
-   * CRITICAL: localStorage check MUST come FIRST to prevent redirect loops.
-   * The RoleProtectedRoute trusts localStorage, so we must set it correctly here.
+   * CRITICAL: resolve Supabase user first to prevent redirect loops.
+   * RoleProtectedRoute grants access only with a valid session + user_roles row (not localStorage alone).
    * 
    * @lastModified December 2025
    * ═══════════════════════════════════════════════════════════════════════════════
