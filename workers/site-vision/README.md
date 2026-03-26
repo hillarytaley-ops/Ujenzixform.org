@@ -12,7 +12,17 @@ Use **64-bit Python 3.11 or 3.12** from [python.org](https://www.python.org/down
 
 1. Apply the Supabase migration: `supabase/migrations/20260326120000_site_vision_events.sql` (or push migrations from CI).
 2. In **Supabase → SQL** or dashboard, confirm table `site_vision_events` exists.
-3. **Monitoring** cameras must have a working `stream_url` (RTSP or HLS; OpenCV/FFmpeg must decode it on the machine running this worker).
+3. **Monitoring** cameras must have a **`stream_url` OpenCV can open** — typically **RTSP**, **RTMP**, or **HLS (`.m3u8`)**, not a normal web page.
+
+### GoPro / gallery links (`gopro.com/v/...`)
+
+Those are **HTML share pages** for humans in a browser. **OpenCV cannot use them.** You need a **direct stream** from your setup, for example:
+
+- RTSP from the camera or NVR (check the device manual / app).
+- An **HLS `.m3u8`** URL if your NVR or cloud product exposes one.
+- **VLC test:** *Media → Open Network Stream* — if VLC cannot play it, the worker cannot either.
+
+Update the **`cameras.stream_url`** in Supabase to that direct URL.
 
 ## Setup
 

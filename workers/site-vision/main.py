@@ -66,8 +66,12 @@ MIN_EVENT_GAP_SEC = float(os.environ.get("MIN_EVENT_GAP_SEC", "20"))
 USE_YOLO = os.environ.get("USE_YOLO", "0").lower() in ("1", "true", "yes")
 SOURCE_WORKER = os.environ.get("SOURCE_WORKER", "site-vision-python-v1")
 YOLO_MODEL = os.environ.get("YOLO_MODEL", "yolov8n.pt")
+# Min seconds between repeated "cannot open" / "read failed" logs per camera (stops console spam)
+LOG_STREAM_ERRORS_EVERY_SEC = float(os.environ.get("LOG_STREAM_ERRORS_EVERY_SEC", "120"))
 
 _last_emit: dict[tuple[str, str], float] = {}
+_last_stream_error_log: dict[tuple[str, str], float] = {}
+_stream_error_counts: dict[tuple[str, str], int] = {}
 
 
 def _now_ts() -> float:
@@ -223,6 +227,37 @@ def open_capture(url: str) -> cv2.VideoCapture:
     return cv2.VideoCapture(url, cv2.CAP_FFMPEG)
 
 
+def _log_stream_error(cam_id: str, name: str, kind: str, detail: str, url: str) -> None:
+    key = (cam_id, kind)
+    now = time.time()
+    prev = _last_stream_error_log.get(key, 0)
+    if now - prev < LOG_STREAM_ERRORS_EVERY_SEC:
+        _stream_error_counts[key] = _stream_error_counts.get(key, 0) + 1
+        return
+    _last_stream_error_log[key] = now
+    n = _stream_error_counts.get(key, 0) + 1
+    _stream_error_counts[key] = 0
+    suffix = f" (x{n} failures since last log)" if n > 1 else ""
+    print(f"[site-vision] {kind}: {name}{suffix} — {detail}")
+    if n > 1:
+        print(f"  url: {url[:96]}{'...' if len(url) > 96 else ''}")
+
+
+def _stream_url_hint(url: str) -> str:
+    u = url.lower()
+    if "gopro.com/v/" in u or "gopro.com/channels" in u:
+        return (
+            "GoPro share pages are websites, not video streams. Use an RTSP/RTMP URL from the camera/NVR, "
+            "or an HLS .m3u8 link your NVR/cloud provides — not the browser gallery link."
+        )
+    if u.startswith("http") and "m3u8" not in u and "mjpeg" not in u and "mp4" not in u:
+        return (
+            "Many HTTPS URLs are HTML pages; OpenCV needs a direct stream (RTSP, or HLS .m3u8, or MJPEG). "
+            "Test the URL in VLC (Media → Open Network Stream)."
+        )
+    return "Use a URL that works in VLC → Open Network Stream (RTSP or HLS .m3u8)."
+
+
 def main() -> None:
     sb = get_supabase()
     yolo = load_yolo()
@@ -246,16 +281,23 @@ def main() -> None:
             continue
 
         for cam in cams:
-            url = cam["stream_url"]
+            url = (cam.get("stream_url") or "").strip()
             name = cam.get("name") or cam["id"]
+            cid = str(cam["id"])
             cap = open_capture(url)
             if not cap.isOpened():
-                print(f"[site-vision] cannot open: {name} ({str(url)[:64]}...)")
+                _log_stream_error(
+                    cid,
+                    name,
+                    "cannot open stream",
+                    _stream_url_hint(url),
+                    url,
+                )
                 continue
             ok, frame = cap.read()
             cap.release()
             if not ok or frame is None:
-                print(f"[site-vision] read failed: {name}")
+                _log_stream_error(cid, name, "read failed", "Opened but no frame (codec/end of stream?)", url)
                 continue
 
             try:
