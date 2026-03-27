@@ -107,6 +107,12 @@ export const RoleProtectedRoute = ({ children, allowedRoles }: RoleProtectedRout
   }
 
   const correctDashboard = DASHBOARDS[dbRole] || '/home';
+  // Avoid Navigate to the same path: remounts this guard and traps the UI on the loading spinner
+  // (e.g. DB role is `builder` but allowedRoles only listed `professional_builder`).
+  if (correctDashboard === location.pathname) {
+    return <>{children}</>;
+  }
+
   return <Navigate to={correctDashboard} replace />;
 };
 

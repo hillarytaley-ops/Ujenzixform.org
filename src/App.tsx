@@ -340,7 +340,7 @@ const App = () => {
                       </RoleProtectedRoute>
                     } />
                     <Route path="/professional-builder-dashboard" element={
-                      <RoleProtectedRoute allowedRoles={['professional_builder', 'admin']}>
+                      <RoleProtectedRoute allowedRoles={['professional_builder', 'builder', 'admin']}>
                         <SuspenseWrapper><ProfessionalBuilderDashboardPage /></SuspenseWrapper>
                       </RoleProtectedRoute>
                     } />
