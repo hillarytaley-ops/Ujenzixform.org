@@ -1,6 +1,6 @@
 import * as React from "react";
-import { Menu } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { HamburgerMenuIcon } from "@/components/dashboard/HamburgerMenuIcon";
 import {
   Sheet,
   SheetContent,
@@ -22,9 +22,9 @@ type DashboardMobileActionSheetProps = {
 };
 
 /**
- * Hamburger + right sheet for dashboard header actions on small screens.
- * Use with `hidden md:flex` (or similar) for the inline desktop actions.
- * Mark interactive blocks that should not close the sheet (Select, language menu) with `data-keep-sheet-open`.
+ * Classic hamburger (☰) opens a right sheet with dashboard navigation/actions.
+ * Use with `hidden md:flex` (or similar) for inline desktop controls.
+ * Mark blocks that should not close the sheet (Select, language menu) with `data-keep-sheet-open`.
  */
 export function DashboardMobileActionSheet({
   title,
@@ -51,17 +51,18 @@ export function DashboardMobileActionSheet({
           variant="outline"
           size="icon"
           className={cn(
-            "h-10 w-10 shrink-0 md:hidden border-border bg-background/95 shadow-sm",
+            "h-11 w-11 shrink-0 rounded-xl border-2 md:hidden border-border/80 bg-background/95 p-0 shadow-sm",
             triggerClassName
           )}
-          aria-label="Open menu"
+          aria-label="Open navigation menu"
+          aria-haspopup="dialog"
         >
-          <Menu className="h-5 w-5" />
+          <HamburgerMenuIcon className="h-[22px] w-[22px]" />
         </Button>
       </SheetTrigger>
       <SheetContent side="right" className={cn("flex w-full flex-col sm:max-w-sm", contentClassName)}>
         <SheetHeader className="text-left">
-          <SheetTitle>{title}</SheetTitle>
+          <SheetTitle className="text-base font-semibold">{title}</SheetTitle>
           {description ? (
             <p className="text-sm text-muted-foreground">{description}</p>
           ) : null}
