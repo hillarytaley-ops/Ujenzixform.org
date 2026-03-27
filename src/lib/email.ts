@@ -339,9 +339,34 @@ export interface SendEmailParams {
   from?: string;
 }
 
-/** Sends mail through the deployed Supabase Edge Function `send-email` (Resend). */
+/**
+ * Sends mail via same-origin Vercel API (`/api/send-email`) so the browser never hits Supabase
+ * Edge Function CORS. Falls back to `supabase.functions.invoke` when `/api/send-email` is missing (e.g. local Vite).
+ */
 export const sendEmailViaEdgeFunction = async (params: SendEmailParams): Promise<{ success: boolean; error?: string }> => {
   try {
+    const { data: { session } } = await supabase.auth.getSession();
+    const token = session?.access_token;
+    const origin = typeof window !== 'undefined' ? window.location.origin : '';
+
+    if (origin && token) {
+      const response = await fetch(`${origin}/api/send-email`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(params),
+      });
+      const payload = (await response.json().catch(() => ({}))) as { error?: string };
+      if (response.ok) {
+        return { success: true };
+      }
+      if (response.status !== 404) {
+        return { success: false, error: payload.error || `HTTP ${response.status}` };
+      }
+    }
+
     const { error } = await supabase.functions.invoke('send-email', { body: params });
     if (error) {
       return { success: false, error: error.message };

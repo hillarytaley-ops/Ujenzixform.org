@@ -186,6 +186,33 @@ class DeliveryProviderNotificationService {
     position: number
   ): Promise<boolean> {
     try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+      const origin = typeof window !== 'undefined' ? window.location.origin : '';
+
+      if (origin && token) {
+        const response = await fetch(`${origin}/api/delivery-provider-queue`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            providerId,
+            requestId,
+            queuePosition: position,
+          }),
+        });
+        const payload = (await response.json().catch(() => ({}))) as { error?: string };
+        if (response.ok) {
+          return true;
+        }
+        if (response.status !== 404) {
+          console.warn('⚠️ Could not queue provider notification:', payload.error || response.statusText);
+          return false;
+        }
+      }
+
       const { error } = await supabase
         .from('delivery_provider_queue')
         .insert({
@@ -194,17 +221,18 @@ class DeliveryProviderNotificationService {
           queue_position: position,
           status: 'notified',
           contacted_at: new Date().toISOString(),
-          timeout_at: new Date(Date.now() + 30 * 60 * 1000).toISOString() // 30 min timeout
+          timeout_at: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
         } as any);
-      
+
       if (error) {
         console.warn('⚠️ Could not queue provider notification:', error.message);
         return false;
       }
-      
+
       return true;
-    } catch (error: any) {
-      console.warn('⚠️ Queue notification error:', error?.message);
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : String(error);
+      console.warn('⚠️ Queue notification error:', msg);
       return false;
     }
   }
