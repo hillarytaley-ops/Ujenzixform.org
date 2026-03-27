@@ -17,7 +17,7 @@ import { Github, Mail, KeyRound, CheckCircle, Loader2, Shield } from "lucide-rea
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { SimplePasswordReset } from "@/components/SimplePasswordReset";
 
-console.log('🔐 Auth.tsx BUILD v35 - shared userRolesRest helper with RoleProtectedRoute');
+console.log('🔐 Auth.tsx BUILD v36 - signIn timeout race + finally always clears spinner');
 
 const DASHBOARDS: Record<string, string> = {
   admin: '/admin-dashboard',
@@ -46,6 +46,12 @@ function pickDashboardPath(roles: string[]): string | null {
     ROLE_REDIRECT_PRIORITY.find((r) => roles.includes(r)) ?? roles[0] ?? null;
   if (picked && DASHBOARDS[picked]) return DASHBOARDS[picked];
   return null;
+}
+
+const SIGN_IN_NETWORK_MS = 22_000;
+
+function rejectAfter(ms: number, message: string): Promise<never> {
+  return new Promise((_, rej) => setTimeout(() => rej(new Error(message)), ms));
 }
 
 const Auth = () => {
@@ -127,36 +133,26 @@ const Auth = () => {
       isSubmitting.current = false;
     };
 
-    const unlockTimer = window.setTimeout(() => {
-      console.warn('🔐 Sign-in: forcing button unlock');
-      passwordSignInFlowRef.current = false;
-      resetButton();
-    }, 18_000);
-
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email: signInEmail,
-        password: signInPassword,
-      });
+      const { data, error } = await Promise.race([
+        supabase.auth.signInWithPassword({
+          email: signInEmail,
+          password: signInPassword,
+        }),
+        rejectAfter(SIGN_IN_NETWORK_MS, 'SIGN_IN_TIMEOUT'),
+      ]);
 
       if (error) {
-        window.clearTimeout(unlockTimer);
         toast({ variant: "destructive", title: "Sign in failed", description: error.message });
-        passwordSignInFlowRef.current = false;
-        resetButton();
         return;
       }
 
       if (!data.session?.user) {
-        window.clearTimeout(unlockTimer);
         toast({ variant: 'destructive', title: 'Sign in failed', description: 'No session returned.' });
-        passwordSignInFlowRef.current = false;
-        resetButton();
         return;
       }
 
-      // Unlock the button as soon as credentials are OK — navigation runs next (users were stuck here forever when .from() deadlocked).
-      window.clearTimeout(unlockTimer);
+      // Stop showing "Signing in…" as soon as we have a session; navigation may take another second.
       resetButton();
 
       await new Promise((r) => setTimeout(r, 0));
@@ -171,17 +167,25 @@ const Auth = () => {
           description: 'You are signed in — try Home or refresh.',
         });
         navigate('/home', { replace: true });
-      } finally {
-        passwordSignInFlowRef.current = false;
       }
     } catch (err: unknown) {
-      window.clearTimeout(unlockTimer);
-      console.error('🔐 Sign in exception:', err);
-      toast({
-        variant: 'destructive',
-        title: 'Sign in failed',
-        description: err instanceof Error ? err.message : 'Unknown error',
-      });
+      const msg = err instanceof Error ? err.message : String(err);
+      if (msg === 'SIGN_IN_TIMEOUT') {
+        console.warn('🔐 signInWithPassword timed out');
+        toast({
+          variant: 'destructive',
+          title: 'Sign-in timed out',
+          description: 'Check your connection and try again.',
+        });
+      } else {
+        console.error('🔐 Sign in exception:', err);
+        toast({
+          variant: 'destructive',
+          title: 'Sign in failed',
+          description: err instanceof Error ? err.message : 'Unknown error',
+        });
+      }
+    } finally {
       passwordSignInFlowRef.current = false;
       resetButton();
     }
