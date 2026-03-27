@@ -288,44 +288,18 @@ export const useFeedback = () => {
     }
     
     try {
-      console.log('📝 Fetching feedback via REST API...');
-      
-      // Use REST API with timeout for reliability
-      const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
-      const ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
-      
-      let accessToken = ANON_KEY;
-      try {
-        const stored = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
-        if (stored) {
-          const parsed = JSON.parse(stored);
-          accessToken = parsed.access_token || ANON_KEY;
-        }
-      } catch (e) {}
-      
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 8000);
-      
-      const response = await fetch(
-        `${SUPABASE_URL}/rest/v1/feedback?select=*&order=created_at.desc`,
-        {
-          headers: {
-            'apikey': ANON_KEY,
-            'Authorization': `Bearer ${accessToken}`,
-          },
-          signal: controller.signal
-        }
-      );
-      clearTimeout(timeoutId);
-      
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
-      }
-      
-      const data = await response.json();
+      console.log('📝 Fetching feedback via Supabase client...');
+
+      const { data, error } = await supabase
+        .from('feedback')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(500);
+
+      if (error) throw error;
       console.log('📝 Feedback loaded:', data?.length || 0);
 
-      const formattedFeedback: FeedbackRecord[] = (data || []).map((f: Record<string, unknown>) => ({
+      const formattedFeedback: FeedbackRecord[] = (data ?? []).map((f: Record<string, unknown>) => ({
         id: f.id as string,
         user_email: (f.email as string) || (f.user_email as string) || 'Anonymous',
         message: (f.message as string) || (f.comment as string) || '',

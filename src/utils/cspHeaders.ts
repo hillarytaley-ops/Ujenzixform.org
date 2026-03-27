@@ -1,5 +1,8 @@
 // Content Security Policy configuration
 // Environment-aware CSP directives for enhanced security
+//
+// Tailwind and many UI libs need 'unsafe-inline' on style-src; removing it without a build-time
+// nonce pipeline often breaks the app. Tighten further on the edge (e.g. nonces) when you can test thoroughly.
 import { SUPABASE_URL } from '@/integrations/supabase/client';
 
 const isDevelopment = import.meta.env.MODE === 'development';

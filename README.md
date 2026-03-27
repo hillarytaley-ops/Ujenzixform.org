@@ -98,6 +98,7 @@ cp .env.example .env.local
 # VITE_SUPPORT_EMAIL=support@your-domain
 # VITE_SOCIAL_INSTAGRAM_URL=...
 # VITE_SOCIAL_TIKTOK_URL=...
+# Optional: VITE_SUPABASE_AUTH_STORAGE=session  (tab-scoped session; see docs/SECURITY_OPERATIONS.md)
 ```
 
 ## 📊 **Available Scripts**

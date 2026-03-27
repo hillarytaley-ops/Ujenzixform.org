@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { sanitizeChatBoldHtml } from '@/utils/sanitizeHtml';
 import { 
   MessageCircle, 
   X, 
@@ -2207,7 +2208,17 @@ ${staffOnline > 0 ? `\n💬 **${staffOnline} staff online** - Type "live chat" f
                     <div className="text-sm whitespace-pre-wrap leading-relaxed">
                       {message.content.split('\n').map((line, i) => (
                         <React.Fragment key={i}>
-                          {line.includes('**') ? <span dangerouslySetInnerHTML={{ __html: line.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>') }} /> : line}
+                          {line.includes('**') ? (
+                            <span
+                              dangerouslySetInnerHTML={{
+                                __html: sanitizeChatBoldHtml(
+                                  line.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                                ),
+                              }}
+                            />
+                          ) : (
+                            line
+                          )}
                           {i < message.content.split('\n').length - 1 && <br />}
                         </React.Fragment>
                       ))}

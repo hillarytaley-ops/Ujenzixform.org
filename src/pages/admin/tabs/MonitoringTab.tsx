@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { sanitizeCameraEmbedHtml } from '@/utils/sanitizeHtml';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -681,7 +682,7 @@ const CameraCard: React.FC<CameraCardProps> = ({
         <div className="w-full h-full flex items-center justify-center bg-black">
           <div 
             className="w-full h-full"
-            dangerouslySetInnerHTML={{ __html: camera.embed_code }}
+            dangerouslySetInnerHTML={{ __html: sanitizeCameraEmbedHtml(camera.embed_code) }}
           />
         </div>
       );

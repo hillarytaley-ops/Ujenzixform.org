@@ -13,7 +13,7 @@
  * ║   │  1. Uses ANON key (public, safe for client-side)                           │   ║
  * ║   │  2. PKCE flow for secure OAuth                                              │   ║
  * ║   │  3. Auto token refresh enabled                                              │   ║
- * ║   │  4. Session persisted in localStorage                                       │   ║
+ * ║   │  4. Session storage: localStorage (default) or sessionStorage (optional)    │   ║
  * ║   │  5. RLS policies enforce data access on server-side                         │   ║
  * ║   └─────────────────────────────────────────────────────────────────────────────┘   ║
  * ║                                                                                      ║
@@ -34,12 +34,17 @@ export const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiO
 // Alias for backward compatibility
 const SUPABASE_PUBLISHABLE_KEY = SUPABASE_ANON_KEY;
 
+// Optional: set VITE_SUPABASE_AUTH_STORAGE=session to use sessionStorage (clears when the tab
+// closes; slightly reduces XSS window vs long-lived localStorage — not a substitute for CSP / no XSS).
+const authStorage =
+  import.meta.env.VITE_SUPABASE_AUTH_STORAGE === 'session' ? sessionStorage : localStorage;
+
 // Import the supabase client like this:
 // import { supabase } from "@/integrations/supabase/client";
 
 export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
   auth: {
-    storage: localStorage,
+    storage: authStorage,
     persistSession: true,
     autoRefreshToken: true,
     detectSessionInUrl: true,

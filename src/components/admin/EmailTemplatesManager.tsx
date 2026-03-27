@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { sanitizeEmailPreviewHtml } from '@/utils/sanitizeHtml';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -286,7 +287,7 @@ export const EmailTemplatesManager: React.FC = () => {
                 <Label>HTML Preview</Label>
                 <div 
                   className="border rounded-md p-4 bg-white overflow-auto max-h-[400px]"
-                  dangerouslySetInnerHTML={{ __html: selectedTemplate.html_body }}
+                  dangerouslySetInnerHTML={{ __html: sanitizeEmailPreviewHtml(selectedTemplate.html_body) }}
                 />
               </div>
             </div>

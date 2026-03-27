@@ -25,8 +25,12 @@ Use **UjenziXform** in user-facing copy and new docs. **MradiPro** is retired; `
 ## Security notes
 
 - **No service role in the browser** — the SPA uses the anon key + user JWT; RLS must allow `admin` where needed. Service role belongs only in Edge Function secrets (or other server env).
-- **Session storage** — `localStorage` / client “encryption” are **XSS-sensitive**; authorization is always from Supabase Auth + RLS.
-- **`analytics_events`** — migration `20260328120000_analytics_events_tighten_insert_rls.sql` requires `user_id = auth.uid()` on insert and revokes anon INSERT.
+- **Session storage** — `localStorage` / client “encryption” are **XSS-sensitive**; authorization is always from Supabase Auth + RLS. Optional: `VITE_SUPABASE_AUTH_STORAGE=session` (see [SECURITY_OPERATIONS.md](./SECURITY_OPERATIONS.md)).
+- **`analytics_events`** — `20260328120000_analytics_events_tighten_insert_rls.sql` requires `user_id = auth.uid()` on insert and revokes anon INSERT; `20260328140000_analytics_admin_select_and_is_admin_grant.sql` lets **`is_admin()`** read all rows for admin views.
+- **HTML in React** — camera embeds, email previews, and chat bold HTML go through `src/utils/sanitizeHtml.ts` (best-effort; keep treating untrusted HTML carefully).
+- **Production headers** — `vercel.json` sets `X-Frame-Options`, `X-Content-Type-Options`, `Referrer-Policy`, and `Permissions-Policy` on all routes.
+
+Full runbook: [SECURITY_OPERATIONS.md](./SECURITY_OPERATIONS.md).
 
 ## Identity and storage keys
 
