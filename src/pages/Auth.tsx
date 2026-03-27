@@ -1,6 +1,7 @@
-// Auth Page - Build v30 - USE AUTH STATE CHANGE FOR REDIRECT
-import { useState, useRef, useEffect } from "react";
+// Auth Page — sign-in redirect must NOT await supabase.from() inside onAuthStateChange (deadlocks client).
+import { useState, useRef, useEffect, useCallback } from "react";
 import { Link } from "react-router-dom";
+import type { Session } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,9 +16,8 @@ import { Github, Mail, KeyRound, CheckCircle, Loader2, Shield } from "lucide-rea
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { SimplePasswordReset } from "@/components/SimplePasswordReset";
 
-console.log('🔐 Auth.tsx BUILD v31 - SAVE EMAIL TO LOCALSTORAGE Feb 21 2026');
+console.log('🔐 Auth.tsx BUILD v32 - deferred post-sign-in redirect (no deadlock in onAuthStateChange)');
 
-// Dashboard paths (must match DB `user_roles.role` — includes `builder` alias for professional builders)
 const DASHBOARDS: Record<string, string> = {
   admin: '/admin-dashboard',
   supplier: '/supplier-dashboard',
@@ -28,7 +28,6 @@ const DASHBOARDS: Record<string, string> = {
   private_client: '/private-client-dashboard',
 };
 
-/** When a user has multiple roles, pick redirect target deterministically */
 const ROLE_REDIRECT_PRIORITY = [
   'admin',
   'professional_builder',
@@ -39,6 +38,19 @@ const ROLE_REDIRECT_PRIORITY = [
   'private_client',
 ] as const;
 
+const ROLE_FETCH_MS = 10_000;
+
+async function fetchRolesWithTimeout(userId: string) {
+  const query = supabase.from('user_roles').select('role').eq('user_id', userId);
+  const result = await Promise.race([
+    query,
+    new Promise<{ data: null; error: { message: string } }>((resolve) =>
+      setTimeout(() => resolve({ data: null, error: { message: 'timeout' } }), ROLE_FETCH_MS)
+    ),
+  ]);
+  return result;
+}
+
 const Auth = () => {
   const [formLoading, setFormLoading] = useState(false);
   const [showResetDialog, setShowResetDialog] = useState(false);
@@ -47,89 +59,144 @@ const Auth = () => {
   const [signUpEmail, setSignUpEmail] = useState("");
   const [signUpPassword, setSignUpPassword] = useState("");
   const isSubmitting = useRef(false);
-  const isRedirecting = useRef(false);
+  /** Prevents double navigation when both listener and handleSignIn run */
+  const redirectOnceRef = useRef(false);
   const { toast } = useToast();
 
-  // Listen for auth state changes and redirect
-  useEffect(() => {
-    console.log('🔐 Setting up auth listener...');
-    
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log('🔐 Auth event:', event, session?.user?.email);
-      
-      if (event === 'SIGNED_IN' && session?.user && !isRedirecting.current) {
-        isRedirecting.current = true;
-        console.log('🔐 SIGNED_IN detected, fetching role...');
-        
-        // Save user email and ID to localStorage for Navigation display
-        if (session.user.email) {
-          localStorage.setItem('user_email', session.user.email);
-        }
-        localStorage.setItem('user_id', session.user.id);
-        
-        // Fetch roles via Supabase client (same URL/keys as app — avoids missing VITE_SUPABASE_URL on deploy)
-        try {
-          const { data: roleRows, error: roleError } = await supabase
-            .from('user_roles')
-            .select('role')
-            .eq('user_id', session.user.id);
+  const redirectAfterSignIn = useCallback(
+    async (session: Session) => {
+      if (redirectOnceRef.current) return;
+      redirectOnceRef.current = true;
 
-          if (roleError) {
-            console.error('🔐 Role query error:', roleError.message);
-          } else {
-            const roles = (roleRows ?? [])
-              .map((r: { role?: string }) => r?.role)
-              .filter((r): r is string => Boolean(r));
-            const picked =
-              ROLE_REDIRECT_PRIORITY.find((r) => roles.includes(r)) ?? roles[0];
-            console.log('🔐 Role data:', roles, '→', picked);
-
-            if (picked && DASHBOARDS[picked]) {
-              localStorage.setItem('user_role', picked);
-              console.log('🔐 Redirecting to:', DASHBOARDS[picked]);
-              toast({ title: '✅ Welcome back!' });
-              window.location.href = DASHBOARDS[picked];
-              return;
-            }
-          }
-        } catch (err) {
-          console.error('🔐 Role fetch error:', err);
-        }
-        
-        // No role - go to home
-        console.log('🔐 No role, going to home');
-        toast({ title: "✅ Signed in!" });
-        window.location.href = '/home';
+      if (session.user.email) {
+        localStorage.setItem('user_email', session.user.email);
       }
+      localStorage.setItem('user_id', session.user.id);
+
+      try {
+        const { data: roleRows, error: roleError } = await fetchRolesWithTimeout(session.user.id);
+
+        if (roleError && roleError.message !== 'timeout') {
+          console.error('🔐 Role query error:', roleError.message);
+        }
+
+        const rows = roleRows as { role?: string }[] | null;
+        const roles = (rows ?? [])
+          .map((r) => r?.role)
+          .filter((r): r is string => Boolean(r));
+        const picked =
+          ROLE_REDIRECT_PRIORITY.find((r) => roles.includes(r)) ?? roles[0];
+
+        console.log('🔐 Role data:', roles, '→', picked);
+
+        if (picked && DASHBOARDS[picked]) {
+          localStorage.setItem('user_role', picked);
+          toast({ title: '✅ Welcome back!' });
+          window.location.assign(DASHBOARDS[picked]);
+          return;
+        }
+
+        console.log('🔐 No mappable role, going to home');
+        toast({ title: '✅ Signed in!' });
+        window.location.assign('/home');
+      } catch (err) {
+        console.error('🔐 Post-sign-in redirect error:', err);
+        redirectOnceRef.current = false;
+        throw err;
+      }
+    },
+    [toast]
+  );
+
+  // OAuth / magic link / session restore: never await supabase in this callback (deadlock risk).
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      console.log('🔐 Auth event:', event, session?.user?.email);
+
+      if (event !== 'SIGNED_IN' || !session?.user) return;
+
+      window.setTimeout(() => {
+        void redirectAfterSignIn(session).catch((err) => {
+          console.error('🔐 Deferred redirect failed:', err);
+          toast({
+            variant: 'destructive',
+            title: 'Could not finish sign-in',
+            description: 'Try again or open the site from a fresh tab.',
+          });
+        });
+      }, 0);
     });
 
     return () => subscription.unsubscribe();
-  }, [toast]);
+  }, [toast, redirectAfterSignIn]);
 
-  // SIGN IN - just trigger the sign in, let auth listener handle redirect
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
     if (isSubmitting.current || formLoading) return;
     isSubmitting.current = true;
     setFormLoading(true);
 
-    console.log('🔐 Starting sign in for:', signInEmail);
-
-    const { error } = await supabase.auth.signInWithPassword({
-      email: signInEmail,
-      password: signInPassword
-    });
-
-    if (error) {
-      console.error('🔐 Sign in error:', error.message);
-      toast({ variant: "destructive", title: "Sign in failed", description: error.message });
+    const resetFormState = () => {
       setFormLoading(false);
       isSubmitting.current = false;
+    };
+
+    const safetyTimer = window.setTimeout(() => {
+      console.warn('🔐 Sign-in UI safety timeout — resetting button');
+      resetFormState();
+    }, 15_000);
+
+    try {
+      console.log('🔐 Starting sign in for:', signInEmail);
+
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: signInEmail,
+        password: signInPassword,
+      });
+
+      if (error) {
+        window.clearTimeout(safetyTimer);
+        console.error('🔐 Sign in error:', error.message);
+        toast({ variant: "destructive", title: "Sign in failed", description: error.message });
+        resetFormState();
+        return;
+      }
+
+      if (!data.session?.user) {
+        window.clearTimeout(safetyTimer);
+        toast({ variant: 'destructive', title: 'Sign in failed', description: 'No session returned.' });
+        resetFormState();
+        return;
+      }
+
+      // Run redirect outside the auth state callback stack (same deadlock rule as listener).
+      await new Promise((r) => setTimeout(r, 0));
+
+      try {
+        await redirectAfterSignIn(data.session);
+      } catch {
+        toast({
+          variant: 'destructive',
+          title: 'Sign-in incomplete',
+          description: 'Could not load your account. Try again.',
+        });
+        redirectOnceRef.current = false;
+      } finally {
+        window.clearTimeout(safetyTimer);
+        resetFormState();
+      }
+    } catch (err: unknown) {
+      window.clearTimeout(safetyTimer);
+      console.error('🔐 Sign in exception:', err);
+      toast({
+        variant: 'destructive',
+        title: 'Sign in failed',
+        description: err instanceof Error ? err.message : 'Unknown error',
+      });
+      resetFormState();
     }
-    // Don't reset loading - auth listener will handle redirect
   };
 
-  // SIGN UP
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
     if (isSubmitting.current || formLoading) return;
@@ -156,9 +223,13 @@ const Auth = () => {
         return;
       }
 
-      // If auto-confirmed, auth listener will handle redirect
-    } catch (err: any) {
-      toast({ variant: "destructive", title: "Error", description: err.message });
+      // Auto-confirmed: SIGNED_IN listener + deferred redirect handles navigation
+    } catch (err: unknown) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: err instanceof Error ? err.message : 'Unknown error',
+      });
       setFormLoading(false);
       isSubmitting.current = false;
     }
@@ -331,7 +402,6 @@ const Auth = () => {
               <Link to="/privacy" className="text-primary hover:underline">Privacy Policy</Link>
             </div>
 
-            {/* Staff Access Link */}
             <div className="mt-4 pt-4 border-t">
               <Link to="/admin-login">
                 <Button variant="outline" className="w-full bg-slate-800 text-white hover:bg-slate-700 border-slate-700">
