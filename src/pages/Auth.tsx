@@ -2,7 +2,8 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import type { Session } from "@supabase/supabase-js";
-import { supabase, SUPABASE_URL, SUPABASE_ANON_KEY } from "@/integrations/supabase/client";
+import { supabase } from "@/integrations/supabase/client";
+import { fetchUserRolesViaRest } from "@/lib/userRolesRest";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -16,7 +17,7 @@ import { Github, Mail, KeyRound, CheckCircle, Loader2, Shield } from "lucide-rea
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { SimplePasswordReset } from "@/components/SimplePasswordReset";
 
-console.log('🔐 Auth.tsx BUILD v34 - REST role fetch + navigate (no client deadlock, no stuck button)');
+console.log('🔐 Auth.tsx BUILD v35 - shared userRolesRest helper with RoleProtectedRoute');
 
 const DASHBOARDS: Record<string, string> = {
   admin: '/admin-dashboard',
@@ -39,49 +40,6 @@ const ROLE_REDIRECT_PRIORITY = [
   'delivery_provider',
   'private_client',
 ] as const;
-
-const ROLE_REST_TIMEOUT_MS = 14_000;
-
-function normalizeRoleToken(v: unknown): string {
-  if (v == null) return '';
-  return String(v).trim();
-}
-
-/** Load roles without supabase-js .from() — avoids auth client deadlocks after SIGNED_IN. */
-async function fetchRolesViaRest(userId: string, accessToken: string): Promise<string[]> {
-  const url = `${SUPABASE_URL}/rest/v1/user_roles?user_id=eq.${encodeURIComponent(userId)}&select=role`;
-  const ac = new AbortController();
-  const timer = window.setTimeout(() => ac.abort(), ROLE_REST_TIMEOUT_MS);
-  try {
-    const res = await fetch(url, {
-      method: 'GET',
-      signal: ac.signal,
-      headers: {
-        apikey: SUPABASE_ANON_KEY,
-        Authorization: `Bearer ${accessToken}`,
-        Accept: 'application/json',
-      },
-    });
-    const body: unknown = await res.json().catch(() => null);
-    if (!res.ok) {
-      console.error('🔐 user_roles REST HTTP', res.status, body);
-      return [];
-    }
-    if (!Array.isArray(body)) return [];
-    return body
-      .map((r: { role?: unknown }) => normalizeRoleToken((r as { role?: unknown }).role))
-      .filter(Boolean);
-  } catch (e) {
-    if ((e as Error)?.name === 'AbortError') {
-      console.warn('🔐 user_roles REST aborted (timeout)');
-    } else {
-      console.error('🔐 user_roles REST error:', e);
-    }
-    return [];
-  } finally {
-    window.clearTimeout(timer);
-  }
-}
 
 function pickDashboardPath(roles: string[]): string | null {
   const picked =
@@ -109,7 +67,7 @@ const Auth = () => {
       }
       localStorage.setItem('user_id', session.user.id);
 
-      const roles = await fetchRolesViaRest(session.user.id, session.access_token);
+      const roles = await fetchUserRolesViaRest(session.user.id, session.access_token);
       const path = pickDashboardPath(roles);
 
       console.log('🔐 Role data:', roles, '→', path);

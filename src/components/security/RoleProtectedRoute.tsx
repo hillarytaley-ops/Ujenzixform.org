@@ -1,13 +1,12 @@
 /**
- * RoleProtectedRoute — requires a valid Supabase session and a `user_roles` row.
- * Does not grant access from localStorage/cache alone (fixes stale admin UI after JWT expiry).
+ * RoleProtectedRoute — valid session + user_roles, aligned with Auth.tsx (REST role read avoids supabase-js hangs).
  */
 
 import { useState, useEffect, useRef } from 'react';
 import type { User } from '@supabase/supabase-js';
 import { Navigate, useLocation } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
-import { refreshSessionIfNeeded } from '@/lib/supabaseSession';
+import { fetchUserRolesViaRest } from '@/lib/userRolesRest';
 
 interface RoleProtectedRouteProps {
   children: React.ReactNode;
@@ -25,10 +24,8 @@ const DASHBOARDS: Record<string, string> = {
   super_admin: '/admin-dashboard',
 };
 
-/** Max wait before we stop blocking the UI (then show redirect / children). */
-const UNLOCK_MS = 12_000;
-const REFRESH_CAP_MS = 5_000;
-const GET_SESSION_CAP_MS = 8_000;
+/** Do not hang forever if getSession never resolves (rare). */
+const GET_SESSION_CAP_MS = 10_000;
 
 function pickRoleForRoute(roles: string[], allowed: string[]): string | null {
   if (!roles.length) return null;
@@ -47,31 +44,9 @@ export const RoleProtectedRoute = ({ children, allowedRoles }: RoleProtectedRout
 
   useEffect(() => {
     let cancelled = false;
-    const timedOutRef = { current: false };
-
-    const timer = window.setTimeout(() => {
-      timedOutRef.current = true;
-      if (cancelled) return;
-      console.warn('RoleProtectedRoute: timed out — unlock UI (check network / user_roles RLS)');
-      setSessionUser(null);
-      setDbRole(null);
-      setReady(true);
-    }, UNLOCK_MS);
-
-    const end = () => {
-      window.clearTimeout(timer);
-      if (!cancelled) setReady(true);
-    };
 
     void (async () => {
       try {
-        await Promise.race([
-          refreshSessionIfNeeded(),
-          new Promise<void>((resolve) => setTimeout(resolve, REFRESH_CAP_MS)),
-        ]);
-
-        if (cancelled || timedOutRef.current) return;
-
         const sessionResult = await Promise.race([
           supabase.auth.getSession(),
           new Promise<{ data: { session: null } }>((resolve) =>
@@ -79,7 +54,7 @@ export const RoleProtectedRoute = ({ children, allowedRoles }: RoleProtectedRout
           ),
         ]);
 
-        if (cancelled || timedOutRef.current) return;
+        if (cancelled) return;
 
         const session = sessionResult.data?.session ?? null;
 
@@ -91,46 +66,31 @@ export const RoleProtectedRoute = ({ children, allowedRoles }: RoleProtectedRout
 
         setSessionUser(session.user);
 
-        const { data: roleRows, error } = await supabase
-          .from('user_roles')
-          .select('role')
-          .eq('user_id', session.user.id);
+        const roleStrings = await fetchUserRolesViaRest(session.user.id, session.access_token);
 
-        if (cancelled || timedOutRef.current) return;
+        if (cancelled) return;
 
-        const roleStrings = (roleRows ?? [])
-          .map((r: { role?: string }) => r?.role)
-          .filter((r): r is string => Boolean(r));
-
-        if (error) {
-          console.warn('RoleProtectedRoute: user_roles fetch failed', error.message);
-          setDbRole(null);
+        const picked = pickRoleForRoute(roleStrings, allowedRef.current);
+        if (picked) {
+          setDbRole(picked);
+          localStorage.setItem('user_role', picked);
         } else {
-          const picked = pickRoleForRoute(roleStrings, allowedRef.current);
-          if (picked) {
-            setDbRole(picked);
-            localStorage.setItem('user_role', picked);
-          } else {
-            setDbRole(null);
-            localStorage.removeItem('user_role');
-          }
+          setDbRole(null);
+          localStorage.removeItem('user_role');
         }
       } catch (e) {
-        console.error('RoleProtectedRoute: session check failed', e);
-        if (!cancelled && !timedOutRef.current) {
+        console.error('RoleProtectedRoute: check failed', e);
+        if (!cancelled) {
           setSessionUser(null);
           setDbRole(null);
         }
       } finally {
-        // Always unblock the UI when this async flow finishes (unless unmounted).
-        // Do not gate on timedOut — that left ready=false in edge races with the unlock timer.
-        end();
+        if (!cancelled) setReady(true);
       }
     })();
 
     return () => {
       cancelled = true;
-      window.clearTimeout(timer);
     };
   }, []);
 
