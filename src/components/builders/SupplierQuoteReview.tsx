@@ -922,6 +922,13 @@ export const SupplierQuoteReview: React.FC<SupplierQuoteReviewProps> = ({
     }).format(amount);
   };
 
+  const humanizeRawStatus = (s: string) =>
+    s
+      .trim()
+      .split('_')
+      .map((part) => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
+      .join(' ');
+
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'pending':
@@ -942,7 +949,11 @@ export const SupplierQuoteReview: React.FC<SupplierQuoteReviewProps> = ({
       case 'quote_rejected':
         return <Badge className="bg-red-100 text-red-700 border-red-300">❌ Rejected</Badge>;
       default:
-        return <Badge variant="outline">{status}</Badge>;
+        return (
+          <Badge variant="outline" className="whitespace-normal break-words text-left max-w-full">
+            {humanizeRawStatus(status)}
+          </Badge>
+        );
     }
   };
 
@@ -1064,11 +1075,14 @@ export const SupplierQuoteReview: React.FC<SupplierQuoteReviewProps> = ({
                           
                           {/* Material Info */}
                           <div className="mt-3 p-3 bg-gray-50 rounded-lg">
-                            <div className="flex items-center gap-2 text-sm">
-                              <Package className="h-4 w-4 text-gray-500" />
-                              <span className="font-medium">{quote.material_name}</span>
-                              <span className="text-gray-500">•</span>
-                              <span>{quote.quantity} {quote.unit}</span>
+                            <div className="flex items-start gap-2 text-sm min-w-0">
+                              <Package className="h-4 w-4 text-gray-500 shrink-0 mt-0.5" />
+                              <div className="min-w-0 flex-1">
+                                <span className="font-medium break-words leading-snug block">{quote.material_name}</span>
+                                <span className="text-gray-500 text-xs sm:text-sm mt-0.5 block">
+                                  {quote.quantity} {quote.unit}
+                                </span>
+                              </div>
                             </div>
                             {quote.project_description && (
                               <p className="text-xs text-gray-500 mt-1">
@@ -1091,7 +1105,7 @@ export const SupplierQuoteReview: React.FC<SupplierQuoteReviewProps> = ({
                     </div>
 
                     {/* Price & Actions */}
-                    <div className="flex flex-col items-end gap-3 min-w-[200px]">
+                    <div className="flex flex-col items-stretch gap-3 w-full lg:w-auto lg:min-w-[200px] lg:items-end">
                       {/* Price Display */}
                       <div className="text-right bg-green-50 p-3 rounded-lg border border-green-200 w-full">
                         <p className="text-xs text-green-600 font-medium">Quoted Price</p>
@@ -1155,13 +1169,25 @@ export const SupplierQuoteReview: React.FC<SupplierQuoteReviewProps> = ({
           </CardHeader>
           <CardContent className="space-y-2">
             {pendingQuotes.map((quote) => (
-              <div key={quote.id} className={`p-2 rounded-lg border flex items-center justify-between ${isDarkMode ? 'bg-slate-700 border-slate-600' : 'bg-gray-50'}`}>
-                <div className="flex items-center gap-2 flex-1 min-w-0">
-                  <Package className="h-4 w-4 text-gray-400 flex-shrink-0" />
-                  <span className={`font-medium truncate ${textColor}`}>{quote.material_name}</span>
-                  <span className={`text-xs ${mutedText}`}>×{quote.quantity}</span>
+              <div
+                key={quote.id}
+                className={`p-3 rounded-lg border flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-3 ${
+                  isDarkMode ? 'bg-slate-700 border-slate-600' : 'bg-gray-50'
+                }`}
+              >
+                <div className="flex items-start gap-2 flex-1 min-w-0">
+                  <Package className="h-4 w-4 text-gray-400 shrink-0 mt-0.5" />
+                  <div className="min-w-0 flex-1">
+                    <span className={`font-medium block break-words leading-snug ${textColor}`}>{quote.material_name}</span>
+                    <span className={`text-xs ${mutedText} block mt-0.5`}>Qty ×{quote.quantity}</span>
+                  </div>
                 </div>
-                <Badge variant="outline" className="text-yellow-600 border-yellow-300 text-xs ml-2">⏳ Awaiting</Badge>
+                <Badge
+                  variant="outline"
+                  className="text-yellow-600 border-yellow-300 text-xs shrink-0 self-start sm:self-center whitespace-normal"
+                >
+                  ⏳ Awaiting
+                </Badge>
               </div>
             ))}
           </CardContent>
@@ -1179,17 +1205,28 @@ export const SupplierQuoteReview: React.FC<SupplierQuoteReviewProps> = ({
           </CardHeader>
           <CardContent className="space-y-2">
             {acceptedQuotes.map((quote) => (
-              <div key={quote.id} className={`p-2 rounded-lg border flex items-center justify-between ${isDarkMode ? 'bg-slate-700 border-slate-600' : 'bg-green-50 border-green-200'}`}>
-                <div className="flex items-center gap-2 flex-1 min-w-0">
-                  <QrCode className="h-4 w-4 text-green-600 flex-shrink-0" />
-                  <span className={`font-medium truncate ${isDarkMode ? 'text-white' : 'text-green-800'}`}>
-                    {quote.material_name}
-                  </span>
-                  <span className={`text-xs ${isDarkMode ? 'text-gray-400' : 'text-green-600'}`}>
-                    {quote.quote_amount ? formatCurrency(quote.quote_amount) : ''}
-                  </span>
+              <div
+                key={quote.id}
+                className={`p-3 rounded-lg border flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between ${
+                  isDarkMode ? 'bg-slate-700 border-slate-600' : 'bg-green-50 border-green-200'
+                }`}
+              >
+                <div className="flex items-start gap-2 flex-1 min-w-0">
+                  <QrCode className="h-4 w-4 text-green-600 shrink-0 mt-0.5" />
+                  <div className="min-w-0 flex-1">
+                    <span
+                      className={`font-medium block break-words leading-snug ${isDarkMode ? 'text-white' : 'text-green-800'}`}
+                    >
+                      {quote.material_name}
+                    </span>
+                    {quote.quote_amount ? (
+                      <span className={`text-xs font-semibold block mt-0.5 ${isDarkMode ? 'text-gray-300' : 'text-green-700'}`}>
+                        {formatCurrency(quote.quote_amount)}
+                      </span>
+                    ) : null}
+                  </div>
                 </div>
-                <div className="flex items-center gap-1 ml-2">
+                <div className="flex items-center gap-1 shrink-0 self-start sm:self-center">
                   <Badge className="bg-green-100 text-green-700 text-xs">✓ QR</Badge>
                   <Button
                     size="sm"

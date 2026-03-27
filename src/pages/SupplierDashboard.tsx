@@ -148,7 +148,7 @@ const QuotesManagementContent: React.FC<QuotesManagementContentProps> = ({
   return (
     <div className="space-y-4">
       {/* Clickable Status Filter Cards */}
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
         <button
           onClick={() => setActiveFilter(activeFilter === 'pending' ? 'all' : 'pending')}
           className={`p-4 rounded-lg border text-left transition-all duration-200 ${
@@ -203,8 +203,8 @@ const QuotesManagementContent: React.FC<QuotesManagementContentProps> = ({
       </div>
 
       {/* Active Filter Indicator & Refresh Button */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-wrap items-center gap-2 min-w-0">
           {activeFilter !== 'all' && (
             <>
               <Badge 
@@ -233,7 +233,13 @@ const QuotesManagementContent: React.FC<QuotesManagementContentProps> = ({
             <span className={`text-sm ${mutedText}`}>Showing all {quoteRequests.length} quotes</span>
           )}
         </div>
-        <Button variant="outline" size="sm" onClick={fetchQuoteRequests} disabled={loadingQuotes}>
+        <Button
+          variant="outline"
+          size="sm"
+          className="self-start sm:self-center shrink-0"
+          onClick={fetchQuoteRequests}
+          disabled={loadingQuotes}
+        >
           <RefreshCw className={`h-4 w-4 mr-1 ${loadingQuotes ? 'animate-spin' : ''}`} />
           Refresh
         </Button>
@@ -257,15 +263,15 @@ const QuotesManagementContent: React.FC<QuotesManagementContentProps> = ({
                   : isDarkMode ? 'border-slate-600 bg-slate-800' : 'border-gray-200 bg-white'
               }`}
             >
-              <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
-                <div className="flex-1">
+              <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                <div className="min-w-0 flex-1">
                   <div className="flex items-start gap-3">
-                    <div className={`p-2 rounded-lg ${isDarkMode ? 'bg-slate-700' : 'bg-white'} shadow-sm`}>
+                    <div className={`p-2 rounded-lg shrink-0 ${isDarkMode ? 'bg-slate-700' : 'bg-white'} shadow-sm`}>
                       <Building2 className="h-6 w-6 text-blue-500" />
                     </div>
-                    <div>
-                      <h4 className={`font-semibold ${textColor}`}>{quote.builder_name || 'Professional Builder'}</h4>
-                      <p className={`text-sm font-medium text-blue-600`}>{quote.material_name}</p>
+                    <div className="min-w-0 flex-1">
+                      <h4 className={`font-semibold ${textColor} break-words`}>{quote.builder_name || 'Professional Builder'}</h4>
+                      <p className={`text-sm font-medium text-blue-600 break-words mt-0.5`}>{quote.material_name}</p>
                       <p className={`text-sm ${mutedText}`}>Qty: {quote.quantity} {quote.unit}</p>
                       {quote.delivery_address && (
                         <p className={`text-xs mt-1 ${mutedText}`}>
@@ -277,8 +283,9 @@ const QuotesManagementContent: React.FC<QuotesManagementContentProps> = ({
                   </div>
                 </div>
 
-                <div className="flex flex-col items-end gap-2">
-                  <Badge className={`${
+                <div className="flex flex-col items-stretch gap-2 sm:items-end w-full lg:w-auto lg:min-w-[200px]">
+                  <Badge
+                    className={`inline-flex flex-wrap items-center justify-center gap-1 sm:justify-end text-center sm:text-right whitespace-normal break-words max-w-full py-1.5 px-2 ${
                     quote.status === 'quote_created' || quote.status === 'pending' ? 'bg-amber-100 text-amber-700' :
                     quote.status === 'quote_received_by_supplier' ? 'bg-cyan-100 text-cyan-700' :
                     quote.status === 'quote_responded' || quote.status === 'quoted' ? 'bg-blue-100 text-blue-700' :
@@ -306,7 +313,7 @@ const QuotesManagementContent: React.FC<QuotesManagementContentProps> = ({
                   )}
 
                   {(quote.status === 'quote_created' || quote.status === 'quote_received_by_supplier' || quote.status === 'pending') && (
-                    <div className="flex gap-2">
+                    <div className="flex flex-col gap-2 w-full sm:flex-row sm:justify-end">
                       <Button size="sm" className="bg-green-500 hover:bg-green-600" onClick={() => openQuoteDialog(quote)}>
                         <CheckCircle className="h-4 w-4 mr-1" />
                         Quote
@@ -1705,6 +1712,15 @@ const SupplierDashboard = () => {
     }).format(amount || 0);
   };
 
+  const humanizeOrderStatus = (status: string | undefined | null) => {
+    const s = (status || 'pending').trim();
+    if (!s) return 'Pending';
+    return s
+      .split('_')
+      .map((part) => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
+      .join(' ');
+  };
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'pending': return 'bg-yellow-100 text-yellow-800';
@@ -1750,55 +1766,74 @@ const SupplierDashboard = () => {
       {/* Navigation hidden in dashboard - use Exit Dashboard to access main navigation */}
 
       {/* Hero Section */}
-      <section className="bg-gradient-to-r from-orange-600 to-amber-600 text-white py-8">
-        <div className="container mx-auto px-4">
-          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-            <div>
-              <h1 className="text-3xl font-bold flex items-center gap-3">
-                <Store className="h-8 w-8" />
-                {t('supplier.dashboard.title')}
-              </h1>
-              <p className="text-orange-100 mt-1">
-                {t('supplier.dashboard.welcome')}, {supplierProfile?.company_name || supplierProfile?.store_name || supplierProfile?.full_name || 'Supplier'}
-              </p>
+      <section className="bg-gradient-to-r from-orange-600 to-amber-600 text-white py-5 sm:py-8">
+        <div className="container mx-auto px-4 max-w-7xl">
+          <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between lg:gap-6">
+            <div className="min-w-0 flex-1">
+              <div className="flex items-start gap-3">
+                <Store className="h-8 w-8 shrink-0 mt-0.5" aria-hidden />
+                <div className="min-w-0">
+                  <h1 className="text-2xl sm:text-3xl font-bold leading-tight text-balance break-words">
+                    {t('supplier.dashboard.title')}
+                  </h1>
+                  <p className="text-orange-100 mt-1.5 text-sm sm:text-base leading-relaxed break-words">
+                    {t('supplier.dashboard.welcome')},{' '}
+                    <span className="font-medium text-white">
+                      {supplierProfile?.company_name ||
+                        supplierProfile?.store_name ||
+                        supplierProfile?.full_name ||
+                        'Supplier'}
+                    </span>
+                  </p>
+                </div>
+              </div>
             </div>
-            <div className="flex flex-wrap gap-3">
-              <LanguageSwitcher variant="compact" />
-              <Button 
-                variant="outline" 
-                className="bg-white/10 border-white/30 text-white hover:bg-white/20"
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:flex lg:flex-wrap gap-2 w-full lg:w-auto lg:max-w-xl">
+              <LanguageSwitcher
+                variant="compact"
+                className="h-10 w-full sm:w-auto bg-white/10 border border-white/30 text-white hover:bg-white/20 hover:text-white"
+              />
+              <Button
+                variant="outline"
+                className="bg-white/10 border-white/30 text-white hover:bg-white/20 h-10 text-xs sm:text-sm justify-center"
                 onClick={toggleDarkMode}
               >
-                {isDarkMode ? <Sun className="h-4 w-4 mr-2" /> : <Moon className="h-4 w-4 mr-2" />}
-                {isDarkMode ? 'Light' : 'Dark'}
+                {isDarkMode ? <Sun className="h-4 w-4 mr-1.5 sm:mr-2 shrink-0" /> : <Moon className="h-4 w-4 mr-1.5 sm:mr-2 shrink-0" />}
+                <span className="truncate">{isDarkMode ? 'Light' : 'Dark'}</span>
               </Button>
-              <Button variant="outline" className="bg-white/10 border-white/30 text-white hover:bg-white/20">
-                <Bell className="h-4 w-4 mr-2" />
-                {t('supplier.dashboard.notifications')}
+              <Button
+                variant="outline"
+                className="bg-white/10 border-white/30 text-white hover:bg-white/20 h-10 text-xs sm:text-sm justify-center"
+              >
+                <Bell className="h-4 w-4 mr-1.5 sm:mr-2 shrink-0" />
+                <span className="truncate">{t('supplier.dashboard.notifications')}</span>
               </Button>
-              <Button 
-                variant="outline" 
-                className="bg-white/10 border-white/30 text-white hover:bg-white/20"
+              <Button
+                variant="outline"
+                className="bg-white/10 border-white/30 text-white hover:bg-white/20 h-10 text-xs sm:text-sm justify-center"
                 onClick={() => setShowProfileView(true)}
               >
-                <User className="h-4 w-4 mr-2" />
+                <User className="h-4 w-4 mr-1.5 sm:mr-2 shrink-0" />
                 Profile
               </Button>
-              <Button variant="outline" className="bg-white/10 border-white/30 text-white hover:bg-white/20">
-                <Settings className="h-4 w-4 mr-2" />
-                {t('supplier.dashboard.settings')}
+              <Button
+                variant="outline"
+                className="bg-white/10 border-white/30 text-white hover:bg-white/20 h-10 text-xs sm:text-sm justify-center"
+              >
+                <Settings className="h-4 w-4 mr-1.5 sm:mr-2 shrink-0" />
+                <span className="truncate">{t('supplier.dashboard.settings')}</span>
               </Button>
-              <Button 
-                variant="outline" 
-                className="bg-white/10 border-white/30 text-white hover:bg-white/20"
+              <Button
+                variant="outline"
+                className="bg-white/10 border-white/30 text-white hover:bg-white/20 h-10 text-xs sm:text-sm justify-center col-span-2 sm:col-span-1"
                 onClick={handleExitDashboard}
               >
-                <LogOut className="h-4 w-4 mr-2" />
-                Exit Dashboard
+                <LogOut className="h-4 w-4 mr-1.5 sm:mr-2 shrink-0" />
+                <span className="truncate">Exit Dashboard</span>
               </Button>
-              <Button 
-                variant="outline" 
-                className="bg-red-500/20 border-red-300/50 text-white hover:bg-red-500/30"
+              <Button
+                variant="outline"
+                className="bg-red-500/20 border-red-300/50 text-white hover:bg-red-500/30 h-10 text-xs sm:text-sm justify-center col-span-2 sm:col-span-1"
                 onClick={() => {
                   console.log('🚪 Logout: Starting sign out process...');
                   // Clear auth data immediately
@@ -1818,8 +1853,8 @@ const SupplierDashboard = () => {
                   signOut().catch(() => {});
                 }}
               >
-                <LogOut className="h-4 w-4 mr-2" />
-                Logout
+                <LogOut className="h-4 w-4 mr-1.5 sm:mr-2 shrink-0" />
+                <span className="truncate">Logout</span>
               </Button>
             </div>
           </div>
@@ -1914,39 +1949,39 @@ const SupplierDashboard = () => {
           </Card>
         </div>
 
-        {/* Navigation Cards - Single Row */}
-        <div className="grid grid-cols-3 md:grid-cols-7 gap-3 mb-6">
+        {/* Navigation Cards — responsive grid (was 3× cramped columns on mobile) */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-2 sm:gap-3 mb-6">
           <Button 
-            className={`h-auto py-4 transition-all ${activeTab === 'overview' 
+            className={`h-auto py-3 sm:py-4 transition-all ${activeTab === 'overview' 
               ? 'bg-gradient-to-r from-slate-600 to-slate-700 ring-2 ring-slate-400 shadow-lg' 
               : isDarkMode ? 'bg-slate-700 hover:bg-slate-600' : 'bg-gray-100 hover:bg-gray-200 text-gray-700'}`}
             onClick={() => setActiveTab('overview')}
           >
-            <div className="flex flex-col items-center gap-2">
-              <Store className="h-6 w-6" />
-              <span className="text-xs sm:text-sm">Overview</span>
+            <div className="flex flex-col items-center gap-1.5 sm:gap-2 px-1">
+              <Store className="h-5 w-5 sm:h-6 sm:w-6 shrink-0" />
+              <span className="text-[10px] sm:text-xs md:text-sm text-center leading-tight">Overview</span>
             </div>
           </Button>
           <Button 
-            className={`h-auto py-4 transition-all ${activeTab === 'materials' 
+            className={`h-auto py-3 sm:py-4 transition-all ${activeTab === 'materials' 
               ? 'bg-gradient-to-r from-orange-500 to-amber-500 ring-2 ring-orange-300 shadow-lg' 
               : isDarkMode ? 'bg-slate-700 hover:bg-slate-600' : 'bg-gray-100 hover:bg-gray-200 text-gray-700'}`}
             onClick={() => setActiveTab('materials')}
           >
-            <div className="flex flex-col items-center gap-2">
-              <Boxes className="h-6 w-6" />
-              <span className="text-xs sm:text-sm">My Materials</span>
+            <div className="flex flex-col items-center gap-1.5 sm:gap-2 px-1">
+              <Boxes className="h-5 w-5 sm:h-6 sm:w-6 shrink-0" />
+              <span className="text-[10px] sm:text-xs md:text-sm text-center leading-tight">My Materials</span>
             </div>
           </Button>
           <Button 
-            className={`h-auto py-4 transition-all relative ${activeTab === 'view-orders' 
+            className={`h-auto py-3 sm:py-4 transition-all relative ${activeTab === 'view-orders' 
               ? 'bg-gradient-to-r from-blue-500 to-blue-600 ring-2 ring-blue-300 shadow-lg' 
               : isDarkMode ? 'bg-slate-700 hover:bg-slate-600' : 'bg-gray-100 hover:bg-gray-200 text-gray-700'}`}
             onClick={() => setActiveTab('view-orders')}
           >
-            <div className="flex flex-col items-center gap-2">
-              <Eye className="h-6 w-6" />
-              <span className="text-xs sm:text-sm">View Orders</span>
+            <div className="flex flex-col items-center gap-1.5 sm:gap-2 px-1">
+              <Eye className="h-5 w-5 sm:h-6 sm:w-6 shrink-0" />
+              <span className="text-[10px] sm:text-xs md:text-sm text-center leading-tight">View Orders</span>
               {quoteRequests.filter(q => q.status === 'pending').length > 0 && (
                 <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full px-1.5 py-0.5 min-w-[20px] text-center">
                   {quoteRequests.filter(q => q.status === 'pending').length}
@@ -1955,47 +1990,47 @@ const SupplierDashboard = () => {
             </div>
           </Button>
           <Button 
-            className={`h-auto py-4 transition-all ${activeTab === 'scan-qr' 
+            className={`h-auto py-3 sm:py-4 transition-all ${activeTab === 'scan-qr' 
               ? 'bg-gradient-to-r from-teal-500 to-cyan-500 ring-2 ring-cyan-300 shadow-lg' 
               : isDarkMode ? 'bg-slate-700 hover:bg-slate-600' : 'bg-gray-100 hover:bg-gray-200 text-gray-700'}`}
             onClick={() => setActiveTab('scan-qr')}
           >
-            <div className="flex flex-col items-center gap-2">
-              <QrCode className="h-6 w-6" />
-              <span className="text-xs sm:text-sm">QR Codes</span>
+            <div className="flex flex-col items-center gap-1.5 sm:gap-2 px-1">
+              <QrCode className="h-5 w-5 sm:h-6 sm:w-6 shrink-0" />
+              <span className="text-[10px] sm:text-xs md:text-sm text-center leading-tight">QR Codes</span>
             </div>
           </Button>
           <Button 
-            className={`h-auto py-4 transition-all ${activeTab === 'tracking' 
+            className={`h-auto py-3 sm:py-4 transition-all ${activeTab === 'tracking' 
               ? 'bg-gradient-to-r from-purple-500 to-purple-600 ring-2 ring-purple-300 shadow-lg' 
               : isDarkMode ? 'bg-slate-700 hover:bg-slate-600' : 'bg-gray-100 hover:bg-gray-200 text-gray-700'}`}
             onClick={() => setActiveTab('tracking')}
           >
-            <div className="flex flex-col items-center gap-2">
-              <NavigationIcon className="h-6 w-6" />
-              <span className="text-xs sm:text-sm">Tracking</span>
+            <div className="flex flex-col items-center gap-1.5 sm:gap-2 px-1">
+              <NavigationIcon className="h-5 w-5 sm:h-6 sm:w-6 shrink-0" />
+              <span className="text-[10px] sm:text-xs md:text-sm text-center leading-tight">Tracking</span>
             </div>
           </Button>
           <Button 
-            className={`h-auto py-4 transition-all ${activeTab === 'analytics' 
+            className={`h-auto py-3 sm:py-4 transition-all ${activeTab === 'analytics' 
               ? 'bg-gradient-to-r from-blue-600 to-indigo-600 ring-2 ring-blue-300 shadow-lg' 
               : isDarkMode ? 'bg-slate-700 hover:bg-slate-600' : 'bg-gray-100 hover:bg-gray-200 text-gray-700'}`}
             onClick={() => setActiveTab('analytics')}
           >
-            <div className="flex flex-col items-center gap-2">
-              <BarChart3 className="h-6 w-6" />
-              <span className="text-xs sm:text-sm">Analytics</span>
+            <div className="flex flex-col items-center gap-1.5 sm:gap-2 px-1">
+              <BarChart3 className="h-5 w-5 sm:h-6 sm:w-6 shrink-0" />
+              <span className="text-[10px] sm:text-xs md:text-sm text-center leading-tight">Analytics</span>
             </div>
           </Button>
           <Button 
-            className={`h-auto py-4 transition-all ${activeTab === 'reports' 
+            className={`h-auto py-3 sm:py-4 transition-all ${activeTab === 'reports' 
               ? 'bg-gradient-to-r from-green-500 to-emerald-600 ring-2 ring-green-300 shadow-lg' 
               : isDarkMode ? 'bg-slate-700 hover:bg-slate-600' : 'bg-gray-100 hover:bg-gray-200 text-gray-700'}`}
             onClick={() => setActiveTab('reports')}
           >
-            <div className="flex flex-col items-center gap-2">
-              <FileText className="h-6 w-6" />
-              <span className="text-xs sm:text-sm">Reports</span>
+            <div className="flex flex-col items-center gap-1.5 sm:gap-2 px-1">
+              <FileText className="h-5 w-5 sm:h-6 sm:w-6 shrink-0" />
+              <span className="text-[10px] sm:text-xs md:text-sm text-center leading-tight">Reports</span>
             </div>
           </Button>
         </div>
@@ -2017,42 +2052,60 @@ const SupplierDashboard = () => {
             <div className="space-y-6">
               {/* Recent Orders Summary */}
               <Card className={cardBg}>
-                <CardHeader>
-                  <div className="flex justify-between items-center">
-                    <div>
-                      <CardTitle className={textColor}>{t('supplier.orders.title')}</CardTitle>
-                      <CardDescription className={mutedText}>{t('supplier.orders.description')}</CardDescription>
+                <CardHeader className="space-y-3">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+                    <div className="min-w-0">
+                      <CardTitle className={`${textColor} text-lg sm:text-xl`}>{t('supplier.orders.title')}</CardTitle>
+                      <CardDescription className={`${mutedText} mt-1`}>{t('supplier.orders.description')}</CardDescription>
                     </div>
-                    <Button variant="outline" size="sm" onClick={() => setActiveTab('orders')}>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="shrink-0 self-start sm:self-center"
+                      onClick={() => setActiveTab('view-orders')}
+                    >
                       {t('supplier.orders.viewAll')}
                     </Button>
                   </div>
                 </CardHeader>
                 <CardContent>
-                  <div className="space-y-4">
+                  <div className="space-y-3 sm:space-y-4">
                     {recentOrders.slice(0, 5).map((order) => (
-                      <div key={order.id} className={`flex items-center justify-between p-4 ${isDarkMode ? 'bg-slate-700' : 'bg-gray-50'} rounded-lg hover:${isDarkMode ? 'bg-slate-600' : 'bg-gray-100'} transition-colors`}>
-                        <div className="flex items-center gap-4">
-                          <div className={`p-2 ${isDarkMode ? 'bg-slate-600' : 'bg-white'} rounded-lg shadow-sm`}>
-                            <Package className="h-8 w-8 text-orange-500" />
+                      <div
+                        key={order.id}
+                        className={`flex flex-col gap-3 p-3 sm:p-4 rounded-lg transition-colors sm:flex-row sm:items-center sm:justify-between ${
+                          isDarkMode ? 'bg-slate-700 hover:bg-slate-600/90' : 'bg-gray-50 hover:bg-gray-100'
+                        }`}
+                      >
+                        <div className="flex items-start gap-3 min-w-0 flex-1">
+                          <div
+                            className={`p-2 rounded-lg shadow-sm shrink-0 ${isDarkMode ? 'bg-slate-600' : 'bg-white'}`}
+                          >
+                            <Package className="h-7 w-7 sm:h-8 sm:w-8 text-orange-500" />
                           </div>
-                          <div>
-                            <p className={`font-medium ${textColor}`}>{order.product_name}</p>
-                            <p className={`text-sm ${mutedText}`}>
-                              {order.customer_name} • Qty: {order.quantity}
+                          <div className="min-w-0 flex-1">
+                            <p className={`font-medium ${textColor} text-sm sm:text-base leading-snug break-words`}>
+                              {order.product_name}
+                            </p>
+                            <p className={`text-xs sm:text-sm ${mutedText} mt-1 break-words`}>
+                              {order.customer_name} · Qty: {order.quantity}
                             </p>
                           </div>
                         </div>
-                        <div className="flex items-center gap-4">
-                          <div className="text-right">
-                            <p className={`font-semibold ${textColor}`}>{formatCurrency(order.total_amount)}</p>
+                        <div className="flex flex-row flex-wrap items-center justify-between gap-2 sm:flex-col sm:items-end sm:justify-center sm:gap-2 sm:min-w-[140px] pl-11 sm:pl-0">
+                          <div className="text-left sm:text-right min-w-0">
+                            <p className={`font-semibold text-sm sm:text-base ${textColor}`}>
+                              {formatCurrency(order.total_amount)}
+                            </p>
                             <p className={`text-xs ${mutedText}`}>
                               {order.created_at ? new Date(order.created_at).toLocaleDateString() : 'N/A'}
                             </p>
                           </div>
-                          <Badge className={`${getStatusColor(order.status || 'pending')} flex items-center gap-1`}>
+                          <Badge
+                            className={`${getStatusColor(order.status || 'pending')} inline-flex items-center gap-1 max-w-full whitespace-normal text-left sm:text-right px-2 py-1`}
+                          >
                             {getStatusIcon(order.status || 'pending')}
-                            {(order.status || 'pending').charAt(0).toUpperCase() + (order.status || 'pending').slice(1)}
+                            <span className="break-words">{humanizeOrderStatus(order.status)}</span>
                           </Badge>
                         </div>
                       </div>

@@ -1105,6 +1105,14 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
     }
   };
 
+  const humanizeSnakeStatus = (s: string) =>
+    (s || '')
+      .trim()
+      .split('_')
+      .filter(Boolean)
+      .map((part) => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
+      .join(' ');
+
   // Get human-readable status label with delivery provider info for orders
   const getStatusLabel = (order: any) => {
     const status = order.status || 'pending';
@@ -1333,7 +1341,7 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
       case 'rescheduled_delivery': return '🔄 Delivery Rescheduled';
       case 'supplier_delay': return '⏱️ Supplier Delay';
       case 'provider_unavailable': return '🚫 Provider Unavailable';
-      default: return status;
+      default: return humanizeSnakeStatus(status);
     }
   };
 
@@ -1426,26 +1434,26 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
     <Card key={order.id} className="border">
       <CardContent className="p-4">
         {/* Order Header */}
-        <div 
-          className="flex items-center justify-between cursor-pointer"
+        <div
+          className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between cursor-pointer"
           onClick={() => setExpandedOrder(isExpanded ? null : order.id)}
         >
-          <div className="flex items-center gap-4">
-            <div className="p-2 bg-blue-50 rounded-lg">
+          <div className="flex items-start gap-3 min-w-0 flex-1">
+            <div className="p-2 bg-blue-50 rounded-lg shrink-0">
               <QrCode className="h-6 w-6 text-blue-600" />
             </div>
-            <div>
-              <p className="font-semibold">{order.po_number}</p>
-              <div className="flex items-center gap-2 text-sm text-gray-500">
-                <Calendar className="h-3 w-3" />
+            <div className="min-w-0 flex-1">
+              <p className="font-semibold text-sm sm:text-base break-words leading-snug">{order.po_number}</p>
+              <div className="flex items-center gap-2 text-xs sm:text-sm text-gray-500 mt-1">
+                <Calendar className="h-3 w-3 shrink-0" />
                 {format(new Date(order.created_at), 'MMM dd, yyyy')}
               </div>
             </div>
           </div>
-          
-          <div className="flex items-center gap-3">
+
+          <div className="flex flex-row flex-wrap items-center justify-between gap-2 sm:justify-end sm:gap-3 pl-11 sm:pl-0 w-full sm:w-auto">
             {/* Mini Status Timeline - Always Visible */}
-            <div className="hidden sm:flex items-center gap-1">
+            <div className="hidden sm:flex items-center gap-1 shrink-0">
               {/* Confirmed/Pending */}
               <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
                 ['pending', 'confirmed', 'dispatched', 'in_transit', 'delivered', 'received', 'verified'].includes(order.status)
@@ -1503,10 +1511,12 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
             </div>
             
             {/* Status Badge */}
-            <div className="flex flex-col items-end gap-1">
-              <Badge className={`${getStatusColor(order.status)} px-3 py-1 whitespace-nowrap`}>
-                {getStatusIcon(order.status)}
-                <span className="ml-1">{getStatusLabel(order)}</span>
+            <div className="flex flex-col items-stretch sm:items-end gap-1 min-w-0 max-w-full sm:max-w-[min(100%,280px)]">
+              <Badge
+                className={`${getStatusColor(order.status)} px-2 sm:px-3 py-1.5 whitespace-normal inline-flex flex-wrap items-center gap-1 max-w-full justify-start sm:justify-end text-left sm:text-right`}
+              >
+                <span className="shrink-0">{getStatusIcon(order.status)}</span>
+                <span className="min-w-0 break-words text-xs sm:text-sm leading-snug">{getStatusLabel(order)}</span>
               </Badge>
               
               {/* Show provider details for confirmed deliveries - visible even when collapsed */}
@@ -1514,11 +1524,11 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
               {(order.delivery_provider_id || providerDisplayName(order) || providerDisplayPhone(order) ||
                 order.delivery_status === 'accepted' || order.delivery_status === 'assigned' ||
                 ['confirmed'].includes(order.status)) && (
-                <div className="text-[10px] text-gray-600 text-right max-w-[160px]">
+                <div className="text-[10px] text-gray-600 max-w-full sm:max-w-[200px] text-left sm:text-right">
                   <div className="font-medium truncate" title={providerDisplayName(order) || undefined}>
                     {providerDisplayName(order) || '—'}
                   </div>
-                  <div className="text-[9px] text-gray-500 flex items-center justify-end gap-1 mt-0.5">
+                  <div className="text-[9px] text-gray-500 flex items-center sm:justify-end gap-1 mt-0.5">
                     <Phone className="h-3 w-3 flex-shrink-0" />
                     <span className="truncate">{providerDisplayPhone(order) || '—'}</span>
                   </div>
@@ -1526,11 +1536,9 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
               )}
             </div>
             
-            {isExpanded ? (
-              <ChevronUp className="h-5 w-5 text-gray-400" />
-            ) : (
-              <ChevronDown className="h-5 w-5 text-gray-400" />
-            )}
+            <span className="shrink-0 text-gray-400 sm:ml-1" aria-hidden>
+              {isExpanded ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
+            </span>
           </div>
         </div>
         
