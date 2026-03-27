@@ -179,6 +179,11 @@ export const checkForExposedSecrets = (): string[] => {
   if (typeof import.meta !== 'undefined' && import.meta.env) {
     for (const [key, value] of Object.entries(import.meta.env)) {
       if (key.startsWith('VITE_') && typeof value === 'string') {
+        if (/SERVICE_ROLE|service_role/i.test(key)) {
+          warnings.push(
+            `🚨 ${key}: Never put the Supabase service role in VITE_* — it is bundled into the client. Use Edge Functions and server-side secrets instead.`
+          );
+        }
         for (const { pattern, name } of dangerousPatterns) {
           if (pattern.test(value) || pattern.test(key)) {
             warnings.push(`⚠️ Potential ${name} exposed in ${key}`);

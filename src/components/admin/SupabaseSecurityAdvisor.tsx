@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { getAdminClient, isAdminClientAvailable } from '@/integrations/supabase/adminClient';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -43,13 +42,9 @@ export function SupabaseSecurityAdvisor() {
     const allIssues: SecurityIssue[] = [];
 
     try {
-      // Use admin client if available for comprehensive checks
-      const client = isAdminClientAvailable() ? getAdminClient() : supabase;
-      const useAdminClient = isAdminClientAvailable() && client !== null;
-
-      // 1. Get all security issues using comprehensive function
+      // 1. Get all security issues using comprehensive function (RLS must allow admin RPCs)
       try {
-        const { data: allSecurityIssues, error: allIssuesError } = await (client as any).rpc('get_all_security_issues' as any);
+        const { data: allSecurityIssues, error: allIssuesError } = await (supabase as any).rpc('get_all_security_issues' as any);
 
         if (allIssuesError) {
           console.error('Error calling get_all_security_issues:', allIssuesError);
@@ -82,7 +77,7 @@ export function SupabaseSecurityAdvisor() {
         
         // Fallback: Try calling get_permissive_rls_policies directly
         try {
-          const { data: permissivePolicies, error: permError } = await (client as any).rpc('get_permissive_rls_policies' as any);
+          const { data: permissivePolicies, error: permError } = await (supabase as any).rpc('get_permissive_rls_policies' as any);
           if (!permError && permissivePolicies && Array.isArray(permissivePolicies)) {
             console.log(`Found ${permissivePolicies.length} permissive RLS policies`);
             permissivePolicies.forEach((policy: any) => {
@@ -106,7 +101,7 @@ export function SupabaseSecurityAdvisor() {
       // 2. Check for tables without RLS enabled (fallback if comprehensive function doesn't work)
       if (allIssues.length === 0) {
         try {
-          const result = await (client as any).rpc('get_tables_without_rls' as any);
+          const result = await (supabase as any).rpc('get_tables_without_rls' as any);
           const { data: tablesWithoutRLS, error: rlsError } = result || { data: null, error: null };
 
           if (!rlsError && tablesWithoutRLS) {
@@ -131,7 +126,7 @@ export function SupabaseSecurityAdvisor() {
       // 3. Check for SECURITY DEFINER functions (fallback)
       if (allIssues.length === 0 || !allIssues.some(i => i.category === 'Function Security')) {
         try {
-          const result = await (client as any).rpc('get_security_definer_functions' as any);
+          const result = await (supabase as any).rpc('get_security_definer_functions' as any);
           const { data: securityDefinerFuncs, error: funcError } = result || { data: null, error: null };
 
           if (!funcError && securityDefinerFuncs) {
@@ -156,7 +151,7 @@ export function SupabaseSecurityAdvisor() {
       // 4. Check for tables with missing RLS policies (fallback)
       if (allIssues.length === 0 || !allIssues.some(i => i.category === 'RLS Policies')) {
         try {
-          const result = await (client as any).rpc('get_tables_without_policies' as any);
+          const result = await (supabase as any).rpc('get_tables_without_policies' as any);
           const { data: tablesWithoutPolicies, error: policyError } = result || { data: null, error: null };
 
           if (!policyError && tablesWithoutPolicies) {
@@ -187,7 +182,7 @@ export function SupabaseSecurityAdvisor() {
 
       // 6. Check admin_security_logs table structure
       try {
-        const { error: logError } = await (client as any)
+        const { error: logError } = await (supabase as any)
           .from('admin_security_logs' as any)
           .select('id')
           .limit(1);
@@ -211,7 +206,7 @@ export function SupabaseSecurityAdvisor() {
       // 7. Check for views with SECURITY DEFINER (fallback)
       if (allIssues.length === 0 || !allIssues.some(i => i.category === 'View Security')) {
         try {
-          const result = await (client as any).rpc('get_security_definer_views' as any);
+          const result = await (supabase as any).rpc('get_security_definer_views' as any);
           const { data: securityDefinerViews, error: viewError } = result || { data: null, error: null };
 
           if (!viewError && securityDefinerViews) {

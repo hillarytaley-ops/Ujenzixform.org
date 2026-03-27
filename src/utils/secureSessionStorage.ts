@@ -7,6 +7,8 @@
  * 3. Non-sensitive preferences can use localStorage
  * 4. Automatic session expiry validation
  * 5. Device fingerprinting for session binding
+ *
+ * Client-side obfuscation is not a substitute for server auth; XSS can bypass it.
  */
 
 import {

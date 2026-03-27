@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase, SUPABASE_URL } from '@/integrations/supabase/client';
 
 interface SecurityMetrics {
   sessionValidationCount: number;
@@ -161,8 +161,7 @@ export const useSecurityMonitor = () => {
     }
 
     // Verify Supabase connection is secure
-    const supabaseUrl = 'https://wuuyjjpgzgeimiptuuws.supabase.co'; // Use the known Supabase URL
-    if (!supabaseUrl.startsWith('https://')) {
+    if (!SUPABASE_URL.startsWith('https://')) {
       logSecurityEvent('insecure_api', 'Insecure API connection detected', 'high');
       return false;
     }

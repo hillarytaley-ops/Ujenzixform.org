@@ -1,13 +1,17 @@
 // Content Security Policy configuration
 // Environment-aware CSP directives for enhanced security
+import { SUPABASE_URL } from '@/integrations/supabase/client';
+
 const isDevelopment = import.meta.env.MODE === 'development';
+
+const supabaseWss = SUPABASE_URL.replace(/^https:/i, 'wss:');
 
 export const CSP_DIRECTIVES = {
   'default-src': ["'self'"],
   'script-src': [
     "'self'",
     ...(isDevelopment ? ["'unsafe-inline'", "'unsafe-eval'"] : []), // Only allow in development
-    'https://wuuyjjpgzgeimiptuuws.supabase.co',
+    SUPABASE_URL,
     'https://challenges.cloudflare.com', // For Turnstile CAPTCHA
     'https://js.stripe.com' // For payment processing
   ],
@@ -20,7 +24,7 @@ export const CSP_DIRECTIVES = {
     "'self'",
     'data:',
     'blob:',
-    'https://wuuyjjpgzgeimiptuuws.supabase.co',
+    SUPABASE_URL,
     'https://*.supabase.co',
     'https://images.unsplash.com' // For placeholder images
   ],
@@ -31,12 +35,12 @@ export const CSP_DIRECTIVES = {
   ],
   'connect-src': [
     "'self'",
-    'https://wuuyjjpgzgeimiptuuws.supabase.co',
+    SUPABASE_URL,
     'https://*.supabase.co',
     'https://ipapi.co',
     'https://api.ipify.org',
     'https://api.stripe.com', // For payment processing
-    'wss://wuuyjjpgzgeimiptuuws.supabase.co' // WebSocket connections
+    supabaseWss // WebSocket connections
   ],
   'frame-src': [
     "'self'",

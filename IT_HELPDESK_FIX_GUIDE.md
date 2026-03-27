@@ -107,15 +107,8 @@ If you still prefer Option 1 (configuring admin service key):
 - ⚠️ Should ideally be server-side only (Edge Functions)
 - ⚠️ Not recommended for client-side use
 
-### How to Configure (if needed):
-1. Get service role key from: Supabase Dashboard → Settings → API → Service Role Key
-2. Add to `.env` file:
-   ```
-   VITE_SUPABASE_SERVICE_ROLE_KEY=your_service_role_key_here
-   ```
-3. Restart development server
-
-**⚠️ WARNING:** Never commit service role key to git!
+### Do **not** configure service role for the SPA
+The app **must not** use `VITE_SUPABASE_SERVICE_ROLE_KEY` — it would be embedded in the JavaScript bundle. Use **RLS + admin `user_roles`** for the dashboard, and **Edge Functions** (with server-only secrets) if you truly need the service role.
 
 ---
 

@@ -41,8 +41,7 @@ FOR SELECT TO anon
 USING (is_active = true);
 
 COMMENT ON POLICY "cameras_insert_authenticated" ON cameras IS 
-'Temporary permissive policy - admin check done at application level. 
-Configure VITE_SUPABASE_SERVICE_ROLE_KEY for proper admin operations.';
+'Temporary permissive policy - tighten via migrations; admin uses JWT + RLS, never service_role in the browser.';
 
 
 

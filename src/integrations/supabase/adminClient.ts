@@ -1,106 +1,46 @@
 /**
- * Admin Supabase Client
- * 
- * This client uses the service role key to bypass RLS for admin operations.
- * IMPORTANT: This should only be used in admin contexts and the service role
- * key should be kept secure.
- * 
- * For production, consider moving admin operations to Edge Functions
- * where the service role key can be kept server-side.
+ * Admin helpers — browser-safe only.
+ *
+ * The Supabase **service role key must never** be bundled in the SPA (no `VITE_*` service role).
+ * Admin dashboards use the normal `supabase` client with JWT + RLS policies for `admin` users.
+ * Operations that truly need service role (e.g. Auth Admin API) belong in Edge Functions with secrets server-side.
  */
 
-import { createClient, SupabaseClient } from '@supabase/supabase-js';
-import type { Database } from './types';
-
-const SUPABASE_URL = "https://wuuyjjpgzgeimiptuuws.supabase.co";
-
-// Service role key - in production, this should be in environment variables
-// and admin operations should be done via Edge Functions
-const SUPABASE_SERVICE_ROLE_KEY = import.meta.env.VITE_SUPABASE_SERVICE_ROLE_KEY || '';
-
-let adminClient: SupabaseClient<Database> | null = null;
-let hasWarnedAboutMissingKey = false;
+import { supabase } from '@/integrations/supabase/client';
 
 /**
- * Get the admin Supabase client (bypasses RLS)
- * Only use this for admin dashboard operations
+ * @deprecated Always null. Do not use — import `supabase` from `@/integrations/supabase/client` instead.
+ * Retained temporarily so old call sites can be removed; prefer deleting `getAdminClient() || supabase` patterns.
  */
-export const getAdminClient = (): SupabaseClient<Database> | null => {
-  if (!SUPABASE_SERVICE_ROLE_KEY) {
-    // Only warn once to avoid console spam
-    if (!hasWarnedAboutMissingKey) {
-      console.warn('⚠️ Admin service role key not configured. Admin operations may fail.');
-      hasWarnedAboutMissingKey = true;
-    }
-    return null;
-  }
-  
-  if (!adminClient) {
-    adminClient = createClient<Database>(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
-      auth: {
-        autoRefreshToken: false,
-        persistSession: false,
-        storageKey: 'sb-admin-auth-token' // Use different storage key to avoid conflicts
-      }
-    });
-  }
-  
-  return adminClient;
+export const getAdminClient = (): null => {
+  return null;
 };
 
-/**
- * Check if admin client is available
- */
-export const isAdminClientAvailable = (): boolean => {
-  return !!SUPABASE_SERVICE_ROLE_KEY;
-};
+export const isAdminClientAvailable = (): boolean => false;
 
 /**
- * Verify if the current user is an admin by checking user_roles table
- * This uses the regular client but the admin_staff or user_roles check
+ * Verifies the given email matches the signed-in user and that user has role `admin`.
+ * Uses only the anon/authenticated client (RLS must allow the read on `user_roles`).
  */
 export const verifyAdminAccess = async (email: string): Promise<boolean> => {
   try {
-    const client = getAdminClient();
-    if (!client) return false;
-    
-    // Check user_roles table for admin role
-    const { data, error } = await client
-      .from('user_roles')
-      .select('role')
-      .eq('role', 'admin')
-      .limit(1);
-    
-    if (error) {
-      console.error('Admin verification error:', error);
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user?.email || user.email.toLowerCase() !== email.trim().toLowerCase()) {
       return false;
     }
-    
-    // Also verify the email matches an admin user
-    const { data: userData } = await client
+    const { data, error } = await supabase
       .from('user_roles')
-      .select(`
-        user_id,
-        role
-      `)
-      .eq('role', 'admin');
-    
-    if (!userData || userData.length === 0) return false;
-    
-    // Get user emails
-    for (const ur of userData) {
-      const { data: authUser } = await client.auth.admin.getUserById(ur.user_id);
-      if (authUser?.user?.email === email) {
-        return true;
-      }
-    }
-    
-    return false;
-  } catch (err) {
-    console.error('Admin verification exception:', err);
+      .select('role')
+      .eq('user_id', user.id)
+      .eq('role', 'admin')
+      .maybeSingle();
+    if (error) return false;
+    return data?.role === 'admin';
+  } catch {
     return false;
   }
 };
 
 export default getAdminClient;
-

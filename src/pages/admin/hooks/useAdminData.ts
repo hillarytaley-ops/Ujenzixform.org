@@ -1,6 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { getAdminClient } from '@/integrations/supabase/adminClient';
 import { useToast } from '@/hooks/use-toast';
 import {
   DashboardStats,
@@ -34,7 +33,7 @@ export const useAdminStats = () => {
   const fetchStats = useCallback(async () => {
     try {
       setLoading(true);
-      const client = getAdminClient() || supabase;
+      const client = supabase;
 
       // Fetch counts in parallel using correct table names
       const [
@@ -93,7 +92,7 @@ export const useUsers = (pagination?: PaginationState) => {
   const fetchUsers = useCallback(async () => {
     try {
       setLoading(true);
-      const client = getAdminClient() || supabase;
+      const client = supabase;
 
       let query = client
         .from('profiles')
@@ -148,7 +147,7 @@ export const useRegistrations = () => {
   const fetchRegistrations = useCallback(async () => {
     try {
       setLoading(true);
-      const client = getAdminClient() || supabase;
+      const client = supabase;
 
       // Fetch all registration/application types in parallel
       // Try delivery_provider_registrations first (less strict RLS), fallback to delivery_providers
@@ -223,7 +222,7 @@ export const useRegistrations = () => {
     newStatus: string
   ) => {
     try {
-      const client = getAdminClient() || supabase;
+      const client = supabase;
       
       // Use correct table names
       if (type === 'supplier') {
@@ -376,7 +375,7 @@ export const useCameras = () => {
   const fetchCameras = useCallback(async () => {
     try {
       setLoading(true);
-      const client = getAdminClient() || supabase;
+      const client = supabase;
 
       const { data, error } = await client
         .from('cameras')
@@ -434,7 +433,7 @@ export const useCameras = () => {
   // Add camera - uses only columns that exist in the database
   const addCamera = useCallback(async (cameraData: CameraFormData) => {
     try {
-      const client = getAdminClient() || supabase;
+      const client = supabase;
 
       const { error } = await client
         .from('cameras')
@@ -469,7 +468,7 @@ export const useCameras = () => {
   // Update camera - uses only columns that exist in the database
   const updateCamera = useCallback(async (id: string, cameraData: Partial<CameraFormData>) => {
     try {
-      const client = getAdminClient() || supabase;
+      const client = supabase;
 
       const updateData: Record<string, unknown> = {};
       
@@ -508,7 +507,7 @@ export const useCameras = () => {
   // Delete camera
   const deleteCamera = useCallback(async (id: string) => {
     try {
-      const client = getAdminClient() || supabase;
+      const client = supabase;
 
       const { error } = await client
         .from('cameras')
@@ -565,7 +564,7 @@ export const useDeliveryApplications = () => {
   const fetchApplications = useCallback(async () => {
     try {
       setLoading(true);
-      const client = getAdminClient() || supabase;
+      const client = supabase;
 
       const { data, error } = await client
         .from('delivery_provider_registrations')
@@ -624,7 +623,7 @@ export const useBuilderDeliveryRequests = () => {
   const fetchRequests = useCallback(async () => {
     try {
       setLoading(true);
-      const client = getAdminClient() || supabase;
+      const client = supabase;
 
       const { data, error } = await client
         .from('delivery_requests')

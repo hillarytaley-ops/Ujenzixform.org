@@ -4,7 +4,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Building2, Store, Users, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
-import { getAdminClient } from '@/integrations/supabase/adminClient';
 import { useToast } from '@/hooks/use-toast';
 import { SuppliersRegister } from '../components/SuppliersRegister';
 import { BuildersRegister } from '../components/BuildersRegister';
@@ -97,8 +96,7 @@ export const RegistersTab: React.FC = () => {
       setLoading(true);
       
       // Try admin client first, fall back to regular supabase client
-      const adminClient = getAdminClient();
-      const client = adminClient || supabase;
+      const client = supabase;
       
       console.log('📊 Fetching user registrations...');
 
@@ -214,7 +212,7 @@ export const RegistersTab: React.FC = () => {
   // Update status handlers
   const updateSupplierStatus = useCallback(async (id: string, status: string) => {
     try {
-      const client = getAdminClient() || supabase;
+      const client = supabase;
       const { error } = await client
         .from('supplier_applications')
         .update({ status, updated_at: new Date().toISOString() })
@@ -239,7 +237,7 @@ export const RegistersTab: React.FC = () => {
 
   const updateBuilderStatus = useCallback(async (id: string, status: string) => {
     try {
-      const client = getAdminClient() || supabase;
+      const client = supabase;
       const { error } = await client
         .from('builder_registrations')
         .update({ status, updated_at: new Date().toISOString() })

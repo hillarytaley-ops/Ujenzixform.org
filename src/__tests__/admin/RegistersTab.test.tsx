@@ -85,27 +85,6 @@ vi.mock('@/integrations/supabase/client', () => ({
       }),
     })),
   },
-  getAdminClient: vi.fn().mockReturnValue({
-    from: vi.fn((table: string) => ({
-      select: vi.fn().mockReturnValue({
-        order: vi.fn().mockImplementation(() => {
-          if (table === 'supplier_applications') {
-            return Promise.resolve({ data: mockSuppliers, error: null });
-          }
-          if (table === 'profiles') {
-            return Promise.resolve({ data: mockBuilders, error: null });
-          }
-          if (table === 'delivery_providers') {
-            return Promise.resolve({ data: mockDeliveryProviders, error: null });
-          }
-          return Promise.resolve({ data: [], error: null });
-        }),
-      }),
-      update: vi.fn().mockReturnValue({
-        eq: vi.fn().mockResolvedValue({ error: null }),
-      }),
-    })),
-  }),
 }));
 
 vi.mock('@/hooks/use-toast', () => ({

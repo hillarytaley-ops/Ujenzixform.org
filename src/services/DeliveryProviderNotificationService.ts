@@ -351,16 +351,22 @@ class DeliveryProviderNotificationService {
     result: NotificationResult
   ): Promise<void> {
     try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user?.id) return;
+
       await supabase.from('analytics_events').insert({
+        user_id: user.id,
         event_type: 'delivery_providers_notified',
         event_data: {
           request_id: requestId,
           total_providers: result.totalProviders,
           notified: result.notified,
           failed: result.failed,
-          errors: result.errors
+          errors: result.errors,
         },
-        created_at: new Date().toISOString()
+        created_at: new Date().toISOString(),
       } as any);
     } catch (error) {
       // Non-critical - just log

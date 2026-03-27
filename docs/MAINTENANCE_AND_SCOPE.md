@@ -22,6 +22,12 @@ Treat features as **independent slices**: changing delivery should not require l
 
 Use **UjenziXform** in user-facing copy and new docs. **MradiPro** is retired; `MRADIPRO_*` filenames and `mradipro_*` storage keys are legacy only.
 
+## Security notes
+
+- **No service role in the browser** — the SPA uses the anon key + user JWT; RLS must allow `admin` where needed. Service role belongs only in Edge Function secrets (or other server env).
+- **Session storage** — `localStorage` / client “encryption” are **XSS-sensitive**; authorization is always from Supabase Auth + RLS.
+- **`analytics_events`** — migration `20260328120000_analytics_events_tighten_insert_rls.sql` requires `user_id = auth.uid()` on insert and revokes anon INSERT.
+
 ## Identity and storage keys
 
 Canonical defaults live in `src/config/appIdentity.ts`:

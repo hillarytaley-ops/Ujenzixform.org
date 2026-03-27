@@ -37,16 +37,6 @@ vi.mock('@/integrations/supabase/client', () => ({
       }),
     }),
   },
-  getAdminClient: vi.fn().mockReturnValue({
-    from: vi.fn().mockReturnValue({
-      select: vi.fn().mockReturnValue({
-        eq: vi.fn().mockResolvedValue({ data: [], error: null }),
-        order: vi.fn().mockReturnValue({
-          limit: vi.fn().mockResolvedValue({ data: [], error: null }),
-        }),
-      }),
-    }),
-  }),
 }));
 
 // Mock hooks

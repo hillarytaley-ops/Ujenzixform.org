@@ -21,6 +21,7 @@
  * ║                                                                                      ║
  * ║   IMPORTANT: This utility is for UX optimization (faster loading).                  ║
  * ║   Actual authorization is ALWAYS verified against the database.                     ║
+ * ║   XSS on this origin can read localStorage; never store secrets here — rely on RLS. ║
  * ║                                                                                      ║
  * ╚══════════════════════════════════════════════════════════════════════════════════════╝
  */

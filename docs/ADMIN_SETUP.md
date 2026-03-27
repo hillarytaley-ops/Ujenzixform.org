@@ -2,33 +2,11 @@
 
 This guide will help you set up admin access for the UjenziXform dashboard.
 
-## Quick Setup (2 Steps)
+## Quick setup: grant admin in the database
 
-### Step 1: Get Your Service Role Key
+The admin dashboard uses the **normal Supabase anon + JWT client**. Access is enforced by **Row Level Security (RLS)** and your row in `user_roles`. **Do not** put the **service_role** key in any `VITE_*` variable — it would ship in the browser bundle.
 
-1. Go to **Supabase Dashboard**: https://supabase.com/dashboard/project/wuuyjjpgzgeimiptuuws/settings/api
-2. Find the **"service_role" key** (under "Project API keys")
-   - ⚠️ This is the SECRET key, NOT the anon/public key
-3. Copy this key
-
-### Step 2: Add to Environment File
-
-Create or edit `.env.local` in your project root:
-
-```env
-VITE_SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...your_actual_key_here
-```
-
-Then restart your dev server:
-```bash
-npm run dev
-```
-
----
-
-## Alternative: Set Up Admin User in Database
-
-If you prefer not to use the service role key, you can make your user an admin:
+### Set up an admin user
 
 ### Step 1: Find Your User ID
 
@@ -71,27 +49,18 @@ Run the secure camera RLS migration:
 
 ## Security Best Practices
 
-### For Development
-- Using the service role key in `.env.local` is fine
-- The `.env.local` file should be in `.gitignore` (never commit it!)
-
-### For Production
-- **NEVER expose the service role key in frontend code**
-- Move admin operations to **Supabase Edge Functions**
-- Use proper authentication flow with admin role check
-- Enable 2FA for all admin accounts
+### Development & production
+- **Never** add `VITE_SUPABASE_SERVICE_ROLE_KEY` (or any service role) to the frontend.
+- Keep `.env.local` in `.gitignore`.
+- If an operation truly requires service role (e.g. Auth Admin API), implement it in a **Supabase Edge Function** with the secret stored server-side only.
+- Use strong passwords and 2FA on admin accounts where possible.
 
 ---
 
 ## Troubleshooting
 
-### "Admin service role key not configured" warning
-→ Add `VITE_SUPABASE_SERVICE_ROLE_KEY` to your `.env.local`
-
 ### "new row violates row-level security policy"
-→ Either:
-1. Add service role key (bypasses RLS)
-2. OR make your user an admin in `user_roles` table
+→ Ensure your user has `admin` in `user_roles` and that RLS policies allow admins for that table. Do not use the service role in the browser.
 
 ### Cameras still not loading after adding admin role
 → Make sure you're logged in with the email that has admin role

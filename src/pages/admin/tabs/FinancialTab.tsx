@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { getAdminClient } from '@/integrations/supabase/adminClient';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -98,7 +97,7 @@ export const FinancialTab: React.FC = () => {
   const loadFinancialData = useCallback(async () => {
     try {
       setLoading(true);
-      const client = getAdminClient() || supabase;
+      const client = supabase;
       
       const allDocs: FinancialDocument[] = [];
       const newStats: FinancialStats = {

@@ -2,7 +2,6 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useUrlTabSync } from "@/hooks/useUrlTabSync";
 import { supabase } from "@/integrations/supabase/client";
-import { getAdminClient, isAdminClientAvailable } from "@/integrations/supabase/adminClient";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -1161,7 +1160,7 @@ const AdminDashboard = () => {
   const loadDocuments = async () => {
     try {
       // Use admin client if available
-      const client = getAdminClient() || supabase;
+      const client = supabase;
       
       // Collect documents from all registration tables
       const allDocuments: DocumentRecord[] = [];
@@ -1277,7 +1276,7 @@ const AdminDashboard = () => {
   const loadFinancialData = async () => {
     try {
       // Use admin client if available
-      const client = getAdminClient() || supabase;
+      const client = supabase;
       
       const allFinancialDocs: FinancialDocument[] = [];
       let stats: FinancialStats = {
@@ -1555,7 +1554,7 @@ const AdminDashboard = () => {
   const loadFeedback = async () => {
     try {
       // Use admin client if available
-      const client = getAdminClient() || supabase;
+      const client = supabase;
       
       // Try to load from feedback table if it exists
       const { data: feedbackData, error } = await client
@@ -1607,7 +1606,7 @@ const AdminDashboard = () => {
   // Load cameras from database
   const loadCameras = async () => {
     try {
-      const client = getAdminClient() || supabase;
+      const client = supabase;
       
       const { data: camerasData, error } = await client
         .from('cameras')
@@ -1655,7 +1654,7 @@ const AdminDashboard = () => {
   // Add new camera
   const handleAddCamera = async () => {
     try {
-      const client = getAdminClient() || supabase;
+      const client = supabase;
       
       const { error } = await client
         .from('cameras')
@@ -1691,7 +1690,7 @@ const AdminDashboard = () => {
     if (!editingCamera) return;
     
     try {
-      const client = getAdminClient() || supabase;
+      const client = supabase;
       
       const { error } = await client
         .from('cameras')
@@ -1729,7 +1728,7 @@ const AdminDashboard = () => {
     if (!confirm(`Are you sure you want to delete camera "${cameraName}"?`)) return;
     
     try {
-      const client = getAdminClient() || supabase;
+      const client = supabase;
       
       const { error } = await client
         .from('cameras')
@@ -1757,7 +1756,7 @@ const AdminDashboard = () => {
   // Toggle camera status
   const handleToggleCameraStatus = async (camera: CameraRecord) => {
     try {
-      const client = getAdminClient() || supabase;
+      const client = supabase;
       
       const { error } = await client
         .from('cameras')
@@ -1831,7 +1830,7 @@ const AdminDashboard = () => {
       }
 
       // Fallback: direct table (may miss providers due to RLS)
-      const client = getAdminClient() || supabase;
+      const client = supabase;
       const { data: deliveryApps, error } = await client
         .from('delivery_provider_registrations')
         .select('*')
@@ -1876,7 +1875,7 @@ const AdminDashboard = () => {
   const loadRegistrations = async () => {
     try {
       // Use admin client if available
-      const client = getAdminClient() || supabase;
+      const client = supabase;
       
       const allRegistrations: RegistrationRecord[] = [];
 
