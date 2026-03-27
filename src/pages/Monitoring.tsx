@@ -51,6 +51,7 @@ import { useToast } from '@/hooks/use-toast';
 import { DeliveryRouteTracker } from '@/components/delivery/DeliveryRouteTracker';
 import { CameraAccessRequest } from '@/components/builders/CameraAccessRequest';
 import { MonitoringServiceRequest } from '@/components/builders/MonitoringServiceRequest';
+import { CameraRemoteCapabilitiesPanel } from '@/components/monitoring/CameraRemoteCapabilitiesPanel';
 
 interface CameraFeed {
   id: string;
@@ -65,6 +66,11 @@ interface CameraFeed {
   isRecording: boolean;
   batteryLevel?: number;
   signalStrength: number;
+  stream_url?: string | null;
+  embed_code?: string | null;
+  connection_type?: string;
+  supports_ptz?: boolean;
+  supports_two_way_audio?: boolean;
 }
 
 interface ProjectMonitoring {
@@ -157,7 +163,9 @@ const Monitoring = () => {
       uptime: '2h 15m',
       lastActivity: new Date(),
       isRecording: true,
-      signalStrength: 95
+      signalStrength: 95,
+      supports_ptz: true,
+      supports_two_way_audio: true,
     },
     {
       id: 'cam-002',
@@ -229,6 +237,8 @@ const Monitoring = () => {
       signalStrength: 45
     }
   ]);
+
+  const activeCameraList = assignedCameras.length > 0 ? assignedCameras : cameras;
 
   const [projects] = useState<ProjectMonitoring[]>([
     {
@@ -392,7 +402,9 @@ const Monitoring = () => {
         signalStrength: cam.is_active ? 95 : 0,
         stream_url: cam.stream_url,
         embed_code: cam.embed_code,
-        connection_type: cam.connection_type
+        connection_type: cam.connection_type,
+        supports_ptz: cam.supports_ptz === true,
+        supports_two_way_audio: cam.supports_two_way_audio === true,
       }));
 
       setAssignedCameras(transformedCameras);
@@ -1791,6 +1803,17 @@ const Monitoring = () => {
                             </div>
                           )}
                         </div>
+                        {selectedCamera && (
+                          <CameraRemoteCapabilitiesPanel
+                            supportsPtz={
+                              !!activeCameraList.find((c) => c.id === selectedCamera)?.supports_ptz
+                            }
+                            supportsTwoWayAudio={
+                              !!activeCameraList.find((c) => c.id === selectedCamera)
+                                ?.supports_two_way_audio
+                            }
+                          />
+                        )}
                       </CardContent>
                     </Card>
                   </div>

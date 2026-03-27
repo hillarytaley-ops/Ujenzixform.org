@@ -360,6 +360,8 @@ export const useCameras = () => {
           project_id,
           stream_url,
           is_active,
+          supports_ptz,
+          supports_two_way_audio,
           created_at,
           updated_at,
           projects:project_id (name)
@@ -385,6 +387,8 @@ export const useCameras = () => {
         fps: null,
         recording_enabled: false,
         motion_detection: false,
+        supports_ptz: (cam.supports_ptz as boolean) ?? false,
+        supports_two_way_audio: (cam.supports_two_way_audio as boolean) ?? false,
         status: (cam.is_active as boolean) ? 'online' : 'offline',
         last_connected: null,
         created_at: cam.created_at as string,
@@ -416,6 +420,8 @@ export const useCameras = () => {
           location: cameraData.location || null,
           stream_url: cameraData.stream_url || null,
           is_active: cameraData.is_active ?? true,
+          supports_ptz: cameraData.supports_ptz ?? false,
+          supports_two_way_audio: cameraData.supports_two_way_audio ?? false,
         });
 
       if (error) throw error;
@@ -451,6 +457,9 @@ export const useCameras = () => {
       if (cameraData.location !== undefined) updateData.location = cameraData.location || null;
       if (cameraData.stream_url !== undefined) updateData.stream_url = cameraData.stream_url || null;
       if (cameraData.is_active !== undefined) updateData.is_active = cameraData.is_active;
+      if (cameraData.supports_ptz !== undefined) updateData.supports_ptz = cameraData.supports_ptz;
+      if (cameraData.supports_two_way_audio !== undefined)
+        updateData.supports_two_way_audio = cameraData.supports_two_way_audio;
 
       const { error } = await client
         .from('cameras')

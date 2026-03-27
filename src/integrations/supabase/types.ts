@@ -208,6 +208,8 @@ export type Database = {
           name: string
           project_id: string | null
           stream_url: string | null
+          supports_ptz: boolean
+          supports_two_way_audio: boolean
           updated_at: string
         }
         Insert: {
@@ -218,6 +220,8 @@ export type Database = {
           name: string
           project_id?: string | null
           stream_url?: string | null
+          supports_ptz?: boolean
+          supports_two_way_audio?: boolean
           updated_at?: string
         }
         Update: {
@@ -228,6 +232,8 @@ export type Database = {
           name?: string
           project_id?: string | null
           stream_url?: string | null
+          supports_ptz?: boolean
+          supports_two_way_audio?: boolean
           updated_at?: string
         }
         Relationships: [

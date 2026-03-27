@@ -251,6 +251,8 @@ export interface CameraRecord {
   fps?: number | null;
   recording_enabled?: boolean;
   motion_detection?: boolean;
+  supports_ptz?: boolean;
+  supports_two_way_audio?: boolean;
   status: 'online' | 'offline' | 'error';
   last_connected?: string | null;
   created_at: string;
@@ -272,6 +274,8 @@ export interface CameraFormData {
   resolution?: string;
   recording_enabled?: boolean;
   motion_detection?: boolean;
+  supports_ptz?: boolean;
+  supports_two_way_audio?: boolean;
   is_active: boolean;
 }
 

@@ -47,6 +47,7 @@ import {
   Server,
   Radio,
   HelpCircle,
+  Mic,
 } from 'lucide-react';
 import { CameraRecord, CameraFormData, CameraConnectionType } from '../types';
 import { StatsCard, StatsGrid } from '../components/StatsCard';
@@ -122,6 +123,10 @@ export const MonitoringTab: React.FC<MonitoringTabProps> = ({
     stream_url: '',
     camera_type: 'ip',
     connection_type: 'url',
+    recording_enabled: false,
+    motion_detection: false,
+    supports_ptz: false,
+    supports_two_way_audio: false,
     is_active: true,
   });
   const { openDialog, DialogComponent } = useConfirmDialog();
@@ -174,6 +179,8 @@ export const MonitoringTab: React.FC<MonitoringTabProps> = ({
       resolution: camera.resolution || '',
       recording_enabled: camera.recording_enabled,
       motion_detection: camera.motion_detection,
+      supports_ptz: camera.supports_ptz ?? false,
+      supports_two_way_audio: camera.supports_two_way_audio ?? false,
       is_active: camera.is_active,
     });
   };
@@ -185,6 +192,10 @@ export const MonitoringTab: React.FC<MonitoringTabProps> = ({
       stream_url: '',
       camera_type: 'ip',
       connection_type: 'url',
+      recording_enabled: false,
+      motion_detection: false,
+      supports_ptz: false,
+      supports_two_way_audio: false,
       is_active: true,
     });
   };
@@ -1115,7 +1126,38 @@ const CameraModal: React.FC<CameraModalProps> = ({
                   Motion Detection
                 </Label>
               </div>
+              <div className="flex items-center gap-2 p-3 bg-slate-800/50 rounded-lg border border-slate-700 md:col-span-1">
+                <input
+                  type="checkbox"
+                  id="supports-ptz"
+                  checked={formData.supports_ptz || false}
+                  onChange={(e) => setFormData((prev) => ({ ...prev, supports_ptz: e.target.checked }))}
+                  className="rounded bg-slate-700 border-slate-600 text-cyan-500"
+                />
+                <Label htmlFor="supports-ptz" className="text-gray-300 cursor-pointer">
+                  PTZ capable (pan/tilt/zoom)
+                </Label>
+              </div>
+              <div className="flex items-center gap-2 p-3 bg-slate-800/50 rounded-lg border border-slate-700 md:col-span-1">
+                <input
+                  type="checkbox"
+                  id="supports-two-way-audio"
+                  checked={formData.supports_two_way_audio || false}
+                  onChange={(e) =>
+                    setFormData((prev) => ({ ...prev, supports_two_way_audio: e.target.checked }))
+                  }
+                  className="rounded bg-slate-700 border-slate-600 text-emerald-500"
+                />
+                <Label htmlFor="supports-two-way-audio" className="text-gray-300 cursor-pointer flex items-center gap-1">
+                  <Mic className="h-3.5 w-3.5 text-emerald-400" />
+                  Two-way audio (speaker/mic)
+                </Label>
+              </div>
             </div>
+            <p className="text-xs text-gray-500 mt-2">
+              PTZ and talk-back still require a future camera gateway or vendor API; checking these only marks intent for
+              the monitoring UI.
+            </p>
           </div>
         </CardContent>
         <div className="p-4 border-t border-slate-700 flex justify-end gap-2">

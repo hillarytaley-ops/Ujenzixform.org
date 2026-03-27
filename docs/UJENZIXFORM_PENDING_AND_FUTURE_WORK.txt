@@ -91,6 +91,20 @@ payments, and admin into one printable booklet unless you assemble it from
 several files.
 
 
+REMOTE PTZ AND TWO-WAY AUDIO (MONITORING)
+--------------------------------------------------------------------------------
+
+The app can store per-camera flags supports_ptz and supports_two_way_audio and
+show a monitoring panel (disabled controls) when those are enabled. Actually
+moving the lens or streaming microphone audio from the client browser to the
+site requires vendor-specific or protocol work: ONVIF PTZ over a reachable
+network path, or a vendor cloud / WebRTC talk-back channel. Camera passwords
+and control endpoints must not live in the browser; a Supabase Edge Function,
+dedicated gateway, or third-party service would relay signed commands from
+entitled users only. Until that gateway exists, the UI is intentional
+scaffolding only.
+
+
 CLOSING SUMMARY
 --------------------------------------------------------------------------------
 
