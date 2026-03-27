@@ -1,8 +1,12 @@
-# 🏗️ UjenziXform - Kenya's Premier Construction Platform
+# 🏗️ UjenziXform — Construction marketplace platform
 
-## 📋 Project Overview
+## 📋 Project overview
 
-**UjenziXform** is Kenya's leading digital platform connecting builders with verified construction material suppliers across all 47 counties. From Mombasa to Eldoret, from Kisumu to Garissa - we facilitate quality materials, competitive prices, and lasting business partnerships.
+**UjenziXform** is a digital platform that connects builders with construction material suppliers across Kenya. The goal is to make sourcing, orders, delivery, and related workflows easier to run in one place.
+
+### Scope and maintenance
+
+This repository covers a **broad surface area** (marketplace, admin, delivery, monitoring, security tooling, and more). That supports a full product vision but increases maintenance cost. For production, **prioritize and harden the flows you actually ship**; not every module is equally mature.
 
 ### 🎯 **Mission**
 *Kujenga Pamoja* - Building Together Across Kenya
@@ -10,45 +14,32 @@
 ### 🌟 **Vision**
 To revolutionize Kenya's construction industry through digital innovation, transparency, and secure business connections.
 
-## 🚀 **Key Features**
+## 🚀 **Key features** (by audience)
 
-### **For Builders** 🏗️
-- **Project Management**: Complete project lifecycle management
-- **Material Sourcing**: Access to verified supplier network
-- **Real-time Monitoring**: Live construction site monitoring (view-only)
-- **Delivery Tracking**: Track material deliveries to construction sites
-- **Quality Assurance**: QR code verification and material authentication
-- **Budget Management**: Comprehensive budget tracking and optimization
+Capabilities exist in code across these areas; depth and polish vary by route and deployment configuration.
 
-### **For Suppliers** 📦
-- **Order Management**: Streamlined order processing and fulfillment
-- **Inventory Control**: Real-time inventory management and tracking
-- **Performance Analytics**: Business intelligence and growth insights
-- **Quality Control**: QR code generation and material verification
-- **Customer Relations**: Secure communication and relationship management
+### **For builders** 🏗️
+- Projects and material sourcing, supplier discovery
+- Site monitoring (where cameras and RLS policies are configured)
+- Delivery tracking and QR-related flows where enabled
+- Budget and PO-related tooling (see app routes for current behavior)
 
-### **For Administrators** 👨‍💼
-- **System Management**: Complete platform administration and control
-- **User Management**: User approval, role management, and access control
-- **Security Monitoring**: Real-time security dashboard and incident response
-- **Content Management**: Platform content and configuration management
-- **Analytics**: System-wide analytics and business intelligence
+### **For suppliers** 📦
+- Orders, catalog/inventory patterns, analytics components
+- Contact and approval flows tied to your Supabase policies
 
-## 🛡️ **Security Features**
+### **For administrators** 👨‍💼
+- Admin dashboard, registrations, monitoring assignments, and operational tools
+- Security-oriented panels and exports (depend on environment variables and backend setup)
 
-### **Enterprise-Grade Security** (97/100 Score)
-- **Field-Level Encryption**: AES-256 encryption for sensitive data
-- **Row Level Security**: Comprehensive database access controls
-- **Role-Based Access**: Strict role-based permissions and boundaries
-- **Real-time Monitoring**: Live security monitoring and threat detection
-- **Audit Logging**: Complete activity tracking and compliance
-- **Privacy Protection**: Full Kenya DPA 2019 and GDPR compliance
+## 🛡️ **Security (what the codebase is built for)**
 
-### **Access Control Matrix**
-- **Admins**: Full system control and management
-- **Builders**: Project-specific access with view-only monitoring
-- **Suppliers**: Order management with restricted system access
-- **Guests**: Public directory access only
+Security is **defense in depth**: client practices, Supabase **Row Level Security (RLS)**, auth, and optional monitoring (e.g. Sentry) must be configured and reviewed for your environment.
+
+- **Client-side**: Utilities for sensitive fields, session handling, CSP-related helpers (verify headers at the edge / host).
+- **Database**: RLS policies in `supabase/migrations` — review and test with real roles before production.
+- **Roles**: Admin, builder, supplier, and guest-style access are modeled in the app; exact permissions follow your policies and UI gates.
+- **Compliance**: Kenya DPA 2019 / GDPR alignment requires **legal and operational** measures (privacy policy, data processing agreements, retention, breach process), not only application code. Treat in-repo security docs as **supporting material**, not a certification.
 
 ## 🛠️ **Technology Stack**
 
@@ -65,12 +56,10 @@ To revolutionize Kenya's construction industry through digital innovation, trans
 - **Row Level Security**: Database-level security policies
 - **Real-time Subscriptions**: Live data updates and notifications
 
-### **Security & Monitoring**
-- **JWT Authentication**: Secure token-based authentication
-- **OAuth Integration**: Google and GitHub authentication
-- **Content Security Policy**: XSS protection and security headers
-- **Real-time Monitoring**: Live system health and security monitoring
-- **Comprehensive Logging**: Complete audit trail and compliance
+### **Security & monitoring**
+- **Auth**: Supabase JWT; optional OAuth providers when enabled in the project
+- **CSP / headers**: Helpers and scripts exist to test headers locally — confirm the same policies on your production host (e.g. Vercel)
+- **Error reporting**: Optional Sentry integration when configured
 
 ## 🚀 **Getting Started**
 
@@ -145,34 +134,33 @@ UjenziXform/
 └── scripts/                # Build and deployment scripts
 ```
 
-## 🔐 **Security Documentation**
+## 🔐 **Security documentation**
 
-### **Comprehensive Security Coverage**
-- **Security Rating Report**: Complete security assessment (97/100)
-- **Access Control Matrix**: Detailed permission documentation
-- **Incident Response Plan**: Formal security incident procedures
-- **Compliance Framework**: Kenya DPA and GDPR compliance documentation
-- **Training Materials**: Security awareness and best practices
+In-repo docs describe intended controls and workflows. They are **not** a substitute for your own penetration test, threat model, or legal review.
 
-### **Key Security Documents**
-- `COMPREHENSIVE_SECURITY_RATING_REPORT.md` - Complete security assessment
-- `DELIVERY_PROVIDER_ACCESS_RESTRICTIONS.md` - Access control policies
-- `BUILDER_MONITORING_ACCESS_GUIDE.md` - Builder access documentation
-- `docs/security/incident-response-plan.md` - Incident response procedures
+- `COMPREHENSIVE_SECURITY_RATING_REPORT.md` — historical / narrative assessment (verify claims against current code)
+- `DELIVERY_PROVIDER_ACCESS_RESTRICTIONS.md` — delivery access notes
+- `BUILDER_MONITORING_ACCESS_GUIDE.md` — monitoring access
+- `docs/security/incident-response-plan.md` — incident response draft
 
-## 📈 **Performance & Analytics**
+## ✅ **Verify quality locally** (reduce “unknowns” before release)
 
-### **System Performance**
-- **Response Time**: <500ms average API response
-- **Uptime**: 99.7% system availability
-- **Security Score**: 97/100 (Outstanding)
-- **User Satisfaction**: 95%+ user satisfaction rate
+Nothing below replaces **production** monitoring (latency, errors, Core Web Vitals), but it gives a repeatable baseline:
 
-### **Business Metrics**
-- **Multi-county Coverage**: All 47 Kenyan counties supported
-- **Verified Suppliers**: Comprehensive supplier verification process
-- **Quality Assurance**: QR code verification and material authentication
-- **Real-time Tracking**: Live delivery and construction monitoring
+| Check | Command / action |
+|--------|------------------|
+| Lint | `npm run lint` |
+| Unit tests | `npm run test:run` |
+| Production build | `npm run build` — catches many TS and bundling issues |
+| Security scripts | `npm run security:test` and `npm run security:full` when you rely on them |
+| Accessibility | Use browser DevTools / axe / Lighthouse on critical flows after deploy |
+| Load / uptime | Measure on your host and Supabase tier; do not infer from this README |
+
+Onboarding polish and per-screen a11y are best validated with **real user sessions** or a short scripted checklist on staging.
+
+## 📈 **Performance and analytics**
+
+Latency, uptime, and user satisfaction **depend on hosting, database plan, traffic, and configuration**. Track them with your provider dashboards, Supabase metrics, and (if enabled) Sentry — do not treat marketing figures as guarantees.
 
 ## 🤝 **Contributing**
 
@@ -188,22 +176,15 @@ UjenziXform/
 - Comprehensive audit logging
 - Regular security testing and validation
 
-## 📞 **Support & Contact**
+## 📞 **Support and contact**
 
-### **Technical Support**
-- **Email**: support@mradipro.co.ke
-- **Phone**: +254-700-MRADIPRO
-- **Hours**: 24/7 technical support
+Use addresses and numbers that match **your live business and domain**. Some older paths, assets, or integration defaults in the repo may still reference the historical **MradiPro** name or `mradipro.*` hostnames; migrate those as you standardize on UjenziXform.
 
-### **Security Contact**
-- **Security Team**: security@mradipro.co.ke
-- **Emergency**: security-emergency@mradipro.co.ke
-- **Hotline**: +254-700-SECURE (732873)
+Example placeholders (replace with production values):
 
-### **Business Inquiries**
-- **Email**: info@mradipro.co.ke
-- **Phone**: +254-700-123-4567
-- **Address**: Nairobi, Kenya
+- **Support**: `support@ujenzixform.org`
+- **Security**: `security@ujenzixform.org`
+- **General**: `info@ujenzixform.org`
 
 ## 📄 **License**
 
@@ -211,21 +192,14 @@ This project is proprietary software owned by UjenziXform Ltd. All rights reserv
 
 ## 🎉 **Acknowledgments**
 
-Special thanks to:
-- **Kenya's Construction Industry**: For inspiring this platform
-- **Our Development Team**: For building world-class security and functionality
-- **Our Users**: Builders and suppliers who make this platform successful
-- **Security Community**: For helping us achieve outstanding security standards
+Thanks to everyone contributing to the product and to the wider security and open-source communities whose tools this project builds on.
 
 ---
 
-**🏆 UjenziXform - Building Kenya's Future, One Connection at a Time**
-
-*Proudly Kenyan 🇰🇪 | Enterprise Security 🛡️ | World-Class Platform 🌍*
+**UjenziXform** — *Kujenga Pamoja* (building together)
 
 ---
 
 **Version**: 2.0  
-**Last Updated**: October 8, 2025  
-**Security Rating**: 97/100 (Outstanding)  
-**Status**: Production Ready ✅
+**Last updated**: March 2026  
+**Status**: Under active development — validate each release in your own environment before calling it “production ready.”
