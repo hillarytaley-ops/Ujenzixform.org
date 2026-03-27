@@ -41,7 +41,7 @@ export const SimpleChatButton = () => {
     return null;
   }
 
-  // Enhanced AI Response Engine - Kenya Construction Knowledge
+  // Rule-based assistant (Kenya construction FAQs) — full AI/ML chat can come later
   const getAIResponse = async (userQuery: string): Promise<{ response: string; suggestions?: string[] }> => {
     const query = userQuery.toLowerCase();
 
@@ -90,7 +90,7 @@ export const SimpleChatButton = () => {
     // Monitoring Services
     if (query.includes('monitor') || query.includes('camera') || query.includes('surveillance') || query.includes('watch') || query.includes('security')) {
       return {
-        response: `📹 **Site Monitoring Services:**\n\n**What We Offer:**\n✅ 24/7 Live Camera Surveillance\n✅ Drone Aerial Monitoring\n✅ AI-Powered Security Alerts\n✅ Time-lapse Construction Progress\n✅ Remote Site Inspection\n\n**Benefits:**\n• Prevent theft & vandalism\n• Monitor worker productivity\n• Track construction progress\n• Remote project oversight\n• Insurance compliance\n• Security documentation\n\n**Pricing:**\n- Basic Camera Setup: KES 50,000 - 100,000\n- Monthly Monitoring: KES 15,000 - 30,000\n- Drone Services: KES 10,000 - 25,000/session\n\n**Access:** Click "Site Monitoring" in menu`,
+        response: `📹 **Site Monitoring Services:**\n\n**What We Offer:**\n✅ 24/7 Live Camera Surveillance\n✅ Drone Aerial Monitoring\n✅ Smart / rule-based security alerts\n✅ Time-lapse Construction Progress\n✅ Remote Site Inspection\n\n**Benefits:**\n• Prevent theft & vandalism\n• Monitor worker productivity\n• Track construction progress\n• Remote project oversight\n• Insurance compliance\n• Security documentation\n\n**Pricing:**\n- Basic Camera Setup: KES 50,000 - 100,000\n- Monthly Monitoring: KES 15,000 - 30,000\n- Drone Services: KES 10,000 - 25,000/session\n\n**Access:** Click "Site Monitoring" in menu`,
         suggestions: ['How does monitoring work?', 'Setup site cameras', 'Drone monitoring costs', 'Security features']
       };
     }
@@ -108,7 +108,7 @@ export const SimpleChatButton = () => {
       setShowHumanSupport(true);
       return {
         response: `👤 **Connect with UjenziXform staff**\n\n**We are here to help.**\n\n📧 **Email:** ${SUPPORT_EMAIL}\n\nAdd phone and WhatsApp in your deployment content if needed.\n\n**What can we help you with?**`,
-        suggestions: ['I have a custom order', 'Need project consultation', 'Technical support', 'Back to AI assistant']
+        suggestions: ['I have a custom order', 'Need project consultation', 'Technical support', 'Back to assistant']
       };
     }
 
@@ -133,7 +133,7 @@ export const SimpleChatButton = () => {
     // Show typing indicator
     setIsTyping(true);
     
-    // Get AI response
+    // Get scripted response
     setTimeout(async () => {
       const aiResponse = await getAIResponse(userQuery);
       const botResponse: Message = { 
@@ -200,7 +200,7 @@ export const SimpleChatButton = () => {
             <Bot className="h-5 w-5" />
             <div>
               <div className="font-semibold">UjenziXform</div>
-              <div className="text-xs">Kenya Construction Expert • AI & Human Support</div>
+              <div className="text-xs">Kenya construction help • Guided answers & human support</div>
             </div>
           </div>
           <Button
@@ -341,7 +341,7 @@ export const SimpleChatButton = () => {
           </div>
           <div className="text-xs text-gray-500 mt-2 flex items-center gap-1">
             <Sparkles className="h-3 w-3" />
-            Powered by UjenziXform 🇰🇪 • AI & Human Support Available • v2.0
+            Powered by UjenziXform 🇰🇪 • Guided help & human support • v2.0
           </div>
         </div>
       </Card>

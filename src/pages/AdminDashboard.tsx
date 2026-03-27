@@ -65,7 +65,6 @@ import {
   ShoppingCart,
   CreditCard,
   FileBarChart,
-  Brain,
   Sparkles,
   Bot,
   FileImage,
@@ -133,7 +132,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { StaffManagement } from "@/components/admin/StaffManagement";
 import { ActivityLogViewer } from "@/components/admin/ActivityLogViewer";
 import { ThemeToggle, ThemeProvider } from "@/components/admin/dashboard/ThemeToggle";
@@ -2420,8 +2419,8 @@ const AdminDashboard = () => {
             )}
             {shouldShowTab('ml') && (
               <TabsTrigger value="ml" className="data-[state=active]:bg-pink-600">
-                <Brain className="h-4 w-4 mr-2" />
-                ML & AI
+                <BarChart3 className="h-4 w-4 mr-2" />
+                Analytics
               </TabsTrigger>
             )}
             {shouldShowTab('security') && (
@@ -4273,19 +4272,31 @@ const AdminDashboard = () => {
             </div>
           </TabsContent>
 
-          {/* ML & AI Tab */}
+          {/* Analytics tab (mock KPIs today; real reports on /analytics) */}
           <TabsContent value="ml" className="space-y-6">
-            {/* ML Stats */}
+            <Alert className="bg-amber-950/35 border-amber-700/50">
+              <Info className="h-4 w-4 text-amber-400" />
+              <AlertTitle className="text-amber-100">Basics now — full AI/ML later</AlertTitle>
+              <AlertDescription className="text-amber-100/85">
+                Production analytics (catalog usage, monitoring / site vision) live on{' '}
+                <Link to="/analytics" className="underline font-medium text-white">
+                  Material Analytics
+                </Link>
+                . The KPIs and model cards below are mock placeholders for future ML work—not trained models in production.
+              </AlertDescription>
+            </Alert>
+
+            {/* Mock preview stats (local demo only) */}
             <div className="grid md:grid-cols-3 lg:grid-cols-6 gap-4">
               <Card className="bg-gradient-to-br from-pink-900/40 to-pink-800/20 border-pink-700/50">
                 <CardContent className="p-4">
                   <div className="flex items-center gap-3">
                     <div className="p-3 bg-pink-600/30 rounded-xl">
-                      <Brain className="h-6 w-6 text-pink-400" />
+                      <BarChart3 className="h-6 w-6 text-pink-400" />
                     </div>
                     <div>
                       <p className="text-2xl font-bold text-white">{mlStats.totalPredictions}</p>
-                      <p className="text-sm text-pink-300">Total Predictions</p>
+                      <p className="text-sm text-pink-300">Demo events</p>
                     </div>
                   </div>
                 </CardContent>
@@ -4299,7 +4310,7 @@ const AdminDashboard = () => {
                     </div>
                     <div>
                       <p className="text-2xl font-bold text-white">{mlStats.successRate.toFixed(1)}%</p>
-                      <p className="text-sm text-green-300">Success Rate</p>
+                      <p className="text-sm text-green-300">Demo success %</p>
                     </div>
                   </div>
                 </CardContent>
@@ -4313,7 +4324,7 @@ const AdminDashboard = () => {
                     </div>
                     <div>
                       <p className="text-2xl font-bold text-white">{mlStats.avgProcessingTime.toFixed(0)}ms</p>
-                      <p className="text-sm text-blue-300">Avg Response</p>
+                      <p className="text-sm text-blue-300">Demo latency</p>
                     </div>
                   </div>
                 </CardContent>
@@ -4327,7 +4338,7 @@ const AdminDashboard = () => {
                     </div>
                     <div>
                       <p className="text-2xl font-bold text-white">{mlStats.activeModels}</p>
-                      <p className="text-sm text-purple-300">Active Models</p>
+                      <p className="text-sm text-purple-300">Roadmap slots</p>
                     </div>
                   </div>
                 </CardContent>
@@ -4341,7 +4352,7 @@ const AdminDashboard = () => {
                     </div>
                     <div>
                       <p className="text-2xl font-bold text-white">{mlStats.todayPredictions}</p>
-                      <p className="text-sm text-cyan-300">Today</p>
+                      <p className="text-sm text-cyan-300">Today (demo)</p>
                     </div>
                   </div>
                 </CardContent>
@@ -4355,19 +4366,19 @@ const AdminDashboard = () => {
                     </div>
                     <div>
                       <p className="text-2xl font-bold text-white">{mlStats.errorRate.toFixed(1)}%</p>
-                      <p className="text-sm text-red-300">Error Rate</p>
+                      <p className="text-sm text-red-300">Demo errors</p>
                     </div>
                   </div>
                 </CardContent>
               </Card>
             </div>
             
-            {/* Active ML Models */}
+            {/* Roadmap: model types (not deployed) */}
             <Card className="bg-slate-900/50 border-slate-800">
               <CardHeader>
                 <CardTitle className="text-white flex items-center gap-2">
                   <Bot className="h-5 w-5 text-pink-400" />
-                  Active ML Models
+                  Planned model types (roadmap)
                 </CardTitle>
               </CardHeader>
               <CardContent>
@@ -4385,11 +4396,11 @@ const AdminDashboard = () => {
                           <h4 className="text-white font-medium">{model.name}</h4>
                           <p className="text-gray-400 text-xs">{model.version} • {model.type}</p>
                         </div>
-                        <Badge className="bg-green-600">Active</Badge>
+                        <Badge className="bg-amber-700">Planned</Badge>
                       </div>
                       <div className="space-y-2">
                         <div className="flex justify-between text-sm">
-                          <span className="text-gray-400">Accuracy</span>
+                          <span className="text-gray-400">Illustrative target</span>
                           <span className="text-white font-medium">{model.accuracy}%</span>
                         </div>
                         <div className="w-full bg-slate-700 rounded-full h-2">
@@ -4405,13 +4416,13 @@ const AdminDashboard = () => {
               </CardContent>
             </Card>
             
-            {/* ML Activity Log */}
+            {/* Mock activity log (localStorage demo) */}
             <Card className="bg-slate-900/50 border-slate-800">
               <CardHeader>
                 <div className="flex justify-between items-center">
                   <CardTitle className="text-white flex items-center gap-2">
                     <History className="h-5 w-5 text-pink-400" />
-                    Recent ML Activities
+                    Sample activity (mock)
                   </CardTitle>
                   <Button
                     variant="outline"
@@ -4484,27 +4495,27 @@ const AdminDashboard = () => {
                   ))}
                   {mlActivities.length === 0 && (
                     <div className="text-center py-8">
-                      <Brain className="h-12 w-12 text-gray-600 mx-auto mb-3" />
-                      <p className="text-gray-400">No ML activities recorded yet</p>
+                      <BarChart3 className="h-12 w-12 text-gray-600 mx-auto mb-3" />
+                      <p className="text-gray-400">No demo activities in local storage yet</p>
                     </div>
                   )}
                 </div>
               </CardContent>
             </Card>
             
-            {/* ML Controls */}
+            {/* Future automation (non-functional placeholders) */}
             <Card className="bg-gradient-to-r from-pink-900/30 to-purple-900/30 border-pink-800/50">
               <CardHeader>
                 <CardTitle className="text-white flex items-center gap-2">
                   <Settings className="h-5 w-5 text-pink-400" />
-                  ML System Controls
+                  Automation (coming later)
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
                   <Button 
                     className="bg-green-600 hover:bg-green-700 h-auto py-4"
-                    onClick={() => toast({ title: "🚀 ML System", description: "All models are running optimally" })}
+                    onClick={() => toast({ title: "Coming later", description: "Model orchestration is not wired yet." })}
                   >
                     <div className="text-center">
                       <Activity className="h-6 w-6 mx-auto mb-2" />
@@ -4513,7 +4524,7 @@ const AdminDashboard = () => {
                   </Button>
                   <Button 
                     className="bg-yellow-600 hover:bg-yellow-700 h-auto py-4"
-                    onClick={() => toast({ title: "🔄 Retraining", description: "Model retraining scheduled" })}
+                    onClick={() => toast({ title: "Coming later", description: "Retraining pipelines are not deployed yet." })}
                   >
                     <div className="text-center">
                       <RefreshCw className="h-6 w-6 mx-auto mb-2" />
@@ -4522,7 +4533,7 @@ const AdminDashboard = () => {
                   </Button>
                   <Button 
                     className="bg-blue-600 hover:bg-blue-700 h-auto py-4"
-                    onClick={() => toast({ title: "📊 Report", description: "Generating ML performance report..." })}
+                    onClick={() => toast({ title: "Use Material Analytics", description: "Open /analytics for live reports." })}
                   >
                     <div className="text-center">
                       <FileBarChart className="h-6 w-6 mx-auto mb-2" />
@@ -4531,7 +4542,7 @@ const AdminDashboard = () => {
                   </Button>
                   <Button 
                     className="bg-red-600 hover:bg-red-700 h-auto py-4"
-                    onClick={() => toast({ title: "⏸️ Paused", description: "All ML processing paused" })}
+                    onClick={() => toast({ title: "Coming later", description: "No ML runtime to pause yet." })}
                   >
                     <div className="text-center">
                       <XCircle className="h-6 w-6 mx-auto mb-2" />

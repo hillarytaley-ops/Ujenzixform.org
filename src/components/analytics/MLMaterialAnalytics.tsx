@@ -10,7 +10,6 @@ import {
   BarChart3,
   TrendingUp,
   TrendingDown,
-  Brain,
   Zap,
   Package,
   DollarSign,
@@ -310,7 +309,7 @@ export const MLMaterialAnalytics: React.FC<MaterialAnalytics> = ({ projectId, us
 
       let camRows = (camerasRes.data || []) as CameraRow[];
       if (camerasRes.error) {
-        console.warn('Cameras fetch for ML vision (optional):', camerasRes.error);
+        console.warn('Cameras fetch for site vision (optional):', camerasRes.error);
         camRows = [];
       }
 
@@ -358,7 +357,7 @@ export const MLMaterialAnalytics: React.FC<MaterialAnalytics> = ({ projectId, us
 
       setPredictions(generatePredictions(processedData));
     } catch (error) {
-      console.error('Error in ML analytics:', error);
+      console.error('Error in material analytics:', error);
       toast({
         title: 'Analytics Error',
         description: 'Failed to load material analytics',
@@ -430,8 +429,8 @@ export const MLMaterialAnalytics: React.FC<MaterialAnalytics> = ({ projectId, us
     if (increasingTrend.length > 2) {
       out.push({
         type: 'warning',
-        title: 'Price Increase Predicted',
-        description: `ML models predict price increases for ${increasingTrend.map((m) => m.category).join(', ')}. Consider purchasing now to lock in current rates.`,
+        title: 'Rising usage trend',
+        description: `Several categories (${increasingTrend.map((m) => m.category).join(', ')}) are trending up in this snapshot. Consider reviewing orders and supplier pricing—not a trained forecast.`,
         confidence: 78,
         action: 'Purchase Now',
       });
@@ -465,7 +464,7 @@ export const MLMaterialAnalytics: React.FC<MaterialAnalytics> = ({ projectId, us
         type: 'info',
         title: 'Seasonal Insight: Rainy Season',
         description:
-          'ML analysis suggests stocking roofing materials and waterproofing supplies during rainy season for better project completion rates.',
+          'Rule-of-thumb: many sites stock more roofing and waterproofing ahead of heavy rains. Confirm with your schedule and suppliers—not model output.',
         confidence: 88,
         action: 'View Roofing Materials',
       });
@@ -532,8 +531,8 @@ export const MLMaterialAnalytics: React.FC<MaterialAnalytics> = ({ projectId, us
       <Card>
         <CardContent className="flex items-center justify-center h-64">
           <div className="text-center">
-            <Brain className="h-12 w-12 mx-auto mb-4 text-blue-600 animate-pulse" />
-            <p className="text-muted-foreground">Analyzing material usage patterns...</p>
+            <BarChart3 className="h-12 w-12 mx-auto mb-4 text-blue-600 animate-pulse" />
+            <p className="text-muted-foreground">Loading analytics…</p>
           </div>
         </CardContent>
       </Card>
@@ -542,19 +541,28 @@ export const MLMaterialAnalytics: React.FC<MaterialAnalytics> = ({ projectId, us
 
   return (
     <div className="space-y-6">
+      <Alert className="border-amber-200 bg-amber-50">
+        <Lightbulb className="h-4 w-4 text-amber-800" />
+        <AlertTitle className="text-amber-950">Basics today</AlertTitle>
+        <AlertDescription className="text-amber-950/90">
+          This dashboard uses catalog data, simple heuristics, and optional site-vision events. Full AI/ML (learned
+          forecasting, automated optimization) is planned for a later release—not live yet.
+        </AlertDescription>
+      </Alert>
+
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h2 className="text-3xl font-bold flex items-center gap-3">
-            <Brain className="h-8 w-8 text-blue-600" />
-            ML Material Analytics
+            <BarChart3 className="h-8 w-8 text-blue-600" />
+            Material analytics
           </h2>
           <p className="text-muted-foreground">
-            AI-powered material trends plus site vision signals from Monitoring cameras
+            Usage summaries and monitoring-linked site vision — rule-based insights for now
           </p>
         </div>
-        <Badge className="bg-gradient-to-r from-blue-600 to-purple-600 text-white px-4 py-2 w-fit">
+        <Badge variant="secondary" className="px-4 py-2 w-fit">
           <Zap className="h-4 w-4 mr-2" />
-          Powered by ML
+          Heuristics + reports
         </Badge>
       </div>
 
@@ -578,7 +586,7 @@ export const MLMaterialAnalytics: React.FC<MaterialAnalytics> = ({ projectId, us
                 <AlertTitle className="mb-2 flex flex-wrap items-center gap-2 justify-between">
                   <span>{insight.title}</span>
                   <Badge variant="outline" className="text-xs shrink-0">
-                    {insight.confidence}% confidence
+                    {insight.confidence}% signal strength
                   </Badge>
                 </AlertTitle>
                 <AlertDescription className="text-sm mb-3">{insight.description}</AlertDescription>
@@ -613,7 +621,7 @@ export const MLMaterialAnalytics: React.FC<MaterialAnalytics> = ({ projectId, us
             Material usage
           </TabsTrigger>
           <TabsTrigger value="predictions" className="text-xs sm:text-sm">
-            Predictions
+            Baseline projections
           </TabsTrigger>
           <TabsTrigger value="trends" className="text-xs sm:text-sm">
             Trends
@@ -923,7 +931,7 @@ export const MLMaterialAnalytics: React.FC<MaterialAnalytics> = ({ projectId, us
                   <CardHeader>
                     <CardTitle className="text-lg flex items-center gap-2">
                       <Clock className="h-5 w-5" />
-                      Next week forecast
+                      Next week (heuristic)
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
@@ -933,7 +941,7 @@ export const MLMaterialAnalytics: React.FC<MaterialAnalytics> = ({ projectId, us
                           <div>
                             <div className="font-medium">{pred.category}</div>
                             <div className="text-sm text-muted-foreground">
-                              Predicted: {pred.predictedQuantity} items
+                              Projected: {pred.predictedQuantity} items
                             </div>
                           </div>
                           <Badge variant="outline">{pred.confidence.toFixed(0)}%</Badge>
@@ -947,7 +955,7 @@ export const MLMaterialAnalytics: React.FC<MaterialAnalytics> = ({ projectId, us
                   <CardHeader>
                     <CardTitle className="text-lg flex items-center gap-2">
                       <Target className="h-5 w-5" />
-                      Monthly forecast
+                      Monthly (heuristic)
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
@@ -957,7 +965,7 @@ export const MLMaterialAnalytics: React.FC<MaterialAnalytics> = ({ projectId, us
                           <div>
                             <div className="font-medium">{pred.category}</div>
                             <div className="text-sm text-muted-foreground">
-                              Predicted: {pred.predictedQuantity} items
+                              Projected: {pred.predictedQuantity} items
                             </div>
                           </div>
                           <Badge variant="outline">{pred.confidence.toFixed(0)}%</Badge>
@@ -972,7 +980,7 @@ export const MLMaterialAnalytics: React.FC<MaterialAnalytics> = ({ projectId, us
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <DollarSign className="h-5 w-5" />
-                    Cost forecast & savings
+                    Cost projection & savings hint
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
@@ -1016,7 +1024,7 @@ export const MLMaterialAnalytics: React.FC<MaterialAnalytics> = ({ projectId, us
                 <LineChart className="h-5 w-5" />
                 Material demand trends
               </CardTitle>
-              <CardDescription>ML-detected patterns in material consumption</CardDescription>
+              <CardDescription>Patterns from current catalog snapshot (not a trained model)</CardDescription>
             </CardHeader>
             <CardContent>
               {materialUsage.length === 0 ? (
@@ -1145,12 +1153,12 @@ export const MLMaterialAnalytics: React.FC<MaterialAnalytics> = ({ projectId, us
                 <Activity className="h-5 w-5" />
                 Seasonal trend analysis
               </CardTitle>
-              <CardDescription>ML-detected seasonal patterns in material demand</CardDescription>
+              <CardDescription>Seasonal notes for planning (rule-based)</CardDescription>
             </CardHeader>
             <CardContent>
               <Alert className="bg-blue-50 border-blue-200">
-                <Brain className="h-4 w-4 text-blue-600" />
-                <AlertTitle>ML seasonal insight</AlertTitle>
+                <Lightbulb className="h-4 w-4 text-blue-600" />
+                <AlertTitle>Seasonal planning note</AlertTitle>
                 <AlertDescription>
                   Historical patterns often show higher roofing demand in rainy months and more cement / blocks in dry
                   foundation phases — combine with Site vision for delivery and storage verification.
@@ -1165,9 +1173,9 @@ export const MLMaterialAnalytics: React.FC<MaterialAnalytics> = ({ projectId, us
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Target className="h-5 w-5" />
-                ML-powered optimization
+                Cost & efficiency tips
               </CardTitle>
-              <CardDescription>Smart suggestions to reduce costs and improve efficiency</CardDescription>
+              <CardDescription>Practical suggestions from usage heuristics</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
@@ -1192,7 +1200,7 @@ export const MLMaterialAnalytics: React.FC<MaterialAnalytics> = ({ projectId, us
 
                   <Card className="bg-gradient-to-br from-purple-50 to-purple-100 border-purple-200">
                     <CardContent className="p-4">
-                      <div className="text-sm text-muted-foreground mb-1">ML confidence (insights)</div>
+                      <div className="text-sm text-muted-foreground mb-1">Avg. signal strength (insights)</div>
                       <div className="text-3xl font-bold text-purple-600">{avgInsightConfidence.toFixed(0)}%</div>
                       <div className="text-xs text-purple-600 mt-1">Narrative + catalog fit</div>
                     </CardContent>
@@ -1200,7 +1208,7 @@ export const MLMaterialAnalytics: React.FC<MaterialAnalytics> = ({ projectId, us
                 </div>
 
                 <div className="space-y-3">
-                  <h4 className="font-semibold">Smart recommendations</h4>
+                  <h4 className="font-semibold">Recommendations</h4>
 
                   <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
                     <div className="flex items-start gap-3">
@@ -1259,9 +1267,9 @@ export const MLMaterialAnalytics: React.FC<MaterialAnalytics> = ({ projectId, us
         <CardContent className="p-6">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div className="flex items-center gap-3">
-              <Brain className="h-8 w-8 text-blue-600 shrink-0" />
+              <BarChart3 className="h-8 w-8 text-blue-600 shrink-0" />
               <div>
-                <div className="font-semibold">Analytics stack</div>
+                <div className="font-semibold">Data sources</div>
                 <div className="text-sm text-muted-foreground">
                   {materialUsage.length} catalog categories · {visionBlock.activeCameras} camera(s) · vision:{' '}
                   {visionBlock.mode === 'live_db'

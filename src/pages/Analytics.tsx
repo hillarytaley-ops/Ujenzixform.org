@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
 import { Link } from 'react-router-dom';
-import { Brain, BarChart3, TrendingUp, Zap, Video } from 'lucide-react';
+import { BarChart3, TrendingUp, Zap, Video, Sparkles } from 'lucide-react';
 
 const Analytics = () => {
   const [user, setUser] = useState<any>(null);
@@ -106,7 +106,7 @@ const Analytics = () => {
       {/* Hero Section */}
       <AnimatedSection animation="fadeInUp">
         <section className="text-white py-20 relative overflow-hidden">
-          {/* AI/Tech Background */}
+          {/* Hero background */}
           <div 
             className="absolute inset-0"
             style={{
@@ -120,7 +120,7 @@ const Analytics = () => {
           <div className="container mx-auto px-4 text-center relative z-10">
             <div className="mb-6">
               <span className="text-2xl mb-2 block">🇰🇪</span>
-              <p className="text-lg text-gray-200 mb-2">Kenya's First AI-Powered</p>
+              <p className="text-lg text-gray-200 mb-2">Admin operations</p>
             </div>
             
             <h1 className="text-5xl md:text-6xl font-bold mb-6 leading-tight">
@@ -134,31 +134,30 @@ const Analytics = () => {
             </h1>
             
             <p className="text-xl md:text-2xl mb-8 opacity-90 max-w-4xl mx-auto leading-relaxed">
-              <strong>Smart construction intelligence:</strong> Combine catalog analytics with{' '}
+              <strong>Basics today:</strong> catalog usage, simple projections, and{' '}
               <Link to="/monitoring" className="text-blue-300 underline-offset-4 hover:underline">
-                Monitoring cameras
+                monitoring / site vision
               </Link>{' '}
-              for site vision — material cues, deliveries, and staff safety signals — plus forecasts and cost
-              optimization.
+              summaries. Deeper AI/ML (learned forecasting, automated optimization) is on the roadmap—not live yet.
             </p>
 
-            {/* Stats */}
+            {/* Stats — reflect what exists today */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-8">
               <div className="bg-white/10 backdrop-blur-sm rounded-lg p-4">
-                <div className="text-2xl font-bold text-blue-400">AI-Powered</div>
-                <div className="text-sm opacity-90">Smart Analytics</div>
+                <div className="text-2xl font-bold text-blue-400">Reports</div>
+                <div className="text-sm opacity-90">Catalog & usage</div>
               </div>
               <div className="bg-white/10 backdrop-blur-sm rounded-lg p-4">
-                <div className="text-2xl font-bold text-purple-400">85%+</div>
-                <div className="text-sm opacity-90">Accuracy</div>
+                <div className="text-2xl font-bold text-purple-400">Vision</div>
+                <div className="text-sm opacity-90">Camera-linked signals</div>
               </div>
               <div className="bg-white/10 backdrop-blur-sm rounded-lg p-4">
-                <div className="text-2xl font-bold text-green-400">15%</div>
-                <div className="text-sm opacity-90">Cost Savings</div>
+                <div className="text-2xl font-bold text-green-400">Heuristics</div>
+                <div className="text-sm opacity-90">Rule-based tips</div>
               </div>
               <div className="bg-white/10 backdrop-blur-sm rounded-lg p-4">
-                <div className="text-2xl font-bold text-orange-400">Real-Time</div>
-                <div className="text-sm opacity-90">Updates</div>
+                <div className="text-2xl font-bold text-orange-400">Roadmap</div>
+                <div className="text-sm opacity-90">Full AI/ML later</div>
               </div>
             </div>
           </div>
@@ -169,10 +168,10 @@ const Analytics = () => {
       <main className="container mx-auto px-4 py-8 bg-gradient-to-b from-gray-50/30 to-white min-h-screen">
         {!user ? (
           <div className="max-w-2xl mx-auto text-center py-12">
-            <Brain className="h-16 w-16 mx-auto mb-4 text-blue-600" />
-            <h2 className="text-2xl font-bold mb-4">Sign In to Access ML Analytics</h2>
+            <BarChart3 className="h-16 w-16 mx-auto mb-4 text-blue-600" />
+            <h2 className="text-2xl font-bold mb-4">Sign in to access Analytics</h2>
             <p className="text-muted-foreground mb-6">
-              Get AI-powered insights into your construction material usage and costs
+              Admin material reports, monitoring summaries, and baseline projections
             </p>
             <Button size="lg" onClick={() => window.location.href = '/auth'}>
               Sign In to Continue
@@ -185,17 +184,17 @@ const Analytics = () => {
           />
         )}
 
-        {/* ML Features Showcase */}
+        {/* Capability cards: today vs roadmap */}
         <AnimatedSection animation="fadeInUp">
           <div className="mt-12 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
             <div className="bg-white p-6 rounded-lg shadow-lg border border-gray-200">
               <div className="p-3 bg-blue-100 rounded-full w-fit mb-4">
-                <Brain className="h-6 w-6 text-blue-600" />
+                <Sparkles className="h-6 w-6 text-blue-600" />
               </div>
-              <h3 className="text-lg font-bold mb-2">Predictive Analytics</h3>
+              <h3 className="text-lg font-bold mb-2">Predictive analytics</h3>
               <p className="text-sm text-muted-foreground">
-                ML algorithms predict future material needs based on historical usage patterns, 
-                helping you order the right quantities at the right time.
+                <span className="font-medium text-amber-800">Coming later:</span> learned models on historical usage.
+                Today you get simple projections from current catalog data only.
               </p>
             </div>
 
@@ -203,10 +202,10 @@ const Analytics = () => {
               <div className="p-3 bg-green-100 rounded-full w-fit mb-4">
                 <TrendingUp className="h-6 w-6 text-green-600" />
               </div>
-              <h3 className="text-lg font-bold mb-2">Trend Detection</h3>
+              <h3 className="text-lg font-bold mb-2">Trend detection</h3>
               <p className="text-sm text-muted-foreground">
-                Identify material demand trends across Kenya, seasonal patterns, 
-                and price fluctuations to make informed purchasing decisions.
+                <span className="font-medium text-amber-800">Planned:</span> richer regional and seasonal models.
+                For now, trends are rule-based from the data already in the dashboard.
               </p>
             </div>
 
@@ -214,10 +213,10 @@ const Analytics = () => {
               <div className="p-3 bg-purple-100 rounded-full w-fit mb-4">
                 <Zap className="h-6 w-6 text-purple-600" />
               </div>
-              <h3 className="text-lg font-bold mb-2">Cost Optimization</h3>
+              <h3 className="text-lg font-bold mb-2">Cost optimization</h3>
               <p className="text-sm text-muted-foreground">
-                AI-powered recommendations to reduce material costs by 15-20% through 
-                bulk purchasing, supplier selection, and waste reduction.
+                <span className="font-medium text-amber-800">Future AI/ML:</span> automated supplier and batch
+                suggestions. Today: heuristic tips tied to usage and spend thresholds.
               </p>
             </div>
 
@@ -227,8 +226,8 @@ const Analytics = () => {
               </div>
               <h3 className="text-lg font-bold mb-2">Site vision</h3>
               <p className="text-sm text-muted-foreground mb-3">
-                Uses the same cameras as Monitoring to surface material sightings, perimeter activity, and PPE-style
-                staff safety checks — with live video for verification.
+                Live today: same cameras as Monitoring — material-style events, perimeter activity, and safety-style
+                cues, with optional database-backed events when the worker is enabled.
               </p>
               <Button variant="outline" size="sm" asChild>
                 <Link to="/monitoring">Open Monitoring</Link>

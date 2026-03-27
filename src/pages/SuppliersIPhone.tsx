@@ -214,8 +214,8 @@ const SuppliersIPhone = () => {
             >
               <CardContent className="p-6 text-center">
                 <Database className="h-8 w-8 mx-auto mb-2 text-purple-600" />
-                <h3 className="font-semibold">ML Analytics</h3>
-                <p className="text-sm text-muted-foreground">AI Insights</p>
+                <h3 className="font-semibold">Analytics</h3>
+                <p className="text-sm text-muted-foreground">Reports & metrics</p>
               </CardContent>
             </Card>
 

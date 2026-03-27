@@ -306,9 +306,9 @@ export const TAB_METADATA: Record<AdminTab, { name: string; icon: string; descri
     category: 'Finance'
   },
   'ml': {
-    name: 'ML Insights',
-    icon: 'Brain',
-    description: 'Machine learning analytics',
+    name: 'Analytics',
+    icon: 'BarChart3',
+    description: 'Reports and site metrics; advanced AI/ML planned',
     category: 'Analytics'
   },
   'security': {

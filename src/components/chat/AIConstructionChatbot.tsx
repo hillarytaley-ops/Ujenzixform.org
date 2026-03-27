@@ -326,7 +326,7 @@ I'll help you find the best suppliers!`,
 
 📹 **Site Monitoring** - Camera and drone surveillance (optional)
 
-🧠 **ML Analytics** - AI insights on material usage and costs
+📊 **Analytics** - Material usage reports & monitoring summaries (full AI/ML planned later)
 
 📱 **QR Scanners** - Verify material authenticity
 
@@ -335,7 +335,7 @@ I'll help you find the best suppliers!`,
           'How to register as supplier?',
           'How to upload product images?',
           'How does QR verification work?',
-          'Explain ML analytics'
+          'What is Analytics?'
         ]
       };
     }
@@ -370,43 +370,33 @@ Want detailed breakdown or quote? I can help!`,
       };
     }
 
-    // ML Analytics
+    // Analytics (basics today; ML roadmap)
     if (query.includes('ml') || query.includes('analytics') || query.includes('ai') || query.includes('predict')) {
       return {
-        response: `🧠 **ML Analytics Features:**
+        response: `📊 **Analytics (basics today)**
 
-Our AI analyzes your material usage to provide:
+**What works now (admins):**
+- Material usage summaries from catalog data
+- Simple projections and rule-based tips
+- Site vision signals when Monitoring cameras are linked
 
-**Predictions:**
-- Next week material needs (75-95% accuracy)
-- Monthly consumption forecasts
-- Cost projections
+**Coming later:**
+- Trained models, automated forecasting, and deeper optimization
 
-**Insights:**
-- High demand detection
-- Price trend predictions
-- Waste alerts (save 15%!)
-- Bulk purchase opportunities
+**Access:** **Analytics** in the admin menu → full **Material Analytics** page at \`/analytics\`.
 
-**Optimization:**
-- 12-18% cost savings identified
-- Smart supplier recommendations
-- Seasonal buying tips
-
-**Access:** Click "ML Analytics" in menu
-
-**It's like having a data scientist for your construction project!** 🎯`,
+Questions? Ask support for a walkthrough.`,
         suggestions: [
-          'View my analytics dashboard',
-          'Predict next month costs',
-          'Show savings opportunities'
+          'Open suppliers',
+          'Site monitoring help',
+          'How do I track delivery?'
         ]
       };
     }
 
     // Default response with Kenya construction context
     return {
-      response: `I'm your AI construction assistant for Kenya! 🇰🇪
+      response: `I'm your UjenziXform assistant for Kenya! 🇰🇪
 
 I can help with:
 • **Material Prices** - Current rates for cement, steel, paint, etc.

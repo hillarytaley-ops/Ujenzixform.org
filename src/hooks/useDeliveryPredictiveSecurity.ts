@@ -37,7 +37,7 @@ export const useDeliveryPredictiveSecurity = (): UseDeliveryPredictiveSecurityRe
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const { toast } = useToast();
 
-  // Machine Learning-inspired threat prediction
+  // Heuristic / rules-based threat signals (full ML can extend this later)
   const generatePredictions = useCallback(async (): Promise<SecurityPrediction[]> => {
     try {
       setIsAnalyzing(true);

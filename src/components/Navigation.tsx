@@ -135,7 +135,7 @@ const Navigation = () => {
 
   // Admin-only navigation items (only visible to admin)
   const adminNavItems = [
-    { path: "/analytics", label: "ML Analytics" },
+    { path: "/analytics", label: "Analytics" },
   ];
 
   // Combine nav items based on user role
