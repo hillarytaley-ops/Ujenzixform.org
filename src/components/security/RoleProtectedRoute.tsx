@@ -3,7 +3,7 @@
  * Does not grant access from localStorage/cache alone (fixes stale admin UI after JWT expiry).
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import type { User } from '@supabase/supabase-js';
 import { Navigate, useLocation } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -24,65 +24,105 @@ const DASHBOARDS: Record<string, string> = {
   admin: '/admin-dashboard',
 };
 
+const UNLOCK_MS = 12_000;
+const REFRESH_CAP_MS = 5_000;
+
+function pickRoleForRoute(roles: string[], allowed: string[]): string | null {
+  if (!roles.length) return null;
+  const preferred = allowed.find((ar) => roles.includes(ar));
+  return preferred ?? roles[0] ?? null;
+}
+
 export const RoleProtectedRoute = ({ children, allowedRoles }: RoleProtectedRouteProps) => {
   const location = useLocation();
+  const allowedRef = useRef(allowedRoles);
+  allowedRef.current = allowedRoles;
+
   const [ready, setReady] = useState(false);
   const [sessionUser, setSessionUser] = useState<User | null>(null);
   const [dbRole, setDbRole] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
+    let timedOut = false;
+    const timer = window.setTimeout(() => {
+      timedOut = true;
+      if (cancelled) return;
+      console.warn('RoleProtectedRoute: timed out — unlock UI (check network / user_roles RLS)');
+      setSessionUser(null);
+      setDbRole(null);
+      setReady(true);
+    }, UNLOCK_MS);
+
+    const finish = () => {
+      window.clearTimeout(timer);
+      if (!cancelled) setReady(true);
+    };
 
     (async () => {
       try {
-        await refreshSessionIfNeeded();
+        await Promise.race([
+          refreshSessionIfNeeded(),
+          new Promise<void>((resolve) => setTimeout(resolve, REFRESH_CAP_MS)),
+        ]);
+
+        if (cancelled || timedOut) return;
+
         const {
           data: { session },
         } = await supabase.auth.getSession();
 
-        if (cancelled) return;
+        if (cancelled || timedOut) return;
 
         if (!session?.user) {
           setSessionUser(null);
           setDbRole(null);
-          setReady(true);
+          finish();
           return;
         }
 
+        if (cancelled || timedOut) return;
         setSessionUser(session.user);
 
-        const { data: roleData, error } = await supabase
+        // Do not use maybeSingle(): users with multiple user_roles rows get a PostgREST error and no role.
+        const { data: roleRows, error } = await supabase
           .from('user_roles')
           .select('role')
-          .eq('user_id', session.user.id)
-          .limit(1)
-          .maybeSingle();
+          .eq('user_id', session.user.id);
 
-        if (cancelled) return;
+        if (cancelled || timedOut) return;
+
+        const roleStrings = (roleRows ?? [])
+          .map((r: { role?: string }) => r?.role)
+          .filter((r): r is string => Boolean(r));
 
         if (error) {
           console.warn('RoleProtectedRoute: user_roles fetch failed', error.message);
           setDbRole(null);
-        } else if (roleData?.role) {
-          setDbRole(roleData.role);
-          localStorage.setItem('user_role', roleData.role);
         } else {
-          setDbRole(null);
-          localStorage.removeItem('user_role');
+          const picked = pickRoleForRoute(roleStrings, allowedRef.current);
+          if (picked) {
+            setDbRole(picked);
+            localStorage.setItem('user_role', picked);
+          } else {
+            setDbRole(null);
+            localStorage.removeItem('user_role');
+          }
         }
       } catch (e) {
         console.error('RoleProtectedRoute: session check failed', e);
-        if (!cancelled) {
+        if (!cancelled && !timedOut) {
           setSessionUser(null);
           setDbRole(null);
         }
       } finally {
-        if (!cancelled) setReady(true);
+        if (!cancelled && !timedOut) finish();
       }
     })();
 
     return () => {
       cancelled = true;
+      window.clearTimeout(timer);
     };
   }, []);
 
