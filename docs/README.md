@@ -1,6 +1,8 @@
-# 📚 MradiPro Documentation
+# 📚 UjenziXform Documentation
 
-Welcome to the MradiPro documentation. This folder contains comprehensive documentation for Kenya's Premier Construction Marketplace.
+Welcome to the UjenziXform documentation. This folder contains comprehensive documentation for Kenya's Premier Construction Marketplace.
+
+> **Note:** Some files still use the legacy prefix `MRADIPRO_` in their **filenames** only. The product name is **UjenziXform**.
 
 ---
 
@@ -10,7 +12,7 @@ Welcome to the MradiPro documentation. This folder contains comprehensive docume
 
 | Document | Description |
 |----------|-------------|
-| [Complete Workflow Documentation](./MRADIPRO_COMPLETE_WORKFLOW_DOCUMENTATION.md) | Full platform overview with all workflows |
+| [Complete workflow](./MRADIPRO_COMPLETE_WORKFLOW_DOCUMENTATION.md) (legacy filename) | Full UjenziXform platform overview with all workflows |
 | [Pending & future work (plain text, printable)](./UJENZIXFORM_PENDING_AND_FUTURE_WORK.txt) | Layman summary of gaps, TODOs, and roadmap-style items |
 
 ### Workflow Documentation
@@ -80,7 +82,7 @@ docs/
 ### Platform Overview
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                     MradiPro Ecosystem                      │
+│                     UjenziXform Ecosystem                      │
 ├─────────────────────────────────────────────────────────────┤
 │                                                             │
 │   BUILDERS ←──────→ MARKETPLACE ←──────→ SUPPLIERS         │
@@ -144,9 +146,9 @@ docs/
 
 ## 📞 Support
 
-- **Technical Support**: support@mradipro.co.ke
-- **Security Issues**: security@mradipro.co.ke
-- **Data Protection**: dpo@mradipro.co.ke
+- **Technical Support**: support@ujenzixform.org
+- **Security Issues**: security@ujenzixform.org
+- **Data Protection**: dpo@ujenzixform.org
 
 ---
 
@@ -163,5 +165,5 @@ docs/
 
 ---
 
-*🏗️ MradiPro - Building Kenya's Future, One Connection at a Time*
+*🏗️ UjenziXform - Building Kenya's Future, One Connection at a Time*
 

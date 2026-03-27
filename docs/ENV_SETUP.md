@@ -1,6 +1,6 @@
 # Environment Variables Setup Guide
 
-This document describes all environment variables used by UjenziPro / MradiPro.
+This document describes all environment variables used by UjenziPro / UjenziXform.
 
 ## Quick Start
 

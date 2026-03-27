@@ -18,6 +18,10 @@ The app spans many domains (marketplace, admin, delivery, monitoring, security t
 
 Treat features as **independent slices**: changing delivery should not require loading every admin tab in your head—use this map to jump to the right folder.
 
+## Product name
+
+Use **UjenziXform** in user-facing copy and new docs. **MradiPro** is retired; `MRADIPRO_*` filenames and `mradipro_*` storage keys are legacy only.
+
 ## Identity and storage keys
 
 Canonical defaults live in `src/config/appIdentity.ts`:

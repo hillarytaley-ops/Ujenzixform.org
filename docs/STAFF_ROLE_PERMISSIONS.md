@@ -2,7 +2,7 @@
 
 ## Overview
 
-MradiPro's Admin Dashboard now supports **granular role-based access control** for staff members. Different staff roles have access to specific dashboard sections based on their job responsibilities.
+UjenziXform's Admin Dashboard now supports **granular role-based access control** for staff members. Different staff roles have access to specific dashboard sections based on their job responsibilities.
 
 ## Available Staff Roles
 

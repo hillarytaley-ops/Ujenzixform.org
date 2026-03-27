@@ -1,8 +1,10 @@
-# 🏗️ MradiPro - Complete Application Workflow Documentation
+# 🏗️ UjenziXform - Complete Application Workflow Documentation
 
 **Version**: 2.0  
 **Last Updated**: December 3, 2025  
 **Platform**: Kenya's Premier Construction Marketplace
+
+> **Filename note:** This file keeps the legacy name `MRADIPRO_COMPLETE_WORKFLOW_DOCUMENTATION.md`. The product is **UjenziXform** (not MradiPro).
 
 ---
 
@@ -26,9 +28,9 @@
 
 ## 1. Platform Overview
 
-### 1.1 What is MradiPro?
+### 1.1 What is UjenziXform?
 
-MradiPro is Kenya's leading digital construction marketplace that connects:
+UjenziXform is Kenya's leading digital construction marketplace that connects:
 - **Builders** (contractors, construction companies, individual builders)
 - **Suppliers** (hardware stores, cement distributors, steel suppliers)
 - **Delivery Providers** (trucking companies, individual drivers)
@@ -38,7 +40,7 @@ MradiPro is Kenya's leading digital construction marketplace that connects:
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                     MradiPro Ecosystem                          │
+│                     UjenziXform Ecosystem                          │
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                 │
 │   BUILDERS ←──────→ MARKETPLACE ←──────→ SUPPLIERS             │
@@ -879,7 +881,7 @@ Scan QR Code → Decode Data → Verify Signature →
 │  5. User receives prompt on phone                               │
 │     ┌─────────────────────────────────────┐                     │
 │     │  M-PESA                             │                     │
-│     │  Pay KES 50,000 to MradiPro?        │                     │
+│     │  Pay KES 50,000 to UjenziXform?        │                     │
 │     │  Enter M-PESA PIN to confirm        │                     │
 │     │  [____]                             │                     │
 │     └─────────────────────────────────────┘                     │
@@ -1297,10 +1299,10 @@ New Registration → Admin Queue → Review Documents →
 
 **Document Version**: 2.0  
 **Last Updated**: December 3, 2025  
-**Author**: MradiPro Development Team  
+**Author**: UjenziXform Development Team  
 **Status**: Production Ready ✅
 
 ---
 
-*🏗️ MradiPro - Building Kenya's Future, One Connection at a Time*
+*🏗️ UjenziXform - Building Kenya's Future, One Connection at a Time*
 

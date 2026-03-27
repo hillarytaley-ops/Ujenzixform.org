@@ -1,8 +1,8 @@
-# 📝 MradiPro User Registration Flows
+# 📝 UjenziXform User Registration Flows
 
 ## Overview
 
-This document details all user registration workflows in the MradiPro platform.
+This document details all user registration workflows in the UjenziXform platform.
 
 ---
 

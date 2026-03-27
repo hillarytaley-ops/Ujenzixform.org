@@ -4,6 +4,8 @@
 
 **UjenziXform** is a digital platform that connects builders with construction material suppliers across Kenya. The goal is to make sourcing, orders, delivery, and related workflows easier to run in one place.
 
+**Branding:** The product name is **UjenziXform** (spelled with an **r** before “form”). **MradiPro** is a retired name. You may still see it in a few **legacy doc filenames** (for example `MRADIPRO_*.md` in the repo root) and in **`mradipro_*` browser storage keys**, which exist only to migrate existing users—new code and copy should say UjenziXform.
+
 ### Scope and maintenance
 
 This repository covers a **broad surface area** (marketplace, admin, delivery, monitoring, security tooling, and more). That supports a full product vision but increases maintenance cost. For production, **prioritize and harden the flows you actually ship**; not every module is equally mature. See [docs/MAINTENANCE_AND_SCOPE.md](docs/MAINTENANCE_AND_SCOPE.md) for a **module map**, storage/identity notes, and a **release checklist**.
@@ -185,7 +187,7 @@ Latency, uptime, and user satisfaction **depend on hosting, database plan, traff
 
 ## 📞 **Support and contact**
 
-Use addresses and numbers that match **your live business and domain**. Some older paths, assets, or integration defaults in the repo may still reference the historical **MradiPro** name or `mradipro.*` hostnames; migrate those as you standardize on UjenziXform.
+Use addresses and numbers that match **your live business and domain**. Some older paths, assets, or hostnames may still use the legacy **MradiPro** / `mradipro.*` naming—replace them with your live **UjenziXform** domain when you touch that code.
 
 Example placeholders (replace with production values):
 

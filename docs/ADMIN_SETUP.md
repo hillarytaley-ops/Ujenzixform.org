@@ -1,6 +1,6 @@
-# MradiPro Admin Setup Guide
+# UjenziXform Admin Setup Guide
 
-This guide will help you set up admin access for the MradiPro dashboard.
+This guide will help you set up admin access for the UjenziXform dashboard.
 
 ## Quick Setup (2 Steps)
 

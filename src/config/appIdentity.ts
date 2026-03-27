@@ -1,5 +1,6 @@
 /**
- * Canonical product identity and storage keys.
+ * Canonical product identity: **UjenziXform** (not MradiPro).
+ * `mradipro_*` keys below are legacy localStorage/sessionStorage names for one-time migration only.
  * Override URLs via VITE_SITE_URL and optional VITE_SOCIAL_* vars in .env.
  */
 

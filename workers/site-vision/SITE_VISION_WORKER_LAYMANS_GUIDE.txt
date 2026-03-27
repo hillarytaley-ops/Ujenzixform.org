@@ -1,6 +1,6 @@
 ================================================================================
 SITE VISION WORKER — PLAIN-LANGUAGE GUIDE
-UjenziXform / MradiPro · workers/site-vision
+UjenziXform · workers/site-vision
 ================================================================================
 
 You can save this file from your project folder or from GitHub and open it in

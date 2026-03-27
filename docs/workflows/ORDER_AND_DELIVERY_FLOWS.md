@@ -1,4 +1,4 @@
-# 📦 MradiPro Order & Delivery Workflows
+# 📦 UjenziXform Order & Delivery Workflows
 
 ## Overview
 
@@ -247,7 +247,7 @@ This document details the complete order lifecycle from material selection to de
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                 │
 │  ┌─────────────────────────────────────────────────────────┐    │
-│  │  🏗️ MradiPro                                           │    │
+│  │  🏗️ UjenziXform                                           │    │
 │  │  PURCHASE ORDER                                         │    │
 │  │                                                         │    │
 │  │  PO Number: PO-2025-001234                              │    │
@@ -307,7 +307,7 @@ This document details the complete order lifecycle from material selection to de
 │  │                                                         │    │
 │  │  QR CODE:         TRACKING:                             │    │
 │  │  [█▀▀▀▀▀█]       Track this order:                      │    │
-│  │  [█ ▄▄▄ █]       mradipro.co.ke/track/PO-2025-001234    │    │
+│  │  [█ ▄▄▄ █]       ujenzixform.org/track/PO-2025-001234    │    │
 │  │  [█▄▄▄▄▄█]                                              │    │
 │  │                                                         │    │
 │  └─────────────────────────────────────────────────────────┘    │
@@ -518,7 +518,7 @@ This document details the complete order lifecycle from material selection to de
 │                                                                 │
 │  ┌─────────────────────────────────────────────────────────┐    │
 │  │                                                         │    │
-│  │  🏗️ MradiPro                                           │    │
+│  │  🏗️ UjenziXform                                           │    │
 │  │  GOODS RECEIVED NOTE                                    │    │
 │  │                                                         │    │
 │  │  GRN Number: GRN-2025-001234                            │    │

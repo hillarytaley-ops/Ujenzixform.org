@@ -1,7 +1,7 @@
-# MradiPro Staffing & Roles Guide
+# UjenziXform Staffing & Roles Guide
 
 ## Overview
-This document outlines the key professional roles needed to operate and grow the MradiPro construction materials platform effectively.
+This document outlines the key professional roles needed to operate and grow the UjenziXform construction materials platform effectively.
 
 ---
 

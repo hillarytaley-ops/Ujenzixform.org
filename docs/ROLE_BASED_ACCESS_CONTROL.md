@@ -8,7 +8,7 @@ Last Updated: December 2025
 
 ## Overview
 
-MradiPro uses a **database-verified role-based access control** system to protect dashboard routes. This ensures that users can ONLY access dashboards that match their registered role.
+UjenziXform uses a **database-verified role-based access control** system to protect dashboard routes. This ensures that users can ONLY access dashboards that match their registered role.
 
 ## Valid Roles
 

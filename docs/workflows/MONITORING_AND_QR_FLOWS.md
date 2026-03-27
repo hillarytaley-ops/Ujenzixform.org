@@ -1,8 +1,8 @@
-# 📹 MradiPro Monitoring & QR Code Workflows
+# 📹 UjenziXform Monitoring & QR Code Workflows
 
 ## Overview
 
-This document details the construction site monitoring and QR code verification workflows in the MradiPro platform.
+This document details the construction site monitoring and QR code verification workflows in the UjenziXform platform.
 
 ---
 
@@ -396,7 +396,7 @@ This document details the construction site monitoring and QR code verification 
 │  │  QR LABEL FORMAT:                                       │    │
 │  │  ┌───────────────────────────────────────┐             │    │
 │  │  │                                       │             │    │
-│  │  │  🏗️ MradiPro Verified               │             │    │
+│  │  │  🏗️ UjenziXform Verified               │             │    │
 │  │  │                                       │             │    │
 │  │  │  ┌─────────────┐  Bamburi Cement     │             │    │
 │  │  │  │ █▀▀▀▀▀█ ▄▄ │  50kg Bags          │             │    │
@@ -465,7 +465,7 @@ This document details the construction site monitoring and QR code verification 
 │  │  1. Open Scanner App                                    │    │
 │  │     ┌─────────────────────────────────────────────┐    │    │
 │  │     │                                             │    │    │
-│  │     │  📷 MRADIPRO QR SCANNER                     │    │    │
+│  │     │  📷 UJENZIXFORM QR SCANNER                     │    │    │
 │  │     │                                             │    │    │
 │  │     │  ┌───────────────────────────────────────┐ │    │    │
 │  │     │  │                                       │ │    │    │

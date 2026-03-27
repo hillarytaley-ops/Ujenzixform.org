@@ -45,7 +45,7 @@ const { data: { user } } = await supabase.auth.getUser();
 
 ## User Roles
 
-MradiPro supports the following user roles:
+UjenziXform supports the following user roles:
 
 | Role | Description |
 |------|-------------|

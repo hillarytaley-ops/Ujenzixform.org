@@ -1,8 +1,8 @@
-# 💳 MradiPro Payment & Security Workflows
+# 💳 UjenziXform Payment & Security Workflows
 
 ## Overview
 
-This document details all payment processing workflows and security measures in the MradiPro platform.
+This document details all payment processing workflows and security measures in the UjenziXform platform.
 
 ---
 
@@ -112,7 +112,7 @@ This document details all payment processing workflows and security measures in 
 │     │    "PartyA": "254712345678",                        │     │
 │     │    "PartyB": "174379",                              │     │
 │     │    "PhoneNumber": "254712345678",                   │     │
-│     │    "CallBackURL": "https://api.mradipro.co.ke/...", │     │
+│     │    "CallBackURL": "https://api.ujenzixform.org/...", │     │
 │     │    "AccountReference": "PO-2025-001234",            │     │
 │     │    "TransactionDesc": "Material Purchase"           │     │
 │     │  }                                                  │     │
@@ -128,7 +128,7 @@ This document details all payment processing workflows and security measures in 
 │     │  │  📱 M-PESA                          │           │     │
 │     │  │                                     │           │     │
 │     │  │  Pay KES 195,460.00 to              │           │     │
-│     │  │  MRADIPRO LTD                       │           │     │
+│     │  │  UJENZIXFORM LTD                       │           │     │
 │     │  │                                     │           │     │
 │     │  │  Account: PO-2025-001234            │           │     │
 │     │  │                                     │           │     │
@@ -216,7 +216,7 @@ This document details all payment processing workflows and security measures in 
 │  │  STEP 1: PAYMENT HELD                                   │    │
 │  │  ─────────────────────────────────────────────────────  │    │
 │  │                                                         │    │
-│  │  Builder pays → MradiPro Escrow Account                 │    │
+│  │  Builder pays → UjenziXform Escrow Account                 │    │
 │  │                                                         │    │
 │  │  ┌─────────┐         ┌─────────┐         ┌─────────┐   │    │
 │  │  │ Builder │ ──KES──▶│ ESCROW  │         │Supplier │   │    │
@@ -305,7 +305,7 @@ This document details all payment processing workflows and security measures in 
 │  INVOICE GENERATED:                                             │
 │  ┌─────────────────────────────────────────────────────────┐    │
 │  │                                                         │    │
-│  │  🏗️ MradiPro                                           │    │
+│  │  🏗️ UjenziXform                                           │    │
 │  │  TAX INVOICE                                            │    │
 │  │                                                         │    │
 │  │  Invoice No: INV-2025-001234                            │    │
@@ -344,7 +344,7 @@ This document details all payment processing workflows and security measures in 
 │  │                                                         │    │
 │  │  Bank: Equity Bank                                      │    │
 │  │  Account: 1234567890123                                 │    │
-│  │  Name: MradiPro Ltd                                     │    │
+│  │  Name: UjenziXform Ltd                                     │    │
 │  │                                                         │    │
 │  └─────────────────────────────────────────────────────────┘    │
 │                                                                 │
@@ -364,7 +364,7 @@ This document details all payment processing workflows and security measures in 
 │  RECEIPT GENERATED & SENT:                                      │
 │  ┌─────────────────────────────────────────────────────────┐    │
 │  │                                                         │    │
-│  │  🏗️ MradiPro                                           │    │
+│  │  🏗️ UjenziXform                                           │    │
 │  │  PAYMENT RECEIPT                                        │    │
 │  │                                                         │    │
 │  │  Receipt No: RCT-2025-001234                            │    │
@@ -755,7 +755,7 @@ This document details all payment processing workflows and security measures in 
 │  DATA PROTECTION OFFICER                                        │
 │  ┌─────────────────────────────────────────────────────────┐    │
 │  │                                                         │    │
-│  │  Contact: dpo@mradipro.co.ke                            │    │
+│  │  Contact: dpo@ujenzixform.org                            │    │
 │  │                                                         │    │
 │  │  Responsibilities:                                      │    │
 │  │  • Oversee data protection strategy                     │    │

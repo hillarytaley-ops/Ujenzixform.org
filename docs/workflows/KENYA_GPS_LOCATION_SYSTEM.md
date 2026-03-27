@@ -1,8 +1,8 @@
-# 📍 MradiPro Kenya GPS Location System
+# 📍 UjenziXform Kenya GPS Location System
 
 ## Overview
 
-Since Kenya lacks a standardized street addressing system like those in Western countries, MradiPro uses a **multi-layered location approach** combining GPS coordinates, landmarks, directions, and phone contacts to ensure accurate deliveries.
+Since Kenya lacks a standardized street addressing system like those in Western countries, UjenziXform uses a **multi-layered location approach** combining GPS coordinates, landmarks, directions, and phone contacts to ensure accurate deliveries.
 
 ---
 
@@ -39,11 +39,11 @@ Since Kenya lacks a standardized street addressing system like those in Western 
 └─────────────────────────────────────────────────────────────────┘
 ```
 
-### 1.2 MradiPro's Solution: Multi-Layer Location System
+### 1.2 UjenziXform's Solution: Multi-Layer Location System
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│              MRADIPRO LOCATION LAYERS                            │
+│              UJENZIXFORM LOCATION LAYERS                            │
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                 │
 │  LAYER 1: GPS COORDINATES (Most Accurate)                       │
@@ -116,7 +116,7 @@ Since Kenya lacks a standardized street addressing system like those in Western 
 │                          ▼                                      │
 │  2. BROWSER REQUESTS PERMISSION                                 │
 │     ┌─────────────────────────────────────────────────────┐     │
-│     │  "MradiPro wants to know your location"             │     │
+│     │  "UjenziXform wants to know your location"             │     │
 │     │  [Allow]  [Block]                                   │     │
 │     └─────────────────────────────────────────────────────┘     │
 │                          │                                      │
@@ -555,7 +555,7 @@ Since Kenya lacks a standardized street addressing system like those in Western 
 │  │  1. Go to what3words.com or download the app            │    │
 │  │  2. Allow location access                               │    │
 │  │  3. Your 3-word address appears                         │    │
-│  │  4. Enter it in MradiPro delivery form                  │    │
+│  │  4. Enter it in UjenziXform delivery form                  │    │
 │  │                                                         │    │
 │  └─────────────────────────────────────────────────────────┘    │
 │                                                                 │
@@ -651,7 +651,7 @@ Since Kenya lacks a standardized street addressing system like those in Western 
 │  │                                                         │    │
 │  │  5. KEEP GPS TRACKING ON                                │    │
 │  │     • Ensure phone has battery                          │    │
-│  │     • Keep MradiPro app running                         │    │
+│  │     • Keep UjenziXform app running                         │    │
 │  │     • Don't disable location services                   │    │
 │  │                                                         │    │
 │  └─────────────────────────────────────────────────────────┘    │
@@ -676,7 +676,7 @@ Since Kenya lacks a standardized street addressing system like those in Western 
 ### 9.2 GPS Configuration
 
 ```typescript
-// High accuracy GPS settings used in MradiPro
+// High accuracy GPS settings used in UjenziXform
 navigator.geolocation.getCurrentPosition(
   successCallback,
   errorCallback,
@@ -694,7 +694,7 @@ navigator.geolocation.getCurrentPosition(
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│              MRADIPRO LOCATION SYSTEM SUMMARY                    │
+│              UJENZIXFORM LOCATION SYSTEM SUMMARY                    │
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                 │
 │  🎯 GOAL: Accurate deliveries in a country without addresses   │

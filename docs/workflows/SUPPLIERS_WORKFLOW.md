@@ -1,4 +1,4 @@
-n# 🏪 MradiPro Suppliers Workflow Documentation
+# 🏪 UjenziXform Suppliers Workflow Documentation
 
 ## Overview
 
@@ -63,7 +63,7 @@ This document covers both the **Supplier Marketplace** (where builders browse an
 │  │                                                         │    │
 │  │  🇰🇪 Trusted by 500+ Kenyan Suppliers                   │    │
 │  │                                                         │    │
-│  │  "Kenyan Suppliers Powered by MradiPro"                 │    │
+│  │  "Kenyan Suppliers Powered by UjenziXform"                 │    │
 │  │                                                         │    │
 │  │  [Browse Materials]  [Become a Supplier]                │    │
 │  │                                                         │    │

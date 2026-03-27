@@ -1,12 +1,12 @@
 # 🔐 Admin Staff Credentials Guide
 
-## MradiPro / UjenziPro - IT Administrator Manual
+## UjenziXform / UjenziPro - IT Administrator Manual
 
 ---
 
 ## Overview
 
-This guide explains how to create, manage, and revoke admin staff credentials for the MradiPro Admin Portal.
+This guide explains how to create, manage, and revoke admin staff credentials for the UjenziXform Admin Portal.
 
 ---
 

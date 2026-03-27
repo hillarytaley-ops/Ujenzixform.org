@@ -1,8 +1,8 @@
-# MradiPro API Documentation
+# UjenziXform API Documentation
 
 ## Overview
 
-MradiPro uses **Supabase** as its backend, providing:
+UjenziXform uses **Supabase** as its backend, providing:
 - PostgreSQL database with Row Level Security (RLS)
 - Real-time subscriptions
 - Authentication (email/password, OAuth)
@@ -460,9 +460,9 @@ type PurchaseOrder = Database['public']['Tables']['purchase_orders']['Row'];
 
 ## Support
 
-- **Documentation:** https://docs.mradipro.co.ke
-- **API Status:** https://status.mradipro.co.ke
-- **Support Email:** api@mradipro.co.ke
+- **Documentation:** https://docs.ujenzixform.org
+- **API Status:** https://status.ujenzixform.org
+- **Support Email:** api@ujenzixform.org
 
 
 
