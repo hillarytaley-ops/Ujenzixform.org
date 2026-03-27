@@ -74,6 +74,7 @@ import DeliveryRequest from "@/components/DeliveryRequest";
 import { InAppCommunication } from "@/components/communication/InAppCommunication";
 import { TrackingTab } from "@/components/tracking/TrackingTab";
 import { Navigation as NavigationIcon, Navigation, Settings, QrCode } from "lucide-react";
+import { DashboardMobileActionSheet } from "@/components/dashboard/DashboardMobileActionSheet";
 import { ProfileEditDialog } from "@/components/profile/ProfileEditDialog";
 import { ProfileViewDialog } from "@/components/profile/ProfileViewDialog";
 import { ProjectDetails } from "@/components/projects/ProjectDetails";
@@ -1835,6 +1836,21 @@ const ProfessionalBuilderDashboardPage = () => {
     navigate('/home');
   };
 
+  const handleLogoutProfessional = () => {
+    console.log('🚪 Logout: Starting sign out process...');
+    localStorage.removeItem('user_role');
+    localStorage.removeItem('user_role_id');
+    localStorage.removeItem('user_role_verified');
+    localStorage.removeItem('user_security_key');
+    localStorage.removeItem('user_email');
+    localStorage.removeItem('user_name');
+    localStorage.removeItem('user_id');
+    localStorage.removeItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+    sessionStorage.clear();
+    window.location.replace('/auth');
+    signOut().catch(() => {});
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100">
@@ -1850,20 +1866,99 @@ const ProfessionalBuilderDashboardPage = () => {
       {/* Header */}
       <div className="bg-gradient-to-r from-blue-600 via-indigo-600 to-slate-700 text-white py-8 px-4">
         <div className="container mx-auto max-w-7xl">
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-            <div className="flex items-center gap-4">
-              <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center">
-                <HardHat className="h-8 w-8 text-white" />
+          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+            <div className="flex min-w-0 items-start justify-between gap-3 md:flex-1 md:items-center md:justify-start">
+              <div className="flex min-w-0 items-center gap-4">
+                <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-white/20">
+                  <HardHat className="h-8 w-8 text-white" />
+                </div>
+                <div className="min-w-0">
+                  <h1 className="text-2xl font-bold md:text-3xl">
+                    Welcome, {profile?.full_name || profile?.company_name || 'Builder'}!
+                  </h1>
+                  <p className="text-blue-100">Professional Builder Dashboard</p>
+                </div>
               </div>
-              <div>
-                <h1 className="text-2xl md:text-3xl font-bold">
-                  Welcome, {profile?.full_name || profile?.company_name || 'Builder'}!
-                </h1>
-                <p className="text-blue-100">Professional Builder Dashboard</p>
-              </div>
+              <DashboardMobileActionSheet
+                title="Account & ordering"
+                triggerClassName="border-white/40 bg-white/15 text-white hover:bg-white/25"
+              >
+                {projects.length > 0 && (
+                  <div className="mb-3 space-y-2" data-keep-sheet-open>
+                    <Label className="text-xs text-muted-foreground">Project for orders</Label>
+                    <Select
+                      value={selectedProjectForOrder || 'none'}
+                      onValueChange={(value) => {
+                        if (value === 'none') {
+                          setSelectedProjectForOrder(null);
+                          clearCartProjectContext();
+                        } else {
+                          setSelectedProjectForOrder(value);
+                          const proj = projects.find((p) => p.id === value);
+                          setCartProjectContext(
+                            value,
+                            proj?.name ?? null,
+                            proj?.location ?? null
+                          );
+                        }
+                      }}
+                    >
+                      <SelectTrigger className="w-full border-blue-200 bg-blue-50 text-blue-900">
+                        <SelectValue placeholder="Select project (optional)" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">No project (general order)</SelectItem>
+                        {projects.map((project) => (
+                          <SelectItem key={project.id} value={project.id}>
+                            <div className="flex items-center gap-2">
+                              <Building2 className="h-3 w-3 text-blue-600" />
+                              <span>{project.name}</span>
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+                <Link
+                  className="block w-full"
+                  to={
+                    selectedProjectForOrder && selectedProjectForOrder !== 'none'
+                      ? `/suppliers?from=dashboard&project_id=${selectedProjectForOrder}`
+                      : '/suppliers?from=dashboard'
+                  }
+                >
+                  <Button className="w-full justify-start bg-blue-600 text-white hover:bg-blue-700">
+                    <ShoppingCart className="mr-2 h-4 w-4" />
+                    Order Materials
+                  </Button>
+                </Link>
+                <Button
+                  className="w-full justify-start bg-blue-50 text-blue-800 hover:bg-blue-100"
+                  onClick={() => setShowProfileView(true)}
+                >
+                  <User className="mr-2 h-4 w-4" />
+                  Profile
+                </Button>
+                <Button
+                  variant="outline"
+                  className="w-full justify-start border-blue-200 bg-blue-50/80 text-blue-800 hover:bg-blue-100"
+                  onClick={handleExitDashboard}
+                >
+                  <LogOut className="mr-2 h-4 w-4" />
+                  Exit Dashboard
+                </Button>
+                <Button
+                  variant="outline"
+                  className="w-full justify-start border-red-200 bg-red-50 text-red-800 hover:bg-red-100"
+                  onClick={handleLogoutProfessional}
+                >
+                  <LogOut className="mr-2 h-4 w-4" />
+                  Logout
+                </Button>
+              </DashboardMobileActionSheet>
             </div>
-            <div className="flex flex-wrap gap-2 items-center">
-              {/* Project Selector for Ordering */}
+            <div className="hidden flex-wrap items-center gap-2 md:flex">
               {projects.length > 0 && (
                 <Select
                   value={selectedProjectForOrder || 'none'}
@@ -1882,7 +1977,7 @@ const ProfessionalBuilderDashboardPage = () => {
                     }
                   }}
                 >
-                  <SelectTrigger className="w-[200px] bg-white/90 border-blue-200 text-blue-700">
+                  <SelectTrigger className="w-[200px] border-blue-200 bg-white/90 text-blue-700">
                     <SelectValue placeholder="Select project (optional)" />
                   </SelectTrigger>
                   <SelectContent>
@@ -1898,52 +1993,39 @@ const ProfessionalBuilderDashboardPage = () => {
                   </SelectContent>
                 </Select>
               )}
-              <Link to={selectedProjectForOrder && selectedProjectForOrder !== 'none'
-                ? `/suppliers?from=dashboard&project_id=${selectedProjectForOrder}`
-                : '/suppliers?from=dashboard'
-              }>
+              <Link
+                to={
+                  selectedProjectForOrder && selectedProjectForOrder !== 'none'
+                    ? `/suppliers?from=dashboard&project_id=${selectedProjectForOrder}`
+                    : '/suppliers?from=dashboard'
+                }
+              >
                 <Button className="bg-white text-blue-700 hover:bg-blue-50">
-                  <ShoppingCart className="h-4 w-4 mr-2" />
+                  <ShoppingCart className="mr-2 h-4 w-4" />
                   Order Materials
                 </Button>
               </Link>
-              <Button 
+              <Button
                 className="bg-white/90 text-blue-700 hover:bg-white"
                 onClick={() => setShowProfileView(true)}
               >
-                <User className="h-4 w-4 mr-2" />
+                <User className="mr-2 h-4 w-4" />
                 Profile
               </Button>
-              <Button 
+              <Button
                 variant="outline"
-                className="bg-white/90 text-blue-700 hover:bg-white border-white/30"
+                className="border-white/30 bg-white/90 text-blue-700 hover:bg-white"
                 onClick={handleExitDashboard}
               >
-                <LogOut className="h-4 w-4 mr-2" />
+                <LogOut className="mr-2 h-4 w-4" />
                 Exit Dashboard
               </Button>
-              <Button 
+              <Button
                 variant="outline"
-                className="bg-red-500/20 text-white hover:bg-red-500/30 border-red-300/50"
-                onClick={() => {
-                  console.log('🚪 Logout: Starting sign out process...');
-                  // Clear auth data immediately
-                  localStorage.removeItem('user_role');
-                  localStorage.removeItem('user_role_id');
-                  localStorage.removeItem('user_role_verified');
-                  localStorage.removeItem('user_security_key');
-                  localStorage.removeItem('user_email');
-                  localStorage.removeItem('user_name');
-                  localStorage.removeItem('user_id');
-                  localStorage.removeItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
-                  sessionStorage.clear();
-                  // Redirect immediately - don't wait for Supabase signOut
-                  window.location.replace('/auth');
-                  // Sign out from Supabase in background (non-blocking)
-                  signOut().catch(() => {});
-                }}
+                className="border-red-300/50 bg-red-500/20 text-white hover:bg-red-500/30"
+                onClick={handleLogoutProfessional}
               >
-                <LogOut className="h-4 w-4 mr-2" />
+                <LogOut className="mr-2 h-4 w-4" />
                 Logout
               </Button>
             </div>

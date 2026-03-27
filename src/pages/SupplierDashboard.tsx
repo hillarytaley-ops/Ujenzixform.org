@@ -60,6 +60,7 @@ import { SupplierCharts } from "@/components/supplier/SupplierCharts";
 import { ProductManagement } from "@/components/supplier/ProductManagement";
 import { OrderManagement } from "@/components/supplier/OrderManagement";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
+import { DashboardMobileActionSheet } from "@/components/dashboard/DashboardMobileActionSheet";
 import { SupplierAnalyticsDashboard } from "@/components/suppliers/SupplierAnalyticsDashboard";
 import { SupplierProductManager } from "@/components/suppliers/SupplierProductManager";
 import { MessageSquare, QrCode, Boxes, BarChart3 as BarChartIcon, User, Scan } from "lucide-react";
@@ -1757,6 +1758,22 @@ const SupplierDashboard = () => {
     window.location.href = '/home';
   };
 
+  const handleLogoutSupplier = () => {
+    console.log('🚪 Logout: Starting sign out process...');
+    localStorage.removeItem('user_role');
+    localStorage.removeItem('user_role_id');
+    localStorage.removeItem('user_role_verified');
+    localStorage.removeItem('user_security_key');
+    localStorage.removeItem('user_email');
+    localStorage.removeItem('user_name');
+    localStorage.removeItem('user_id');
+    localStorage.removeItem('supplier_id');
+    localStorage.removeItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+    sessionStorage.clear();
+    window.location.replace('/auth');
+    signOut().catch(() => {});
+  };
+
   if (loading) {
     return <DashboardLoader type="supplier" />;
   }
@@ -1767,93 +1784,143 @@ const SupplierDashboard = () => {
 
       {/* Hero Section */}
       <section className="bg-gradient-to-r from-orange-600 to-amber-600 text-white py-5 sm:py-8">
-        <div className="container mx-auto px-4 max-w-7xl">
-          <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between lg:gap-6">
-            <div className="min-w-0 flex-1">
-              <div className="flex items-start gap-3">
-                <Store className="h-8 w-8 shrink-0 mt-0.5" aria-hidden />
-                <div className="min-w-0">
-                  <h1 className="text-2xl sm:text-3xl font-bold leading-tight text-balance break-words">
-                    {t('supplier.dashboard.title')}
-                  </h1>
-                  <p className="text-orange-100 mt-1.5 text-sm sm:text-base leading-relaxed break-words">
-                    {t('supplier.dashboard.welcome')},{' '}
-                    <span className="font-medium text-white">
-                      {supplierProfile?.company_name ||
-                        supplierProfile?.store_name ||
-                        supplierProfile?.full_name ||
-                        'Supplier'}
-                    </span>
-                  </p>
+        <div className="container mx-auto max-w-7xl px-4">
+          <div className="flex flex-col gap-5">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0 flex-1">
+                <div className="flex items-start gap-3">
+                  <Store className="mt-0.5 h-8 w-8 shrink-0" aria-hidden />
+                  <div className="min-w-0">
+                    <h1 className="text-balance break-words text-2xl font-bold leading-tight sm:text-3xl">
+                      {t('supplier.dashboard.title')}
+                    </h1>
+                    <p className="mt-1.5 break-words text-sm leading-relaxed text-orange-100 sm:text-base">
+                      {t('supplier.dashboard.welcome')},{' '}
+                      <span className="font-medium text-white">
+                        {supplierProfile?.company_name ||
+                          supplierProfile?.store_name ||
+                          supplierProfile?.full_name ||
+                          'Supplier'}
+                      </span>
+                    </p>
+                  </div>
                 </div>
               </div>
+              <DashboardMobileActionSheet
+                title={t('supplier.dashboard.title')}
+                triggerClassName="border-white/40 bg-white/15 text-white hover:bg-white/25"
+              >
+                <div data-keep-sheet-open className="w-full">
+                  <LanguageSwitcher
+                    variant="compact"
+                    className="h-10 w-full border border-white/20 bg-orange-50 text-orange-900 hover:bg-orange-100 hover:text-orange-950"
+                  />
+                </div>
+                <Button
+                  variant="outline"
+                  className="h-10 w-full justify-start border-orange-200 bg-orange-50 text-orange-900 hover:bg-orange-100"
+                  onClick={toggleDarkMode}
+                >
+                  {isDarkMode ? (
+                    <Sun className="mr-2 h-4 w-4 shrink-0" />
+                  ) : (
+                    <Moon className="mr-2 h-4 w-4 shrink-0" />
+                  )}
+                  <span className="truncate">{isDarkMode ? 'Light' : 'Dark'}</span>
+                </Button>
+                <Button
+                  variant="outline"
+                  className="h-10 w-full justify-start border-orange-200 bg-orange-50 text-orange-900 hover:bg-orange-100"
+                >
+                  <Bell className="mr-2 h-4 w-4 shrink-0" />
+                  <span className="truncate">{t('supplier.dashboard.notifications')}</span>
+                </Button>
+                <Button
+                  variant="outline"
+                  className="h-10 w-full justify-start border-orange-200 bg-orange-50 text-orange-900 hover:bg-orange-100"
+                  onClick={() => setShowProfileView(true)}
+                >
+                  <User className="mr-2 h-4 w-4 shrink-0" />
+                  Profile
+                </Button>
+                <Button
+                  variant="outline"
+                  className="h-10 w-full justify-start border-orange-200 bg-orange-50 text-orange-900 hover:bg-orange-100"
+                >
+                  <Settings className="mr-2 h-4 w-4 shrink-0" />
+                  <span className="truncate">{t('supplier.dashboard.settings')}</span>
+                </Button>
+                <Button
+                  variant="outline"
+                  className="h-10 w-full justify-start border-orange-200 bg-orange-50/90 text-orange-900 hover:bg-orange-100"
+                  onClick={handleExitDashboard}
+                >
+                  <LogOut className="mr-2 h-4 w-4 shrink-0" />
+                  <span className="truncate">Exit Dashboard</span>
+                </Button>
+                <Button
+                  variant="outline"
+                  className="h-10 w-full justify-start border-red-200 bg-red-50 text-red-800 hover:bg-red-100"
+                  onClick={handleLogoutSupplier}
+                >
+                  <LogOut className="mr-2 h-4 w-4 shrink-0" />
+                  <span className="truncate">Logout</span>
+                </Button>
+              </DashboardMobileActionSheet>
             </div>
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:flex lg:flex-wrap gap-2 w-full lg:w-auto lg:max-w-xl">
+            <div className="hidden w-full gap-2 md:flex md:flex-wrap md:items-center lg:w-auto lg:max-w-xl">
               <LanguageSwitcher
                 variant="compact"
-                className="h-10 w-full sm:w-auto bg-white/10 border border-white/30 text-white hover:bg-white/20 hover:text-white"
+                className="h-10 w-full border border-white/30 bg-white/10 text-white hover:bg-white/20 hover:text-white sm:w-auto"
               />
               <Button
                 variant="outline"
-                className="bg-white/10 border-white/30 text-white hover:bg-white/20 h-10 text-xs sm:text-sm justify-center"
+                className="h-10 justify-center border-white/30 bg-white/10 text-xs text-white hover:bg-white/20 sm:text-sm"
                 onClick={toggleDarkMode}
               >
-                {isDarkMode ? <Sun className="h-4 w-4 mr-1.5 sm:mr-2 shrink-0" /> : <Moon className="h-4 w-4 mr-1.5 sm:mr-2 shrink-0" />}
+                {isDarkMode ? (
+                  <Sun className="mr-1.5 h-4 w-4 shrink-0 sm:mr-2" />
+                ) : (
+                  <Moon className="mr-1.5 h-4 w-4 shrink-0 sm:mr-2" />
+                )}
                 <span className="truncate">{isDarkMode ? 'Light' : 'Dark'}</span>
               </Button>
               <Button
                 variant="outline"
-                className="bg-white/10 border-white/30 text-white hover:bg-white/20 h-10 text-xs sm:text-sm justify-center"
+                className="h-10 justify-center border-white/30 bg-white/10 text-xs text-white hover:bg-white/20 sm:text-sm"
               >
-                <Bell className="h-4 w-4 mr-1.5 sm:mr-2 shrink-0" />
+                <Bell className="mr-1.5 h-4 w-4 shrink-0 sm:mr-2" />
                 <span className="truncate">{t('supplier.dashboard.notifications')}</span>
               </Button>
               <Button
                 variant="outline"
-                className="bg-white/10 border-white/30 text-white hover:bg-white/20 h-10 text-xs sm:text-sm justify-center"
+                className="h-10 justify-center border-white/30 bg-white/10 text-xs text-white hover:bg-white/20 sm:text-sm"
                 onClick={() => setShowProfileView(true)}
               >
-                <User className="h-4 w-4 mr-1.5 sm:mr-2 shrink-0" />
+                <User className="mr-1.5 h-4 w-4 shrink-0 sm:mr-2" />
                 Profile
               </Button>
               <Button
                 variant="outline"
-                className="bg-white/10 border-white/30 text-white hover:bg-white/20 h-10 text-xs sm:text-sm justify-center"
+                className="h-10 justify-center border-white/30 bg-white/10 text-xs text-white hover:bg-white/20 sm:text-sm"
               >
-                <Settings className="h-4 w-4 mr-1.5 sm:mr-2 shrink-0" />
+                <Settings className="mr-1.5 h-4 w-4 shrink-0 sm:mr-2" />
                 <span className="truncate">{t('supplier.dashboard.settings')}</span>
               </Button>
               <Button
                 variant="outline"
-                className="bg-white/10 border-white/30 text-white hover:bg-white/20 h-10 text-xs sm:text-sm justify-center col-span-2 sm:col-span-1"
+                className="h-10 justify-center border-white/30 bg-white/10 text-xs text-white hover:bg-white/20 sm:text-sm"
                 onClick={handleExitDashboard}
               >
-                <LogOut className="h-4 w-4 mr-1.5 sm:mr-2 shrink-0" />
+                <LogOut className="mr-1.5 h-4 w-4 shrink-0 sm:mr-2" />
                 <span className="truncate">Exit Dashboard</span>
               </Button>
               <Button
                 variant="outline"
-                className="bg-red-500/20 border-red-300/50 text-white hover:bg-red-500/30 h-10 text-xs sm:text-sm justify-center col-span-2 sm:col-span-1"
-                onClick={() => {
-                  console.log('🚪 Logout: Starting sign out process...');
-                  // Clear auth data immediately
-                  localStorage.removeItem('user_role');
-                  localStorage.removeItem('user_role_id');
-                  localStorage.removeItem('user_role_verified');
-                  localStorage.removeItem('user_security_key');
-                  localStorage.removeItem('user_email');
-                  localStorage.removeItem('user_name');
-                  localStorage.removeItem('user_id');
-                  localStorage.removeItem('supplier_id');
-                  localStorage.removeItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
-                  sessionStorage.clear();
-                  // Redirect immediately - don't wait for Supabase signOut
-                  window.location.replace('/auth');
-                  // Sign out from Supabase in background (non-blocking)
-                  signOut().catch(() => {});
-                }}
+                className="h-10 justify-center border-red-300/50 bg-red-500/20 text-xs text-white hover:bg-red-500/30 sm:text-sm"
+                onClick={handleLogoutSupplier}
               >
-                <LogOut className="h-4 w-4 mr-1.5 sm:mr-2 shrink-0" />
+                <LogOut className="mr-1.5 h-4 w-4 shrink-0 sm:mr-2" />
                 <span className="truncate">Logout</span>
               </Button>
             </div>

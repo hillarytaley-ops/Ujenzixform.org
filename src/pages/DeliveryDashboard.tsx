@@ -13,6 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { DashboardLoader } from "@/components/ui/DashboardLoader";
+import { DashboardMobileActionSheet } from "@/components/dashboard/DashboardMobileActionSheet";
 import { 
   Truck, 
   Package, 
@@ -2370,6 +2371,22 @@ const DeliveryDashboard = () => {
     window.location.href = '/home';
   };
 
+  const handleLogoutDelivery = () => {
+    console.log('🚪 Logout: Starting sign out process...');
+    localStorage.removeItem('user_role');
+    localStorage.removeItem('user_role_id');
+    localStorage.removeItem('user_role_verified');
+    localStorage.removeItem('user_security_key');
+    localStorage.removeItem('user_email');
+    localStorage.removeItem('user_name');
+    localStorage.removeItem('user_id');
+    localStorage.removeItem('supplier_id');
+    localStorage.removeItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+    sessionStorage.clear();
+    window.location.replace('/auth');
+    signOut().catch(() => {});
+  };
+
   if (loading) {
     return <DashboardLoader type="delivery" />;
   }
@@ -2381,87 +2398,137 @@ const DeliveryDashboard = () => {
       {/* Hero Section */}
       <section className={`${isDarkMode ? 'bg-gray-800' : 'bg-gradient-to-r from-teal-600 to-cyan-600'} text-white py-8`}>
         <div className="container mx-auto px-4">
-          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-            <div>
-              <h1 className="text-3xl font-bold flex items-center gap-3">
-                <Truck className="h-8 w-8" />
-                Delivery Dashboard
-              </h1>
-              <p className="text-teal-100 mt-1">
-                Welcome back, {providerProfile?.full_name || providerProfile?.company_name || 'Driver'}
-              </p>
+          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+            <div className="flex w-full items-start justify-between gap-3 md:w-auto md:items-center md:justify-start">
+              <div className="min-w-0">
+                <h1 className="flex items-center gap-3 text-3xl font-bold">
+                  <Truck className="h-8 w-8 shrink-0" />
+                  Delivery Dashboard
+                </h1>
+                <p className="mt-1 text-teal-100">
+                  Welcome back, {providerProfile?.full_name || providerProfile?.company_name || 'Driver'}
+                </p>
+              </div>
+              <DashboardMobileActionSheet
+                title="Delivery menu"
+                triggerClassName="border-white/40 bg-white/15 text-white hover:bg-white/25"
+              >
+                <div
+                  data-keep-sheet-open
+                  className="mb-1 flex flex-col gap-3 rounded-lg border border-teal-200 bg-teal-50/95 p-3 text-teal-900"
+                >
+                  <div className="flex items-center gap-2 rounded-full bg-teal-100/80 px-3 py-2">
+                    <Sun className="h-4 w-4" />
+                    <Switch checked={isDarkMode} onCheckedChange={setIsDarkMode} />
+                    <Moon className="h-4 w-4" />
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2 rounded-full bg-teal-100/80 px-3 py-2">
+                    <div
+                      className={`h-3 w-3 rounded-full ${isOnline ? 'animate-pulse bg-green-500' : 'bg-gray-400'}`}
+                    />
+                    <span className="text-sm font-medium">
+                      {isOnline ? 'Online' : 'Offline'}
+                    </span>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 px-2 text-teal-900 hover:bg-teal-200/60"
+                      onClick={() => setIsOnline(!isOnline)}
+                    >
+                      {isOnline ? 'Go Offline' : 'Go Online'}
+                    </Button>
+                  </div>
+                </div>
+                <Button
+                  variant="outline"
+                  className="w-full justify-start border-teal-200 bg-teal-50 text-teal-900 hover:bg-teal-100"
+                >
+                  <Bell className="mr-2 h-4 w-4" />
+                  Notifications
+                </Button>
+                <Button
+                  variant="outline"
+                  className="w-full justify-start border-teal-200 bg-teal-50 text-teal-900 hover:bg-teal-100"
+                  onClick={() => setShowProfileView(true)}
+                >
+                  <User className="mr-2 h-4 w-4" />
+                  Profile
+                </Button>
+                <Button
+                  variant="outline"
+                  className="w-full justify-start border-teal-200 bg-teal-50 text-teal-900 hover:bg-teal-100"
+                >
+                  <Settings className="mr-2 h-4 w-4" />
+                  Settings
+                </Button>
+                <Button
+                  variant="outline"
+                  className="w-full justify-start border-teal-200 bg-teal-50 text-teal-900 hover:bg-teal-100"
+                  onClick={handleExitDashboard}
+                >
+                  <LogOut className="mr-2 h-4 w-4" />
+                  Exit Dashboard
+                </Button>
+                <Button
+                  variant="outline"
+                  className="w-full justify-start border-red-200 bg-red-50 text-red-800 hover:bg-red-100"
+                  onClick={handleLogoutDelivery}
+                >
+                  <LogOut className="mr-2 h-4 w-4" />
+                  Logout
+                </Button>
+              </DashboardMobileActionSheet>
             </div>
-            <div className="flex flex-wrap gap-3 items-center">
-              {/* Dark Mode Toggle */}
-              <div className="flex items-center gap-2 bg-white/10 rounded-full px-4 py-2">
+            <div className="hidden flex-wrap items-center gap-3 md:flex">
+              <div className="flex items-center gap-2 rounded-full bg-white/10 px-4 py-2">
                 <Sun className="h-4 w-4" />
-                <Switch
-                  checked={isDarkMode}
-                  onCheckedChange={setIsDarkMode}
-                />
+                <Switch checked={isDarkMode} onCheckedChange={setIsDarkMode} />
                 <Moon className="h-4 w-4" />
               </div>
-              
-              {/* Online/Offline Toggle */}
-              <div className="flex items-center gap-2 bg-white/10 rounded-full px-4 py-2">
-                <div className={`w-3 h-3 rounded-full ${isOnline ? 'bg-green-400 animate-pulse' : 'bg-gray-400'}`}></div>
+              <div className="flex items-center gap-2 rounded-full bg-white/10 px-4 py-2">
+                <div
+                  className={`h-3 w-3 rounded-full ${isOnline ? 'animate-pulse bg-green-400' : 'bg-gray-400'}`}
+                />
                 <span className="text-sm font-medium">{isOnline ? 'Online' : 'Offline'}</span>
-                <Button 
-                  variant="ghost" 
+                <Button
+                  variant="ghost"
                   size="sm"
-                  className="text-white hover:bg-white/20 h-6 px-2"
+                  className="h-6 px-2 text-white hover:bg-white/20"
                   onClick={() => setIsOnline(!isOnline)}
                 >
                   {isOnline ? 'Go Offline' : 'Go Online'}
                 </Button>
               </div>
-              <Button variant="outline" className="bg-white/10 border-white/30 text-white hover:bg-white/20">
-                <Bell className="h-4 w-4 mr-2" />
+              <Button variant="outline" className="border-white/30 bg-white/10 text-white hover:bg-white/20">
+                <Bell className="mr-2 h-4 w-4" />
                 Notifications
               </Button>
-              <Button 
-                variant="outline" 
-                className="bg-white/10 border-white/30 text-white hover:bg-white/20"
+              <Button
+                variant="outline"
+                className="border-white/30 bg-white/10 text-white hover:bg-white/20"
                 onClick={() => setShowProfileView(true)}
               >
-                <User className="h-4 w-4 mr-2" />
+                <User className="mr-2 h-4 w-4" />
                 Profile
               </Button>
-              <Button variant="outline" className="bg-white/10 border-white/30 text-white hover:bg-white/20">
-                <Settings className="h-4 w-4 mr-2" />
+              <Button variant="outline" className="border-white/30 bg-white/10 text-white hover:bg-white/20">
+                <Settings className="mr-2 h-4 w-4" />
                 Settings
               </Button>
-              <Button 
-                variant="outline" 
-                className="bg-white/10 border-white/30 text-white hover:bg-white/20"
+              <Button
+                variant="outline"
+                className="border-white/30 bg-white/10 text-white hover:bg-white/20"
                 onClick={handleExitDashboard}
               >
-                <LogOut className="h-4 w-4 mr-2" />
+                <LogOut className="mr-2 h-4 w-4" />
                 Exit Dashboard
               </Button>
-              <Button 
-                variant="outline" 
-                className="bg-red-500/20 border-red-300/50 text-white hover:bg-red-500/30"
-                onClick={() => {
-                  console.log('🚪 Logout: Starting sign out process...');
-                  // Clear auth data immediately
-                  localStorage.removeItem('user_role');
-                  localStorage.removeItem('user_role_id');
-                  localStorage.removeItem('user_role_verified');
-                  localStorage.removeItem('user_security_key');
-                  localStorage.removeItem('user_email');
-                  localStorage.removeItem('user_name');
-                  localStorage.removeItem('user_id');
-                  localStorage.removeItem('supplier_id');
-                  localStorage.removeItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
-                  sessionStorage.clear();
-                  // Redirect immediately - don't wait for Supabase signOut
-                  window.location.replace('/auth');
-                  // Sign out from Supabase in background (non-blocking)
-                  signOut().catch(() => {});
-                }}
+              <Button
+                variant="outline"
+                className="border-red-300/50 bg-red-500/20 text-white hover:bg-red-500/30"
+                onClick={handleLogoutDelivery}
               >
-                <LogOut className="h-4 w-4 mr-2" />
+                <LogOut className="mr-2 h-4 w-4" />
                 Logout
               </Button>
             </div>
