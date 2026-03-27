@@ -22,6 +22,7 @@ const DASHBOARDS: Record<string, string> = {
   delivery: '/delivery-dashboard',
   delivery_provider: '/delivery-dashboard',
   admin: '/admin-dashboard',
+  super_admin: '/admin-dashboard',
 };
 
 /** Max wait before we stop blocking the UI (then show redirect / children). */

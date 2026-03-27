@@ -277,7 +277,7 @@ const App = () => {
                     {/* Alias for private-client-registration (some links use this path) */}
                     <Route path="/private-builder-registration" element={<SuspenseWrapper><PrivateBuilderRegistration /></SuspenseWrapper>} />
                     <Route path="/analytics" element={
-                      <RoleProtectedRoute allowedRoles={['admin']}>
+                      <RoleProtectedRoute allowedRoles={['admin', 'super_admin']}>
                         <SuspenseWrapper><Analytics /></SuspenseWrapper>
                       </RoleProtectedRoute>
                     } />
@@ -316,7 +316,7 @@ const App = () => {
                     
                     {/* Dashboard Routes - Protected */}
                     <Route path="/admin-dashboard" element={
-                      <RoleProtectedRoute allowedRoles={['admin']}>
+                      <RoleProtectedRoute allowedRoles={['admin', 'super_admin']}>
                         <SuspenseWrapper><AdminDashboard /></SuspenseWrapper>
                       </RoleProtectedRoute>
                     } />

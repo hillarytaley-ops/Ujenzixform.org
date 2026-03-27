@@ -1,8 +1,8 @@
-// Auth Page — sign-in redirect must NOT await supabase.from() inside onAuthStateChange (deadlocks client).
+// Auth — post-sign-in uses REST fetch for user_roles + React Router navigate (avoids supabase-js auth deadlocks + stuck "Signing in…").
 import { useState, useRef, useEffect, useCallback } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import type { Session } from "@supabase/supabase-js";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase, SUPABASE_URL, SUPABASE_ANON_KEY } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -16,10 +16,11 @@ import { Github, Mail, KeyRound, CheckCircle, Loader2, Shield } from "lucide-rea
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { SimplePasswordReset } from "@/components/SimplePasswordReset";
 
-console.log('🔐 Auth.tsx BUILD v33 - password sign-in owns redirect (no listener race / no role timeout)');
+console.log('🔐 Auth.tsx BUILD v34 - REST role fetch + navigate (no client deadlock, no stuck button)');
 
 const DASHBOARDS: Record<string, string> = {
   admin: '/admin-dashboard',
+  super_admin: '/admin-dashboard',
   supplier: '/supplier-dashboard',
   delivery: '/delivery-dashboard',
   delivery_provider: '/delivery-dashboard',
@@ -29,6 +30,7 @@ const DASHBOARDS: Record<string, string> = {
 };
 
 const ROLE_REDIRECT_PRIORITY = [
+  'super_admin',
   'admin',
   'professional_builder',
   'builder',
@@ -38,12 +40,58 @@ const ROLE_REDIRECT_PRIORITY = [
   'private_client',
 ] as const;
 
+const ROLE_REST_TIMEOUT_MS = 14_000;
+
 function normalizeRoleToken(v: unknown): string {
   if (v == null) return '';
   return String(v).trim();
 }
 
+/** Load roles without supabase-js .from() — avoids auth client deadlocks after SIGNED_IN. */
+async function fetchRolesViaRest(userId: string, accessToken: string): Promise<string[]> {
+  const url = `${SUPABASE_URL}/rest/v1/user_roles?user_id=eq.${encodeURIComponent(userId)}&select=role`;
+  const ac = new AbortController();
+  const timer = window.setTimeout(() => ac.abort(), ROLE_REST_TIMEOUT_MS);
+  try {
+    const res = await fetch(url, {
+      method: 'GET',
+      signal: ac.signal,
+      headers: {
+        apikey: SUPABASE_ANON_KEY,
+        Authorization: `Bearer ${accessToken}`,
+        Accept: 'application/json',
+      },
+    });
+    const body: unknown = await res.json().catch(() => null);
+    if (!res.ok) {
+      console.error('🔐 user_roles REST HTTP', res.status, body);
+      return [];
+    }
+    if (!Array.isArray(body)) return [];
+    return body
+      .map((r: { role?: unknown }) => normalizeRoleToken((r as { role?: unknown }).role))
+      .filter(Boolean);
+  } catch (e) {
+    if ((e as Error)?.name === 'AbortError') {
+      console.warn('🔐 user_roles REST aborted (timeout)');
+    } else {
+      console.error('🔐 user_roles REST error:', e);
+    }
+    return [];
+  } finally {
+    window.clearTimeout(timer);
+  }
+}
+
+function pickDashboardPath(roles: string[]): string | null {
+  const picked =
+    ROLE_REDIRECT_PRIORITY.find((r) => roles.includes(r)) ?? roles[0] ?? null;
+  if (picked && DASHBOARDS[picked]) return DASHBOARDS[picked];
+  return null;
+}
+
 const Auth = () => {
+  const navigate = useNavigate();
   const [formLoading, setFormLoading] = useState(false);
   const [showResetDialog, setShowResetDialog] = useState(false);
   const [signInEmail, setSignInEmail] = useState("");
@@ -51,73 +99,63 @@ const Auth = () => {
   const [signUpEmail, setSignUpEmail] = useState("");
   const [signUpPassword, setSignUpPassword] = useState("");
   const isSubmitting = useRef(false);
-  /** True while email/password sign-in runs — SIGNED_IN listener must not compete (was causing /home + stuck UX). */
   const passwordSignInFlowRef = useRef(false);
   const { toast } = useToast();
 
-  const redirectAfterSignIn = useCallback(
+  const completeSignInNavigation = useCallback(
     async (session: Session) => {
       if (session.user.email) {
         localStorage.setItem('user_email', session.user.email);
       }
       localStorage.setItem('user_id', session.user.id);
 
-      const { data: roleRows, error: roleError } = await supabase
-        .from('user_roles')
-        .select('role')
-        .eq('user_id', session.user.id);
+      const roles = await fetchRolesViaRest(session.user.id, session.access_token);
+      const path = pickDashboardPath(roles);
 
-      if (roleError) {
-        console.error('🔐 Role query error:', roleError.message);
-      }
+      console.log('🔐 Role data:', roles, '→', path);
 
-      const roles = (roleRows ?? [])
-        .map((r: { role?: unknown }) => normalizeRoleToken(r?.role))
-        .filter(Boolean);
-      const picked =
-        ROLE_REDIRECT_PRIORITY.find((r) => roles.includes(r)) ?? roles[0];
-
-      console.log('🔐 Role data:', roles, '→', picked);
-
-      if (picked && DASHBOARDS[picked]) {
-        localStorage.setItem('user_role', picked);
+      if (path) {
+        const picked =
+          ROLE_REDIRECT_PRIORITY.find((r) => roles.includes(r)) ?? roles[0] ?? '';
+        if (picked) localStorage.setItem('user_role', picked);
         toast({ title: '✅ Welcome back!' });
-        window.location.assign(DASHBOARDS[picked]);
+        navigate(path, { replace: true });
         return;
       }
 
-      console.log('🔐 No mappable role, going to home');
-      toast({ title: '✅ Signed in!' });
-      window.location.assign('/home');
+      toast({
+        title: '✅ Signed in',
+        description: 'No dashboard role found — open your dashboard from the menu or contact support.',
+      });
+      navigate('/home', { replace: true });
     },
-    [toast]
+    [navigate, toast]
   );
 
-  // OAuth / magic link / auto-confirmed sign-up: defer work out of the callback (Supabase deadlock if we await .from() here).
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       console.log('🔐 Auth event:', event, session?.user?.email);
 
       if (event !== 'SIGNED_IN' || !session?.user) return;
       if (passwordSignInFlowRef.current) {
-        console.log('🔐 Listener skipped (password sign-in will redirect)');
+        console.log('🔐 Listener skipped (password flow navigates separately)');
         return;
       }
 
       window.setTimeout(() => {
-        void redirectAfterSignIn(session).catch((err) => {
-          console.error('🔐 Deferred redirect failed:', err);
+        void completeSignInNavigation(session).catch((err) => {
+          console.error('🔐 Deferred navigation failed:', err);
           toast({
             variant: 'destructive',
             title: 'Could not finish sign-in',
-            description: 'Try again or open the site from a fresh tab.',
+            description: 'Try again or reload the page.',
           });
         });
       }, 0);
     });
 
     return () => subscription.unsubscribe();
-  }, [toast, redirectAfterSignIn]);
+  }, [toast, completeSignInNavigation]);
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -126,64 +164,68 @@ const Auth = () => {
     setFormLoading(true);
     passwordSignInFlowRef.current = true;
 
-    const resetFormState = () => {
+    const resetButton = () => {
       setFormLoading(false);
       isSubmitting.current = false;
-      passwordSignInFlowRef.current = false;
     };
 
-    const safetyTimer = window.setTimeout(() => {
-      console.warn('🔐 Sign-in UI safety timeout — resetting button');
-      resetFormState();
-    }, 25_000);
+    const unlockTimer = window.setTimeout(() => {
+      console.warn('🔐 Sign-in: forcing button unlock');
+      passwordSignInFlowRef.current = false;
+      resetButton();
+    }, 18_000);
 
     try {
-      console.log('🔐 Starting sign in for:', signInEmail);
-
       const { data, error } = await supabase.auth.signInWithPassword({
         email: signInEmail,
         password: signInPassword,
       });
 
       if (error) {
-        window.clearTimeout(safetyTimer);
-        console.error('🔐 Sign in error:', error.message);
+        window.clearTimeout(unlockTimer);
         toast({ variant: "destructive", title: "Sign in failed", description: error.message });
-        resetFormState();
+        passwordSignInFlowRef.current = false;
+        resetButton();
         return;
       }
 
       if (!data.session?.user) {
-        window.clearTimeout(safetyTimer);
+        window.clearTimeout(unlockTimer);
         toast({ variant: 'destructive', title: 'Sign in failed', description: 'No session returned.' });
-        resetFormState();
+        passwordSignInFlowRef.current = false;
+        resetButton();
         return;
       }
 
-      // Defer one tick so we are not inside Supabase's auth callback stack when calling .from().
+      // Unlock the button as soon as credentials are OK — navigation runs next (users were stuck here forever when .from() deadlocked).
+      window.clearTimeout(unlockTimer);
+      resetButton();
+
       await new Promise((r) => setTimeout(r, 0));
 
       try {
-        await redirectAfterSignIn(data.session);
-      } catch {
+        await completeSignInNavigation(data.session);
+      } catch (err) {
+        console.error('🔐 Post sign-in navigation:', err);
         toast({
           variant: 'destructive',
-          title: 'Sign-in incomplete',
-          description: 'Could not load your account. Try again.',
+          title: 'Could not open your dashboard',
+          description: 'You are signed in — try Home or refresh.',
         });
+        navigate('/home', { replace: true });
       } finally {
-        window.clearTimeout(safetyTimer);
-        resetFormState();
+        passwordSignInFlowRef.current = false;
       }
     } catch (err: unknown) {
-      window.clearTimeout(safetyTimer);
+      window.clearTimeout(unlockTimer);
       console.error('🔐 Sign in exception:', err);
       toast({
         variant: 'destructive',
         title: 'Sign in failed',
         description: err instanceof Error ? err.message : 'Unknown error',
       });
-      resetFormState();
+      passwordSignInFlowRef.current = false;
+      resetButton();
     }
   };
 
@@ -212,8 +254,6 @@ const Auth = () => {
         isSubmitting.current = false;
         return;
       }
-
-      // Auto-confirmed: SIGNED_IN listener + deferred redirect handles navigation
     } catch (err: unknown) {
       toast({
         variant: "destructive",
