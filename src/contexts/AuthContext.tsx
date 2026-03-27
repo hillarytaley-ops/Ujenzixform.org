@@ -121,53 +121,54 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     let mounted = true;
     let rolesFetched = false;
 
+    // Defer .from() / getSession work out of the auth callback (avoids Supabase client deadlocks with Auth.tsx).
+    const schedulePostAuthWork = (userId: string, email: string | undefined, triggerPrefetch: boolean) => {
+      window.setTimeout(() => {
+        if (!mounted) return;
+        void fetchUserRole(userId, triggerPrefetch);
+        void (async () => {
+          try {
+            const { data: profile } = await supabase
+              .from('profiles')
+              .select('full_name')
+              .eq('user_id', userId)
+              .maybeSingle();
+            if (profile?.full_name) {
+              localStorage.setItem('user_name', profile.full_name);
+            }
+          } catch {
+            // optional
+          }
+        })();
+      }, 0);
+    };
+
     // Set up auth state change listener FIRST
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, currentSession) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, currentSession) => {
         if (!mounted) return;
 
         console.log('Auth state changed:', event, currentSession?.user?.email);
 
         if (event === 'SIGNED_IN' && currentSession?.user) {
-          // User just signed in - fetch role immediately
           setSession(currentSession);
           setUser(currentSession.user);
           setLoading(false);
           rolesFetched = true;
-          // Save email and user_id to localStorage for instant display on refresh
           if (currentSession.user.email) {
             localStorage.setItem('user_email', currentSession.user.email);
           }
           localStorage.setItem('user_id', currentSession.user.id);
-          
-          // Fetch role synchronously on sign-in AND trigger prefetch
-          await fetchUserRole(currentSession.user.id, true);
-          
-          // Also fetch user profile name for display
-          try {
-            const { data: profile } = await supabase
-              .from('profiles')
-              .select('full_name')
-              .eq('user_id', currentSession.user.id)
-              .single();
-            if (profile?.full_name) {
-              localStorage.setItem('user_name', profile.full_name);
-            }
-          } catch (e) {
-            // Profile fetch is optional, don't fail
-          }
+          schedulePostAuthWork(currentSession.user.id, currentSession.user.email, true);
         } else if (currentSession?.user) {
           setSession(currentSession);
           setUser(currentSession.user);
           setLoading(false);
-          // Save email to localStorage for instant display on refresh
           if (currentSession.user.email) {
             localStorage.setItem('user_email', currentSession.user.email);
           }
-          // Fetch role in background (only once)
           if (!rolesFetched) {
             rolesFetched = true;
-            fetchUserRole(currentSession.user.id).catch(console.error);
+            schedulePostAuthWork(currentSession.user.id, currentSession.user.email, false);
           }
         } else if (event === 'SIGNED_OUT') {
           setSession(null);
@@ -181,8 +182,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           // No session on initial load
           setLoading(false);
         }
-      }
-    );
+    });
 
     // Also check session directly (backup)
     supabase.auth.getSession().then(({ data: { session: initialSession } }) => {
@@ -197,7 +197,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         }
         if (!rolesFetched) {
           rolesFetched = true;
-          fetchUserRole(initialSession.user.id).catch(console.error);
+          window.setTimeout(() => {
+            if (mounted) void fetchUserRole(initialSession.user.id);
+          }, 0);
         }
       }
       setLoading(false);
@@ -206,13 +208,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       if (mounted) setLoading(false);
     });
 
-    // Safety timeout - ensure loading is false after 1 second
+    // Safety: release loading if getSession/onAuthStateChange never cleared it (functional update — no stale closure)
     const timeoutId = setTimeout(() => {
-      if (mounted && loading) {
-        console.log('AuthContext: Safety timeout - setting loading false');
-        setLoading(false);
-      }
-    }, 1000);
+      if (!mounted) return;
+      setLoading((prev) => {
+        if (!prev) return prev;
+        if (import.meta.env.DEV) {
+          console.warn('AuthContext: loading safety release (still true after 2.5s)');
+        }
+        return false;
+      });
+    }, 2500);
 
     return () => {
       mounted = false;
