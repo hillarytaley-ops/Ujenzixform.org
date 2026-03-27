@@ -1786,11 +1786,11 @@ const SupplierDashboard = () => {
       <section className="bg-gradient-to-r from-orange-600 to-amber-600 text-white py-5 sm:py-8">
         <div className="container mx-auto max-w-7xl px-4">
           <div className="flex flex-col gap-5">
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0 flex-1">
+            <div className="flex w-full min-w-0 items-start justify-between gap-3 md:items-center">
+              <div className="min-w-0 flex-1 md:min-w-[12rem]">
                 <div className="flex items-start gap-3">
                   <Store className="mt-0.5 h-8 w-8 shrink-0" aria-hidden />
-                  <div className="min-w-0">
+                  <div className="min-w-0 flex-1">
                     <h1 className="text-balance break-words text-2xl font-bold leading-tight sm:text-3xl">
                       {t('supplier.dashboard.title')}
                     </h1>

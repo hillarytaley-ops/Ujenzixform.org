@@ -1866,18 +1866,17 @@ const ProfessionalBuilderDashboardPage = () => {
       {/* Header */}
       <div className="bg-gradient-to-r from-blue-600 via-indigo-600 to-slate-700 text-white py-8 px-4">
         <div className="container mx-auto max-w-7xl">
-          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-            <div className="flex min-w-0 items-start justify-between gap-3 md:flex-1 md:items-center md:justify-start">
-              <div className="flex min-w-0 items-center gap-4">
-                <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-white/20">
-                  <HardHat className="h-8 w-8 text-white" />
-                </div>
-                <div className="min-w-0">
-                  <h1 className="text-2xl font-bold md:text-3xl">
-                    Welcome, {profile?.full_name || profile?.company_name || 'Builder'}!
-                  </h1>
-                  <p className="text-blue-100">Professional Builder Dashboard</p>
-                </div>
+          <div className="flex flex-col gap-4 md:flex-row md:flex-wrap md:items-center md:justify-between">
+            {/* One row: avatar | title (grows) | hamburger. Prevents flex-shrink crushing the heading. */}
+            <div className="flex w-full min-w-0 items-center gap-3 md:min-w-[12rem] md:flex-1">
+              <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-white/20">
+                <HardHat className="h-8 w-8 text-white" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <h1 className="break-words text-2xl font-bold md:text-3xl">
+                  Welcome, {profile?.full_name || profile?.company_name || 'Builder'}!
+                </h1>
+                <p className="text-blue-100">Professional Builder Dashboard</p>
               </div>
               <DashboardMobileActionSheet
                 title="Account & ordering"
@@ -1958,7 +1957,7 @@ const ProfessionalBuilderDashboardPage = () => {
                 </Button>
               </DashboardMobileActionSheet>
             </div>
-            <div className="hidden flex-wrap items-center gap-2 md:flex">
+            <div className="hidden w-full flex-none flex-wrap items-center gap-2 md:flex md:w-auto md:justify-end">
               {projects.length > 0 && (
                 <Select
                   value={selectedProjectForOrder || 'none'}

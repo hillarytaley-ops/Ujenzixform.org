@@ -2398,12 +2398,12 @@ const DeliveryDashboard = () => {
       {/* Hero Section */}
       <section className={`${isDarkMode ? 'bg-gray-800' : 'bg-gradient-to-r from-teal-600 to-cyan-600'} text-white py-8`}>
         <div className="container mx-auto px-4">
-          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-            <div className="flex w-full items-start justify-between gap-3 md:w-auto md:items-center md:justify-start">
-              <div className="min-w-0">
-                <h1 className="flex items-center gap-3 text-3xl font-bold">
+          <div className="flex flex-col gap-4 md:flex-row md:flex-wrap md:items-center md:justify-between">
+            <div className="flex w-full min-w-0 items-center gap-3 md:min-w-[12rem] md:flex-1">
+              <div className="min-w-0 flex-1">
+                <h1 className="flex flex-wrap items-center gap-3 break-words text-3xl font-bold">
                   <Truck className="h-8 w-8 shrink-0" />
-                  Delivery Dashboard
+                  <span>Delivery Dashboard</span>
                 </h1>
                 <p className="mt-1 text-teal-100">
                   Welcome back, {providerProfile?.full_name || providerProfile?.company_name || 'Driver'}
@@ -2479,7 +2479,7 @@ const DeliveryDashboard = () => {
                 </Button>
               </DashboardMobileActionSheet>
             </div>
-            <div className="hidden flex-wrap items-center gap-3 md:flex">
+            <div className="hidden w-full flex-none flex-wrap items-center gap-3 md:flex md:w-auto md:justify-end">
               <div className="flex items-center gap-2 rounded-full bg-white/10 px-4 py-2">
                 <Sun className="h-4 w-4" />
                 <Switch checked={isDarkMode} onCheckedChange={setIsDarkMode} />

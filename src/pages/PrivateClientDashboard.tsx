@@ -662,18 +662,16 @@ const PrivateClientDashboard = () => {
       {/* Header */}
       <div className="bg-gradient-to-r from-green-600 via-emerald-600 to-teal-600 text-white py-8 px-4">
         <div className="container mx-auto max-w-7xl">
-          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-            <div className="flex min-w-0 items-start justify-between gap-3 md:flex-1 md:items-center md:justify-start">
-              <div className="flex min-w-0 items-center gap-4">
-                <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-white/20">
-                  <User className="h-8 w-8 text-white" />
-                </div>
-                <div className="min-w-0">
-                  <h1 className="text-2xl font-bold md:text-3xl">
-                    Welcome, {profile?.full_name || 'Builder'}!
-                  </h1>
-                  <p className="text-green-100">Private Builder Dashboard</p>
-                </div>
+          <div className="flex flex-col gap-4 md:flex-row md:flex-wrap md:items-center md:justify-between">
+            <div className="flex w-full min-w-0 items-center gap-3 md:min-w-[12rem] md:flex-1">
+              <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-white/20">
+                <User className="h-8 w-8 text-white" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <h1 className="break-words text-2xl font-bold md:text-3xl">
+                  Welcome, {profile?.full_name || 'Builder'}!
+                </h1>
+                <p className="text-green-100">Private Builder Dashboard</p>
               </div>
               <DashboardMobileActionSheet
                 title="Menu"
@@ -728,7 +726,7 @@ const PrivateClientDashboard = () => {
                 </Button>
               </DashboardMobileActionSheet>
             </div>
-            <div className="hidden flex-wrap gap-2 md:flex">
+            <div className="hidden w-full flex-none flex-wrap gap-2 md:flex md:w-auto md:justify-end">
               <Link to="/suppliers?from=dashboard">
                 <Button className="bg-white text-green-700 hover:bg-green-50">
                   <ShoppingCart className="mr-2 h-4 w-4" />
