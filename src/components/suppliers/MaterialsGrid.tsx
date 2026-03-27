@@ -370,7 +370,12 @@ const PRODUCT_CATEGORIES = [
 
 // No demo materials - only show real data from database
 
-export const MaterialsGrid = () => {
+export type MaterialsGridProps = {
+  /** When true, skip the large duplicate page title (parent page already showed marketplace context). */
+  embeddedInDashboard?: boolean;
+};
+
+export const MaterialsGrid: React.FC<MaterialsGridProps> = ({ embeddedInDashboard = false }) => {
   const [searchParams] = useSearchParams();
   const [materials, setMaterials] = useState<Material[]>([]);
   const [filteredMaterials, setFilteredMaterials] = useState<Material[]>([]);
@@ -1715,31 +1720,40 @@ export const MaterialsGrid = () => {
           - Private Client: ONLY Buy Now
           ═══════════════════════════════════════════════════════════════════════════════ */}
       {isAuthenticated && userRole === 'professional_builder' && (
-        <Alert className="bg-gradient-to-r from-blue-50 to-purple-50 border-blue-300 border-2">
-          <FileText className="h-5 w-5 text-blue-600" />
-          <AlertDescription className="ml-2">
-            <strong className="text-blue-800">🏗️ Professional Builder Mode</strong>
-            <p className="text-sm text-blue-700 mt-1">
-              Add items to your cart, then <strong className="text-blue-600">Request Quotes from Multiple Suppliers</strong> to compare prices and get the best deal!
+        <Alert
+          className={`bg-gradient-to-r from-blue-50 to-purple-50 border-blue-300 ${embeddedInDashboard ? 'border py-3' : 'border-2'}`}
+        >
+          <FileText className="h-5 w-5 text-blue-600 shrink-0" />
+          <AlertDescription className="ml-2 min-w-0">
+            <strong className="text-blue-800 text-sm sm:text-base">Professional builder mode</strong>
+            <p className="text-xs sm:text-sm text-blue-700 mt-1 leading-relaxed">
+              Add to cart, then{' '}
+              <strong className="text-blue-600">request quotes from multiple suppliers</strong> to compare prices.
             </p>
-            <p className="text-xs text-blue-600 mt-1 font-medium">
-              ℹ️ As a Professional Builder, you request quotes instead of buying directly.
-            </p>
+            {!embeddedInDashboard && (
+              <p className="text-xs text-blue-600 mt-1 font-medium leading-snug">
+                You request quotes instead of buying directly.
+              </p>
+            )}
           </AlertDescription>
         </Alert>
       )}
       
       {isAuthenticated && userRole === 'private_client' && (
-        <Alert className="bg-gradient-to-r from-green-50 to-emerald-50 border-green-300 border-2">
-          <ShoppingCart className="h-5 w-5 text-green-600" />
-          <AlertDescription className="ml-2">
-            <strong className="text-green-800">🏠 Private Client Mode</strong>
-            <p className="text-sm text-green-700 mt-1">
-              Add items to your cart, then <strong className="text-green-600">Buy Now</strong> to complete your purchase instantly at listed prices!
+        <Alert
+          className={`bg-gradient-to-r from-green-50 to-emerald-50 border-green-300 ${embeddedInDashboard ? 'border py-3' : 'border-2'}`}
+        >
+          <ShoppingCart className="h-5 w-5 text-green-600 shrink-0" />
+          <AlertDescription className="ml-2 min-w-0">
+            <strong className="text-green-800 text-sm sm:text-base">Private client mode</strong>
+            <p className="text-xs sm:text-sm text-green-700 mt-1 leading-relaxed">
+              Add to cart, then <strong className="text-green-600">Buy now</strong> at listed prices.
             </p>
-            <p className="text-xs text-green-600 mt-1 font-medium">
-              ℹ️ As a Private Client, you can purchase directly from suppliers.
-            </p>
+            {!embeddedInDashboard && (
+              <p className="text-xs text-green-600 mt-1 font-medium leading-snug">
+                You can purchase directly from suppliers.
+              </p>
+            )}
           </AlertDescription>
         </Alert>
       )}
@@ -1769,14 +1783,35 @@ export const MaterialsGrid = () => {
       )}
       
       {/* Header */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-        <div>
-          <h2 className="text-3xl font-bold">Construction Materials Marketplace</h2>
-          <p className="text-muted-foreground">
-            Browse {computedFilteredMaterials.length} materials from {new Set(materials.map(m => m.supplier_id)).size} suppliers
-          </p>
-        </div>
-        <div className="flex items-center gap-2 flex-wrap">
+      <div className="flex flex-col gap-4 sm:flex-row sm:justify-between sm:items-start sm:gap-4">
+        {embeddedInDashboard ? (
+          <div className="min-w-0 space-y-1">
+            <p className="text-sm sm:text-base text-muted-foreground leading-relaxed">
+              <span className="font-semibold text-foreground tabular-nums">
+                {computedFilteredMaterials.length}
+              </span>{' '}
+              materials
+              <span className="mx-1.5 text-muted-foreground/60" aria-hidden>
+                ·
+              </span>
+              <span className="font-semibold text-foreground tabular-nums">
+                {new Set(materials.map((m) => m.supplier_id)).size}
+              </span>{' '}
+              suppliers
+            </p>
+          </div>
+        ) : (
+          <div className="min-w-0 pr-2 space-y-1.5">
+            <h2 className="text-2xl sm:text-3xl font-bold tracking-tight leading-tight text-balance break-words">
+              Construction materials marketplace
+            </h2>
+            <p className="text-muted-foreground text-sm sm:text-base leading-relaxed">
+              Browse {computedFilteredMaterials.length} materials from{' '}
+              {new Set(materials.map((m) => m.supplier_id)).size} suppliers
+            </p>
+          </div>
+        )}
+        <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto sm:justify-end">
           {/* Shopping Cart Button - For all builders */}
           {(userRole === 'professional_builder' || userRole === 'private_client' || userRole === 'admin') && (
             <Button 

@@ -224,36 +224,48 @@ const Suppliers = () => {
 
       {/* Dashboard Header - Show when coming from dashboard */}
       {isFromDashboard && isLoggedInBuilder && (
-        <section className="bg-gradient-to-r from-slate-800 via-emerald-800 to-slate-800 py-4 border-b border-emerald-600/30">
-          <div className="container mx-auto px-4">
-            <div className="flex items-center justify-between">
-              <Button 
+        <section className="bg-gradient-to-r from-slate-800 via-emerald-800 to-slate-800 py-4 sm:py-5 border-b border-emerald-600/30">
+          <div className="container mx-auto px-4 max-w-6xl">
+            <div className="flex flex-col gap-4 md:flex-row md:items-start md:gap-6">
+              <Button
+                type="button"
                 variant="outline"
                 onClick={() => navigate(getDashboardPath())}
-                className="bg-white/10 border-white/30 text-white hover:bg-white/20"
+                className="shrink-0 self-start bg-white/10 border-white/30 text-white hover:bg-white/20 h-10 text-sm sm:text-base"
               >
-                <ArrowLeft className="h-4 w-4 mr-2" />
+                <ArrowLeft className="h-4 w-4 mr-2 shrink-0" />
                 Back to Dashboard
               </Button>
-              <div className="text-center flex-1">
-                <h1 className="text-xl md:text-2xl font-bold text-white">
-                  Materials Marketplace
+              <div className="min-w-0 flex-1 md:text-center space-y-1.5">
+                <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-white leading-tight text-balance break-words">
+                  Materials marketplace
                 </h1>
-                <p className="text-sm text-white/70">
-                  {selectedProjectName 
-                    ? `Ordering for: ${selectedProjectName}`
-                    : (userRole === 'professional_builder' ? 'Request quotes for bulk orders' : 'Browse and purchase materials')
-                  }
+                <p className="text-sm sm:text-base text-white/80 leading-relaxed text-balance break-words max-w-2xl md:mx-auto">
+                  {selectedProjectName ? (
+                    <>
+                      Ordering for{' '}
+                      <span className="font-semibold text-white">{selectedProjectName}</span>
+                    </>
+                  ) : userRole === 'professional_builder' ? (
+                    'Request quotes for bulk orders from verified suppliers.'
+                  ) : (
+                    'Browse and purchase materials at listed prices.'
+                  )}
                 </p>
               </div>
-              <div className="w-[140px]" /> {/* Spacer for centering */}
             </div>
-            {/* Project indicator banner */}
             {selectedProjectName && (
-              <div className="mt-3 bg-blue-600/30 border border-blue-400/50 rounded-lg p-2 text-center">
-                <p className="text-sm text-white flex items-center justify-center gap-2">
-                  <Building2 className="h-4 w-4" />
-                  <span>All materials will be linked to <strong>{selectedProjectName}</strong> for cost tracking</span>
+              <div className="mt-4 rounded-lg border border-blue-400/45 bg-blue-600/25 px-3 py-3 sm:px-4">
+                <p className="text-xs sm:text-sm text-white/95 leading-snug flex flex-col gap-2 sm:flex-row sm:items-start sm:gap-3">
+                  <span className="flex items-center gap-2 shrink-0 font-medium">
+                    <Building2 className="h-4 w-4 shrink-0 opacity-90" />
+                    Cost tracking
+                  </span>
+                  <span className="min-w-0 sm:pt-0.5">
+                    Materials you add are linked to{' '}
+                    <strong className="font-semibold text-white">{selectedProjectName}</strong>
+                    {' '}for project spend tracking.
+                  </span>
                 </p>
               </div>
             )}
@@ -283,13 +295,13 @@ const Suppliers = () => {
           </div>
           
           {/* Title - Responsive sizing */}
-          <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold mb-4 md:mb-6">
+          <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold mb-4 md:mb-6 px-1 leading-tight text-balance break-words">
             <span className="text-white">Materials</span>
             <span className="bg-gradient-to-r from-emerald-400 to-teal-400 bg-clip-text text-transparent"> Marketplace</span>
           </h1>
           
           {/* Description */}
-          <p className="text-base md:text-lg lg:text-xl mb-6 max-w-2xl mx-auto text-white/80 px-4">
+          <p className="text-sm sm:text-base md:text-lg lg:text-xl mb-6 max-w-2xl mx-auto text-white/80 px-3 sm:px-4 leading-relaxed text-balance">
             Connect with 500+ verified suppliers. Quality construction materials delivered across all 47 counties.
           </p>
 
@@ -439,18 +451,20 @@ const Suppliers = () => {
       )}
 
       {/* Materials Grid Section */}
-      <section id="materials-section" className="py-8 md:py-12 bg-gray-50">
-        <div className="container mx-auto px-4">
-          <div className="text-center mb-6 md:mb-8">
-            <h2 className="text-2xl md:text-3xl font-bold text-gray-900 mb-2">
-              Browse Construction Materials
-            </h2>
-            <p className="text-gray-600 text-sm md:text-base">
-              Quality materials from verified suppliers across Kenya
-            </p>
-          </div>
-          
-          <MaterialsGrid />
+      <section id="materials-section" className="py-6 md:py-12 bg-gray-50">
+        <div className="container mx-auto px-4 max-w-7xl">
+          {!isFromDashboard && (
+            <div className="text-center mb-6 md:mb-8 max-w-3xl mx-auto px-1">
+              <h2 className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-900 mb-2 leading-tight text-balance break-words">
+                Browse construction materials
+              </h2>
+              <p className="text-gray-600 text-sm sm:text-base leading-relaxed text-balance">
+                Quality materials from verified suppliers across Kenya
+              </p>
+            </div>
+          )}
+
+          <MaterialsGrid embeddedInDashboard={isFromDashboard} />
         </div>
       </section>
 
