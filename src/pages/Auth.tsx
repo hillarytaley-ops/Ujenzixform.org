@@ -17,15 +17,27 @@ import { SimplePasswordReset } from "@/components/SimplePasswordReset";
 
 console.log('🔐 Auth.tsx BUILD v31 - SAVE EMAIL TO LOCALSTORAGE Feb 21 2026');
 
-// Dashboard paths
+// Dashboard paths (must match DB `user_roles.role` — includes `builder` alias for professional builders)
 const DASHBOARDS: Record<string, string> = {
-  'admin': '/admin-dashboard',
-  'supplier': '/supplier-dashboard',
-  'delivery': '/delivery-dashboard',
-  'delivery_provider': '/delivery-dashboard',
-  'professional_builder': '/professional-builder-dashboard',
-  'private_client': '/private-client-dashboard',
+  admin: '/admin-dashboard',
+  supplier: '/supplier-dashboard',
+  delivery: '/delivery-dashboard',
+  delivery_provider: '/delivery-dashboard',
+  professional_builder: '/professional-builder-dashboard',
+  builder: '/professional-builder-dashboard',
+  private_client: '/private-client-dashboard',
 };
+
+/** When a user has multiple roles, pick redirect target deterministically */
+const ROLE_REDIRECT_PRIORITY = [
+  'admin',
+  'professional_builder',
+  'builder',
+  'supplier',
+  'delivery',
+  'delivery_provider',
+  'private_client',
+] as const;
 
 const Auth = () => {
   const [formLoading, setFormLoading] = useState(false);
@@ -55,30 +67,30 @@ const Auth = () => {
         }
         localStorage.setItem('user_id', session.user.id);
         
-        // Fetch role and redirect
+        // Fetch roles via Supabase client (same URL/keys as app — avoids missing VITE_SUPABASE_URL on deploy)
         try {
-          const response = await fetch(
-            `${import.meta.env.VITE_SUPABASE_URL}/rest/v1/user_roles?user_id=eq.${session.user.id}&select=role&limit=1`,
-            {
-              headers: {
-                'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
-                'Authorization': `Bearer ${session.access_token}`,
-                'Content-Type': 'application/json'
-              }
+          const { data: roleRows, error: roleError } = await supabase
+            .from('user_roles')
+            .select('role')
+            .eq('user_id', session.user.id);
+
+          if (roleError) {
+            console.error('🔐 Role query error:', roleError.message);
+          } else {
+            const roles = (roleRows ?? [])
+              .map((r: { role?: string }) => r?.role)
+              .filter((r): r is string => Boolean(r));
+            const picked =
+              ROLE_REDIRECT_PRIORITY.find((r) => roles.includes(r)) ?? roles[0];
+            console.log('🔐 Role data:', roles, '→', picked);
+
+            if (picked && DASHBOARDS[picked]) {
+              localStorage.setItem('user_role', picked);
+              console.log('🔐 Redirecting to:', DASHBOARDS[picked]);
+              toast({ title: '✅ Welcome back!' });
+              window.location.href = DASHBOARDS[picked];
+              return;
             }
-          );
-          
-          console.log('🔐 Role fetch status:', response.status);
-          const roleData = await response.json();
-          console.log('🔐 Role data:', roleData);
-          
-          if (roleData?.[0]?.role && DASHBOARDS[roleData[0].role]) {
-            const role = roleData[0].role;
-            localStorage.setItem('user_role', role);
-            console.log('🔐 Redirecting to:', DASHBOARDS[role]);
-            toast({ title: "✅ Welcome back!" });
-            window.location.href = DASHBOARDS[role];
-            return;
           }
         } catch (err) {
           console.error('🔐 Role fetch error:', err);

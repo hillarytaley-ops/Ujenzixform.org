@@ -24,8 +24,10 @@ const DASHBOARDS: Record<string, string> = {
   admin: '/admin-dashboard',
 };
 
+/** Max wait before we stop blocking the UI (then show redirect / children). */
 const UNLOCK_MS = 12_000;
 const REFRESH_CAP_MS = 5_000;
+const GET_SESSION_CAP_MS = 8_000;
 
 function pickRoleForRoute(roles: string[], allowed: string[]): string | null {
   if (!roles.length) return null;
@@ -44,9 +46,10 @@ export const RoleProtectedRoute = ({ children, allowedRoles }: RoleProtectedRout
 
   useEffect(() => {
     let cancelled = false;
-    let timedOut = false;
+    const timedOutRef = { current: false };
+
     const timer = window.setTimeout(() => {
-      timedOut = true;
+      timedOutRef.current = true;
       if (cancelled) return;
       console.warn('RoleProtectedRoute: timed out — unlock UI (check network / user_roles RLS)');
       setSessionUser(null);
@@ -54,43 +57,45 @@ export const RoleProtectedRoute = ({ children, allowedRoles }: RoleProtectedRout
       setReady(true);
     }, UNLOCK_MS);
 
-    const finish = () => {
+    const end = () => {
       window.clearTimeout(timer);
       if (!cancelled) setReady(true);
     };
 
-    (async () => {
+    void (async () => {
       try {
         await Promise.race([
           refreshSessionIfNeeded(),
           new Promise<void>((resolve) => setTimeout(resolve, REFRESH_CAP_MS)),
         ]);
 
-        if (cancelled || timedOut) return;
+        if (cancelled || timedOutRef.current) return;
 
-        const {
-          data: { session },
-        } = await supabase.auth.getSession();
+        const sessionResult = await Promise.race([
+          supabase.auth.getSession(),
+          new Promise<{ data: { session: null } }>((resolve) =>
+            setTimeout(() => resolve({ data: { session: null } }), GET_SESSION_CAP_MS)
+          ),
+        ]);
 
-        if (cancelled || timedOut) return;
+        if (cancelled || timedOutRef.current) return;
+
+        const session = sessionResult.data?.session ?? null;
 
         if (!session?.user) {
           setSessionUser(null);
           setDbRole(null);
-          finish();
           return;
         }
 
-        if (cancelled || timedOut) return;
         setSessionUser(session.user);
 
-        // Do not use maybeSingle(): users with multiple user_roles rows get a PostgREST error and no role.
         const { data: roleRows, error } = await supabase
           .from('user_roles')
           .select('role')
           .eq('user_id', session.user.id);
 
-        if (cancelled || timedOut) return;
+        if (cancelled || timedOutRef.current) return;
 
         const roleStrings = (roleRows ?? [])
           .map((r: { role?: string }) => r?.role)
@@ -111,12 +116,14 @@ export const RoleProtectedRoute = ({ children, allowedRoles }: RoleProtectedRout
         }
       } catch (e) {
         console.error('RoleProtectedRoute: session check failed', e);
-        if (!cancelled && !timedOut) {
+        if (!cancelled && !timedOutRef.current) {
           setSessionUser(null);
           setDbRole(null);
         }
       } finally {
-        if (!cancelled && !timedOut) finish();
+        // Always unblock the UI when this async flow finishes (unless unmounted).
+        // Do not gate on timedOut — that left ready=false in edge races with the unlock timer.
+        end();
       }
     })();
 
@@ -147,8 +154,6 @@ export const RoleProtectedRoute = ({ children, allowedRoles }: RoleProtectedRout
   }
 
   const correctDashboard = DASHBOARDS[dbRole] || '/home';
-  // Avoid Navigate to the same path: remounts this guard and traps the UI on the loading spinner
-  // (e.g. DB role is `builder` but allowedRoles only listed `professional_builder`).
   if (correctDashboard === location.pathname) {
     return <>{children}</>;
   }
