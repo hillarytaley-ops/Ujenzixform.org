@@ -9,9 +9,6 @@
   },
   "rewrites": [
     {
-      "handle": "filesystem"
-    },
-    {
       "source": "/(.*)",
       "destination": "/index.html"
     }
