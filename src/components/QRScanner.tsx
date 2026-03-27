@@ -9,6 +9,10 @@ import { DecodeHintType } from '@zxing/library';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 
+/** Radix Select forbids SelectItem value=""; empty deviceId still uses default constraints in scanner. */
+const QR_DEFAULT_CAMERA_SELECT_VALUE = '__ujenzi_qr_default_camera__';
+const QR_VIDEO_FALLBACK_PREFIX = '__ujenzi_qr_vid_';
+
 interface QRScannerProps {
   onMaterialScanned: (material: ScannedMaterial) => void;
   mode?: 'dispatch' | 'receiving';
@@ -244,16 +248,32 @@ const QRScanner: React.FC<QRScannerProps> = ({ onMaterialScanned, onRawScan, mod
             <div className="grid grid-cols-1 md:grid-cols-3 gap-2 mb-4">
               <div className="space-y-2 md:col-span-2">
                 <Label htmlFor="camera-source">Camera Source</Label>
-                <Select value={selectedDeviceId ?? ''} onValueChange={setSelectedDeviceId}>
+                <Select
+                  value={
+                    selectedDeviceId === ''
+                      ? QR_DEFAULT_CAMERA_SELECT_VALUE
+                      : selectedDeviceId
+                  }
+                  onValueChange={(v) => {
+                    if (v === QR_DEFAULT_CAMERA_SELECT_VALUE || v.startsWith(QR_VIDEO_FALLBACK_PREFIX)) {
+                      setSelectedDeviceId('');
+                    } else {
+                      setSelectedDeviceId(v);
+                    }
+                  }}
+                >
                   <SelectTrigger id="camera-source">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
                     {videoDevices.length === 0 ? (
-                      <SelectItem value="">Default</SelectItem>
+                      <SelectItem value={QR_DEFAULT_CAMERA_SELECT_VALUE}>Default</SelectItem>
                     ) : (
                       videoDevices.map((d, i) => (
-                        <SelectItem key={d.deviceId || i} value={d.deviceId || ''}>
+                        <SelectItem
+                          key={d.deviceId || `${QR_VIDEO_FALLBACK_PREFIX}${i}`}
+                          value={d.deviceId || `${QR_VIDEO_FALLBACK_PREFIX}${i}`}
+                        >
                           {d.label || `Camera ${i + 1}`}
                         </SelectItem>
                       ))

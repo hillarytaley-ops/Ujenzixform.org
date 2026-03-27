@@ -44,6 +44,9 @@ export interface FilterConfig {
   showResolved: boolean;
 }
 
+/** Radix Select forbids SelectItem value="". */
+const ANALYTICS_ALL_PROJECTS_VALUE = '__ujenzi_analytics_all_projects__';
+
 interface SavedFilter {
   id: string;
   name: string;
@@ -434,17 +437,24 @@ export const AnalyticsFilters: React.FC<AnalyticsFiltersProps> = ({
                   Projects
                 </Label>
                 <Select
-                  value={filters.projects.join(',')}
-                  onValueChange={(v) => setFilters(prev => ({
-                    ...prev,
-                    projects: v ? v.split(',') : []
-                  }))}
+                  value={
+                    filters.projects.length === 0
+                      ? ANALYTICS_ALL_PROJECTS_VALUE
+                      : filters.projects.join(',')
+                  }
+                  onValueChange={(v) =>
+                    setFilters((prev) => ({
+                      ...prev,
+                      projects:
+                        v === ANALYTICS_ALL_PROJECTS_VALUE ? [] : v.split(',').filter(Boolean),
+                    }))
+                  }
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="All projects" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">All Projects</SelectItem>
+                    <SelectItem value={ANALYTICS_ALL_PROJECTS_VALUE}>All Projects</SelectItem>
                     {projects.map(p => (
                       <SelectItem key={p} value={p}>{p}</SelectItem>
                     ))}

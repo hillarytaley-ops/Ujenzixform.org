@@ -61,7 +61,7 @@ interface PendingEscalation {
 }
 
 const ALERT_TYPES = [
-  { value: '', label: 'Any Type' },
+  { value: SEL_ANY_ALERT_TYPE, label: 'Any Type' },
   { value: 'camera_offline', label: 'Camera Offline' },
   { value: 'camera_low_battery', label: 'Low Battery' },
   { value: 'motion_detected', label: 'Motion Detected' },
@@ -74,6 +74,12 @@ const ALERT_TYPES = [
 
 const SEVERITIES = ['info', 'warning', 'critical', 'emergency'];
 const ROLES = ['admin', 'builder', 'supplier', 'delivery_provider'];
+
+/** Radix Select forbids SelectItem value=""; map these to '' in form state / DB. */
+const SEL_ANY_ALERT_TYPE = '__ujenzi_sel_any_alert_type__';
+const SEL_ANY_SEVERITY = '__ujenzi_sel_any_severity__';
+const SEL_NO_SEVERITY_CHANGE = '__ujenzi_sel_no_severity_change__';
+const SEL_NOTIFY_NONE = '__ujenzi_sel_notify_none__';
 
 const defaultRule = {
   name: '',
@@ -396,8 +402,13 @@ export const AlertEscalationManager: React.FC = () => {
                   <div>
                     <Label>Alert Type</Label>
                     <Select 
-                      value={formData.alert_type} 
-                      onValueChange={(v) => setFormData({ ...formData, alert_type: v })}
+                      value={formData.alert_type === '' ? SEL_ANY_ALERT_TYPE : formData.alert_type} 
+                      onValueChange={(v) =>
+                        setFormData({
+                          ...formData,
+                          alert_type: v === SEL_ANY_ALERT_TYPE ? '' : v,
+                        })
+                      }
                     >
                       <SelectTrigger>
                         <SelectValue placeholder="Any type" />
@@ -412,14 +423,19 @@ export const AlertEscalationManager: React.FC = () => {
                   <div>
                     <Label>Initial Severity</Label>
                     <Select 
-                      value={formData.initial_severity} 
-                      onValueChange={(v) => setFormData({ ...formData, initial_severity: v })}
+                      value={formData.initial_severity === '' ? SEL_ANY_SEVERITY : formData.initial_severity} 
+                      onValueChange={(v) =>
+                        setFormData({
+                          ...formData,
+                          initial_severity: v === SEL_ANY_SEVERITY ? '' : v,
+                        })
+                      }
                     >
                       <SelectTrigger>
                         <SelectValue placeholder="Any severity" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="">Any Severity</SelectItem>
+                        <SelectItem value={SEL_ANY_SEVERITY}>Any Severity</SelectItem>
                         {SEVERITIES.map(s => (
                           <SelectItem key={s} value={s}>{s}</SelectItem>
                         ))}
@@ -444,14 +460,23 @@ export const AlertEscalationManager: React.FC = () => {
                   <div>
                     <Label>Escalate To Severity</Label>
                     <Select 
-                      value={formData.escalate_to_severity} 
-                      onValueChange={(v) => setFormData({ ...formData, escalate_to_severity: v })}
+                      value={
+                        formData.escalate_to_severity === ''
+                          ? SEL_NO_SEVERITY_CHANGE
+                          : formData.escalate_to_severity
+                      } 
+                      onValueChange={(v) =>
+                        setFormData({
+                          ...formData,
+                          escalate_to_severity: v === SEL_NO_SEVERITY_CHANGE ? '' : v,
+                        })
+                      }
                     >
                       <SelectTrigger>
                         <SelectValue placeholder="No change" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="">No change</SelectItem>
+                        <SelectItem value={SEL_NO_SEVERITY_CHANGE}>No change</SelectItem>
                         {SEVERITIES.map(s => (
                           <SelectItem key={s} value={s}>{s}</SelectItem>
                         ))}
@@ -461,14 +486,19 @@ export const AlertEscalationManager: React.FC = () => {
                   <div>
                     <Label>Notify Role</Label>
                     <Select 
-                      value={formData.notify_role} 
-                      onValueChange={(v) => setFormData({ ...formData, notify_role: v })}
+                      value={formData.notify_role === '' ? SEL_NOTIFY_NONE : formData.notify_role} 
+                      onValueChange={(v) =>
+                        setFormData({
+                          ...formData,
+                          notify_role: v === SEL_NOTIFY_NONE ? '' : v,
+                        })
+                      }
                     >
                       <SelectTrigger>
                         <SelectValue placeholder="Select role" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="">None</SelectItem>
+                        <SelectItem value={SEL_NOTIFY_NONE}>None</SelectItem>
                         {ROLES.map(r => (
                           <SelectItem key={r} value={r}>{r}</SelectItem>
                         ))}

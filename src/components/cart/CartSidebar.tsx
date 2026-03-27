@@ -46,6 +46,9 @@ interface BuilderProject {
   status: string;
 }
 
+/** Radix Select forbids SelectItem with value=""; use this for "no project" in the cart project picker. */
+const CART_NO_PROJECT_SELECT_VALUE = '__ujenzi_no_project__';
+
 // Parse Supabase/PostgREST error response so we can show the real server error (e.g. trigger/DB message)
 const parseSupabaseError = (body: string, status: number): string => {
   if (!body || !body.trim()) return `Server ${status}`;
@@ -857,23 +860,25 @@ export const CartSidebar: React.FC = () => {
                   Link Order to Project
                 </div>
                 <Select
-                  value={selectedProjectId || ''}
+                  value={selectedProjectId ?? CART_NO_PROJECT_SELECT_VALUE}
                   onValueChange={(value) => {
-                    const id = value || null;
-                    setSelectedProjectId(id);
-                    if (id) {
-                      const p = projects.find((x) => x.id === id);
-                      setCartProjectContext(id, p?.name ?? null, p?.location ?? null);
-                    } else {
+                    if (value === CART_NO_PROJECT_SELECT_VALUE) {
+                      setSelectedProjectId(null);
                       clearCartProjectContext();
+                      return;
                     }
+                    setSelectedProjectId(value);
+                    const p = projects.find((x) => x.id === value);
+                    setCartProjectContext(value, p?.name ?? null, p?.location ?? null);
                   }}
                 >
                   <SelectTrigger className="w-full bg-white border-blue-200">
                     <SelectValue placeholder="Select a project (optional)" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">No project (general purchase)</SelectItem>
+                    <SelectItem value={CART_NO_PROJECT_SELECT_VALUE}>
+                      No project (general purchase)
+                    </SelectItem>
                     {projects.map((project) => (
                       <SelectItem key={project.id} value={project.id}>
                         <div className="flex items-center gap-2">
