@@ -2,3 +2,8 @@ project_id = "wuuyjjpgzgeimiptuuws"
 
 [functions.secure-encryption]
 verify_jwt = true
+
+# Browser CORS preflight (OPTIONS) does not send a JWT; gateway would reject before the function runs.
+# POST still requires a valid Supabase session (checked inside the function).
+[functions.send-email]
+verify_jwt = false

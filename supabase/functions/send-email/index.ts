@@ -1,21 +1,22 @@
 /**
  * Supabase Edge Function: Send Email via Resend
- * 
- * SETUP INSTRUCTIONS:
- * 1. Sign up at https://resend.com
- * 2. Verify your domain (ujenzixform.org)
- * 3. Get your API key from Resend dashboard
- * 4. Add secret: supabase secrets set RESEND_API_KEY=re_xxxxxxxxxxxxx
- * 5. Deploy: supabase functions deploy send-email
+ *
+ * CORS: verify_jwt is false in config.toml so browser OPTIONS preflight reaches this handler.
+ * POST requests require a valid Supabase user JWT (Authorization: Bearer <access_token>).
  */
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.8";
 
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
+const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
+const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
 
-const corsHeaders = {
+const corsHeaders: Record<string, string> = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type, x-supabase-authorization",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
 interface EmailRequest {
@@ -27,9 +28,37 @@ interface EmailRequest {
 }
 
 serve(async (req) => {
-  // Handle CORS preflight
   if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders });
+    return new Response(null, { status: 204, headers: corsHeaders });
+  }
+
+  if (req.method !== "POST") {
+    return new Response(JSON.stringify({ error: "Method not allowed" }), {
+      status: 405,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
+  const authHeader = req.headers.get("Authorization");
+  if (!authHeader?.startsWith("Bearer ")) {
+    return new Response(JSON.stringify({ error: "Unauthorized" }), {
+      status: 401,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
+  const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+    global: { headers: { Authorization: authHeader } },
+  });
+  const {
+    data: { user },
+    error: authErr,
+  } = await supabase.auth.getUser();
+  if (authErr || !user) {
+    return new Response(JSON.stringify({ error: "Unauthorized" }), {
+      status: 401,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
   }
 
   try {
@@ -39,16 +68,14 @@ serve(async (req) => {
 
     const { to, subject, html, from, replyTo }: EmailRequest = await req.json();
 
-    // Validate required fields
     if (!to || !subject || !html) {
       throw new Error("Missing required fields: to, subject, html");
     }
 
-    // Send email via Resend API
     const response = await fetch("https://api.resend.com/emails", {
       method: "POST",
       headers: {
-        "Authorization": `Bearer ${RESEND_API_KEY}`,
+        Authorization: `Bearer ${RESEND_API_KEY}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
@@ -67,22 +94,17 @@ serve(async (req) => {
       throw new Error(data.message || "Failed to send email");
     }
 
-    console.log("Email sent successfully:", data);
-
-    return new Response(
-      JSON.stringify({ success: true, id: data.id }),
-      {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-        status: 200,
-      }
-    );
+    return new Response(JSON.stringify({ success: true, id: data.id }), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      status: 200,
+    });
   } catch (error) {
     console.error("Email sending error:", error);
-    
+
     return new Response(
-      JSON.stringify({ 
-        success: false, 
-        error: error instanceof Error ? error.message : "Unknown error" 
+      JSON.stringify({
+        success: false,
+        error: error instanceof Error ? error.message : "Unknown error",
       }),
       {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -91,4 +113,3 @@ serve(async (req) => {
     );
   }
 });
-
