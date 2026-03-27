@@ -2392,23 +2392,16 @@ const DeliveryDashboard = () => {
   }
 
   return (
-    <div className={`min-h-screen transition-colors duration-300 ${isDarkMode ? 'bg-gray-900' : 'bg-gradient-to-br from-teal-50 via-white to-cyan-50'}`}>
+    <div
+      className={`min-h-screen w-full min-w-0 max-w-[100vw] overflow-x-hidden transition-colors duration-300 ${isDarkMode ? 'bg-gray-900' : 'bg-gradient-to-br from-teal-50 via-white to-cyan-50'}`}
+    >
       {/* Navigation hidden in dashboard - use Exit Dashboard to access main navigation */}
 
       {/* Hero Section */}
-      <section className={`${isDarkMode ? 'bg-gray-800' : 'bg-gradient-to-r from-teal-600 to-cyan-600'} text-white py-8`}>
-        <div className="container mx-auto px-4">
-          <div className="flex flex-col gap-4 md:flex-row md:flex-wrap md:items-center md:justify-between">
-            <div className="flex w-full min-w-0 items-center gap-3 md:min-w-[12rem] md:flex-1">
-              <div className="min-w-0 flex-1">
-                <h1 className="flex flex-wrap items-center gap-3 break-words text-3xl font-bold">
-                  <Truck className="h-8 w-8 shrink-0" />
-                  <span>Delivery Dashboard</span>
-                </h1>
-                <p className="mt-1 text-teal-100">
-                  Welcome back, {providerProfile?.full_name || providerProfile?.company_name || 'Driver'}
-                </p>
-              </div>
+      <section className={`relative ${isDarkMode ? 'bg-gray-800' : 'bg-gradient-to-r from-teal-600 to-cyan-600'} text-white py-8`}>
+        <div className="container relative mx-auto px-4">
+          <div className="pointer-events-none absolute right-2 top-1/2 z-20 -translate-y-1/2 md:hidden">
+            <div className="pointer-events-auto">
               <DashboardMobileActionSheet
                 title="Delivery menu"
                 triggerClassName="border-white/40 bg-white/15 text-white hover:bg-white/25"
@@ -2478,6 +2471,19 @@ const DeliveryDashboard = () => {
                   Logout
                 </Button>
               </DashboardMobileActionSheet>
+            </div>
+          </div>
+          <div className="flex flex-col gap-4 md:flex-row md:flex-wrap md:items-center md:justify-between">
+            <div className="flex w-full min-w-0 items-center gap-3 pr-14 sm:pr-16 md:min-w-[12rem] md:flex-1 md:pr-0">
+              <div className="min-w-0 flex-1">
+                <h1 className="flex flex-wrap items-center gap-3 text-3xl font-bold break-normal">
+                  <Truck className="h-8 w-8 shrink-0" />
+                  <span>Delivery Dashboard</span>
+                </h1>
+                <p className="mt-1 text-teal-100">
+                  Welcome back, {providerProfile?.full_name || providerProfile?.company_name || 'Driver'}
+                </p>
+              </div>
             </div>
             <div className="hidden w-full flex-none flex-wrap items-center gap-3 md:flex md:w-auto md:justify-end">
               <div className="flex items-center gap-2 rounded-full bg-white/10 px-4 py-2">

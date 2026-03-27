@@ -22,6 +22,12 @@ body {
   text-size-adjust: 100%;
 }
 
+/* Ensure app root never collapses to zero width inside flex ancestors */
+#root {
+  width: 100%;
+  min-width: 0;
+}
+
 /* Responsive text - prevent overflow and improve mobile readability */
 p, span, div, h1, h2, h3, h4, h5, h6, label, button {
   word-wrap: break-word;

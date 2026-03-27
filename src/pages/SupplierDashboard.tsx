@@ -1779,33 +1779,14 @@ const SupplierDashboard = () => {
   }
 
   return (
-    <div className={`min-h-screen ${bgMain}`}>
+    <div className={`min-h-screen w-full min-w-0 max-w-[100vw] overflow-x-hidden ${bgMain}`}>
       {/* Navigation hidden in dashboard - use Exit Dashboard to access main navigation */}
 
       {/* Hero Section */}
-      <section className="bg-gradient-to-r from-orange-600 to-amber-600 text-white py-5 sm:py-8">
-        <div className="container mx-auto max-w-7xl px-4">
-          <div className="flex flex-col gap-5">
-            <div className="flex w-full min-w-0 items-start justify-between gap-3 md:items-center">
-              <div className="min-w-0 flex-1 md:min-w-[12rem]">
-                <div className="flex items-start gap-3">
-                  <Store className="mt-0.5 h-8 w-8 shrink-0" aria-hidden />
-                  <div className="min-w-0 flex-1">
-                    <h1 className="text-balance break-words text-2xl font-bold leading-tight sm:text-3xl">
-                      {t('supplier.dashboard.title')}
-                    </h1>
-                    <p className="mt-1.5 break-words text-sm leading-relaxed text-orange-100 sm:text-base">
-                      {t('supplier.dashboard.welcome')},{' '}
-                      <span className="font-medium text-white">
-                        {supplierProfile?.company_name ||
-                          supplierProfile?.store_name ||
-                          supplierProfile?.full_name ||
-                          'Supplier'}
-                      </span>
-                    </p>
-                  </div>
-                </div>
-              </div>
+      <section className="relative bg-gradient-to-r from-orange-600 to-amber-600 text-white py-5 sm:py-8">
+        <div className="container relative mx-auto max-w-7xl px-4">
+          <div className="pointer-events-none absolute right-1 top-1/2 z-20 -translate-y-1/2 sm:right-2 md:hidden">
+            <div className="pointer-events-auto">
               <DashboardMobileActionSheet
                 title={t('supplier.dashboard.title')}
                 triggerClassName="border-white/40 bg-white/15 text-white hover:bg-white/25"
@@ -1867,6 +1848,27 @@ const SupplierDashboard = () => {
                   <span className="truncate">Logout</span>
                 </Button>
               </DashboardMobileActionSheet>
+            </div>
+          </div>
+          <div className="flex flex-col gap-5">
+            <div className="w-full min-w-0 pr-14 sm:pr-16 md:pr-0">
+              <div className="flex items-start gap-3">
+                <Store className="mt-0.5 h-8 w-8 shrink-0" aria-hidden />
+                <div className="min-w-0 flex-1">
+                  <h1 className="text-balance text-2xl font-bold leading-tight break-normal sm:text-3xl">
+                    {t('supplier.dashboard.title')}
+                  </h1>
+                  <p className="mt-1.5 text-sm leading-relaxed break-normal text-orange-100 sm:text-base">
+                    {t('supplier.dashboard.welcome')},{' '}
+                    <span className="font-medium text-white">
+                      {supplierProfile?.company_name ||
+                        supplierProfile?.store_name ||
+                        supplierProfile?.full_name ||
+                        'Supplier'}
+                    </span>
+                  </p>
+                </div>
+              </div>
             </div>
             <div className="hidden w-full gap-2 md:flex md:flex-wrap md:items-center lg:w-auto lg:max-w-xl">
               <LanguageSwitcher
