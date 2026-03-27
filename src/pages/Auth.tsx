@@ -16,7 +16,7 @@ import { Github, Mail, KeyRound, CheckCircle, Loader2, Shield } from "lucide-rea
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { SimplePasswordReset } from "@/components/SimplePasswordReset";
 
-console.log('🔐 Auth.tsx BUILD v32 - deferred post-sign-in redirect (no deadlock in onAuthStateChange)');
+console.log('🔐 Auth.tsx BUILD v33 - password sign-in owns redirect (no listener race / no role timeout)');
 
 const DASHBOARDS: Record<string, string> = {
   admin: '/admin-dashboard',
@@ -38,17 +38,9 @@ const ROLE_REDIRECT_PRIORITY = [
   'private_client',
 ] as const;
 
-const ROLE_FETCH_MS = 10_000;
-
-async function fetchRolesWithTimeout(userId: string) {
-  const query = supabase.from('user_roles').select('role').eq('user_id', userId);
-  const result = await Promise.race([
-    query,
-    new Promise<{ data: null; error: { message: string } }>((resolve) =>
-      setTimeout(() => resolve({ data: null, error: { message: 'timeout' } }), ROLE_FETCH_MS)
-    ),
-  ]);
-  return result;
+function normalizeRoleToken(v: unknown): string {
+  if (v == null) return '';
+  return String(v).trim();
 }
 
 const Auth = () => {
@@ -59,61 +51,58 @@ const Auth = () => {
   const [signUpEmail, setSignUpEmail] = useState("");
   const [signUpPassword, setSignUpPassword] = useState("");
   const isSubmitting = useRef(false);
-  /** Prevents double navigation when both listener and handleSignIn run */
-  const redirectOnceRef = useRef(false);
+  /** True while email/password sign-in runs — SIGNED_IN listener must not compete (was causing /home + stuck UX). */
+  const passwordSignInFlowRef = useRef(false);
   const { toast } = useToast();
 
   const redirectAfterSignIn = useCallback(
     async (session: Session) => {
-      if (redirectOnceRef.current) return;
-      redirectOnceRef.current = true;
-
       if (session.user.email) {
         localStorage.setItem('user_email', session.user.email);
       }
       localStorage.setItem('user_id', session.user.id);
 
-      try {
-        const { data: roleRows, error: roleError } = await fetchRolesWithTimeout(session.user.id);
+      const { data: roleRows, error: roleError } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', session.user.id);
 
-        if (roleError && roleError.message !== 'timeout') {
-          console.error('🔐 Role query error:', roleError.message);
-        }
-
-        const rows = roleRows as { role?: string }[] | null;
-        const roles = (rows ?? [])
-          .map((r) => r?.role)
-          .filter((r): r is string => Boolean(r));
-        const picked =
-          ROLE_REDIRECT_PRIORITY.find((r) => roles.includes(r)) ?? roles[0];
-
-        console.log('🔐 Role data:', roles, '→', picked);
-
-        if (picked && DASHBOARDS[picked]) {
-          localStorage.setItem('user_role', picked);
-          toast({ title: '✅ Welcome back!' });
-          window.location.assign(DASHBOARDS[picked]);
-          return;
-        }
-
-        console.log('🔐 No mappable role, going to home');
-        toast({ title: '✅ Signed in!' });
-        window.location.assign('/home');
-      } catch (err) {
-        console.error('🔐 Post-sign-in redirect error:', err);
-        redirectOnceRef.current = false;
-        throw err;
+      if (roleError) {
+        console.error('🔐 Role query error:', roleError.message);
       }
+
+      const roles = (roleRows ?? [])
+        .map((r: { role?: unknown }) => normalizeRoleToken(r?.role))
+        .filter(Boolean);
+      const picked =
+        ROLE_REDIRECT_PRIORITY.find((r) => roles.includes(r)) ?? roles[0];
+
+      console.log('🔐 Role data:', roles, '→', picked);
+
+      if (picked && DASHBOARDS[picked]) {
+        localStorage.setItem('user_role', picked);
+        toast({ title: '✅ Welcome back!' });
+        window.location.assign(DASHBOARDS[picked]);
+        return;
+      }
+
+      console.log('🔐 No mappable role, going to home');
+      toast({ title: '✅ Signed in!' });
+      window.location.assign('/home');
     },
     [toast]
   );
 
-  // OAuth / magic link / session restore: never await supabase in this callback (deadlock risk).
+  // OAuth / magic link / auto-confirmed sign-up: defer work out of the callback (Supabase deadlock if we await .from() here).
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       console.log('🔐 Auth event:', event, session?.user?.email);
 
       if (event !== 'SIGNED_IN' || !session?.user) return;
+      if (passwordSignInFlowRef.current) {
+        console.log('🔐 Listener skipped (password sign-in will redirect)');
+        return;
+      }
 
       window.setTimeout(() => {
         void redirectAfterSignIn(session).catch((err) => {
@@ -135,16 +124,18 @@ const Auth = () => {
     if (isSubmitting.current || formLoading) return;
     isSubmitting.current = true;
     setFormLoading(true);
+    passwordSignInFlowRef.current = true;
 
     const resetFormState = () => {
       setFormLoading(false);
       isSubmitting.current = false;
+      passwordSignInFlowRef.current = false;
     };
 
     const safetyTimer = window.setTimeout(() => {
       console.warn('🔐 Sign-in UI safety timeout — resetting button');
       resetFormState();
-    }, 15_000);
+    }, 25_000);
 
     try {
       console.log('🔐 Starting sign in for:', signInEmail);
@@ -169,7 +160,7 @@ const Auth = () => {
         return;
       }
 
-      // Run redirect outside the auth state callback stack (same deadlock rule as listener).
+      // Defer one tick so we are not inside Supabase's auth callback stack when calling .from().
       await new Promise((r) => setTimeout(r, 0));
 
       try {
@@ -180,7 +171,6 @@ const Auth = () => {
           title: 'Sign-in incomplete',
           description: 'Could not load your account. Try again.',
         });
-        redirectOnceRef.current = false;
       } finally {
         window.clearTimeout(safetyTimer);
         resetFormState();
