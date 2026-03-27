@@ -16,6 +16,7 @@
  */
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { STORAGE_CART_KEY, STORAGE_CART_KEY_LEGACY } from '@/config/appIdentity';
 
 export interface CartItem {
   id: string;
@@ -46,16 +47,16 @@ interface CartContextType {
 
 const CartContext = createContext<CartContextType | undefined>(undefined);
 
-const CART_STORAGE_KEY = 'mradipro_cart';
-
 export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [items, setItems] = useState<CartItem[]>([]);
   const [isCartOpen, setIsCartOpen] = useState(false);
 
-  // Load cart from localStorage on mount
+  // Load cart from localStorage on mount (prefer new key; migrate from legacy)
   useEffect(() => {
     try {
-      const savedCart = localStorage.getItem(CART_STORAGE_KEY);
+      const savedCart =
+        localStorage.getItem(STORAGE_CART_KEY) ??
+        localStorage.getItem(STORAGE_CART_KEY_LEGACY);
       console.log('🛒 Loading cart from localStorage:', savedCart ? 'found' : 'not found');
       if (savedCart) {
         const parsed = JSON.parse(savedCart);
@@ -73,7 +74,8 @@ export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   useEffect(() => {
     try {
       console.log('🛒 Saving cart to localStorage:', items.length, 'items');
-      localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(items));
+      localStorage.setItem(STORAGE_CART_KEY, JSON.stringify(items));
+      localStorage.removeItem(STORAGE_CART_KEY_LEGACY);
     } catch (error) {
       console.error('Error saving cart to storage:', error);
     }
@@ -148,6 +150,12 @@ export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const clearCart = () => {
     setItems([]);
+    try {
+      localStorage.removeItem(STORAGE_CART_KEY);
+      localStorage.removeItem(STORAGE_CART_KEY_LEGACY);
+    } catch {
+      /* ignore */
+    }
   };
 
   const getItemQuantity = (itemId: string): number => {

@@ -6,7 +6,7 @@
 
 ### Scope and maintenance
 
-This repository covers a **broad surface area** (marketplace, admin, delivery, monitoring, security tooling, and more). That supports a full product vision but increases maintenance cost. For production, **prioritize and harden the flows you actually ship**; not every module is equally mature.
+This repository covers a **broad surface area** (marketplace, admin, delivery, monitoring, security tooling, and more). That supports a full product vision but increases maintenance cost. For production, **prioritize and harden the flows you actually ship**; not every module is equally mature. See [docs/MAINTENANCE_AND_SCOPE.md](docs/MAINTENANCE_AND_SCOPE.md) for a **module map**, storage/identity notes, and a **release checklist**.
 
 ### 🎯 **Mission**
 *Kujenga Pamoja* - Building Together Across Kenya
@@ -91,6 +91,11 @@ cp .env.example .env.local
 # Configure your environment variables
 # VITE_SUPABASE_URL=your_supabase_url
 # VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
+# Optional branding / links:
+# VITE_SITE_URL=https://your-production-host
+# VITE_SUPPORT_EMAIL=support@your-domain
+# VITE_SOCIAL_INSTAGRAM_URL=...
+# VITE_SOCIAL_TIKTOK_URL=...
 ```
 
 ## 📊 **Available Scripts**
@@ -157,6 +162,8 @@ Nothing below replaces **production** monitoring (latency, errors, Core Web Vita
 | Load / uptime | Measure on your host and Supabase tier; do not infer from this README |
 
 Onboarding polish and per-screen a11y are best validated with **real user sessions** or a short scripted checklist on staging.
+
+**CI:** Pushes and PRs to `main` run lint, unit tests, and production build (`.github/workflows/build-main.yml`).
 
 ## 📈 **Performance and analytics**
 

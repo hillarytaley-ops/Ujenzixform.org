@@ -9,10 +9,21 @@
  * 5. Device fingerprinting for session binding
  */
 
+import {
+  STORAGE_ENCRYPTION_KEY_NAME,
+  STORAGE_ENCRYPTION_KEY_NAME_LEGACY,
+  STORAGE_SECURE_SESSION_KEY,
+  STORAGE_SECURE_SESSION_KEY_LEGACY,
+  STORAGE_SESSION_KEY,
+  STORAGE_SESSION_KEY_LEGACY,
+} from '@/config/appIdentity';
+
 // Session configuration
 const SESSION_EXPIRY_HOURS = 24; // Shorter than before for security
-const SESSION_KEY = 'mradipro_secure_session';
-const ENCRYPTION_KEY_NAME = 'mradipro_session_key';
+const SESSION_KEY = STORAGE_SECURE_SESSION_KEY;
+const SESSION_KEY_LEGACY = STORAGE_SECURE_SESSION_KEY_LEGACY;
+const ENCRYPTION_KEY_NAME = STORAGE_ENCRYPTION_KEY_NAME;
+const ENCRYPTION_KEY_NAME_LEGACY = STORAGE_ENCRYPTION_KEY_NAME_LEGACY;
 
 interface SecureSession {
   userId: string;
@@ -64,14 +75,17 @@ const generateSessionToken = (): string => {
 /**
  * Encrypt data using Web Crypto API
  */
-const encryptData = async (data: string): Promise<string> => {
+const encryptData = async (
+  data: string,
+  encryptionKeyStorageName: string = ENCRYPTION_KEY_NAME
+): Promise<string> => {
   try {
     // Generate or retrieve encryption key
-    let keyData = sessionStorage.getItem(ENCRYPTION_KEY_NAME);
+    let keyData = sessionStorage.getItem(encryptionKeyStorageName);
     if (!keyData) {
       const key = crypto.getRandomValues(new Uint8Array(32));
       keyData = Array.from(key, b => b.toString(16).padStart(2, '0')).join('');
-      sessionStorage.setItem(ENCRYPTION_KEY_NAME, keyData);
+      sessionStorage.setItem(encryptionKeyStorageName, keyData);
     }
 
     // Simple XOR encryption (for client-side obfuscation)
@@ -93,9 +107,12 @@ const encryptData = async (data: string): Promise<string> => {
 /**
  * Decrypt data
  */
-const decryptData = async (encryptedData: string): Promise<string> => {
+const decryptData = async (
+  encryptedData: string,
+  encryptionKeyStorageName: string = ENCRYPTION_KEY_NAME
+): Promise<string> => {
   try {
-    const keyData = sessionStorage.getItem(ENCRYPTION_KEY_NAME);
+    const keyData = sessionStorage.getItem(encryptionKeyStorageName);
     if (!keyData) {
       throw new Error('No encryption key found');
     }
@@ -165,37 +182,64 @@ export const saveSecureSession = async (
 /**
  * Get secure session if valid
  */
+const tryDecryptSession = async (
+  encryptedSession: string,
+  encKeyName: string
+): Promise<SecureSession | null> => {
+  try {
+    const sessionStr = await decryptData(encryptedSession, encKeyName);
+    if (!sessionStr) return null;
+    return JSON.parse(sessionStr) as SecureSession;
+  } catch {
+    return null;
+  }
+};
+
+async function readStoredSecureSession(): Promise<{
+  session: SecureSession;
+  fromLegacy: boolean;
+} | null> {
+  const primaryEnc = sessionStorage.getItem(SESSION_KEY);
+  if (primaryEnc) {
+    const s = await tryDecryptSession(primaryEnc, ENCRYPTION_KEY_NAME);
+    if (s) return { session: s, fromLegacy: false };
+  }
+  const legacyEnc = sessionStorage.getItem(SESSION_KEY_LEGACY);
+  if (legacyEnc) {
+    const s = await tryDecryptSession(legacyEnc, ENCRYPTION_KEY_NAME_LEGACY);
+    if (s) return { session: s, fromLegacy: true };
+  }
+  return null;
+}
+
 export const getSecureSession = async (): Promise<SecureSession | null> => {
   try {
-    const encryptedSession = sessionStorage.getItem(SESSION_KEY);
-    if (!encryptedSession) return null;
-    
-    const sessionStr = await decryptData(encryptedSession);
-    if (!sessionStr) return null;
-    
-    const session: SecureSession = JSON.parse(sessionStr);
+    const parsed = await readStoredSecureSession();
+    if (!parsed) return null;
+
+    const { session, fromLegacy } = parsed;
     const now = Date.now();
-    
-    // Validate session expiry
+
     if (now > session.expiryTime) {
       console.log('⚠️ Secure session expired');
       clearSecureSession();
       return null;
     }
-    
-    // Validate device fingerprint (session binding)
+
     const currentFingerprint = generateDeviceFingerprint();
     if (session.deviceFingerprint !== currentFingerprint) {
       console.warn('⚠️ Device fingerprint mismatch - possible session hijacking');
-      // Don't immediately invalidate - could be legitimate browser update
-      // But log for monitoring
     }
-    
-    // Update last activity
+
     session.lastActivity = now;
     const encryptedUpdated = await encryptData(JSON.stringify(session));
     sessionStorage.setItem(SESSION_KEY, encryptedUpdated);
-    
+
+    if (fromLegacy) {
+      sessionStorage.removeItem(SESSION_KEY_LEGACY);
+      sessionStorage.removeItem(ENCRYPTION_KEY_NAME_LEGACY);
+    }
+
     return session;
   } catch (error) {
     console.error('Failed to get secure session:', error);
@@ -223,7 +267,9 @@ export const getQuickSecureSessionInfo = () => {
   return {
     role: sessionStorage.getItem('user_role'),
     userId: sessionStorage.getItem('user_role_id'),
-    hasSession: sessionStorage.getItem(SESSION_KEY) !== null
+    hasSession:
+      sessionStorage.getItem(SESSION_KEY) !== null ||
+      sessionStorage.getItem(SESSION_KEY_LEGACY) !== null,
   };
 };
 
@@ -232,7 +278,9 @@ export const getQuickSecureSessionInfo = () => {
  */
 export const clearSecureSession = () => {
   sessionStorage.removeItem(SESSION_KEY);
+  sessionStorage.removeItem(SESSION_KEY_LEGACY);
   sessionStorage.removeItem(ENCRYPTION_KEY_NAME);
+  sessionStorage.removeItem(ENCRYPTION_KEY_NAME_LEGACY);
   sessionStorage.removeItem('session_token');
   sessionStorage.removeItem('user_role');
   sessionStorage.removeItem('user_role_id');
@@ -293,7 +341,8 @@ export const migrateFromLocalStorage = async (): Promise<boolean> => {
       localStorage.removeItem('user_role');
       localStorage.removeItem('user_role_id');
       localStorage.removeItem('user_email');
-      localStorage.removeItem('mradipro_session');
+      localStorage.removeItem(STORAGE_SESSION_KEY_LEGACY);
+      localStorage.removeItem(STORAGE_SESSION_KEY);
       
       console.log('✅ Migrated from localStorage to secure sessionStorage');
       return true;

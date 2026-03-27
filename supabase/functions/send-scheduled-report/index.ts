@@ -1,5 +1,8 @@
 // Supabase Edge Function: send-scheduled-report
 // Generates and sends scheduled monitoring reports via email
+//
+// Secrets: RESEND_API_KEY, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
+// Optional: SITE_URL (default https://ujenzixform.org), RESEND_FROM_REPORTS (verified Resend sender)
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
@@ -8,6 +11,14 @@ const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
+
+const DEFAULT_SITE_URL = () =>
+  Deno.env.get("SITE_URL") ?? "https://ujenzixform.org";
+
+/** Must match a domain verified in Resend; override with RESEND_FROM_REPORTS. */
+const RESEND_FROM_REPORTS = () =>
+  Deno.env.get("RESEND_FROM_REPORTS") ??
+  "UjenziXform Reports <reports@ujenzixform.org>";
 
 interface ScheduledReport {
   id: string;
@@ -213,7 +224,7 @@ serve(async (req: Request) => {
               'Authorization': `Bearer ${RESEND_API_KEY}`
             },
             body: JSON.stringify({
-              from: 'UjenziXform Reports <reports@mradipro.com>',
+              from: RESEND_FROM_REPORTS(),
               to: recipient,
               subject: `${isTest ? '[TEST] ' : ''}${report.name} - ${new Date().toLocaleDateString()}`,
               html: emailHtml
@@ -402,7 +413,7 @@ function generateReportEmail(
       ` : ''}
       
       <div style="text-align: center; margin-top: 30px;">
-        <a href="${Deno.env.get('SITE_URL') || 'https://mradipro.com'}/admin" class="button">View Dashboard</a>
+        <a href="${DEFAULT_SITE_URL()}/admin" class="button">View Dashboard</a>
       </div>
     </div>
     

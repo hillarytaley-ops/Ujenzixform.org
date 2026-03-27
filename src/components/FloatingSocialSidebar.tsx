@@ -38,6 +38,7 @@ import {
   EmailIcon,
   PhoneIcon
 } from './SocialMediaIcons';
+import { SOCIAL_INSTAGRAM_URL, SOCIAL_TIKTOK_URL } from '@/config/appIdentity';
 
 /**
  * ⚠️ PROTECTED: Pages where the floating social button should NOT appear
@@ -59,8 +60,8 @@ const SOCIAL_LINKS = [
   { name: 'WhatsApp', href: 'https://wa.me/254712345678', icon: WhatsAppIcon, bg: 'bg-[#25D366]', hoverBg: 'hover:bg-[#20BD5A]' },
   { name: 'Facebook', href: 'https://www.facebook.com/profile.php?id=61588491484665', icon: FacebookIcon, bg: 'bg-[#1877F2]', hoverBg: 'hover:bg-[#166FE5]' },
   { name: 'X', href: 'https://x.com/UjenziXform', icon: TwitterIcon, bg: 'bg-black', hoverBg: 'hover:bg-gray-800' },
-  { name: 'Instagram', href: 'https://instagram.com/mradipro', icon: InstagramIcon, bg: 'bg-gradient-to-br from-purple-600 via-pink-500 to-orange-400', hoverBg: '' },
-  { name: 'TikTok', href: 'https://tiktok.com/@mradipro', icon: TikTokIcon, bg: 'bg-black', hoverBg: 'hover:bg-gray-800' },
+  { name: 'Instagram', href: SOCIAL_INSTAGRAM_URL, icon: InstagramIcon, bg: 'bg-gradient-to-br from-purple-600 via-pink-500 to-orange-400', hoverBg: '' },
+  { name: 'TikTok', href: SOCIAL_TIKTOK_URL, icon: TikTokIcon, bg: 'bg-black', hoverBg: 'hover:bg-gray-800' },
   { name: 'LinkedIn', href: 'https://www.linkedin.com/company/ujenzixform/?viewAsMember=true', icon: LinkedInIcon, bg: 'bg-[#0A66C2]', hoverBg: 'hover:bg-[#0958A8]' },
   { name: 'YouTube', href: 'https://www.youtube.com/@ujenziXform', icon: YouTubeIcon, bg: 'bg-[#FF0000]', hoverBg: 'hover:bg-[#E60000]' },
 ];

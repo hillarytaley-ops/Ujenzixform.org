@@ -61,6 +61,35 @@ import {
   Camera,
   MapPin
 } from 'lucide-react';
+import {
+  STORAGE_DASHBOARD_LAYOUT_PREFIX,
+  STORAGE_DASHBOARD_LAYOUT_PREFIX_LEGACY,
+} from '@/config/appIdentity';
+
+function dashboardLayoutStorageKey(userId: string, legacy: boolean): string {
+  const prefix = legacy
+    ? STORAGE_DASHBOARD_LAYOUT_PREFIX_LEGACY
+    : STORAGE_DASHBOARD_LAYOUT_PREFIX;
+  return `${prefix}_${userId}`;
+}
+
+function readDashboardLayoutRaw(userId: string): string | null {
+  const primary = dashboardLayoutStorageKey(userId, false);
+  const legacy = dashboardLayoutStorageKey(userId, true);
+  const primaryVal = localStorage.getItem(primary);
+  if (primaryVal) return primaryVal;
+  const legacyVal = localStorage.getItem(legacy);
+  if (legacyVal) {
+    localStorage.setItem(primary, legacyVal);
+    localStorage.removeItem(legacy);
+  }
+  return legacyVal;
+}
+
+function writeDashboardLayout(userId: string, json: string): void {
+  localStorage.setItem(dashboardLayoutStorageKey(userId, false), json);
+  localStorage.removeItem(dashboardLayoutStorageKey(userId, true));
+}
 
 export interface DashboardWidget {
   id: string;
@@ -179,8 +208,6 @@ const DEFAULT_WIDGETS: DashboardWidget[] = [
   }
 ];
 
-const STORAGE_KEY = 'mradipro_dashboard_layout';
-
 export const DashboardWidgets: React.FC<DashboardWidgetsProps> = ({
   userId,
   onLayoutChange
@@ -198,7 +225,7 @@ export const DashboardWidgets: React.FC<DashboardWidgetsProps> = ({
 
   const loadLayout = () => {
     try {
-      const saved = localStorage.getItem(`${STORAGE_KEY}_${userId}`);
+      const saved = readDashboardLayoutRaw(userId);
       if (saved) {
         const parsed = JSON.parse(saved);
         setWidgetConfigs(parsed);
@@ -219,7 +246,7 @@ export const DashboardWidgets: React.FC<DashboardWidgetsProps> = ({
 
   const saveLayout = () => {
     try {
-      localStorage.setItem(`${STORAGE_KEY}_${userId}`, JSON.stringify(widgetConfigs));
+      writeDashboardLayout(userId, JSON.stringify(widgetConfigs));
       onLayoutChange?.(widgetConfigs);
       setIsDirty(false);
       toast({
@@ -484,7 +511,7 @@ export const useDashboardWidgets = (userId: string) => {
   const [widgetConfigs, setWidgetConfigs] = useState<WidgetConfig[]>([]);
 
   useEffect(() => {
-    const saved = localStorage.getItem(`${STORAGE_KEY}_${userId}`);
+    const saved = readDashboardLayoutRaw(userId);
     if (saved) {
       setWidgetConfigs(JSON.parse(saved));
     } else {

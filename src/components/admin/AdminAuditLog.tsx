@@ -297,7 +297,7 @@ export const AdminAuditLog: React.FC<AdminAuditLogProps> = ({ userId }) => {
       {
         id: '1',
         user_id: userId,
-        user_email: 'admin@mradipro.com',
+        user_email: 'admin@ujenzixform.org',
         action: 'USER_APPROVED',
         action_category: 'user',
         status: 'success',
@@ -313,7 +313,7 @@ export const AdminAuditLog: React.FC<AdminAuditLogProps> = ({ userId }) => {
       {
         id: '2',
         user_id: userId,
-        user_email: 'admin@mradipro.com',
+        user_email: 'admin@ujenzixform.org',
         action: 'PRODUCT_REJECTED',
         action_category: 'product',
         status: 'success',
@@ -329,7 +329,7 @@ export const AdminAuditLog: React.FC<AdminAuditLogProps> = ({ userId }) => {
       {
         id: '3',
         user_id: userId,
-        user_email: 'admin@mradipro.com',
+        user_email: 'admin@ujenzixform.org',
         action: 'LOGIN_ATTEMPT',
         action_category: 'auth',
         status: 'failed',
@@ -345,7 +345,7 @@ export const AdminAuditLog: React.FC<AdminAuditLogProps> = ({ userId }) => {
       {
         id: '4',
         user_id: userId,
-        user_email: 'admin@mradipro.com',
+        user_email: 'admin@ujenzixform.org',
         action: '2FA_ENABLED',
         action_category: 'security',
         status: 'success',
@@ -361,7 +361,7 @@ export const AdminAuditLog: React.FC<AdminAuditLogProps> = ({ userId }) => {
       {
         id: '5',
         user_id: userId,
-        user_email: 'admin@mradipro.com',
+        user_email: 'admin@ujenzixform.org',
         action: 'PAYMENT_VERIFIED',
         action_category: 'payment',
         status: 'success',

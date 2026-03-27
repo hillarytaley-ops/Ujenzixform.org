@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useLocation } from 'react-router-dom';
+import { SUPPORT_EMAIL } from '@/config/appIdentity';
 
 interface Message {
   role: 'user' | 'bot';
@@ -106,7 +107,7 @@ export const SimpleChatButton = () => {
     if (query.includes('human') || query.includes('staff') || query.includes('person') || query.includes('agent') || query.includes('talk to someone')) {
       setShowHumanSupport(true);
       return {
-        response: `👤 **Connect with UjenziXform Staff:**\n\n**Our team is here to help!**\n\n📞 **Call Us:** +254-700-MRADIPRO\n📧 **Email:** support@mradipro.co.ke\n💬 **WhatsApp:** +254-712-345-678\n\n**Office Hours:**\n• Monday - Friday: 8:00 AM - 6:00 PM\n• Saturday: 9:00 AM - 4:00 PM\n• Sunday: Closed\n\n**For urgent matters:** Our 24/7 emergency line is available at +254-700-EMERGENCY\n\n**What can our team help you with?**`,
+        response: `👤 **Connect with UjenziXform staff**\n\n**We are here to help.**\n\n📧 **Email:** ${SUPPORT_EMAIL}\n\nAdd phone and WhatsApp in your deployment content if needed.\n\n**What can we help you with?**`,
         suggestions: ['I have a custom order', 'Need project consultation', 'Technical support', 'Back to AI assistant']
       };
     }

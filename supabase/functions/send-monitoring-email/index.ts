@@ -5,6 +5,8 @@
 // - RESEND_API_KEY: Your Resend API key
 // - SUPABASE_URL: Supabase project URL
 // - SUPABASE_SERVICE_ROLE_KEY: Supabase service role key
+// Optional:
+// - RESEND_FROM_MONITORING: Verified Resend sender (default UjenziXform <noreply@ujenzixform.org>)
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
@@ -13,6 +15,11 @@ const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
+
+/** Verified sender domain must match your Resend setup; override with RESEND_FROM_MONITORING. */
+const RESEND_FROM =
+  Deno.env.get("RESEND_FROM_MONITORING") ??
+  "UjenziXform <noreply@ujenzixform.org>";
 
 interface EmailRequest {
   to: string;
@@ -115,7 +122,7 @@ serve(async (req: Request) => {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        from: "UjenziXform <noreply@mradipro.com>",
+        from: RESEND_FROM,
         to: [to],
         subject: subject,
         html: htmlBody,

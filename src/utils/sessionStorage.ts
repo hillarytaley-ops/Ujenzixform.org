@@ -25,8 +25,14 @@
  * ╚══════════════════════════════════════════════════════════════════════════════════════╝
  */
 
+import {
+  STORAGE_SESSION_KEY,
+  STORAGE_SESSION_KEY_LEGACY,
+} from '@/config/appIdentity';
+
 const SESSION_EXPIRY_DAYS = 30;
-const SESSION_KEY = 'mradipro_session';
+const SESSION_KEY = STORAGE_SESSION_KEY;
+const SESSION_KEY_LEGACY = STORAGE_SESSION_KEY_LEGACY;
 
 interface StoredSession {
   userId: string;
@@ -80,25 +86,32 @@ export const saveUserSession = (userId: string, email: string, role: string) => 
 /**
  * Get stored session if valid
  */
+const readSessionRaw = (): { raw: string; usedLegacy: boolean } | null => {
+  const primary = localStorage.getItem(SESSION_KEY);
+  if (primary) return { raw: primary, usedLegacy: false };
+  const legacy = localStorage.getItem(SESSION_KEY_LEGACY);
+  if (legacy) return { raw: legacy, usedLegacy: true };
+  return null;
+};
+
 export const getStoredSession = (): StoredSession | null => {
   try {
-    const sessionStr = localStorage.getItem(SESSION_KEY);
-    if (!sessionStr) return null;
-    
-    const session: StoredSession = JSON.parse(sessionStr);
+    const blob = readSessionRaw();
+    if (!blob) return null;
+
+    const session: StoredSession = JSON.parse(blob.raw);
     const now = Date.now();
-    
-    // Check if session has expired
+
     if (now > session.expiryTime) {
       console.log('⚠️ Session expired, clearing...');
       clearUserSession();
       return null;
     }
-    
-    // Update last activity
+
     session.lastActivity = now;
     localStorage.setItem(SESSION_KEY, JSON.stringify(session));
-    
+    localStorage.removeItem(SESSION_KEY_LEGACY);
+
     return session;
   } catch (error) {
     console.error('Failed to get session:', error);
@@ -148,6 +161,7 @@ export const updateSessionActivity = () => {
  */
 export const clearUserSession = () => {
   localStorage.removeItem(SESSION_KEY);
+  localStorage.removeItem(SESSION_KEY_LEGACY);
   localStorage.removeItem('user_role');
   localStorage.removeItem('user_role_id');
   localStorage.removeItem('user_email');

@@ -1,4 +1,5 @@
 import { format } from 'date-fns';
+import { SUPPORT_EMAIL } from '@/config/appIdentity';
 
 // Types
 interface ExportData {
@@ -347,7 +348,7 @@ const generatePDFHTML = (data: ExportData): string => {
 
   <div class="footer">
     <p>UjenziXform Construction Monitoring System</p>
-    <p>This report was automatically generated. For questions, contact support@mradipro.com</p>
+    <p>This report was automatically generated. For questions, contact ${SUPPORT_EMAIL}</p>
   </div>
 </body>
 </html>

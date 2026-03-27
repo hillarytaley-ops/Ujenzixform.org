@@ -16,6 +16,7 @@
  */
 
 import { supabase } from '@/integrations/supabase/client';
+import { DEFAULT_SITE_URL } from '@/config/appIdentity';
 
 // Types
 export interface SMSMessage {
@@ -334,7 +335,7 @@ class NotificationService {
   async sendWelcome(
     phone: string,
     name: string,
-    appUrl: string = 'https://mradipro.com'
+    appUrl: string = DEFAULT_SITE_URL
   ): Promise<NotificationResult> {
     return this.sendTemplateNotification('WELCOME', phone, {
       name,

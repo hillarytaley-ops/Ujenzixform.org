@@ -1,6 +1,7 @@
 import { Building2 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { APP_BUILD_ID } from "@/lib/buildInfo";
+import { SOCIAL_INSTAGRAM_URL } from "@/config/appIdentity";
 import {
   FacebookIcon,
   TwitterIcon,
@@ -172,7 +173,7 @@ const Footer = () => {
               <a href="https://x.com/UjenziXform" target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-white">
                 <TwitterIcon size={20} />
               </a>
-              <a href="https://instagram.com/mradipro" target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-white">
+              <a href={SOCIAL_INSTAGRAM_URL} target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-white">
                 <InstagramIcon size={20} />
               </a>
               <a href="https://wa.me/254712345678" target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-white">

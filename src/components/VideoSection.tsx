@@ -21,7 +21,7 @@ const VideoSection: React.FC<VideoSectionProps> = ({
   videoUrl,
   synthesiaUrl,
   steveAiUrl,
-  thumbnail = '/mradipro-demo-thumbnail.svg',
+  thumbnail = '/ujenzipro-demo-thumbnail.svg',
   title = 'UjenziXform Platform Demo',
   description = 'See how easy it is to connect, quote, and build across Kenya',
   useYouTube = true,

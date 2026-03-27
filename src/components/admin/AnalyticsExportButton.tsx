@@ -54,15 +54,15 @@ export const AnalyticsExportButton: React.FC<AnalyticsExportButtonProps> = ({
       
       switch (format) {
         case 'csv':
-          exportToCSV(exportData, 'mradipro-analytics');
+          exportToCSV(exportData, 'ujenzixform-analytics');
           toast.success('CSV file downloaded successfully!');
           break;
         case 'pdf':
-          await exportToPDF(exportData, 'mradipro-analytics');
+          await exportToPDF(exportData, 'ujenzixform-analytics');
           toast.success('PDF report opened for printing');
           break;
         case 'json':
-          exportToJSON(exportData, 'mradipro-analytics');
+          exportToJSON(exportData, 'ujenzixform-analytics');
           toast.success('JSON file downloaded successfully!');
           break;
       }
