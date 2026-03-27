@@ -133,7 +133,7 @@ export const CartSidebar: React.FC = () => {
 
       const { data: raw, error } = await supabase
         .from('builder_projects')
-        .select('id,name,location,latitude,longitude,address,status')
+        .select('id,name,location,address,status')
         .eq('builder_id', userId)
         .order('created_at', { ascending: false });
 

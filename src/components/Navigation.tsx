@@ -70,12 +70,12 @@ const Navigation = () => {
         try {
           const { data: profile } = await supabase
             .from('profiles')
-            .select('full_name, store_name, company_name')
-            .eq('id', userId)
-            .single();
+            .select('full_name, company_name')
+            .eq('user_id', userId)
+            .maybeSingle();
           
           if (profile) {
-            const displayName = profile.full_name || profile.store_name || profile.company_name;
+            const displayName = profile.full_name || profile.company_name;
             if (displayName) {
               console.log('🧭 Got display name from profile:', displayName);
               setUserDisplayName(displayName);

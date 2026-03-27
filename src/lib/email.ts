@@ -18,6 +18,8 @@
  * ╚══════════════════════════════════════════════════════════════════════════════════════╝
  */
 
+import { supabase } from '@/integrations/supabase/client';
+
 // Email templates for different notifications
 export const emailTemplates = {
   // Welcome email for new users
@@ -337,21 +339,13 @@ export interface SendEmailParams {
   from?: string;
 }
 
-// This will be called from Supabase Edge Function
+/** Sends mail through the deployed Supabase Edge Function `send-email` (Resend). */
 export const sendEmailViaEdgeFunction = async (params: SendEmailParams): Promise<{ success: boolean; error?: string }> => {
   try {
-    const response = await fetch('/api/send-email', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(params),
-    });
-
-    if (!response.ok) {
-      throw new Error('Failed to send email');
+    const { error } = await supabase.functions.invoke('send-email', { body: params });
+    if (error) {
+      return { success: false, error: error.message };
     }
-
     return { success: true };
   } catch (error) {
     console.error('Email sending error:', error);

@@ -77,7 +77,7 @@ class DeliveryProviderNotificationService {
   }
 
   /**
-   * Email alert when the edge/API route is configured (/api/send-email).
+   * Email via Supabase Edge Function `send-email` (see sendEmailViaEdgeFunction).
    */
   async sendEmailNotification(
     email: string,
@@ -129,8 +129,7 @@ class DeliveryProviderNotificationService {
           weight_kg: requestDetails.weight_kg,
           budget_range: requestDetails.budget_range
         },
-        is_read: false,
-        created_at: new Date().toISOString()
+        read: false
       };
 
       const { error } = await supabase
@@ -158,7 +157,7 @@ class DeliveryProviderNotificationService {
     requestDetails: DeliveryRequestDetails
   ): Promise<boolean> {
     try {
-      const message = `🚚 UjenziPro: New delivery job available!\n` +
+      const message = `🚚 UjenziXform: New delivery job available!\n` +
         `📍 From: ${requestDetails.pickup_address}\n` +
         `📍 To: ${requestDetails.delivery_address}\n` +
         `📅 Date: ${new Date(requestDetails.pickup_date).toLocaleDateString()}\n` +
