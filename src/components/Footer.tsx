@@ -1,6 +1,5 @@
 import { Building2 } from "lucide-react";
 import { Link } from "react-router-dom";
-import { APP_BUILD_ID } from "@/lib/buildInfo";
 import { SOCIAL_INSTAGRAM_URL, SOCIAL_TIKTOK_URL } from "@/config/appIdentity";
 import {
   FacebookIcon,
@@ -93,12 +92,9 @@ const Footer = () => {
         {/* Bottom bar: copyright + single social row (outline icons, all breakpoints) */}
         <div className="border-t border-gray-800 mt-8 pt-8">
           <div className="flex flex-col items-center gap-6 md:flex-row md:justify-between md:items-center md:gap-4">
-            <div className="text-gray-400 text-center md:text-left text-sm space-y-1">
+            <div className="text-gray-400 text-center md:text-left text-sm">
               <p>
-                &copy; {new Date().getFullYear()} UjenziXform. All rights reserved. Made with ❤️ in Kenya 🇰🇪
-              </p>
-              <p className="text-gray-500 text-xs font-mono" title="Compare this to the latest commit on GitHub to confirm production is updated">
-                Build: {APP_BUILD_ID}
+                &copy; {new Date().getFullYear()} UjenziXform. All rights reserved.
               </p>
             </div>
 
