@@ -22,6 +22,23 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { trackingNumberService } from '@/services/TrackingNumberService';
 
+/** Order is in a state where supplier has dispatched goods (navigation to route is meaningful). */
+function supplierHasDispatched(d: DeliveryRequest): boolean {
+  const s = (d.status || '').toLowerCase();
+  const postDispatch = [
+    'in_transit',
+    'dispatched',
+    'shipped',
+    'out_for_delivery',
+    'picked_up',
+    'delivery_arrived',
+    'on_the_way',
+  ];
+  if (postDispatch.includes(s)) return true;
+  if (typeof d._dispatched_count === 'number' && d._dispatched_count > 0) return true;
+  return false;
+}
+
 interface DeliveryRequest {
   id: string;
   pickup_location: string;
@@ -43,6 +60,8 @@ interface DeliveryRequest {
   pickup_date?: string;
   delivery_date?: string;
   expected_delivery_date?: string;
+  /** From unified/legacy row: count of material items dispatch-scanned by supplier */
+  _dispatched_count?: number;
 }
 
 interface DeliveryRequestCardProps {
@@ -79,6 +98,10 @@ export const DeliveryRequestCard: React.FC<DeliveryRequestCardProps> = ({
       case 'assigned': return 'bg-blue-100 text-blue-800 border-blue-300';
       case 'accepted': return 'bg-green-100 text-green-800 border-green-300';
       case 'pending_pickup': return 'bg-orange-100 text-orange-800 border-orange-300';
+      case 'dispatched':
+      case 'shipped':
+      case 'out_for_delivery':
+        return 'bg-indigo-100 text-indigo-800 border-indigo-300';
       case 'in_transit': return 'bg-purple-100 text-purple-800 border-purple-300';
       case 'delivered': return 'bg-green-100 text-green-800 border-green-300';
       case 'rejected': return 'bg-red-100 text-red-800 border-red-300';
@@ -291,6 +314,17 @@ export const DeliveryRequestCard: React.FC<DeliveryRequestCardProps> = ({
   const isPendingRequest = delivery.status === 'pending' || delivery.status === 'assigned';
   const isAccepted = delivery.status === 'accepted' || delivery.status === 'pending_pickup' || delivery.status === 'in_transit';
 
+  /** Supplier has released materials — same idea as DeliveryDashboard dispatchedStatuses + en-route variants */
+  const canNavigateAfterSupplierDispatch = [
+    'dispatched',
+    'shipped',
+    'in_transit',
+    'out_for_delivery',
+    'picked_up',
+    'on_the_way',
+    'delivery_arrived',
+  ].includes(delivery.status);
+
   return (
     <>
       <Card className={`${isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white'} hover:shadow-lg transition-all ${
@@ -298,7 +332,7 @@ export const DeliveryRequestCard: React.FC<DeliveryRequestCardProps> = ({
         delivery.urgency === 'urgent' ? 'ring-2 ring-orange-500 ring-opacity-50' : ''
       }`}>
         <CardContent className="p-3">
-          <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-2">
+          <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-2 sm:gap-3">
             {/* Left Section - Delivery Details */}
             <div className="flex-1">
               {/* Status and ID Row */}
@@ -427,11 +461,11 @@ export const DeliveryRequestCard: React.FC<DeliveryRequestCardProps> = ({
             </div>
             
             {/* Right Section - Price and Actions */}
-            <div className="flex flex-col items-end gap-1.5 min-w-[160px]">
+            <div className="flex flex-col items-stretch sm:items-end gap-1.5 w-full lg:min-w-[160px] lg:w-auto">
               {/* Price and Distance */}
-              <div className="text-right">
-                <p className="text-lg font-bold text-teal-600">{formatCurrency(delivery.price)}</p>
-                <div className={`flex items-center gap-1 text-[10px] ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+              <div className="text-left sm:text-right">
+                <p className="text-base sm:text-lg font-bold text-teal-600 tabular-nums">{formatCurrency(delivery.price)}</p>
+                <div className={`flex flex-wrap items-center gap-1 text-[0.625rem] sm:text-[10px] ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
                   <Timer className="h-3 w-3" />
                   {delivery.estimated_time}
                   <span className="mx-0.5">•</span>
@@ -478,39 +512,36 @@ export const DeliveryRequestCard: React.FC<DeliveryRequestCardProps> = ({
                 {/* Action Buttons for Accepted Deliveries */}
                 {isAccepted && (
                   <div className="space-y-1">
-                    <div className="flex flex-wrap gap-1">
+                    <div className="flex flex-wrap gap-1 justify-start sm:justify-end">
                       <Button 
                         size="sm" 
                         variant="outline"
-                        className="h-7 px-2 text-xs"
+                        className="h-7 px-2 text-[0.6875rem] sm:text-xs flex-1 sm:flex-initial min-w-[4.5rem]"
                         onClick={() => onCall?.(delivery.customer_phone)}
                       >
-                        <Phone className="h-3 w-3 mr-0.5" />
+                        <Phone className="h-3 w-3 mr-0.5 shrink-0" />
                         Call
                       </Button>
                       <Button 
                         size="sm" 
                         variant="outline"
-                        className="h-7 px-2 text-xs"
+                        className="h-7 px-2 text-[0.6875rem] sm:text-xs flex-1 sm:flex-initial min-w-[4.5rem]"
                         onClick={() => onCaptureProof?.(delivery.id)}
                       >
-                        <Camera className="h-3 w-3 mr-0.5" />
+                        <Camera className="h-3 w-3 mr-0.5 shrink-0" />
                         Proof
                       </Button>
-                      <Button 
-                        size="sm" 
-                        className="h-7 px-2 text-xs bg-teal-600 hover:bg-teal-700"
-                        disabled={!['dispatched', 'shipped', 'in_transit', 'out_for_delivery', 'delivery_arrived', 'picked_up', 'on_the_way', 'accepted', 'scheduled', 'assigned'].includes(delivery.status)}
-                        onClick={() => onNavigate?.(delivery)}
-                        title={
-                          !['dispatched', 'shipped', 'in_transit', 'out_for_delivery', 'delivery_arrived', 'picked_up', 'on_the_way', 'accepted', 'scheduled', 'assigned'].includes(delivery.status)
-                            ? 'Navigation will be available after supplier dispatches the order'
-                            : 'Navigate to delivery location'
-                        }
-                      >
-                        <NavigationIcon className="h-3 w-3 mr-0.5" />
-                        Navigate
-                      </Button>
+                      {canNavigateAfterSupplierDispatch && (
+                        <Button 
+                          size="sm" 
+                          className="h-7 px-2 text-[0.6875rem] sm:text-xs bg-teal-600 hover:bg-teal-700 flex-1 sm:flex-initial min-w-[4.5rem]"
+                          onClick={() => onNavigate?.(delivery)}
+                          title="Navigate to delivery location"
+                        >
+                          <NavigationIcon className="h-3 w-3 mr-0.5 shrink-0" />
+                          Navigate
+                        </Button>
+                      )}
                     </div>
                     
                     {/* I've Arrived Button - Prominent for in_transit deliveries */}

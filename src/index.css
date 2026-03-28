@@ -10,8 +10,8 @@ All colors MUST be HSL.
 html {
   scroll-behavior: smooth;
   overflow-x: hidden;
-  /* Fluid responsive typography - scales text for mobile readability */
-  font-size: clamp(14px, 2.5vw + 12px, 16px);
+  /* Root rem base: scales down on small devices (Tailwind rem/spacing follow this) */
+  font-size: clamp(11px, 1.15vw + 11px, 16px);
 }
 
 /* Prevent horizontal overflow on mobile */
