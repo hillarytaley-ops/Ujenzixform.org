@@ -628,8 +628,8 @@ const PrivateClientDashboard = () => {
 
   // Exit dashboard - goes back to home page, stays logged in
   const handleExitDashboard = () => {
-    console.log('🚪 Exit Dashboard: Redirecting to home...');
-    navigate('/home');
+    console.log('🚪 Exit Dashboard: Redirecting to public home...');
+    navigate('/home?browse=1');
   };
 
   const handleLogoutPrivate = () => {
@@ -2178,7 +2178,7 @@ const PrivateClientDashboard = () => {
         isOpen={showProfileView}
         onClose={() => setShowProfileView(false)}
         onEditProfile={() => setShowProfileEdit(true)}
-        onExitDashboard={() => navigate('/home')}
+        onExitDashboard={() => navigate('/home?browse=1')}
       />
 
       {/* Profile Edit Dialog */}

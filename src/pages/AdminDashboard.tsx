@@ -2205,7 +2205,7 @@ const AdminDashboard = () => {
                   <DropdownMenuSeparator className="bg-slate-700" />
                   <DropdownMenuItem 
                     className="text-gray-300 hover:bg-slate-800 cursor-pointer"
-                    onClick={() => navigate('/home')}
+                    onClick={() => navigate('/home?browse=1')}
                   >
                     <Home className="h-4 w-4 mr-2" />
                     Go to Main Site
@@ -4769,7 +4769,7 @@ const AdminDashboard = () => {
                   </Button>
                   <Button 
                     className="justify-start bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-400 border border-indigo-600/30"
-                    onClick={() => navigate('/home')}
+                    onClick={() => navigate('/home?browse=1')}
                   >
                     <Home className="h-4 w-4 mr-2" />
                     Home Page

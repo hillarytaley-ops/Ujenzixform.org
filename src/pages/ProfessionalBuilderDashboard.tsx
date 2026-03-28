@@ -1866,10 +1866,10 @@ const ProfessionalBuilderDashboardPage = () => {
     }
   };
 
-  // Exit dashboard - goes back to home page, stays logged in
+  // Exit dashboard — public /home with ?browse=1 so Index does not auto-redirect back to dashboard
   const handleExitDashboard = () => {
-    console.log('🚪 Exit Dashboard: Redirecting to home...');
-    navigate('/home');
+    console.log('🚪 Exit Dashboard: Redirecting to public home...');
+    navigate('/home?browse=1');
   };
 
   const handleLogoutProfessional = () => {
@@ -3988,7 +3988,7 @@ const ProfessionalBuilderDashboardPage = () => {
         isOpen={showProfileView}
         onClose={() => setShowProfileView(false)}
         onEditProfile={() => setShowProfileEdit(true)}
-        onExitDashboard={() => navigate('/home')}
+        onExitDashboard={() => navigate('/home?browse=1')}
       />
 
       {/* Profile Edit Dialog */}

@@ -1754,8 +1754,8 @@ const SupplierDashboard = () => {
 
   // Exit dashboard - goes back to home page, stays logged in
   const handleExitDashboard = () => {
-    console.log('🚪 Exit Dashboard: Redirecting to home...');
-    window.location.href = '/home';
+    console.log('🚪 Exit Dashboard: Redirecting to public home...');
+    window.location.href = '/home?browse=1';
   };
 
   const handleLogoutSupplier = () => {

@@ -2367,8 +2367,8 @@ const DeliveryDashboard = () => {
 
   // Exit dashboard - goes back to home page, stays logged in
   const handleExitDashboard = () => {
-    console.log('🚪 Exit Dashboard: Redirecting to home...');
-    window.location.href = '/home';
+    console.log('🚪 Exit Dashboard: Redirecting to public home...');
+    window.location.href = '/home?browse=1';
   };
 
   const handleLogoutDelivery = () => {
@@ -2875,7 +2875,7 @@ const DeliveryDashboard = () => {
                         <div className="flex items-center justify-between mb-3">
                           <div className="flex items-center gap-2">
                             <div className="h-2 w-2 bg-blue-500 rounded-full animate-pulse" />
-                            <h3 className={`text-lg font-semibold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                            <h3 className={`text-base font-semibold sm:text-lg ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
                               📅 Scheduled Orders ({scheduled.length})
                             </h3>
                             {scheduled.length > 0 && (

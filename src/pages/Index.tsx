@@ -28,7 +28,7 @@ import {
   Play,
   ChevronRight
 } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import Navigation from "@/components/Navigation";
 import Footer from "@/components/Footer";
 import AnimatedSection from "@/components/AnimatedSection";
@@ -37,23 +37,28 @@ import VideoSection from "@/components/VideoSection";
 // Dashboard paths for each role
 const DASHBOARDS: Record<string, string> = {
   'admin': '/admin-dashboard',
+  'super_admin': '/admin-dashboard',
   'supplier': '/supplier-dashboard',
   'delivery': '/delivery-dashboard',
   'delivery_provider': '/delivery-dashboard',
   'professional_builder': '/professional-builder-dashboard',
+  'builder': '/professional-builder-dashboard',
   'private_client': '/private-client-dashboard',
 };
 
 const Index = () => {
   const { userRole, user, loading } = useAuth();
-  
-  // AUTO-REDIRECT: Users with roles go to their dashboards
+  const [searchParams] = useSearchParams();
+  const skipDashboardRedirect = searchParams.get('browse') === '1';
+
+  // AUTO-REDIRECT: Users with roles go to their dashboards (unless explicitly browsing public home)
   useEffect(() => {
+    if (skipDashboardRedirect) return;
     if (!loading && user && userRole && DASHBOARDS[userRole]) {
       console.log('🏠 Index: User has role', userRole, '- redirecting to dashboard');
       window.location.href = DASHBOARDS[userRole];
     }
-  }, [loading, user, userRole]);
+  }, [loading, user, userRole, skipDashboardRedirect]);
   
   // Determine scanner link based on user role
   // - Suppliers: Dispatch Scanner
