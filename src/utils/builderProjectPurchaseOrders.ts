@@ -274,3 +274,46 @@ export function monitoringRequestBelongsToProject(
   if (pn.length >= 3 && mn.includes(pn)) return true;
   return false;
 }
+
+/**
+ * Map a merged delivery row (request, deliveries row, or synthetic order-delivery) to at most one project.
+ */
+export function resolveDeliveryToProjectId(
+  d: {
+    project_id?: string | null;
+    project_name?: string | null;
+    delivery_address?: string | null;
+  },
+  projects: { id: string; name?: string | null; location?: string | null }[]
+): string | null {
+  if (!projects.length) return null;
+  const pid = d.project_id && typeof d.project_id === "string" ? d.project_id.trim() : "";
+  if (pid && projects.some((p) => p.id === pid)) return pid;
+
+  return resolvePurchaseOrderToProjectId(
+    {
+      project_id: d.project_id,
+      project_name: d.project_name,
+      delivery_address: d.delivery_address,
+    },
+    projects
+  );
+}
+
+/**
+ * Map a monitoring_service_requests row to a builder project when unambiguous.
+ */
+export function resolveMonitoringToProjectId(
+  m: { project_id?: string | null; project_name?: string | null },
+  projects: { id: string; name?: string | null; location?: string | null }[]
+): string | null {
+  if (!projects.length) return null;
+  const pid = m.project_id && typeof m.project_id === "string" ? m.project_id.trim() : "";
+  if (pid && projects.some((p) => p.id === pid)) return pid;
+
+  const hits = projects.filter((p) =>
+    monitoringRequestBelongsToProject(m, p.id, p.name)
+  );
+  if (hits.length === 1) return hits[0].id;
+  return null;
+}

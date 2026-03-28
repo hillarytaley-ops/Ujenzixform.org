@@ -87,6 +87,8 @@ import {
 import {
   fetchPurchaseBuyerIdsForBuilder,
   resolvePurchaseOrderToProjectId,
+  resolveDeliveryToProjectId,
+  resolveMonitoringToProjectId,
 } from "@/utils/builderProjectPurchaseOrders";
 import { formatKesCompact } from "@/utils/kesFormat";
 import { DeliveryNoteWorkflow } from "@/components/delivery/DeliveryNoteWorkflow";
@@ -487,6 +489,37 @@ const ProfessionalBuilderDashboardPage = () => {
   const [deliveries, setDeliveries] = useState<any[]>([]);
   const [loadingDeliveries, setLoadingDeliveries] = useState(false);
   const [deliveriesLoaded, setDeliveriesLoaded] = useState(false); // Track if initial load is done
+
+  /** Per-project counts for Active Project cards (orders already on project via PO merge). */
+  const projectActivityById = useMemo(() => {
+    const map = new Map<string, { deliveries: number; monitoring: number }>();
+    for (const p of projects) {
+      if (p?.id) map.set(String(p.id), { deliveries: 0, monitoring: 0 });
+    }
+    if (projects.length === 0) return map;
+
+    const plist = projects.map((p: any) => ({
+      id: p.id,
+      name: p.name,
+      location: p.location ?? null,
+    }));
+
+    for (const d of deliveries) {
+      const pid = resolveDeliveryToProjectId(d, plist);
+      if (pid && map.has(pid)) {
+        const cur = map.get(pid)!;
+        cur.deliveries += 1;
+      }
+    }
+    for (const m of monitoringRequests) {
+      const pid = resolveMonitoringToProjectId(m, plist);
+      if (pid && map.has(pid)) {
+        const cur = map.get(pid)!;
+        cur.monitoring += 1;
+      }
+    }
+    return map;
+  }, [projects, deliveries, monitoringRequests]);
 
   // SUPABASE_URL and SUPABASE_ANON_KEY are imported from @/integrations/supabase/client
 
@@ -1047,6 +1080,9 @@ const ProfessionalBuilderDashboardPage = () => {
                             o.status === 'shipped' ? 'in_transit' : 'pending',
             pickup_address: o.supplier_name || 'Supplier',
             delivery_address: o.delivery_address,
+            project_id: o.project_id ?? null,
+            project_name: o.project_name ?? null,
+            purchase_order_id: o.id,
             materials_description: o.items?.map((i: any) => i.material_name || i.name).join(', ') || 'Materials',
             estimated_cost: o.total_amount,
             created_at: o.created_at,
@@ -2631,16 +2667,43 @@ const ProfessionalBuilderDashboardPage = () => {
                                 </div>
                               </div>
                               
-                              {/* Footer */}
-                              <div className="flex items-center justify-between pt-3 border-t text-xs text-gray-500">
-                                <span className="flex items-center gap-1">
-                                  <Calendar className="h-3 w-3" />
-                                  {formatProjectCardDate(project)}
-                                </span>
-                                <span className="flex items-center gap-1">
-                                  <Package className="h-3 w-3" />
-                                  {project.total_orders || 0} orders
-                                </span>
+                              {/* Footer — orders / deliveries / monitoring per project */}
+                              <div className="pt-3 border-t space-y-2">
+                                <div className="flex items-center justify-center text-xs text-gray-500">
+                                  <span className="flex items-center gap-1">
+                                    <Calendar className="h-3 w-3 shrink-0" />
+                                    {formatProjectCardDate(project)}
+                                  </span>
+                                </div>
+                                <div className="grid grid-cols-3 gap-1 text-center text-[11px]">
+                                  <div className="rounded-md bg-gray-50 px-1 py-1.5">
+                                    <p className="text-[10px] text-gray-500 flex items-center justify-center gap-0.5">
+                                      <Package className="h-3 w-3 shrink-0" />
+                                      Orders
+                                    </p>
+                                    <p className="font-semibold text-gray-900 tabular-nums">
+                                      {project.total_orders ?? 0}
+                                    </p>
+                                  </div>
+                                  <div className="rounded-md bg-gray-50 px-1 py-1.5">
+                                    <p className="text-[10px] text-gray-500 flex items-center justify-center gap-0.5">
+                                      <Truck className="h-3 w-3 shrink-0" />
+                                      Deliveries
+                                    </p>
+                                    <p className="font-semibold text-gray-900 tabular-nums">
+                                      {projectActivityById.get(String(project.id))?.deliveries ?? 0}
+                                    </p>
+                                  </div>
+                                  <div className="rounded-md bg-gray-50 px-1 py-1.5">
+                                    <p className="text-[10px] text-gray-500 flex items-center justify-center gap-0.5">
+                                      <Camera className="h-3 w-3 shrink-0" />
+                                      Monitor
+                                    </p>
+                                    <p className="font-semibold text-gray-900 tabular-nums">
+                                      {projectActivityById.get(String(project.id))?.monitoring ?? 0}
+                                    </p>
+                                  </div>
+                                </div>
                               </div>
                               
                               {/* Action Buttons */}
