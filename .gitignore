@@ -37,10 +37,8 @@ logs/
 *.sln
 *.sw?
 
-# Capacitor
+# Capacitor (CLI metadata only; native shells are committed for reproducible App Store / Play builds)
 .capacitor/
-android/
-ios/
 
 # Build artifacts
 buildconnectke/

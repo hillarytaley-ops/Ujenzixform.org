@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  After `npx cap add ios` / `npx cap sync ios`, merge these keys into:
+    ios/App/App/Info.plist
+  (Open in Xcode → App target → Info, or edit as source code.)
+  Duplicate keys: keep a single entry per key.
+-->
+<plist version="1.0">
+<dict>
+	<key>NSCameraUsageDescription</key>
+	<string>UjenziXform uses the camera to scan QR codes for deliveries and to add photos when you choose.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>UjenziXform may access your photo library when you attach or upload images.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>UjenziXform may save images you export to your photo library when you choose.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>UjenziXform uses your location to set pickup and delivery points on the map and for delivery tracking.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>UjenziXform uses your location for delivery and project site features when the app is in use.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>UjenziXform may use the microphone if you record video or audio in a feature that requires it.</string>
+</dict>
+</plist>

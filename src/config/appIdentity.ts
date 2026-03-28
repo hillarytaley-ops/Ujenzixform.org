@@ -8,6 +8,10 @@ export const DEFAULT_SITE_URL =
   (import.meta.env.VITE_SITE_URL as string | undefined)?.replace(/\/$/, '') ||
   'https://ujenzixform.org';
 
+/** Use these URLs in App Store Connect (Privacy Policy, etc.). */
+export const PRIVACY_POLICY_URL = `${DEFAULT_SITE_URL}/privacy`;
+export const TERMS_OF_SERVICE_URL = `${DEFAULT_SITE_URL}/terms`;
+
 export const SUPPORT_EMAIL =
   (import.meta.env.VITE_SUPPORT_EMAIL as string | undefined) || 'support@ujenzixform.org';
 
