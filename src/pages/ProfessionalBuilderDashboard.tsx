@@ -1945,6 +1945,13 @@ const ProfessionalBuilderDashboardPage = () => {
                     </Select>
                   </div>
                 )}
+                <Button
+                  className="w-full justify-start bg-blue-50 text-blue-800 hover:bg-blue-100"
+                  onClick={() => setShowProfileView(true)}
+                >
+                  <User className="mr-2 h-4 w-4" />
+                  Profile
+                </Button>
                 <Link
                   className="block w-full"
                   to={
@@ -1958,13 +1965,6 @@ const ProfessionalBuilderDashboardPage = () => {
                     Order Materials
                   </Button>
                 </Link>
-                <Button
-                  className="w-full justify-start bg-blue-50 text-blue-800 hover:bg-blue-100"
-                  onClick={() => setShowProfileView(true)}
-                >
-                  <User className="mr-2 h-4 w-4" />
-                  Profile
-                </Button>
                 <Button
                   variant="outline"
                   className="w-full justify-start border-blue-200 bg-blue-50/80 text-blue-800 hover:bg-blue-100"
@@ -2031,6 +2031,13 @@ const ProfessionalBuilderDashboardPage = () => {
                   </SelectContent>
                 </Select>
               )}
+              <Button
+                className="bg-white/90 text-blue-700 hover:bg-white"
+                onClick={() => setShowProfileView(true)}
+              >
+                <User className="mr-2 h-4 w-4" />
+                Profile
+              </Button>
               <Link
                 to={
                   selectedProjectForOrder && selectedProjectForOrder !== 'none'
@@ -2043,13 +2050,6 @@ const ProfessionalBuilderDashboardPage = () => {
                   Order Materials
                 </Button>
               </Link>
-              <Button
-                className="bg-white/90 text-blue-700 hover:bg-white"
-                onClick={() => setShowProfileView(true)}
-              >
-                <User className="mr-2 h-4 w-4" />
-                Profile
-              </Button>
               <Button
                 variant="outline"
                 className="border-white/30 bg-white/90 text-blue-700 hover:bg-white"

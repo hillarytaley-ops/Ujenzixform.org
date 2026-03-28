@@ -1800,6 +1800,14 @@ const SupplierDashboard = () => {
                 <Button
                   variant="outline"
                   className="h-10 w-full justify-start border-orange-200 bg-orange-50 text-orange-900 hover:bg-orange-100"
+                  onClick={() => setShowProfileView(true)}
+                >
+                  <User className="mr-2 h-4 w-4 shrink-0" />
+                  Profile
+                </Button>
+                <Button
+                  variant="outline"
+                  className="h-10 w-full justify-start border-orange-200 bg-orange-50 text-orange-900 hover:bg-orange-100"
                   onClick={toggleDarkMode}
                 >
                   {isDarkMode ? (
@@ -1815,14 +1823,6 @@ const SupplierDashboard = () => {
                 >
                   <Bell className="mr-2 h-4 w-4 shrink-0" />
                   <span className="truncate">{t('supplier.dashboard.notifications')}</span>
-                </Button>
-                <Button
-                  variant="outline"
-                  className="h-10 w-full justify-start border-orange-200 bg-orange-50 text-orange-900 hover:bg-orange-100"
-                  onClick={() => setShowProfileView(true)}
-                >
-                  <User className="mr-2 h-4 w-4 shrink-0" />
-                  Profile
                 </Button>
                 <Button
                   variant="outline"
@@ -1878,6 +1878,14 @@ const SupplierDashboard = () => {
               <Button
                 variant="outline"
                 className="h-10 justify-center border-white/30 bg-white/10 text-xs text-white hover:bg-white/20 sm:text-sm"
+                onClick={() => setShowProfileView(true)}
+              >
+                <User className="mr-1.5 h-4 w-4 shrink-0 sm:mr-2" />
+                Profile
+              </Button>
+              <Button
+                variant="outline"
+                className="h-10 justify-center border-white/30 bg-white/10 text-xs text-white hover:bg-white/20 sm:text-sm"
                 onClick={toggleDarkMode}
               >
                 {isDarkMode ? (
@@ -1893,14 +1901,6 @@ const SupplierDashboard = () => {
               >
                 <Bell className="mr-1.5 h-4 w-4 shrink-0 sm:mr-2" />
                 <span className="truncate">{t('supplier.dashboard.notifications')}</span>
-              </Button>
-              <Button
-                variant="outline"
-                className="h-10 justify-center border-white/30 bg-white/10 text-xs text-white hover:bg-white/20 sm:text-sm"
-                onClick={() => setShowProfileView(true)}
-              >
-                <User className="mr-1.5 h-4 w-4 shrink-0 sm:mr-2" />
-                Profile
               </Button>
               <Button
                 variant="outline"

@@ -2435,17 +2435,17 @@ const DeliveryDashboard = () => {
                 <Button
                   variant="outline"
                   className="w-full justify-start border-teal-200 bg-teal-50 text-teal-900 hover:bg-teal-100"
-                >
-                  <Bell className="mr-2 h-4 w-4" />
-                  Notifications
-                </Button>
-                <Button
-                  variant="outline"
-                  className="w-full justify-start border-teal-200 bg-teal-50 text-teal-900 hover:bg-teal-100"
                   onClick={() => setShowProfileView(true)}
                 >
                   <User className="mr-2 h-4 w-4" />
                   Profile
+                </Button>
+                <Button
+                  variant="outline"
+                  className="w-full justify-start border-teal-200 bg-teal-50 text-teal-900 hover:bg-teal-100"
+                >
+                  <Bell className="mr-2 h-4 w-4" />
+                  Notifications
                 </Button>
                 <Button
                   variant="outline"
@@ -2505,10 +2505,6 @@ const DeliveryDashboard = () => {
                   {isOnline ? 'Go Offline' : 'Go Online'}
                 </Button>
               </div>
-              <Button variant="outline" className="border-white/30 bg-white/10 text-white hover:bg-white/20">
-                <Bell className="mr-2 h-4 w-4" />
-                Notifications
-              </Button>
               <Button
                 variant="outline"
                 className="border-white/30 bg-white/10 text-white hover:bg-white/20"
@@ -2516,6 +2512,10 @@ const DeliveryDashboard = () => {
               >
                 <User className="mr-2 h-4 w-4" />
                 Profile
+              </Button>
+              <Button variant="outline" className="border-white/30 bg-white/10 text-white hover:bg-white/20">
+                <Bell className="mr-2 h-4 w-4" />
+                Notifications
               </Button>
               <Button variant="outline" className="border-white/30 bg-white/10 text-white hover:bg-white/20">
                 <Settings className="mr-2 h-4 w-4" />

@@ -668,6 +668,13 @@ const PrivateClientDashboard = () => {
                 title="Menu"
                 triggerClassName="border-white/40 bg-white/15 text-white hover:bg-white/25"
               >
+                <Button
+                  className="w-full justify-start bg-green-600 text-white hover:bg-green-700"
+                  onClick={() => setShowProfileView(true)}
+                >
+                  <User className="mr-2 h-4 w-4" />
+                  Profile
+                </Button>
                 <Link to="/suppliers?from=dashboard" className="block w-full">
                   <Button className="w-full justify-start bg-white text-green-700 hover:bg-green-50">
                     <ShoppingCart className="mr-2 h-4 w-4" />
@@ -707,13 +714,6 @@ const PrivateClientDashboard = () => {
                 >
                   <LogOut className="mr-2 h-4 w-4" />
                   Logout
-                </Button>
-                <Button
-                  className="w-full justify-start bg-green-600 text-white hover:bg-green-700"
-                  onClick={() => setShowProfileView(true)}
-                >
-                  <User className="mr-2 h-4 w-4" />
-                  Profile
                 </Button>
               </DashboardMobileActionSheet>
             </div>
@@ -756,6 +756,13 @@ const PrivateClientDashboard = () => {
                 </Button>
               </Link>
               <Button
+                className="bg-white/90 text-green-700 hover:bg-white"
+                onClick={() => setShowProfileView(true)}
+              >
+                <User className="mr-2 h-4 w-4" />
+                Profile
+              </Button>
+              <Button
                 variant="outline"
                 className="border-white/30 bg-white/90 text-green-700 hover:bg-white"
                 onClick={handleExitDashboard}
@@ -770,13 +777,6 @@ const PrivateClientDashboard = () => {
               >
                 <LogOut className="mr-2 h-4 w-4" />
                 Logout
-              </Button>
-              <Button
-                className="bg-white/90 text-green-700 hover:bg-white"
-                onClick={() => setShowProfileView(true)}
-              >
-                <User className="mr-2 h-4 w-4" />
-                Profile
               </Button>
             </div>
           </div>
