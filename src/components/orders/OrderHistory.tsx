@@ -21,6 +21,7 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { InvoiceGenerator, generateInvoiceFromOrder } from '@/components/invoices/InvoiceGenerator';
@@ -291,10 +292,11 @@ export const OrderHistory: React.FC<OrderHistoryProps> = ({ userId, userRole }) 
     
     const config = statusConfig[status.toLowerCase()] || { color: 'bg-gray-500/20 text-gray-400', icon: null };
     
+    const label = status.charAt(0).toUpperCase() + status.slice(1);
     return (
-      <Badge className={`${config.color} flex items-center gap-1`}>
+      <Badge title={label} className={`${config.color} inline-flex max-w-[min(160px,40vw)] items-center gap-1 truncate whitespace-nowrap`}>
         {config.icon}
-        {status.charAt(0).toUpperCase() + status.slice(1)}
+        <span className="truncate">{label}</span>
       </Badge>
     );
   };
@@ -472,82 +474,88 @@ export const OrderHistory: React.FC<OrderHistoryProps> = ({ userId, userRole }) 
             Order History ({filteredOrders.length})
           </CardTitle>
         </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            {filteredOrders.map((order) => (
-              <div
-                key={order.id}
-                className="p-4 bg-slate-700/30 rounded-lg hover:bg-slate-700/50 transition-colors"
-              >
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-3 mb-2">
-                      <span className="font-mono text-white font-medium">{order.po_number}</span>
-                      {getStatusBadge(order.status)}
-                    </div>
-                    <div className="text-sm text-slate-400 space-y-1">
-                      <p className="flex items-center gap-2">
-                        <Package className="h-3 w-3" />
-                        {order.items.length} item(s) • {order.supplier_name}
-                      </p>
-                      <p className="flex items-center gap-2">
-                        <Calendar className="h-3 w-3" />
-                        {new Date(order.created_at).toLocaleDateString()}
-                      </p>
-                      {order.tracking_number && (
-                        <p className="flex items-center gap-2">
-                          <Truck className="h-3 w-3" />
-                          Tracking: {order.tracking_number}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                  
-                  <div className="flex items-center gap-4">
-                    <div className="text-right">
-                      <p className="text-lg font-bold text-white">
+        <CardContent className="p-0 sm:p-6">
+          {filteredOrders.length === 0 ? (
+            <div className="text-center py-12 text-slate-400 px-4">
+              <ShoppingCart className="h-12 w-12 mx-auto mb-4 opacity-50" />
+              <p>No orders found</p>
+              <p className="text-sm mt-1">Your order history will appear here</p>
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow className="border-slate-600 hover:bg-transparent">
+                  <TableHead className="text-slate-300 min-w-[100px]">PO #</TableHead>
+                  <TableHead className="text-slate-300 hidden sm:table-cell min-w-[100px]">Items</TableHead>
+                  <TableHead className="text-slate-300 hidden md:table-cell min-w-[120px]">Supplier</TableHead>
+                  <TableHead className="text-slate-300 whitespace-nowrap min-w-[88px]">Date</TableHead>
+                  <TableHead className="text-slate-300 min-w-[100px]">Status</TableHead>
+                  <TableHead className="text-slate-300 text-right whitespace-nowrap min-w-[96px]">Amount</TableHead>
+                  <TableHead className="text-slate-300 text-right w-[1%] pr-4"> </TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredOrders.map((order) => (
+                  <TableRow key={order.id} className="border-slate-600 hover:bg-slate-700/40">
+                    <TableCell className="font-mono text-sm font-medium text-white align-middle">
+                      <span className="block truncate max-w-[120px] sm:max-w-none" title={order.po_number}>
+                        {order.po_number}
+                      </span>
+                    </TableCell>
+                    <TableCell className="hidden sm:table-cell text-slate-400 text-sm align-middle whitespace-nowrap">
+                      {order.items.length} item{order.items.length !== 1 ? 's' : ''}
+                    </TableCell>
+                    <TableCell
+                      className="hidden md:table-cell text-slate-300 text-sm align-middle max-w-[180px] truncate"
+                      title={order.supplier_name}
+                    >
+                      {order.supplier_name}
+                    </TableCell>
+                    <TableCell className="text-slate-400 text-sm align-middle whitespace-nowrap">
+                      {new Date(order.created_at).toLocaleDateString()}
+                    </TableCell>
+                    <TableCell className="align-middle">{getStatusBadge(order.status)}</TableCell>
+                    <TableCell className="text-right align-middle">
+                      <div className="font-semibold text-white whitespace-nowrap text-sm">
                         KES {(order.total_amount || 0).toLocaleString()}
-                      </p>
-                      {order.payment_status && (
-                        <Badge variant="outline" className="text-xs">
+                      </div>
+                      {order.payment_status ? (
+                        <Badge variant="outline" className="mt-1 text-[10px] truncate max-w-[100px]">
                           {order.payment_status}
                         </Badge>
-                      )}
-                    </div>
-                    
-                    <div className="flex gap-2">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => loadOrderDetails(order)}
-                      >
-                        <Eye className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => {
-                          setSelectedOrder(order);
-                          loadOrderDetails(order);
-                          setShowInvoice(true);
-                        }}
-                      >
-                        <Download className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            ))}
-            
-            {filteredOrders.length === 0 && (
-              <div className="text-center py-12 text-slate-400">
-                <ShoppingCart className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                <p>No orders found</p>
-                <p className="text-sm mt-1">Your order history will appear here</p>
-              </div>
-            )}
-          </div>
+                      ) : null}
+                    </TableCell>
+                    <TableCell className="text-right align-middle pr-2 sm:pr-4">
+                      <div className="flex justify-end gap-0.5">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-8 w-8 p-0 text-slate-300"
+                          onClick={() => loadOrderDetails(order)}
+                          aria-label="View order"
+                        >
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-8 w-8 p-0 text-slate-300"
+                          onClick={() => {
+                            setSelectedOrder(order);
+                            loadOrderDetails(order);
+                            setShowInvoice(true);
+                          }}
+                          aria-label="Download invoice"
+                        >
+                          <Download className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
         </CardContent>
       </Card>
 

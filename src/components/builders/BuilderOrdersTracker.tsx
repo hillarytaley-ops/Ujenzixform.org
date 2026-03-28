@@ -107,27 +107,6 @@ function providerDisplayPhone(order: { delivery_provider_phone?: string | null }
   return (order.delivery_provider_phone || '').trim();
 }
 
-// QR Code Image Component - EXTRA LARGE for easy scanning
-const QRCodeImage: React.FC<{ value: string; size?: number; className?: string }> = ({ value, size = 250, className = '' }) => {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  
-  useEffect(() => {
-    if (canvasRef.current && value) {
-      QRCode.toCanvas(canvasRef.current, value, {
-        width: size,
-        margin: 3,
-        errorCorrectionLevel: 'H', // High error correction for better scanning
-        color: {
-          dark: '#000000',
-          light: '#ffffff'
-        }
-      }).catch(err => console.error('QR Code generation error:', err));
-    }
-  }, [value, size]);
-  
-  return <canvas ref={canvasRef} className={`rounded-lg border-2 bg-white shadow-md ${className}`} />;
-};
-
 // Large QR Code Dialog for scanning
 const QRCodeDialog: React.FC<{ 
   isOpen: boolean; 
@@ -1429,122 +1408,89 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
 
   const filteredOrders = getFilteredOrders();
 
-  // Render order card component
-  const renderOrderCard = (order: PurchaseOrder, isExpanded: boolean, progress: number) => (
-    <Card key={order.id} className="border">
-      <CardContent className="p-4">
-        {/* Order Header */}
-        <div
-          className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between cursor-pointer"
+  // Render order card component — collapsed row is a single scannable list line (expand for details + QR)
+  const renderOrderCard = (order: PurchaseOrder, isExpanded: boolean, progress: number) => {
+    const statusLabel = getStatusLabel(order);
+    return (
+    <Card key={order.id} className="border overflow-hidden">
+      <CardContent className="p-0">
+        {/* Order header — one horizontal row; avoids stacked “letter columns” on narrow viewports */}
+        <button
+          type="button"
+          className="flex w-full min-w-0 items-center gap-2 sm:gap-3 px-3 py-2.5 text-left hover:bg-gray-50/90 transition-colors"
           onClick={() => setExpandedOrder(isExpanded ? null : order.id)}
         >
-          <div className="flex items-start gap-3 min-w-0 flex-1">
-            <div className="p-2 bg-blue-50 rounded-lg shrink-0">
-              <QrCode className="h-6 w-6 text-blue-600" />
+          <div className="shrink-0 rounded-lg bg-blue-50 p-1.5">
+            <QrCode className="h-5 w-5 text-blue-600" aria-hidden />
+          </div>
+          <div className="min-w-0 flex-1 overflow-hidden">
+            <p className="truncate text-sm font-semibold text-gray-900" title={order.po_number}>
+              {order.po_number}
+            </p>
+            <p className="flex items-center gap-1 truncate text-xs text-gray-500">
+              <Calendar className="h-3 w-3 shrink-0" aria-hidden />
+              <span className="truncate">{format(new Date(order.created_at), 'MMM dd, yyyy')}</span>
+              <span className="shrink-0 text-gray-400 hidden sm:inline">·</span>
+              <span className="truncate text-gray-600 hidden sm:inline">
+                KES {order.total_amount?.toLocaleString() ?? '0'}
+              </span>
+            </p>
+          </div>
+          {/* Timeline — tablet+ */}
+          <div className="hidden md:flex shrink-0 items-center gap-0.5">
+            <div className={`flex h-6 w-6 items-center justify-center rounded-full text-[10px] font-bold ${
+              ['pending', 'confirmed', 'dispatched', 'in_transit', 'delivered', 'received', 'verified'].includes(order.status)
+                ? 'bg-green-500 text-white' : 'bg-gray-200 text-gray-400'
+            }`}>✓</div>
+            <div className={`h-0.5 w-3 ${
+              ['dispatched', 'in_transit', 'delivered', 'received', 'verified'].includes(order.status) ||
+              (order.delivery_provider_id && ['pending', 'confirmed', 'quoted'].includes(order.status))
+                ? 'bg-green-500' : 'bg-gray-200'
+            }`} />
+            <div className={`flex h-6 w-6 items-center justify-center rounded-full text-[10px] font-bold ${
+              ['dispatched', 'in_transit', 'delivered', 'received', 'verified'].includes(order.status)
+                ? 'bg-orange-500 text-white' : 'bg-gray-200 text-gray-400'
+            }`}>📦</div>
+            <div className={`h-0.5 w-3 ${
+              ['in_transit', 'delivered', 'received', 'verified'].includes(order.status) ? 'bg-green-500' : 'bg-gray-200'
+            }`} />
+            <div className={`flex h-6 w-6 items-center justify-center rounded-full text-[10px] font-bold ${
+              ['in_transit', 'delivered', 'received', 'verified'].includes(order.status)
+                ? 'bg-purple-500 text-white' : 'bg-gray-200 text-gray-400'
+            }`}>🚚</div>
+            <div className={`h-0.5 w-3 ${
+              ['delivered', 'received', 'verified'].includes(order.status) ? 'bg-green-500' : 'bg-gray-200'
+            }`} />
+            <div className={`flex h-6 w-6 items-center justify-center rounded-full text-[10px] font-bold ${
+              ['delivered', 'received', 'verified'].includes(order.status)
+                ? 'bg-green-600 text-white' : 'bg-gray-200 text-gray-400'
+            }`}>✅</div>
+          </div>
+          <div className="hidden lg:block w-20 shrink-0">
+            <div className="mb-0.5 flex justify-between text-[10px] text-gray-500">
+              <span>Prog</span>
+              <span className="font-medium text-gray-700">{progress}%</span>
             </div>
-            <div className="min-w-0 flex-1">
-              <p className="font-semibold text-sm sm:text-base break-words leading-snug">{order.po_number}</p>
-              <div className="flex items-center gap-2 text-xs sm:text-sm text-gray-500 mt-1">
-                <Calendar className="h-3 w-3 shrink-0" />
-                {format(new Date(order.created_at), 'MMM dd, yyyy')}
-              </div>
+            <div className="h-1.5 overflow-hidden rounded-full bg-gray-200">
+              <div className="h-full bg-green-500 transition-all" style={{ width: `${progress}%` }} />
             </div>
           </div>
-
-          <div className="flex flex-row flex-wrap items-center justify-between gap-2 sm:justify-end sm:gap-3 pl-11 sm:pl-0 w-full sm:w-auto">
-            {/* Mini Status Timeline - Always Visible */}
-            <div className="hidden sm:flex items-center gap-1 shrink-0">
-              {/* Confirmed/Pending */}
-              <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
-                ['pending', 'confirmed', 'dispatched', 'in_transit', 'delivered', 'received', 'verified'].includes(order.status)
-                  ? 'bg-green-500 text-white'
-                  : 'bg-gray-200 text-gray-400'
-              }`}>✓</div>
-                        <div className={`w-4 h-0.5 ${
-                          ['dispatched', 'in_transit', 'delivered', 'received', 'verified'].includes(order.status) ||
-                          (order.delivery_provider_id && ['pending', 'confirmed', 'quoted'].includes(order.status))
-                            ? 'bg-green-500'
-                            : 'bg-gray-200'
-                        }`} />
-              {/* Dispatched */}
-              <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
-                ['dispatched', 'in_transit', 'delivered', 'received', 'verified'].includes(order.status)
-                  ? 'bg-orange-500 text-white'
-                  : 'bg-gray-200 text-gray-400'
-              }`}>📦</div>
-              <div className={`w-4 h-0.5 ${
-                ['in_transit', 'delivered', 'received', 'verified'].includes(order.status)
-                  ? 'bg-green-500'
-                  : 'bg-gray-200'
-              }`} />
-              {/* In Transit */}
-              <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
-                ['in_transit', 'delivered', 'received', 'verified'].includes(order.status)
-                  ? 'bg-purple-500 text-white'
-                  : 'bg-gray-200 text-gray-400'
-              }`}>🚚</div>
-              <div className={`w-4 h-0.5 ${
-                ['delivered', 'received', 'verified'].includes(order.status)
-                  ? 'bg-green-500'
-                  : 'bg-gray-200'
-              }`} />
-              {/* Delivered */}
-              <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
-                ['delivered', 'received', 'verified'].includes(order.status)
-                  ? 'bg-green-600 text-white'
-                  : 'bg-gray-200 text-gray-400'
-              }`}>✅</div>
-            </div>
-            
-            {/* Progress Bar - Hidden on mobile */}
-            <div className="hidden lg:block w-24">
-              <div className="flex items-center justify-between text-xs mb-1">
-                <span className="text-gray-500">Progress</span>
-                <span className="font-medium">{progress}%</span>
-              </div>
-              <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
-                <div 
-                  className="h-full bg-green-500 transition-all duration-300"
-                  style={{ width: `${progress}%` }}
-                />
-              </div>
-            </div>
-            
-            {/* Status Badge */}
-            <div className="flex flex-col items-stretch sm:items-end gap-1 min-w-0 max-w-full sm:max-w-[min(100%,280px)]">
-              <Badge
-                className={`${getStatusColor(order.status)} px-2 sm:px-3 py-1.5 whitespace-normal inline-flex flex-wrap items-center gap-1 max-w-full justify-start sm:justify-end text-left sm:text-right`}
-              >
-                <span className="shrink-0">{getStatusIcon(order.status)}</span>
-                <span className="min-w-0 break-words text-xs sm:text-sm leading-snug">{getStatusLabel(order)}</span>
-              </Badge>
-              
-              {/* Show provider details for confirmed deliveries - visible even when collapsed */}
-              {/* Show whenever a provider is assigned (delivery_provider_id exists) OR delivery is confirmed */}
-              {(order.delivery_provider_id || providerDisplayName(order) || providerDisplayPhone(order) ||
-                order.delivery_status === 'accepted' || order.delivery_status === 'assigned' ||
-                ['confirmed'].includes(order.status)) && (
-                <div className="text-[10px] text-gray-600 max-w-full sm:max-w-[200px] text-left sm:text-right">
-                  <div className="font-medium truncate" title={providerDisplayName(order) || undefined}>
-                    {providerDisplayName(order) || '—'}
-                  </div>
-                  <div className="text-[9px] text-gray-500 flex items-center sm:justify-end gap-1 mt-0.5">
-                    <Phone className="h-3 w-3 flex-shrink-0" />
-                    <span className="truncate">{providerDisplayPhone(order) || '—'}</span>
-                  </div>
-                </div>
-              )}
-            </div>
-            
-            <span className="shrink-0 text-gray-400 sm:ml-1" aria-hidden>
-              {isExpanded ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
-            </span>
-          </div>
-        </div>
+          <span className="shrink-0 text-xs font-medium text-gray-600 md:hidden">{progress}%</span>
+          <Badge
+            title={statusLabel}
+            className={`${getStatusColor(order.status)} max-w-[42vw] sm:max-w-[200px] shrink-0 truncate px-2 py-1 text-xs whitespace-nowrap inline-flex items-center gap-1`}
+          >
+            <span className="shrink-0">{getStatusIcon(order.status)}</span>
+            <span className="truncate">{statusLabel}</span>
+          </Badge>
+          <span className="shrink-0 text-gray-400" aria-hidden>
+            {isExpanded ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
+          </span>
+        </button>
         
-        {/* Order Details (Expanded) - Same as before */}
+        {/* Order Details (Expanded) */}
         {isExpanded && (
-          <div className="mt-4 pt-4 border-t space-y-4">
+          <div className="space-y-4 border-t border-gray-100 px-3 pb-4 pt-3">
             {/* Order Status Timeline */}
             <div className="bg-gray-50 rounded-lg p-4">
               <p className="font-medium text-sm text-gray-600 mb-3">Order Status Timeline</p>
@@ -1685,75 +1631,63 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
               )}
             </div>
             
-            {/* Material Items with QR Codes - EXTRA LARGE */}
+            {/* Material items — compact table; open dialog for full QR */}
             <div>
-              <p className="font-medium mb-4 flex items-center gap-2 text-lg">
-                <QrCode className="h-5 w-5" />
-                Material Items with QR Codes ({order.material_items?.length || 0})
+              <p className="mb-2 flex items-center gap-2 text-sm font-medium text-gray-700">
+                <QrCode className="h-4 w-4 shrink-0" aria-hidden />
+                Materials ({order.material_items?.length || 0})
               </p>
-              <div className="space-y-6">
-                {order.material_items?.map((item) => (
-                  <div 
-                    key={item.id}
-                    className="flex flex-col items-center p-6 bg-white rounded-xl border-2 border-gray-200 shadow-lg hover:shadow-xl transition-shadow"
-                  >
-                    {/* Item Header */}
-                    <div className="w-full flex flex-col sm:flex-row items-center justify-between mb-4 gap-3">
-                      <h3 className="text-xl font-bold text-gray-800">{item.material_type}</h3>
-                      <Badge className={`text-base px-4 py-2 ${getStatusColor(item.status)}`}>
-                        {getStatusIcon(item.status)}
-                        <span className="ml-2">{getItemStatusLabel(item.status)}</span>
-                      </Badge>
-                    </div>
-                    
-                    {/* HUGE QR Code Image */}
-                    <div 
-                      className="cursor-pointer hover:scale-[1.02] transition-transform my-4"
-                      onClick={() => {
-                        setSelectedQRItem(item);
-                        setShowQRDialog(true);
-                      }}
-                      title="Click to enlarge for scanning"
-                    >
-                      <div className="relative p-4 bg-white rounded-2xl border-4 border-blue-200 shadow-xl">
-                        <QRCodeImage value={item.qr_code} size={280} />
-                        <div className="absolute -bottom-3 -right-3 bg-blue-600 text-white p-2 rounded-full shadow-lg">
-                          <Maximize2 className="h-5 w-5" />
-                        </div>
-                      </div>
-                    </div>
-                    
-                    {/* QR Code Value */}
-                    <p className="font-mono text-sm bg-gray-100 px-4 py-2 rounded-lg my-3 break-all text-center max-w-full">
-                      {item.qr_code}
-                    </p>
-                    
-                    {/* Item Details */}
-                    <div className="w-full grid grid-cols-2 gap-4 mt-2">
-                      <div className="bg-gray-50 p-4 rounded-lg text-center">
-                        <p className="text-gray-500 text-sm">Quantity</p>
-                        <p className="font-bold text-xl">{item.quantity} {item.unit}</p>
-                      </div>
-                      <div className="bg-gray-50 p-4 rounded-lg text-center">
-                        <p className="text-gray-500 text-sm">Category</p>
-                        <p className="font-bold text-xl">{item.category}</p>
-                      </div>
-                    </div>
-                    
-                    <Button 
-                      variant="default" 
-                      size="lg" 
-                      className="mt-4 w-full sm:w-auto px-8"
-                      onClick={() => {
-                        setSelectedQRItem(item);
-                        setShowQRDialog(true);
-                      }}
-                    >
-                      <Maximize2 className="h-5 w-5 mr-2" />
-                      Open Full Screen for Scanning
-                    </Button>
-                  </div>
-                ))}
+              <div className="overflow-x-auto rounded-lg border border-gray-200 bg-white">
+                <table className="w-full min-w-[320px] text-left text-sm">
+                  <thead className="border-b border-gray-200 bg-gray-50 text-xs font-medium uppercase tracking-wide text-gray-600">
+                    <tr>
+                      <th className="px-3 py-2">Item</th>
+                      <th className="px-3 py-2 whitespace-nowrap">Qty</th>
+                      <th className="px-3 py-2 hidden sm:table-cell">Category</th>
+                      <th className="px-3 py-2">Status</th>
+                      <th className="px-3 py-2 text-right w-[1%]">QR</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {(order.material_items || []).map((item) => (
+                      <tr key={item.id} className="hover:bg-gray-50/80">
+                        <td className="px-3 py-2 font-medium text-gray-900 max-w-[140px] sm:max-w-[220px]">
+                          <span className="block truncate" title={item.material_type}>
+                            {item.material_type}
+                          </span>
+                        </td>
+                        <td className="px-3 py-2 whitespace-nowrap text-gray-700">
+                          {item.quantity} {item.unit}
+                        </td>
+                        <td className="px-3 py-2 hidden sm:table-cell text-gray-600 truncate max-w-[120px]" title={item.category}>
+                          {item.category}
+                        </td>
+                        <td className="px-3 py-2">
+                          <Badge className={`${getStatusColor(item.status)} max-w-[140px] truncate px-2 py-0.5 text-xs whitespace-nowrap inline-flex items-center gap-1`}>
+                            <span className="shrink-0">{getStatusIcon(item.status)}</span>
+                            <span className="truncate">{getItemStatusLabel(item.status)}</span>
+                          </Badge>
+                        </td>
+                        <td className="px-3 py-2 text-right whitespace-nowrap">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="h-8 px-2"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedQRItem(item);
+                              setShowQRDialog(true);
+                            }}
+                          >
+                            <Maximize2 className="h-3.5 w-3.5 mr-1" />
+                            View
+                          </Button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             </div>
             
@@ -1768,7 +1702,8 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
         )}
       </CardContent>
     </Card>
-  );
+    );
+  };
 
   // Group pending orders into three categories: supplier responded, accepted by provider, awaiting provider
   const getGroupedPendingOrders = () => {
