@@ -7,6 +7,13 @@
   "env": {
     "VERCEL_TOOLBAR_ENABLED": "false"
   },
+  "redirects": [
+    {
+      "source": "/favicon.ico",
+      "destination": "/ujenzixform-logo.png",
+      "permanent": false
+    }
+  ],
   "rewrites": [
     {
       "source": "/(.*)",

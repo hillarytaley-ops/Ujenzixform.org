@@ -144,7 +144,7 @@ export const useMonitoringAlerts = () => {
     if (Notification.permission === 'granted') {
       new Notification(alert.title, {
         body: alert.message,
-        icon: '/favicon.ico',
+        icon: '/ujenzixform-logo.png',
         tag: alert.id,
         requireInteraction: alert.severity === 'critical' || alert.severity === 'emergency'
       });

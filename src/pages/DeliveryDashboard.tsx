@@ -89,7 +89,7 @@ function notifyNewDeliveryRequest() {
   if (Notification.permission === "granted") {
     new Notification("🚚 New Delivery Request!", {
       body: "A new delivery job is available. Open the Alerts tab to accept.",
-      icon: "/favicon.ico",
+      icon: "/ujenzixform-logo.png",
       tag: "ujenzi-new-delivery",
     });
   } else if (Notification.permission !== "denied") {
@@ -97,7 +97,7 @@ function notifyNewDeliveryRequest() {
       if (p === "granted") {
         new Notification("🚚 New Delivery Request!", {
           body: "A new delivery job is available. Open the Alerts tab to accept.",
-          icon: "/favicon.ico",
+          icon: "/ujenzixform-logo.png",
           tag: "ujenzi-new-delivery",
         });
       }
