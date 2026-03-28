@@ -278,6 +278,35 @@ const GoogleMapLocationPicker: React.FC<MapLocationPickerProps & { apiKey: strin
     });
     mapRef.current = map;
 
+    const gEvent = (g.maps as { event: { trigger: (m: unknown, ev: string) => void; addListenerOnce: (m: unknown, ev: string, fn: () => void) => { remove: () => void } } }).event;
+    const triggerResize = () => {
+      const m = map as {
+        getCenter?: () => { lat: () => number; lng: () => number };
+        setCenter?: (c: { lat: number; lng: number }) => void;
+      };
+      if (!m || !gEvent) return;
+      const c = typeof m.getCenter === 'function' ? m.getCenter() : null;
+      gEvent.trigger(m, 'resize');
+      if (c && typeof m.setCenter === 'function') {
+        m.setCenter({ lat: c.lat(), lng: c.lng() });
+      }
+    };
+    const idleOnce = gEvent.addListenerOnce(map, 'idle', triggerResize);
+    listenersRef.current.push(idleOnce);
+    requestAnimationFrame(() => {
+      requestAnimationFrame(triggerResize);
+    });
+    const t1 = window.setTimeout(triggerResize, 120);
+    const t2 = window.setTimeout(triggerResize, 450);
+
+    let resizeObserver: ResizeObserver | null = null;
+    if (typeof ResizeObserver !== 'undefined' && mapsDivRef.current) {
+      resizeObserver = new ResizeObserver(() => {
+        triggerResize();
+      });
+      resizeObserver.observe(mapsDivRef.current);
+    }
+
     const clickL = map.addListener('click', (e) => {
       if (!e.latLng) return;
       const lat = e.latLng.lat();
@@ -344,6 +373,9 @@ const GoogleMapLocationPicker: React.FC<MapLocationPickerProps & { apiKey: strin
     setMapReady(true);
 
     return () => {
+      window.clearTimeout(t1);
+      window.clearTimeout(t2);
+      resizeObserver?.disconnect();
       listenersRef.current.forEach((l) => l.remove());
       listenersRef.current = [];
       const m = markerRef.current as { setMap: (x: null) => void } | null;

@@ -248,3 +248,8 @@ p, span, div, h1, h2, h3, h4, h5, h6, label, button {
 .leaflet-container img.leaflet-tile {
   max-width: none !important;
 }
+
+/* Google Maps: same preflight rule shrinks tile images and breaks the tile grid */
+.gm-style img {
+  max-width: none !important;
+}
