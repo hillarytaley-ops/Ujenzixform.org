@@ -32,6 +32,13 @@ const GMAPS_SCRIPT_ID = 'ujenzi-google-maps-js';
 /** Kenya — soft restriction; users can still pan slightly outside with strictBounds: false */
 const KENYA_LAT_LNG_BOUNDS = { north: 5.2, south: -5.0, west: 33.5, east: 42.0 };
 
+/** Stable map panel height (Leaflet/Google both need a real pixel height, not a collapsed flex box). */
+const MAP_PANEL_STYLE: React.CSSProperties = {
+  width: '100%',
+  height: 'clamp(280px, min(52vh, 420px), 420px)',
+  minHeight: 280,
+};
+
 function loadGoogleMapsScript(apiKey: string): Promise<void> {
   const w = window as Window & { google?: { maps?: { Map?: unknown } } };
   if (w.google?.maps?.Map) return Promise.resolve();
@@ -529,10 +536,7 @@ const GoogleMapLocationPicker: React.FC<MapLocationPickerProps & { apiKey: strin
       </div>
 
       <div className="relative overflow-hidden rounded-lg border border-gray-300 bg-gray-100">
-        <div
-          ref={mapsDivRef}
-          className="h-[min(52vh,420px)] min-h-[280px] w-full bg-gray-200"
-        />
+        <div ref={mapsDivRef} className="bg-gray-200" style={MAP_PANEL_STYLE} />
         {mapReady && !selectedLocation && (
           <div className="pointer-events-none absolute bottom-2 left-2 right-2 rounded-lg border border-gray-200 bg-white/95 p-2 text-center text-sm text-gray-700 shadow-sm backdrop-blur-sm">
             <Target className="mr-1 inline-block h-4 w-4 text-blue-600" />
@@ -689,12 +693,15 @@ const LeafletMapLocationPicker: React.FC<MapLocationPickerProps> = ({
 
   useEffect(() => {
     if (!leafletLoaded || !mapContainerRef.current || mapRef.current) return;
+    const el = mapContainerRef.current;
     const L = (window as unknown as { L: typeof import('leaflet') }).L;
     const defaultLat = initialLocation?.latitude || -1.2921;
     const defaultLng = initialLocation?.longitude || 36.8219;
     const defaultZoom = initialLocation?.latitude ? 15 : 6;
-    const map = L.map(mapContainerRef.current).setView([defaultLat, defaultLng], defaultZoom);
+    el.classList.add('ujenzi-leaflet-picker');
+    const map = L.map(el, { zoomControl: true }).setView([defaultLat, defaultLng], defaultZoom);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19,
       attribution: '&copy; OpenStreetMap contributors',
     }).addTo(map);
     map.on('click', async (e: import('leaflet').LeafletMouseEvent) => {
@@ -703,6 +710,29 @@ const LeafletMapLocationPicker: React.FC<MapLocationPickerProps> = ({
     });
     mapRef.current = map;
     setMapLoaded(true);
+
+    const invalidate = () => {
+      try {
+        map.invalidateSize({ animate: false });
+      } catch {
+        /* ignore */
+      }
+    };
+    invalidate();
+    requestAnimationFrame(() => {
+      invalidate();
+      requestAnimationFrame(invalidate);
+    });
+    const t1 = window.setTimeout(invalidate, 80);
+    const t2 = window.setTimeout(invalidate, 250);
+    const t3 = window.setTimeout(invalidate, 600);
+
+    let resizeObserver: ResizeObserver | null = null;
+    if (typeof ResizeObserver !== 'undefined') {
+      resizeObserver = new ResizeObserver(() => invalidate());
+      resizeObserver.observe(el);
+    }
+
     if (initialLocation?.latitude && initialLocation?.longitude) {
       const marker = L.marker([initialLocation.latitude, initialLocation.longitude], {
         draggable: true,
@@ -713,7 +743,13 @@ const LeafletMapLocationPicker: React.FC<MapLocationPickerProps> = ({
       });
       markerRef.current = marker;
     }
+
     return () => {
+      window.clearTimeout(t1);
+      window.clearTimeout(t2);
+      window.clearTimeout(t3);
+      resizeObserver?.disconnect();
+      el.classList.remove('ujenzi-leaflet-picker');
       if (mapRef.current) {
         (mapRef.current as import('leaflet').Map).remove();
         mapRef.current = null;
@@ -821,9 +857,13 @@ const LeafletMapLocationPicker: React.FC<MapLocationPickerProps> = ({
 
   return (
     <div className="space-y-4">
-      <div className="rounded-md border border-amber-200 bg-amber-50/80 px-3 py-2 text-xs text-amber-900">
-        <strong>Tip:</strong> Add <code className="rounded bg-amber-100 px-1">VITE_GOOGLE_MAPS_API_KEY</code> to your
-        environment for full Google Maps (clearer tiles and search). This view uses OpenStreetMap as a fallback.
+      <div className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2.5 text-sm text-amber-950">
+        <p className="font-semibold">You are on the OpenStreetMap preview</p>
+        <p className="mt-1 text-xs leading-relaxed text-amber-900">
+          For the full Google Maps experience (labels, satellite, familiar search), add{' '}
+          <code className="rounded bg-amber-100 px-1 py-0.5 text-[11px]">VITE_GOOGLE_MAPS_API_KEY</code> in Vercel
+          env and redeploy. Enable Maps JavaScript, Places, and Geocoding APIs for that key.
+        </p>
       </div>
       <div className="flex items-center justify-between">
         <div>
@@ -888,10 +928,11 @@ const LeafletMapLocationPicker: React.FC<MapLocationPickerProps> = ({
           </CardContent>
         </Card>
       )}
-      <div className="relative">
+      <div className="relative w-full">
         <div
           ref={mapContainerRef}
-          className="h-[min(52vh,420px)] min-h-[280px] w-full overflow-hidden rounded-lg border border-gray-300 bg-gray-100"
+          className="overflow-hidden rounded-lg border border-gray-300 bg-gray-100"
+          style={MAP_PANEL_STYLE}
         >
           {!leafletLoaded && (
             <div className="absolute inset-0 flex items-center justify-center bg-gray-100">

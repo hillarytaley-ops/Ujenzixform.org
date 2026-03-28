@@ -249,6 +249,14 @@ p, span, div, h1, h2, h3, h4, h5, h6, label, button {
   max-width: none !important;
 }
 
+/* Leaflet needs an explicit-sized parent; 100% height fills our clamp-height shell */
+.ujenzi-leaflet-picker.leaflet-container {
+  width: 100% !important;
+  height: 100% !important;
+  min-height: 280px !important;
+  z-index: 0;
+}
+
 /* Google Maps: same preflight rule shrinks tile images and breaks the tile grid */
 .gm-style img {
   max-width: none !important;
