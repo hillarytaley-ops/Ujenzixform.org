@@ -450,6 +450,7 @@ const ProfessionalBuilderDashboardPage = () => {
   const [activeTab, setActiveTab] = useUrlTabSync(BUILDER_TABS, 'projects');
   const [extrasSubTab, setExtrasSubTab] = useState('team'); // Sub-tab for Extras (team or support)
   const [deliveriesSubTab, setDeliveriesSubTab] = useState('request'); // Sub-tab for Deliveries (request, schedule, history)
+  const [invoiceDocsSubTab, setInvoiceDocsSubTab] = useState('delivery-notes'); // Invoices tab: DN / GRN / invoices list
   const [supplierResponseCount, setSupplierResponseCount] = useState(0); // Count of supplier responses for notification badge
   const [invoiceHubBadgeCount, setInvoiceHubBadgeCount] = useState(0); // DN + invoices needing builder action (Invoices tab)
   const [deliveryAddressNeededNotifications, setDeliveryAddressNeededNotifications] = useState<{ id: string; title: string; message: string; action_url?: string }[]>([]);
@@ -3357,67 +3358,64 @@ const ProfessionalBuilderDashboardPage = () => {
           </TabsContent>
 
           <TabsContent value="invoices" className="space-y-6">
-            <div className="space-y-6">
-              {/* Delivery Notes Workflow */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <FileSignature className="h-5 w-5" />
-                    Delivery Notes & Inspection
-                  </CardTitle>
-                  <CardDescription>
-                    Sign delivery notes and verify materials received
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  {user?.id && (
-                    <DeliveryNoteWorkflow
-                      builderAuthUserId={user.id}
-                      builderProfileId={profile?.id ?? null}
-                      onComplete={() => {
-                        // Refresh data if needed
-                      }}
-                    />
-                  )}
-                </CardContent>
-              </Card>
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Receipt className="h-5 w-5 text-orange-500" />
+                  Receipts & documents
+                </CardTitle>
+                <CardDescription>
+                  Switch between delivery notes to sign, goods received notes (GRN), and invoices — no long scroll.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Tabs value={invoiceDocsSubTab} onValueChange={setInvoiceDocsSubTab} className="space-y-4">
+                  <TabsList className="grid h-auto w-full grid-cols-1 gap-2 p-1 sm:grid-cols-3 bg-muted">
+                    <TabsTrigger value="delivery-notes" className="gap-2">
+                      <FileSignature className="h-4 w-4 shrink-0" />
+                      Delivery notes
+                    </TabsTrigger>
+                    <TabsTrigger value="grn" className="gap-2">
+                      <Package className="h-4 w-4 shrink-0" />
+                      GRN
+                    </TabsTrigger>
+                    <TabsTrigger value="invoice-list" className="gap-2">
+                      <Receipt className="h-4 w-4 shrink-0" />
+                      Invoices
+                    </TabsTrigger>
+                  </TabsList>
 
-              {/* GRN View */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Package className="h-5 w-5" />
-                    Goods Received Notes (GRN)
-                  </CardTitle>
-                  <CardDescription>
-                    View all GRNs for accepted deliveries
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  {user?.id && (
-                    <GRNView userId={user.id} userRole="builder" />
-                  )}
-                </CardContent>
-              </Card>
+                  <TabsContent value="delivery-notes" className="mt-0 space-y-2">
+                    <p className="text-sm text-muted-foreground">
+                      Sign delivery notes and verify materials received.
+                    </p>
+                    {user?.id && (
+                      <DeliveryNoteWorkflow
+                        builderAuthUserId={user.id}
+                        builderProfileId={profile?.id ?? null}
+                        onComplete={() => {
+                          // Refresh data if needed
+                        }}
+                      />
+                    )}
+                  </TabsContent>
 
-              {/* Invoice Management */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Receipt className="h-5 w-5" />
-                    Invoices
-                  </CardTitle>
-                  <CardDescription>
-                    View, acknowledge, and process invoices
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  {user?.id && (
-                    <InvoiceManagement userId={user.id} userRole="builder" />
-                  )}
-                </CardContent>
-              </Card>
-            </div>
+                  <TabsContent value="grn" className="mt-0 space-y-2">
+                    <p className="text-sm text-muted-foreground">
+                      View all GRNs for accepted deliveries.
+                    </p>
+                    {user?.id && <GRNView userId={user.id} userRole="builder" />}
+                  </TabsContent>
+
+                  <TabsContent value="invoice-list" className="mt-0 space-y-2">
+                    <p className="text-sm text-muted-foreground">
+                      View, acknowledge, and process invoices.
+                    </p>
+                    {user?.id && <InvoiceManagement userId={user.id} userRole="builder" />}
+                  </TabsContent>
+                </Tabs>
+              </CardContent>
+            </Card>
           </TabsContent>
 
           {/* Legacy Invoices Tab - Keeping for backward compatibility */}
