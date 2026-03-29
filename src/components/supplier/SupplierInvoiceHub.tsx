@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
@@ -19,8 +19,6 @@ import { useToast } from '@/hooks/use-toast';
 interface SupplierInvoiceHubProps {
   userId: string;
   supplierRecordId: string | null;
-  /** All supplier UUIDs this login may act as (suppliers.id + auth id when POs use user id). */
-  supplierScopeIds: string[];
   isDarkMode: boolean;
   textColor: string;
   mutedText: string;
@@ -38,7 +36,6 @@ function humanizeStatus(status: string | undefined) {
 export const SupplierInvoiceHub: React.FC<SupplierInvoiceHubProps> = ({
   userId,
   supplierRecordId,
-  supplierScopeIds,
   isDarkMode,
   textColor,
   mutedText,
@@ -53,26 +50,13 @@ export const SupplierInvoiceHub: React.FC<SupplierInvoiceHubProps> = ({
   const [poById, setPoById] = useState<Record<string, string>>({});
   const [grnUpdatingId, setGrnUpdatingId] = useState<string | null>(null);
 
-  const scopeIds = useMemo(() => {
-    const merged = [
-      ...supplierScopeIds,
-      ...(supplierRecordId ? [supplierRecordId] : []),
-      userId,
-    ].filter(Boolean) as string[];
-    return [...new Set(merged)];
-  }, [supplierScopeIds, supplierRecordId, userId]);
-
+  /** No client filter on supplier_id: RLS returns every DN this login may see (by supplier_id or linked PO). */
   const loadDeliveryNotes = useCallback(async () => {
-    if (scopeIds.length === 0) {
-      setDeliveryNotes([]);
-      return;
-    }
     setDnLoading(true);
     try {
       const { data: rows, error } = await supabase
         .from('delivery_notes')
         .select('*')
-        .in('supplier_id', scopeIds)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -101,19 +85,14 @@ export const SupplierInvoiceHub: React.FC<SupplierInvoiceHubProps> = ({
     } finally {
       setDnLoading(false);
     }
-  }, [scopeIds, toast]);
+  }, [toast]);
 
   const loadGrns = useCallback(async () => {
-    if (scopeIds.length === 0) {
-      setGrns([]);
-      return;
-    }
     setGrnLoading(true);
     try {
       const { data: rows, error } = await supabase
         .from('goods_received_notes')
         .select('*')
-        .in('supplier_id', scopeIds)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -129,7 +108,7 @@ export const SupplierInvoiceHub: React.FC<SupplierInvoiceHubProps> = ({
     } finally {
       setGrnLoading(false);
     }
-  }, [scopeIds, toast]);
+  }, [toast]);
 
   useEffect(() => {
     if (subTab === 'delivery-notes') loadDeliveryNotes();

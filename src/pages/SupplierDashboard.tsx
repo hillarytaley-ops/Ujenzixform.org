@@ -2623,7 +2623,6 @@ const SupplierDashboard = () => {
               <SupplierInvoiceHub
                 userId={user.id}
                 supplierRecordId={supplierRecordId}
-                supplierScopeIds={analyticsSupplierIds}
                 isDarkMode={isDarkMode}
                 textColor={textColor}
                 mutedText={mutedText}

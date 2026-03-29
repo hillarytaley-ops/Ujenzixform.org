@@ -62,22 +62,11 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({ userId, us
     try {
       setLoading(true);
 
-      // Supplier: plain select avoids PostgREST embed 400 when FK hints are missing from schema cache.
+      // Supplier: RLS restricts rows; avoid .eq(supplier_id) so invoices still show when supplier_id/auth/PO linkage varies.
       if (userRole === 'supplier') {
-        const { data: supplier, error: supErr } = await supabase
-          .from('suppliers')
-          .select('id')
-          .eq('user_id', userId)
-          .maybeSingle();
-        if (supErr) throw supErr;
-        if (!supplier?.id) {
-          setInvoices([]);
-          return;
-        }
         const { data, error } = await supabase
           .from('invoices')
           .select('*')
-          .eq('supplier_id', supplier.id)
           .order('created_at', { ascending: false });
         if (error) throw error;
         setInvoices(data || []);
