@@ -35,6 +35,7 @@ import { format } from "date-fns";
 
 interface ActiveDelivery {
   id: string;
+  purchase_order_id?: string | null;
   tracking_number: string;
   pickup_address: string;
   delivery_address: string;
@@ -111,6 +112,7 @@ export const ProviderGPSTracking: React.FC = () => {
         .from('delivery_requests')
         .select(`
           id,
+          purchase_order_id,
           tracking_number,
           pickup_address,
           delivery_address,
@@ -238,6 +240,23 @@ export const ProviderGPSTracking: React.FC = () => {
         .eq('id', selectedDeliveryId);
 
       if (error) throw error;
+
+      // Align with receiving-scanner flow: PO must become "delivered" for auto delivery_note + supplier workflow.
+      if (newStatus === 'delivered') {
+        const poId = activeDeliveries.find((d) => d.id === selectedDeliveryId)?.purchase_order_id;
+        if (poId) {
+          const { error: poErr } = await supabase
+            .from('purchase_orders')
+            .update({
+              status: 'delivered',
+              delivery_status: 'delivered',
+              delivered_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', poId);
+          if (poErr) console.warn('Could not sync purchase_order to delivered:', poErr.message);
+        }
+      }
 
       toast({
         title: "Status Updated",

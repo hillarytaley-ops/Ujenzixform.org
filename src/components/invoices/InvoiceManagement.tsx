@@ -28,6 +28,7 @@ interface Invoice {
   payment_status: string;
   is_editable: boolean;
   acknowledged_at?: string;
+  created_at?: string;
   purchase_order?: {
     po_number?: string;
   };
@@ -73,20 +74,54 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({ userId, us
         return;
       }
 
-      let query = supabase
-        .from('invoices')
-        .select(`
+      const invoiceSelect = `
           *,
           purchase_order:purchase_orders(po_number),
           supplier:suppliers(company_name)
-        `)
-        .order('created_at', { ascending: false });
+        `;
 
       if (userRole === 'builder') {
-        query = query.eq('builder_id', userId);
+        const { data: byBuilderId, error: e1 } = await supabase
+          .from('invoices')
+          .select(invoiceSelect)
+          .eq('builder_id', userId);
+        if (e1) throw e1;
+
+        const { data: myOrders, error: e2 } = await supabase
+          .from('purchase_orders')
+          .select('id')
+          .eq('buyer_id', userId);
+        if (e2) throw e2;
+
+        const poIds = (myOrders || []).map((p) => p.id).filter(Boolean);
+        let byPo: Invoice[] = [];
+        if (poIds.length > 0) {
+          const { data: invPo, error: e3 } = await supabase
+            .from('invoices')
+            .select(invoiceSelect)
+            .in('purchase_order_id', poIds);
+          if (e3) throw e3;
+          byPo = (invPo || []) as Invoice[];
+        }
+
+        const merged = new Map<string, Invoice>();
+        for (const inv of [...(byBuilderId || []), ...byPo] as Invoice[]) {
+          merged.set(inv.id, inv);
+        }
+        const list = Array.from(merged.values()).sort((a, b) => {
+          const ta = new Date(a.created_at || a.invoice_date || 0).getTime();
+          const tb = new Date(b.created_at || b.invoice_date || 0).getTime();
+          return tb - ta;
+        });
+        setInvoices(list);
+        return;
       }
 
-      const { data, error } = await query;
+      const { data, error } = await supabase
+        .from('invoices')
+        .select(invoiceSelect)
+        .order('created_at', { ascending: false });
+
       if (error) throw error;
       setInvoices(data || []);
     } catch (error: any) {
