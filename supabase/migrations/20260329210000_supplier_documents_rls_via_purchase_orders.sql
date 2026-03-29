@@ -1,5 +1,12 @@
 -- Supplier visibility for delivery_notes / GRNs / invoices when document.supplier_id does not match
 -- suppliers.id or auth.uid() but the linked purchase_order still belongs to this supplier.
+-- Idempotent: safe to re-run in SQL editor after a partial apply.
+
+DROP POLICY IF EXISTS "Suppliers can view delivery notes for their purchase orders" ON delivery_notes;
+DROP POLICY IF EXISTS "Suppliers can view GRNs for their purchase orders" ON goods_received_notes;
+DROP POLICY IF EXISTS "Suppliers can view invoices for their purchase orders" ON invoices;
+DROP POLICY IF EXISTS "Suppliers can view invoices supplier_id auth uid" ON invoices;
+DROP POLICY IF EXISTS "Suppliers can update GRNs they can view" ON goods_received_notes;
 
 CREATE POLICY "Suppliers can view delivery notes for their purchase orders"
   ON delivery_notes FOR SELECT
