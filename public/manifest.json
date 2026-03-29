@@ -11,49 +11,13 @@
   "scope": "/",
   "icons": [
     {
-      "src": "/ujenzixform-logo.png",
-      "sizes": "72x72",
-      "type": "image/png",
-      "purpose": "any"
-    },
-    {
-      "src": "/ujenzixform-logo.png",
-      "sizes": "96x96",
-      "type": "image/png",
-      "purpose": "any"
-    },
-    {
-      "src": "/ujenzixform-logo.png",
-      "sizes": "128x128",
-      "type": "image/png",
-      "purpose": "any"
-    },
-    {
-      "src": "/ujenzixform-logo.png",
-      "sizes": "144x144",
-      "type": "image/png",
-      "purpose": "any"
-    },
-    {
-      "src": "/ujenzixform-logo.png",
-      "sizes": "152x152",
-      "type": "image/png",
-      "purpose": "any"
-    },
-    {
-      "src": "/ujenzixform-logo.png",
+      "src": "/pwa-icon-192.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "/ujenzixform-logo.png",
-      "sizes": "384x384",
-      "type": "image/png",
-      "purpose": "any"
-    },
-    {
-      "src": "/ujenzixform-logo.png",
+      "src": "/pwa-icon-512.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"
@@ -71,21 +35,21 @@
       "short_name": "Materials",
       "description": "Browse construction materials from verified suppliers",
       "url": "/supplier-marketplace",
-      "icons": [{ "src": "/ujenzixform-logo.png", "sizes": "192x192" }]
+      "icons": [{ "src": "/pwa-icon-192.png", "sizes": "192x192", "type": "image/png" }]
     },
     {
       "name": "Track Delivery",
       "short_name": "Track",
       "description": "Track your material deliveries in real-time",
       "url": "/tracking",
-      "icons": [{ "src": "/ujenzixform-logo.png", "sizes": "192x192" }]
+      "icons": [{ "src": "/pwa-icon-192.png", "sizes": "192x192", "type": "image/png" }]
     },
     {
       "name": "My Orders",
       "short_name": "Orders",
       "description": "View your order history and status",
       "url": "/builder-dashboard",
-      "icons": [{ "src": "/ujenzixform-logo.png", "sizes": "192x192" }]
+      "icons": [{ "src": "/pwa-icon-192.png", "sizes": "192x192", "type": "image/png" }]
     }
   ],
   "categories": ["business", "construction", "productivity", "shopping"],
