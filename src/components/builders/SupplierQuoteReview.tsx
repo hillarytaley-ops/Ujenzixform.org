@@ -16,6 +16,10 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { DeliveryPromptDialog } from './DeliveryPromptDialog';
+import {
+  hasUsableDeliveryCoordinates,
+  isPlaceholderDeliveryAddress,
+} from '@/lib/deliveryAddressPlaceholder';
 import { 
   CheckCircle, 
   XCircle,
@@ -610,15 +614,25 @@ export const SupplierQuoteReview: React.FC<SupplierQuoteReviewProps> = ({
       const poData = poDataArray?.[0];
       console.log('✅ Quote accepted successfully:', poData);
 
+      const deliveryAddress = quote.delivery_address || quote.purchase_order?.delivery_address || '';
+      const poCoords =
+        (quote as any).delivery_coordinates ||
+        (quote.purchase_order as any)?.delivery_coordinates ||
+        '';
+      const addressReadyForAutoDr =
+        !isPlaceholderDeliveryAddress(deliveryAddress) ||
+        hasUsableDeliveryCoordinates(poCoords);
+
       toast({
         title: '✅ Quote Accepted!',
-        description: 'Order created and awaiting delivery provider allocation. QR codes will be generated when dispatched.',
+        description: addressReadyForAutoDr
+          ? 'Order created and awaiting delivery provider allocation. QR codes will be generated when dispatched.'
+          : 'Use the delivery form to enter your full address (or map/GPS) so a driver can be assigned.',
       });
 
       console.log('📦 Quote accepted, status set to pending. Order will appear in Pending Orders awaiting delivery provider.');
 
       // Prepare purchase order data for delivery/pickup choice dialog
-      const deliveryAddress = quote.delivery_address || quote.purchase_order?.delivery_address || '';
       const deliveryDate = quote.preferred_delivery_date || quote.purchase_order?.delivery_date || new Date().toISOString().split('T')[0];
       
       const purchaseOrderForDelivery = {
@@ -641,24 +655,37 @@ export const SupplierQuoteReview: React.FC<SupplierQuoteReviewProps> = ({
 
       setAcceptedPurchaseOrder(purchaseOrderForDelivery);
       
-      // AUTO-CREATE delivery_request so it appears on provider dashboard immediately
+      // AUTO-CREATE delivery_request when address/coords are valid (DB rejects literal "To be provided" on INSERT).
       const effectiveBuilderId = getEffectiveBuilderId();
       if (effectiveBuilderId) {
         try {
           const pickupAddr = quote.supplier?.address || quote.supplier?.location || 'Supplier location';
-          const fullDeliveryAddr = (deliveryAddress || 'To be provided').trim();
+          const fullDeliveryAddr = (deliveryAddress || '').trim();
           const materialType = (quote.purchase_order?.items?.[0]?.material_name || quote.material_name || 'Construction Materials').toString();
           const qty = quote.purchase_order?.items?.reduce((s: number, i: any) => s + (i.quantity || 0), 0) || quote.quantity || 1;
-          const drPayload = {
+
+          const canAutoCreateDr =
+            !isPlaceholderDeliveryAddress(fullDeliveryAddr) ||
+            hasUsableDeliveryCoordinates(poCoords);
+
+          if (!canAutoCreateDr) {
+            console.log(
+              'ℹ️ Skipping auto delivery_request: no real address yet. Complete the delivery dialog — DB rejects placeholder addresses.'
+            );
+          } else {
+          const drPayload: Record<string, unknown> = {
             builder_id: effectiveBuilderId,
             purchase_order_id: quote.id,
             pickup_address: pickupAddr,
-            delivery_address: fullDeliveryAddr,
+            delivery_address: isPlaceholderDeliveryAddress(fullDeliveryAddr) ? '' : fullDeliveryAddr,
             pickup_date: deliveryDate,
             material_type: materialType,
             quantity: qty,
             status: 'pending'
           };
+          if (hasUsableDeliveryCoordinates(poCoords)) {
+            drPayload.delivery_coordinates = String(poCoords).trim();
+          }
           const drRes = await fetch(`${SUPABASE_URL}/rest/v1/delivery_requests`, {
             method: 'POST',
             headers: { ...headers, 'Content-Type': 'application/json', 'Prefer': 'return=representation' },
@@ -679,7 +706,7 @@ export const SupplierQuoteReview: React.FC<SupplierQuoteReviewProps> = ({
                     request_id: drId,
                     builder_id: effectiveBuilderId,
                     pickup_address: pickupAddr,
-                    delivery_address: fullDeliveryAddr,
+                    delivery_address: (drPayload.delivery_address as string) || fullDeliveryAddr,
                     material_details: (purchaseOrderForDelivery.items || []).map((i: any) => ({
                       material_type: i.material_name || i.name,
                       quantity: i.quantity,
@@ -693,6 +720,7 @@ export const SupplierQuoteReview: React.FC<SupplierQuoteReviewProps> = ({
             }
           } else {
             console.warn('⚠️ Auto-create delivery_request failed (dialog will allow manual):', await drRes.text());
+          }
           }
         } catch (e) {
           console.warn('⚠️ Auto-create delivery_request error (dialog will allow manual):', e);

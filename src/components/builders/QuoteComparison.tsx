@@ -7,6 +7,10 @@ import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { DeliveryPromptDialog } from './DeliveryPromptDialog';
+import {
+  hasUsableDeliveryCoordinates,
+  isPlaceholderDeliveryAddress,
+} from '@/lib/deliveryAddressPlaceholder';
 import { 
   CheckCircle, 
   Loader2, 
@@ -217,13 +221,20 @@ export const QuoteComparison: React.FC<QuoteComparisonProps> = ({ orderId, build
 
       if (orderError) throw orderError;
 
+      const deliveryAddress = (orderData?.delivery_address || '').trim();
+      const poCoords = (orderData as any)?.delivery_coordinates || '';
+      const addressReadyForAutoDr =
+        !isPlaceholderDeliveryAddress(deliveryAddress) ||
+        hasUsableDeliveryCoordinates(poCoords);
+
       toast({
         title: '✅ Quote Accepted!',
-        description: 'Please choose delivery or pickup option.',
+        description: addressReadyForAutoDr
+          ? 'Please choose delivery or pickup option.'
+          : 'Use the delivery form to enter your full address (or map/GPS) so a driver can be assigned.',
       });
 
       // Prepare purchase order data for delivery/pickup choice dialog
-      const deliveryAddress = orderData?.delivery_address || '';
       const deliveryDate = orderData?.delivery_date || new Date().toISOString().split('T')[0];
       
       const purchaseOrderForDelivery = {
@@ -233,7 +244,7 @@ export const QuoteComparison: React.FC<QuoteComparisonProps> = ({ orderId, build
         supplier_name: supplierName,
         supplier_address: quote.supplier_location,
         total_amount: quote.total_price,
-        delivery_address: deliveryAddress,
+        delivery_address: orderData?.delivery_address || '',
         delivery_date: deliveryDate,
         items: quote.items.map(item => ({
           material_name: item.material_name,
@@ -246,25 +257,39 @@ export const QuoteComparison: React.FC<QuoteComparisonProps> = ({ orderId, build
 
       setAcceptedPurchaseOrder(purchaseOrderForDelivery);
       
-      // AUTO-CREATE delivery_request so it appears on provider dashboard immediately
+      // AUTO-CREATE delivery_request only when address/coords pass DB validation (no literal "To be provided").
       if (builderId) {
         try {
           const pickupAddr = purchaseOrderForDelivery.supplier_address || 'Supplier location';
-          const fullDeliveryAddr = (deliveryAddress || 'To be provided').trim();
           const materialType = purchaseOrderForDelivery.items?.[0]?.material_name || 'Construction Materials';
           const qty = purchaseOrderForDelivery.items?.reduce((s: number, i: any) => s + (i.quantity || 0), 0) || 1;
-          const { error: drErr } = await supabase.from('delivery_requests').insert({
-            builder_id: builderId,
-            purchase_order_id: orderId,
-            pickup_address: pickupAddr,
-            delivery_address: fullDeliveryAddr,
-            pickup_date: deliveryDate,
-            material_type: materialType,
-            quantity: qty,
-            status: 'pending'
-          });
-          if (!drErr) {
-            console.log('✅ Auto-created delivery_request — appears on provider dashboard');
+          const canAutoCreateDr =
+            !isPlaceholderDeliveryAddress(deliveryAddress) ||
+            hasUsableDeliveryCoordinates(poCoords);
+          if (!canAutoCreateDr) {
+            console.log(
+              'ℹ️ Skipping auto delivery_request: no real address yet. Complete the delivery dialog — DB rejects placeholder addresses.'
+            );
+          } else {
+            const insertRow: Record<string, unknown> = {
+              builder_id: builderId,
+              purchase_order_id: orderId,
+              pickup_address: pickupAddr,
+              delivery_address: isPlaceholderDeliveryAddress(deliveryAddress) ? '' : deliveryAddress,
+              pickup_date: deliveryDate,
+              material_type: materialType,
+              quantity: qty,
+              status: 'pending',
+            };
+            if (hasUsableDeliveryCoordinates(poCoords)) {
+              insertRow.delivery_coordinates = String(poCoords).trim();
+            }
+            const { error: drErr } = await supabase.from('delivery_requests').insert(insertRow as any);
+            if (!drErr) {
+              console.log('✅ Auto-created delivery_request — appears on provider dashboard');
+            } else {
+              console.warn('⚠️ Auto-create delivery_request:', drErr.message);
+            }
           }
         } catch (e) {
           console.warn('⚠️ Auto-create delivery_request:', e);
