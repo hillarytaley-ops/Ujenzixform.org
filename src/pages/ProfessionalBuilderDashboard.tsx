@@ -451,6 +451,7 @@ const ProfessionalBuilderDashboardPage = () => {
   const [extrasSubTab, setExtrasSubTab] = useState('team'); // Sub-tab for Extras (team or support)
   const [deliveriesSubTab, setDeliveriesSubTab] = useState('request'); // Sub-tab for Deliveries (request, schedule, history)
   const [supplierResponseCount, setSupplierResponseCount] = useState(0); // Count of supplier responses for notification badge
+  const [invoiceHubBadgeCount, setInvoiceHubBadgeCount] = useState(0); // DN + invoices needing builder action (Invoices tab)
   const [deliveryAddressNeededNotifications, setDeliveryAddressNeededNotifications] = useState<{ id: string; title: string; message: string; action_url?: string }[]>([]);
 
   // Projects state - start with loading false to show empty state immediately
@@ -520,6 +521,19 @@ const ProfessionalBuilderDashboardPage = () => {
     }
     return map;
   }, [projects, deliveries, monitoringRequests]);
+
+  /** Deliveries tab: address reminders + non-terminal shipment rows. */
+  const deliveriesNavBadgeCount = useMemo(() => {
+    const needAddress = deliveryAddressNeededNotifications.length;
+    const active = deliveries.filter((d: any) => {
+      const s = String(d.display_status ?? d.status ?? '').toLowerCase();
+      if (['delivered', 'completed', 'cancelled', 'failed'].some((term) => s.includes(term))) {
+        return false;
+      }
+      return true;
+    }).length;
+    return Math.min(99, needAddress + active);
+  }, [deliveries, deliveryAddressNeededNotifications]);
 
   // SUPABASE_URL and SUPABASE_ANON_KEY are imported from @/integrations/supabase/client
 
@@ -610,6 +624,61 @@ const ProfessionalBuilderDashboardPage = () => {
     } catch (error) {
       console.error('Error fetching supplier response count:', error);
       setSupplierResponseCount(0);
+    }
+  };
+
+  /** Delivery notes awaiting signature/inspection + invoices sent but not acknowledged (matches Invoice tab workflows). */
+  const fetchInvoiceHubBadgeCount = async (profileId?: string | null, authUserId?: string | null) => {
+    const builders = [...new Set([profileId, authUserId].filter(Boolean))] as string[];
+    if (builders.length === 0) {
+      setInvoiceHubBadgeCount(0);
+      return;
+    }
+    try {
+      const { count: dnCount, error: dnErr } = await supabase
+        .from('delivery_notes')
+        .select('id', { count: 'exact', head: true })
+        .in('builder_id', builders)
+        .in('status', ['pending_signature', 'inspection_pending']);
+      if (dnErr) console.warn('Invoice hub badge (DN):', dnErr.message);
+
+      const { data: invByBuilder, error: ibErr } = await supabase
+        .from('invoices')
+        .select('id')
+        .in('builder_id', builders)
+        .eq('status', 'sent')
+        .is('acknowledged_at', null);
+      if (ibErr) console.warn('Invoice hub badge (inv builder_id):', ibErr.message);
+
+      const { data: poRows, error: poErr } = await supabase
+        .from('purchase_orders')
+        .select('id')
+        .in('buyer_id', builders);
+      if (poErr) console.warn('Invoice hub badge (PO):', poErr.message);
+
+      const poIds = (poRows || []).map((p) => p.id).filter(Boolean);
+      let invByPo: { id: string }[] = [];
+      if (poIds.length > 0) {
+        const { data, error: ipErr } = await supabase
+          .from('invoices')
+          .select('id')
+          .in('purchase_order_id', poIds)
+          .eq('status', 'sent')
+          .is('acknowledged_at', null);
+        if (ipErr) console.warn('Invoice hub badge (inv PO):', ipErr.message);
+        invByPo = data || [];
+      }
+
+      const invSeen = new Set<string>();
+      for (const r of [...(invByBuilder || []), ...invByPo]) {
+        if (r?.id) invSeen.add(r.id);
+      }
+
+      const total = (dnCount || 0) + invSeen.size;
+      setInvoiceHubBadgeCount(Math.min(99, total));
+    } catch (e) {
+      console.warn('fetchInvoiceHubBadgeCount:', e);
+      setInvoiceHubBadgeCount(0);
     }
   };
 
@@ -1639,6 +1708,7 @@ const ProfessionalBuilderDashboardPage = () => {
       loadRealStats(userId);
       void fetchProjects();
       fetchSupplierResponseCount(userId, profileBuyerId);
+      void fetchInvoiceHubBadgeCount(profileBuyerId, userId);
       toast({
         title: "Order Updated",
         description: "Your order status has been updated.",
@@ -1736,6 +1806,47 @@ const ProfessionalBuilderDashboardPage = () => {
       };
     }
   }, [authUser, profile?.id]);
+
+  // Invoices tab badge: delivery notes + unacknowledged invoices
+  useEffect(() => {
+    const userId = getUserId();
+    if (!userId) return;
+    const profileBuyerId = profile?.id;
+    void fetchInvoiceHubBadgeCount(profileBuyerId, userId);
+
+    let ch = supabase.channel(`invoice-hub-badge-${userId}`);
+    const builders = [...new Set([userId, profileBuyerId].filter(Boolean))] as string[];
+    for (const bid of builders) {
+      ch = ch.on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'delivery_notes',
+          filter: `builder_id=eq.${bid}`,
+        },
+        () => {
+          void fetchInvoiceHubBadgeCount(profileBuyerId, userId);
+        }
+      );
+      ch = ch.on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'invoices',
+          filter: `builder_id=eq.${bid}`,
+        },
+        () => {
+          void fetchInvoiceHubBadgeCount(profileBuyerId, userId);
+        }
+      );
+    }
+    ch.subscribe();
+    return () => {
+      void supabase.removeChannel(ch);
+    };
+  }, [authUser?.id, profile?.id]);
 
   const handleMonitoringRequest = async () => {
     if (!monitoringRequest.projectName || !monitoringRequest.projectLocation) {
@@ -2141,22 +2252,36 @@ const ProfessionalBuilderDashboardPage = () => {
             )}
           </Button>
           <Button 
-            className={`h-auto py-3 px-2 transition-all flex flex-col items-center gap-1 ${activeTab === 'orders' 
+            className={`h-auto py-3 px-2 transition-all flex flex-col items-center gap-1 relative ${activeTab === 'orders' 
               ? 'bg-gradient-to-r from-blue-500 to-indigo-600 ring-2 ring-blue-300 shadow-lg text-white' 
               : 'bg-white hover:bg-blue-50 text-gray-700 border shadow-sm'}`}
             onClick={() => setActiveTab('orders')}
           >
             <Package className="h-5 w-5" />
             <span className="text-[10px] sm:text-xs">Orders</span>
+            {stats.pendingOrders > 0 && (
+              <Badge
+                className="absolute -top-1 -right-1 h-5 min-w-5 px-1 rounded-full p-0 flex items-center justify-center text-[10px] bg-red-500 text-white border-2 border-white"
+              >
+                {stats.pendingOrders > 9 ? '9+' : stats.pendingOrders}
+              </Badge>
+            )}
           </Button>
           <Button 
-            className={`h-auto py-3 px-2 transition-all flex flex-col items-center gap-1 ${activeTab === 'deliveries' 
+            className={`h-auto py-3 px-2 transition-all flex flex-col items-center gap-1 relative ${activeTab === 'deliveries' 
               ? 'bg-gradient-to-r from-amber-500 to-orange-500 ring-2 ring-amber-300 shadow-lg text-white' 
               : 'bg-white hover:bg-amber-50 text-gray-700 border shadow-sm'}`}
             onClick={() => setActiveTab('deliveries')}
           >
             <Truck className="h-5 w-5" />
             <span className="text-[10px] sm:text-xs">Deliveries</span>
+            {deliveriesNavBadgeCount > 0 && (
+              <Badge
+                className="absolute -top-1 -right-1 h-5 min-w-5 px-1 rounded-full p-0 flex items-center justify-center text-[10px] bg-red-500 text-white border-2 border-white"
+              >
+                {deliveriesNavBadgeCount > 9 ? '9+' : deliveriesNavBadgeCount}
+              </Badge>
+            )}
           </Button>
           <Button 
             className={`h-auto py-3 px-2 transition-all flex flex-col items-center gap-1 ${activeTab === 'tracking' 
@@ -2168,13 +2293,20 @@ const ProfessionalBuilderDashboardPage = () => {
             <span className="text-[10px] sm:text-xs">Tracking</span>
           </Button>
           <Button 
-            className={`h-auto py-3 px-2 transition-all flex flex-col items-center gap-1 ${activeTab === 'invoices' 
+            className={`h-auto py-3 px-2 transition-all flex flex-col items-center gap-1 relative ${activeTab === 'invoices' 
               ? 'bg-gradient-to-r from-slate-500 to-slate-600 ring-2 ring-slate-300 shadow-lg text-white' 
               : 'bg-white hover:bg-slate-50 text-gray-700 border shadow-sm'}`}
             onClick={() => setActiveTab('invoices')}
           >
             <FileText className="h-5 w-5" />
             <span className="text-[10px] sm:text-xs">Invoices</span>
+            {invoiceHubBadgeCount > 0 && (
+              <Badge
+                className="absolute -top-1 -right-1 h-5 min-w-5 px-1 rounded-full p-0 flex items-center justify-center text-[10px] bg-red-500 text-white border-2 border-white"
+              >
+                {invoiceHubBadgeCount > 9 ? '9+' : invoiceHubBadgeCount}
+              </Badge>
+            )}
           </Button>
           <Button 
             className={`h-auto py-3 px-2 transition-all flex flex-col items-center gap-1 ${activeTab === 'extras' 
