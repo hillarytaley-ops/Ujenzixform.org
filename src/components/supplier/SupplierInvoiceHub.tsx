@@ -49,6 +49,11 @@ export const SupplierInvoiceHub: React.FC<SupplierInvoiceHubProps> = ({
   const [deliveryNotes, setDeliveryNotes] = useState<any[]>([]);
   const [grns, setGrns] = useState<any[]>([]);
   const [poById, setPoById] = useState<Record<string, string>>({});
+  const [poItemsById, setPoItemsById] = useState<Record<string, unknown[]>>({});
+  const [builderLabelByKey, setBuilderLabelByKey] = useState<Record<string, string>>({});
+  const [signatureFallbackByDnId, setSignatureFallbackByDnId] = useState<
+    Record<string, { signature: string; signedAt: string }>
+  >({});
   const [grnUpdatingId, setGrnUpdatingId] = useState<string | null>(null);
   const [supplierCompanyName, setSupplierCompanyName] = useState('');
   const [dnFileDownloadingId, setDnFileDownloadingId] = useState<string | null>(null);
@@ -58,6 +63,9 @@ export const SupplierInvoiceHub: React.FC<SupplierInvoiceHubProps> = ({
     if (!supplierRecordId) {
       setDeliveryNotes([]);
       setPoById({});
+      setPoItemsById({});
+      setBuilderLabelByKey({});
+      setSignatureFallbackByDnId({});
       setDnLoading(false);
       return;
     }
@@ -94,17 +102,62 @@ export const SupplierInvoiceHub: React.FC<SupplierInvoiceHubProps> = ({
       }
       setDeliveryNotes(list);
 
+      const builderKeys = [...new Set(list.map((r: any) => r.builder_id).filter(Boolean))];
+      let labelMap: Record<string, string> = {};
+      if (builderKeys.length > 0) {
+        const [byId, byUser] = await Promise.all([
+          supabase.from('profiles').select('id, user_id, full_name, company_name').in('id', builderKeys),
+          supabase.from('profiles').select('id, user_id, full_name, company_name').in('user_id', builderKeys),
+        ]);
+        const add = (p: { id?: string; user_id?: string; full_name?: string | null; company_name?: string | null }) => {
+          const label = (p.company_name || p.full_name || '').trim() || 'Builder';
+          if (p.id) labelMap[p.id] = label;
+          if (p.user_id) labelMap[p.user_id] = label;
+        };
+        (byId.data || []).forEach(add);
+        (byUser.data || []).forEach(add);
+      }
+      setBuilderLabelByKey(labelMap);
+
+      const dnIds = [...new Set(list.map((r: any) => r.id).filter(Boolean))];
+      let sigByDnId: Record<string, { signature: string; signedAt: string }> = {};
+      if (dnIds.length > 0) {
+        const { data: sigRows, error: sigErr } = await supabase
+          .from('delivery_note_signatures')
+          .select('delivery_note_id, signature_data, signed_at')
+          .in('delivery_note_id', dnIds)
+          .order('signed_at', { ascending: false });
+        if (!sigErr && sigRows) {
+          for (const r of sigRows) {
+            const id = r.delivery_note_id as string;
+            if (!id || sigByDnId[id]) continue;
+            sigByDnId[id] = {
+              signature: r.signature_data as string,
+              signedAt: r.signed_at as string,
+            };
+          }
+        }
+      }
+      setSignatureFallbackByDnId(sigByDnId);
+
       const poIds = [...new Set(list.map((r) => r.purchase_order_id).filter(Boolean))];
       if (poIds.length === 0) {
         setPoById({});
+        setPoItemsById({});
         return;
       }
       const { data: pos, error: poErr } = await supabase
         .from('purchase_orders')
-        .select('id, po_number')
+        .select('id, po_number, items')
         .in('id', poIds);
       if (poErr) throw poErr;
-      setPoById(Object.fromEntries((pos || []).map((p: any) => [p.id, p.po_number || '—'])));
+      const poRows = pos || [];
+      setPoById(Object.fromEntries(poRows.map((p: any) => [p.id, p.po_number || '—'])));
+      setPoItemsById(
+        Object.fromEntries(
+          poRows.map((p: any) => [p.id, Array.isArray(p.items) ? p.items : []])
+        )
+      );
     } catch (e: any) {
       console.error('Supplier DN fetch:', e);
       toast({
@@ -113,6 +166,10 @@ export const SupplierInvoiceHub: React.FC<SupplierInvoiceHubProps> = ({
         variant: 'destructive',
       });
       setDeliveryNotes([]);
+      setPoById({});
+      setPoItemsById({});
+      setBuilderLabelByKey({});
+      setSignatureFallbackByDnId({});
     } finally {
       setDnLoading(false);
     }
@@ -135,11 +192,24 @@ export const SupplierInvoiceHub: React.FC<SupplierInvoiceHubProps> = ({
   }, [supplierRecordId]);
 
   const printDeliveryNotePdf = (dn: Record<string, unknown>) => {
+    const poId = String(dn.purchase_order_id || '');
+    const builderKey = dn.builder_id != null ? String(dn.builder_id) : '';
+    const dnId = String(dn.id || '');
+    const altSig = dnId ? signatureFallbackByDnId[dnId] : undefined;
+    const hasColSig =
+      typeof dn.builder_signature === 'string' && dn.builder_signature.trim().length > 0;
+    const merged: Record<string, unknown> = { ...dn };
+    if (!hasColSig && altSig?.signature) {
+      merged.builder_signature = altSig.signature;
+      merged.builder_signed_at = merged.builder_signed_at || altSig.signedAt;
+    }
     const opened = openDeliveryNotePdfWindow(
-      dn,
+      merged,
       {
-        poNumber: poById[String(dn.purchase_order_id)] || undefined,
+        poNumber: poById[poId] || undefined,
         supplierName: supplierCompanyName || undefined,
+        builderDisplayName: builderKey ? builderLabelByKey[builderKey] : undefined,
+        purchaseOrderItems: poId ? poItemsById[poId] : undefined,
       },
       {
         onPopUpBlocked: () =>
