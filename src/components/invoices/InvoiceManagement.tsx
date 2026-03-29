@@ -40,9 +40,15 @@ interface Invoice {
 interface InvoiceManagementProps {
   userId: string;
   userRole: 'builder' | 'supplier' | 'admin';
+  /** public.suppliers.id — passed to list_invoices_for_supplier RPC */
+  supplierRecordId?: string | null;
 }
 
-export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({ userId, userRole }) => {
+export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
+  userId,
+  userRole,
+  supplierRecordId,
+}) => {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);
   const [editingInvoice, setEditingInvoice] = useState<Invoice | null>(null);
@@ -69,9 +75,13 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({ userId, us
           supplier:suppliers(company_name)
         `;
 
-      // Supplier: prefer RPC (SECURITY DEFINER) when RLS blocks nested selects; enrich PO / supplier labels after.
+      // Supplier: prefer RPC with p_supplier_id when dashboard resolved suppliers.id.
       if (userRole === 'supplier') {
-        const rpc = await supabase.rpc('list_invoices_for_supplier');
+        const rpcArgs =
+          supplierRecordId != null && supplierRecordId !== ''
+            ? { p_supplier_id: supplierRecordId }
+            : ({} as Record<string, string>);
+        const rpc = await supabase.rpc('list_invoices_for_supplier', rpcArgs);
         let base: any[] = [];
         if (!rpc.error && Array.isArray(rpc.data)) {
           base = rpc.data;
@@ -175,7 +185,7 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({ userId, us
     if (userId) {
       fetchInvoices();
     }
-  }, [userId, userRole]);
+  }, [userId, userRole, supplierRecordId]);
 
   const handleEditInvoice = (invoice: Invoice) => {
     if (!invoice.is_editable) {

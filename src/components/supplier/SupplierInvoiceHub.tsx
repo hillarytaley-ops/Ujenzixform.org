@@ -50,11 +50,19 @@ export const SupplierInvoiceHub: React.FC<SupplierInvoiceHubProps> = ({
   const [poById, setPoById] = useState<Record<string, string>>({});
   const [grnUpdatingId, setGrnUpdatingId] = useState<string | null>(null);
 
-  /** Prefer SECURITY DEFINER RPC (migration 20260329330000) so lists are not empty when RLS + nested PO checks fail. */
+  /** RPC with p_supplier_id = dashboard suppliers.id; refetch when supplierRecordId resolves (was missing from deps before). */
   const loadDeliveryNotes = useCallback(async () => {
+    if (!supplierRecordId) {
+      setDeliveryNotes([]);
+      setPoById({});
+      setDnLoading(false);
+      return;
+    }
     setDnLoading(true);
     try {
-      const rpc = await supabase.rpc('list_delivery_notes_for_supplier');
+      const rpc = await supabase.rpc('list_delivery_notes_for_supplier', {
+        p_supplier_id: supplierRecordId,
+      });
       let list: any[] = [];
       if (!rpc.error && Array.isArray(rpc.data)) {
         list = rpc.data;
@@ -68,7 +76,7 @@ export const SupplierInvoiceHub: React.FC<SupplierInvoiceHubProps> = ({
             toast({
               title: 'Database update required',
               description:
-                'Run migration 20260329330000 and 20260329340000 in Supabase SQL (list_delivery_notes_for_supplier).',
+                'Run migration 20260329350000 in Supabase SQL (list_delivery_notes_for_supplier with p_supplier_id).',
               variant: 'destructive',
             });
           }
@@ -105,12 +113,19 @@ export const SupplierInvoiceHub: React.FC<SupplierInvoiceHubProps> = ({
     } finally {
       setDnLoading(false);
     }
-  }, [toast]);
+  }, [toast, supplierRecordId]);
 
   const loadGrns = useCallback(async () => {
+    if (!supplierRecordId) {
+      setGrns([]);
+      setGrnLoading(false);
+      return;
+    }
     setGrnLoading(true);
     try {
-      const rpc = await supabase.rpc('list_goods_received_notes_for_supplier');
+      const rpc = await supabase.rpc('list_goods_received_notes_for_supplier', {
+        p_supplier_id: supplierRecordId,
+      });
       let rows: any[] = [];
       if (!rpc.error && Array.isArray(rpc.data)) {
         rows = rpc.data;
@@ -124,7 +139,7 @@ export const SupplierInvoiceHub: React.FC<SupplierInvoiceHubProps> = ({
             toast({
               title: 'Database update required',
               description:
-                'Run migrations list_goods_received_notes_for_supplier in Supabase SQL, then refresh.',
+                'Run migration 20260329350000 (list_goods_received_notes_for_supplier) in Supabase SQL.',
               variant: 'destructive',
             });
           }
@@ -149,18 +164,20 @@ export const SupplierInvoiceHub: React.FC<SupplierInvoiceHubProps> = ({
     } finally {
       setGrnLoading(false);
     }
-  }, [toast]);
+  }, [toast, supplierRecordId]);
 
   useEffect(() => {
-    if (subTab === 'delivery-notes') loadDeliveryNotes();
-    if (subTab === 'grn') loadGrns();
-  }, [subTab, loadDeliveryNotes, loadGrns]);
+    if (!supplierRecordId) return;
+    if (subTab === 'delivery-notes') void loadDeliveryNotes();
+    if (subTab === 'grn') void loadGrns();
+  }, [subTab, supplierRecordId, loadDeliveryNotes, loadGrns]);
 
-  // Preload DN + GRN when the hub mounts so sub-tabs show data without an extra click.
+  // Preload when suppliers.id is known (async on parent dashboard — without this, fetch ran once with no id).
   useEffect(() => {
+    if (!supplierRecordId) return;
     void loadDeliveryNotes();
     void loadGrns();
-  }, [loadDeliveryNotes, loadGrns]);
+  }, [supplierRecordId, loadDeliveryNotes, loadGrns]);
 
   const markGrnViewed = async (id: string) => {
     setGrnUpdatingId(id);
@@ -240,7 +257,11 @@ export const SupplierInvoiceHub: React.FC<SupplierInvoiceHubProps> = ({
             <p className={`text-sm ${mutedText}`}>
               Invoices tied to your supplier account: edit and send when marked editable.
             </p>
-            <InvoiceManagement userId={userId} userRole="supplier" />
+            <InvoiceManagement
+              userId={userId}
+              userRole="supplier"
+              supplierRecordId={supplierRecordId}
+            />
           </TabsContent>
 
           <TabsContent value="delivery-notes" className="mt-0">
