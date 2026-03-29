@@ -13,6 +13,7 @@ build/
 
 # Generated from scripts/generate-favicon.mjs (created by npm run build)
 public/favicon.ico
+public/favicon-32.png
 public/pwa-icon-192.png
 public/pwa-icon-512.png
 public/ujenzixform-logo.png

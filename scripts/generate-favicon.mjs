@@ -1,20 +1,18 @@
 /**
- * Writes public/ujenzixform-logo.png, favicon.ico, and PWA icons for deploys.
- * Prefers ujenzixform-logo-circular.svg. Skips corrupt .png files that are
- * data-URL text instead of binary PNG.
- * Run: npm run favicon:generate (also runs before vite build).
+ * Writes public/ujenzixform-logo.png, favicon-32.png, and PWA icons (sharp only).
+ * No png-to-ico: avoids libraries that read .png paths (broken data-URL text files).
+ * Legacy /favicon.ico is rewritten to /favicon-32.png in vercel.json.
  */
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import pngToIco from "png-to-ico";
 import sharp from "sharp";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const root = path.join(__dirname, "..");
 const publicDir = path.join(root, "public");
 const outLogoPng = path.join(publicDir, "ujenzixform-logo.png");
-const icoPath = path.join(publicDir, "favicon.ico");
+const favicon32Path = path.join(publicDir, "favicon-32.png");
 const svgPath = path.join(publicDir, "ujenzixform-logo-circular.svg");
 const preferredPng = path.join(publicDir, "ujenzixform-logo.png");
 const fallbackPng = path.join(publicDir, "ujenzipro-logo.png");
@@ -54,7 +52,6 @@ function tryDecodeDataUrlPng(filePath) {
   return null;
 }
 
-/** Drop data-URL-as-text “.png” files so png-to-ico / sharp never read garbage (CI cache, old branches). */
 function scrubBrokenPngFiles() {
   for (const p of [preferredPng, fallbackPng]) {
     if (!fs.existsSync(p)) continue;
@@ -71,7 +68,6 @@ function scrubBrokenPngFiles() {
 
 scrubBrokenPngFiles();
 
-/** @returns {{ kind: 'svg', path: string } | { kind: 'pngFile', path: string } | { kind: 'pngBuffer', buffer: Buffer }} */
 function resolveBrandSource() {
   if (fs.existsSync(svgPath)) {
     console.log("Brand source: ujenzixform-logo-circular.svg");
@@ -111,12 +107,9 @@ function raster(side) {
 await raster(512).png().toFile(outLogoPng);
 console.log("Wrote", outLogoPng);
 
+await raster(32).png().toFile(favicon32Path);
+console.log("Wrote", favicon32Path);
+
 await raster(192).png().toFile(path.join(publicDir, "pwa-icon-192.png"));
 await raster(512).png().toFile(path.join(publicDir, "pwa-icon-512.png"));
 console.log("Wrote pwa-icon-192.png, pwa-icon-512.png");
-
-const icoBuffers = await Promise.all(
-  [16, 32, 48].map((s) => raster(s).png().toBuffer())
-);
-fs.writeFileSync(icoPath, await pngToIco(icoBuffers));
-console.log("Wrote", icoPath);
