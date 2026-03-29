@@ -73,6 +73,10 @@ import { ReviewsList, SupplierRatingSummary } from "@/components/reviews/ReviewS
 import { UserAnalyticsDashboard } from "@/components/analytics/UserAnalyticsDashboard";
 import { InAppCommunication } from "@/components/communication/InAppCommunication";
 import { DispatchScanner } from "@/components/qr/DispatchScanner";
+import {
+  buildOrderStatusChartData,
+  countOrdersInStatusBucket,
+} from "@/lib/purchaseOrderMetrics";
 import { TrackingTab } from "@/components/tracking/TrackingTab";
 import { Navigation as NavigationIcon } from "lucide-react";
 
@@ -93,6 +97,16 @@ interface RecentOrder {
   total_amount: number;
   status: string;
   created_at: string;
+}
+
+/** Matches QuotesManagementContent "Pending Response" — supplier must act. */
+function countQuotesPendingSupplierResponse(quotes: { status?: string }[]): number {
+  return quotes.filter(
+    (q) =>
+      q.status === 'pending' ||
+      q.status === 'quote_created' ||
+      q.status === 'quote_received_by_supplier'
+  ).length;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════════════════════
@@ -127,7 +141,12 @@ const QuotesManagementContent: React.FC<QuotesManagementContentProps> = ({
   // Default to 'pending' to show Pending Response quotes as the primary view
   const [activeFilter, setActiveFilter] = useState<'all' | 'pending' | 'quoted' | 'confirmed'>('pending');
   
-  const pendingQuotes = quoteRequests.filter(q => q.status === 'pending' || q.status === 'quote_created' || q.status === 'quote_received_by_supplier');
+  const pendingQuotes = quoteRequests.filter(
+    (q) =>
+      q.status === 'pending' ||
+      q.status === 'quote_created' ||
+      q.status === 'quote_received_by_supplier'
+  );
   // Awaiting Client: Quotes where supplier has responded and is waiting for builder to accept/reject
   const quotedQuotes = quoteRequests.filter(q => 
     q.status === 'quoted' || 
@@ -373,6 +392,8 @@ interface SupplierReportsTabProps {
   mutedText: string;
   cardBg: string;
   stats: DashboardStats;
+  /** Aligned with overview Pending card and order-status chart (quote / early-pipeline statuses). */
+  pendingOrdersCount: number;
   recentOrders: RecentOrder[];
   quoteRequests: any[];
 }
@@ -384,6 +405,7 @@ const SupplierReportsTab: React.FC<SupplierReportsTabProps> = ({
   mutedText,
   cardBg,
   stats,
+  pendingOrdersCount,
   recentOrders,
   quoteRequests
 }) => {
@@ -426,7 +448,7 @@ const SupplierReportsTab: React.FC<SupplierReportsTabProps> = ({
       csvContent = `Quote Report - Generated ${today}\n\n`;
       csvContent += `Total Quotes,${quoteRequests.length}\n`;
       csvContent += `Conversion Rate,${quoteConversionRate.toFixed(1)}%\n`;
-      csvContent += `Pending Quotes,${quoteRequests.filter(q => q.status === 'pending').length}\n`;
+      csvContent += `Pending Quotes,${countQuotesPendingSupplierResponse(quoteRequests)}\n`;
       csvContent += `Confirmed Quotes,${quoteRequests.filter(q => q.status === 'confirmed' || q.status === 'accepted').length}\n\n`;
       csvContent += `Quote ID,Builder,Material,Quantity,Quote Amount,Status,Date\n`;
       quoteRequests.forEach(quote => {
@@ -559,10 +581,10 @@ const SupplierReportsTab: React.FC<SupplierReportsTabProps> = ({
                 </tr>
                 <tr className={isDarkMode ? 'bg-slate-800' : 'bg-white'}>
                   <td className={`px-4 py-3 ${textColor}`}>Pending Orders</td>
-                  <td className={`px-4 py-3 font-semibold ${textColor}`}>{stats.pendingOrders}</td>
+                  <td className={`px-4 py-3 font-semibold ${textColor}`}>{pendingOrdersCount}</td>
                   <td className="px-4 py-3">
-                    <Badge className={stats.pendingOrders > 5 ? 'bg-amber-100 text-amber-700' : 'bg-green-100 text-green-700'}>
-                      {stats.pendingOrders > 5 ? 'Needs Attention' : 'On Track'}
+                    <Badge className={pendingOrdersCount > 5 ? 'bg-amber-100 text-amber-700' : 'bg-green-100 text-green-700'}>
+                      {pendingOrdersCount > 5 ? 'Needs Attention' : 'On Track'}
                     </Badge>
                   </td>
                 </tr>
@@ -659,6 +681,23 @@ const SupplierDashboard = () => {
     if (!user?.id) return [];
     return supplierRecordId ? [...new Set([user.id, supplierRecordId])] : [user.id];
   }, [resolvedSupplierIds, user?.id, supplierRecordId]);
+
+  const viewOrdersNavBadgeCount = useMemo(
+    () => countQuotesPendingSupplierResponse(quoteRequests),
+    [quoteRequests]
+  );
+  const viewOrdersNavBadgeLabel =
+    viewOrdersNavBadgeCount > 99 ? '99+' : String(viewOrdersNavBadgeCount);
+
+  const orderStatusChartData = useMemo(
+    () => buildOrderStatusChartData(ordersForOrdersTab),
+    [ordersForOrdersTab]
+  );
+
+  const pendingOrdersDisplay = useMemo(
+    () => countOrdersInStatusBucket(ordersForOrdersTab, 'pending'),
+    [ordersForOrdersTab]
+  );
 
   // Cache resolved supplier ID so QR Manager etc. can use it on next load
   useEffect(() => {
@@ -1650,8 +1689,8 @@ const SupplierDashboard = () => {
               });
               setRecentOrders(formattedOrders);
               
-              // Calculate stats from ALL orders
-              const pendingCount = ordersData.filter((o: any) => o.status === 'pending').length;
+              // Calculate stats from ALL orders (pending = chart bucket, includes quote workflow statuses)
+              const pendingCount = countOrdersInStatusBucket(ordersData, 'pending');
               const confirmedCount = ordersData.filter((o: any) => o.status === 'confirmed').length;
               const totalRevenue = ordersData.reduce((sum: number, o: any) => sum + (o.total_amount || 0), 0);
               const uniqueCustomers = new Set(ordersData.map((o: any) => o.buyer_id)).size;
@@ -1966,7 +2005,7 @@ const SupplierDashboard = () => {
               <div className="flex items-center justify-between">
                 <div>
                   <p className={`text-sm ${mutedText}`}>{t('supplier.stats.pending')}</p>
-                  <p className="text-2xl font-bold text-yellow-600">{stats.pendingOrders}</p>
+                  <p className="text-2xl font-bold text-yellow-600">{pendingOrdersDisplay}</p>
                 </div>
                 <div className="p-3 bg-yellow-100 rounded-full">
                   <Clock className="h-6 w-6 text-yellow-600" />
@@ -2043,19 +2082,24 @@ const SupplierDashboard = () => {
             </div>
           </Button>
           <Button 
-            className={`h-auto py-3 sm:py-4 transition-all relative ${activeTab === 'view-orders' 
+            className={`h-auto py-3 sm:py-4 transition-all relative overflow-visible ${activeTab === 'view-orders' 
               ? 'bg-gradient-to-r from-blue-500 to-blue-600 ring-2 ring-blue-300 shadow-lg' 
               : isDarkMode ? 'bg-slate-700 hover:bg-slate-600' : 'bg-gray-100 hover:bg-gray-200 text-gray-700'}`}
             onClick={() => setActiveTab('view-orders')}
           >
-            <div className="flex flex-col items-center gap-1.5 sm:gap-2 px-1">
-              <Eye className="h-5 w-5 sm:h-6 sm:w-6 shrink-0" />
+            <div className="relative flex flex-col items-center gap-1.5 sm:gap-2 px-1">
+              <span className="relative inline-flex">
+                <Eye className="h-5 w-5 sm:h-6 sm:w-6 shrink-0" />
+                {viewOrdersNavBadgeCount > 0 && (
+                  <span
+                    className="absolute -right-2 -top-2 flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold leading-none text-white ring-2 ring-white dark:ring-slate-800"
+                    aria-label={`${viewOrdersNavBadgeCount} quotes need your response`}
+                  >
+                    {viewOrdersNavBadgeLabel}
+                  </span>
+                )}
+              </span>
               <span className="text-[10px] sm:text-xs md:text-sm text-center leading-tight">View Orders</span>
-              {quoteRequests.filter(q => q.status === 'pending').length > 0 && (
-                <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full px-1.5 py-0.5 min-w-[20px] text-center">
-                  {quoteRequests.filter(q => q.status === 'pending').length}
-                </span>
-              )}
             </div>
           </Button>
           <Button 
@@ -2192,7 +2236,7 @@ const SupplierDashboard = () => {
               </Card>
 
               {/* Quick Analytics */}
-              <SupplierCharts isDarkMode={isDarkMode} />
+              <SupplierCharts isDarkMode={isDarkMode} orderStatusData={orderStatusChartData} />
             </div>
           </TabsContent>
 
@@ -2335,9 +2379,9 @@ const SupplierDashboard = () => {
                       >
                         <FileCheck className="h-5 w-5 sm:h-6 sm:w-6 shrink-0" />
                         <span className="whitespace-nowrap">Quotes</span>
-                        {quoteRequests.filter(q => q.status === 'pending').length > 0 && (
-                          <span className="bg-red-500 text-white text-xs font-bold rounded-full min-w-[1.25rem] px-1.5 py-0.5">
-                            {quoteRequests.filter(q => q.status === 'pending').length}
+                        {viewOrdersNavBadgeCount > 0 && (
+                          <span className="min-w-[1.25rem] rounded-full bg-red-500 px-1.5 py-0.5 text-center text-xs font-bold text-white">
+                            {viewOrdersNavBadgeLabel}
                           </span>
                         )}
                       </TabsTrigger>
@@ -2569,6 +2613,7 @@ const SupplierDashboard = () => {
               mutedText={mutedText}
               cardBg={cardBg}
               stats={stats}
+              pendingOrdersCount={pendingOrdersDisplay}
               recentOrders={recentOrders}
               quoteRequests={quoteRequests}
             />

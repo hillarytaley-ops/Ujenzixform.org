@@ -16,6 +16,7 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { trackingNumberService } from '@/services/TrackingNumberService';
+import { countOrdersInStatusBucket } from '@/lib/purchaseOrderMetrics';
 
 export interface UserContext {
   userId: string;
@@ -278,8 +279,8 @@ export const useSupplierData = () => {
         console.log('Payments table not available');
       }
 
-      // Calculate stats from actual data
-      const pendingOrders = (ordersData || []).filter(o => o.status === 'pending').length;
+      // Calculate stats from actual data (pending = quote / early pipeline, not only status === 'pending')
+      const pendingOrders = countOrdersInStatusBucket(ordersData || [], 'pending');
       const totalRevenue = paymentsData.reduce((sum, p) => sum + (p.amount || 0), 0);
       const uniqueCustomers = new Set((ordersData || []).map(o => o.builder_id)).size;
 

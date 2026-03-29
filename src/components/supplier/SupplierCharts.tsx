@@ -18,23 +18,19 @@ import {
   Line
 } from 'recharts';
 import { TrendingUp, DollarSign, Package, ShoppingCart } from 'lucide-react';
+import { ORDER_STATUS_CHART_COLORS } from '@/lib/purchaseOrderMetrics';
 
 interface SupplierChartsProps {
   salesData?: any[];
-  orderStatusData?: any[];
+  /** When set (including `[]`), replaces demo donut data so the chart matches real orders. */
+  orderStatusData?: any[] | null;
   topProductsData?: any[];
   monthlyRevenueData?: any[];
   isDarkMode?: boolean;
 }
 
 const COLORS = ['#f97316', '#fb923c', '#fdba74', '#fed7aa', '#ffedd5'];
-const STATUS_COLORS = {
-  pending: '#eab308',
-  processing: '#3b82f6',
-  shipped: '#8b5cf6',
-  delivered: '#22c55e',
-  cancelled: '#ef4444'
-};
+const STATUS_COLORS = ORDER_STATUS_CHART_COLORS;
 
 export const SupplierCharts: React.FC<SupplierChartsProps> = ({
   salesData,
@@ -80,7 +76,9 @@ export const SupplierCharts: React.FC<SupplierChartsProps> = ({
   ];
 
   const sales = salesData || defaultSalesData;
-  const orderStatus = orderStatusData || defaultOrderStatusData;
+  const usingLiveOrderStatus = orderStatusData !== undefined && orderStatusData !== null;
+  const orderStatus = usingLiveOrderStatus ? orderStatusData : defaultOrderStatusData;
+  const orderStatusPieEmpty = usingLiveOrderStatus && orderStatus.length === 0;
   const topProducts = topProductsData || defaultTopProductsData;
   const monthlyRevenue = monthlyRevenueData || defaultMonthlyRevenueData;
 
@@ -149,33 +147,43 @@ export const SupplierCharts: React.FC<SupplierChartsProps> = ({
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <ResponsiveContainer width="100%" height={250}>
-            <PieChart>
-              <Pie
-                data={orderStatus}
-                cx="50%"
-                cy="50%"
-                innerRadius={60}
-                outerRadius={90}
-                paddingAngle={5}
-                dataKey="value"
-                label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                labelLine={false}
-              >
-                {orderStatus.map((entry, index) => (
-                  <Cell key={`cell-${index}`} fill={entry.color || COLORS[index % COLORS.length]} />
-                ))}
-              </Pie>
-              <Tooltip 
-                contentStyle={{ 
-                  backgroundColor: isDarkMode ? '#1e293b' : '#fff',
-                  border: `1px solid ${isDarkMode ? '#475569' : '#e5e7eb'}`,
-                  borderRadius: '8px'
-                }}
-              />
-              <Legend />
-            </PieChart>
-          </ResponsiveContainer>
+          {orderStatusPieEmpty ? (
+            <div
+              className={`flex h-[250px] items-center justify-center text-sm ${
+                isDarkMode ? 'text-slate-400' : 'text-gray-500'
+              }`}
+            >
+              No orders yet — status breakdown will appear here once you have purchase orders.
+            </div>
+          ) : (
+            <ResponsiveContainer width="100%" height={250}>
+              <PieChart>
+                <Pie
+                  data={orderStatus}
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={60}
+                  outerRadius={90}
+                  paddingAngle={5}
+                  dataKey="value"
+                  label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                  labelLine={false}
+                >
+                  {orderStatus.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={entry.color || COLORS[index % COLORS.length]} />
+                  ))}
+                </Pie>
+                <Tooltip 
+                  contentStyle={{ 
+                    backgroundColor: isDarkMode ? '#1e293b' : '#fff',
+                    border: `1px solid ${isDarkMode ? '#475569' : '#e5e7eb'}`,
+                    borderRadius: '8px'
+                  }}
+                />
+                <Legend />
+              </PieChart>
+            </ResponsiveContainer>
+          )}
         </CardContent>
       </Card>
 
