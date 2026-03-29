@@ -39,12 +39,26 @@ interface DeliveryNote {
 }
 
 interface DeliveryNoteWorkflowProps {
-  builderId: string;
+  /**
+   * auth.users.id — used for builder_signed_by (FK) and to match delivery_notes.builder_id
+   * when PO.buyer_id stored the session user id.
+   */
+  builderAuthUserId: string;
+  /** profiles.id — matches delivery_notes.builder_id when PO.buyer_id stored profile row id */
+  builderProfileId?: string | null;
   onComplete?: () => void;
 }
 
+function uniqueBuilderIds(
+  authId: string | undefined,
+  profileId?: string | null
+): string[] {
+  return [...new Set([authId, profileId].filter(Boolean))] as string[];
+}
+
 export const DeliveryNoteWorkflow: React.FC<DeliveryNoteWorkflowProps> = ({
-  builderId,
+  builderAuthUserId,
+  builderProfileId,
   onComplete
 }) => {
   const [deliveryNotes, setDeliveryNotes] = useState<DeliveryNote[]>([]);
@@ -63,10 +77,16 @@ export const DeliveryNoteWorkflow: React.FC<DeliveryNoteWorkflowProps> = ({
   const fetchDeliveryNotes = async () => {
     try {
       setLoading(true);
+      const builderIds = uniqueBuilderIds(builderAuthUserId, builderProfileId);
+      if (builderIds.length === 0) {
+        setDeliveryNotes([]);
+        return;
+      }
+
       const { data: rows, error } = await supabase
         .from('delivery_notes')
         .select('*')
-        .eq('builder_id', builderId)
+        .in('builder_id', builderIds)
         .in('status', ['pending_signature', 'signed', 'forwarded_to_supplier', 'inspection_pending'])
         .order('created_at', { ascending: false });
 
@@ -121,10 +141,10 @@ export const DeliveryNoteWorkflow: React.FC<DeliveryNoteWorkflowProps> = ({
   };
 
   useEffect(() => {
-    if (builderId) {
+    if (builderAuthUserId || builderProfileId) {
       fetchDeliveryNotes();
     }
-  }, [builderId]);
+  }, [builderAuthUserId, builderProfileId]);
 
   // Sign delivery note
   const handleSignDN = async () => {
@@ -149,7 +169,7 @@ export const DeliveryNoteWorkflow: React.FC<DeliveryNoteWorkflowProps> = ({
         .update({
           builder_signature: signatureData,
           builder_signed_at: new Date().toISOString(),
-          builder_signed_by: builderId,
+          builder_signed_by: builderAuthUserId,
           status: 'signed',
           updated_at: new Date().toISOString()
         })
