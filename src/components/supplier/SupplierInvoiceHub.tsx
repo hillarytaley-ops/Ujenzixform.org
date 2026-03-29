@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
@@ -19,6 +19,8 @@ import { useToast } from '@/hooks/use-toast';
 interface SupplierInvoiceHubProps {
   userId: string;
   supplierRecordId: string | null;
+  /** All supplier UUIDs this login may act as (suppliers.id + auth id when POs use user id). */
+  supplierScopeIds: string[];
   isDarkMode: boolean;
   textColor: string;
   mutedText: string;
@@ -36,6 +38,7 @@ function humanizeStatus(status: string | undefined) {
 export const SupplierInvoiceHub: React.FC<SupplierInvoiceHubProps> = ({
   userId,
   supplierRecordId,
+  supplierScopeIds,
   isDarkMode,
   textColor,
   mutedText,
@@ -50,10 +53,17 @@ export const SupplierInvoiceHub: React.FC<SupplierInvoiceHubProps> = ({
   const [poById, setPoById] = useState<Record<string, string>>({});
   const [grnUpdatingId, setGrnUpdatingId] = useState<string | null>(null);
 
-  const supplierId = supplierRecordId;
+  const scopeIds = useMemo(() => {
+    const merged = [
+      ...supplierScopeIds,
+      ...(supplierRecordId ? [supplierRecordId] : []),
+      userId,
+    ].filter(Boolean) as string[];
+    return [...new Set(merged)];
+  }, [supplierScopeIds, supplierRecordId, userId]);
 
   const loadDeliveryNotes = useCallback(async () => {
-    if (!supplierId) {
+    if (scopeIds.length === 0) {
       setDeliveryNotes([]);
       return;
     }
@@ -62,7 +72,7 @@ export const SupplierInvoiceHub: React.FC<SupplierInvoiceHubProps> = ({
       const { data: rows, error } = await supabase
         .from('delivery_notes')
         .select('*')
-        .eq('supplier_id', supplierId)
+        .in('supplier_id', scopeIds)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -91,10 +101,10 @@ export const SupplierInvoiceHub: React.FC<SupplierInvoiceHubProps> = ({
     } finally {
       setDnLoading(false);
     }
-  }, [supplierId, toast]);
+  }, [scopeIds, toast]);
 
   const loadGrns = useCallback(async () => {
-    if (!supplierId) {
+    if (scopeIds.length === 0) {
       setGrns([]);
       return;
     }
@@ -103,7 +113,7 @@ export const SupplierInvoiceHub: React.FC<SupplierInvoiceHubProps> = ({
       const { data: rows, error } = await supabase
         .from('goods_received_notes')
         .select('*')
-        .eq('supplier_id', supplierId)
+        .in('supplier_id', scopeIds)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -119,7 +129,7 @@ export const SupplierInvoiceHub: React.FC<SupplierInvoiceHubProps> = ({
     } finally {
       setGrnLoading(false);
     }
-  }, [supplierId, toast]);
+  }, [scopeIds, toast]);
 
   useEffect(() => {
     if (subTab === 'delivery-notes') loadDeliveryNotes();
@@ -154,7 +164,7 @@ export const SupplierInvoiceHub: React.FC<SupplierInvoiceHubProps> = ({
     }
   };
 
-  if (!supplierId) {
+  if (!supplierRecordId) {
     return (
       <Card className={cardBg}>
         <CardHeader>
