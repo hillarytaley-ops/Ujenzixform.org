@@ -178,33 +178,34 @@ const prefetchSupplierData = async (userId: string, accessToken: string): Promis
   
   result.supplierId = supplierId;
   
-  // Now prefetch data in parallel
-  const [orders, quotes, products, materialItems] = await Promise.all([
-    // Fetch orders
+  // purchase_orders has no guaranteed `order_type` column in DB — filtering it caused PostgREST 400.
+  // Quote-style rows are identified the same way as OrderManagement (po_number prefix QR-).
+  const [orders, products, materialItems] = await Promise.all([
     fastFetch(
-      `${SUPABASE_URL}/rest/v1/purchase_orders?or=(supplier_id.eq.${userId},supplier_id.eq.${supplierId})&order=created_at.desc&limit=100`,
+      `${SUPABASE_URL}/rest/v1/purchase_orders?or=(supplier_id.eq.${userId},supplier_id.eq.${supplierId})&order=created_at.desc&limit=120`,
       accessToken,
       5000
     ),
-    // Fetch quote requests
-    fastFetch(
-      `${SUPABASE_URL}/rest/v1/purchase_orders?or=(supplier_id.eq.${userId},supplier_id.eq.${supplierId})&order_type=eq.quote_request&order=created_at.desc&limit=50`,
-      accessToken,
-      4000
-    ),
-    // Fetch supplier products
     fastFetch(
       `${SUPABASE_URL}/rest/v1/supplier_product_prices?supplier_id=eq.${supplierId}&select=*&limit=200`,
       accessToken,
       4000
     ),
-    // Fetch material items (for QR codes)
     fastFetch(
       `${SUPABASE_URL}/rest/v1/material_items?supplier_id=eq.${supplierId}&order=created_at.desc&limit=200`,
       accessToken,
       4000
     ),
   ]);
+
+  const quotes = Array.isArray(orders)
+    ? orders
+        .filter((o: any) => {
+          const pn = String(o.po_number ?? '');
+          return pn.startsWith('QR-');
+        })
+        .slice(0, 50)
+    : null;
   
   // Cache the results
   if (orders) {
