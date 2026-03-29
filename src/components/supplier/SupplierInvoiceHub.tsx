@@ -335,21 +335,39 @@ export const SupplierInvoiceHub: React.FC<SupplierInvoiceHubProps> = ({
   const markGrnViewed = async (id: string) => {
     setGrnUpdatingId(id);
     try {
-      const { error } = await supabase
-        .from('goods_received_notes')
-        .update({
-          status: 'viewed_by_supplier',
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', id);
-
-      if (error) throw error;
+      const rpc = await supabase.rpc('mark_grn_viewed_by_supplier', { p_grn_id: id });
+      if (rpc.error) {
+        const msg = rpc.error.message || '';
+        const missingFn =
+          msg.includes('Could not find the function') ||
+          (msg.includes('function') && msg.includes('does not exist'));
+        if (missingFn) {
+          const { data, error } = await supabase
+            .from('goods_received_notes')
+            .update({
+              status: 'viewed_by_supplier',
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', id)
+            .eq('status', 'generated')
+            .select('id');
+          if (error) throw error;
+          if (!data?.length) {
+            throw new Error(
+              'No row updated (run migration 20260329360000_mark_grn_viewed_by_supplier_rpc.sql or check GRN status).'
+            );
+          }
+        } else {
+          throw rpc.error;
+        }
+      }
       toast({
         title: 'Marked as viewed',
         description: 'GRN status updated. An invoice may be generated for the builder.',
       });
       await loadGrns();
     } catch (e: any) {
+      console.error('markGrnViewed:', e);
       toast({
         title: 'Update failed',
         description: e?.message || 'Check permissions or try again.',
@@ -550,13 +568,18 @@ export const SupplierInvoiceHub: React.FC<SupplierInvoiceHubProps> = ({
                             ? new Date(g.received_date).toLocaleDateString()
                             : '—'}
                         </TableCell>
-                        <TableCell className="text-right">
+                        <TableCell className="relative z-10 text-right">
                           {g.status === 'generated' && (
                             <Button
+                              type="button"
                               size="sm"
                               variant="secondary"
                               disabled={grnUpdatingId === g.id}
-                              onClick={() => markGrnViewed(g.id)}
+                              onClick={(ev) => {
+                                ev.preventDefault();
+                                ev.stopPropagation();
+                                void markGrnViewed(g.id);
+                              }}
                             >
                               {grnUpdatingId === g.id ? (
                                 <Loader2 className="h-4 w-4 animate-spin" />
