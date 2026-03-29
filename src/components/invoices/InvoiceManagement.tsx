@@ -61,6 +61,29 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({ userId, us
   const fetchInvoices = async () => {
     try {
       setLoading(true);
+
+      // Supplier: plain select avoids PostgREST embed 400 when FK hints are missing from schema cache.
+      if (userRole === 'supplier') {
+        const { data: supplier, error: supErr } = await supabase
+          .from('suppliers')
+          .select('id')
+          .eq('user_id', userId)
+          .maybeSingle();
+        if (supErr) throw supErr;
+        if (!supplier?.id) {
+          setInvoices([]);
+          return;
+        }
+        const { data, error } = await supabase
+          .from('invoices')
+          .select('*')
+          .eq('supplier_id', supplier.id)
+          .order('created_at', { ascending: false });
+        if (error) throw error;
+        setInvoices(data || []);
+        return;
+      }
+
       let query = supabase
         .from('invoices')
         .select(`
@@ -72,16 +95,6 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({ userId, us
 
       if (userRole === 'builder') {
         query = query.eq('builder_id', userId);
-      } else if (userRole === 'supplier') {
-        const { data: supplier } = await supabase
-          .from('suppliers')
-          .select('id')
-          .eq('user_id', userId)
-          .single();
-        
-        if (supplier) {
-          query = query.eq('supplier_id', supplier.id);
-        }
       }
 
       const { data, error } = await query;
@@ -243,6 +256,14 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({ userId, us
           Refresh
         </Button>
       </div>
+
+      {invoices.length === 0 ? (
+        <Card>
+          <CardContent className="py-10 text-center text-muted-foreground text-sm">
+            No invoices yet.
+          </CardContent>
+        </Card>
+      ) : null}
 
       {invoices.map((invoice) => (
         <Card key={invoice.id}>

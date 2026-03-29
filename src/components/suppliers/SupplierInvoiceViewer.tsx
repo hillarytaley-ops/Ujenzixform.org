@@ -72,7 +72,7 @@ const SupplierInvoiceViewer: React.FC = () => {
       const { data: supplier } = await supabase
         .from('suppliers')
         .select('id')
-        .eq('user_id', userProfile.id)
+        .eq('user_id', user.id)
         .single();
 
       if (!supplier) {

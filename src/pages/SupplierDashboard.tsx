@@ -78,7 +78,8 @@ import {
   countOrdersInStatusBucket,
 } from "@/lib/purchaseOrderMetrics";
 import { TrackingTab } from "@/components/tracking/TrackingTab";
-import { Navigation as NavigationIcon } from "lucide-react";
+import { Navigation as NavigationIcon, Receipt } from "lucide-react";
+import { SupplierInvoiceHub } from "@/components/supplier/SupplierInvoiceHub";
 
 interface DashboardStats {
   totalProducts: number;
@@ -660,7 +661,7 @@ const SupplierDashboard = () => {
   });
   const [recentOrders, setRecentOrders] = useState<RecentOrder[]>([]);
   const [ordersForOrdersTab, setOrdersForOrdersTab] = useState<any[]>([]); // Full orders for OrderManagement (so Orders tab shows immediately)
-  const SUPPLIER_TABS = ['overview', 'materials', 'view-orders', 'scan-qr', 'tracking', 'analytics', 'reports'];
+  const SUPPLIER_TABS = ['overview', 'materials', 'view-orders', 'scan-qr', 'tracking', 'analytics', 'invoice', 'reports'];
   const [activeTab, setActiveTab] = useUrlTabSync(SUPPLIER_TABS, 'overview');
   const [viewOrdersSubTab, setViewOrdersSubTab] = useState('quotes');
   const [showProfileEdit, setShowProfileEdit] = useState(false);
@@ -2058,7 +2059,7 @@ const SupplierDashboard = () => {
         </div>
 
         {/* Navigation Cards — responsive grid (was 3× cramped columns on mobile) */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-2 sm:gap-3 mb-6">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4 xl:grid-cols-8 gap-2 sm:gap-3 mb-6">
           <Button 
             className={`h-auto py-3 sm:py-4 transition-all ${activeTab === 'overview' 
               ? 'bg-gradient-to-r from-slate-600 to-slate-700 ring-2 ring-slate-400 shadow-lg' 
@@ -2136,6 +2137,17 @@ const SupplierDashboard = () => {
             </div>
           </Button>
           <Button 
+            className={`h-auto py-3 sm:py-4 transition-all ${activeTab === 'invoice' 
+              ? 'bg-gradient-to-r from-rose-500 to-pink-600 ring-2 ring-rose-300 shadow-lg' 
+              : isDarkMode ? 'bg-slate-700 hover:bg-slate-600' : 'bg-gray-100 hover:bg-gray-200 text-gray-700'}`}
+            onClick={() => setActiveTab('invoice')}
+          >
+            <div className="flex flex-col items-center gap-1.5 sm:gap-2 px-1">
+              <Receipt className="h-5 w-5 sm:h-6 sm:w-6 shrink-0" />
+              <span className="text-[10px] sm:text-xs md:text-sm text-center leading-tight">Invoice</span>
+            </div>
+          </Button>
+          <Button 
             className={`h-auto py-3 sm:py-4 transition-all ${activeTab === 'reports' 
               ? 'bg-gradient-to-r from-green-500 to-emerald-600 ring-2 ring-green-300 shadow-lg' 
               : isDarkMode ? 'bg-slate-700 hover:bg-slate-600' : 'bg-gray-100 hover:bg-gray-200 text-gray-700'}`}
@@ -2157,6 +2169,7 @@ const SupplierDashboard = () => {
             <TabsTrigger value="scan-qr">QR Codes</TabsTrigger>
             <TabsTrigger value="tracking">Tracking</TabsTrigger>
             <TabsTrigger value="analytics">Analytics</TabsTrigger>
+            <TabsTrigger value="invoice">Invoice</TabsTrigger>
             <TabsTrigger value="reports">Reports</TabsTrigger>
           </TabsList>
 
@@ -2600,6 +2613,22 @@ const SupplierDashboard = () => {
                 </div>
               </CardContent>
             </Card>
+          </TabsContent>
+
+          {/* ═══════════════════════════════════════════════════════════════════════════════════ */}
+          {/* INVOICE TAB — invoices, delivery notes, GRN */}
+          {/* ═══════════════════════════════════════════════════════════════════════════════════ */}
+          <TabsContent value="invoice">
+            {user?.id && (
+              <SupplierInvoiceHub
+                userId={user.id}
+                supplierRecordId={supplierRecordId}
+                isDarkMode={isDarkMode}
+                textColor={textColor}
+                mutedText={mutedText}
+                cardBg={cardBg}
+              />
+            )}
           </TabsContent>
 
           {/* ═══════════════════════════════════════════════════════════════════════════════════ */}
