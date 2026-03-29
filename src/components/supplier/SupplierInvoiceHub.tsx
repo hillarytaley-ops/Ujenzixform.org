@@ -335,7 +335,10 @@ export const SupplierInvoiceHub: React.FC<SupplierInvoiceHubProps> = ({
   const markGrnViewed = async (id: string) => {
     setGrnUpdatingId(id);
     try {
-      const rpc = await supabase.rpc('mark_grn_viewed_by_supplier', { p_grn_id: id });
+      const rpc = await supabase.rpc('mark_grn_viewed_by_supplier', {
+        p_grn_id: id,
+        ...(supplierRecordId ? { p_supplier_id: supplierRecordId } : {}),
+      });
       if (rpc.error) {
         const msg = rpc.error.message || '';
         const missingFn =
@@ -354,7 +357,7 @@ export const SupplierInvoiceHub: React.FC<SupplierInvoiceHubProps> = ({
           if (error) throw error;
           if (!data?.length) {
             throw new Error(
-              'No row updated (run migration 20260329360000_mark_grn_viewed_by_supplier_rpc.sql or check GRN status).'
+              'No row updated (apply migrations through 20260329380000 or check GRN status).'
             );
           }
         } else {
