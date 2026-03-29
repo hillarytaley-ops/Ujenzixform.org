@@ -7,3 +7,7 @@ verify_jwt = true
 # POST still requires a valid Supabase session (checked inside the function).
 [functions.send-email]
 verify_jwt = false
+
+# Called from Postgres (pg_net) with x-dn-email-secret; not end-user JWT.
+[functions.notify-supplier-delivery-note]
+verify_jwt = false
