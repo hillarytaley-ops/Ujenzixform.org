@@ -4,6 +4,7 @@
 -- (and only when purchase_order_id was set). Replace with the same pattern used for GRN updates.
 
 DROP POLICY IF EXISTS "Suppliers can view invoices supplier_id auth uid" ON public.invoices;
+DROP POLICY IF EXISTS "Suppliers can view invoices supplier_id row or legacy auth uid" ON public.invoices;
 
 CREATE POLICY "Suppliers can view invoices supplier_id row or legacy auth uid"
   ON public.invoices FOR SELECT
