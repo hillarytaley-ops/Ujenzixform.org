@@ -3238,9 +3238,9 @@ const ProfessionalBuilderDashboardPage = () => {
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  {user?.id && (
-                    <DeliveryNoteWorkflow 
-                      builderId={user.id}
+                  {Boolean(profile?.id || user?.id) && (
+                    <DeliveryNoteWorkflow
+                      builderId={(profile?.id || user?.id) as string}
                       onComplete={() => {
                         // Refresh data if needed
                       }}
