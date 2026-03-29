@@ -115,6 +115,12 @@ export const SupplierInvoiceHub: React.FC<SupplierInvoiceHubProps> = ({
     if (subTab === 'grn') loadGrns();
   }, [subTab, loadDeliveryNotes, loadGrns]);
 
+  // Preload DN + GRN when the hub mounts so sub-tabs show data without an extra click.
+  useEffect(() => {
+    void loadDeliveryNotes();
+    void loadGrns();
+  }, [loadDeliveryNotes, loadGrns]);
+
   const markGrnViewed = async (id: string) => {
     setGrnUpdatingId(id);
     try {

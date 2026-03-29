@@ -63,22 +63,22 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({ userId, us
     try {
       setLoading(true);
 
-      // Supplier: RLS restricts rows; avoid .eq(supplier_id) so invoices still show when supplier_id/auth/PO linkage varies.
-      if (userRole === 'supplier') {
-        const { data, error } = await supabase
-          .from('invoices')
-          .select('*')
-          .order('created_at', { ascending: false });
-        if (error) throw error;
-        setInvoices(data || []);
-        return;
-      }
-
       const invoiceSelect = `
           *,
           purchase_order:purchase_orders(po_number),
           supplier:suppliers(company_name)
         `;
+
+      // Supplier: RLS restricts rows (do not .eq supplier_id — PO-linked invoices may still apply).
+      if (userRole === 'supplier') {
+        const { data, error } = await supabase
+          .from('invoices')
+          .select(invoiceSelect)
+          .order('created_at', { ascending: false });
+        if (error) throw error;
+        setInvoices((data || []) as Invoice[]);
+        return;
+      }
 
       if (userRole === 'builder') {
         const { data: byBuilderId, error: e1 } = await supabase
@@ -283,8 +283,15 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({ userId, us
 
       {invoices.length === 0 ? (
         <Card>
-          <CardContent className="py-10 text-center text-muted-foreground text-sm">
-            No invoices yet.
+          <CardContent className="space-y-2 py-10 text-center text-muted-foreground text-sm">
+            <p>No invoices yet.</p>
+            {userRole === 'supplier' && (
+              <p className="mx-auto max-w-md text-xs leading-relaxed">
+                Invoices are usually created after delivery is completed and a goods received note (GRN) is in
+                progress. Open <strong>View Orders</strong> for order status; delivery notes and GRNs appear here
+                as the workflow runs.
+              </p>
+            )}
           </CardContent>
         </Card>
       ) : null}
