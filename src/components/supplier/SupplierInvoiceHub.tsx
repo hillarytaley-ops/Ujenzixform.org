@@ -50,17 +50,25 @@ export const SupplierInvoiceHub: React.FC<SupplierInvoiceHubProps> = ({
   const [poById, setPoById] = useState<Record<string, string>>({});
   const [grnUpdatingId, setGrnUpdatingId] = useState<string | null>(null);
 
-  /** No client filter on supplier_id: RLS returns every DN this login may see (by supplier_id or linked PO). */
+  /** Prefer SECURITY DEFINER RPC (migration 20260329330000) so lists are not empty when RLS + nested PO checks fail. */
   const loadDeliveryNotes = useCallback(async () => {
     setDnLoading(true);
     try {
-      const { data: rows, error } = await supabase
-        .from('delivery_notes')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      const list = rows || [];
+      const rpc = await supabase.rpc('list_delivery_notes_for_supplier');
+      let list: any[] = [];
+      if (!rpc.error && Array.isArray(rpc.data)) {
+        list = rpc.data;
+      } else {
+        if (rpc.error) {
+          console.warn('list_delivery_notes_for_supplier RPC unavailable, using direct select:', rpc.error.message);
+        }
+        const { data: rows, error } = await supabase
+          .from('delivery_notes')
+          .select('*')
+          .order('created_at', { ascending: false });
+        if (error) throw error;
+        list = rows || [];
+      }
       setDeliveryNotes(list);
 
       const poIds = [...new Set(list.map((r) => r.purchase_order_id).filter(Boolean))];
@@ -90,13 +98,22 @@ export const SupplierInvoiceHub: React.FC<SupplierInvoiceHubProps> = ({
   const loadGrns = useCallback(async () => {
     setGrnLoading(true);
     try {
-      const { data: rows, error } = await supabase
-        .from('goods_received_notes')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      setGrns(rows || []);
+      const rpc = await supabase.rpc('list_goods_received_notes_for_supplier');
+      let rows: any[] = [];
+      if (!rpc.error && Array.isArray(rpc.data)) {
+        rows = rpc.data;
+      } else {
+        if (rpc.error) {
+          console.warn('list_goods_received_notes_for_supplier RPC unavailable, using direct select:', rpc.error.message);
+        }
+        const { data, error } = await supabase
+          .from('goods_received_notes')
+          .select('*')
+          .order('created_at', { ascending: false });
+        if (error) throw error;
+        rows = data || [];
+      }
+      setGrns(rows);
     } catch (e: any) {
       console.error('Supplier GRN fetch:', e);
       toast({

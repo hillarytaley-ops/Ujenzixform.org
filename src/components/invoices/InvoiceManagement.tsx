@@ -69,14 +69,49 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({ userId, us
           supplier:suppliers(company_name)
         `;
 
-      // Supplier: RLS restricts rows (do not .eq supplier_id — PO-linked invoices may still apply).
+      // Supplier: prefer RPC (SECURITY DEFINER) when RLS blocks nested selects; enrich PO / supplier labels after.
       if (userRole === 'supplier') {
-        const { data, error } = await supabase
-          .from('invoices')
-          .select(invoiceSelect)
-          .order('created_at', { ascending: false });
-        if (error) throw error;
-        setInvoices((data || []) as Invoice[]);
+        const rpc = await supabase.rpc('list_invoices_for_supplier');
+        let base: any[] = [];
+        if (!rpc.error && Array.isArray(rpc.data)) {
+          base = rpc.data;
+        } else {
+          if (rpc.error) {
+            console.warn('list_invoices_for_supplier RPC unavailable, using direct select:', rpc.error.message);
+          }
+          const { data, error } = await supabase
+            .from('invoices')
+            .select(invoiceSelect)
+            .order('created_at', { ascending: false });
+          if (error) throw error;
+          setInvoices((data || []) as Invoice[]);
+          return;
+        }
+
+        const poIds = [...new Set(base.map((i) => i.purchase_order_id).filter(Boolean))];
+        const supIds = [...new Set(base.map((i) => i.supplier_id).filter(Boolean))];
+        const [poRes, supRes] = await Promise.all([
+          poIds.length
+            ? supabase.from('purchase_orders').select('id, po_number').in('id', poIds)
+            : Promise.resolve({ data: [] as { id: string; po_number?: string }[], error: null }),
+          supIds.length
+            ? supabase.from('suppliers').select('id, company_name').in('id', supIds)
+            : Promise.resolve({ data: [] as { id: string; company_name?: string }[], error: null }),
+        ]);
+        if (poRes.error) throw poRes.error;
+        if (supRes.error) throw supRes.error;
+        const poById = Object.fromEntries((poRes.data || []).map((p) => [p.id, p]));
+        const supById = Object.fromEntries((supRes.data || []).map((s) => [s.id, s]));
+        const enriched = base.map((inv) => ({
+          ...inv,
+          purchase_order: poById[inv.purchase_order_id]
+            ? { po_number: poById[inv.purchase_order_id].po_number }
+            : undefined,
+          supplier: supById[inv.supplier_id]
+            ? { company_name: supById[inv.supplier_id].company_name }
+            : undefined,
+        })) as Invoice[];
+        setInvoices(enriched);
         return;
       }
 
