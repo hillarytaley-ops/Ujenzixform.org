@@ -11,10 +11,11 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { FileText, Package, Receipt, Loader2, Eye } from 'lucide-react';
+import { FileText, Package, Receipt, Loader2, Eye, Download } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { InvoiceManagement } from '@/components/invoices/InvoiceManagement';
 import { useToast } from '@/hooks/use-toast';
+import { openDeliveryNotePdfWindow } from '@/utils/deliveryNoteDocument';
 
 interface SupplierInvoiceHubProps {
   userId: string;
@@ -49,6 +50,8 @@ export const SupplierInvoiceHub: React.FC<SupplierInvoiceHubProps> = ({
   const [grns, setGrns] = useState<any[]>([]);
   const [poById, setPoById] = useState<Record<string, string>>({});
   const [grnUpdatingId, setGrnUpdatingId] = useState<string | null>(null);
+  const [supplierCompanyName, setSupplierCompanyName] = useState('');
+  const [dnFileDownloadingId, setDnFileDownloadingId] = useState<string | null>(null);
 
   /** RPC with p_supplier_id = dashboard suppliers.id; refetch when supplierRecordId resolves (was missing from deps before). */
   const loadDeliveryNotes = useCallback(async () => {
@@ -114,6 +117,86 @@ export const SupplierInvoiceHub: React.FC<SupplierInvoiceHubProps> = ({
       setDnLoading(false);
     }
   }, [toast, supplierRecordId]);
+
+  useEffect(() => {
+    if (!supplierRecordId) {
+      setSupplierCompanyName('');
+      return;
+    }
+    void supabase
+      .from('suppliers')
+      .select('company_name')
+      .eq('id', supplierRecordId)
+      .single()
+      .then(({ data, error }) => {
+        if (!error && data?.company_name) setSupplierCompanyName(data.company_name);
+        else setSupplierCompanyName('');
+      });
+  }, [supplierRecordId]);
+
+  const printDeliveryNotePdf = (dn: Record<string, unknown>) => {
+    const opened = openDeliveryNotePdfWindow(
+      dn,
+      {
+        poNumber: poById[String(dn.purchase_order_id)] || undefined,
+        supplierName: supplierCompanyName || undefined,
+      },
+      {
+        onPopUpBlocked: () =>
+          toast({
+            title: 'Pop-up blocked',
+            description: 'Allow pop-ups for this site to open the delivery note and save as PDF.',
+            variant: 'destructive',
+          }),
+      }
+    );
+    if (opened) {
+      toast({
+        title: 'Delivery note opened',
+        description: 'Use Print → Save as PDF in your browser to download.',
+      });
+    }
+  };
+
+  const downloadDeliveryNoteUpload = async (dn: Record<string, unknown>) => {
+    const path = typeof dn.file_path === 'string' ? dn.file_path.trim() : '';
+    if (!path) {
+      toast({
+        title: 'No uploaded file',
+        description: 'This delivery note has no attachment in storage. Use PDF for the generated document.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    const id = String(dn.id);
+    setDnFileDownloadingId(id);
+    try {
+      const { data, error } = await supabase.storage.from('delivery-notes').download(path);
+      if (error) throw error;
+      const url = URL.createObjectURL(data);
+      const a = document.createElement('a');
+      a.href = url;
+      const name =
+        typeof dn.file_name === 'string' && dn.file_name.trim()
+          ? dn.file_name.trim()
+          : `DN_${dn.delivery_note_number || dn.dn_number || id}.pdf`;
+      a.download = name;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      toast({ title: 'Download started', description: name });
+    } catch (e: any) {
+      console.error('DN file download:', e);
+      toast({
+        title: 'Download failed',
+        description: e?.message || 'Could not fetch the file from storage.',
+        variant: 'destructive',
+      });
+    } finally {
+      setDnFileDownloadingId(null);
+    }
+  };
 
   const loadGrns = useCallback(async () => {
     if (!supplierRecordId) {
@@ -292,6 +375,7 @@ export const SupplierInvoiceHub: React.FC<SupplierInvoiceHubProps> = ({
                       <TableHead>Status</TableHead>
                       <TableHead>Delivery date</TableHead>
                       <TableHead>Updated</TableHead>
+                      <TableHead className="text-right w-[1%] whitespace-nowrap">Document</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -315,6 +399,37 @@ export const SupplierInvoiceHub: React.FC<SupplierInvoiceHubProps> = ({
                           {dn.updated_at
                             ? new Date(dn.updated_at).toLocaleString()
                             : '—'}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex flex-wrap items-center justify-end gap-1">
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              className="h-8"
+                              onClick={() => printDeliveryNotePdf(dn as Record<string, unknown>)}
+                            >
+                              <FileText className="mr-1 h-3.5 w-3.5" />
+                              PDF
+                            </Button>
+                            {typeof dn.file_path === 'string' && dn.file_path.trim() ? (
+                              <Button
+                                type="button"
+                                variant="secondary"
+                                size="sm"
+                                className="h-8"
+                                disabled={dnFileDownloadingId === dn.id}
+                                onClick={() => downloadDeliveryNoteUpload(dn as Record<string, unknown>)}
+                                title="Download uploaded file"
+                              >
+                                {dnFileDownloadingId === dn.id ? (
+                                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                ) : (
+                                  <Download className="h-3.5 w-3.5" />
+                                )}
+                              </Button>
+                            ) : null}
+                          </div>
                         </TableCell>
                       </TableRow>
                     ))}
