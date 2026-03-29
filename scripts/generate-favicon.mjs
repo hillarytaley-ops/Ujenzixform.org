@@ -54,6 +54,23 @@ function tryDecodeDataUrlPng(filePath) {
   return null;
 }
 
+/** Drop data-URL-as-text “.png” files so png-to-ico / sharp never read garbage (CI cache, old branches). */
+function scrubBrokenPngFiles() {
+  for (const p of [preferredPng, fallbackPng]) {
+    if (!fs.existsSync(p)) continue;
+    if (isBinaryPng(p)) continue;
+    if (tryDecodeDataUrlPng(p)) continue;
+    try {
+      fs.unlinkSync(p);
+      console.warn("Removed invalid PNG (not binary):", path.basename(p));
+    } catch (e) {
+      console.warn("Could not remove", p, e);
+    }
+  }
+}
+
+scrubBrokenPngFiles();
+
 /** @returns {{ kind: 'svg', path: string } | { kind: 'pngFile', path: string } | { kind: 'pngBuffer', buffer: Buffer }} */
 function resolveBrandSource() {
   if (fs.existsSync(svgPath)) {
