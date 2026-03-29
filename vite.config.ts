@@ -3,6 +3,15 @@ import react from "@vitejs/plugin-react-swc";
 import path from "path";
 import { execSync } from "node:child_process";
 
+/** Canonical site URL for og:image / og:url (Vercel preview vs production). */
+function resolveSiteOrigin(): string {
+  const explicit = process.env.VITE_PUBLIC_SITE_URL?.trim();
+  if (explicit) return explicit.replace(/\/$/, "");
+  const vercel = process.env.VERCEL_URL?.trim();
+  if (vercel) return `https://${vercel.replace(/^https?:\/\//, "")}`;
+  return "https://ujenzixform.org";
+}
+
 /** Injected into client bundle for footer “Build:” line (compare to GitHub commit). */
 function resolveAppBuildId(): string {
   const fromEnv =
@@ -32,6 +41,13 @@ export default defineConfig(({ mode }) => {
     },
     plugins: [
       react(),
+      {
+        name: "inject-site-origin-meta",
+        transformIndexHtml(html) {
+          const origin = resolveSiteOrigin();
+          return html.replaceAll("%UJENZI_SITE_ORIGIN%", origin);
+        },
+      },
     ],
     resolve: {
       alias: {
