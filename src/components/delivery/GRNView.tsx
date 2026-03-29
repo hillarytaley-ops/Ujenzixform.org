@@ -3,8 +3,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
-import { Package, Download, Eye, Loader2 } from 'lucide-react';
+import { Package, Download, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { lineItemDescription } from '@/utils/deliveryNoteDocument';
 
 interface GRN {
   id: string;
@@ -17,7 +18,32 @@ interface GRN {
   status: string;
   purchase_order?: {
     po_number?: string;
+    items?: unknown[];
   };
+}
+
+function poItemsArray(grn: GRN): Record<string, unknown>[] {
+  const raw = grn.purchase_order?.items;
+  return Array.isArray(raw) ? (raw as Record<string, unknown>[]) : [];
+}
+
+function resolveGrnLineLabel(row: Record<string, unknown>, poLine: Record<string, unknown> | undefined): string {
+  let d = lineItemDescription(row);
+  if (d === 'Item' && poLine) {
+    const fromPo = lineItemDescription(poLine);
+    if (fromPo !== 'Item') return fromPo;
+  }
+  return d;
+}
+
+function resolveGrnLineQty(row: Record<string, unknown>, poLine: Record<string, unknown> | undefined): string {
+  const q =
+    row.quantity ??
+    row.qty ??
+    row.amount ??
+    poLine?.quantity ??
+    poLine?.qty;
+  return q != null && String(q).trim() !== '' ? String(q) : '—';
 }
 
 interface GRNViewProps {
@@ -37,7 +63,7 @@ export const GRNView: React.FC<GRNViewProps> = ({ userId, userRole }) => {
         .from('goods_received_notes')
         .select(`
           *,
-          purchase_order:purchase_orders(po_number)
+          purchase_order:purchase_orders(po_number, items)
         `)
         .order('created_at', { ascending: false });
 
@@ -99,11 +125,14 @@ export const GRNView: React.FC<GRNViewProps> = ({ userId, userRole }) => {
   }, [userId, userRole]);
 
   const handleDownloadGRN = (grn: GRN) => {
-    const itemsHtml = (Array.isArray(grn.items) ? grn.items : [])
-      .map(
-        (row: Record<string, unknown>, i: number) =>
-          `<tr><td>${i + 1}</td><td>${escapeHtml(String(row.description ?? row.name ?? row.material ?? 'Item'))}</td><td>${escapeHtml(String(row.quantity ?? row.qty ?? '—'))}</td></tr>`
-      )
+    const poLines = poItemsArray(grn);
+    const rows = Array.isArray(grn.items) && grn.items.length > 0 ? grn.items : poLines;
+    const itemsHtml = rows
+      .map((row: Record<string, unknown>, i: number) => {
+        const label = resolveGrnLineLabel(row, poLines[i]);
+        const qty = resolveGrnLineQty(row, poLines[i]);
+        return `<tr><td>${i + 1}</td><td>${escapeHtml(label)}</td><td>${escapeHtml(qty)}</td></tr>`;
+      })
       .join('');
 
     const html = `<!DOCTYPE html><html><head><meta charset="utf-8"/><title>${escapeHtml(grn.grn_number)}</title>
@@ -207,6 +236,36 @@ export const GRNView: React.FC<GRNViewProps> = ({ userId, userRole }) => {
                   <p className="font-medium">{grn.total_quantity} items</p>
                 </div>
               </div>
+
+              {(() => {
+                const poLines = poItemsArray(grn);
+                const rows =
+                  Array.isArray(grn.items) && grn.items.length > 0 ? grn.items : poLines;
+                if (!rows.length) return null;
+                return (
+                  <div className="rounded-md border bg-muted/30 px-3 py-2">
+                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">
+                      Materials received
+                    </p>
+                    <ul className="space-y-2 text-sm">
+                      {rows.map((raw, i) => {
+                        const row = raw as Record<string, unknown>;
+                        const label = resolveGrnLineLabel(row, poLines[i]);
+                        const qty = resolveGrnLineQty(row, poLines[i]);
+                        return (
+                          <li
+                            key={i}
+                            className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-0 border-b border-dashed border-border/80 pb-2 last:border-0 last:pb-0"
+                          >
+                            <span className="font-medium text-foreground min-w-0">{label}</span>
+                            <span className="text-muted-foreground shrink-0 tabular-nums">Qty {qty}</span>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </div>
+                );
+              })()}
 
               <div className="flex gap-2 pt-4 border-t">
                 <Button variant="outline" onClick={() => handleDownloadGRN(grn)}>
