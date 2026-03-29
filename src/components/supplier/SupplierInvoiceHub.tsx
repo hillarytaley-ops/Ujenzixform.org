@@ -60,6 +60,18 @@ export const SupplierInvoiceHub: React.FC<SupplierInvoiceHubProps> = ({
         list = rpc.data;
       } else {
         if (rpc.error) {
+          const msg = rpc.error.message || '';
+          const missingFn =
+            msg.includes('Could not find the function') ||
+            (msg.includes('function') && msg.includes('does not exist'));
+          if (missingFn) {
+            toast({
+              title: 'Database update required',
+              description:
+                'Run migration 20260329330000 and 20260329340000 in Supabase SQL (list_delivery_notes_for_supplier).',
+              variant: 'destructive',
+            });
+          }
           console.warn('list_delivery_notes_for_supplier RPC unavailable, using direct select:', rpc.error.message);
         }
         const { data: rows, error } = await supabase
@@ -104,6 +116,18 @@ export const SupplierInvoiceHub: React.FC<SupplierInvoiceHubProps> = ({
         rows = rpc.data;
       } else {
         if (rpc.error) {
+          const msg = rpc.error.message || '';
+          if (
+            msg.includes('Could not find the function') ||
+            (msg.includes('function') && msg.includes('does not exist'))
+          ) {
+            toast({
+              title: 'Database update required',
+              description:
+                'Run migrations list_goods_received_notes_for_supplier in Supabase SQL, then refresh.',
+              variant: 'destructive',
+            });
+          }
           console.warn('list_goods_received_notes_for_supplier RPC unavailable, using direct select:', rpc.error.message);
         }
         const { data, error } = await supabase
