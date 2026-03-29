@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Link, useLocation } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
@@ -12,7 +11,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { FileText, Package, Receipt, Loader2, Eye, ShoppingCart } from 'lucide-react';
+import { FileText, Package, Receipt, Loader2, Eye } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { InvoiceManagement } from '@/components/invoices/InvoiceManagement';
 import { useToast } from '@/hooks/use-toast';
@@ -43,8 +42,6 @@ export const SupplierInvoiceHub: React.FC<SupplierInvoiceHubProps> = ({
   cardBg,
 }) => {
   const { toast } = useToast();
-  const location = useLocation();
-  const viewOrdersHref = `${location.pathname}?tab=view-orders`;
   const [subTab, setSubTab] = useState('invoices');
   const [dnLoading, setDnLoading] = useState(false);
   const [grnLoading, setGrnLoading] = useState(false);
@@ -52,35 +49,6 @@ export const SupplierInvoiceHub: React.FC<SupplierInvoiceHubProps> = ({
   const [grns, setGrns] = useState<any[]>([]);
   const [poById, setPoById] = useState<Record<string, string>>({});
   const [grnUpdatingId, setGrnUpdatingId] = useState<string | null>(null);
-  const [recentOrders, setRecentOrders] = useState<
-    { id: string; po_number: string; status: string; updated_at: string | null }[]
-  >([]);
-  const [recentOrdersLoading, setRecentOrdersLoading] = useState(false);
-
-  const loadRecentOrders = useCallback(async () => {
-    if (!supplierRecordId) return;
-    setRecentOrdersLoading(true);
-    try {
-      const { data, error } = await supabase
-        .from('purchase_orders')
-        .select('id, po_number, status, updated_at')
-        .eq('supplier_id', supplierRecordId)
-        .order('updated_at', { ascending: false })
-        .limit(25);
-
-      if (error) throw error;
-      setRecentOrders(data || []);
-    } catch (e: any) {
-      console.error('Supplier recent orders fetch:', e);
-      setRecentOrders([]);
-    } finally {
-      setRecentOrdersLoading(false);
-    }
-  }, [supplierRecordId]);
-
-  useEffect(() => {
-    void loadRecentOrders();
-  }, [loadRecentOrders]);
 
   /** No client filter on supplier_id: RLS returns every DN this login may see (by supplier_id or linked PO). */
   const loadDeliveryNotes = useCallback(async () => {
@@ -206,62 +174,7 @@ export const SupplierInvoiceHub: React.FC<SupplierInvoiceHubProps> = ({
           (GRN).
         </CardDescription>
       </CardHeader>
-      <CardContent className="space-y-6">
-        <div
-          className={`rounded-lg border p-4 ${isDarkMode ? 'border-slate-600 bg-slate-900/40' : 'bg-muted/40'}`}
-        >
-          <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-            <div className={`flex items-center gap-2 text-sm font-medium ${textColor}`}>
-              <ShoppingCart className="h-4 w-4 shrink-0 text-orange-500" />
-              Your orders (same as View Orders)
-            </div>
-            <Button variant="outline" size="sm" asChild>
-              <Link to={viewOrdersHref} replace>
-                Open View Orders
-              </Link>
-            </Button>
-          </div>
-          <p className={`mb-3 text-xs leading-relaxed ${mutedText}`}>
-            The tabs below list <strong>documents</strong> (invoice / delivery note / GRN rows in the database), not
-            every purchase order. Those documents usually appear after an order is marked{' '}
-            <strong>delivered</strong> and the builder-side workflow runs. If you have many orders but empty tabs,
-            it often means no DN/GRN/invoice rows exist yet — not a broken dashboard.
-          </p>
-          {recentOrdersLoading ? (
-            <div className={`flex items-center gap-2 py-4 text-sm ${mutedText}`}>
-              <Loader2 className="h-4 w-4 animate-spin" />
-              Loading recent orders…
-            </div>
-          ) : recentOrders.length === 0 ? (
-            <p className={`text-sm ${mutedText}`}>No purchase orders returned for this supplier account.</p>
-          ) : (
-            <div className="overflow-x-auto rounded-md border">
-              <Table>
-                <TableHeader>
-                  <TableRow className={isDarkMode ? 'border-slate-600' : ''}>
-                    <TableHead>PO</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Last updated</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {recentOrders.map((o) => (
-                    <TableRow key={o.id}>
-                      <TableCell className="font-mono text-sm">{o.po_number || '—'}</TableCell>
-                      <TableCell>
-                        <Badge variant="secondary">{humanizeStatus(o.status)}</Badge>
-                      </TableCell>
-                      <TableCell className="text-sm text-muted-foreground">
-                        {o.updated_at ? new Date(o.updated_at).toLocaleString() : '—'}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          )}
-        </div>
-
+      <CardContent>
         <Tabs value={subTab} onValueChange={setSubTab} className="space-y-4">
           <TabsList
             className={`grid h-auto w-full grid-cols-1 gap-2 p-1 sm:grid-cols-3 ${
@@ -304,16 +217,8 @@ export const SupplierInvoiceHub: React.FC<SupplierInvoiceHubProps> = ({
                 Loading…
               </div>
             ) : deliveryNotes.length === 0 ? (
-              <div className={`space-y-2 rounded-lg border py-10 px-4 text-center text-sm ${mutedText}`}>
-                <p>No delivery notes yet.</p>
-                <p className="mx-auto max-w-md text-xs leading-relaxed">
-                  A delivery note is normally created when the linked purchase order becomes{' '}
-                  <strong>delivered</strong> (e.g. after the delivery provider completes the job). Use{' '}
-                  <Link className="text-orange-600 underline underline-offset-2" to={viewOrdersHref} replace>
-                    View Orders
-                  </Link>{' '}
-                  to check order status.
-                </p>
+              <div className={`rounded-lg border py-10 text-center text-sm ${mutedText}`}>
+                No delivery notes yet.
               </div>
             ) : (
               <div className="overflow-x-auto rounded-md border">
@@ -372,12 +277,8 @@ export const SupplierInvoiceHub: React.FC<SupplierInvoiceHubProps> = ({
                 Loading…
               </div>
             ) : grns.length === 0 ? (
-              <div className={`space-y-2 rounded-lg border py-10 px-4 text-center text-sm ${mutedText}`}>
-                <p>No GRNs yet.</p>
-                <p className="mx-auto max-w-md text-xs leading-relaxed">
-                  GRNs are created after the builder accepts delivery against a delivery note. If orders are still in
-                  transit or not delivered, this list will stay empty.
-                </p>
+              <div className={`rounded-lg border py-10 text-center text-sm ${mutedText}`}>
+                No GRNs yet.
               </div>
             ) : (
               <div className="overflow-x-auto rounded-md border">

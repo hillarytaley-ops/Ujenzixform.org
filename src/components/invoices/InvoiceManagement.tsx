@@ -283,15 +283,8 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({ userId, us
 
       {invoices.length === 0 ? (
         <Card>
-          <CardContent className="space-y-2 py-10 text-center text-muted-foreground text-sm">
-            <p>No invoices yet.</p>
-            {userRole === 'supplier' && (
-              <p className="mx-auto max-w-md text-xs leading-relaxed">
-                Invoices are usually created after delivery is completed and a goods received note (GRN) is in
-                progress. Open <strong>View Orders</strong> for order status; delivery notes and GRNs appear here
-                as the workflow runs.
-              </p>
-            )}
+          <CardContent className="py-10 text-center text-muted-foreground text-sm">
+            No invoices yet.
           </CardContent>
         </Card>
       ) : null}
