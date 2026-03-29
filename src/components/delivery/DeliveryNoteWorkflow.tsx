@@ -59,23 +59,55 @@ export const DeliveryNoteWorkflow: React.FC<DeliveryNoteWorkflowProps> = ({
   const [rejectionReason, setRejectionReason] = useState('');
   const { toast } = useToast();
 
-  // Fetch pending delivery notes
+  // Fetch pending delivery notes (no nested embeds — avoids PostgREST 400 when FK hints are missing from schema cache)
   const fetchDeliveryNotes = async () => {
     try {
       setLoading(true);
-      const { data, error } = await supabase
+      const { data: rows, error } = await supabase
         .from('delivery_notes')
-        .select(`
-          *,
-          purchase_order:purchase_orders(po_number, total_amount),
-          supplier:suppliers(company_name)
-        `)
+        .select('*')
         .eq('builder_id', builderId)
         .in('status', ['pending_signature', 'signed', 'forwarded_to_supplier', 'inspection_pending'])
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setDeliveryNotes(data || []);
+      const list = rows || [];
+      if (list.length === 0) {
+        setDeliveryNotes([]);
+        return;
+      }
+
+      const poIds = [...new Set(list.map((r) => r.purchase_order_id).filter(Boolean))];
+      const supplierIds = [...new Set(list.map((r) => r.supplier_id).filter(Boolean))];
+
+      const [poRes, supRes] = await Promise.all([
+        poIds.length
+          ? supabase.from('purchase_orders').select('id, po_number, total_amount').in('id', poIds)
+          : Promise.resolve({ data: [] as { id: string; po_number?: string; total_amount?: number }[], error: null }),
+        supplierIds.length
+          ? supabase.from('suppliers').select('id, company_name').in('id', supplierIds)
+          : Promise.resolve({ data: [] as { id: string; company_name?: string }[], error: null }),
+      ]);
+
+      if (poRes.error) throw poRes.error;
+      if (supRes.error) throw supRes.error;
+
+      const poById = Object.fromEntries((poRes.data || []).map((p) => [p.id, p]));
+      const supById = Object.fromEntries((supRes.data || []).map((s) => [s.id, s]));
+
+      const enriched: DeliveryNote[] = list.map((r: any) => {
+        const po = poById[r.purchase_order_id];
+        const sup = supById[r.supplier_id];
+        return {
+          ...r,
+          purchase_order: po
+            ? { po_number: po.po_number, total_amount: po.total_amount ?? undefined }
+            : undefined,
+          supplier: sup ? { company_name: sup.company_name ?? undefined } : undefined,
+        };
+      });
+
+      setDeliveryNotes(enriched);
     } catch (error: any) {
       console.error('Error fetching delivery notes:', error);
       toast({
