@@ -18,6 +18,7 @@ import {
   Store,
   HardHat,
 } from "lucide-react";
+import { AdminSupplyChainLiveSummary } from "@/components/admin/AdminSupplyChainLiveSummary";
 
 const BUILDER_INVOICES_URL = "/professional-builder-dashboard?tab=invoices";
 const SUPPLIER_INVOICE_URL = "/supplier-dashboard?tab=invoice";
@@ -30,12 +31,15 @@ export function AdminSupplyChainDocsPanel() {
         <AlertTitle className="text-amber-100">How staff should use these links</AlertTitle>
         <AlertDescription className="text-amber-100/85 text-sm leading-relaxed">
           Builder and supplier screens require the corresponding <strong>user role</strong> in Supabase. Your
-          admin session will not show another user&apos;s delivery notes or GRNs. Use a{" "}
+          admin session will not impersonate another user&apos;s full DN/GRN screens. Use a{" "}
           <strong>test builder</strong> or <strong>test supplier</strong> account (e.g. incognito or another
-          browser profile) when validating flows. Links open in a <strong>new tab</strong> so you keep this
-          dashboard open.
+          browser profile) when validating flows end-to-end. Below, <strong>live totals and recent rows</strong>{" "}
+          reflect database records your admin JWT can read (RLS). Links open in a <strong>new tab</strong> so
+          you keep this dashboard open.
         </AlertDescription>
       </Alert>
+
+      <AdminSupplyChainLiveSummary />
 
       <div className="grid gap-4 md:grid-cols-2">
         <Card className="bg-slate-900/50 border-slate-800">
