@@ -405,14 +405,14 @@ export const DeliveryNoteWorkflow: React.FC<DeliveryNoteWorkflowProps> = ({
                 </div>
               </div>
 
-              <div className="flex gap-2 pt-4 border-t">
+              <div className="flex flex-wrap gap-2 pt-4 border-t">
                 {dn.status === 'pending_signature' && (
                   <Button
                     onClick={() => {
                       setSelectedDN(dn);
                       setShowSignatureDialog(true);
                     }}
-                    className="flex-1"
+                    className="w-auto min-w-0 !bg-orange-500 text-white hover:!bg-orange-600"
                   >
                     <FileSignature className="h-4 w-4 mr-2" />
                     Sign Delivery Note
@@ -425,8 +425,7 @@ export const DeliveryNoteWorkflow: React.FC<DeliveryNoteWorkflowProps> = ({
                       setSelectedDN(dn);
                       setShowInspectionDialog(true);
                     }}
-                    variant="default"
-                    className="flex-1"
+                    className="w-auto min-w-0 !bg-orange-500 text-white hover:!bg-orange-600"
                   >
                     <ClipboardCheck className="h-4 w-4 mr-2" />
                     Verify & Inspect
@@ -434,14 +433,14 @@ export const DeliveryNoteWorkflow: React.FC<DeliveryNoteWorkflowProps> = ({
                 )}
 
                 {dn.status === 'accepted' && (
-                  <Button variant="outline" className="flex-1" disabled>
+                  <Button variant="outline" className="w-auto min-w-0" disabled>
                     <CheckCircle2 className="h-4 w-4 mr-2" />
                     Accepted - GRN Generated
                   </Button>
                 )}
 
                 {dn.status === 'rejected' && (
-                  <Button variant="outline" className="flex-1" disabled>
+                  <Button variant="outline" className="w-auto min-w-0" disabled>
                     <XCircle className="h-4 w-4 mr-2" />
                     Rejected
                   </Button>
