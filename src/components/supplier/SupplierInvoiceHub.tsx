@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
@@ -33,6 +33,50 @@ function humanizeStatus(status: string | undefined) {
     .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
     .join(' ');
 }
+
+type DeliveryNoteGroup = 'pending_signature' | 'accepted' | 'rejected_or_cancelled' | 'other';
+
+/** Supplier-facing buckets: pending builder sign-off vs accepted / in supplier workflow. */
+function getDeliveryNoteGroup(
+  dn: Record<string, unknown>,
+  signatureFallbackByDnId: Record<string, { signature: string; signedAt: string }>
+): DeliveryNoteGroup {
+  const st = String(dn.status ?? '').toLowerCase();
+  const decision = String(dn.builder_decision ?? '').toLowerCase();
+  if (decision === 'rejected' || st === 'cancelled') return 'rejected_or_cancelled';
+
+  const pendingLike = new Set([
+    'pending_signature',
+    'pending_approval',
+    'draft',
+    'pending',
+  ]);
+  if (pendingLike.has(st)) return 'pending_signature';
+
+  const acceptedStatuses = new Set([
+    'signed',
+    'forwarded_to_supplier',
+    'inspection_pending',
+    'delivered',
+    'completed',
+    'approved',
+  ]);
+  if (decision === 'accepted' || acceptedStatuses.has(st)) return 'accepted';
+
+  const dnId = String(dn.id ?? '');
+  const hasColSig = typeof dn.builder_signature === 'string' && String(dn.builder_signature).trim().length > 0;
+  const hasFallback = Boolean(dnId && signatureFallbackByDnId[dnId]?.signature);
+  if (hasColSig || hasFallback) return 'accepted';
+
+  return 'other';
+}
+
+const DN_GROUP_SECTIONS: { key: DeliveryNoteGroup; title: string }[] = [
+  { key: 'pending_signature', title: 'Pending signature' },
+  { key: 'accepted', title: 'Accepted / signed off' },
+  { key: 'rejected_or_cancelled', title: 'Rejected or cancelled' },
+  { key: 'other', title: 'Other statuses' },
+];
 
 export const SupplierInvoiceHub: React.FC<SupplierInvoiceHubProps> = ({
   userId,
@@ -332,6 +376,20 @@ export const SupplierInvoiceHub: React.FC<SupplierInvoiceHubProps> = ({
     void loadGrns();
   }, [supplierRecordId, loadDeliveryNotes, loadGrns]);
 
+  const groupedDeliveryNotes = useMemo(() => {
+    const buckets: Record<DeliveryNoteGroup, any[]> = {
+      pending_signature: [],
+      accepted: [],
+      rejected_or_cancelled: [],
+      other: [],
+    };
+    for (const dn of deliveryNotes) {
+      const g = getDeliveryNoteGroup(dn as Record<string, unknown>, signatureFallbackByDnId);
+      buckets[g].push(dn);
+    }
+    return buckets;
+  }, [deliveryNotes, signatureFallbackByDnId]);
+
   const markGrnViewed = async (id: string) => {
     setGrnUpdatingId(id);
     try {
@@ -441,7 +499,8 @@ export const SupplierInvoiceHub: React.FC<SupplierInvoiceHubProps> = ({
           <TabsContent value="delivery-notes" className="mt-0">
             <div className="mb-3 flex items-center justify-between gap-2">
               <p className={`text-sm ${mutedText}`}>
-                Delivery notes for your orders (e.g. after builder sign-off).
+                Grouped by builder progress: pending signature vs accepted. Professional builder names come from their
+                profile; use PDF for the full signed note.
               </p>
               <Button variant="outline" size="sm" onClick={() => loadDeliveryNotes()} disabled={dnLoading}>
                 Refresh
@@ -457,75 +516,118 @@ export const SupplierInvoiceHub: React.FC<SupplierInvoiceHubProps> = ({
                 No delivery notes yet.
               </div>
             ) : (
-              <div className="overflow-x-auto rounded-md border">
-                <Table>
-                  <TableHeader>
-                    <TableRow className={isDarkMode ? 'border-slate-600' : ''}>
-                      <TableHead>DN</TableHead>
-                      <TableHead>PO</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Delivery date</TableHead>
-                      <TableHead>Updated</TableHead>
-                      <TableHead className="text-right w-[1%] whitespace-nowrap">Document</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {deliveryNotes.map((dn) => (
-                      <TableRow key={dn.id}>
-                        <TableCell className="font-mono text-sm">
-                          {dn.dn_number || dn.delivery_note_number || '—'}
-                        </TableCell>
-                        <TableCell className="font-mono text-sm">
-                          {poById[dn.purchase_order_id] || '—'}
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant="secondary">{humanizeStatus(dn.status)}</Badge>
-                        </TableCell>
-                        <TableCell>
-                          {dn.delivery_date
-                            ? new Date(dn.delivery_date).toLocaleDateString()
-                            : '—'}
-                        </TableCell>
-                        <TableCell className="text-sm text-muted-foreground">
-                          {dn.updated_at
-                            ? new Date(dn.updated_at).toLocaleString()
-                            : '—'}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex flex-wrap items-center justify-end gap-1">
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              className="h-8"
-                              onClick={() => printDeliveryNotePdf(dn as Record<string, unknown>)}
-                            >
-                              <FileText className="mr-1 h-3.5 w-3.5" />
-                              PDF
-                            </Button>
-                            {typeof dn.file_path === 'string' && dn.file_path.trim() ? (
-                              <Button
-                                type="button"
-                                variant="secondary"
-                                size="sm"
-                                className="h-8"
-                                disabled={dnFileDownloadingId === dn.id}
-                                onClick={() => downloadDeliveryNoteUpload(dn as Record<string, unknown>)}
-                                title="Download uploaded file"
-                              >
-                                {dnFileDownloadingId === dn.id ? (
-                                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                                ) : (
-                                  <Download className="h-3.5 w-3.5" />
-                                )}
-                              </Button>
-                            ) : null}
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+              <div className="space-y-8">
+                {DN_GROUP_SECTIONS.map(({ key, title }) => {
+                  const rows = groupedDeliveryNotes[key];
+                  if (!rows.length) return null;
+                  return (
+                    <div key={key} className="space-y-2">
+                      <h4 className={`text-sm font-semibold tracking-tight ${textColor}`}>
+                        {title}{' '}
+                        <span className={`font-normal ${mutedText}`}>({rows.length})</span>
+                      </h4>
+                      <div className="overflow-x-auto rounded-md border">
+                        <Table>
+                          <TableHeader>
+                            <TableRow className={isDarkMode ? 'border-slate-600' : ''}>
+                              <TableHead>DN</TableHead>
+                              <TableHead>PO</TableHead>
+                              <TableHead>Professional builder</TableHead>
+                              <TableHead>Status</TableHead>
+                              <TableHead>Delivery date</TableHead>
+                              <TableHead>Updated</TableHead>
+                              <TableHead className="text-right w-[1%] whitespace-nowrap">Document</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {rows.map((dn) => {
+                              const builderKey =
+                                dn.builder_id != null && dn.builder_id !== ''
+                                  ? String(dn.builder_id)
+                                  : '';
+                              const builderName = builderKey
+                                ? builderLabelByKey[builderKey] || '—'
+                                : '—';
+                              const fileLabel =
+                                typeof dn.file_name === 'string' && dn.file_name.trim()
+                                  ? dn.file_name.trim()
+                                  : null;
+                              return (
+                                <TableRow key={dn.id}>
+                                  <TableCell className="font-mono text-sm">
+                                    {dn.dn_number || dn.delivery_note_number || '—'}
+                                  </TableCell>
+                                  <TableCell className="font-mono text-sm">
+                                    {poById[dn.purchase_order_id] || '—'}
+                                  </TableCell>
+                                  <TableCell className={`max-w-[200px] ${textColor}`}>
+                                    <span className="line-clamp-2 font-medium" title={builderName}>
+                                      {builderName}
+                                    </span>
+                                  </TableCell>
+                                  <TableCell>
+                                    <Badge variant="secondary">{humanizeStatus(dn.status)}</Badge>
+                                  </TableCell>
+                                  <TableCell>
+                                    {dn.delivery_date
+                                      ? new Date(dn.delivery_date).toLocaleDateString()
+                                      : '—'}
+                                  </TableCell>
+                                  <TableCell className={`text-sm ${mutedText}`}>
+                                    {dn.updated_at
+                                      ? new Date(dn.updated_at).toLocaleString()
+                                      : '—'}
+                                  </TableCell>
+                                  <TableCell className="text-right">
+                                    <div className="flex flex-col items-end gap-1">
+                                      {fileLabel ? (
+                                        <span
+                                          className={`max-w-[180px] truncate text-left text-xs ${mutedText}`}
+                                          title={fileLabel}
+                                        >
+                                          {fileLabel}
+                                        </span>
+                                      ) : null}
+                                      <div className="flex flex-wrap items-center justify-end gap-1">
+                                        <Button
+                                          type="button"
+                                          variant="outline"
+                                          size="sm"
+                                          className="h-8"
+                                          onClick={() => printDeliveryNotePdf(dn as Record<string, unknown>)}
+                                        >
+                                          <FileText className="mr-1 h-3.5 w-3.5" />
+                                          PDF
+                                        </Button>
+                                        {typeof dn.file_path === 'string' && dn.file_path.trim() ? (
+                                          <Button
+                                            type="button"
+                                            variant="secondary"
+                                            size="sm"
+                                            className="h-8"
+                                            disabled={dnFileDownloadingId === dn.id}
+                                            onClick={() => downloadDeliveryNoteUpload(dn as Record<string, unknown>)}
+                                            title="Download uploaded file"
+                                          >
+                                            {dnFileDownloadingId === dn.id ? (
+                                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                            ) : (
+                                              <Download className="h-3.5 w-3.5" />
+                                            )}
+                                          </Button>
+                                        ) : null}
+                                      </div>
+                                    </div>
+                                  </TableCell>
+                                </TableRow>
+                              );
+                            })}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             )}
           </TabsContent>
