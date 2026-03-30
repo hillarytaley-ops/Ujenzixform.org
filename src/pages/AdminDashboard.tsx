@@ -139,6 +139,7 @@ import { ThemeToggle, ThemeProvider } from "@/components/admin/dashboard/ThemeTo
 import { MobileNav } from "@/components/admin/dashboard/MobileNav";
 import { GroupedTabNav } from "@/components/admin/dashboard/GroupedTabNav";
 import { AdminSupplyChainDocsPanel } from "@/components/admin/AdminSupplyChainDocsPanel";
+import { isAdminStaffLocalSessionValid } from "@/utils/adminStaffSession";
 import { useStaffPermissions } from "@/hooks/useStaffPermissions";
 import { PermissionGate } from "@/components/admin/PermissionGate";
 import { AdminTab } from "@/config/staffPermissions";
@@ -507,22 +508,18 @@ const AdminDashboard = () => {
   ];
 
   useEffect(() => {
-    // Check authentication IMMEDIATELY before anything else
-    const isAdminAuthenticated = localStorage.getItem('admin_authenticated') === 'true';
-    const userRole = localStorage.getItem('user_role');
-    const supabaseToken = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
-    
-    console.log('🔐 Admin Dashboard: Initial auth check', { isAdminAuthenticated, userRole, hasToken: !!supabaseToken });
-    
-    // If not authenticated OR no Supabase token, redirect immediately
-    if (!isAdminAuthenticated || userRole !== 'admin' || !supabaseToken) {
-      console.log('🚫 Not authenticated - redirecting to admin login');
-      // Set loading false to prevent showing loading screen
+    // Staff portal: valid local session (email + flags + 24h). Supabase JWT optional (limited mode).
+    if (!isAdminStaffLocalSessionValid()) {
+      console.log('🚫 Admin Dashboard: no valid staff session — redirecting to admin login');
       setLoading(false);
-      // Use replace to prevent back button issues
       window.location.replace('/admin-login');
       return;
     }
+
+    const isAdminAuthenticated = localStorage.getItem('admin_authenticated') === 'true';
+    const userRole = localStorage.getItem('user_role');
+    const supabaseToken = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+    console.log('🔐 Admin Dashboard: Initial auth check', { isAdminAuthenticated, userRole, hasToken: !!supabaseToken });
     
     // Listen for auth state changes (e.g., sign out)
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
@@ -543,10 +540,9 @@ const AdminDashboard = () => {
       }
     });
     
-    // FAST: If localStorage auth is valid, show UI immediately
-    // Don't wait for checkAdminAccess() - it can run in background
-    if (isAdminAuthenticated && userRole === 'admin' && supabaseToken) {
-      console.log('✅ Admin Dashboard: Valid localStorage auth - showing UI immediately');
+    // FAST: Valid staff session — show UI immediately (JWT not required)
+    if (isAdminAuthenticated && userRole === 'admin') {
+      console.log('✅ Admin Dashboard: Valid staff session — showing UI immediately');
       setAdminEmail(localStorage.getItem('admin_email') || '');
       setLoading(false);
     }
@@ -2138,10 +2134,7 @@ const AdminDashboard = () => {
 
   // FAST PATH: If we have valid localStorage auth, skip the loading screen entirely
   // This prevents the dashboard from hanging on slow Supabase auth
-  const isAuthFromStorage = localStorage.getItem('admin_authenticated') === 'true';
-  const roleFromStorage = localStorage.getItem('user_role');
-  const tokenFromStorage = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
-  const hasValidAuth = isAuthFromStorage && roleFromStorage === 'admin' && tokenFromStorage;
+  const hasValidAuth = isAdminStaffLocalSessionValid();
   
   // Only show loading screen if we DON'T have valid localStorage auth
   // If we have localStorage auth, show the dashboard immediately

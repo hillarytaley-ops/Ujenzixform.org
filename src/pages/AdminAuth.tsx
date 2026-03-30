@@ -42,6 +42,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Shield, Lock, AlertTriangle, KeyRound, Users } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { isAdminStaffLocalSessionValid } from "@/utils/adminStaffSession";
 
 // Type helper for tables not yet in generated types
 const db = supabase as any;
@@ -50,7 +51,6 @@ const AdminAuth = () => {
   const [workEmail, setWorkEmail] = useState("");
   const [staffCode, setStaffCode] = useState("");
   const [loading, setLoading] = useState(false);
-  const [pageLoading, setPageLoading] = useState(false); // Start as false - show form immediately
   const [attempts, setAttempts] = useState(0);
   const [lockoutUntil, setLockoutUntil] = useState<number | null>(null);
   const [hasError, setHasError] = useState(false);
@@ -59,7 +59,6 @@ const AdminAuth = () => {
   const { toast } = useToast();
 
   useEffect(() => {
-    // IMMEDIATELY show form - pageLoading starts as false
     // Clear any stale lockouts on component mount (non-blocking)
     try {
       Object.keys(localStorage).forEach(key => {
@@ -83,22 +82,12 @@ const AdminAuth = () => {
 
   const checkExistingAuth = async () => {
     try {
-      // Check localStorage first (fast, synchronous)
-      const isAdminAuthenticated = localStorage.getItem('admin_authenticated') === 'true';
-      const adminLoginTime = localStorage.getItem('admin_login_time');
-      
-      if (isAdminAuthenticated && adminLoginTime) {
-        const sessionAge = Date.now() - parseInt(adminLoginTime);
-        const maxSessionAge = 24 * 60 * 60 * 1000; // 24 hours
-        
-        if (sessionAge < maxSessionAge) {
-          // Valid admin session, redirect immediately
-          // Use setTimeout to avoid blocking render
-          setTimeout(() => {
-            navigate("/admin-dashboard", { replace: true });
-          }, 100);
-          return;
-        }
+      // Same rules as AdminDashboard — includes admin_email; no Supabase JWT required
+      if (isAdminStaffLocalSessionValid()) {
+        setTimeout(() => {
+          navigate("/admin-dashboard", { replace: true });
+        }, 0);
+        return;
       }
       
       // Skip Supabase checks on mobile to avoid hanging
@@ -500,74 +489,8 @@ const AdminAuth = () => {
   const isLocked = lockoutUntil && Date.now() < lockoutUntil;
   const remainingAttempts = Math.max(0, 3 - attempts);
 
-  // Mobile Debug Console - Shows errors on screen (can be removed later)
-  const [debugErrors, setDebugErrors] = useState<string[]>([]);
-  
-  useEffect(() => {
-    // Capture console errors
-    const originalError = console.error;
-    const originalWarn = console.warn;
-    
-    console.error = (...args: any[]) => {
-      originalError(...args);
-      setDebugErrors(prev => [...prev.slice(-4), `ERROR: ${args.join(' ')}`]);
-    };
-    
-    console.warn = (...args: any[]) => {
-      originalWarn(...args);
-      setDebugErrors(prev => [...prev.slice(-4), `WARN: ${args.join(' ')}`]);
-    };
-    
-    // Capture unhandled errors
-    window.addEventListener('error', (event) => {
-      setDebugErrors(prev => [...prev.slice(-4), `ERROR: ${event.message} at ${event.filename}:${event.lineno}`]);
-    });
-    
-    // Capture promise rejections
-    window.addEventListener('unhandledrejection', (event) => {
-      setDebugErrors(prev => [...prev.slice(-4), `PROMISE ERROR: ${event.reason}`]);
-    });
-    
-    return () => {
-      console.error = originalError;
-      console.warn = originalWarn;
-    };
-  }, []);
-
-  // Show loading spinner only during initial page load
-  if (pageLoading) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 flex items-center justify-center p-4">
-        <div className="text-center space-y-4">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-500 mx-auto"></div>
-          <p className="text-gray-400">Loading admin portal...</p>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className="min-h-screen relative flex items-center justify-center p-4 overflow-hidden">
-      {/* Mobile Debug Console - Shows errors on screen */}
-      {debugErrors.length > 0 && (
-        <div className="fixed top-0 left-0 right-0 z-50 bg-red-950/95 border-b-2 border-red-500 p-2 max-h-40 overflow-y-auto">
-          <div className="flex items-center justify-between mb-1">
-            <p className="text-red-400 text-xs font-bold">🐛 DEBUG CONSOLE (Tap to dismiss)</p>
-            <button
-              onClick={() => setDebugErrors([])}
-              className="text-red-400 hover:text-red-300 text-xs px-2 py-1 bg-red-900/50 rounded"
-            >
-              ✕ Clear
-            </button>
-          </div>
-          {debugErrors.map((error, idx) => (
-            <div key={idx} className="text-red-300 text-xs font-mono mb-1 break-all">
-              {error}
-            </div>
-          ))}
-        </div>
-      )}
-      
+    <div className="min-h-screen relative flex items-center justify-center p-4 overflow-hidden bg-slate-950">
       {/* Beautiful Kenyan Construction Workers with Yellow Hard Hats Background */}
       {/* Note: Removed backgroundAttachment: 'fixed' as it causes issues on iOS Safari and some mobile browsers */}
       <div 

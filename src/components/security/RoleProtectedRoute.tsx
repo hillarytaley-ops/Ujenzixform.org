@@ -7,6 +7,7 @@ import type { User } from '@supabase/supabase-js';
 import { Navigate, useLocation } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { fetchUserRolesViaRest } from '@/lib/userRolesRest';
+import { isAdminStaffLocalSessionValid } from '@/utils/adminStaffSession';
 
 interface RoleProtectedRouteProps {
   children: React.ReactNode;
@@ -38,11 +39,27 @@ export const RoleProtectedRoute = ({ children, allowedRoles }: RoleProtectedRout
   const allowedRef = useRef(allowedRoles);
   allowedRef.current = allowedRoles;
 
-  const [ready, setReady] = useState(false);
+  /** Only /admin-dashboard — not supplier/delivery routes that also list `admin` in allowedRoles */
+  const isAdminDashboardPath =
+    location.pathname === '/admin-dashboard' || location.pathname.startsWith('/admin-dashboard/');
+  const allowsAdminStaffStorageBypass =
+    isAdminDashboardPath &&
+    (allowedRoles.includes('admin') || allowedRoles.includes('super_admin'));
+
+  /** Staff portal often has no Supabase JWT ("limited mode"); skip session wait to avoid /auth redirect loops */
+  const [ready, setReady] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    return allowsAdminStaffStorageBypass && isAdminStaffLocalSessionValid();
+  });
   const [sessionUser, setSessionUser] = useState<User | null>(null);
   const [dbRole, setDbRole] = useState<string | null>(null);
 
   useEffect(() => {
+    if (allowsAdminStaffStorageBypass && isAdminStaffLocalSessionValid()) {
+      setReady(true);
+      return;
+    }
+
     let cancelled = false;
 
     void (async () => {
@@ -92,18 +109,28 @@ export const RoleProtectedRoute = ({ children, allowedRoles }: RoleProtectedRout
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [allowsAdminStaffStorageBypass]);
 
   if (!ready) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-background">
-        <div className="animate-spin rounded-full h-8 w-8 border-4 border-primary border-t-transparent" />
+      <div className="flex items-center justify-center min-h-screen bg-slate-950">
+        <div className="animate-spin rounded-full h-8 w-8 border-4 border-blue-500 border-t-transparent" />
       </div>
     );
   }
 
+  if (allowsAdminStaffStorageBypass && isAdminStaffLocalSessionValid()) {
+    return <>{children}</>;
+  }
+
   if (!sessionUser) {
-    return <Navigate to="/auth" state={{ from: location }} replace />;
+    return (
+      <Navigate
+        to={isAdminDashboardPath ? '/admin-login' : '/auth'}
+        state={{ from: location }}
+        replace
+      />
+    );
   }
 
   if (!dbRole) {
