@@ -138,6 +138,7 @@ import { ActivityLogViewer } from "@/components/admin/ActivityLogViewer";
 import { ThemeToggle, ThemeProvider } from "@/components/admin/dashboard/ThemeToggle";
 import { MobileNav } from "@/components/admin/dashboard/MobileNav";
 import { GroupedTabNav } from "@/components/admin/dashboard/GroupedTabNav";
+import { AdminSupplyChainDocsPanel } from "@/components/admin/AdminSupplyChainDocsPanel";
 import { useStaffPermissions } from "@/hooks/useStaffPermissions";
 import { PermissionGate } from "@/components/admin/PermissionGate";
 import { AdminTab } from "@/config/staffPermissions";
@@ -411,7 +412,8 @@ const AdminDashboard = () => {
     "monitoring-requests", "camera-assignment", "feedback", "documents", "financial",
     "ml", "security", "staff", "activity-log", "scanning", "qr-codes", "communications",
     "builder-moderation", "delivery-analytics", "delivery-pay", "settings", "careers", "user-roles",
-    "messaging", "analytics", "reviews", "sms-test", "tracking", "voice-calls"
+    "messaging", "analytics", "reviews", "sms-test", "tracking", "voice-calls",
+    "supply-chain-docs"
   ] as const;
   const [activeTab, setActiveTab] = useUrlTabSync([...ADMIN_TABS], "overview");
   
@@ -500,6 +502,8 @@ const AdminDashboard = () => {
     { name: 'Privacy Policy', path: '/privacy', icon: Shield, status: 'active', visits: 0, description: 'Privacy information', category: 'public' },
     { name: 'Admin Login', path: '/admin-login', icon: Shield, status: 'active', visits: 0, description: 'Admin authentication', category: 'admin' },
     { name: 'Admin Dashboard', path: '/admin-dashboard', icon: Shield, status: 'active', visits: 0, description: 'Admin control panel', category: 'admin' },
+    { name: 'Builder — Invoices / DN / GRN', path: '/professional-builder-dashboard?tab=invoices', icon: FileText, status: 'active', visits: 0, description: 'Builder hub: delivery notes, GRN, invoices (role: professional builder)', category: 'protected' },
+    { name: 'Supplier — Invoice hub', path: '/supplier-dashboard?tab=invoice', icon: FileText, status: 'active', visits: 0, description: 'Supplier delivery docs & invoices (role: supplier)', category: 'protected' },
   ];
 
   useEffect(() => {
@@ -4270,6 +4274,39 @@ const AdminDashboard = () => {
                 </CardContent>
               </Card>
             </div>
+          </TabsContent>
+
+          <TabsContent value="supply-chain-docs" className="space-y-6">
+            <Card className="bg-slate-900/50 border-slate-800">
+              <CardHeader>
+                <CardTitle className="text-white flex items-center gap-2">
+                  <FileText className="h-5 w-5 text-emerald-400" />
+                  Delivery notes, GRN &amp; invoices
+                </CardTitle>
+                <CardDescription className="text-gray-400">
+                  Staff reference for the builder–supplier delivery and billing flow. Pair with{" "}
+                  <button
+                    type="button"
+                    className="text-emerald-400 hover:underline font-medium"
+                    onClick={() => setActiveTab("financial")}
+                  >
+                    Financial
+                  </button>{" "}
+                  for live invoice totals and{" "}
+                  <button
+                    type="button"
+                    className="text-emerald-400 hover:underline font-medium"
+                    onClick={() => setActiveTab("orders")}
+                  >
+                    Orders
+                  </button>{" "}
+                  for purchase context.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <AdminSupplyChainDocsPanel />
+              </CardContent>
+            </Card>
           </TabsContent>
 
           {/* Analytics tab (mock KPIs today; real reports on /analytics) */}

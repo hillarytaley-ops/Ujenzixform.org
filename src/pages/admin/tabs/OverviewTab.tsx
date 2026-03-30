@@ -17,6 +17,7 @@ import {
   ShoppingCart,
   Truck,
   Package,
+  ClipboardList,
 } from 'lucide-react';
 import { DashboardStats, RegistrationRecord, AppPage } from '../types';
 import { StatsCard, StatsGrid } from '../components/StatsCard';
@@ -154,6 +155,12 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
               onClick={() => onTabChange('delivery-requests')}
             />
             <QuickActionButton
+              icon={ClipboardList}
+              label="DN · GRN · Invoices guide"
+              color="emerald"
+              onClick={() => onTabChange('supply-chain-docs')}
+            />
+            <QuickActionButton
               icon={Users}
               label={`Pending Registrations (${stats.pendingRegistrations})`}
               color="blue"
@@ -256,7 +263,7 @@ const SystemHealthItem: React.FC<SystemHealthItemProps> = ({ icon: Icon, title, 
 interface QuickActionButtonProps {
   icon: React.ElementType;
   label: string;
-  color: 'blue' | 'purple' | 'green' | 'orange' | 'red' | 'cyan' | 'yellow' | 'teal';
+  color: 'blue' | 'purple' | 'green' | 'orange' | 'red' | 'cyan' | 'yellow' | 'teal' | 'emerald';
   onClick: () => void;
 }
 
@@ -275,6 +282,7 @@ const QuickActionButton: React.FC<QuickActionButtonProps> = ({
     cyan: 'bg-cyan-600/20 hover:bg-cyan-600/30 text-cyan-400 border-cyan-600/30',
     yellow: 'bg-yellow-600/20 hover:bg-yellow-600/30 text-yellow-400 border-yellow-600/30',
     teal: 'bg-teal-600/20 hover:bg-teal-600/30 text-teal-400 border-teal-600/30',
+    emerald: 'bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-400 border-emerald-600/30',
   };
 
   return (

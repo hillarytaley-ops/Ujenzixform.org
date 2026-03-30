@@ -4,7 +4,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/co
 import { Badge } from '@/components/ui/badge';
 import { 
   Menu, BarChart3, Users, FileText, Settings, Shield, 
-  Activity, MessageSquare, Globe, DollarSign, QrCode, X
+  Activity, MessageSquare, Globe, DollarSign, QrCode, X, ClipboardList
 } from 'lucide-react';
 
 interface MobileNavProps {
@@ -21,6 +21,7 @@ const navItems = [
   { id: 'feedback', label: 'Feedback', icon: MessageSquare, color: 'text-yellow-400' },
   { id: 'documents', label: 'Documents', icon: FileText, color: 'text-orange-400' },
   { id: 'financial', label: 'Financial', icon: DollarSign, color: 'text-emerald-400' },
+  { id: 'supply-chain-docs', label: 'DN · GRN · Invoices', icon: ClipboardList, color: 'text-emerald-400' },
   { id: 'qr-scanning', label: 'QR Scanning', icon: QrCode, color: 'text-cyan-400' },
   { id: 'settings', label: 'Settings', icon: Settings, color: 'text-gray-400' },
 ];

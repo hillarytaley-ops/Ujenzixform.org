@@ -53,6 +53,7 @@ import {
   Headphones,
   Navigation,
   Video,
+  ClipboardList,
 } from 'lucide-react';
 
 interface TabGroup {
@@ -189,6 +190,7 @@ export const GroupedTabNav: React.FC<GroupedTabNavProps> = ({
       tabs: [
         { value: 'financial', label: 'Financial', icon: DollarSign, badge: financialDocsCount || undefined },
         { value: 'documents', label: 'Documents', icon: Folder },
+        { value: 'supply-chain-docs', label: 'DN · GRN · Invoices', icon: ClipboardList },
       ],
     },
     {

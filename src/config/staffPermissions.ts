@@ -57,7 +57,8 @@ export const ALL_ADMIN_TABS = [
   'communications',
   'delivery-analytics',
   'delivery-pay',
-  'settings'
+  'settings',
+  'supply-chain-docs'
 ] as const;
 
 export type AdminTab = typeof ALL_ADMIN_TABS[number];
@@ -100,7 +101,8 @@ export const STAFF_ROLES: Record<string, StaffRole> = {
       'activity-log',
       'settings',
       'communications',
-      'material-images'
+      'material-images',
+      'supply-chain-docs'
     ],
     canManageStaff: false,
     canExportData: true,
@@ -120,7 +122,8 @@ export const STAFF_ROLES: Record<string, StaffRole> = {
       'delivery-requests',
       'delivery-analytics',
       'delivery-pay',
-      'scanning'
+      'scanning',
+      'supply-chain-docs'
     ],
     canManageStaff: false,
     canExportData: true,
@@ -138,7 +141,8 @@ export const STAFF_ROLES: Record<string, StaffRole> = {
       'registrations',
       'delivery-apps',
       'documents',
-      'activity-log'
+      'activity-log',
+      'supply-chain-docs'
     ],
     canManageStaff: false,
     canExportData: true,
@@ -156,7 +160,8 @@ export const STAFF_ROLES: Record<string, StaffRole> = {
       'financial',
       'delivery-pay',
       'delivery-analytics',
-      'activity-log'
+      'activity-log',
+      'supply-chain-docs'
     ],
     canManageStaff: false,
     canExportData: true,
@@ -191,7 +196,8 @@ export const STAFF_ROLES: Record<string, StaffRole> = {
       'feedback',
       'communications',
       'registrations',
-      'delivery-requests'
+      'delivery-requests',
+      'supply-chain-docs'
     ],
     canManageStaff: false,
     canExportData: false,
@@ -207,7 +213,8 @@ export const STAFF_ROLES: Record<string, StaffRole> = {
     allowedTabs: [
       'overview',
       'feedback',
-      'documents'
+      'documents',
+      'supply-chain-docs'
     ],
     canManageStaff: false,
     canExportData: false,
@@ -358,6 +365,12 @@ export const TAB_METADATA: Record<AdminTab, { name: string; icon: string; descri
     icon: 'Settings',
     description: 'System configuration',
     category: 'System'
+  },
+  'supply-chain-docs': {
+    name: 'Delivery notes · GRN · Invoices',
+    icon: 'ClipboardList',
+    description: 'Flow documentation and deep links to builder/supplier hubs',
+    category: 'Finance'
   }
 };
 
