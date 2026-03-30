@@ -13,6 +13,7 @@ import {
   ClipboardCheck, Receipt, CreditCard, Loader2, Eye, Send
 } from 'lucide-react';
 import SignatureCanvas from 'react-signature-canvas';
+import { ResponsiveSignatureCanvas } from '@/components/ui/ResponsiveSignatureCanvas';
 
 interface DeliveryNote {
   id: string;
@@ -462,13 +463,11 @@ export const DeliveryNoteWorkflow: React.FC<DeliveryNoteWorkflowProps> = ({
           </DialogHeader>
           <div className="space-y-4">
             <div className="border rounded-lg p-4 bg-white">
-              <SignatureCanvas
+              <ResponsiveSignatureCanvas
                 ref={signatureRef}
-                canvasProps={{
-                  width: 600,
-                  height: 200,
-                  className: 'signature-canvas border rounded w-full'
-                }}
+                active={showSignatureDialog}
+                minHeight={200}
+                className="rounded"
               />
               <div className="flex justify-between mt-2">
                 <p className="text-xs text-gray-500">Draw your signature above</p>

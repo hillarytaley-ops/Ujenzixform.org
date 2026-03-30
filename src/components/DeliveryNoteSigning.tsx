@@ -8,6 +8,7 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from '@/integrations/supabase/client';
 import { FileSignature, Shield, AlertTriangle, CheckCircle2 } from "lucide-react";
 import SignatureCanvas from 'react-signature-canvas';
+import { ResponsiveSignatureCanvas } from '@/components/ui/ResponsiveSignatureCanvas';
 
 interface DeliveryNote {
   id: string;
@@ -329,13 +330,11 @@ const DeliveryNoteSigning = () => {
             <div className="space-y-2">
               <Label>Digital Signature *</Label>
               <div className="border rounded-lg p-4 bg-white">
-                <SignatureCanvas
+                <ResponsiveSignatureCanvas
                   ref={signatureRef}
-                  canvasProps={{
-                    width: 500,
-                    height: 200,
-                    className: 'signature-canvas border rounded'
-                  }}
+                  active={!!selectedNote}
+                  minHeight={200}
+                  className="rounded"
                 />
                 <div className="flex justify-between mt-2">
                   <p className="text-xs text-muted-foreground">
