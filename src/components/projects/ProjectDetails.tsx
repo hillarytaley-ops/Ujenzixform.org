@@ -72,6 +72,11 @@ interface Order {
   items?: any[];
   supplier_name?: string;
   delivery_date?: string;
+  /** Set when a delivery provider is linked on the PO — PO.status may still say awaiting_delivery_request */
+  delivery_provider_id?: string | null;
+  delivery_provider_name?: string | null;
+  delivery_status?: string | null;
+  delivery_required?: boolean | null;
 }
 
 interface Delivery {
@@ -83,6 +88,136 @@ interface Delivery {
   pickup_address?: string;
   delivery_address?: string;
   provider_name?: string;
+  purchase_order_id?: string | null;
+}
+
+/** Latest delivery_request per purchase_order_id (by created_at) for PO badge enrichment. */
+function enrichOrdersWithDeliveryRequests(
+  orders: Order[],
+  drRows: Record<string, unknown>[]
+): Order[] {
+  const byPo = new Map<string, Record<string, unknown>>();
+  for (const r of drRows) {
+    const poId = r.purchase_order_id != null ? String(r.purchase_order_id) : '';
+    if (!poId) continue;
+    const prev = byPo.get(poId);
+    const t = new Date(String(r.created_at ?? 0)).getTime();
+    const pt = prev ? new Date(String(prev.created_at ?? 0)).getTime() : -1;
+    if (!prev || t >= pt) byPo.set(poId, r);
+  }
+
+  return orders.map((o) => {
+    const dr = byPo.get(o.id);
+    if (!dr) return o;
+    const pid = dr.provider_id != null && String(dr.provider_id).trim() ? String(dr.provider_id) : '';
+    const st = dr.status != null ? String(dr.status) : '';
+    const nameFromDr =
+      dr.provider_name != null
+        ? String(dr.provider_name)
+        : dr.delivery_provider_name != null
+          ? String(dr.delivery_provider_name)
+          : undefined;
+    return {
+      ...o,
+      delivery_provider_id: (o.delivery_provider_id && String(o.delivery_provider_id).trim()) || pid || null,
+      delivery_provider_name:
+        (o.delivery_provider_name && String(o.delivery_provider_name).trim()) || nameFromDr || null,
+      delivery_status:
+        (o.delivery_status && String(o.delivery_status).trim()) || (st || null),
+    };
+  });
+}
+
+function mapDeliveryRequestRow(raw: Record<string, unknown>): Delivery {
+  const id = String(raw.id ?? '');
+  return {
+    id,
+    tracking_number: raw.tracking_number != null ? String(raw.tracking_number) : undefined,
+    status: String(raw.status ?? 'pending'),
+    estimated_cost:
+      raw.estimated_cost != null && raw.estimated_cost !== ''
+        ? Number(raw.estimated_cost)
+        : undefined,
+    created_at: String(raw.created_at ?? ''),
+    pickup_address: raw.pickup_address != null ? String(raw.pickup_address) : undefined,
+    delivery_address: raw.delivery_address != null ? String(raw.delivery_address) : undefined,
+    provider_name:
+      raw.provider_name != null
+        ? String(raw.provider_name)
+        : raw.delivery_provider_name != null
+          ? String(raw.delivery_provider_name)
+          : undefined,
+    purchase_order_id: raw.purchase_order_id != null ? String(raw.purchase_order_id) : null,
+  };
+}
+
+/** Builder-facing label when PO row lags behind delivery provider assignment on purchase_orders. */
+function getPurchaseOrderStatusPresentation(order: Order): { label: string; badgeClass: string } {
+  const st = String(order.status ?? '').toLowerCase();
+  const dStatus = String(order.delivery_status ?? '').toLowerCase();
+  const providerName = order.delivery_provider_name?.trim();
+  const hasProvider = Boolean(
+    (order.delivery_provider_id && String(order.delivery_provider_id).trim()) || providerName
+  );
+
+  const preDispatchStatuses = new Set([
+    'quote_accepted',
+    'order_created',
+    'awaiting_delivery_request',
+    'delivery_requested',
+    'awaiting_delivery_provider',
+    'delivery_assigned',
+    'ready_for_dispatch',
+  ]);
+
+  if (hasProvider && preDispatchStatuses.has(st)) {
+    if (dStatus === 'picked_up' || dStatus === 'in_transit') {
+      return {
+        label: providerName ? `In transit · ${providerName}` : 'In transit',
+        badgeClass: 'bg-purple-100 text-purple-800',
+      };
+    }
+    if (dStatus === 'delivered' || dStatus === 'completed') {
+      return { label: 'Delivered', badgeClass: 'bg-emerald-100 text-emerald-800' };
+    }
+    return {
+      label: providerName ? `Delivery accepted · ${providerName}` : 'Delivery provider accepted',
+      badgeClass: 'bg-emerald-100 text-emerald-800',
+    };
+  }
+
+  const label = st.replace(/_/g, ' ') || '—';
+  return { label, badgeClass: getOrderStatusColorForPoStatus(st) };
+}
+
+function getOrderStatusColorForPoStatus(status: string): string {
+  switch (status) {
+    case 'pending':
+    case 'awaiting_delivery_request':
+    case 'awaiting_delivery_provider':
+      return 'bg-amber-100 text-amber-800';
+    case 'quoted':
+    case 'quote_responded':
+      return 'bg-blue-100 text-blue-800';
+    case 'confirmed':
+    case 'quote_accepted':
+    case 'order_created':
+    case 'delivery_requested':
+    case 'delivery_assigned':
+    case 'ready_for_dispatch':
+      return 'bg-green-100 text-green-800';
+    case 'dispatched':
+      return 'bg-purple-100 text-purple-800';
+    case 'in_transit':
+      return 'bg-cyan-100 text-cyan-800';
+    case 'delivered':
+      return 'bg-emerald-100 text-emerald-800';
+    case 'rejected':
+    case 'cancelled':
+      return 'bg-red-100 text-red-800';
+    default:
+      return 'bg-gray-100 text-gray-800';
+  }
 }
 
 interface MonitoringRequest {
@@ -211,6 +346,7 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
 
       // REST only for POs — supabase-js global fetch can hang and overlapped loads broke pendingRef logic.
       let orderRows: Order[] = [];
+      let matchedOrders: Order[] = [];
       try {
         if (buyerIds.length > 0) {
           const controller1 = new AbortController();
@@ -241,11 +377,11 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
 
         if (!isCurrent() || loadSig.aborted) return;
 
-        let matched = orderRows.filter((o) => {
+        matchedOrders = orderRows.filter((o) => {
           return resolvePurchaseOrderToProjectId(o, attributionProjects) === project.id;
         });
 
-        if (matched.length === 0) {
+        if (matchedOrders.length === 0) {
           const controllerPid = new AbortController();
           const unlinkP = linkChildToLoad(controllerPid);
           const tPid = setTimeout(() => controllerPid.abort(), 12000);
@@ -263,7 +399,7 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
             if (pidRes.ok) {
               const pidData = await pidRes.json();
               if (Array.isArray(pidData) && pidData.length > 0) {
-                matched = pidData as Order[];
+                matchedOrders = pidData as Order[];
               }
             }
           } finally {
@@ -273,10 +409,10 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
         }
 
         if (isCurrent()) {
-          setOrders(matched);
+          setOrders(matchedOrders);
           console.log(
             '📁 ProjectDetails: orders',
-            matched.length,
+            matchedOrders.length,
             'matched for project',
             project.id,
             '(fetched',
@@ -294,27 +430,67 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
 
       if (!isCurrent() || loadSig.aborted) return;
 
-      // Fetch deliveries for this project with timeout
+      // Fetch deliveries: by project_id AND by purchase_order_id for this project's orders
+      // (many rows only link PO → delivery_requests.purchase_order_id, so project_id filter alone shows 0).
       try {
         const controller2 = new AbortController();
         const unlink2 = linkChildToLoad(controller2);
-        const timeout2 = setTimeout(() => controller2.abort(), 8000);
-        const deliveriesResponse = await fetch(
+        const timeout2 = setTimeout(() => controller2.abort(), 12000);
+        const headers = {
+          apikey: SUPABASE_ANON_KEY,
+          Authorization: `Bearer ${bearer}`,
+        };
+
+        const byProjectPromise = fetch(
           `${SUPABASE_URL}/rest/v1/delivery_requests?project_id=eq.${project.id}&order=created_at.desc`,
-          {
-            headers: {
-              'apikey': SUPABASE_ANON_KEY,
-              'Authorization': `Bearer ${bearer}`,
-            },
-            signal: controller2.signal
-          }
+          { headers, signal: controller2.signal }
         );
+
+        const poIds = matchedOrders.map((o) => o.id).filter(Boolean);
+        const byPoPromise =
+          poIds.length > 0
+            ? fetch(
+                `${SUPABASE_URL}/rest/v1/delivery_requests?purchase_order_id=in.(${poIds.join(',')})&order=created_at.desc`,
+                { headers, signal: controller2.signal }
+              )
+            : Promise.resolve(null as Response | null);
+
+        const [deliveriesResponse, byPoRes] = await Promise.all([byProjectPromise, byPoPromise]);
+
         clearTimeout(timeout2);
         unlink2();
-        
+
+        const mergedMap = new Map<string, Delivery>();
+        const rawRowsForEnrichment: Record<string, unknown>[] = [];
+
         if (deliveriesResponse.ok) {
           const deliveriesData = await deliveriesResponse.json();
-          if (isCurrent()) setDeliveries(deliveriesData);
+          if (Array.isArray(deliveriesData)) {
+            for (const row of deliveriesData) {
+              rawRowsForEnrichment.push(row as Record<string, unknown>);
+              const d = mapDeliveryRequestRow(row as Record<string, unknown>);
+              mergedMap.set(d.id, d);
+            }
+          }
+        }
+
+        if (byPoRes?.ok) {
+          const byPoData = await byPoRes.json();
+          if (Array.isArray(byPoData)) {
+            for (const row of byPoData) {
+              rawRowsForEnrichment.push(row as Record<string, unknown>);
+              const d = mapDeliveryRequestRow(row as Record<string, unknown>);
+              mergedMap.set(d.id, d);
+            }
+          }
+        }
+
+        if (isCurrent()) {
+          const merged = Array.from(mergedMap.values()).sort(
+            (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+          );
+          setDeliveries(merged);
+          setOrders(enrichOrdersWithDeliveryRequests(matchedOrders, rawRowsForEnrichment));
         }
       } catch (e: any) {
         if (e.name !== 'AbortError') {
@@ -418,6 +594,30 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
       );
     }
 
+    channel = channel.on(
+      'postgres_changes',
+      {
+        event: '*',
+        schema: 'public',
+        table: 'delivery_requests',
+        filter: `builder_id=eq.${userId}`,
+      },
+      scheduleRefetch
+    );
+
+    if (pid && pid !== userId) {
+      channel = channel.on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'delivery_requests',
+          filter: `builder_id=eq.${pid}`,
+        },
+        scheduleRefetch
+      );
+    }
+
     channel.subscribe();
     return () => {
       if (debounceTimer != null) clearTimeout(debounceTimer);
@@ -436,8 +636,11 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
     .reduce((sum, o) => sum + (Number(o.total_amount) || 0), 0);
   
   const deliverySpent = deliveries
-    .filter(d => ['accepted', 'in_transit', 'delivered', 'completed'].includes(d.status))
-    .reduce((sum, d) => sum + (d.estimated_cost || 0), 0);
+    .filter((d) => {
+      const s = String(d.status ?? '').toLowerCase();
+      return ['accepted', 'assigned', 'picked_up', 'in_transit', 'delivered', 'completed'].includes(s);
+    })
+    .reduce((sum, d) => sum + (Number(d.estimated_cost) || 0), 0);
   
   const monitoringSpent = monitoringRequests
     .filter((m) => {
@@ -804,13 +1007,18 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
                       >
                         <div className="flex items-start justify-between">
                           <div className="flex-1">
-                            <div className="flex items-center gap-2 mb-2">
+                            <div className="flex flex-wrap items-center gap-2 mb-2">
                               <code className="text-sm font-mono bg-gray-100 px-2 py-1 rounded">
                                 {order.po_number}
                               </code>
-                              <Badge className={getOrderStatusColor(order.status)}>
-                                {order.status?.replace('_', ' ')}
-                              </Badge>
+                              {(() => {
+                                const pres = getPurchaseOrderStatusPresentation(order);
+                                return (
+                                  <Badge className={pres.badgeClass} title={order.status?.replace(/_/g, ' ')}>
+                                    {pres.label}
+                                  </Badge>
+                                );
+                              })()}
                             </div>
                             
                             {order.items && order.items.length > 0 && (
@@ -819,7 +1027,12 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
                                 <ul className="list-disc list-inside">
                                   {order.items.slice(0, 3).map((item: any, idx: number) => (
                                     <li key={idx}>
-                                      {item.name || item.product_name} x {item.quantity}
+                                      {item.material_name ||
+                                        item.name ||
+                                        item.product_name ||
+                                        item.title ||
+                                        'Item'}{' '}
+                                      x {item.quantity ?? item.qty ?? 1}
                                     </li>
                                   ))}
                                   {order.items.length > 3 && (
