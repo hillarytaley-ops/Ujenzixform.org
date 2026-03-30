@@ -26,6 +26,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { MobileHorizontalScroll } from "@/components/ui/mobile-horizontal-scroll";
 import { 
   Package, 
   Search,
@@ -1292,8 +1293,10 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, in
     };
 
     return (
-      <div className="overflow-x-auto">
-        <Table>
+      <MobileHorizontalScroll
+        className={`rounded-md border ${isDarkMode ? "border-slate-600" : "border-border/80"}`}
+      >
+        <Table className="min-w-[720px] w-full">
           <TableHeader>
             <TableRow>
               <TableHead>Order #</TableHead>
@@ -1459,7 +1462,7 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, in
             })}
           </TableBody>
         </Table>
-      </div>
+      </MobileHorizontalScroll>
     );
   };
 

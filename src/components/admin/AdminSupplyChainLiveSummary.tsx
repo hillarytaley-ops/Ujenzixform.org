@@ -1,15 +1,16 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Truck, FileCheck2, FileText, RefreshCw, AlertCircle } from "lucide-react";
+import { Truck, FileCheck2, FileText, RefreshCw, AlertCircle, FileDown } from "lucide-react";
+import { MobileHorizontalScroll } from "@/components/ui/mobile-horizontal-scroll";
+import { useToast } from "@/hooks/use-toast";
+import { openDeliveryNotePdfWindow } from "@/utils/deliveryNoteDocument";
+import { openGrnPrintWindow } from "@/utils/grnDocument";
+import { openInvoicePrintWindow } from "@/utils/invoiceDocument";
 
-type DnRow = Record<string, unknown> & {
-  id: string;
-  created_at: string;
-  purchase_order_id?: string | null;
-};
+type DnRow = Record<string, unknown> & { id: string; created_at: string };
 
 type GrnRow = {
   id: string;
@@ -18,9 +19,13 @@ type GrnRow = {
   status: string;
   supplier_id?: string | null;
   supplier_name?: string | null;
+  items?: unknown;
+  total_quantity?: number;
+  received_date?: string;
+  purchase_order?: { po_number?: string; items?: unknown[] };
 };
 
-type InvRow = {
+type InvRow = Record<string, unknown> & {
   id: string;
   created_at: string;
   invoice_number: string;
@@ -28,9 +33,32 @@ type InvRow = {
   total_amount: number;
 };
 
+type DnAux = {
+  poById: Record<string, { po_number?: string; items?: unknown }>;
+  supById: Record<string, string>;
+  builderLabelByKey: Record<string, string>;
+};
+
 const RECENT_LIMIT = 8;
 
+async function downloadStorageObject(bucket: string, storagePath: string, fallbackFilename: string) {
+  const trimmed = storagePath.trim();
+  const { data, error } = await supabase.storage.from(bucket).download(trimmed);
+  if (error) throw error;
+  if (!data) throw new Error("Empty file");
+  const url = URL.createObjectURL(data);
+  const a = document.createElement("a");
+  a.href = url;
+  const leaf = trimmed.split("/").pop() || fallbackFilename;
+  a.download = leaf.includes(".") ? leaf : `${leaf}.pdf`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
 export function AdminSupplyChainLiveSummary() {
+  const { toast } = useToast();
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -40,6 +68,7 @@ export function AdminSupplyChainLiveSummary() {
   const [recentDn, setRecentDn] = useState<DnRow[]>([]);
   const [recentGrn, setRecentGrn] = useState<GrnRow[]>([]);
   const [recentInv, setRecentInv] = useState<InvRow[]>([]);
+  const [dnAux, setDnAux] = useState<DnAux>({ poById: {}, supById: {}, builderLabelByKey: {} });
 
   const load = useCallback(async (isRefresh: boolean) => {
     if (isRefresh) setRefreshing(true);
@@ -58,19 +87,33 @@ export function AdminSupplyChainLiveSummary() {
         supabase.from("delivery_notes").select("id", { count: "exact", head: true }),
         supabase
           .from("delivery_notes")
-          .select("id, created_at, purchase_order_id, status, dn_number, delivery_note_number")
+          .select("*")
           .order("created_at", { ascending: false })
           .limit(RECENT_LIMIT),
         supabase.from("goods_received_notes").select("id", { count: "exact", head: true }),
         supabase
           .from("goods_received_notes")
-          .select("id, created_at, grn_number, status, supplier_id")
+          .select(
+            `
+          id,
+          created_at,
+          grn_number,
+          status,
+          supplier_id,
+          items,
+          total_quantity,
+          received_date,
+          purchase_order:purchase_orders(po_number, items)
+        `
+          )
           .order("created_at", { ascending: false })
           .limit(RECENT_LIMIT),
         supabase.from("invoices").select("id", { count: "exact", head: true }),
         supabase
           .from("invoices")
-          .select("id, created_at, invoice_number, status, total_amount")
+          .select(
+            "id, created_at, invoice_number, status, total_amount, custom_invoice_path, items, subtotal, tax_amount, due_date, notes, payment_terms"
+          )
           .order("created_at", { ascending: false })
           .limit(RECENT_LIMIT),
       ]);
@@ -83,25 +126,75 @@ export function AdminSupplyChainLiveSummary() {
         setError(msg);
       }
 
-      const rawGrn = (grnListRaw.data as GrnRow[]) || [];
-      const supIds = [...new Set(rawGrn.map((g) => g.supplier_id).filter(Boolean))] as string[];
-      let supById: Record<string, string> = {};
+      const dnRows = (dnList.data as DnRow[]) || [];
+      const poIds = [...new Set(dnRows.map((r) => r.purchase_order_id).filter(Boolean))] as string[];
+      const supIds = [...new Set(dnRows.map((r) => r.supplier_id).filter(Boolean))] as string[];
+      const builderKeys = [...new Set(dnRows.map((r) => r.builder_id).filter(Boolean))] as string[];
+
+      const poById: DnAux["poById"] = {};
+      const supById: DnAux["supById"] = {};
+      const builderLabelByKey: DnAux["builderLabelByKey"] = {};
+
+      if (poIds.length) {
+        const { data: pos, error: poErr } = await supabase
+          .from("purchase_orders")
+          .select("id, po_number, items")
+          .in("id", poIds);
+        if (poErr && !errs.length) setError(poErr.message);
+        for (const p of pos || []) poById[p.id] = { po_number: p.po_number ?? undefined, items: p.items };
+      }
       if (supIds.length) {
         const { data: sups, error: supErr } = await supabase
           .from("suppliers")
           .select("id, company_name")
           .in("id", supIds);
         if (supErr && !errs.length) setError(supErr.message);
-        supById = Object.fromEntries((sups || []).map((s) => [s.id, s.company_name || ""]));
+        for (const s of sups || []) supById[s.id] = s.company_name || "";
+      }
+      if (builderKeys.length) {
+        const { data: profByUser, error: profErr } = await supabase
+          .from("profiles")
+          .select("user_id, id, full_name, company_name")
+          .in("user_id", builderKeys);
+        if (profErr && !errs.length) setError(profErr.message);
+        for (const p of profByUser || []) {
+          const label = (p.full_name || p.company_name || "").trim();
+          if (p.user_id) builderLabelByKey[p.user_id] = label;
+        }
+        const missing = builderKeys.filter((k) => !builderLabelByKey[k]);
+        if (missing.length) {
+          const { data: profById } = await supabase
+            .from("profiles")
+            .select("id, full_name, company_name")
+            .in("id", missing);
+          for (const p of profById || []) {
+            builderLabelByKey[p.id] = (p.full_name || p.company_name || "").trim();
+          }
+        }
+      }
+
+      setDnAux({ poById, supById, builderLabelByKey });
+
+      const rawGrn = (grnListRaw.data as GrnRow[]) || [];
+      const grnSupIds = [...new Set(rawGrn.map((g) => g.supplier_id).filter(Boolean))] as string[];
+      let grnSupById: Record<string, string> = { ...supById };
+      const extraGrnSids = grnSupIds.filter((id) => grnSupById[id] == null || grnSupById[id] === "");
+      if (extraGrnSids.length) {
+        const { data: grnSups, error: gse } = await supabase
+          .from("suppliers")
+          .select("id, company_name")
+          .in("id", extraGrnSids);
+        if (gse && !errs.length) setError(gse.message);
+        for (const s of grnSups || []) grnSupById[s.id] = s.company_name || "";
       }
 
       const grnList: GrnRow[] = rawGrn.map((g) => ({
         ...g,
-        supplier_name: (g.supplier_id ? supById[g.supplier_id] : null) || g.supplier_name || null,
+        supplier_name: (g.supplier_id ? grnSupById[g.supplier_id] : null) || g.supplier_name || null,
       }));
 
       setDnCount(dnHead.count ?? null);
-      setRecentDn((dnList.data as DnRow[]) || []);
+      setRecentDn(dnRows);
       setGrnCount(grnHead.count ?? null);
       setRecentGrn(grnList);
       setInvCount(invHead.count ?? null);
@@ -129,14 +222,104 @@ export function AdminSupplyChainLiveSummary() {
     }
   };
 
-  const statusBadge = (status: string) => {
-    const s = (status || "").toLowerCase();
-    if (s.includes("paid") || s.includes("complete") || s.includes("approved"))
-      return <Badge className="bg-emerald-700 text-white text-xs">{status}</Badge>;
-    if (s.includes("pending") || s.includes("draft")) return <Badge className="bg-amber-600 text-white text-xs">{status}</Badge>;
-    if (s.includes("reject") || s.includes("overdue") || s.includes("cancel"))
-      return <Badge variant="destructive" className="text-xs">{status}</Badge>;
-    return <Badge variant="secondary" className="text-xs">{status || "—"}</Badge>;
+  const handleDnDocument = async (row: DnRow) => {
+    const path = typeof row.file_path === "string" ? row.file_path.trim() : "";
+    const poId = row.purchase_order_id != null ? String(row.purchase_order_id) : "";
+    const supId = row.supplier_id != null ? String(row.supplier_id) : "";
+    const builderKey = row.builder_id != null ? String(row.builder_id) : "";
+    const po = poId ? dnAux.poById[poId] : undefined;
+    const ctx = {
+      poNumber: po?.po_number,
+      supplierName: supId ? dnAux.supById[supId] : undefined,
+      builderDisplayName: builderKey ? dnAux.builderLabelByKey[builderKey] : undefined,
+      purchaseOrderItems: po?.items,
+    };
+    try {
+      if (path) {
+        const label =
+          (row.dn_number as string | undefined) ||
+          (row.delivery_note_number as string | undefined) ||
+          row.id.slice(0, 8);
+        await downloadStorageObject("delivery-notes", path, `DN_${label}`);
+        toast({ title: "Download started", description: "Delivery note file from storage." });
+        return;
+      }
+      const ok = openDeliveryNotePdfWindow(row, ctx, {
+        onPopUpBlocked: () =>
+          toast({
+            title: "Pop-up blocked",
+            description: "Allow pop-ups to open the printable delivery note (includes signature when present).",
+            variant: "destructive",
+          }),
+      });
+      if (ok) {
+        toast({
+          title: "Delivery note opened",
+          description: "Use Print → Save as PDF. The builder signature appears when it is stored on the record.",
+        });
+      }
+    } catch (err) {
+      console.error(err);
+      toast({
+        title: "Could not open delivery note",
+        description: err instanceof Error ? err.message : "Try again or check storage permissions.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleGrnDocument = (row: GrnRow) => {
+    const rd = row.received_date || row.created_at;
+    const ok = openGrnPrintWindow(
+      {
+        grn_number: row.grn_number,
+        purchase_order: row.purchase_order,
+        items: row.items,
+        total_quantity: row.total_quantity,
+        received_date: rd,
+        status: row.status,
+      },
+      {
+        onPopUpBlocked: () =>
+          toast({
+            title: "Pop-up blocked",
+            description: "Allow pop-ups to print or save the GRN as PDF.",
+            variant: "destructive",
+          }),
+      }
+    );
+    if (ok) {
+      toast({ title: "GRN opened", description: "Use Print → Save as PDF." });
+    }
+  };
+
+  const handleInvoiceDocument = async (row: InvRow) => {
+    const path = typeof row.custom_invoice_path === "string" ? row.custom_invoice_path.trim() : "";
+    try {
+      if (path) {
+        await downloadStorageObject("invoices", path, `Invoice_${row.invoice_number}`);
+        toast({ title: "Download started", description: "Invoice file from storage." });
+        return;
+      }
+      const ok = openInvoicePrintWindow(row, {
+        onPopUpBlocked: () =>
+          toast({
+            title: "Pop-up blocked",
+            description: "Allow pop-ups to print or save the invoice as PDF.",
+            variant: "destructive",
+          }),
+      });
+      if (ok) {
+        toast({ title: "Invoice opened", description: "Use Print → Save as PDF (generated from line items)." });
+      }
+    } catch (err) {
+      console.error(err);
+      toast({
+        title: "Could not open invoice",
+        description: err instanceof Error ? err.message : "Check storage policies for the invoices bucket.",
+        variant: "destructive",
+      });
+    }
   };
 
   return (
@@ -145,7 +328,9 @@ export function AdminSupplyChainLiveSummary() {
         <div>
           <h3 className="text-lg font-semibold text-white">Live platform data</h3>
           <p className="text-sm text-gray-400">
-            Totals and latest rows from the database (same source as builder/supplier hubs). Requires admin JWT + RLS.
+            Totals and recent rows. Use <strong className="text-gray-300">PDF</strong> to download a stored file or open
+            a printable view (delivery notes include the builder signature when saved on the row). Requires staff JWT,
+            table RLS, and (for files) Storage policies.
           </p>
         </div>
         <Button
@@ -212,7 +397,7 @@ export function AdminSupplyChainLiveSummary() {
           title="Recent delivery notes"
           loading={loading}
           empty={!recentDn.length}
-          headers={["DN #", "PO", "Status", "When"]}
+          headers={["DN #", "PO", "Status", "When", "PDF"]}
           rows={recentDn.map((r) => {
             const dn =
               (r.dn_number as string | undefined) ||
@@ -220,20 +405,27 @@ export function AdminSupplyChainLiveSummary() {
               r.id.slice(0, 8);
             const po = r.purchase_order_id;
             const st = (r.status as string | undefined) || "—";
-            return [
-              dn,
-              po ? String(po).slice(0, 8) + "…" : "—",
-              st,
-              fmtDate(r.created_at),
-            ];
+            return [dn, po ? String(po).slice(0, 8) + "…" : "—", st, fmtDate(r.created_at)];
           })}
           statusCol={2}
+          actionsColumn={recentDn.map((r) => (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-8 px-2 text-cyan-300 hover:text-cyan-100"
+              onClick={() => void handleDnDocument(r)}
+              title="Download stored file or open printable note with signature"
+            >
+              <FileDown className="h-4 w-4" />
+            </Button>
+          ))}
         />
         <RecentTable
           title="Recent GRNs"
           loading={loading}
           empty={!recentGrn.length}
-          headers={["GRN #", "Supplier", "Status", "When"]}
+          headers={["GRN #", "Supplier", "Status", "When", "PDF"]}
           rows={recentGrn.map((r) => [
             r.grn_number,
             r.supplier_name?.slice(0, 24) || "—",
@@ -241,12 +433,24 @@ export function AdminSupplyChainLiveSummary() {
             fmtDate(r.created_at),
           ])}
           statusCol={2}
+          actionsColumn={recentGrn.map((r) => (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-8 px-2 text-cyan-300 hover:text-cyan-100"
+              onClick={() => handleGrnDocument(r)}
+              title="Open printable GRN (Save as PDF from browser)"
+            >
+              <FileDown className="h-4 w-4" />
+            </Button>
+          ))}
         />
         <RecentTable
           title="Recent invoices"
           loading={loading}
           empty={!recentInv.length}
-          headers={["Invoice #", "Amount", "Status", "When"]}
+          headers={["Invoice #", "Amount", "Status", "When", "PDF"]}
           rows={recentInv.map((r) => [
             r.invoice_number,
             `Ksh ${Number(r.total_amount).toLocaleString()}`,
@@ -254,6 +458,18 @@ export function AdminSupplyChainLiveSummary() {
             fmtDate(r.created_at),
           ])}
           statusCol={2}
+          actionsColumn={recentInv.map((r) => (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-8 px-2 text-cyan-300 hover:text-cyan-100"
+              onClick={() => void handleInvoiceDocument(r)}
+              title="Download uploaded invoice or open printable summary"
+            >
+              <FileDown className="h-4 w-4" />
+            </Button>
+          ))}
         />
       </div>
     </div>
@@ -266,49 +482,57 @@ function RecentTable(props: {
   empty: boolean;
   headers: string[];
   rows: (string | number)[][];
-  /** 0-based column index to render as Badge */
   statusCol?: number;
+  actionsColumn?: ReactNode[];
 }) {
-  const { title, loading, empty, headers, rows, statusCol } = props;
+  const { title, loading, empty, headers, rows, statusCol, actionsColumn } = props;
   return (
     <Card className="bg-slate-900/50 border-slate-800 overflow-hidden">
       <CardHeader className="py-3 border-b border-slate-800">
         <CardTitle className="text-white text-sm">{title}</CardTitle>
       </CardHeader>
-      <CardContent className="p-0 max-h-[280px] overflow-y-auto">
+      <CardContent className="p-0">
         {loading ? (
           <p className="p-4 text-sm text-gray-500">Loading…</p>
         ) : empty ? (
           <p className="p-4 text-sm text-gray-500">No rows yet.</p>
         ) : (
-          <table className="w-full text-xs text-left">
-            <thead className="sticky top-0 bg-slate-900/95 text-gray-400 border-b border-slate-800">
-              <tr>
-                {headers.map((h) => (
-                  <th key={h} className="px-3 py-2 font-medium">
-                    {h}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="text-gray-300">
-              {rows.map((cells, i) => (
-                <tr key={i} className="border-b border-slate-800/80 hover:bg-slate-800/40">
-                  {cells.map((c, j) => (
-                    <td key={j} className="px-3 py-2 align-middle">
-                      {statusCol === j ? (
-                        <Badge variant="secondary" className="text-[10px] font-normal max-w-[120px] truncate">
-                          {String(c)}
-                        </Badge>
-                      ) : (
-                        <span className="break-all">{c}</span>
-                      )}
-                    </td>
+          <MobileHorizontalScroll
+            tone="dark"
+            scrollClassName="max-h-[320px] overflow-y-auto"
+          >
+            <table className="min-w-[640px] w-full text-xs text-left">
+              <thead className="sticky top-0 z-[1] bg-slate-900/95 text-gray-400 border-b border-slate-800">
+                <tr>
+                  {headers.map((h) => (
+                    <th key={h} className="px-3 py-2 font-medium">
+                      {h}
+                    </th>
                   ))}
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="text-gray-300">
+                {rows.map((cells, i) => (
+                  <tr key={i} className="border-b border-slate-800/80 hover:bg-slate-800/40">
+                    {cells.map((c, j) => (
+                      <td key={j} className="px-3 py-2 align-middle">
+                        {statusCol === j ? (
+                          <Badge variant="secondary" className="text-[10px] font-normal max-w-[120px] truncate">
+                            {String(c)}
+                          </Badge>
+                        ) : (
+                          <span className="break-all">{c}</span>
+                        )}
+                      </td>
+                    ))}
+                    {actionsColumn && (
+                      <td className="px-2 py-1 align-middle w-12">{actionsColumn[i]}</td>
+                    )}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </MobileHorizontalScroll>
         )}
       </CardContent>
     </Card>

@@ -16,6 +16,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { InvoiceManagement } from '@/components/invoices/InvoiceManagement';
 import { useToast } from '@/hooks/use-toast';
 import { openDeliveryNotePdfWindow } from '@/utils/deliveryNoteDocument';
+import { MobileHorizontalScroll } from '@/components/ui/mobile-horizontal-scroll';
 
 interface SupplierInvoiceHubProps {
   userId: string;
@@ -526,8 +527,9 @@ export const SupplierInvoiceHub: React.FC<SupplierInvoiceHubProps> = ({
                         {title}{' '}
                         <span className={`font-normal ${mutedText}`}>({rows.length})</span>
                       </h4>
-                      <div className="overflow-x-auto rounded-md border">
-                        <Table>
+                      <div className="rounded-md border overflow-hidden">
+                        <MobileHorizontalScroll>
+                          <Table className="min-w-[760px] w-full">
                           <TableHeader>
                             <TableRow className={isDarkMode ? 'border-slate-600' : ''}>
                               <TableHead>DN</TableHead>
@@ -624,6 +626,7 @@ export const SupplierInvoiceHub: React.FC<SupplierInvoiceHubProps> = ({
                             })}
                           </TableBody>
                         </Table>
+                        </MobileHorizontalScroll>
                       </div>
                     </div>
                   );
@@ -651,8 +654,9 @@ export const SupplierInvoiceHub: React.FC<SupplierInvoiceHubProps> = ({
                 No GRNs yet.
               </div>
             ) : (
-              <div className="overflow-x-auto rounded-md border">
-                <Table>
+              <div className="rounded-md border overflow-hidden">
+                <MobileHorizontalScroll>
+                  <Table className="min-w-[520px] w-full">
                   <TableHeader>
                     <TableRow className={isDarkMode ? 'border-slate-600' : ''}>
                       <TableHead>GRN #</TableHead>
@@ -701,6 +705,7 @@ export const SupplierInvoiceHub: React.FC<SupplierInvoiceHubProps> = ({
                     ))}
                   </TableBody>
                 </Table>
+                </MobileHorizontalScroll>
               </div>
             )}
           </TabsContent>
