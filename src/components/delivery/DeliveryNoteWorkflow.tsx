@@ -57,6 +57,57 @@ function uniqueBuilderIds(
   return [...new Set([authId, profileId].filter(Boolean))] as string[];
 }
 
+const INSPECTION_STATEMENT_PRESETS: { id: string; label: string; text: string }[] = [
+  {
+    id: 'standards',
+    label: 'Meets standards',
+    text: 'I have reviewed these items and certify that they meet the required standards as per the delivery note / invoice.',
+  },
+  {
+    id: 'complete_ok',
+    label: 'Complete & good condition',
+    text: 'All listed materials were received in full, match the delivery note, and are in acceptable condition for use on site.',
+  },
+  {
+    id: 'minor_variation',
+    label: 'Minor variation noted',
+    text: 'Materials accepted subject to minor packaging or batch variation noted; no impact on specified grade or quantity for the order.',
+  },
+  {
+    id: 'received_site',
+    label: 'Received on site',
+    text: 'Goods received on site as described. Quantities checked against the delivery note and accepted.',
+  },
+];
+
+const REJECTION_REASON_PRESETS: { id: string; label: string; text: string }[] = [
+  {
+    id: 'damaged',
+    label: 'Damaged goods',
+    text: 'Rejected: materials arrived damaged or unsuitable for use. Details to follow with photos if required.',
+  },
+  {
+    id: 'wrong_items',
+    label: 'Wrong items / qty',
+    text: 'Rejected: wrong product specification or quantity does not match the purchase order / delivery note.',
+  },
+  {
+    id: 'incomplete',
+    label: 'Incomplete delivery',
+    text: 'Rejected: delivery incomplete — missing line items compared to the delivery note.',
+  },
+  {
+    id: 'quality',
+    label: 'Quality not acceptable',
+    text: 'Rejected: quality of materials does not meet agreed specification or samples.',
+  },
+  {
+    id: 'late',
+    label: 'Late / failed delivery',
+    text: 'Rejected: delivery failed agreed timing or site access; materials not accepted in current state.',
+  },
+];
+
 export const DeliveryNoteWorkflow: React.FC<DeliveryNoteWorkflowProps> = ({
   builderAuthUserId,
   builderProfileId,
@@ -518,66 +569,101 @@ export const DeliveryNoteWorkflow: React.FC<DeliveryNoteWorkflowProps> = ({
       </Dialog>
 
       {/* Inspection Dialog */}
-      <Dialog open={showInspectionDialog} onOpenChange={setShowInspectionDialog}>
-        <DialogContent className="max-w-2xl">
+      <Dialog
+        open={showInspectionDialog}
+        onOpenChange={(open) => {
+          setShowInspectionDialog(open);
+          if (!open) {
+            setInspectionNotes('');
+            setRejectionReason('');
+          }
+        }}
+      >
+        <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Inspect & Verify Materials</DialogTitle>
             <DialogDescription>
-              Please verify that all materials have been received and are in good condition
+              Choose a quick statement or write your own notes. Use Reject with a reason if anything does not match the order.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>Quick statements (accept)</Label>
+              <p className="text-xs text-muted-foreground">
+                Tap one to fill the box — you can still edit the text.
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {INSPECTION_STATEMENT_PRESETS.map((p) => (
+                  <Button
+                    key={p.id}
+                    type="button"
+                    variant={inspectionNotes === p.text ? 'default' : 'outline'}
+                    size="sm"
+                    className="h-auto max-w-full whitespace-normal py-2 text-left text-xs sm:text-sm"
+                    onClick={() => setInspectionNotes(p.text)}
+                  >
+                    {p.label}
+                  </Button>
+                ))}
+              </div>
+            </div>
+
             <div>
-              <Label>Inspection Notes (Optional)</Label>
+              <Label htmlFor="inspection-notes">Inspection notes (optional)</Label>
               <Textarea
+                id="inspection-notes"
                 placeholder="Add any notes about the condition of materials, packaging, etc."
                 value={inspectionNotes}
                 onChange={(e) => setInspectionNotes(e.target.value)}
-                rows={3}
+                rows={4}
               />
             </div>
 
             <Alert>
               <ClipboardCheck className="h-4 w-4" />
               <AlertDescription>
-                Please carefully inspect all materials before accepting. If materials are damaged or incorrect, please reject and provide a reason.
+                Inspect everything before you accept. To reject, pick a reason below (or type your own) — the Reject button stays off until a reason is filled.
               </AlertDescription>
             </Alert>
 
+            <div className="space-y-2 rounded-lg border border-destructive/30 bg-destructive/5 p-3">
+              <Label className="text-destructive">Reject — quick reasons</Label>
+              <p className="text-xs text-muted-foreground">
+                Select a reason to enable <strong>Reject</strong>, or type in the box.
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {REJECTION_REASON_PRESETS.map((p) => (
+                  <Button
+                    key={p.id}
+                    type="button"
+                    variant={rejectionReason === p.text ? 'destructive' : 'outline'}
+                    size="sm"
+                    className="h-auto max-w-full whitespace-normal border-destructive/40 py-2 text-left text-xs sm:text-sm"
+                    onClick={() => setRejectionReason(p.text)}
+                  >
+                    {p.label}
+                  </Button>
+                ))}
+              </div>
+            </div>
+
             <div>
-              <Label>Rejection Reason (if rejecting)</Label>
+              <Label htmlFor="rejection-reason">Rejection reason (required to reject)</Label>
               <Textarea
-                placeholder="Please provide a detailed reason for rejection..."
+                id="rejection-reason"
+                placeholder="Required if you reject — use a quick reason above or describe the issue here."
                 value={rejectionReason}
                 onChange={(e) => setRejectionReason(e.target.value)}
                 rows={3}
-                className={selectedDN?.builder_decision === 'rejected' ? '' : 'opacity-50'}
               />
             </div>
 
-            <div className="flex gap-2 pt-4">
+            <div className="grid grid-cols-1 gap-2 pt-2 sm:grid-cols-2">
               <Button
-                variant="destructive"
-                onClick={() => handleInspectionDecision('rejected')}
-                disabled={inspecting || !rejectionReason.trim()}
-                className="flex-1"
-              >
-                {inspecting ? (
-                  <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Processing...
-                  </>
-                ) : (
-                  <>
-                    <XCircle className="h-4 w-4 mr-2" />
-                    Reject Materials
-                  </>
-                )}
-              </Button>
-              <Button
+                type="button"
                 onClick={() => handleInspectionDecision('accepted')}
                 disabled={inspecting}
-                className="flex-1"
+                className="w-full !bg-green-600 text-white hover:!bg-green-700"
               >
                 {inspecting ? (
                   <>
@@ -587,7 +673,27 @@ export const DeliveryNoteWorkflow: React.FC<DeliveryNoteWorkflowProps> = ({
                 ) : (
                   <>
                     <CheckCircle2 className="h-4 w-4 mr-2" />
-                    Accept Materials
+                    Accept materials
+                  </>
+                )}
+              </Button>
+              <Button
+                type="button"
+                variant="destructive"
+                onClick={() => handleInspectionDecision('rejected')}
+                disabled={inspecting || !rejectionReason.trim()}
+                className="w-full"
+                title={!rejectionReason.trim() ? 'Choose or enter a rejection reason first' : undefined}
+              >
+                {inspecting ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Processing...
+                  </>
+                ) : (
+                  <>
+                    <XCircle className="h-4 w-4 mr-2" />
+                    Reject materials
                   </>
                 )}
               </Button>
