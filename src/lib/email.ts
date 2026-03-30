@@ -362,8 +362,12 @@ export const sendEmailViaEdgeFunction = async (params: SendEmailParams): Promise
       if (response.ok) {
         return { success: true };
       }
+      // Vercel often returns 500 when RESEND_API_KEY (or other server env) is missing — fall through to Edge Function.
       if (response.status !== 404) {
-        return { success: false, error: payload.error || `HTTP ${response.status}` };
+        console.warn(
+          'sendEmailViaEdgeFunction: /api/send-email failed, trying Supabase Edge send-email:',
+          payload.error || response.status
+        );
       }
     }
 

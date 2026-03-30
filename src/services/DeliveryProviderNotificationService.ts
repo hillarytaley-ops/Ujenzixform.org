@@ -207,9 +207,12 @@ class DeliveryProviderNotificationService {
         if (response.ok) {
           return true;
         }
+        // 500 = common when Vercel is missing SUPABASE_SERVICE_ROLE_KEY; fall back to direct insert (RLS permitting).
         if (response.status !== 404) {
-          console.warn('⚠️ Could not queue provider notification:', payload.error || response.statusText);
-          return false;
+          console.warn(
+            '⚠️ /api/delivery-provider-queue failed, trying direct insert:',
+            payload.error || response.statusText
+          );
         }
       }
 

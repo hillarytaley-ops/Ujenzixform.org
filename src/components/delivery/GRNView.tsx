@@ -5,7 +5,12 @@ import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
 import { Package, Download, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { lineItemDescription } from '@/utils/deliveryNoteDocument';
+import {
+  grnPoItemsArray,
+  openGrnPrintWindow,
+  resolveGrnLineLabel,
+  resolveGrnLineQty,
+} from '@/utils/grnDocument';
 
 interface GRN {
   id: string;
@@ -20,30 +25,6 @@ interface GRN {
     po_number?: string;
     items?: unknown[];
   };
-}
-
-function poItemsArray(grn: GRN): Record<string, unknown>[] {
-  const raw = grn.purchase_order?.items;
-  return Array.isArray(raw) ? (raw as Record<string, unknown>[]) : [];
-}
-
-function resolveGrnLineLabel(row: Record<string, unknown>, poLine: Record<string, unknown> | undefined): string {
-  let d = lineItemDescription(row);
-  if (d === 'Item' && poLine) {
-    const fromPo = lineItemDescription(poLine);
-    if (fromPo !== 'Item') return fromPo;
-  }
-  return d;
-}
-
-function resolveGrnLineQty(row: Record<string, unknown>, poLine: Record<string, unknown> | undefined): string {
-  const q =
-    row.quantity ??
-    row.qty ??
-    row.amount ??
-    poLine?.quantity ??
-    poLine?.qty;
-  return q != null && String(q).trim() !== '' ? String(q) : '—';
 }
 
 interface GRNViewProps {
@@ -125,59 +106,21 @@ export const GRNView: React.FC<GRNViewProps> = ({ userId, userRole }) => {
   }, [userId, userRole]);
 
   const handleDownloadGRN = (grn: GRN) => {
-    const poLines = poItemsArray(grn);
-    const rows = Array.isArray(grn.items) && grn.items.length > 0 ? grn.items : poLines;
-    const itemsHtml = rows
-      .map((row: Record<string, unknown>, i: number) => {
-        const label = resolveGrnLineLabel(row, poLines[i]);
-        const qty = resolveGrnLineQty(row, poLines[i]);
-        return `<tr><td>${i + 1}</td><td>${escapeHtml(label)}</td><td>${escapeHtml(qty)}</td></tr>`;
-      })
-      .join('');
-
-    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"/><title>${escapeHtml(grn.grn_number)}</title>
-      <style>
-        body{font-family:system-ui,sans-serif;padding:24px;color:#111}
-        h1{font-size:1.25rem;margin:0 0 8px}
-        table{width:100%;border-collapse:collapse;margin-top:16px;font-size:14px}
-        th,td{border:1px solid #ccc;padding:8px;text-align:left}
-        th{background:#f4f4f5}
-        .meta{color:#555;font-size:13px;margin-bottom:4px}
-      </style></head><body>
-      <h1>Goods Received Note</h1>
-      <p class="meta"><strong>GRN:</strong> ${escapeHtml(grn.grn_number)}</p>
-      <p class="meta"><strong>PO:</strong> ${escapeHtml(grn.purchase_order?.po_number || 'N/A')}</p>
-      <p class="meta"><strong>Received:</strong> ${escapeHtml(new Date(grn.received_date).toLocaleString())}</p>
-      <p class="meta"><strong>Total quantity:</strong> ${grn.total_quantity}</p>
-      <p class="meta"><strong>Status:</strong> ${escapeHtml(grn.status)}</p>
-      <table><thead><tr><th>#</th><th>Description</th><th>Qty</th></tr></thead><tbody>${itemsHtml || '<tr><td colspan="3">No line items</td></tr>'}</tbody></table>
-      <script>window.onload=function(){window.print();}</script>
-      </body></html>`;
-
-    const w = window.open('', '_blank');
-    if (!w) {
-      toast({
-        title: 'Pop-up blocked',
-        description: 'Allow pop-ups for this site to print or save as PDF.',
-        variant: 'destructive',
-      });
-      return;
-    }
-    w.document.write(html);
-    w.document.close();
-    toast({
-      title: 'GRN ready',
-      description: 'Use your browser print dialog to save as PDF or print.',
+    const ok = openGrnPrintWindow(grn, {
+      onPopUpBlocked: () =>
+        toast({
+          title: 'Pop-up blocked',
+          description: 'Allow pop-ups for this site to print or save as PDF.',
+          variant: 'destructive',
+        }),
     });
+    if (ok) {
+      toast({
+        title: 'GRN ready',
+        description: 'Use your browser print dialog to save as PDF or print.',
+      });
+    }
   };
-
-  function escapeHtml(s: string) {
-    return s
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;');
-  }
 
   if (loading) {
     return (
@@ -238,7 +181,7 @@ export const GRNView: React.FC<GRNViewProps> = ({ userId, userRole }) => {
               </div>
 
               {(() => {
-                const poLines = poItemsArray(grn);
+                const poLines = grnPoItemsArray(grn);
                 const rows =
                   Array.isArray(grn.items) && grn.items.length > 0 ? grn.items : poLines;
                 if (!rows.length) return null;
