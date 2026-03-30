@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { MobileHorizontalScroll } from '@/components/ui/mobile-horizontal-scroll';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -322,35 +323,67 @@ export const DeliveryPayAdminTab: React.FC = () => {
             {rows.length === 0 ? (
               <p className="text-slate-600 dark:text-slate-400">No delivered orders yet. Provider mileage will appear here.</p>
             ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
+              <MobileHorizontalScroll className="rounded-lg border border-slate-200 dark:border-slate-700">
+                <table className="w-full min-w-[520px] text-sm">
                   <thead>
                     <tr className="border-b border-slate-200 dark:border-slate-700">
-                      <th className="text-left py-2 text-slate-700 dark:text-slate-300">Provider</th>
-                      <th className="text-right py-2 text-slate-700 dark:text-slate-300">Deliveries</th>
-                      <th className="text-right py-2 text-slate-700 dark:text-slate-300">Round-trip km</th>
-                      <th className="text-right py-2 text-slate-700 dark:text-slate-300">Rate (KES/km)</th>
-                      <th className="text-right py-2 text-slate-700 dark:text-slate-300">Pay (KES)</th>
+                      <th className="text-left py-2.5 px-2 sm:px-3 text-xs sm:text-sm font-semibold text-slate-700 dark:text-slate-300">
+                        Provider
+                      </th>
+                      <th
+                        className="text-right py-2.5 px-1 sm:px-2 text-xs sm:text-sm font-semibold text-slate-700 dark:text-slate-300 whitespace-nowrap"
+                        title="Number of deliveries"
+                      >
+                        <span className="hidden sm:inline">Deliveries</span>
+                        <span className="inline sm:hidden">#</span>
+                      </th>
+                      <th
+                        className="text-right py-2.5 px-1 sm:px-2 text-xs sm:text-sm font-semibold text-slate-700 dark:text-slate-300 whitespace-nowrap"
+                        title="Round-trip kilometers"
+                      >
+                        <span className="hidden sm:inline">Round-trip km</span>
+                        <span className="inline sm:hidden">R-trip km</span>
+                      </th>
+                      <th
+                        className="text-right py-2.5 px-1 sm:px-2 text-xs sm:text-sm font-semibold text-slate-700 dark:text-slate-300 whitespace-nowrap"
+                        title="Rate per kilometer (KES)"
+                      >
+                        <span className="hidden sm:inline">Rate (KES/km)</span>
+                        <span className="inline sm:hidden">Rate</span>
+                      </th>
+                      <th
+                        className="text-right py-2.5 px-2 sm:px-3 text-xs sm:text-sm font-semibold text-slate-700 dark:text-slate-300 whitespace-nowrap"
+                        title="Total pay (KES)"
+                      >
+                        <span className="hidden sm:inline">Pay (KES)</span>
+                        <span className="inline sm:hidden">Pay</span>
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
                     {rows.map((r) => (
                       <tr key={r.provider_id} className="border-b border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800/50">
-                        <td className="py-2 text-slate-900 dark:text-slate-100">
-                          <div className="flex items-center gap-2">
-                            <Route className="h-4 w-4 text-teal-500" />
-                            {r.provider_name || `Provider ${r.provider_id?.slice(0, 8)}`}
+                        <td className="py-2.5 px-2 sm:px-3 text-slate-900 dark:text-slate-100 max-w-[10rem] sm:max-w-none">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <Route className="h-4 w-4 shrink-0 text-teal-500" aria-hidden />
+                            <span className="truncate text-xs sm:text-sm" title={r.provider_name || undefined}>
+                              {r.provider_name || `Provider ${r.provider_id?.slice(0, 8)}`}
+                            </span>
                           </div>
                         </td>
-                        <td className="text-right py-2 text-slate-900 dark:text-slate-100">{r.delivery_count}</td>
-                        <td className="text-right py-2 text-slate-900 dark:text-slate-100">{Number(r.total_round_trip_km || 0).toFixed(1)}</td>
-                        <td className="text-right py-2 text-slate-900 dark:text-slate-100">{Number(r.rate_per_km || 0)}</td>
-                        <td className="text-right py-2 font-medium text-slate-900 dark:text-slate-100">{Number(r.total_amount || 0).toLocaleString()}</td>
+                        <td className="text-right py-2.5 px-1 sm:px-2 tabular-nums">{r.delivery_count}</td>
+                        <td className="text-right py-2.5 px-1 sm:px-2 tabular-nums">
+                          {Number(r.total_round_trip_km || 0).toFixed(1)}
+                        </td>
+                        <td className="text-right py-2.5 px-1 sm:px-2 tabular-nums">{Number(r.rate_per_km || 0)}</td>
+                        <td className="text-right py-2.5 px-2 sm:px-3 font-medium tabular-nums">
+                          {Number(r.total_amount || 0).toLocaleString()}
+                        </td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
-              </div>
+              </MobileHorizontalScroll>
             )}
           </div>
         </CardContent>

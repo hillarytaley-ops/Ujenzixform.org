@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { MobileHorizontalScroll } from '@/components/ui/mobile-horizontal-scroll';
 import { Route, DollarSign, RefreshCw, Package, AlertCircle } from 'lucide-react';
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -240,30 +241,72 @@ export const DeliveryPayTab: React.FC<{ isDarkMode?: boolean }> = ({ isDarkMode 
             {rows.length === 0 ? (
               <p className={mutedText}>No delivered orders yet. Completed deliveries will appear here.</p>
             ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
+              <MobileHorizontalScroll
+                className={`rounded-lg border ${isDarkMode ? 'border-gray-700' : 'border-gray-200'}`}
+              >
+                <table className="w-full min-w-[560px] text-sm">
                   <thead>
                     <tr className="border-b border-gray-200 dark:border-gray-700">
-                      <th className={`text-left py-2 ${mutedText}`}>Order</th>
-                      <th className={`text-right py-2 ${mutedText}`}>One-way km</th>
-                      <th className={`text-right py-2 ${mutedText}`}>Round-trip km</th>
-                      <th className={`text-right py-2 ${mutedText}`}>Pay (KES)</th>
-                      <th className={`text-right py-2 ${mutedText}`}>Delivered</th>
+                      <th
+                        className={`text-left py-2.5 px-2 sm:px-3 text-xs sm:text-sm font-semibold ${mutedText}`}
+                        title="Purchase order / delivery reference"
+                      >
+                        Order
+                      </th>
+                      <th
+                        className={`text-right py-2.5 px-1 sm:px-2 whitespace-nowrap text-xs sm:text-sm font-semibold ${mutedText}`}
+                        title="One-way distance (km)"
+                      >
+                        <span className="hidden sm:inline">One-way km</span>
+                        <span className="inline sm:hidden">1-way km</span>
+                      </th>
+                      <th
+                        className={`text-right py-2.5 px-1 sm:px-2 whitespace-nowrap text-xs sm:text-sm font-semibold ${mutedText}`}
+                        title="Round-trip distance (km)"
+                      >
+                        <span className="hidden sm:inline">Round-trip km</span>
+                        <span className="inline sm:hidden">R-trip km</span>
+                      </th>
+                      <th
+                        className={`text-right py-2.5 px-1 sm:px-2 whitespace-nowrap text-xs sm:text-sm font-semibold ${mutedText}`}
+                        title="Mileage pay in Kenyan shillings"
+                      >
+                        <span className="hidden sm:inline">Pay (KES)</span>
+                        <span className="inline sm:hidden">Pay</span>
+                      </th>
+                      <th
+                        className={`text-right py-2.5 px-2 sm:px-3 whitespace-nowrap text-xs sm:text-sm font-semibold ${mutedText}`}
+                        title="Delivery completion date"
+                      >
+                        <span className="hidden sm:inline">Delivered</span>
+                        <span className="inline sm:hidden">Date</span>
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
                     {rows.map((r) => (
                       <tr key={r.delivery_request_id} className="border-b border-gray-100 dark:border-gray-800">
-                        <td className="py-2">
-                          <div className="flex items-center gap-2">
-                            <Package className="h-4 w-4 text-teal-500" />
-                            {r.order_number || 'N/A'}
+                        <td className="py-2.5 px-2 sm:px-3 max-w-[11rem] sm:max-w-none">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <Package className="h-4 w-4 shrink-0 text-teal-500" aria-hidden />
+                            <span
+                              className="font-mono text-xs sm:text-sm truncate"
+                              title={r.order_number || 'N/A'}
+                            >
+                              {r.order_number || 'N/A'}
+                            </span>
                           </div>
                         </td>
-                        <td className="text-right py-2">{Number(r.one_way_km || 0).toFixed(1)}</td>
-                        <td className="text-right py-2">{Number(r.round_trip_km || 0).toFixed(1)}</td>
-                        <td className="text-right py-2 font-medium">{Number(r.amount || 0).toLocaleString()}</td>
-                        <td className="text-right py-2 text-xs">
+                        <td className="text-right py-2.5 px-1 sm:px-2 tabular-nums text-sm">
+                          {Number(r.one_way_km || 0).toFixed(1)}
+                        </td>
+                        <td className="text-right py-2.5 px-1 sm:px-2 tabular-nums text-sm">
+                          {Number(r.round_trip_km || 0).toFixed(1)}
+                        </td>
+                        <td className="text-right py-2.5 px-1 sm:px-2 font-medium tabular-nums text-sm">
+                          {Number(r.amount || 0).toLocaleString()}
+                        </td>
+                        <td className="text-right py-2.5 px-2 sm:px-3 text-xs sm:text-sm tabular-nums whitespace-nowrap">
                           {r.delivered_at
                             ? new Date(r.delivered_at).toLocaleDateString()
                             : '—'}
@@ -272,7 +315,7 @@ export const DeliveryPayTab: React.FC<{ isDarkMode?: boolean }> = ({ isDarkMode 
                     ))}
                   </tbody>
                 </table>
-              </div>
+              </MobileHorizontalScroll>
             )}
           </div>
 
