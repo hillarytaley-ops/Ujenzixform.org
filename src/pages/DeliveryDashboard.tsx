@@ -450,8 +450,12 @@ const DeliveryDashboard = () => {
             delivery_location: finalDeliveryAddress,
             material_type: d.material_type || d.item_description || 'Materials',
             quantity: d.quantity || d.estimated_weight || 'N/A',
-            customer_name: d.builder_name || d.builder_email?.split('@')[0] || 'Customer',
-            customer_phone: d.builder_phone || '+254 700 000 000',
+            customer_name:
+              d.builder_name?.trim() ||
+              d.builder_email?.split('@')[0]?.trim() ||
+              d.project_name?.trim() ||
+              'Builder',
+            customer_phone: d.builder_phone?.trim() || '',
             status: d.status || d.display_status || 'pending',
             estimated_time: d.estimated_time || '30 mins',
             price: d.price || d.delivery_fee || d.estimated_cost || 0,
@@ -906,8 +910,8 @@ const DeliveryDashboard = () => {
     delivery_location: row.delivery_address ?? 'N/A',
     material_type: 'Materials',
     quantity: String(row._items_count ?? 0),
-    customer_name: 'Customer',
-    customer_phone: '',
+    customer_name: row.builder_name?.trim() || row.builder_email?.split('@')[0]?.trim() || 'Builder',
+    customer_phone: row.builder_phone?.trim() || '',
     status: row.status,
     estimated_time: '',
     price: 0,
@@ -2179,6 +2183,8 @@ const DeliveryDashboard = () => {
             /* RPC may not exist */
           }
 
+          // Optional snapshot stats only — active list and history come from useDeliveryProviderData
+          // (avoids overwriting real builder contact with placeholders).
           setStats({
             totalDeliveries: deliveries.length,
             completedToday,
@@ -2187,137 +2193,16 @@ const DeliveryDashboard = () => {
             averageRating: 4.8, // Would come from reviews table
             totalDistance: 0 // No distance column in schema
           });
-
-          // Set active deliveries - use ACTUAL database column names
-          setActiveDeliveries(deliveries
-            .filter(d => d.status !== 'delivered' && d.status !== 'cancelled')
-            .map(d => ({
-              id: d.id,
-              pickup_location: d.pickup_location || d.pickup_address || 'N/A',
-              delivery_location: d.dropoff_location || d.dropoff_address || 'N/A',
-              material_type: d.item_description || 'Materials',
-              quantity: d.estimated_weight || 'N/A',
-              customer_name: d.builder_email?.split('@')[0] || 'Customer',
-              customer_phone: '+254 700 000 000',
-              status: d.status,
-              estimated_time: '30 mins',
-              price: 0,
-              distance: 0,
-              urgency: d.urgency || 'normal',
-              special_instructions: d.special_instructions
-            })));
-
-          // Set delivery history - use ACTUAL database column names
-          setDeliveryHistory(deliveries
-            .filter(d => d.status === 'delivered')
-            .map(d => ({
-              id: d.id,
-              pickup_location: d.pickup_location || d.pickup_address || 'N/A',
-              delivery_location: d.dropoff_location || d.dropoff_address || 'N/A',
-              material_type: d.item_description || 'Materials',
-              status: d.status,
-              completed_at: d.delivered_at || d.updated_at || d.created_at,
-              price: 0,
-              rating: 5
-            })));
         } else {
-          // Fallback to placeholder data (earnings = 0 until mileage data loads)
+          // No legacy demo deliveries — useDataIsolation hook supplies lists and stats
           setStats({
-            totalDeliveries: 156,
-            completedToday: 8,
-            pendingDeliveries: 3,
+            totalDeliveries: 0,
+            completedToday: 0,
+            pendingDeliveries: 0,
             totalEarnings: 0,
             averageRating: 4.8,
-            totalDistance: 2450
+            totalDistance: 0
           });
-
-          setActiveDeliveries([
-            {
-              id: 'DEL-001',
-              pickup_location: 'Bamburi Cement Factory, Industrial Area',
-              delivery_location: 'Kilimani Construction Site, Nairobi',
-              material_type: 'Cement',
-              quantity: '100 bags',
-              customer_name: 'John Kamau',
-              customer_phone: '+254 712 345 678',
-              status: 'pending',
-              estimated_time: '45 mins',
-              price: 8500,
-              distance: 15,
-              urgency: 'urgent',
-              special_instructions: 'Deliver to site entrance. Ask for foreman Peter.',
-              created_at: new Date().toISOString()
-            },
-            {
-              id: 'DEL-002',
-              pickup_location: 'Steel Masters Kenya, Mombasa Road',
-              delivery_location: 'Karen Villa Project, Karen',
-              material_type: 'Steel Bars',
-              quantity: '2 tons',
-              customer_name: 'Mary Wanjiku',
-              customer_phone: '+254 722 456 789',
-              status: 'pending',
-              estimated_time: '1 hour 30 mins',
-              price: 12000,
-              distance: 25,
-              urgency: 'normal',
-              created_at: new Date(Date.now() - 30 * 60000).toISOString()
-            },
-            {
-              id: 'DEL-003',
-              pickup_location: 'Nairobi Timber, Ngong Road',
-              delivery_location: 'Westlands Office Block',
-              material_type: 'Timber',
-              quantity: '200 pieces',
-              customer_name: 'Peter Ochieng',
-              customer_phone: '+254 733 567 890',
-              status: 'accepted',
-              estimated_time: '2 hours',
-              price: 6500,
-              distance: 12,
-              urgency: 'normal',
-              created_at: new Date(Date.now() - 60 * 60000).toISOString()
-            },
-            {
-              id: 'DEL-004',
-              pickup_location: 'Industrial Area Depot',
-              delivery_location: 'Lavington Mall Construction',
-              material_type: 'Roofing Sheets',
-              quantity: '50 sheets',
-              customer_name: 'Grace Achieng',
-              customer_phone: '+254 700 123 456',
-              status: 'pending',
-              estimated_time: '30 mins',
-              price: 4500,
-              distance: 8,
-              urgency: 'emergency',
-              special_instructions: 'URGENT: Rain expected. Deliver ASAP!',
-              created_at: new Date(Date.now() - 5 * 60000).toISOString()
-            }
-          ]);
-
-          setDeliveryHistory([
-            {
-              id: 'DEL-098',
-              pickup_location: 'Industrial Area',
-              delivery_location: 'Lavington',
-              material_type: 'Roofing Sheets',
-              status: 'completed',
-              completed_at: new Date(Date.now() - 86400000).toISOString(),
-              price: 5500,
-              rating: 5
-            },
-            {
-              id: 'DEL-097',
-              pickup_location: 'Mombasa Road',
-              delivery_location: 'Kileleshwa',
-              material_type: 'Sand',
-              status: 'completed',
-              completed_at: new Date(Date.now() - 172800000).toISOString(),
-              price: 4500,
-              rating: 4
-            }
-          ]);
         }
       } catch (error) {
         console.error('Error fetching dashboard data:', error);
@@ -3399,7 +3284,7 @@ const DeliveryDashboard = () => {
               <DeliveryPhotoProof
                 deliveryId={showProofCapture}
                 deliveryType="delivery"
-                customerName={activeDeliveries.find(d => d.id === showProofCapture)?.customer_name || 'Customer'}
+                customerName={activeDeliveries.find(d => d.id === showProofCapture)?.customer_name || 'Builder'}
                 onComplete={(proof) => {
                   console.log('Proof captured:', proof);
                   setShowProofCapture(null);

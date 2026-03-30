@@ -29,6 +29,10 @@ export interface UnifiedDeliveryRow {
   _categorized_status: 'scheduled' | 'in_transit' | 'delivered';
   delivered_at?: string;
   source?: string;
+  /** Builder (customer) contact — when RPC supplies them */
+  builder_name?: string;
+  builder_phone?: string;
+  builder_email?: string;
 }
 
 export interface UseDeliveriesUnifiedResult {
@@ -67,6 +71,9 @@ function parseUnifiedRows(data: unknown): UnifiedDeliveryRow[] {
       : ('scheduled' as const),
     delivered_at: row.delivered_at,
     source: row.source,
+    builder_name: row.builder_name,
+    builder_phone: row.builder_phone,
+    builder_email: row.builder_email,
   }));
 }
 

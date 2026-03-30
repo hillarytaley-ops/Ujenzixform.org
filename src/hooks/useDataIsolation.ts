@@ -317,6 +317,101 @@ export const useSupplierData = () => {
 };
 
 /**
+ * Attach builder full name, phone, and email to delivery rows for the provider dashboard.
+ * Uses delivery_requests.builder_id → profiles, then purchase_orders.buyer_id → profiles as fallback.
+ */
+async function enrichDeliveryRowsWithBuilderProfiles(
+  deliveries: any[],
+  accessToken: string,
+  supabaseUrl: string,
+  anonKey: string
+): Promise<any[]> {
+  if (!deliveries?.length) return deliveries;
+  const headers: Record<string, string> = {
+    apikey: anonKey,
+    Authorization: `Bearer ${accessToken}`,
+    Accept: 'application/json',
+  };
+  const opts = { headers, cache: 'no-store' as RequestCache };
+
+  const profileByAnyId = new Map<string, { full_name?: string | null; phone?: string | null; email?: string | null }>();
+
+  const ingestProfiles = (rows: any[]) => {
+    for (const p of rows || []) {
+      const entry = {
+        full_name: p.full_name,
+        phone: p.phone,
+        email: p.email,
+      };
+      if (p.id) profileByAnyId.set(String(p.id), entry);
+      if (p.user_id) profileByAnyId.set(String(p.user_id), entry);
+    }
+  };
+
+  const fetchProfilesIn = async (ids: string[], field: 'id' | 'user_id') => {
+    const unique = [...new Set(ids.filter(Boolean))];
+    if (unique.length === 0) return;
+    const res = await fetch(
+      `${supabaseUrl}/rest/v1/profiles?${field}=in.(${unique.join(',')})&select=id,user_id,full_name,phone,email&limit=500`,
+      opts
+    );
+    if (res.ok) {
+      const rows = await res.json();
+      if (Array.isArray(rows)) ingestProfiles(rows);
+    }
+  };
+
+  const builderIds = [...new Set(deliveries.map((d) => d.builder_id).filter(Boolean).map(String))];
+  await fetchProfilesIn(builderIds, 'id');
+  await fetchProfilesIn(builderIds.filter((id) => !profileByAnyId.has(id)), 'user_id');
+
+  const poIds = [...new Set(deliveries.map((d) => d.purchase_order_id).filter(Boolean).map(String))];
+  const poBuyerMap = new Map<string, string>();
+  if (poIds.length > 0) {
+    const poRes = await fetch(
+      `${supabaseUrl}/rest/v1/purchase_orders?id=in.(${poIds.join(',')})&select=id,buyer_id&limit=500`,
+      opts
+    );
+    if (poRes.ok) {
+      const pos = await poRes.json();
+      for (const po of Array.isArray(pos) ? pos : []) {
+        if (po.id && po.buyer_id) poBuyerMap.set(String(po.id), String(po.buyer_id));
+      }
+      const buyerIds = [...new Set([...poBuyerMap.values()])];
+      await fetchProfilesIn(buyerIds.filter((id) => !profileByAnyId.has(id)), 'id');
+      await fetchProfilesIn(buyerIds.filter((id) => !profileByAnyId.has(id)), 'user_id');
+    }
+  }
+
+  return deliveries.map((d) => {
+    let p = d.builder_id ? profileByAnyId.get(String(d.builder_id)) : undefined;
+    if (!p && d.purchase_order_id) {
+      const bid = poBuyerMap.get(String(d.purchase_order_id));
+      if (bid) p = profileByAnyId.get(bid);
+    }
+    if (!p) return d;
+    const name =
+      (d.builder_name && String(d.builder_name).trim()) ||
+      (p.full_name && String(p.full_name).trim()) ||
+      '';
+    const phone =
+      (d.builder_phone && String(d.builder_phone).trim()) ||
+      (p.phone && String(p.phone).trim()) ||
+      '';
+    const email =
+      (d.builder_email && String(d.builder_email).trim()) ||
+      (p.email && String(p.email).trim()) ||
+      '';
+    return {
+      ...d,
+      builder_name: name || d.builder_name,
+      builder_phone: phone || d.builder_phone,
+      builder_email: email || d.builder_email,
+    };
+  });
+}
+
+/**
  * Hook to fetch delivery provider-specific data with isolation
  */
 export const useDeliveryProviderData = () => {
@@ -644,8 +739,14 @@ export const useDeliveryProviderData = () => {
             else if (raw === 'delivered' || raw === 'completed') _cat = 'delivered';
             return { ...d, _categorized_status: _cat };
           });
-          setActiveDeliveries(withDefaultCategory);
-          fastPathCountRef.current = withDefaultCategory.length;
+          const withBuilderContact = await enrichDeliveryRowsWithBuilderProfiles(
+            withDefaultCategory,
+            accessToken,
+            SUPABASE_URL,
+            SUPABASE_ANON_KEY
+          );
+          setActiveDeliveries(withBuilderContact);
+          fastPathCountRef.current = withBuilderContact.length;
           setLoading(false);
           console.log('⚡ FAST PATH: Set activeDeliveries state to', withDefaultCategory.length, 'items');
           // RPC DISABLED: get_material_items_scan_status_for_provider was causing timeouts
@@ -764,7 +865,13 @@ export const useDeliveryProviderData = () => {
           console.log('✅ RPC get_active_deliveries_for_provider: got', validRpc.length, 'deliveries');
           const inTransitCount = validRpc.filter((d: any) => (d._categorized_status || d.status) === 'in_transit').length;
           console.log('🚚 RPC in_transit count:', inTransitCount);
-          setActiveDeliveries(validRpc);
+          const rpcEnriched = await enrichDeliveryRowsWithBuilderProfiles(
+            validRpc,
+            accessToken,
+            SUPABASE_URL,
+            SUPABASE_ANON_KEY
+          );
+          setActiveDeliveries(rpcEnriched);
           setLoading(false);
           clearTimeout(safetyTimeout);
           // Still fetch deliveryHistory (separate path)
@@ -1159,8 +1266,14 @@ export const useDeliveryProviderData = () => {
             status: d.status,
             order_number: d.order_number
           })));
-          setActiveDeliveries(allDeliveries);
-          fastPathCountRef.current = allDeliveries.length;
+          const enrichedImmediate = await enrichDeliveryRowsWithBuilderProfiles(
+            allDeliveries,
+            accessToken,
+            SUPABASE_URL,
+            SUPABASE_ANON_KEY
+          );
+          setActiveDeliveries(enrichedImmediate);
+          fastPathCountRef.current = enrichedImmediate.length;
         }
         setLoading(false); // Clear loading state so UI updates immediately
         clearTimeout(safetyTimeout); // Clear safety timeout since we've set the data
@@ -2160,9 +2273,15 @@ export const useDeliveryProviderData = () => {
       if (activeNonDelivered.length === 0 && fastPathCountRef.current > 0) {
         console.log('📦 REST merge path: Keeping', fastPathCountRef.current, 'FAST PATH deliveries (avoid overwrite with empty)');
       } else {
-        setActiveDeliveries([...activeNonDelivered]);
-        fastPathCountRef.current = activeNonDelivered.length;
-        console.log('✅ Final: Set active deliveries with', activeNonDelivered.length, 'deliveries (categorized by material_items, delivered orders removed)');
+        const enrichedActive = await enrichDeliveryRowsWithBuilderProfiles(
+          activeNonDelivered,
+          accessToken,
+          SUPABASE_URL,
+          SUPABASE_ANON_KEY
+        );
+        setActiveDeliveries([...enrichedActive]);
+        fastPathCountRef.current = enrichedActive.length;
+        console.log('✅ Final: Set active deliveries with', enrichedActive.length, 'deliveries (categorized by material_items, delivered orders removed)');
       }
 
       // Fetch completed deliveries for THIS provider only
