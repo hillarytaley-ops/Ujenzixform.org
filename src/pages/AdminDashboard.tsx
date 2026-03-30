@@ -139,7 +139,11 @@ import { ThemeToggle, ThemeProvider } from "@/components/admin/dashboard/ThemeTo
 import { MobileNav } from "@/components/admin/dashboard/MobileNav";
 import { GroupedTabNav } from "@/components/admin/dashboard/GroupedTabNav";
 import { AdminSupplyChainDocsPanel } from "@/components/admin/AdminSupplyChainDocsPanel";
-import { isAdminStaffLocalSessionValid } from "@/utils/adminStaffSession";
+import {
+  canAccessAdminDashboardStorage,
+  isAdminStaffLocalSessionValid,
+  isLikelySupabaseAdminUser,
+} from "@/utils/adminStaffSession";
 import { useStaffPermissions } from "@/hooks/useStaffPermissions";
 import { PermissionGate } from "@/components/admin/PermissionGate";
 import { AdminTab } from "@/config/staffPermissions";
@@ -508,9 +512,9 @@ const AdminDashboard = () => {
   ];
 
   useEffect(() => {
-    // Staff portal: valid local session (email + flags + 24h). Supabase JWT optional (limited mode).
-    if (!isAdminStaffLocalSessionValid()) {
-      console.log('🚫 Admin Dashboard: no valid staff session — redirecting to admin login');
+    // Staff portal OR Supabase admin from main /auth (same person may never use staff code flow).
+    if (!canAccessAdminDashboardStorage()) {
+      console.log('🚫 Admin Dashboard: no staff session and no Supabase admin — redirecting to admin login');
       setLoading(false);
       window.location.replace('/admin-login');
       return;
@@ -540,10 +544,13 @@ const AdminDashboard = () => {
       }
     });
     
-    // FAST: Valid staff session — show UI immediately (JWT not required)
-    if (isAdminAuthenticated && userRole === 'admin') {
-      console.log('✅ Admin Dashboard: Valid staff session — showing UI immediately');
+    if (isAdminStaffLocalSessionValid()) {
+      console.log('✅ Admin Dashboard: Staff portal session — showing UI immediately');
       setAdminEmail(localStorage.getItem('admin_email') || '');
+      setLoading(false);
+    } else if (isLikelySupabaseAdminUser()) {
+      console.log('✅ Admin Dashboard: Supabase admin session — showing UI immediately');
+      setAdminEmail(localStorage.getItem('user_email') || '');
       setLoading(false);
     }
     
@@ -686,62 +693,49 @@ const AdminDashboard = () => {
 
   const checkAdminAccess = async () => {
     try {
-      // Check localStorage for admin session
-      const isAdminAuthenticated = localStorage.getItem('admin_authenticated') === 'true';
-      const adminEmailLS = localStorage.getItem('admin_email');
-      const adminLoginTime = localStorage.getItem('admin_login_time');
-      const userRole = localStorage.getItem('user_role');
+      if (isAdminStaffLocalSessionValid()) {
+        const adminEmailLS = localStorage.getItem('admin_email') || '';
+        console.log('🔐 Admin Dashboard Access Check (staff portal):', { adminEmail: adminEmailLS });
+        setAdminEmail(adminEmailLS);
+        setLoading(false);
 
-      console.log('🔐 Admin Dashboard Access Check:', { isAdminAuthenticated, adminEmail: adminEmailLS, userRole });
+        const sessionCheckTimeout = setTimeout(() => {
+          console.log('🔐 Supabase session check timed out (optional for staff portal)');
+        }, 3000);
+        supabase.auth.getSession().then(({ data: { session } }) => {
+          clearTimeout(sessionCheckTimeout);
+          console.log('🔐 Supabase session:', session?.user?.email || 'none');
+        }).catch(() => clearTimeout(sessionCheckTimeout));
 
-      // Check if admin session exists and is valid (within 24 hours)
-      const sessionAge = adminLoginTime ? Date.now() - parseInt(adminLoginTime) : Infinity;
-      const maxSessionAge = 24 * 60 * 60 * 1000; // 24 hours
-
-      if (!isAdminAuthenticated || !adminEmailLS || userRole !== 'admin' || sessionAge > maxSessionAge) {
-        console.log('🚫 Admin session invalid or expired');
-        toast({
-          variant: "destructive",
-          title: "Session Expired",
-          description: "Please sign in again."
-        });
-        // Clear invalid session
-        localStorage.removeItem('admin_authenticated');
-        localStorage.removeItem('admin_email');
-        localStorage.removeItem('admin_login_time');
-        navigate('/admin-login');
+        loadDashboardStats();
+        loadChatStats();
         return;
       }
 
-      // Set admin email immediately to show UI faster
-      setAdminEmail(adminEmailLS);
-      
-      // Show UI immediately, load data in background
-      setLoading(false);
+      if (isLikelySupabaseAdminUser()) {
+        console.log('🔐 Admin Dashboard Access Check (Supabase admin)');
+        const { data: { session } } = await supabase.auth.getSession();
+        const email =
+          session?.user?.email?.trim() ||
+          localStorage.getItem('user_email')?.trim() ||
+          '';
+        setAdminEmail(email);
+        setLoading(false);
+        loadDashboardStats();
+        loadChatStats();
+        return;
+      }
 
-      // Check for Supabase session (optional - RLS is disabled for admin access)
-      // Use timeout to prevent hanging
-      const sessionCheckTimeout = setTimeout(() => {
-        console.log('🔐 Supabase session check timed out (RLS disabled, admin access OK)');
-      }, 3000);
-      
-      supabase.auth.getSession().then(({ data: { session } }) => {
-        clearTimeout(sessionCheckTimeout);
-        console.log('🔐 Supabase session:', session?.user?.email || 'No session (RLS disabled, admin access OK)');
-      }).catch(() => {
-        clearTimeout(sessionCheckTimeout);
-        console.log('🔐 Supabase session check failed (RLS disabled, admin access OK)');
+      console.log('🚫 Admin session invalid or expired');
+      toast({
+        variant: "destructive",
+        title: "Session Expired",
+        description: "Please sign in again."
       });
-
-      // Load only essential dashboard stats first (fast)
-      loadDashboardStats();
-      
-      // Load chat stats for notification badges
-      loadChatStats();
-      
-      // Load other data lazily based on active tab
-      // This prevents loading ALL data at once
-
+      localStorage.removeItem('admin_authenticated');
+      localStorage.removeItem('admin_email');
+      localStorage.removeItem('admin_login_time');
+      navigate('/admin-login');
     } catch (error) {
       console.error('Admin access check error:', error);
       navigate('/admin-login');
@@ -2134,7 +2128,7 @@ const AdminDashboard = () => {
 
   // FAST PATH: If we have valid localStorage auth, skip the loading screen entirely
   // This prevents the dashboard from hanging on slow Supabase auth
-  const hasValidAuth = isAdminStaffLocalSessionValid();
+  const hasValidAuth = canAccessAdminDashboardStorage();
   
   // Only show loading screen if we DON'T have valid localStorage auth
   // If we have localStorage auth, show the dashboard immediately

@@ -7,7 +7,7 @@ import type { User } from '@supabase/supabase-js';
 import { Navigate, useLocation } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { fetchUserRolesViaRest } from '@/lib/userRolesRest';
-import { isAdminStaffLocalSessionValid } from '@/utils/adminStaffSession';
+import { canAccessAdminDashboardStorage } from '@/utils/adminStaffSession';
 
 interface RoleProtectedRouteProps {
   children: React.ReactNode;
@@ -46,16 +46,16 @@ export const RoleProtectedRoute = ({ children, allowedRoles }: RoleProtectedRout
     isAdminDashboardPath &&
     (allowedRoles.includes('admin') || allowedRoles.includes('super_admin'));
 
-  /** Staff portal often has no Supabase JWT ("limited mode"); skip session wait to avoid /auth redirect loops */
+  /** Staff portal (no JWT) OR Supabase admin — skip wait; avoid /auth redirect fight */
   const [ready, setReady] = useState(() => {
     if (typeof window === 'undefined') return false;
-    return allowsAdminStaffStorageBypass && isAdminStaffLocalSessionValid();
+    return allowsAdminStaffStorageBypass && canAccessAdminDashboardStorage();
   });
   const [sessionUser, setSessionUser] = useState<User | null>(null);
   const [dbRole, setDbRole] = useState<string | null>(null);
 
   useEffect(() => {
-    if (allowsAdminStaffStorageBypass && isAdminStaffLocalSessionValid()) {
+    if (allowsAdminStaffStorageBypass && canAccessAdminDashboardStorage()) {
       setReady(true);
       return;
     }
@@ -119,7 +119,7 @@ export const RoleProtectedRoute = ({ children, allowedRoles }: RoleProtectedRout
     );
   }
 
-  if (allowsAdminStaffStorageBypass && isAdminStaffLocalSessionValid()) {
+  if (allowsAdminStaffStorageBypass && canAccessAdminDashboardStorage()) {
     return <>{children}</>;
   }
 

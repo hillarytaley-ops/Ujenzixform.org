@@ -42,7 +42,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Shield, Lock, AlertTriangle, KeyRound, Users } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { isAdminStaffLocalSessionValid } from "@/utils/adminStaffSession";
+import { canAccessAdminDashboardStorage } from "@/utils/adminStaffSession";
 
 // Type helper for tables not yet in generated types
 const db = supabase as any;
@@ -82,8 +82,8 @@ const AdminAuth = () => {
 
   const checkExistingAuth = async () => {
     try {
-      // Same rules as AdminDashboard — includes admin_email; no Supabase JWT required
-      if (isAdminStaffLocalSessionValid()) {
+      // Already signed in as admin (staff portal or main /auth)
+      if (canAccessAdminDashboardStorage()) {
         setTimeout(() => {
           navigate("/admin-dashboard", { replace: true });
         }, 0);
