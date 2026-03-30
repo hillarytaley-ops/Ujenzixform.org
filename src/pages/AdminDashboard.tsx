@@ -4271,23 +4271,23 @@ const AdminDashboard = () => {
                   Delivery notes, GRN &amp; invoices
                 </CardTitle>
                 <CardDescription className="text-gray-400">
-                  Staff reference for the builder–supplier delivery and billing flow. Pair with{" "}
+                  Live DN / GRN / invoice rows plus quick links. See also{" "}
                   <button
                     type="button"
-                    className="text-emerald-400 hover:underline font-medium"
+                    className="font-medium text-emerald-400 hover:underline"
                     onClick={() => setActiveTab("financial")}
                   >
                     Financial
                   </button>{" "}
-                  for live invoice totals and{" "}
+                  and{" "}
                   <button
                     type="button"
-                    className="text-emerald-400 hover:underline font-medium"
+                    className="font-medium text-emerald-400 hover:underline"
                     onClick={() => setActiveTab("orders")}
                   >
                     Orders
-                  </button>{" "}
-                  for purchase context.
+                  </button>
+                  .
                 </CardDescription>
               </CardHeader>
               <CardContent>

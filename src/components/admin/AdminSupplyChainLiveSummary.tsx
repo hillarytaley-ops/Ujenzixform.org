@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Truck, FileCheck2, FileText, RefreshCw, AlertCircle, FileDown } from "lucide-react";
-import { MobileHorizontalScroll } from "@/components/ui/mobile-horizontal-scroll";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { openDeliveryNotePdfWindow } from "@/utils/deliveryNoteDocument";
 import { openGrnPrintWindow } from "@/utils/grnDocument";
@@ -324,15 +324,7 @@ export function AdminSupplyChainLiveSummary() {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div>
-          <h3 className="text-lg font-semibold text-white">Live platform data</h3>
-          <p className="text-sm text-gray-400">
-            Totals and recent rows. Use <strong className="text-gray-300">PDF</strong> to download a stored file or open
-            a printable view (delivery notes include the builder signature when saved on the row). Requires staff JWT,
-            table RLS, and (for files) Storage policies.
-          </p>
-        </div>
+      <div className="flex justify-end">
         <Button
           type="button"
           variant="outline"
@@ -392,86 +384,119 @@ export function AdminSupplyChainLiveSummary() {
         </Card>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-3">
-        <RecentTable
-          title="Recent delivery notes"
-          loading={loading}
-          empty={!recentDn.length}
-          headers={["DN #", "PO", "Status", "When", "PDF"]}
-          rows={recentDn.map((r) => {
-            const dn =
-              (r.dn_number as string | undefined) ||
-              (r.delivery_note_number as string | undefined) ||
-              r.id.slice(0, 8);
-            const po = r.purchase_order_id;
-            const st = (r.status as string | undefined) || "—";
-            return [dn, po ? String(po).slice(0, 8) + "…" : "—", st, fmtDate(r.created_at)];
-          })}
-          statusCol={2}
-          actionsColumn={recentDn.map((r) => (
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              className="h-8 px-2 text-cyan-300 hover:text-cyan-100"
-              onClick={() => void handleDnDocument(r)}
-              title="Download stored file or open printable note with signature"
-            >
-              <FileDown className="h-4 w-4" />
-            </Button>
-          ))}
-        />
-        <RecentTable
-          title="Recent GRNs"
-          loading={loading}
-          empty={!recentGrn.length}
-          headers={["GRN #", "Supplier", "Status", "When", "PDF"]}
-          rows={recentGrn.map((r) => [
-            r.grn_number,
-            r.supplier_name?.slice(0, 24) || "—",
-            r.status,
-            fmtDate(r.created_at),
-          ])}
-          statusCol={2}
-          actionsColumn={recentGrn.map((r) => (
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              className="h-8 px-2 text-cyan-300 hover:text-cyan-100"
-              onClick={() => handleGrnDocument(r)}
-              title="Open printable GRN (Save as PDF from browser)"
-            >
-              <FileDown className="h-4 w-4" />
-            </Button>
-          ))}
-        />
-        <RecentTable
-          title="Recent invoices"
-          loading={loading}
-          empty={!recentInv.length}
-          headers={["Invoice #", "Amount", "Status", "When", "PDF"]}
-          rows={recentInv.map((r) => [
-            r.invoice_number,
-            `Ksh ${Number(r.total_amount).toLocaleString()}`,
-            r.status,
-            fmtDate(r.created_at),
-          ])}
-          statusCol={2}
-          actionsColumn={recentInv.map((r) => (
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              className="h-8 px-2 text-cyan-300 hover:text-cyan-100"
-              onClick={() => void handleInvoiceDocument(r)}
-              title="Download uploaded invoice or open printable summary"
-            >
-              <FileDown className="h-4 w-4" />
-            </Button>
-          ))}
-        />
-      </div>
+      <Tabs defaultValue="grns" className="w-full">
+        <TabsList className="grid w-full h-auto grid-cols-3 gap-1 rounded-lg bg-slate-800/90 p-1.5 text-gray-300 md:w-auto md:inline-flex md:max-w-xl">
+          <TabsTrigger
+            value="dns"
+            className="rounded-md px-2 py-2.5 text-xs font-medium data-[state=active]:bg-slate-700 data-[state=active]:text-white sm:text-sm"
+          >
+            <span className="hidden sm:inline">Delivery notes </span>
+            <span className="sm:hidden">DN </span>
+            <span className="text-gray-400 tabular-nums">({loading ? "—" : recentDn.length})</span>
+          </TabsTrigger>
+          <TabsTrigger
+            value="grns"
+            className="rounded-md px-2 py-2.5 text-xs font-medium data-[state=active]:bg-slate-700 data-[state=active]:text-white sm:text-sm"
+          >
+            GRNs <span className="text-gray-400 tabular-nums">({loading ? "—" : recentGrn.length})</span>
+          </TabsTrigger>
+          <TabsTrigger
+            value="invs"
+            className="rounded-md px-2 py-2.5 text-xs font-medium data-[state=active]:bg-slate-700 data-[state=active]:text-white sm:text-sm"
+          >
+            <span className="hidden sm:inline">Invoices </span>
+            <span className="sm:hidden">Inv. </span>
+            <span className="text-gray-400 tabular-nums">({loading ? "—" : recentInv.length})</span>
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="dns" className="mt-4 outline-none focus-visible:ring-0">
+          <RecentTable
+            title="Recent delivery notes"
+            loading={loading}
+            empty={!recentDn.length}
+            headers={["DN #", "PO", "Status", "When", "PDF"]}
+            rows={recentDn.map((r) => {
+              const dn =
+                (r.dn_number as string | undefined) ||
+                (r.delivery_note_number as string | undefined) ||
+                r.id.slice(0, 8);
+              const po = r.purchase_order_id;
+              const st = (r.status as string | undefined) || "—";
+              return [dn, po ? String(po).slice(0, 8) + "…" : "—", st, fmtDate(r.created_at)];
+            })}
+            statusCol={2}
+            actionsColumn={recentDn.map((r) => (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-8 px-2 text-cyan-300 hover:text-cyan-100"
+                onClick={() => void handleDnDocument(r)}
+                title="Download stored file or open printable note with signature"
+              >
+                <FileDown className="h-4 w-4" />
+              </Button>
+            ))}
+          />
+        </TabsContent>
+
+        <TabsContent value="grns" className="mt-4 outline-none focus-visible:ring-0">
+          <RecentTable
+            title="Recent GRNs"
+            loading={loading}
+            empty={!recentGrn.length}
+            headers={["GRN #", "Supplier", "Status", "When", "PDF"]}
+            rows={recentGrn.map((r) => [
+              r.grn_number,
+              r.supplier_name || "—",
+              r.status,
+              fmtDate(r.created_at),
+            ])}
+            statusCol={2}
+            actionsColumn={recentGrn.map((r) => (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-8 px-2 text-cyan-300 hover:text-cyan-100"
+                onClick={() => handleGrnDocument(r)}
+                title="Open printable GRN (Save as PDF from browser)"
+              >
+                <FileDown className="h-4 w-4" />
+              </Button>
+            ))}
+          />
+        </TabsContent>
+
+        <TabsContent value="invs" className="mt-4 outline-none focus-visible:ring-0">
+          <RecentTable
+            title="Recent invoices"
+            loading={loading}
+            empty={!recentInv.length}
+            headers={["Invoice #", "Amount", "Status", "When", "PDF"]}
+            rows={recentInv.map((r) => [
+              r.invoice_number,
+              `Ksh ${Number(r.total_amount).toLocaleString()}`,
+              r.status,
+              fmtDate(r.created_at),
+            ])}
+            statusCol={2}
+            actionsColumn={recentInv.map((r) => (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-8 px-2 text-cyan-300 hover:text-cyan-100"
+                onClick={() => void handleInvoiceDocument(r)}
+                title="Download uploaded invoice or open printable summary"
+              >
+                <FileDown className="h-4 w-4" />
+              </Button>
+            ))}
+          />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
@@ -487,9 +512,9 @@ function RecentTable(props: {
 }) {
   const { title, loading, empty, headers, rows, statusCol, actionsColumn } = props;
   return (
-    <Card className="bg-slate-900/50 border-slate-800 overflow-hidden">
-      <CardHeader className="py-3 border-b border-slate-800">
-        <CardTitle className="text-white text-sm">{title}</CardTitle>
+    <Card className="border-slate-800 bg-slate-900/40 overflow-hidden">
+      <CardHeader className="border-b border-slate-800 py-3">
+        <CardTitle className="text-base font-medium text-white">{title}</CardTitle>
       </CardHeader>
       <CardContent className="p-0">
         {loading ? (
@@ -497,42 +522,39 @@ function RecentTable(props: {
         ) : empty ? (
           <p className="p-4 text-sm text-gray-500">No rows yet.</p>
         ) : (
-          <MobileHorizontalScroll
-            tone="dark"
-            scrollClassName="max-h-[320px] overflow-y-auto"
-          >
-            <table className="min-w-[640px] w-full text-xs text-left">
-              <thead className="sticky top-0 z-[1] bg-slate-900/95 text-gray-400 border-b border-slate-800">
+          <div className="max-h-[min(60vh,560px)] overflow-auto">
+            <table className="w-full min-w-[36rem] text-left text-sm">
+              <thead className="sticky top-0 z-[1] border-b border-slate-800 bg-slate-900/98 text-xs font-medium uppercase tracking-wide text-gray-400">
                 <tr>
                   {headers.map((h) => (
-                    <th key={h} className="px-3 py-2 font-medium">
+                    <th key={h} className="whitespace-nowrap px-4 py-3">
                       {h}
                     </th>
                   ))}
                 </tr>
               </thead>
-              <tbody className="text-gray-300">
+              <tbody className="text-gray-200">
                 {rows.map((cells, i) => (
-                  <tr key={i} className="border-b border-slate-800/80 hover:bg-slate-800/40">
+                  <tr key={i} className="border-b border-slate-800/60 transition-colors hover:bg-slate-800/35">
                     {cells.map((c, j) => (
-                      <td key={j} className="px-3 py-2 align-middle">
+                      <td key={j} className="max-w-[14rem] px-4 py-2.5 align-middle">
                         {statusCol === j ? (
-                          <Badge variant="secondary" className="text-[10px] font-normal max-w-[120px] truncate">
+                          <Badge variant="secondary" className="max-w-full truncate text-xs font-normal">
                             {String(c)}
                           </Badge>
                         ) : (
-                          <span className="break-all">{c}</span>
+                          <span className="break-words">{c}</span>
                         )}
                       </td>
                     ))}
                     {actionsColumn && (
-                      <td className="px-2 py-1 align-middle w-12">{actionsColumn[i]}</td>
+                      <td className="w-14 whitespace-nowrap px-2 py-2 align-middle">{actionsColumn[i]}</td>
                     )}
                   </tr>
                 ))}
               </tbody>
             </table>
-          </MobileHorizontalScroll>
+          </div>
         )}
       </CardContent>
     </Card>
