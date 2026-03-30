@@ -318,7 +318,7 @@ const Index = () => {
             <p className="text-sm uppercase tracking-widest text-white/60 mb-2">CHOOSE YOUR PORTAL</p>
           </div>
           
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6 max-w-7xl mx-auto">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 max-w-7xl mx-auto">
             {/* Private Builder */}
             <Card className="h-full hover:scale-[1.02] transition-all duration-300 bg-gradient-to-br from-emerald-500 to-emerald-600 border-0 shadow-xl hover:shadow-2xl rounded-2xl overflow-hidden">
               <CardContent className="p-6 text-center flex flex-col h-full">
@@ -420,33 +420,6 @@ const Index = () => {
                   <Link to="/delivery-auth">
                     <Button size="sm" className="w-full bg-white text-purple-700 hover:bg-white/90 font-semibold">
                       Explore
-                      <ChevronRight className="h-4 w-4 ml-1" />
-                    </Button>
-                  </Link>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Staff Access */}
-            <Card className="h-full hover:scale-[1.02] transition-all duration-300 bg-gradient-to-br from-slate-700 to-slate-800 border-0 shadow-xl hover:shadow-2xl rounded-2xl overflow-hidden">
-              <CardContent className="p-6 text-center flex flex-col h-full">
-                <div className="w-14 h-14 bg-white/20 rounded-xl flex items-center justify-center mx-auto mb-4">
-                  <Shield className="h-7 w-7 text-white" />
-                </div>
-                <h3 className="text-white font-bold text-lg mb-1">Staff Access</h3>
-                <p className="text-slate-300/80 text-sm mb-4">Admin & Staff Portal</p>
-                <ul className="text-left text-slate-300/70 text-xs space-y-1 mb-4">
-                  <li className="flex items-center gap-2">
-                    <span className="text-slate-400">›</span> Manage platform
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <span className="text-slate-400">›</span> Staff dashboard access
-                  </li>
-                </ul>
-                <div className="mt-auto">
-                  <Link to="/admin-login">
-                    <Button size="sm" className="w-full bg-white text-slate-700 hover:bg-white/90 font-semibold">
-                      Staff Login
                       <ChevronRight className="h-4 w-4 ml-1" />
                     </Button>
                   </Link>
