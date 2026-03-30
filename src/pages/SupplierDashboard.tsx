@@ -1910,7 +1910,7 @@ const SupplierDashboard = () => {
                 </div>
               </div>
             </div>
-            <div className="hidden w-full gap-2 md:flex md:flex-wrap md:items-center lg:w-auto lg:max-w-xl">
+            <div className="hidden w-full justify-center gap-2 md:flex md:flex-wrap md:items-center">
               <LanguageSwitcher
                 variant="compact"
                 className="h-10 w-full border border-white/30 bg-white/10 text-white hover:bg-white/20 hover:text-white sm:w-auto"
@@ -2058,10 +2058,10 @@ const SupplierDashboard = () => {
           </Card>
         </div>
 
-        {/* Navigation Cards — responsive grid (was 3× cramped columns on mobile) */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4 xl:grid-cols-8 gap-2 sm:gap-3 mb-6">
+        {/* Navigation Cards — full-width grid; lg+ one row of eight equal cells */}
+        <div className="mb-6 grid w-full grid-cols-2 gap-2 sm:grid-cols-4 sm:gap-3 md:grid-cols-4 lg:grid-cols-8">
           <Button 
-            className={`h-auto py-3 sm:py-4 transition-all ${activeTab === 'overview' 
+            className={`h-auto w-full min-w-0 py-3 sm:py-4 transition-all ${activeTab === 'overview' 
               ? 'bg-gradient-to-r from-slate-600 to-slate-700 ring-2 ring-slate-400 shadow-lg' 
               : isDarkMode ? 'bg-slate-700 hover:bg-slate-600' : 'bg-gray-100 hover:bg-gray-200 text-gray-700'}`}
             onClick={() => setActiveTab('overview')}
@@ -2072,7 +2072,7 @@ const SupplierDashboard = () => {
             </div>
           </Button>
           <Button 
-            className={`h-auto py-3 sm:py-4 transition-all ${activeTab === 'materials' 
+            className={`h-auto w-full min-w-0 py-3 sm:py-4 transition-all ${activeTab === 'materials' 
               ? 'bg-gradient-to-r from-orange-500 to-amber-500 ring-2 ring-orange-300 shadow-lg' 
               : isDarkMode ? 'bg-slate-700 hover:bg-slate-600' : 'bg-gray-100 hover:bg-gray-200 text-gray-700'}`}
             onClick={() => setActiveTab('materials')}
@@ -2083,7 +2083,7 @@ const SupplierDashboard = () => {
             </div>
           </Button>
           <Button 
-            className={`h-auto py-3 sm:py-4 transition-all relative overflow-visible ${activeTab === 'view-orders' 
+            className={`relative h-auto w-full min-w-0 overflow-visible py-3 sm:py-4 transition-all ${activeTab === 'view-orders' 
               ? 'bg-gradient-to-r from-blue-500 to-blue-600 ring-2 ring-blue-300 shadow-lg' 
               : isDarkMode ? 'bg-slate-700 hover:bg-slate-600' : 'bg-gray-100 hover:bg-gray-200 text-gray-700'}`}
             onClick={() => setActiveTab('view-orders')}
@@ -2104,7 +2104,7 @@ const SupplierDashboard = () => {
             </div>
           </Button>
           <Button 
-            className={`h-auto py-3 sm:py-4 transition-all ${activeTab === 'scan-qr' 
+            className={`h-auto w-full min-w-0 py-3 sm:py-4 transition-all ${activeTab === 'scan-qr' 
               ? 'bg-gradient-to-r from-teal-500 to-cyan-500 ring-2 ring-cyan-300 shadow-lg' 
               : isDarkMode ? 'bg-slate-700 hover:bg-slate-600' : 'bg-gray-100 hover:bg-gray-200 text-gray-700'}`}
             onClick={() => setActiveTab('scan-qr')}
@@ -2115,7 +2115,7 @@ const SupplierDashboard = () => {
             </div>
           </Button>
           <Button 
-            className={`h-auto py-3 sm:py-4 transition-all ${activeTab === 'tracking' 
+            className={`h-auto w-full min-w-0 py-3 sm:py-4 transition-all ${activeTab === 'tracking' 
               ? 'bg-gradient-to-r from-purple-500 to-purple-600 ring-2 ring-purple-300 shadow-lg' 
               : isDarkMode ? 'bg-slate-700 hover:bg-slate-600' : 'bg-gray-100 hover:bg-gray-200 text-gray-700'}`}
             onClick={() => setActiveTab('tracking')}
@@ -2126,7 +2126,7 @@ const SupplierDashboard = () => {
             </div>
           </Button>
           <Button 
-            className={`h-auto py-3 sm:py-4 transition-all ${activeTab === 'analytics' 
+            className={`h-auto w-full min-w-0 py-3 sm:py-4 transition-all ${activeTab === 'analytics' 
               ? 'bg-gradient-to-r from-blue-600 to-indigo-600 ring-2 ring-blue-300 shadow-lg' 
               : isDarkMode ? 'bg-slate-700 hover:bg-slate-600' : 'bg-gray-100 hover:bg-gray-200 text-gray-700'}`}
             onClick={() => setActiveTab('analytics')}
@@ -2137,7 +2137,7 @@ const SupplierDashboard = () => {
             </div>
           </Button>
           <Button 
-            className={`h-auto py-3 sm:py-4 transition-all ${activeTab === 'invoice' 
+            className={`h-auto w-full min-w-0 py-3 sm:py-4 transition-all ${activeTab === 'invoice' 
               ? 'bg-gradient-to-r from-rose-500 to-pink-600 ring-2 ring-rose-300 shadow-lg' 
               : isDarkMode ? 'bg-slate-700 hover:bg-slate-600' : 'bg-gray-100 hover:bg-gray-200 text-gray-700'}`}
             onClick={() => setActiveTab('invoice')}
@@ -2148,7 +2148,7 @@ const SupplierDashboard = () => {
             </div>
           </Button>
           <Button 
-            className={`h-auto py-3 sm:py-4 transition-all ${activeTab === 'reports' 
+            className={`h-auto w-full min-w-0 py-3 sm:py-4 transition-all ${activeTab === 'reports' 
               ? 'bg-gradient-to-r from-green-500 to-emerald-600 ring-2 ring-green-300 shadow-lg' 
               : isDarkMode ? 'bg-slate-700 hover:bg-slate-600' : 'bg-gray-100 hover:bg-gray-200 text-gray-700'}`}
             onClick={() => setActiveTab('reports')}
