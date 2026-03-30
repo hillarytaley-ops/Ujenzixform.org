@@ -46,38 +46,33 @@
   <body>
     <div id="root"></div>
     
-    <!-- AGGRESSIVE CACHE BUSTER v29 -->
+    <!-- Cache / SW cleanup ONLY when build id changes — never on every navigation (caused chunk failures + flicker) -->
     <script>
       (function() {
-        var BUILD = 'v121-native-fetch-videos';
+        var BUILD = 'v122-stable-cache-policy';
         var KEY = 'ujenzi_build';
         var last = localStorage.getItem(KEY);
-        
-        // Always unregister service workers
-        if ('serviceWorker' in navigator) {
-          navigator.serviceWorker.getRegistrations().then(function(regs) {
-            regs.forEach(function(r) { r.unregister(); });
-          });
+        if (last === BUILD) {
+          console.log('🚀 UjenziXform BUILD:', BUILD);
+          return;
         }
-        
-        // Clear caches
-        if ('caches' in window) {
-          caches.keys().then(function(names) {
-            names.forEach(function(n) { caches.delete(n); });
-          });
-        }
-        
-        // Force reload if build changed
-        if (last !== BUILD) {
-          localStorage.setItem(KEY, BUILD);
-          if (last) {
-            // Add cache-busting parameter and reload
-            var url = new URL(window.location.href);
-            url.searchParams.set('_cb', Date.now());
-            window.location.replace(url.toString());
+        localStorage.setItem(KEY, BUILD);
+        if (last) {
+          if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.getRegistrations().then(function(regs) {
+              regs.forEach(function(r) { r.unregister(); });
+            });
           }
+          if ('caches' in window) {
+            caches.keys().then(function(names) {
+              names.forEach(function(n) { caches.delete(n); });
+            });
+          }
+          var url = new URL(window.location.href);
+          url.searchParams.set('_cb', Date.now());
+          window.location.replace(url.toString());
+          return;
         }
-        
         console.log('🚀 UjenziXform BUILD:', BUILD);
       })();
     </script>

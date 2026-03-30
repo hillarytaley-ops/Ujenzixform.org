@@ -15,6 +15,7 @@ import { OnboardingProvider } from "@/components/onboarding/OnboardingProvider";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
+import AdminAuth from "./pages/AdminAuth";
 
 // Lazy load non-critical pages for better bundle splitting
 const Builders = React.lazy(() => import("./pages/Builders"));
@@ -25,7 +26,6 @@ const Suppliers = React.lazy(() => import("./pages/Suppliers"));
 const BuilderPortal = React.lazy(() => import("./pages/BuilderPortal"));
 const About = React.lazy(() => import("./pages/About"));
 const Contact = React.lazy(() => import("./pages/Contact"));
-const AdminAuth = React.lazy(() => import("./pages/AdminAuth"));
 const ResetPassword = React.lazy(() => import("./pages/ResetPassword"));
 const Feedback = React.lazy(() => import("./pages/Feedback"));
 const Careers = React.lazy(() => import("./pages/Careers"));
@@ -234,7 +234,7 @@ const App = () => {
                     <Route path="/professional-builder-auth" element={<SuspenseWrapper><ProfessionalBuilderAuth /></SuspenseWrapper>} />
                     <Route path="/supplier-auth" element={<SuspenseWrapper><SupplierAuth /></SuspenseWrapper>} />
                     <Route path="/delivery-auth" element={<SuspenseWrapper><DeliveryAuth /></SuspenseWrapper>} />
-                    <Route path="/admin-login" element={<SuspenseWrapper><AdminAuth /></SuspenseWrapper>} />
+                    <Route path="/admin-login" element={<AdminAuth />} />
                     <Route path="/reset-password" element={<SuspenseWrapper><ResetPassword /></SuspenseWrapper>} />
                     
                     {/* All pages accessible after sign in - no repeated auth required */}

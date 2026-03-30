@@ -110,24 +110,6 @@ root.render(
   </React.StrictMode>
 );
 
-// DISABLED: Service Worker was causing caching issues with auth pages
-// Unregister any existing service workers to fix the problem
-if ('serviceWorker' in navigator) {
-  window.addEventListener('load', async () => {
-    try {
-      const registrations = await navigator.serviceWorker.getRegistrations();
-      for (const registration of registrations) {
-        await registration.unregister();
-        console.log('🧹 Unregistered service worker:', registration.scope);
-      }
-      // Clear all caches
-      if ('caches' in window) {
-        const cacheNames = await caches.keys();
-        await Promise.all(cacheNames.map(name => caches.delete(name)));
-        console.log('🧹 Cleared all caches');
-      }
-    } catch (e) {
-      console.warn('Failed to cleanup service workers:', e);
-    }
-  });
-}
+// Do not clear Cache Storage / unregister SW on every page load — that races with lazy chunks
+// and triggers chunk-error reloads (flicker on /admin-login). Cleanup runs only on BUILD change
+// in index.html; stale chunks are handled by handleChunkError() above.
