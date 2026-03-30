@@ -16,6 +16,7 @@ import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
 import AdminAuth from "./pages/AdminAuth";
+import AdminDashboard from "./pages/AdminDashboard";
 
 // Lazy load non-critical pages for better bundle splitting
 const Builders = React.lazy(() => import("./pages/Builders"));
@@ -36,8 +37,7 @@ const Scanners = React.lazy(() => import("./pages/Scanners"));
 const Analytics = React.lazy(() => import("./pages/Analytics"));
 const DeliveryProviderApplication = React.lazy(() => import("./pages/DeliveryProviderApplication"));
 
-// Dashboard imports - lazy loaded (heavy components)
-const AdminDashboard = React.lazy(() => import("./pages/AdminDashboard"));
+// Dashboard imports - lazy loaded (heavy components). AdminDashboard is static — avoids stale lazy chunk → HTML MIME errors after deploy.
 const SupplierDashboard = React.lazy(() => import("./pages/SupplierDashboard"));
 const DeliveryDashboard = React.lazy(() => import("./pages/DeliveryDashboard"));
 
@@ -317,7 +317,7 @@ const App = () => {
                     {/* Dashboard Routes - Protected */}
                     <Route path="/admin-dashboard" element={
                       <RoleProtectedRoute allowedRoles={['admin', 'super_admin']}>
-                        <SuspenseWrapper><AdminDashboard /></SuspenseWrapper>
+                        <AdminDashboard />
                       </RoleProtectedRoute>
                     } />
                     {/* Redirect /builder-dashboard to appropriate dashboard based on role */}
