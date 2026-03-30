@@ -20,73 +20,101 @@ const Footer = () => {
   return (
     <footer className="bg-gray-900 text-white py-12">
       <div className="container mx-auto px-4">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
+        <div className="grid grid-cols-1 md:grid-cols-4 md:items-stretch gap-6 md:gap-8">
           {/* Brand Section */}
-          <div className="text-center md:text-left">
+          <div className="text-center md:text-left flex flex-col h-full min-h-0 rounded-xl border border-gray-800/60 bg-gray-800/25 p-5 md:p-6">
             <div className="flex items-center justify-center md:justify-start space-x-2 mb-4">
-              <Building2 className="h-6 w-6" />
+              <Building2 className="h-6 w-6 shrink-0" />
               <h3 className="text-lg font-semibold">
                 <span className="text-white">Ujenzi</span>
                 <span className="text-green-400">Xform</span>
               </h3>
             </div>
-            <p className="text-gray-400 mb-4 max-w-sm mx-auto md:mx-0">
+            <p className="text-gray-400 max-w-sm mx-auto md:mx-0">
               Connecting Kenya's construction industry, one project at a time.
             </p>
           </div>
 
           {/* For Builders + For Suppliers: one row, two columns on mobile */}
           <div className="grid grid-cols-2 gap-6 md:contents text-center md:text-left">
-            <div>
+            <div className="flex flex-col h-full min-h-0 rounded-xl border border-gray-800/60 bg-gray-800/25 p-5 md:p-6">
               <h4 className="font-semibold mb-4">For Builders</h4>
-              <ul className="space-y-2 text-gray-400">
-                <li><Link to="/supplier-marketplace" className="hover:text-white transition-colors">Find Materials</Link></li>
-                <li><Link to="/builders" className="hover:text-white transition-colors">Builder Directory</Link></li>
-                <li><Link to="/tracking" className="hover:text-white transition-colors">Track Deliveries</Link></li>
-                <li><Link to="/builder-registration" className="hover:text-white transition-colors">Register as Builder</Link></li>
+              <ul className="space-y-2 text-gray-400 flex-1">
+                <li className="min-h-[1.375rem] flex items-center justify-center md:justify-start">
+                  <Link to="/supplier-marketplace" className="hover:text-white transition-colors leading-snug">Find Materials</Link>
+                </li>
+                <li className="min-h-[1.375rem] flex items-center justify-center md:justify-start">
+                  <Link to="/builders" className="hover:text-white transition-colors leading-snug">Builder Directory</Link>
+                </li>
+                <li className="min-h-[1.375rem] flex items-center justify-center md:justify-start">
+                  <Link to="/tracking" className="hover:text-white transition-colors leading-snug">Track Deliveries</Link>
+                </li>
+                <li className="min-h-[1.375rem] flex items-center justify-center md:justify-start">
+                  <Link to="/builder-registration" className="hover:text-white transition-colors leading-snug">Register as Builder</Link>
+                </li>
               </ul>
             </div>
 
-            <div>
+            <div className="flex flex-col h-full min-h-0 rounded-xl border border-gray-800/60 bg-gray-800/25 p-5 md:p-6">
               <h4 className="font-semibold mb-4">For Suppliers</h4>
-              <ul className="space-y-2 text-gray-400">
-                <li><Link to="/supplier-registration" className="hover:text-white transition-colors">List Products</Link></li>
-                <li><Link to="/suppliers" className="hover:text-white transition-colors">Supplier Portal</Link></li>
-                <li><Link to="/delivery" className="hover:text-white transition-colors">Delivery Services</Link></li>
-                <li><Link to="/delivery/apply" className="hover:text-white transition-colors">Become a Driver</Link></li>
+              <ul className="space-y-2 text-gray-400 flex-1">
+                <li className="min-h-[1.375rem] flex items-center justify-center md:justify-start">
+                  <Link to="/supplier-registration" className="hover:text-white transition-colors leading-snug">List Products</Link>
+                </li>
+                <li className="min-h-[1.375rem] flex items-center justify-center md:justify-start">
+                  <Link to="/suppliers" className="hover:text-white transition-colors leading-snug">Supplier Portal</Link>
+                </li>
+                <li className="min-h-[1.375rem] flex items-center justify-center md:justify-start">
+                  <Link to="/delivery" className="hover:text-white transition-colors leading-snug">Delivery Services</Link>
+                </li>
+                <li className="min-h-[1.375rem] flex items-center justify-center md:justify-start">
+                  <Link to="/delivery/apply" className="hover:text-white transition-colors leading-snug">Become a Driver</Link>
+                </li>
               </ul>
             </div>
           </div>
 
-          {/* Company & Support */}
-          <div className="text-center md:text-left">
+          {/* Company */}
+          <div className="text-center md:text-left flex flex-col h-full min-h-0 rounded-xl border border-gray-800/60 bg-gray-800/25 p-5 md:p-6">
             <h4 className="font-semibold mb-4">Company</h4>
-            <ul className="space-y-2 text-gray-400">
-              <li><Link to="/about" className="hover:text-white transition-colors">About Us</Link></li>
-              <li><Link to="/careers" className="hover:text-white transition-colors">Careers 🔥</Link></li>
-              <li><Link to="/feedback" className="hover:text-white transition-colors">Help & Feedback</Link></li>
-              <li><Link to="/privacy-policy" className="hover:text-white transition-colors">Privacy Policy</Link></li>
-              <li><Link to="/terms-of-service" className="hover:text-white transition-colors">Terms of Service</Link></li>
+            <ul className="space-y-2 text-gray-400 flex-1">
+              <li className="min-h-[1.375rem] flex items-center justify-center md:justify-start">
+                <Link to="/about" className="hover:text-white transition-colors leading-snug">About Us</Link>
+              </li>
+              <li className="min-h-[1.375rem] flex items-center justify-center md:justify-start">
+                <Link to="/careers" className="hover:text-white transition-colors leading-snug">
+                  Careers <span className="inline-block align-middle leading-none">🔥</span>
+                </Link>
+              </li>
+              <li className="min-h-[1.375rem] flex items-center justify-center md:justify-start">
+                <Link to="/feedback" className="hover:text-white transition-colors leading-snug">Help & Feedback</Link>
+              </li>
+              <li className="min-h-[1.375rem] flex items-center justify-center md:justify-start">
+                <Link to="/privacy-policy" className="hover:text-white transition-colors leading-snug">Privacy Policy</Link>
+              </li>
+              <li className="min-h-[1.375rem] flex items-center justify-center md:justify-start">
+                <Link to="/terms-of-service" className="hover:text-white transition-colors leading-snug">Terms of Service</Link>
+              </li>
             </ul>
-
-            {/* Contact Info */}
-            <div className="mt-4 space-y-2 flex flex-col items-center md:items-stretch">
-              <a
-                href="mailto:info@ujenzixform.org"
-                className="flex items-center gap-2 justify-center md:justify-start text-gray-400 hover:text-white transition-colors"
-              >
-                <EmailIcon size={16} />
-                <span>info@ujenzixform.org</span>
-              </a>
-              <a
-                href="tel:+254700000000"
-                className="flex items-center gap-2 justify-center md:justify-start text-gray-400 hover:text-white transition-colors"
-              >
-                <PhoneIcon size={16} />
-                <span>+254 700 000 000</span>
-              </a>
-            </div>
           </div>
+        </div>
+
+        {/* Contact — shared row so link columns stay equal height */}
+        <div className="mt-8 flex flex-col sm:flex-row flex-wrap items-center justify-center gap-x-10 gap-y-3 text-gray-400 text-sm">
+          <a
+            href="mailto:info@ujenzixform.org"
+            className="flex items-center gap-2 hover:text-white transition-colors"
+          >
+            <EmailIcon size={16} />
+            <span>info@ujenzixform.org</span>
+          </a>
+          <a
+            href="tel:+254700000000"
+            className="flex items-center gap-2 hover:text-white transition-colors"
+          >
+            <PhoneIcon size={16} />
+            <span>+254 700 000 000</span>
+          </a>
         </div>
 
         {/* Bottom bar: copyright + single social row (outline icons, all breakpoints) */}
