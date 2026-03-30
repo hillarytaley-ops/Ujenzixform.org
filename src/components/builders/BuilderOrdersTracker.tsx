@@ -990,26 +990,15 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
       case 'rescheduled_delivery': return 'bg-yellow-100 text-yellow-800';
       case 'supplier_delay': return 'bg-amber-100 text-amber-800';
       case 'provider_unavailable': return 'bg-gray-100 text-gray-800';
-      // Legacy statuses
+      // Legacy / item-style statuses (not duplicated above)
       case 'pending': return 'bg-gray-100 text-gray-800';
       case 'confirmed': return 'bg-amber-100 text-amber-800';
       case 'quoted': return 'bg-green-100 text-green-800';
-      case 'dispatched': return 'bg-orange-100 text-orange-800';
       case 'partially_dispatched': return 'bg-orange-50 text-orange-700';
-      case 'in_transit': return 'bg-purple-100 text-purple-800';
       case 'partially_delivered': return 'bg-teal-100 text-teal-800';
-      case 'received': return 'bg-green-100 text-green-800';
       case 'delivered': return 'bg-green-100 text-green-800';
       case 'verified': return 'bg-emerald-100 text-emerald-800';
       case 'damaged': return 'bg-red-100 text-red-800';
-      case 'completed': return 'bg-emerald-100 text-emerald-800';
-      // Exception and fallback statuses
-      case 'delivery_cancelled': return 'bg-red-100 text-red-800';
-      case 'order_cancelled': return 'bg-red-100 text-red-800';
-      case 'delivery_failed': return 'bg-orange-100 text-orange-800';
-      case 'rescheduled_delivery': return 'bg-yellow-100 text-yellow-800';
-      case 'supplier_delay': return 'bg-amber-100 text-amber-800';
-      case 'provider_unavailable': return 'bg-gray-100 text-gray-800';
       default: return 'bg-gray-100 text-gray-800';
     }
   };
@@ -1043,25 +1032,14 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
       case 'rescheduled_delivery': return <RefreshCw className="h-4 w-4" />;
       case 'supplier_delay': return <Clock className="h-4 w-4" />;
       case 'provider_unavailable': return <ShieldX className="h-4 w-4" />;
-      // Legacy statuses
+      // Legacy / item-style statuses (not duplicated above)
       case 'pending': return <Clock className="h-4 w-4" />;
       case 'confirmed': return <CheckCircle className="h-4 w-4" />;
       case 'quoted': return <CheckCircle className="h-4 w-4" />;
-      case 'dispatched': return <Package className="h-4 w-4" />;
       case 'partially_dispatched': return <Package className="h-4 w-4" />;
-      case 'in_transit': return <Truck className="h-4 w-4" />;
       case 'partially_delivered': return <Truck className="h-4 w-4" />;
-      case 'received': return <CheckCircle className="h-4 w-4" />;
       case 'delivered': return <CheckCircle className="h-4 w-4" />;
       case 'verified': return <CheckCircle className="h-4 w-4" />;
-      case 'completed': return <CheckCircle className="h-4 w-4" />;
-      // Exception and fallback statuses
-      case 'delivery_cancelled': return <XCircle className="h-4 w-4" />;
-      case 'order_cancelled': return <XCircle className="h-4 w-4" />;
-      case 'delivery_failed': return <AlertCircle className="h-4 w-4" />;
-      case 'rescheduled_delivery': return <RefreshCw className="h-4 w-4" />;
-      case 'supplier_delay': return <Clock className="h-4 w-4" />;
-      case 'provider_unavailable': return <ShieldX className="h-4 w-4" />;
       default: return <QrCode className="h-4 w-4" />;
     }
   };
