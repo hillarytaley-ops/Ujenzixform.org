@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -40,7 +40,8 @@ import {
   Eye,
   Map as MapIcon,
   FileSignature,
-  Receipt
+  Receipt,
+  Volume2
 } from "lucide-react";
 import { BuilderProfileEdit } from "@/components/builders/BuilderProfileEdit";
 import { BuilderVideoPortfolio } from "@/components/builders/BuilderVideoPortfolio";
@@ -52,6 +53,7 @@ import { BarChart3, Star } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import {
   Select,
   SelectContent,
@@ -117,6 +119,39 @@ function dedupeProjectsById(rows: any[]): any[] {
     seen.add(id);
     return true;
   });
+}
+
+const BUILDER_DOC_SOUND_KEY = 'ujx_builder_doc_sound_enabled';
+
+/** Short beep when document sub-tab counts increase (mobile may require toggling sound on first). */
+function playBuilderDocAlertBeep(): void {
+  if (typeof window === 'undefined') return;
+  try {
+    if (localStorage.getItem(BUILDER_DOC_SOUND_KEY) === '0') return;
+    const AC =
+      window.AudioContext ||
+      (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+    if (!AC) return;
+    const ctx = new AC();
+    void ctx.resume();
+    const beep = (freq: number, t0: number, dur: number) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(freq, t0);
+      gain.gain.setValueAtTime(0, t0);
+      gain.gain.linearRampToValueAtTime(0.09, t0 + 0.02);
+      gain.gain.linearRampToValueAtTime(0, t0 + dur);
+      osc.start(t0);
+      osc.stop(t0 + dur + 0.01);
+    };
+    beep(880, ctx.currentTime, 0.12);
+    beep(1174, ctx.currentTime + 0.14, 0.12);
+  } catch {
+    /* autoplay blocked or unsupported */
+  }
 }
 
 /**
@@ -453,6 +488,14 @@ const ProfessionalBuilderDashboardPage = () => {
   const [invoiceDocsSubTab, setInvoiceDocsSubTab] = useState('delivery-notes'); // Invoices tab: DN / GRN / invoices list
   const [supplierResponseCount, setSupplierResponseCount] = useState(0); // Count of supplier responses for notification badge
   const [invoiceHubBadgeCount, setInvoiceHubBadgeCount] = useState(0); // DN + invoices needing builder action (Invoices tab)
+  const [invoiceSubBadgeDn, setInvoiceSubBadgeDn] = useState(0);
+  const [invoiceSubBadgeGrn, setInvoiceSubBadgeGrn] = useState(0);
+  const [invoiceSubBadgeInv, setInvoiceSubBadgeInv] = useState(0);
+  const [docAlertSoundOn, setDocAlertSoundOn] = useState(
+    () => typeof window !== 'undefined' && localStorage.getItem(BUILDER_DOC_SOUND_KEY) !== '0'
+  );
+  const prevInvoiceSubBadgesRef = useRef({ dn: 0, grn: 0, inv: 0 });
+  const skipInvoiceSubSoundOnceRef = useRef(true);
   const [deliveryAddressNeededNotifications, setDeliveryAddressNeededNotifications] = useState<{ id: string; title: string; message: string; action_url?: string }[]>([]);
 
   // Projects state - start with loading false to show empty state immediately
@@ -628,11 +671,14 @@ const ProfessionalBuilderDashboardPage = () => {
     }
   };
 
-  /** Delivery notes awaiting signature/inspection + invoices sent but not acknowledged (matches Invoice tab workflows). */
+  /** Delivery notes awaiting signature/inspection + invoices draft/sent and not acknowledged (+ GRN sub-count). */
   const fetchInvoiceHubBadgeCount = async (profileId?: string | null, authUserId?: string | null) => {
     const builders = [...new Set([profileId, authUserId].filter(Boolean))] as string[];
     if (builders.length === 0) {
       setInvoiceHubBadgeCount(0);
+      setInvoiceSubBadgeDn(0);
+      setInvoiceSubBadgeGrn(0);
+      setInvoiceSubBadgeInv(0);
       return;
     }
     try {
@@ -643,11 +689,18 @@ const ProfessionalBuilderDashboardPage = () => {
         .in('status', ['pending_signature', 'inspection_pending']);
       if (dnErr) console.warn('Invoice hub badge (DN):', dnErr.message);
 
+      const { count: grnCount, error: grnErr } = await supabase
+        .from('goods_received_notes')
+        .select('id', { count: 'exact', head: true })
+        .in('builder_id', builders)
+        .eq('status', 'generated');
+      if (grnErr) console.warn('Invoice hub badge (GRN):', grnErr.message);
+
       const { data: invByBuilder, error: ibErr } = await supabase
         .from('invoices')
         .select('id')
         .in('builder_id', builders)
-        .eq('status', 'sent')
+        .in('status', ['sent', 'draft'])
         .is('acknowledged_at', null);
       if (ibErr) console.warn('Invoice hub badge (inv builder_id):', ibErr.message);
 
@@ -664,7 +717,7 @@ const ProfessionalBuilderDashboardPage = () => {
           .from('invoices')
           .select('id')
           .in('purchase_order_id', poIds)
-          .eq('status', 'sent')
+          .in('status', ['sent', 'draft'])
           .is('acknowledged_at', null);
         if (ipErr) console.warn('Invoice hub badge (inv PO):', ipErr.message);
         invByPo = data || [];
@@ -675,11 +728,19 @@ const ProfessionalBuilderDashboardPage = () => {
         if (r?.id) invSeen.add(r.id);
       }
 
-      const total = (dnCount || 0) + invSeen.size;
-      setInvoiceHubBadgeCount(Math.min(99, total));
+      const dnN = Math.min(99, dnCount || 0);
+      const grnN = Math.min(99, grnCount || 0);
+      const invN = Math.min(99, invSeen.size);
+      setInvoiceSubBadgeDn(dnN);
+      setInvoiceSubBadgeGrn(grnN);
+      setInvoiceSubBadgeInv(invN);
+      setInvoiceHubBadgeCount(Math.min(99, dnN + invN));
     } catch (e) {
       console.warn('fetchInvoiceHubBadgeCount:', e);
       setInvoiceHubBadgeCount(0);
+      setInvoiceSubBadgeDn(0);
+      setInvoiceSubBadgeGrn(0);
+      setInvoiceSubBadgeInv(0);
     }
   };
 
@@ -1808,7 +1869,36 @@ const ProfessionalBuilderDashboardPage = () => {
     }
   }, [authUser, profile?.id]);
 
-  // Invoices tab badge: delivery notes + unacknowledged invoices
+  useEffect(() => {
+    skipInvoiceSubSoundOnceRef.current = true;
+    prevInvoiceSubBadgesRef.current = { dn: 0, grn: 0, inv: 0 };
+  }, [authUser?.id, profile?.id]);
+
+  useEffect(() => {
+    if (skipInvoiceSubSoundOnceRef.current) {
+      skipInvoiceSubSoundOnceRef.current = false;
+      prevInvoiceSubBadgesRef.current = {
+        dn: invoiceSubBadgeDn,
+        grn: invoiceSubBadgeGrn,
+        inv: invoiceSubBadgeInv,
+      };
+      return;
+    }
+    const prev = prevInvoiceSubBadgesRef.current;
+    const increased =
+      invoiceSubBadgeDn > prev.dn ||
+      invoiceSubBadgeGrn > prev.grn ||
+      invoiceSubBadgeInv > prev.inv;
+    prevInvoiceSubBadgesRef.current = {
+      dn: invoiceSubBadgeDn,
+      grn: invoiceSubBadgeGrn,
+      inv: invoiceSubBadgeInv,
+    };
+    if (!docAlertSoundOn || !increased) return;
+    playBuilderDocAlertBeep();
+  }, [invoiceSubBadgeDn, invoiceSubBadgeGrn, invoiceSubBadgeInv, docAlertSoundOn]);
+
+  // Invoices tab badge: delivery notes + unacknowledged invoices (+ sub-tab counts + realtime)
   useEffect(() => {
     const userId = getUserId();
     if (!userId) return;
@@ -1824,6 +1914,18 @@ const ProfessionalBuilderDashboardPage = () => {
           event: '*',
           schema: 'public',
           table: 'delivery_notes',
+          filter: `builder_id=eq.${bid}`,
+        },
+        () => {
+          void fetchInvoiceHubBadgeCount(profileBuyerId, userId);
+        }
+      );
+      ch = ch.on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'goods_received_notes',
           filter: `builder_id=eq.${bid}`,
         },
         () => {
@@ -3364,24 +3466,57 @@ const ProfessionalBuilderDashboardPage = () => {
                   <Receipt className="h-5 w-5 text-orange-500" />
                   Receipts & documents
                 </CardTitle>
-                <CardDescription>
-                  Switch between delivery notes to sign, goods received notes (GRN), and invoices — no long scroll.
+                <CardDescription className="space-y-3">
+                  <p>
+                    Switch between delivery notes to sign, goods received notes (GRN), and invoices — no long scroll.
+                  </p>
+                  <div className="flex flex-wrap items-center gap-2 rounded-md border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
+                    <Volume2 className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                    <Label htmlFor="builder-doc-sound" className="cursor-pointer font-normal">
+                      Alert sound when new items appear (tap toggle on phones to allow audio)
+                    </Label>
+                    <Switch
+                      id="builder-doc-sound"
+                      checked={docAlertSoundOn}
+                      onCheckedChange={(on) => {
+                        setDocAlertSoundOn(on);
+                        localStorage.setItem(BUILDER_DOC_SOUND_KEY, on ? '1' : '0');
+                        if (on) playBuilderDocAlertBeep();
+                      }}
+                      className="scale-90"
+                    />
+                  </div>
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 <Tabs value={invoiceDocsSubTab} onValueChange={setInvoiceDocsSubTab} className="space-y-4">
                   <TabsList className="grid h-auto w-full grid-cols-1 gap-2 p-1 sm:grid-cols-3 bg-muted">
-                    <TabsTrigger value="delivery-notes" className="gap-2">
+                    <TabsTrigger value="delivery-notes" className="relative gap-2 pr-7 sm:pr-8">
                       <FileSignature className="h-4 w-4 shrink-0" />
                       Delivery notes
+                      {invoiceSubBadgeDn > 0 && (
+                        <Badge className="absolute right-1 top-1/2 h-5 min-w-5 -translate-y-1/2 border-2 border-background bg-red-500 px-1 text-[10px] text-white hover:bg-red-500">
+                          {invoiceSubBadgeDn > 9 ? '9+' : invoiceSubBadgeDn}
+                        </Badge>
+                      )}
                     </TabsTrigger>
-                    <TabsTrigger value="grn" className="gap-2">
+                    <TabsTrigger value="grn" className="relative gap-2 pr-7 sm:pr-8">
                       <Package className="h-4 w-4 shrink-0" />
                       GRN
+                      {invoiceSubBadgeGrn > 0 && (
+                        <Badge className="absolute right-1 top-1/2 h-5 min-w-5 -translate-y-1/2 border-2 border-background bg-red-500 px-1 text-[10px] text-white hover:bg-red-500">
+                          {invoiceSubBadgeGrn > 9 ? '9+' : invoiceSubBadgeGrn}
+                        </Badge>
+                      )}
                     </TabsTrigger>
-                    <TabsTrigger value="invoice-list" className="gap-2">
+                    <TabsTrigger value="invoice-list" className="relative gap-2 pr-7 sm:pr-8">
                       <Receipt className="h-4 w-4 shrink-0" />
                       Invoices
+                      {invoiceSubBadgeInv > 0 && (
+                        <Badge className="absolute right-1 top-1/2 h-5 min-w-5 -translate-y-1/2 border-2 border-background bg-red-500 px-1 text-[10px] text-white hover:bg-red-500">
+                          {invoiceSubBadgeInv > 9 ? '9+' : invoiceSubBadgeInv}
+                        </Badge>
+                      )}
                     </TabsTrigger>
                   </TabsList>
 
@@ -3394,7 +3529,7 @@ const ProfessionalBuilderDashboardPage = () => {
                         builderAuthUserId={user.id}
                         builderProfileId={profile?.id ?? null}
                         onComplete={() => {
-                          // Refresh data if needed
+                          void fetchInvoiceHubBadgeCount(profile?.id ?? null, user.id);
                         }}
                       />
                     )}
