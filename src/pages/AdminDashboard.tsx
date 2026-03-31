@@ -529,6 +529,13 @@ const AdminDashboard = () => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       console.log('🔐 Admin Dashboard: Auth state changed:', event);
       if (event === 'SIGNED_OUT') {
+        // JWT refresh failure or tab sign-out clears Supabase session first. Staff portal
+        // may still be valid (24h) without a Supabase user — do not wipe staff keys or
+        // redirect, or the dashboard numbers/lists look like they "disappear" mid-session.
+        if (isAdminStaffLocalSessionValid()) {
+          console.log('🔐 Supabase session ended; staff portal session still valid — staying on dashboard (re-sign in via main /auth for full data access).');
+          return;
+        }
         console.log('🚪 User signed out - redirecting to admin login');
         // Clear all admin-related localStorage
         localStorage.removeItem('admin_authenticated');
@@ -760,6 +767,13 @@ const AdminDashboard = () => {
     } catch (e) {
       console.warn('Could not get session from localStorage');
     }
+
+    // user_roles and most admin aggregates require an authenticated JWT (RLS). Staff-only
+    // sessions have no JWT — REST returns empty counts and would overwrite real numbers with zeros.
+    if (!accessToken && isAdminStaffLocalSessionValid()) {
+      console.log('📊 Skipping loadDashboardStats: staff portal without Supabase JWT (RLS needs authenticated role).');
+      return;
+    }
     
     const headers: Record<string, string> = {
       'apikey': SUPABASE_ANON_KEY,
@@ -833,18 +847,7 @@ const AdminDashboard = () => {
       }));
     } catch (error: any) {
       console.error('Error loading stats:', error);
-      // Set defaults - don't block the dashboard
-      setStats(prev => ({
-        ...prev,
-        totalUsers: 0,
-        pendingRegistrations: 0,
-        totalFeedback: 0,
-        totalOrders: 0,
-        pendingOrders: 0,
-        confirmedOrders: 0,
-        totalDeliveryRequests: 0,
-        pendingDeliveryRequests: 0
-      }));
+      // Keep prior stats on failure — zeroing everything looks like data "disappeared"
     }
   };
 
@@ -964,6 +967,8 @@ const AdminDashboard = () => {
           accessToken = parsed.access_token;
         }
       } catch (e) {}
+
+      const skipAnonAggregates = !accessToken && isAdminStaffLocalSessionValid();
       
       const headers: Record<string, string> = {
         'apikey': SUPABASE_ANON_KEY,
@@ -981,6 +986,10 @@ const AdminDashboard = () => {
           console.log('📊 User roles loaded:', rolesData?.length);
           
           if (rolesData && Array.isArray(rolesData)) {
+            // Anon / no JWT: RLS returns [] — do not replace visible stats with zeros
+            if (rolesData.length === 0 && skipAnonAggregates) {
+              console.log('📊 Skipping role counts: empty user_roles without JWT (staff limited mode).');
+            } else {
             const builderCount = rolesData.filter((r: any) => r.role === 'builder' || r.role === 'professional_builder' || r.role === 'private_client').length;
             const supplierCount = rolesData.filter((r: any) => r.role === 'supplier').length;
             const deliveryCount = rolesData.filter((r: any) => r.role === 'delivery_provider' || r.role === 'delivery').length;
@@ -993,6 +1002,7 @@ const AdminDashboard = () => {
               totalDelivery: deliveryCount
             }));
             console.log('📊 Role counts:', { total: rolesData.length, builders: builderCount, suppliers: supplierCount, delivery: deliveryCount });
+            }
           }
         } else {
           console.warn('📊 Failed to load user roles:', rolesResponse.status);
@@ -1018,29 +1028,22 @@ const AdminDashboard = () => {
           pendingCount += Array.isArray(data) ? data.length : 0;
         }
 
-        setStats(prev => ({
-          ...prev,
-          pendingRegistrations: pendingCount
-        }));
-        console.log('📊 Pending registrations:', pendingCount);
+        if (!skipAnonAggregates) {
+          setStats(prev => ({
+            ...prev,
+            pendingRegistrations: pendingCount
+          }));
+          console.log('📊 Pending registrations:', pendingCount);
+        } else {
+          console.log('📊 Skipping pending registration count (staff limited mode without JWT).');
+        }
       } catch (regError: any) {
         console.warn('📊 Error loading pending registrations:', regError.message);
       }
 
     } catch (error: any) {
       console.error('Error loading dashboard data:', error);
-      // Set all stats to 0 to prevent showing stale data
-      setStats({
-        totalUsers: 0,
-        totalBuilders: 0,
-        totalSuppliers: 0,
-        totalDelivery: 0,
-        pendingRegistrations: 0,
-        activeToday: 0,
-        totalFeedback: 0,
-        positiveFeedback: 0,
-        negativeFeedback: 0
-      });
+      // Do not wipe stats — that reads as "all data disappeared"
     }
   };
   
