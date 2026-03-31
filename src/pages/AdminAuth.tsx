@@ -302,62 +302,49 @@ const AdminAuth = () => {
         staffRole = 'super_admin';
         staffName = 'Super Administrator';
       } else {
-        // Check admin_staff table for dynamic staff members
-        console.log('🔐 Checking admin_staff table...');
-        
-        try {
-          // Add timeout to prevent hanging
-          const staffQueryPromise = db
-            .from('admin_staff')
-            .select('id, email, full_name, role, staff_code, status')
-            .eq('email', normalizedEmail)
-            .eq('staff_code', normalizedCode)
-            .maybeSingle();
+        // Verify via SECURITY DEFINER RPC (no broad anon SELECT on admin_staff)
+        console.log('🔐 Verifying staff via verify_admin_staff_login...');
 
-          // Set 5 second timeout for database query
-          const timeoutPromise = new Promise((_, reject) => 
+        try {
+          const rpcPromise = db.rpc('verify_admin_staff_login', {
+            p_email: normalizedEmail,
+            p_staff_code: normalizedCode,
+          });
+
+          const timeoutPromise = new Promise((_, reject) =>
             setTimeout(() => reject(new Error('Query timeout')), 5000)
           );
 
-          const { data: staffData, error: staffError } = await Promise.race([
-            staffQueryPromise,
-            timeoutPromise
-          ]) as any;
+          const { data: rpcData, error: rpcError } = (await Promise.race([
+            rpcPromise,
+            timeoutPromise,
+          ])) as { data: unknown; error: Error | null };
 
-          if (staffError && staffError.message !== 'Query timeout') {
-            console.error('🔐 Staff lookup error:', staffError);
+          if (rpcError && (rpcError as any).message !== 'Query timeout') {
+            console.error('🔐 Staff verify RPC error:', rpcError);
           }
 
-          if (staffData) {
-            // Check if staff account is active
-            if (staffData.status === 'active') {
-              isValidStaff = true;
-              staffRole = staffData.role;
-              staffName = staffData.full_name;
-              console.log('🔐 Staff member verified:', staffData.full_name, 'Role:', staffData.role);
-              
-              // Update last_login timestamp (fire and forget - don't block)
-              (async () => {
-                try {
-                  await db.from('admin_staff')
-                    .update({ last_login: new Date().toISOString() })
-                    .eq('id', staffData.id);
-                } catch (err: any) {
-                  console.error('Failed to update last_login:', err);
-                }
-              })();
-            } else {
-              console.log('🔐 Staff account is not active:', staffData.status);
-              toast({
-                variant: "destructive",
-                title: "Account Inactive",
-                description: `Your account is ${staffData.status}. Please contact an administrator.`
-              });
-              setLoading(false);
-              return;
-            }
+          const result = rpcData as
+            | { ok?: boolean; role?: string; full_name?: string; reason?: string }
+            | null
+            | undefined;
+
+          if (result?.ok === true) {
+            isValidStaff = true;
+            staffRole = result.role || 'admin';
+            staffName = result.full_name || '';
+            console.log('🔐 Staff member verified:', staffName, 'Role:', staffRole);
+          } else if (result?.reason === 'inactive') {
+            console.log('🔐 Staff account inactive');
+            toast({
+              variant: "destructive",
+              title: "Account Inactive",
+              description: 'Your account is not active. Please contact an administrator.',
+            });
+            setLoading(false);
+            return;
           } else {
-            console.log('🔐 No matching staff member found in database');
+            console.log('🔐 No matching staff credentials');
           }
         } catch (err: any) {
           if (err.message === 'Query timeout') {
@@ -365,7 +352,8 @@ const AdminAuth = () => {
             toast({
               variant: "destructive",
               title: "Connection Timeout",
-              description: "Could not verify credentials. Please check your connection and try again."
+              description:
+                "Could not verify credentials. Please check your connection and try again.",
             });
             setLoading(false);
             return;
