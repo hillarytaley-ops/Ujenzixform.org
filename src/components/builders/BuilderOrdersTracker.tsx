@@ -257,7 +257,7 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
         } catch (e) {}
       }
       
-      const headers: Record<string, string> = { 'apikey': apiKey };
+      const headers: Record<string, string> = { 'apikey': SUPABASE_ANON_KEY };
       if (accessToken) {
         headers['Authorization'] = `Bearer ${accessToken}`;
       }
@@ -761,7 +761,7 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
         } catch (e) {}
       }
       
-      const headers: Record<string, string> = { 'apikey': apiKey };
+      const headers: Record<string, string> = { 'apikey': SUPABASE_ANON_KEY };
       if (accessToken) {
         headers['Authorization'] = `Bearer ${accessToken}`;
       }
@@ -878,7 +878,7 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
                 accessToken = parsed.access_token || '';
               } catch (e) {}
             }
-            const headers: Record<string, string> = { 'apikey': apiKey };
+            const headers: Record<string, string> = { 'apikey': SUPABASE_ANON_KEY };
             if (accessToken) {
               headers['Authorization'] = `Bearer ${accessToken}`;
             }

@@ -620,7 +620,7 @@ export const EnhancedQRCodeManager: React.FC<EnhancedQRCodeManagerProps> = ({
   ) => {
     const stored = getUserFromStorage();
     const token = forcedAccessToken || stored?.accessToken;
-    const headers: Record<string, string> = { 'apikey': apiKey };
+    const headers: Record<string, string> = { 'apikey': SUPABASE_ANON_KEY };
     if (token) {
       headers['Authorization'] = `Bearer ${token}`;
     }
@@ -872,7 +872,7 @@ export const EnhancedQRCodeManager: React.FC<EnhancedQRCodeManagerProps> = ({
       // Fetch material items using native fetch with auth for RLS
       try {
         const stored = getUserFromStorage();
-        const headers: Record<string, string> = { 'apikey': apiKey };
+        const headers: Record<string, string> = { 'apikey': SUPABASE_ANON_KEY };
         if (stored?.accessToken) {
           headers['Authorization'] = `Bearer ${stored.accessToken}`;
         }
@@ -907,7 +907,7 @@ export const EnhancedQRCodeManager: React.FC<EnhancedQRCodeManagerProps> = ({
       console.log('👑 Admin detected - fetching ALL material items...');
       try {
         const stored = getUserFromStorage();
-        const headers: Record<string, string> = { 'apikey': apiKey };
+        const headers: Record<string, string> = { 'apikey': SUPABASE_ANON_KEY };
         if (stored?.accessToken) {
           headers['Authorization'] = `Bearer ${stored.accessToken}`;
         }

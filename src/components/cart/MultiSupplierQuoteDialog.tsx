@@ -91,7 +91,7 @@ export const MultiSupplierQuoteDialog: React.FC<MultiSupplierQuoteDialogProps> =
       const suppliersResponse = await fetch(
         `${SUPABASE_URL}/rest/v1/suppliers?select=id,user_id,company_name,location,rating&order=rating.desc.nullslast`,
         { 
-          headers: { 'apikey': apiKey },
+          headers: { 'apikey': SUPABASE_ANON_KEY },
           signal: controller.signal,
           cache: 'no-store'
         }
@@ -114,7 +114,7 @@ export const MultiSupplierQuoteDialog: React.FC<MultiSupplierQuoteDialogProps> =
         const pricesResponse = await fetch(
           `${SUPABASE_URL}/rest/v1/supplier_product_prices?select=supplier_id&price=gt.0`,
           { 
-            headers: { 'apikey': apiKey },
+            headers: { 'apikey': SUPABASE_ANON_KEY },
             signal: pricesController.signal,
             cache: 'no-store'
           }
@@ -310,7 +310,7 @@ export const MultiSupplierQuoteDialog: React.FC<MultiSupplierQuoteDialogProps> =
           const response = await fetch(`${SUPABASE_URL}/rest/v1/purchase_orders`, {
             method: 'POST',
             headers: {
-              'apikey': apiKey,
+              'apikey': SUPABASE_ANON_KEY,
               'Authorization': `Bearer ${accessToken}`,
               'Content-Type': 'application/json',
               'Prefer': 'return=representation'

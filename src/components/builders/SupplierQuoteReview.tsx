@@ -95,7 +95,7 @@ export const SupplierQuoteReview: React.FC<SupplierQuoteReviewProps> = ({
 
   // Helper to get auth headers
   const getAuthHeaders = (): Record<string, string> => {
-    const headers: Record<string, string> = { 'apikey': apiKey, 'Content-Type': 'application/json' };
+    const headers: Record<string, string> = { 'apikey': SUPABASE_ANON_KEY, 'Content-Type': 'application/json' };
     
     try {
       const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');

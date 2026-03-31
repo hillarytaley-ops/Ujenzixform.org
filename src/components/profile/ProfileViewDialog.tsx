@@ -87,7 +87,7 @@ export const ProfileViewDialog: React.FC<ProfileViewDialogProps> = ({
             `${SUPABASE_URL}/rest/v1/profiles?user_id=eq.${effectiveUserId}&select=*`,
             { 
               headers: { 
-                'apikey': apiKey,
+                'apikey': SUPABASE_ANON_KEY,
                 'Authorization': accessToken ? `Bearer ${accessToken}` : ''
               }, 
               cache: 'no-store' 
@@ -111,7 +111,7 @@ export const ProfileViewDialog: React.FC<ProfileViewDialogProps> = ({
               `${SUPABASE_URL}/rest/v1/suppliers?user_id=eq.${effectiveUserId}&select=*`,
               { 
                 headers: { 
-                  'apikey': apiKey,
+                  'apikey': SUPABASE_ANON_KEY,
                   'Authorization': accessToken ? `Bearer ${accessToken}` : ''
                 }, 
                 cache: 'no-store' 
@@ -136,7 +136,7 @@ export const ProfileViewDialog: React.FC<ProfileViewDialogProps> = ({
               `${SUPABASE_URL}/rest/v1/delivery_providers?user_id=eq.${effectiveUserId}&select=*`,
               { 
                 headers: { 
-                  'apikey': apiKey,
+                  'apikey': SUPABASE_ANON_KEY,
                   'Authorization': accessToken ? `Bearer ${accessToken}` : ''
                 }, 
                 cache: 'no-store' 

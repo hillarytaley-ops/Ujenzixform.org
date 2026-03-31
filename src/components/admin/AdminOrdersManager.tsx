@@ -147,7 +147,7 @@ export const AdminOrdersManager: React.FC = () => {
         } catch (e) {}
       }
       
-      const headers: Record<string, string> = { 'apikey': apiKey };
+      const headers: Record<string, string> = { 'apikey': SUPABASE_ANON_KEY };
       if (accessToken) {
         headers['Authorization'] = `Bearer ${accessToken}`;
       }

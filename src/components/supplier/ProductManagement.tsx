@@ -75,7 +75,7 @@ import {
   Image as ImageIcon,
   Trash2
 } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase, SUPABASE_ANON_KEY } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useAuth } from "@/contexts/AuthContext";
@@ -332,7 +332,7 @@ export const ProductManagement: React.FC<ProductManagementProps> = ({ supplierId
           
           const response = await fetch(url, {
             headers: {
-              'apikey': apiKey,
+              'apikey': SUPABASE_ANON_KEY,
               'Authorization': accessToken ? `Bearer ${accessToken}` : '',
             }
           });
@@ -393,7 +393,7 @@ export const ProductManagement: React.FC<ProductManagementProps> = ({ supplierId
         const testResponse = await fetch(
           'https://wuuyjjpgzgeimiptuuws.supabase.co/rest/v1/admin_material_images?select=id&limit=1',
           {
-            headers: { 'apikey': apiKey, 'Authorization': accessToken ? `Bearer ${accessToken}` : '' }
+            headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': accessToken ? `Bearer ${accessToken}` : '' }
           }
         );
         console.log('📦 API test response:', testResponse.status, 'in', Date.now() - testStart, 'ms');
@@ -409,7 +409,7 @@ export const ProductManagement: React.FC<ProductManagementProps> = ({ supplierId
       
       const response = await fetch(url, {
         headers: {
-          'apikey': apiKey,
+          'apikey': SUPABASE_ANON_KEY,
           'Authorization': accessToken ? `Bearer ${accessToken}` : '',
         }
       });
@@ -505,7 +505,7 @@ export const ProductManagement: React.FC<ProductManagementProps> = ({ supplierId
         `https://wuuyjjpgzgeimiptuuws.supabase.co/rest/v1/supplier_product_prices?supplier_id=eq.${effectiveSupplierId}&select=*`,
         {
           headers: {
-            'apikey': apiKey,
+            'apikey': SUPABASE_ANON_KEY,
             'Authorization': accessToken ? `Bearer ${accessToken}` : '',
           }
         }
@@ -586,7 +586,7 @@ export const ProductManagement: React.FC<ProductManagementProps> = ({ supplierId
           {
             method: 'PATCH',
             headers: {
-              'apikey': apiKey,
+              'apikey': SUPABASE_ANON_KEY,
               'Authorization': `Bearer ${accessToken}`,
               'Content-Type': 'application/json',
               'Prefer': 'return=representation'
@@ -610,7 +610,7 @@ export const ProductManagement: React.FC<ProductManagementProps> = ({ supplierId
           {
             method: 'POST',
             headers: {
-              'apikey': apiKey,
+              'apikey': SUPABASE_ANON_KEY,
               'Authorization': `Bearer ${accessToken}`,
               'Content-Type': 'application/json',
               'Prefer': 'return=representation'
@@ -654,7 +654,7 @@ export const ProductManagement: React.FC<ProductManagementProps> = ({ supplierId
             {
               method: existingPrice ? 'PATCH' : 'POST',
               headers: {
-                'apikey': apiKey,
+                'apikey': SUPABASE_ANON_KEY,
                 'Authorization': `Bearer ${accessToken}`,
                 'Content-Type': 'application/json',
                 'Prefer': 'return=representation'
@@ -1861,7 +1861,7 @@ export const ProductManagement: React.FC<ProductManagementProps> = ({ supplierId
                       {
                         method: 'PATCH',
                         headers: {
-                          'apikey': apiKey,
+                          'apikey': SUPABASE_ANON_KEY,
                           'Authorization': `Bearer ${accessToken}`,
                           'Content-Type': 'application/json',
                           'Prefer': 'return=representation'

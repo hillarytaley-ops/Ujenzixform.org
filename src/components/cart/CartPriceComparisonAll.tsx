@@ -108,7 +108,7 @@ export const CartPriceComparisonAll: React.FC<CartPriceComparisonAllProps> = ({
       try {
         const suppliersResponse = await fetch(
           `${SUPABASE_URL}/rest/v1/suppliers?select=id,user_id,company_name,rating,location&order=rating.desc.nullslast&limit=50`,
-          { headers: { 'apikey': apiKey }, cache: 'no-store' }
+          { headers: { 'apikey': SUPABASE_ANON_KEY }, cache: 'no-store' }
         );
         if (suppliersResponse.ok) {
           suppliersData = await suppliersResponse.json();
@@ -133,7 +133,7 @@ export const CartPriceComparisonAll: React.FC<CartPriceComparisonAllProps> = ({
         const productIdsParam = productIds.join(',');
         const pricesResponse = await fetch(
           `${SUPABASE_URL}/rest/v1/supplier_product_prices?select=product_id,supplier_id,price,in_stock&product_id=in.(${productIdsParam})`,
-          { headers: { 'apikey': apiKey }, cache: 'no-store' }
+          { headers: { 'apikey': SUPABASE_ANON_KEY }, cache: 'no-store' }
         );
         if (pricesResponse.ok) {
           pricesData = await pricesResponse.json();
@@ -387,7 +387,7 @@ export const CartPriceComparisonAll: React.FC<CartPriceComparisonAllProps> = ({
           const response = await fetch(`${SUPABASE_URL}/rest/v1/purchase_orders`, {
             method: 'POST',
             headers: {
-              'apikey': apiKey,
+              'apikey': SUPABASE_ANON_KEY,
               'Authorization': `Bearer ${accessToken}`,
               'Content-Type': 'application/json',
               'Prefer': 'return=representation'

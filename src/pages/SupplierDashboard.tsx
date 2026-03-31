@@ -1385,7 +1385,7 @@ const SupplierDashboard = () => {
       }
       
       const authHeaders: Record<string, string> = { 
-        'apikey': apiKey,
+        'apikey': SUPABASE_ANON_KEY,
         'Content-Type': 'application/json'
       };
       if (accessToken) {

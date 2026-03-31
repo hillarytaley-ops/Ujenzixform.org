@@ -107,7 +107,7 @@ export const OrderHistory: React.FC<OrderHistoryProps> = ({ userId, userRole }) 
         } catch (e) {}
       }
       
-      const headers: Record<string, string> = { 'apikey': apiKey };
+      const headers: Record<string, string> = { 'apikey': SUPABASE_ANON_KEY };
       if (accessToken) {
         headers['Authorization'] = `Bearer ${accessToken}`;
       }
@@ -218,7 +218,7 @@ export const OrderHistory: React.FC<OrderHistoryProps> = ({ userId, userRole }) 
       } catch (e) {}
     }
     
-    const headers: Record<string, string> = { 'apikey': apiKey };
+    const headers: Record<string, string> = { 'apikey': SUPABASE_ANON_KEY };
     if (accessToken) {
       headers['Authorization'] = `Bearer ${accessToken}`;
     }
