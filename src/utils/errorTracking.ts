@@ -10,6 +10,7 @@
  */
 
 import { supabase } from '@/integrations/supabase/client';
+import { captureError as sendToSentry } from '@/lib/sentry';
 import { logger } from './logger';
 
 interface ErrorContext {
@@ -106,7 +107,13 @@ export const captureError = async (
   context: ErrorContext = {}
 ): Promise<void> => {
   const err = error instanceof Error ? error : new Error(String(error));
-  
+
+  sendToSentry(err, {
+    component: context.component,
+    action: context.action,
+    ...context.metadata,
+  });
+
   // Log to console in development
   logger.error(`[ErrorTracking] ${err.message}`, { error: err, context });
 
