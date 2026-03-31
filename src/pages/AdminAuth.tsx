@@ -306,28 +306,58 @@ const AdminAuth = () => {
         console.log('🔐 Verifying staff via verify_admin_staff_login...');
 
         try {
-          const rpcPromise = db.rpc('verify_admin_staff_login', {
-            p_email: normalizedEmail,
-            p_staff_code: normalizedCode,
-          });
-
-          const timeoutPromise = new Promise((_, reject) =>
-            setTimeout(() => reject(new Error('Query timeout')), 5000)
+          const { data: rpcData, error: rpcError } = await db.rpc(
+            "verify_admin_staff_login",
+            {
+              p_email: normalizedEmail,
+              p_staff_code: normalizedCode,
+            }
           );
 
-          const { data: rpcData, error: rpcError } = (await Promise.race([
-            rpcPromise,
-            timeoutPromise,
-          ])) as { data: unknown; error: Error | null };
-
-          if (rpcError && (rpcError as any).message !== 'Query timeout') {
-            console.error('🔐 Staff verify RPC error:', rpcError);
+          if (rpcError) {
+            console.error("🔐 Staff verify RPC error:", rpcError);
+            const msg = (rpcError as { message?: string }).message || "";
+            if (
+              /could not find the function|verify_admin_staff_login|PGRST202/i.test(
+                msg
+              )
+            ) {
+              toast({
+                variant: "destructive",
+                title: "Database not ready",
+                description:
+                  "Run the latest Supabase migration (verify_admin_staff_login), then try again.",
+              });
+              setLoading(false);
+              return;
+            }
+            toast({
+              variant: "destructive",
+              title: "Sign-in failed",
+              description: msg || "Database error during login. Try again or contact support.",
+            });
+            setLoading(false);
+            return;
           }
 
-          const result = rpcData as
+          let result = rpcData as
             | { ok?: boolean; role?: string; full_name?: string; reason?: string }
+            | string
             | null
             | undefined;
+
+          if (typeof result === "string") {
+            try {
+              result = JSON.parse(result) as {
+                ok?: boolean;
+                role?: string;
+                full_name?: string;
+                reason?: string;
+              };
+            } catch {
+              result = null;
+            }
+          }
 
           if (result?.ok === true) {
             isValidStaff = true;
@@ -347,18 +377,16 @@ const AdminAuth = () => {
             console.log('🔐 No matching staff credentials');
           }
         } catch (err: any) {
-          if (err.message === 'Query timeout') {
-            console.error('🔐 Database query timed out');
-            toast({
-              variant: "destructive",
-              title: "Connection Timeout",
-              description:
-                "Could not verify credentials. Please check your connection and try again.",
-            });
-            setLoading(false);
-            return;
-          }
-          console.error('🔐 Database check error:', err);
+          console.error("🔐 Database check error:", err);
+          toast({
+            variant: "destructive",
+            title: "Connection error",
+            description:
+              err?.message ||
+              "Could not verify credentials. Check your connection and try again.",
+          });
+          setLoading(false);
+          return;
         }
       }
       

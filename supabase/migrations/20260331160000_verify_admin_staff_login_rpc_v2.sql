@@ -1,29 +1,4 @@
--- Harden staff login: verify via SECURITY DEFINER RPC instead of broad anon SELECT on admin_staff.
--- Supports plaintext staff_code or staff_code_hash (SHA-256 hex of upper(trim(code))), matching AdminAuth normalization.
-
-CREATE EXTENSION IF NOT EXISTS pgcrypto WITH SCHEMA extensions;
-
-ALTER TABLE public.admin_staff ADD COLUMN IF NOT EXISTS full_name TEXT;
-ALTER TABLE public.admin_staff ADD COLUMN IF NOT EXISTS staff_code_hash TEXT;
-ALTER TABLE public.admin_staff ADD COLUMN IF NOT EXISTS last_login timestamptz;
-
-DO $$
-BEGIN
-  IF EXISTS (
-    SELECT 1 FROM information_schema.columns
-    WHERE table_schema = 'public' AND table_name = 'admin_staff' AND column_name = 'name'
-  ) THEN
-    UPDATE public.admin_staff s
-    SET full_name = COALESCE(NULLIF(TRIM(s.full_name), ''), NULLIF(TRIM(s.name), ''), 'Staff Member')
-    WHERE s.full_name IS NULL OR TRIM(s.full_name) = '';
-  ELSE
-    UPDATE public.admin_staff s
-    SET full_name = COALESCE(NULLIF(TRIM(s.full_name), ''), 'Staff Member')
-    WHERE s.full_name IS NULL OR TRIM(s.full_name) = '';
-  END IF;
-END $$;
-
-DROP POLICY IF EXISTS "Allow public read for login verification" ON public.admin_staff;
+-- v2: UTF-8 digest via convert_to; plaintext fallback when staff_code_hash mismatches (legacy hashes).
 
 CREATE OR REPLACE FUNCTION public.verify_admin_staff_login(p_email text, p_staff_code text)
 RETURNS jsonb
@@ -45,7 +20,6 @@ BEGIN
     RETURN jsonb_build_object('ok', false);
   END IF;
 
-  -- UTF-8 bytes of upper(trim(code)), same as crypto.subtle.digest on the client
   v_hash := encode(
     extensions.digest(convert_to(upper(trim(p_staff_code)), 'UTF8'), 'sha256'),
     'hex'
@@ -71,8 +45,6 @@ BEGIN
     RETURN jsonb_build_object('ok', false, 'reason', 'inactive');
   END IF;
 
-  -- Prefer hash match when staff_code_hash is set; if hash mismatches (legacy/wrong algorithm),
-  -- still allow plaintext staff_code match so login keeps working.
   IF COALESCE(NULLIF(TRIM(v_staff_code_hash), ''), '') <> '' THEN
     IF lower(trim(v_staff_code_hash)) IS DISTINCT FROM lower(v_hash) THEN
       IF COALESCE(NULLIF(TRIM(v_staff_code), ''), '') = ''
@@ -99,8 +71,4 @@ BEGIN
 END;
 $$;
 
-REVOKE ALL ON FUNCTION public.verify_admin_staff_login(text, text) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.verify_admin_staff_login(text, text) TO anon, authenticated;
-
-COMMENT ON FUNCTION public.verify_admin_staff_login(text, text) IS
-  'Staff portal login: verifies email + code (plaintext or staff_code_hash). Avoids listing all admin_staff rows to anon.';
