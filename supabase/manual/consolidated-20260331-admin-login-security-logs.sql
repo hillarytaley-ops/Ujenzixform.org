@@ -19,6 +19,8 @@
 -- ---------------------------------------------------------------------------
 DROP POLICY IF EXISTS "admin_security_logs_insert_all" ON public.admin_security_logs;
 DROP POLICY IF EXISTS "admin_security_logs_insert" ON public.admin_security_logs;
+DROP POLICY IF EXISTS "admin_security_logs_insert_authenticated" ON public.admin_security_logs;
+DROP POLICY IF EXISTS "admin_security_logs_insert_anon" ON public.admin_security_logs;
 
 CREATE POLICY "admin_security_logs_insert_authenticated"
 ON public.admin_security_logs FOR INSERT
@@ -42,6 +44,8 @@ WITH CHECK (
 
 DROP POLICY IF EXISTS "security_events_insert_all" ON public.security_events;
 DROP POLICY IF EXISTS "security_events_insert" ON public.security_events;
+DROP POLICY IF EXISTS "security_events_insert_authenticated" ON public.security_events;
+DROP POLICY IF EXISTS "security_events_insert_anon" ON public.security_events;
 
 CREATE POLICY "security_events_insert_authenticated"
 ON public.security_events FOR INSERT
