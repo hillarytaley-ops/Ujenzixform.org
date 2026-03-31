@@ -1,3 +1,4 @@
+import { SUPABASE_URL, SUPABASE_ANON_KEY } from '@/integrations/supabase/client';
 /**
  * ProfileViewDialog - Simple profile view popup
  * Shows user details with option to sign out
@@ -71,8 +72,6 @@ export const ProfileViewDialog: React.FC<ProfileViewDialogProps> = ({
       } catch (e) {}
 
       // Fetch profile from API
-      const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
-      const apiKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
       const accessToken = sessionData?.access_token || '';
       
       const effectiveUserId = userId || sessionData?.user?.id;

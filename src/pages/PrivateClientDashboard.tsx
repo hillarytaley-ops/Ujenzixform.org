@@ -192,9 +192,6 @@ const PrivateClientDashboard = () => {
 
   // Immediate data loader - runs on mount for orders and monitoring
   useEffect(() => {
-    const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
-    const ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
-
     const loadData = async () => {
       // Get user ID from localStorage first (fastest)
       let userId = '';
@@ -394,9 +391,6 @@ const PrivateClientDashboard = () => {
       }
 
       // Fetch real orders from purchase_orders table using direct REST API
-      const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
-      const ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
-      
       // Get access token for authenticated request
       let accessToken = '';
       try {
@@ -1035,8 +1029,6 @@ const PrivateClientDashboard = () => {
                                   // Fetch items if not already loaded
                                   if (!Array.isArray(order.items) || order.items.length === 0) {
                                     try {
-                                      const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
-                                      const ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
                                       let accessToken = '';
                                       try {
                                         const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');

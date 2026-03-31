@@ -35,7 +35,7 @@ import {
   FileText,
   Package
 } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
+import { SUPABASE_ANON_KEY, SUPABASE_URL, supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { CartItem } from '@/contexts/CartContext';
 import { catalogMaterialIdFromCartLineId } from '@/utils/cartLineId';
@@ -83,10 +83,6 @@ export const MultiSupplierQuoteDialog: React.FC<MultiSupplierQuoteDialogProps> =
   const fetchSuppliers = async () => {
     setLoading(true);
     console.log('🔄 Fetching suppliers for quote dialog...');
-    
-    const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
-    const apiKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
-    
     try {
       // Fetch all active suppliers using native fetch
       const controller = new AbortController();
@@ -219,9 +215,6 @@ export const MultiSupplierQuoteDialog: React.FC<MultiSupplierQuoteDialogProps> =
     setSending(true);
     
     // Get user from localStorage (faster than Supabase call)
-    const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
-    const apiKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
-    
     let userId: string | null = null;
     let accessToken: string | null = null;
     

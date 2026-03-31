@@ -14,7 +14,7 @@ import {
   Check, XCircle, Loader2, Copy, Navigation, ExternalLink
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { supabase } from '@/integrations/supabase/client';
+import { SUPABASE_ANON_KEY, SUPABASE_URL, supabase } from '@/integrations/supabase/client';
 
 interface Notification {
   id: string;
@@ -80,9 +80,6 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
 
   // Helper to get auth headers
   const getAuthHeaders = () => {
-    const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
-    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
-    
     try {
       const stored = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
       let accessToken = '';
@@ -102,9 +99,9 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
       return { url: SUPABASE_URL, headers };
     } catch (e) {
       return {
-        url: 'https://wuuyjjpgzgeimiptuuws.supabase.co',
+        url: SUPABASE_URL,
         headers: {
-          'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo',
+          'apikey': SUPABASE_ANON_KEY,
           'Content-Type': 'application/json'
         }
       };

@@ -22,7 +22,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { supabase } from '@/integrations/supabase/client';
+import { SUPABASE_ANON_KEY, SUPABASE_URL, supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { InvoiceGenerator, generateInvoiceFromOrder } from '@/components/invoices/InvoiceGenerator';
 import {
@@ -97,9 +97,6 @@ export const OrderHistory: React.FC<OrderHistoryProps> = ({ userId, userRole }) 
       console.log('📋 OrderHistory: Loading orders for', userRole, userId);
       
       // Use native fetch with timeout for faster loading
-      const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
-      const apiKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
-      
       // Get access token from localStorage
       const stored = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
       let accessToken = '';
@@ -211,9 +208,6 @@ export const OrderHistory: React.FC<OrderHistoryProps> = ({ userId, userRole }) 
     setShowOrderDetails(true);
     
     // Use native fetch with timeout for faster loading
-    const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
-    const apiKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
-    
     // Get access token from localStorage
     const stored = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
     let accessToken = '';

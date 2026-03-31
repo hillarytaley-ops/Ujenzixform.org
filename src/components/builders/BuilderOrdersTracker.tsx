@@ -31,7 +31,7 @@ import {
   FileText,
   Phone
 } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
+import { SUPABASE_ANON_KEY, SUPABASE_URL, supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import QRCode from 'qrcode';
@@ -247,9 +247,6 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
       console.log('🔍 BuilderOrdersTracker: Fetching orders for builder:', builderId);
       
       // Use native fetch with timeout for faster loading
-      const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
-      const apiKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
-      
       // Get access token from localStorage
       const stored = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
       let accessToken = '';
@@ -754,9 +751,6 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
   const fetchScanEvents = async () => {
     try {
       // Use native fetch with timeout for faster loading
-      const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
-      const apiKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
-      
       // Get access token from localStorage
       const stored = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
       let accessToken = '';
@@ -876,8 +870,6 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
           // Fetch order information for the new scan
           let enrichedScan: ScanEvent = { ...newScan };
           try {
-            const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
-            const apiKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
             const stored = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
             let accessToken = '';
             if (stored) {

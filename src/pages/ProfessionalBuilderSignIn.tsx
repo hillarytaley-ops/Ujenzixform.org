@@ -4,16 +4,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useNavigate, Link } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase, SUPABASE_URL, SUPABASE_ANON_KEY } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Home, Eye, EyeOff, Loader2, HardHat } from "lucide-react";
 
 console.log('🔐 ProfessionalBuilderSignIn BUILD v6 - USE NATIVE FETCH Feb 13 2026');
 
 // Supabase config for native fetch
-const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
-
 const ProfessionalBuilderSignIn = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");

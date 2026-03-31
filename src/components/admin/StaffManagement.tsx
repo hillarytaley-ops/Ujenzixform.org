@@ -1,8 +1,5 @@
 import { useState, useEffect } from "react";
-import { supabase } from "@/integrations/supabase/client";
-
-// Type helper for tables not yet in generated types
-const db = supabase as any;
+import { supabase, SUPABASE_URL, SUPABASE_ANON_KEY } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -69,6 +66,8 @@ import {
 } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { logActivity } from "@/utils/activityLogger";
+
+const db = supabase as any;
 
 interface StaffMember {
   id: string;
@@ -184,10 +183,6 @@ export const StaffManagement = () => {
   const fetchStaffMembers = async () => {
     setLoading(true);
     console.log('👥 Fetching staff members...');
-    
-    const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
-    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
-    
     // Get access token
     let accessToken = '';
     try {
@@ -263,9 +258,6 @@ export const StaffManagement = () => {
           
           if (userEmail) {
             // Check if this user is in admin_staff and get their role
-            const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
-            const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
-            
             const response = await fetch(
               `${SUPABASE_URL}/rest/v1/admin_staff?email=eq.${encodeURIComponent(userEmail)}&select=role`,
               {

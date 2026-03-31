@@ -14,7 +14,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { useToast } from '@/hooks/use-toast';
-import { supabase } from '@/integrations/supabase/client';
+import { SUPABASE_ANON_KEY, SUPABASE_URL, supabase } from '@/integrations/supabase/client';
 import { DeliveryPromptDialog } from './DeliveryPromptDialog';
 import {
   hasUsableDeliveryCoordinates,
@@ -95,7 +95,6 @@ export const SupplierQuoteReview: React.FC<SupplierQuoteReviewProps> = ({
 
   // Helper to get auth headers
   const getAuthHeaders = (): Record<string, string> => {
-    const apiKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
     const headers: Record<string, string> = { 'apikey': apiKey, 'Content-Type': 'application/json' };
     
     try {
@@ -114,8 +113,6 @@ export const SupplierQuoteReview: React.FC<SupplierQuoteReviewProps> = ({
 
   // Helper function to transform orders to quote format
   const transformOrders = async (orders: any[], headers: Record<string, string>): Promise<QuotationRequest[]> => {
-    const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
-    
     // Fetch suppliers
     let suppliersData: any[] = [];
     try {
@@ -236,7 +233,6 @@ export const SupplierQuoteReview: React.FC<SupplierQuoteReviewProps> = ({
     
     console.log('🔄 SupplierQuoteReview: Fetching quotes for builder:', effectiveBuilderId, '(prop was:', builderId, ')');
     setLoading(true);
-    const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
     const headers = getAuthHeaders();
     
     try {
@@ -379,7 +375,6 @@ export const SupplierQuoteReview: React.FC<SupplierQuoteReviewProps> = ({
 
   const handleAcceptQuote = async (quote: QuotationRequest) => {
     setProcessingId(quote.id);
-    const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
     const headers = getAuthHeaders();
     
     // Safety timeout: Always clear processing state after 30 seconds max
@@ -758,8 +753,6 @@ export const SupplierQuoteReview: React.FC<SupplierQuoteReviewProps> = ({
   // cause "Delivery address missing" on the provider card. Only fetch the request the dialog created and notify.
   const handleDeliveryRequested = async () => {
     if (!acceptedPurchaseOrder) return;
-    
-    const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
     const headers = getAuthHeaders();
     const effectiveBuilderId = getEffectiveBuilderId();
     
@@ -867,8 +860,6 @@ export const SupplierQuoteReview: React.FC<SupplierQuoteReviewProps> = ({
 
   const handleRejectQuote = async () => {
     if (!selectedQuote) return;
-    
-    const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
     const headers = getAuthHeaders();
     
     setProcessingId(selectedQuote.id);

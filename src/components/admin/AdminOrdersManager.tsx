@@ -1,3 +1,4 @@
+import { SUPABASE_URL, SUPABASE_ANON_KEY } from '@/integrations/supabase/client';
 /**
  * ╔══════════════════════════════════════════════════════════════════════════════════════╗
  * ║                                                                                      ║
@@ -136,9 +137,6 @@ export const AdminOrdersManager: React.FC = () => {
       console.log('📦 AdminOrdersManager: Loading all orders...');
       
       // Use native fetch with timeout
-      const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
-      const apiKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
-      
       // Get access token from localStorage
       const stored = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
       let accessToken = '';
@@ -209,8 +207,6 @@ export const AdminOrdersManager: React.FC = () => {
   };
 
   const loadSupplierAndBuyerNames = async (orders: Order[], headers: Record<string, string>) => {
-    const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
-    
     // Get unique supplier IDs
     const supplierIds = [...new Set(orders.map(o => o.supplier_id).filter(Boolean))];
     const buyerIds = [...new Set(orders.map(o => o.buyer_id).filter(Boolean))];

@@ -45,7 +45,7 @@ import {
   AlertTriangle,
   FileText
 } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase, SUPABASE_URL, SUPABASE_ANON_KEY } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { format } from 'date-fns';
 import { getPrefetchedOrders } from '@/services/dataPrefetch';
@@ -206,9 +206,6 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, in
           const orderSupplierId = payload.new?.supplier_id;
           if (!orderSupplierId || orderSupplierId !== supplierId) {
             // Also check if it matches any related supplier IDs
-            const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
-            const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
-            
             try {
               const stored = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
               let accessToken = '';
@@ -548,9 +545,6 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, in
 
   const loadOrders = async (forceFullLoad = false) => {
     // Use native fetch API (same as dashboard) for reliability
-    const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
-    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
-    
     try {
       // Don't show spinner when we already have data (initialPurchaseOrders) – do background refresh instead
       if (!forceFullLoad && !initialPurchaseOrders?.length) setLoading(true);

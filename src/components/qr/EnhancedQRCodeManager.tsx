@@ -19,7 +19,7 @@ import { QrCode, Package, Download, DownloadCloud, Maximize2, Truck, Clock, Chec
 import { useNavigate } from 'react-router-dom';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/components/ui/use-toast';
-import { supabase, SUPABASE_URL, SUPABASE_ANON_KEY } from '@/integrations/supabase/client';
+import { SUPABASE_ANON_KEY, SUPABASE_URL, supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import QRCodeLib from 'qrcode';
 import { getPrefetchedQRCodes } from '@/services/dataPrefetch';
@@ -265,9 +265,6 @@ export const EnhancedQRCodeManager: React.FC<EnhancedQRCodeManagerProps> = ({
             // Just updating one item isn't enough - we need the full order context
             try {
               const stored = getUserFromStorage();
-              const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
-              const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
-              
               const headers: Record<string, string> = {
                 'apikey': SUPABASE_ANON_KEY,
                 'Content-Type': 'application/json'
@@ -621,8 +618,6 @@ export const EnhancedQRCodeManager: React.FC<EnhancedQRCodeManagerProps> = ({
     supplierId: string | null,
     forcedAccessToken?: string
   ) => {
-    const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
-    const apiKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
     const stored = getUserFromStorage();
     const token = forcedAccessToken || stored?.accessToken;
     const headers: Record<string, string> = { 'apikey': apiKey };
@@ -877,9 +872,6 @@ export const EnhancedQRCodeManager: React.FC<EnhancedQRCodeManagerProps> = ({
       // Fetch material items using native fetch with auth for RLS
       try {
         const stored = getUserFromStorage();
-        const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
-        const apiKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
-        
         const headers: Record<string, string> = { 'apikey': apiKey };
         if (stored?.accessToken) {
           headers['Authorization'] = `Bearer ${stored.accessToken}`;
@@ -915,9 +907,6 @@ export const EnhancedQRCodeManager: React.FC<EnhancedQRCodeManagerProps> = ({
       console.log('👑 Admin detected - fetching ALL material items...');
       try {
         const stored = getUserFromStorage();
-        const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
-        const apiKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
-        
         const headers: Record<string, string> = { 'apikey': apiKey };
         if (stored?.accessToken) {
           headers['Authorization'] = `Bearer ${stored.accessToken}`;
@@ -1080,9 +1069,6 @@ export const EnhancedQRCodeManager: React.FC<EnhancedQRCodeManagerProps> = ({
     if (orderIds.length > 0) {
       try {
         const stored = getUserFromStorage();
-        const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
-        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
-        
         const headers: Record<string, string> = {
           'apikey': SUPABASE_ANON_KEY,
           'Content-Type': 'application/json'

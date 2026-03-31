@@ -13,7 +13,7 @@ import {
   CheckCircle2, Circle, RefreshCw
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { supabase } from '@/integrations/supabase/client';
+import { SUPABASE_ANON_KEY, SUPABASE_URL, supabase } from '@/integrations/supabase/client';
 import { Html5Qrcode, Html5QrcodeScannerState, Html5QrcodeSupportedFormats } from 'html5-qrcode';
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -367,9 +367,6 @@ export const DispatchScanner: React.FC<DispatchScannerProps> = ({
         let foundSupplierId: string | null = null;
         
         // Use REST API with proper token handling (same approach as SupplierDashboard)
-        const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
-        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
-        
         // Helper function to get fresh access token with refresh
         // Checks expiration and refreshes if needed
         const getFreshAccessToken = async (): Promise<string> => {
@@ -602,9 +599,6 @@ export const DispatchScanner: React.FC<DispatchScannerProps> = ({
     
     try {
       // Use native fetch with timeout to avoid Supabase client hanging
-      const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
-      const ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
-      
       // Helper function to get fresh access token with refresh
       // Checks expiration and refreshes if needed
       const getFreshAccessToken = async (): Promise<string> => {
@@ -1272,9 +1266,6 @@ export const DispatchScanner: React.FC<DispatchScannerProps> = ({
     // (trigger only fires on 'accepted', but delivery can be 'assigned' too)
     if (deliveryRequired && !hasDeliveryProvider && selectedOrder.id) {
       try {
-        const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
-        const ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
-        
         // Get access token
         let accessToken = ANON_KEY;
         try {
@@ -1330,9 +1321,6 @@ export const DispatchScanner: React.FC<DispatchScannerProps> = ({
     if (!matchingItem) {
       console.log('⚠️ QR code not found in cached items, verifying with database...');
       try {
-        const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
-        const ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
-        
         // Helper function to get fresh access token with refresh
         const getFreshAccessToken = async (): Promise<string> => {
           try {
@@ -1602,10 +1590,6 @@ export const DispatchScanner: React.FC<DispatchScannerProps> = ({
     try {
       console.log('🔍 Processing QR scan for DISPATCH:', qrCode);
       toast.info('Processing scan...', { duration: 2000 });
-      
-      const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
-      const ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
-      
       // Helper function to get fresh access token with refresh
       // Try localStorage FIRST to avoid auth.getSession() timeout
       const getFreshAccessToken = async (): Promise<string> => {

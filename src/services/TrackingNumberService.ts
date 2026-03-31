@@ -10,7 +10,7 @@
  * 4. New provider accepts → Same tracking number is used
  */
 
-import { supabase } from '@/integrations/supabase/client';
+import { SUPABASE_ANON_KEY, SUPABASE_URL, supabase } from '@/integrations/supabase/client';
 
 export interface TrackingNumberResult {
   trackingNumber: string;
@@ -78,10 +78,6 @@ class TrackingNumberService {
       // First, get the delivery request to check its expected delivery date
       // Use direct REST API call with timeout to avoid Supabase client hanging
       console.log('📦 Step 1: Fetching delivery request...');
-      
-      const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
-      const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
-      
       // Get access token - try localStorage first (faster), then getSession as fallback
       let accessToken = SUPABASE_ANON_KEY;
       try {
@@ -1483,9 +1479,6 @@ class TrackingNumberService {
    */
   private async notifyBuilder(notification: BuilderNotification): Promise<void> {
     try {
-      const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
-      const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
-      
       // Get access token
       let accessToken = SUPABASE_ANON_KEY;
       try {
@@ -1636,9 +1629,6 @@ class TrackingNumberService {
     trackingNumber: string
   ): Promise<void> {
     try {
-      const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
-      const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
-      
       // Get access token
       let accessToken = SUPABASE_ANON_KEY;
       try {
@@ -1869,10 +1859,6 @@ class TrackingNumberService {
    */
   async generateMissingTrackingNumbers(builderId?: string): Promise<{ created: number; errors: number }> {
     console.log('🔧 Generating missing tracking numbers...', builderId ? `for builder: ${builderId}` : 'for all builders');
-    
-    const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
-    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
-    
     // Get access token
     let accessToken = SUPABASE_ANON_KEY;
     try {

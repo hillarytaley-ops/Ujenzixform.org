@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { Link } from "react-router-dom";
 import { useUrlTabSync } from "@/hooks/useUrlTabSync";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase, SUPABASE_URL, SUPABASE_ANON_KEY } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import Footer from "@/components/Footer";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -358,9 +358,6 @@ const DeliveryDashboard = () => {
         
         if (purchaseOrderIds.length > 0) {
           try {
-            const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
-            const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
-            
             let accessToken = SUPABASE_ANON_KEY;
             try {
               const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
@@ -483,9 +480,6 @@ const DeliveryDashboard = () => {
         }
         
         try {
-          const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
-          const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
-          
           let accessToken = SUPABASE_ANON_KEY;
           try {
             const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
@@ -683,8 +677,6 @@ const DeliveryDashboard = () => {
       (async () => {
         // Use object-based map instead of Map to avoid minification errors
         let deliveryRequestsMap: Record<string, any> = {};
-        const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
-        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
         let accessToken = SUPABASE_ANON_KEY;
         try {
           const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
@@ -1078,15 +1070,13 @@ const DeliveryDashboard = () => {
       if (DEBUG_AGGRESSIVE) console.log('Missing delivered orders, force-adding...', missingAggressiveOrders.length);
       const forceAddOrders = async () => {
         try {
-          const SUPABASE_URL_AGGRESSIVE = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
-          const SUPABASE_ANON_KEY_AGGRESSIVE = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
-          
-          let accessTokenAggressive = SUPABASE_ANON_KEY_AGGRESSIVE;
+          const SUPABASE_URL_AGGRESSIVE = SUPABASE_URL;
+          let accessTokenAggressive = SUPABASE_ANON_KEY;
           try {
             const tokenData = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
             if (tokenData) {
               const parsed = JSON.parse(tokenData);
-              accessTokenAggressive = parsed.access_token || SUPABASE_ANON_KEY_AGGRESSIVE;
+              accessTokenAggressive = parsed.access_token || SUPABASE_ANON_KEY;
             }
           } catch (e) {
             // Use anon key
@@ -1102,7 +1092,7 @@ const DeliveryDashboard = () => {
               `${SUPABASE_URL_AGGRESSIVE}/rest/v1/delivery_providers?user_id=eq.${user?.id}&select=id&limit=1`,
               {
                 headers: {
-                  'apikey': SUPABASE_ANON_KEY_AGGRESSIVE,
+                  'apikey': SUPABASE_ANON_KEY,
                   'Authorization': `Bearer ${accessTokenAggressive}`,
                   'Content-Type': 'application/json'
                 },
@@ -1116,7 +1106,7 @@ const DeliveryDashboard = () => {
               } else {
                 const profileRes = await fetch(
                   `${SUPABASE_URL_AGGRESSIVE}/rest/v1/profiles?user_id=eq.${user?.id}&select=id&limit=1`,
-                  { headers: { 'apikey': SUPABASE_ANON_KEY_AGGRESSIVE, 'Authorization': `Bearer ${accessTokenAggressive}`, 'Accept': 'application/json' }, cache: 'no-store' }
+                  { headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${accessTokenAggressive}`, 'Accept': 'application/json' }, cache: 'no-store' }
                 );
                 if (profileRes.ok) {
                   const profiles = await profileRes.json();
@@ -1124,7 +1114,7 @@ const DeliveryDashboard = () => {
                   if (profileId) {
                     const dpRes = await fetch(
                       `${SUPABASE_URL_AGGRESSIVE}/rest/v1/delivery_providers?user_id=eq.${profileId}&select=id&limit=1`,
-                      { headers: { 'apikey': SUPABASE_ANON_KEY_AGGRESSIVE, 'Authorization': `Bearer ${accessTokenAggressive}`, 'Accept': 'application/json' }, cache: 'no-store' }
+                      { headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${accessTokenAggressive}`, 'Accept': 'application/json' }, cache: 'no-store' }
                     );
                     if (dpRes.ok) {
                       const dpData = await dpRes.json();
@@ -1153,7 +1143,7 @@ const DeliveryDashboard = () => {
               `${SUPABASE_URL_AGGRESSIVE}/rest/v1/delivery_requests?provider_id=eq.${providerIdToQuery}&status=in.(delivered,completed)&select=id,purchase_order_id,delivered_at,created_at,status&order=delivered_at.desc&limit=50`,
               {
                 headers: {
-                  'apikey': SUPABASE_ANON_KEY_AGGRESSIVE,
+                  'apikey': SUPABASE_ANON_KEY,
                   'Authorization': `Bearer ${accessTokenAggressive}`,
                   'Content-Type': 'application/json'
                 },
@@ -1182,7 +1172,7 @@ const DeliveryDashboard = () => {
                 `${SUPABASE_URL_AGGRESSIVE}/rest/v1/delivery_requests?provider_id=eq.${user.id}&status=in.(delivered,completed)&select=id,purchase_order_id,delivered_at,created_at,status&order=delivered_at.desc&limit=50`,
                 {
                   headers: {
-                    'apikey': SUPABASE_ANON_KEY_AGGRESSIVE,
+                    'apikey': SUPABASE_ANON_KEY,
                     'Authorization': `Bearer ${accessTokenAggressive}`,
                     'Content-Type': 'application/json'
                   },
@@ -1231,7 +1221,7 @@ const DeliveryDashboard = () => {
             `${SUPABASE_URL_AGGRESSIVE}/rest/v1/purchase_orders?id=in.(${poIdsFilter})&select=*&limit=50`,
             {
               headers: {
-                'apikey': SUPABASE_ANON_KEY_AGGRESSIVE,
+                'apikey': SUPABASE_ANON_KEY,
                 'Authorization': `Bearer ${accessTokenAggressive}`,
                 'Content-Type': 'application/json'
               },
@@ -1278,9 +1268,6 @@ const DeliveryDashboard = () => {
               
               if (aggressivePOIds.length > 0) {
                 try {
-                  const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
-                  const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
-                  
                   let accessToken = SUPABASE_ANON_KEY;
                   try {
                     const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
@@ -1509,9 +1496,6 @@ const DeliveryDashboard = () => {
   // Function to load notification counts (declared before subscription to avoid initialization error)
   const loadNotificationCounts = useCallback(async () => {
     try {
-      const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
-      const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
-      
       let accessToken = SUPABASE_ANON_KEY;
       try {
         const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');

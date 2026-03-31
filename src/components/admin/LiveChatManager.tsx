@@ -302,9 +302,9 @@ export function LiveChatManager({ staffId, staffName }: LiveChatManagerProps) {
     // POLLING FALLBACK: Check for new messages every 2 seconds using REST API
     // This ensures messages appear even if realtime fails
     console.log('📨 LiveChatManager: Starting 2-second polling fallback (REST API)...');
-    const POLL_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
-    const POLL_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mjc4NjAxMTEsImV4cCI6MjA0MzQzNjExMX0.gPR5QHKM3nTcTz6cZhz-6RxVjvvz3AoFxpVhPVpZSi4';
-    
+    const POLL_URL = SUPABASE_URL;
+    const POLL_KEY = SUPABASE_ANON_KEY;
+
     const pollingInterval = setInterval(async () => {
       if (!isSubscribed || !isMountedRef.current) return;
       

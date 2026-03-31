@@ -44,7 +44,18 @@ export function isLikelySupabaseAdminUser(): boolean {
   return role === "admin" || role === "super_admin";
 }
 
-/** Either staff portal session OR Supabase admin (e.g. hillarytaley@gmail.com after /auth). */
+function requireSupabaseSessionForAdminShell(): boolean {
+  try {
+    return import.meta.env.VITE_REQUIRE_SUPABASE_SESSION_FOR_ADMIN === "true";
+  } catch {
+    return false;
+  }
+}
+
+/** Either staff portal session OR Supabase admin (e.g. after /auth). */
 export function canAccessAdminDashboardStorage(): boolean {
+  if (requireSupabaseSessionForAdminShell()) {
+    return isLikelySupabaseAdminUser();
+  }
   return isAdminStaffLocalSessionValid() || isLikelySupabaseAdminUser();
 }

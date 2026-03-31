@@ -13,7 +13,7 @@
  */
 
 import { useEffect, useState, useCallback, useRef } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { SUPABASE_ANON_KEY, SUPABASE_URL, supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { trackingNumberService } from '@/services/TrackingNumberService';
 import { countOrdersInStatusBucket } from '@/lib/purchaseOrderMetrics';
@@ -463,9 +463,6 @@ export const useDeliveryProviderData = () => {
     // ⚡ FAST PATH: Immediately load accepted orders to show in Schedule tab
     // This runs first and sets data instantly, then the full fetch continues in background
     try {
-      const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
-      const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
-      
       let accessToken = SUPABASE_ANON_KEY;
       try {
         const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
@@ -829,9 +826,6 @@ export const useDeliveryProviderData = () => {
       // Check both delivery_requests and purchase_orders tables
       
       // 1. From delivery_requests table - Use direct REST API to bypass RLS issues
-      const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
-      const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
-      
       let accessToken = SUPABASE_ANON_KEY;
       try {
         const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
@@ -2562,15 +2556,13 @@ export const useDeliveryProviderData = () => {
             try {
               // Use REST API directly to bypass RLS issues (same as final reconciliation)
               // Get access token from localStorage
-              const SUPABASE_URL_FALLBACK = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
-              const SUPABASE_ANON_KEY_FALLBACK = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
-              
-              let accessTokenFallback = SUPABASE_ANON_KEY_FALLBACK;
+              const SUPABASE_URL_FALLBACK = SUPABASE_URL;
+              let accessTokenFallback = SUPABASE_ANON_KEY;
               try {
                 const tokenData = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
                 if (tokenData) {
                   const parsed = JSON.parse(tokenData);
-                  accessTokenFallback = parsed.access_token || SUPABASE_ANON_KEY_FALLBACK;
+                  accessTokenFallback = parsed.access_token || SUPABASE_ANON_KEY;
                 }
               } catch (e) {
                 // Use anon key if token parse fails
@@ -2584,7 +2576,7 @@ export const useDeliveryProviderData = () => {
                   `${SUPABASE_URL_FALLBACK}/rest/v1/purchase_orders?po_number=ilike.*${num}*&select=*&limit=5`,
                   {
                     headers: {
-                      'apikey': SUPABASE_ANON_KEY_FALLBACK,
+                      'apikey': SUPABASE_ANON_KEY,
                       'Authorization': `Bearer ${accessTokenFallback}`,
                       'Content-Type': 'application/json'
                     },
@@ -2598,7 +2590,7 @@ export const useDeliveryProviderData = () => {
                   `${SUPABASE_URL_FALLBACK}/rest/v1/purchase_orders?po_number=ilike.QR-${num}*&select=*&limit=5`,
                   {
                     headers: {
-                      'apikey': SUPABASE_ANON_KEY_FALLBACK,
+                      'apikey': SUPABASE_ANON_KEY,
                       'Authorization': `Bearer ${accessTokenFallback}`,
                       'Content-Type': 'application/json'
                     },
@@ -2612,7 +2604,7 @@ export const useDeliveryProviderData = () => {
                   `${SUPABASE_URL_FALLBACK}/rest/v1/purchase_orders?po_number=ilike.PO-${num}*&select=*&limit=5`,
                   {
                     headers: {
-                      'apikey': SUPABASE_ANON_KEY_FALLBACK,
+                      'apikey': SUPABASE_ANON_KEY,
                       'Authorization': `Bearer ${accessTokenFallback}`,
                       'Content-Type': 'application/json'
                     },
@@ -3129,15 +3121,13 @@ export const useDeliveryProviderData = () => {
         
         try {
           // Use REST API directly to bypass RLS issues
-          const SUPABASE_URL_SAFETY = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
-          const SUPABASE_ANON_KEY_SAFETY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
-          
-          let accessTokenSafety = SUPABASE_ANON_KEY_SAFETY;
+          const SUPABASE_URL_SAFETY = SUPABASE_URL;
+          let accessTokenSafety = SUPABASE_ANON_KEY;
           try {
             const tokenData = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
             if (tokenData) {
               const parsed = JSON.parse(tokenData);
-              accessTokenSafety = parsed.access_token || SUPABASE_ANON_KEY_SAFETY;
+              accessTokenSafety = parsed.access_token || SUPABASE_ANON_KEY;
             }
           } catch (e) {
             // Use anon key if token parse fails
@@ -3150,7 +3140,7 @@ export const useDeliveryProviderData = () => {
               `${SUPABASE_URL_SAFETY}/rest/v1/purchase_orders?po_number=ilike.*${num}*&select=*&limit=5`,
               {
                 headers: {
-                  'apikey': SUPABASE_ANON_KEY_SAFETY,
+                  'apikey': SUPABASE_ANON_KEY,
                   'Authorization': `Bearer ${accessTokenSafety}`,
                   'Content-Type': 'application/json'
                 },
@@ -3162,7 +3152,7 @@ export const useDeliveryProviderData = () => {
               `${SUPABASE_URL_SAFETY}/rest/v1/purchase_orders?po_number=ilike.QR-${num}*&select=*&limit=5`,
               {
                 headers: {
-                  'apikey': SUPABASE_ANON_KEY_SAFETY,
+                  'apikey': SUPABASE_ANON_KEY,
                   'Authorization': `Bearer ${accessTokenSafety}`,
                   'Content-Type': 'application/json'
                 },
@@ -3174,7 +3164,7 @@ export const useDeliveryProviderData = () => {
               `${SUPABASE_URL_SAFETY}/rest/v1/purchase_orders?po_number=ilike.PO-${num}*&select=*&limit=5`,
               {
                 headers: {
-                  'apikey': SUPABASE_ANON_KEY_SAFETY,
+                  'apikey': SUPABASE_ANON_KEY,
                   'Authorization': `Bearer ${accessTokenSafety}`,
                   'Content-Type': 'application/json'
                 },
@@ -3258,15 +3248,13 @@ export const useDeliveryProviderData = () => {
         
         // Try one more time with REST API to get the orders
         try {
-          const SUPABASE_URL_FORCE = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
-          const SUPABASE_ANON_KEY_FORCE = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
-          
-          let accessTokenForce = SUPABASE_ANON_KEY_FORCE;
+          const SUPABASE_URL_FORCE = SUPABASE_URL;
+          let accessTokenForce = SUPABASE_ANON_KEY;
           try {
             const tokenData = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
             if (tokenData) {
               const parsed = JSON.parse(tokenData);
-              accessTokenForce = parsed.access_token || SUPABASE_ANON_KEY_FORCE;
+              accessTokenForce = parsed.access_token || SUPABASE_ANON_KEY;
             }
           } catch (e) {
             // Use anon key if token parse fails
@@ -3277,7 +3265,7 @@ export const useDeliveryProviderData = () => {
               `${SUPABASE_URL_FORCE}/rest/v1/purchase_orders?po_number=ilike.*${num}*&select=*&limit=5`,
               {
                 headers: {
-                  'apikey': SUPABASE_ANON_KEY_FORCE,
+                  'apikey': SUPABASE_ANON_KEY,
                   'Authorization': `Bearer ${accessTokenForce}`,
                   'Content-Type': 'application/json'
                 },
@@ -3796,15 +3784,13 @@ export const useDeliveryProviderData = () => {
       if (DEBUG_AGGRESSIVE_HOOK) console.log('AGGRESSIVE: Missing orders:', missingAggressiveOrders.length);
       if (missingAggressiveOrders.length > 0) {
         try {
-          const SUPABASE_URL_AGGRESSIVE = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
-          const SUPABASE_ANON_KEY_AGGRESSIVE = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
-          
-          let accessTokenAggressive = SUPABASE_ANON_KEY_AGGRESSIVE;
+          const SUPABASE_URL_AGGRESSIVE = SUPABASE_URL;
+          let accessTokenAggressive = SUPABASE_ANON_KEY;
           try {
             const tokenData = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
             if (tokenData) {
               const parsed = JSON.parse(tokenData);
-              accessTokenAggressive = parsed.access_token || SUPABASE_ANON_KEY_AGGRESSIVE;
+              accessTokenAggressive = parsed.access_token || SUPABASE_ANON_KEY;
             }
           } catch (e) {
             // Use anon key
@@ -3818,7 +3804,7 @@ export const useDeliveryProviderData = () => {
               `${SUPABASE_URL_AGGRESSIVE}/rest/v1/purchase_orders?po_number=eq.${encodeURIComponent(orderNum)}&select=*`,
               {
                 headers: {
-                  'apikey': SUPABASE_ANON_KEY_AGGRESSIVE,
+                  'apikey': SUPABASE_ANON_KEY,
                   'Authorization': `Bearer ${accessTokenAggressive}`,
                   'Content-Type': 'application/json',
                   'Prefer': 'return=representation'
@@ -3835,7 +3821,7 @@ export const useDeliveryProviderData = () => {
                   `${SUPABASE_URL_AGGRESSIVE}/rest/v1/purchase_orders?po_number=ilike.*${numericPart}*&select=*&limit=5`,
                   {
                     headers: {
-                      'apikey': SUPABASE_ANON_KEY_AGGRESSIVE,
+                      'apikey': SUPABASE_ANON_KEY,
                       'Authorization': `Bearer ${accessTokenAggressive}`,
                       'Content-Type': 'application/json'
                     },

@@ -10,7 +10,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { PackageCheck, Scan, CheckCircle, Camera, Truck, Lock, ArrowRight, RotateCcw, Smartphone, Flashlight, AlertCircle, ArrowLeft, RefreshCw, Clock, QrCode, CheckCircle2, Circle, PartyPopper, X } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
 import { toast } from 'sonner';
-import { supabase } from '@/integrations/supabase/client';
+import { SUPABASE_ANON_KEY, SUPABASE_URL, supabase } from '@/integrations/supabase/client';
 import { Html5Qrcode, Html5QrcodeScannerState, Html5QrcodeSupportedFormats } from 'html5-qrcode';
 
 
@@ -69,10 +69,6 @@ interface ReceivingScannerProps {
   /** Called when user taps Refresh and scanner is using dashboard list – parent should refetch and pass new list. */
   onRefreshRequested?: () => void;
 }
-
-const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
-const ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
-
 export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryComplete, deliveryRequestsFromDashboard, onRefreshRequested }) => {
   const [step, setStep] = useState<'select-delivery' | 'scanning'>('select-delivery');
   const [orders, setOrders] = useState<Order[]>([]);
@@ -865,10 +861,6 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
     try {
       console.log('🔍 Processing QR scan for RECEIVING:', cleanQRCode);
       toast.info('Processing scan...', { duration: 2000 });
-      
-      const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
-      const ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
-      
       // Helper function to get fresh access token (same as DispatchScanner)
       const getFreshAccessToken = async (): Promise<string> => {
         // First, try localStorage (fastest, no network call)

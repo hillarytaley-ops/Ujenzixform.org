@@ -271,18 +271,26 @@ const AdminAuth = () => {
       
       console.log('🔐 Checking credentials:', { email: normalizedEmail, code: normalizedCode });
 
-      // Fallback hardcoded super admin credentials (for initial setup only)
-      const superAdminCredentials = [
-        { email: 'hillarytaley@gmail.com', staffCode: 'UJPRO-2024-0001' },
-        { email: 'hillarykaptingei@gmail.com', staffCode: 'UJPRO-2024-0001' },
-        { email: 'admin@ujenzipro.com', staffCode: 'UJPRO-2024-0001' },
-      ];
+      // Hardcoded super-admin bootstrap (disabled in production unless explicitly allowed)
+      const allowSuperAdminFallback =
+        import.meta.env.DEV ||
+        import.meta.env.VITE_ALLOW_SUPER_ADMIN_FALLBACK === "true";
 
-      // Check if it's a super admin first
-      const isSuperAdmin = superAdminCredentials.some(
-        cred => cred.email.toLowerCase() === normalizedEmail && 
-                cred.staffCode === normalizedCode
-      );
+      const superAdminCredentials = allowSuperAdminFallback
+        ? [
+            { email: "hillarytaley@gmail.com", staffCode: "UJPRO-2024-0001" },
+            { email: "hillarykaptingei@gmail.com", staffCode: "UJPRO-2024-0001" },
+            { email: "admin@ujenzipro.com", staffCode: "UJPRO-2024-0001" },
+          ]
+        : [];
+
+      const isSuperAdmin =
+        allowSuperAdminFallback &&
+        superAdminCredentials.some(
+          (cred) =>
+            cred.email.toLowerCase() === normalizedEmail &&
+            cred.staffCode === normalizedCode
+        );
       
       let isValidStaff = false;
       let staffRole = 'admin';

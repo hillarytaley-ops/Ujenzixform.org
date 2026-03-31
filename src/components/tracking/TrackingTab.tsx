@@ -44,7 +44,7 @@ import {
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
-import { supabase } from '@/integrations/supabase/client';
+import { SUPABASE_ANON_KEY, SUPABASE_URL, supabase } from '@/integrations/supabase/client';
 
 interface TrackingNumber {
   id: string;
@@ -81,10 +81,6 @@ interface TrackingTabProps {
   /** Auth uid + supplier row id + profile id — same as dashboard orders (purchase_orders.supplier_id) */
   supplierScopeIds?: string[];
 }
-
-const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
-
 export const TrackingTab: React.FC<TrackingTabProps> = ({
   userId: propUserId,
   userRole,

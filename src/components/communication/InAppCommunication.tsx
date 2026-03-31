@@ -8,7 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useToast } from '@/hooks/use-toast';
-import { supabase } from '@/integrations/supabase/client';
+import { SUPABASE_ANON_KEY, SUPABASE_URL, supabase } from '@/integrations/supabase/client';
 import {
   Phone,
   PhoneOff,
@@ -113,10 +113,6 @@ export function InAppCommunication({
       const tokenStr = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
       const token = tokenStr ? JSON.parse(tokenStr) : null;
       const accessToken = token?.access_token;
-
-      const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
-      const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
-
       // First, find or create a support_chat for this user
       const chatResponse = await fetch(
         `${SUPABASE_URL}/rest/v1/support_chats?user_id=eq.${userId}&select=*`,
@@ -188,10 +184,6 @@ export function InAppCommunication({
       const tokenStr = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
       const token = tokenStr ? JSON.parse(tokenStr) : null;
       const accessToken = token?.access_token;
-
-      const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
-      const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
-
       const response = await fetch(
         `${SUPABASE_URL}/rest/v1/app_calls?or=(caller_id.eq.${userId},receiver_id.eq.${userId})&order=created_at.desc&limit=50`,
         {
@@ -326,10 +318,6 @@ export function InAppCommunication({
       }
       const token = JSON.parse(tokenStr);
       const accessToken = token?.access_token;
-
-      const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
-      const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
-
       let currentChatId = chatId;
 
       // If no chat exists, create one
@@ -451,10 +439,6 @@ export function InAppCommunication({
       }
       const token = JSON.parse(tokenStr);
       const accessToken = token?.access_token;
-
-      const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
-      const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
-
       const callData = {
         caller_id: userId,
         caller_name: userName,

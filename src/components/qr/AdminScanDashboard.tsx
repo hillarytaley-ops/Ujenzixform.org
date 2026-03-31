@@ -8,7 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { SectionLoader } from '@/components/ui/DashboardLoader';
 import { BarChart, Package, TrendingUp, Clock, CheckCircle, AlertTriangle, User, Building2, Search, Filter, RefreshCw } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
-import { supabase } from '@/integrations/supabase/client';
+import { SUPABASE_ANON_KEY, SUPABASE_URL, supabase } from '@/integrations/supabase/client';
 
 interface ScanStatistics {
   total_items: number;
@@ -222,9 +222,6 @@ export const AdminScanDashboard: React.FC = () => {
   const fetchSuppliers = async () => {
     try {
       // Use native fetch for faster loading
-      const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
-      const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
-      
       const response = await fetchWithTimeout(
         `${SUPABASE_URL}/rest/v1/suppliers?select=id,company_name,user_id`,
         { headers: { 'apikey': SUPABASE_ANON_KEY } },
@@ -248,9 +245,6 @@ export const AdminScanDashboard: React.FC = () => {
 
   const fetchStatistics = async () => {
     try {
-      const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
-      const ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
-      
       // Get access token for authenticated requests
       let accessToken = ANON_KEY;
       try {
@@ -351,9 +345,6 @@ export const AdminScanDashboard: React.FC = () => {
 
   const fetchMaterialItems = async () => {
     try {
-      const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
-      const ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
-      
       let accessToken = ANON_KEY;
       try {
         const stored = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
@@ -517,9 +508,6 @@ export const AdminScanDashboard: React.FC = () => {
 
   const fetchRecentScans = async () => {
     try {
-      const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
-      const ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
-      
       let accessToken = ANON_KEY;
       try {
         const stored = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');

@@ -32,7 +32,7 @@ import {
   FileText,
   Star
 } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
+import { SUPABASE_ANON_KEY, SUPABASE_URL, supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
 interface QuoteRequest {
@@ -68,8 +68,6 @@ export const PendingQuoteRequests: React.FC<PendingQuoteRequestsProps> = ({ buil
 
   // Helper to get auth token from localStorage
   const getAuthHeaders = (): Record<string, string> => {
-    const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
-    const apiKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
     const headers: Record<string, string> = { 'apikey': apiKey, 'Content-Type': 'application/json' };
     
     try {
@@ -100,7 +98,6 @@ export const PendingQuoteRequests: React.FC<PendingQuoteRequestsProps> = ({ buil
     }
     
     setLoading(true);
-    const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
     const headers = getAuthHeaders();
     
     try {

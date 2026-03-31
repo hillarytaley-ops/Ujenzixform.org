@@ -42,7 +42,7 @@ import {
   PanelLeftClose,
   PanelLeft
 } from "lucide-react";
-import { supabase } from '@/integrations/supabase/client';
+import { SUPABASE_ANON_KEY, SUPABASE_URL, supabase } from '@/integrations/supabase/client';
 import {
   fetchMyMonitoringServiceRequests,
   monitoringRestOpts,
@@ -300,8 +300,6 @@ const Monitoring = () => {
   const loadCamerasFromAccessCode = async (code: string) => {
     console.log('📹 Loading cameras for access code:', code);
     setLoadingCameras(true);
-    
-    const ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
     const BASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co/rest/v1';
     
     // Get access token from localStorage
@@ -513,8 +511,6 @@ const Monitoring = () => {
       
       // Try REST API for role check
       let dbRole: string | null = null;
-      const ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
-      
       try {
         const response = await fetch(
           `https://wuuyjjpgzgeimiptuuws.supabase.co/rest/v1/user_roles?user_id=eq.${userId}&select=role`,
@@ -572,7 +568,7 @@ const Monitoring = () => {
         const { rows: allMonitoring } = await fetchMyMonitoringServiceRequests(
           supabase,
           monitoringRestOpts(
-            'https://wuuyjjpgzgeimiptuuws.supabase.co',
+            SUPABASE_URL,
             ANON_KEY,
             userId,
             accessToken

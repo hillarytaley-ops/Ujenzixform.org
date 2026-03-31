@@ -305,9 +305,6 @@ export const ProductManagement: React.FC<ProductManagementProps> = ({ supplierId
     
     setImagesLoading(true);
     console.log(`🖼️ Loading images for ${productIds.length} products in batches...`);
-    
-    const apiKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
-    
     // Get access token
     let accessToken = '';
     try {
@@ -388,9 +385,6 @@ export const ProductManagement: React.FC<ProductManagementProps> = ({ supplierId
       } catch (e) {
         console.log('Could not get token from localStorage');
       }
-      
-      const apiKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
-      
       // First, test if API is responding with a simple count query
       console.log('📦 Testing API connection...');
       const testStart = Date.now();
@@ -497,8 +491,6 @@ export const ProductManagement: React.FC<ProductManagementProps> = ({ supplierId
     }
     
     try {
-      const apiKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
-      
       let accessToken = '';
       try {
         const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
@@ -557,9 +549,6 @@ export const ProductManagement: React.FC<ProductManagementProps> = ({ supplierId
       setIsSubmitting(true);
       
       console.log('💾 Saving price for product:', productId, 'price:', price, 'variants:', variantPrices, 'supplier:', effectiveSupplierId);
-      
-      const apiKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
-      
       // Get access token
       let accessToken = '';
       try {
@@ -1857,8 +1846,6 @@ export const ProductManagement: React.FC<ProductManagementProps> = ({ supplierId
                 if (editingImage || editingAdditionalImages.some(img => img)) {
                   try {
                     const effectiveSupplierId = getEffectiveSupplierId();
-                    const apiKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
-                    
                     let accessToken = '';
                     try {
                       const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
