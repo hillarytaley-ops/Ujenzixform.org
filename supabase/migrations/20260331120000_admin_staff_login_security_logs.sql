@@ -1,21 +1,23 @@
 -- =============================================================================
--- CONSOLIDATED (hosted / one-shot): Admin staff login RPC + security log policies
+-- Admin staff login (SECURITY DEFINER RPC) + tightened security log INSERT RLS
 -- =============================================================================
--- Equivalent to applying these migrations in order:
+-- Single migration replacing (same end state as) these former files:
 --   20260331120000_tighten_anon_insert_security_logs.sql
+--   20260331140000_admin_staff_anon_select_for_login.sql  (bootstrap DO only;
+--     broad anon SELECT was removed by the RPC migration — not recreated here)
 --   20260331150000_verify_admin_staff_login_rpc.sql
 --   20260331160000_verify_admin_staff_login_rpc_v2.sql
--- (20260331140000 is superseded: it temporarily restored broad anon SELECT; the
---  RPC-based flow below drops that policy and does not re-add it.)
 --
--- Use: Supabase Dashboard → SQL Editor → paste → Run
---      Or: psql / supabase db execute (if you wire it to the hosted DB)
+-- Idempotent: safe to re-run (DROP POLICY IF EXISTS, CREATE OR REPLACE function).
 --
--- Safe to re-run: uses DROP IF EXISTS / CREATE OR REPLACE where appropriate.
+-- If this repo previously applied the four separate migrations on a database,
+-- `supabase db push` may report history drift (missing old filenames). Use
+-- `supabase migration repair` for that project, or treat the hosted DB as
+-- source of truth and align the team once.
 -- =============================================================================
 
 -- ---------------------------------------------------------------------------
--- [1] Tighten anon INSERT on security logging tables
+-- [1] admin_security_logs + security_events: tighten anon INSERT
 -- ---------------------------------------------------------------------------
 DROP POLICY IF EXISTS "admin_security_logs_insert_all" ON public.admin_security_logs;
 DROP POLICY IF EXISTS "admin_security_logs_insert" ON public.admin_security_logs;
@@ -67,7 +69,7 @@ WITH CHECK (
 );
 
 -- ---------------------------------------------------------------------------
--- [2] verify_admin_staff_login RPC (SECURITY DEFINER) — v2 body + grants
+-- [2] admin_staff columns + bootstrap staff_code (from former 31140000 DO block)
 -- ---------------------------------------------------------------------------
 CREATE EXTENSION IF NOT EXISTS pgcrypto WITH SCHEMA extensions;
 
@@ -91,7 +93,6 @@ BEGIN
   END IF;
 END $$;
 
--- Optional bootstrap (from 20260331140000): ensure primary row has staff_code if column exists
 DO $$
 BEGIN
   IF EXISTS (
@@ -104,6 +105,9 @@ BEGIN
   END IF;
 END $$;
 
+-- ---------------------------------------------------------------------------
+-- [3] RPC login (no broad anon SELECT on admin_staff)
+-- ---------------------------------------------------------------------------
 DROP POLICY IF EXISTS "Allow public read for login verification" ON public.admin_staff;
 
 CREATE OR REPLACE FUNCTION public.verify_admin_staff_login(p_email text, p_staff_code text)
