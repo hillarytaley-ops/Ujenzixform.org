@@ -11,3 +11,14 @@ verify_jwt = false
 # Called from Postgres (pg_net) with x-dn-email-secret; not end-user JWT.
 [functions.notify-supplier-delivery-note]
 verify_jwt = false
+
+# Staff portal: not a Supabase session yet; Edge applies IP + email rate limits then calls RPC.
+[functions.verify-admin-staff-login]
+verify_jwt = false
+
+# Optional path: browser calls Edge (with user JWT) instead of PostgREST RPC for stream metadata.
+[functions.camera-stream-url]
+verify_jwt = true
+
+[functions.rate-limit]
+verify_jwt = false

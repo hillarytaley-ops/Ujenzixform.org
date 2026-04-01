@@ -131,33 +131,59 @@ export const useSecureCameras = (): UseSecureCamerasResult => {
 
   const getSecureCameraStream = async (cameraId: string): Promise<CameraStreamData | null> => {
     try {
-      // Use the new enhanced secure function with project ownership verification
-      const { data, error } = await supabase
-        .rpc('get_camera_stream_secure', { camera_uuid: cameraId });
+      const normalizeRow = (raw: Record<string, unknown>) => {
+        const granted = raw.access_granted ?? raw.authorized;
+        const reason = raw.access_reason ?? raw.access_message;
+        const exp = raw.access_expires_at ?? raw.expires_at;
+        return {
+          access_granted: !!granted,
+          access_reason: String(reason ?? ''),
+          stream_url: String(raw.stream_url ?? ''),
+          camera_id: String(raw.camera_id ?? cameraId),
+          access_expires_at: exp != null ? String(exp) : undefined,
+        };
+      };
 
-      if (error) {
-        console.error('Error fetching secure camera stream:', error);
-        return null;
+      let row: Record<string, unknown> | null = null;
+
+      if (import.meta.env.VITE_CAMERA_STREAM_VIA_EDGE === 'true') {
+        const { data, error } = await supabase.functions.invoke('camera-stream-url', {
+          body: { camera_id: cameraId },
+        });
+        if (error) {
+          console.error('camera-stream-url Edge error:', error);
+          return null;
+        }
+        const payload = data as { row?: Record<string, unknown> | null } | null;
+        row = payload?.row ?? null;
+      } else {
+        const { data, error } = await supabase
+          .rpc('get_camera_stream_secure', { camera_uuid: cameraId });
+
+        if (error) {
+          console.error('Error fetching secure camera stream:', error);
+          return null;
+        }
+        if (!data || data.length === 0) return null;
+        row = data[0] as unknown as Record<string, unknown>;
       }
 
-      if (!data || data.length === 0) return null;
-      
-      const result = data[0];
-      
-      // Check if access was granted
+      if (!row) return null;
+
+      const result = normalizeRow(row);
+
       if (!result.access_granted) {
         console.warn('Camera stream access denied:', result.access_reason);
         return null;
       }
 
-      // Transform to match CameraStreamData interface with time-limited access
       return {
         camera_id: result.camera_id,
-        camera_name: 'Camera', // Default name since not returned by function
+        camera_name: 'Camera',
         stream_url: result.stream_url,
         can_access: result.access_granted,
         access_message: result.access_reason,
-        expires_at: result.access_expires_at // Time-limited token expiration
+        expires_at: result.access_expires_at,
       };
     } catch (err) {
       console.error('Error in getSecureCameraStream:', err);
