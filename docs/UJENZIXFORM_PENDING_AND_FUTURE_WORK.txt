@@ -38,10 +38,13 @@ with a real stream URL, or another format OpenCV and VLC can open directly.
 MONITORING AND ACCESS CONTROL
 --------------------------------------------------------------------------------
 
-Row-level security for cameras has historically been permissive in some
-migrations to unblock development. Tightening who may see which camera or
-project, especially for multi-tenant privacy, may still be required before you
-treat Monitoring as fully production-grade for sensitive sites.
+Row-level security for cameras and site_vision_events was tightened (migration
+20260401120000): project-scoped camera SELECT for authenticated users, admin
+manage-all, no anon table reads; site vision events follow the same camera access;
+guest monitoring links use a SECURITY DEFINER RPC (resolve_monitoring_access_code)
+so assigned cameras load without exposing the cameras table to anon REST.
+Further hardening (e.g. Edge-only stream URLs, audit every read) can still be added
+for the strictest deployments.
 
 The Analytics site vision screen reads events as an authenticated Supabase user.
 Some administrator sessions that rely only on browser local storage without a

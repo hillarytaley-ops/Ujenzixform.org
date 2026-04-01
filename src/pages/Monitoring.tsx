@@ -300,61 +300,47 @@ const Monitoring = () => {
   const loadCamerasFromAccessCode = async (code: string) => {
     console.log('📹 Loading cameras for access code:', code);
     setLoadingCameras(true);
-    const BASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co/rest/v1';
-    
-    // Get access token from localStorage
-    let accessToken = '';
+
     try {
-      const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
-      if (storedSession) {
-        const parsed = JSON.parse(storedSession);
-        accessToken = parsed.access_token || '';
+      // SECURITY DEFINER RPC: validates code + returns only assigned cameras (works for guests without JWT)
+      const { data: rpcData, error: rpcError } = await supabase.rpc('resolve_monitoring_access_code', {
+        p_code: code.trim(),
+      });
+
+      if (rpcError) {
+        console.error('📹 resolve_monitoring_access_code:', rpcError);
+        throw new Error(rpcError.message || 'Failed to resolve access code');
       }
-    } catch (e) {}
-    
-    try {
-      // Find the monitoring request with this access code using REST API
-      console.log('📹 Fetching monitoring request...');
-      const requestResponse = await fetch(
-        `${BASE_URL}/monitoring_service_requests?access_code=eq.${code.toUpperCase()}&status=in.(approved,completed)&limit=1`,
-        {
-          headers: {
-            'apikey': ANON_KEY,
-            'Authorization': `Bearer ${accessToken || ANON_KEY}`,
-          }
-        }
-      );
-      
-      if (!requestResponse.ok) {
-        console.log('📹 Request fetch failed:', requestResponse.status);
-        throw new Error('Failed to fetch monitoring request');
-      }
-      
-      const requestDataArray = await requestResponse.json();
-      console.log('📹 Request data:', requestDataArray);
-      
-      if (!requestDataArray || requestDataArray.length === 0) {
+
+      const payload = rpcData as {
+        ok?: boolean;
+        reason?: string;
+        request?: { id?: string; project_name?: string; status?: string; access_code?: string };
+        cameras?: any[];
+      } | null;
+
+      if (!payload?.ok) {
         toast({
           title: 'Invalid Access Code',
-          description: 'The access code is invalid or has expired.',
-          variant: 'destructive'
+          description:
+            payload?.reason === 'not_found'
+              ? 'The access code is invalid or has expired.'
+              : 'Could not validate this access code.',
+          variant: 'destructive',
         });
         setAssignedCameras([]);
         setLoadingCameras(false);
         return;
       }
-      
-      const requestData = requestDataArray[0];
 
-      // Set the monitoring request for context
+      const requestData = payload.request || {};
+      const camerasData = Array.isArray(payload.cameras) ? payload.cameras : [];
+
+      console.log('📹 Request data:', requestData);
       setMonitoringRequest(requestData);
       setHasMonitoringAccess(true);
 
-      // Get the assigned camera IDs
-      const cameraIds = requestData.assigned_cameras || [];
-      console.log('📹 Camera IDs:', cameraIds);
-      
-      if (cameraIds.length === 0) {
+      if (camerasData.length === 0) {
         toast({
           title: 'No Cameras Assigned',
           description: 'No cameras have been assigned to this project yet. Please contact admin.',
@@ -364,29 +350,8 @@ const Monitoring = () => {
         return;
       }
 
-      // Fetch the actual camera records using REST API
-      console.log('📹 Fetching cameras...');
-      const cameraIdsParam = cameraIds.map((id: string) => `"${id}"`).join(',');
-      const camerasResponse = await fetch(
-        `${BASE_URL}/cameras?id=in.(${cameraIdsParam})`,
-        {
-          headers: {
-            'apikey': ANON_KEY,
-            'Authorization': `Bearer ${accessToken || ANON_KEY}`,
-          }
-        }
-      );
-      
-      if (!camerasResponse.ok) {
-        console.log('📹 Cameras fetch failed:', camerasResponse.status);
-        throw new Error('Failed to fetch cameras');
-      }
-      
-      const camerasData = await camerasResponse.json();
-      console.log('📹 Cameras data:', camerasData);
-
       // Transform to CameraFeed format
-      const transformedCameras = (camerasData || []).map((cam: any) => ({
+      const transformedCameras = camerasData.map((cam: any) => ({
         id: cam.id,
         name: cam.name,
         location: cam.location || 'Location not specified',

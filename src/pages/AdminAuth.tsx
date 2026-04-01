@@ -373,6 +373,15 @@ const AdminAuth = () => {
             });
             setLoading(false);
             return;
+          } else if (result?.reason === 'rate_limited') {
+            toast({
+              variant: "destructive",
+              title: "Too many attempts",
+              description:
+                "Please wait about 15 minutes before trying again, or contact an administrator if you need help.",
+            });
+            setLoading(false);
+            return;
           } else {
             console.log('🔐 No matching staff credentials');
           }
