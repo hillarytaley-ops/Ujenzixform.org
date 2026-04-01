@@ -52,13 +52,14 @@ import { DeliveryRouteTracker } from '@/components/delivery/DeliveryRouteTracker
 import { CameraAccessRequest } from '@/components/builders/CameraAccessRequest';
 import { MonitoringServiceRequest } from '@/components/builders/MonitoringServiceRequest';
 import { CameraRemoteCapabilitiesPanel } from '@/components/monitoring/CameraRemoteCapabilitiesPanel';
+import { cn } from '@/lib/utils';
 
 interface CameraFeed {
   id: string;
   name: string;
   location: string;
   projectSite: string;
-  status: 'online' | 'offline' | 'recording' | 'maintenance';
+  status: 'online' | 'offline' | 'recording' | 'maintenance' | 'active';
   quality: '480p' | '720p' | '1080p' | '4K';
   viewers: number;
   uptime: string;
@@ -71,6 +72,134 @@ interface CameraFeed {
   connection_type?: string;
   supports_ptz?: boolean;
   supports_two_way_audio?: boolean;
+}
+
+/** Same rules for header badge and camera list (avoid ONLINE in list vs OFFLINE in header). */
+function cameraFeedLooksLive(cam: CameraFeed | null | undefined): boolean {
+  if (!cam) return false;
+  const s = cam.status as string;
+  return s === 'online' || s === 'recording' || s === 'active';
+}
+
+function cameraHasStreamMedia(feed: CameraFeed | null | undefined): boolean {
+  if (!feed) return false;
+  return (
+    String(feed.embed_code ?? '').trim() !== '' || String(feed.stream_url ?? '').trim() !== ''
+  );
+}
+
+function youtubeOrVimeoEmbedUrl(pageUrl: string): string | null {
+  try {
+    const u = new URL(pageUrl);
+    const host = u.hostname.toLowerCase();
+    if (host.includes('youtube.com')) {
+      const v = u.searchParams.get('v');
+      if (v) return `https://www.youtube.com/embed/${encodeURIComponent(v)}`;
+      const parts = u.pathname.split('/').filter(Boolean);
+      const li = parts.indexOf('live');
+      if (li >= 0 && parts[li + 1]) {
+        return `https://www.youtube.com/embed/${encodeURIComponent(parts[li + 1])}`;
+      }
+    }
+    if (host === 'youtu.be' || host.endsWith('.youtu.be')) {
+      const id = u.pathname.replace(/^\//, '').split('/')[0];
+      if (id) return `https://www.youtube.com/embed/${encodeURIComponent(id)}`;
+    }
+    if (host.includes('player.vimeo.com')) return pageUrl;
+    if (host.includes('vimeo.com')) {
+      const seg = u.pathname.split('/').filter(Boolean)[0];
+      if (seg && /^\d+$/.test(seg)) {
+        return `https://player.vimeo.com/video/${seg}`;
+      }
+    }
+  } catch {
+    /* ignore */
+  }
+  return null;
+}
+
+function MonitoringLiveMedia({
+  feed,
+  variant,
+}: {
+  feed: CameraFeed;
+  variant: 'fullscreen' | 'default';
+}) {
+  const [videoFailed, setVideoFailed] = useState(false);
+
+  useEffect(() => {
+    setVideoFailed(false);
+  }, [feed.id, feed.stream_url, feed.embed_code]);
+
+  const shell = cn(
+    'w-full rounded-lg overflow-hidden bg-black flex flex-col',
+    variant === 'fullscreen' ? 'min-h-[min(72vh,720px)] max-h-[80vh]' : 'min-h-[min(52vh,520px)] max-h-[min(70vh,640px)]'
+  );
+
+  const embed = feed.embed_code != null && String(feed.embed_code).trim() !== '';
+  if (embed) {
+    return (
+      <div className={cn(shell, 'overflow-auto')}>
+        <div
+          className="w-full flex-1 min-h-[280px] [&_iframe]:w-full [&_iframe]:min-h-[240px] [&_iframe]:max-w-full"
+          dangerouslySetInnerHTML={{ __html: String(feed.embed_code) }}
+        />
+      </div>
+    );
+  }
+
+  const rawUrl = feed.stream_url != null ? String(feed.stream_url).trim() : '';
+  if (!rawUrl) return null;
+
+  const iframeSrc = youtubeOrVimeoEmbedUrl(rawUrl);
+  if (iframeSrc) {
+    return (
+      <div className={shell}>
+        <iframe
+          title="Camera stream"
+          src={iframeSrc}
+          className="w-full flex-1 min-h-[min(52vh,480px)] border-0"
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
+          allowFullScreen
+        />
+      </div>
+    );
+  }
+
+  if (videoFailed) {
+    return (
+      <div className="max-w-lg mx-auto text-center p-6 rounded-lg bg-slate-900/95 border border-amber-500/40">
+        <p className="text-amber-100 text-sm font-medium mb-2">
+          This link is not playing as a direct video in your browser.
+        </p>
+        <p className="text-slate-400 text-xs leading-relaxed mb-4">
+          Many camera “share” pages (GoPro, vendor portals, etc.) are <strong>websites</strong>, not video files. Use a
+          direct <strong>.mp4</strong> / <strong>.webm</strong> URL, an <strong>HLS (.m3u8)</strong> stream where supported,
+          a <strong>YouTube or Vimeo</strong> page link, or paste your vendor’s <strong>iframe embed</strong> HTML in the
+          admin embed field.
+        </p>
+        <Button variant="outline" size="sm" asChild className="text-slate-200 border-slate-600">
+          <a href={rawUrl} target="_blank" rel="noopener noreferrer">
+            Open link in new tab
+          </a>
+        </Button>
+      </div>
+    );
+  }
+
+  return (
+    <div className={cn(shell, 'items-center justify-center')}>
+      <video
+        key={rawUrl}
+        controls
+        playsInline
+        preload="metadata"
+        className="w-full h-full min-h-[min(48vh,440px)] object-contain bg-black"
+        src={rawUrl}
+        onError={() => setVideoFailed(true)}
+      />
+    </div>
+  );
 }
 
 interface ProjectMonitoring {
@@ -247,48 +376,6 @@ const Monitoring = () => {
         : activeCameraList.find((c) => c.id === selectedCamera) ?? null,
     [activeCameraList, selectedCamera]
   );
-
-  const liveStreamEl = (variant: 'fullscreen' | 'default'): React.ReactNode => {
-    if (!selectedFeed) return null;
-    const embed = selectedFeed.embed_code;
-    const streamUrl = selectedFeed.stream_url;
-    if (embed != null && String(embed).trim() !== '') {
-      return (
-        <div
-          className={
-            variant === 'fullscreen'
-              ? 'w-full max-w-6xl px-4 max-h-[72vh] overflow-auto'
-              : 'w-full max-w-5xl px-4 max-h-[min(60vh,560px)] overflow-auto'
-          }
-        >
-          <div
-            className="w-full [&_iframe]:max-w-full [&_video]:max-w-full"
-            dangerouslySetInnerHTML={{ __html: String(embed) }}
-          />
-        </div>
-      );
-    }
-    if (streamUrl != null && String(streamUrl).trim() !== '') {
-      return (
-        <div
-          className={
-            variant === 'fullscreen'
-              ? 'w-full max-w-6xl max-h-[72vh] flex items-center justify-center bg-black rounded-lg overflow-hidden'
-              : 'w-full max-w-5xl max-h-[min(60vh,560px)] flex items-center justify-center bg-black rounded-lg overflow-hidden'
-          }
-        >
-          <video
-            key={String(streamUrl)}
-            controls
-            playsInline
-            className="max-h-full max-w-full object-contain"
-            src={String(streamUrl)}
-          />
-        </div>
-      );
-    }
-    return null;
-  };
 
   const [projects] = useState<ProjectMonitoring[]>([
     {
@@ -1419,7 +1506,7 @@ const Monitoring = () => {
                     </p>
                   </div>
                   <Badge variant="outline" className="bg-green-50">
-                    {activeCameraList.filter(c => c.status === 'online' || c.status === 'recording').length} Online
+                    {activeCameraList.filter(cameraFeedLooksLive).length} Online
                   </Badge>
                 </div>
 
@@ -1451,11 +1538,13 @@ const Monitoring = () => {
                             <Badge className="bg-slate-700/50 text-cyan-400 border border-cyan-500/30">
                               {selectedFeed?.quality}
                             </Badge>
-                            <Badge className={`${
-                              selectedFeed?.status === 'online' || selectedFeed?.status === 'recording'
-                                ? 'bg-green-500/20 text-green-400 border border-green-500/30'
-                                : 'bg-red-500/20 text-red-400 border border-red-500/30'
-                            }`}>
+                            <Badge
+                              className={`${
+                                cameraFeedLooksLive(selectedFeed)
+                                  ? 'bg-green-500/20 text-green-400 border border-green-500/30'
+                                  : 'bg-red-500/20 text-red-400 border border-red-500/30'
+                              }`}
+                            >
                               <span className="w-2 h-2 rounded-full bg-current mr-2 animate-pulse"></span>
                               {selectedFeed?.status?.toUpperCase()}
                             </Badge>
@@ -1494,7 +1583,9 @@ const Monitoring = () => {
                       {/* Center Content */}
                       <div className="absolute inset-0 flex items-center justify-center p-4">
                         {selectedCamera ? (
-                          liveStreamEl('fullscreen') ?? (
+                          selectedFeed && cameraHasStreamMedia(selectedFeed) ? (
+                            <MonitoringLiveMedia feed={selectedFeed} variant="fullscreen" />
+                          ) : (
                             <div className="text-center">
                               {selectedCamera.startsWith('drone-') ? (
                                 <>
@@ -1611,11 +1702,13 @@ const Monitoring = () => {
                                 <Badge className="bg-slate-700/50 text-cyan-400 border border-cyan-500/30 text-xs">
                                   {selectedFeed?.quality}
                                 </Badge>
-                                <Badge className={`text-xs ${
-                                  selectedFeed?.status === 'online' || selectedFeed?.status === 'recording'
-                                    ? 'bg-green-500/20 text-green-400 border border-green-500/30'
-                                    : 'bg-red-500/20 text-red-400 border border-red-500/30'
-                                }`}>
+                                <Badge
+                                  className={`text-xs ${
+                                    cameraFeedLooksLive(selectedFeed)
+                                      ? 'bg-green-500/20 text-green-400 border border-green-500/30'
+                                      : 'bg-red-500/20 text-red-400 border border-red-500/30'
+                                  }`}
+                                >
                                   <span className="w-2 h-2 rounded-full bg-current mr-1 animate-pulse"></span>
                                   {selectedFeed?.status?.toUpperCase()}
                                 </Badge>
@@ -1703,7 +1796,7 @@ const Monitoring = () => {
                                 <span className="text-slate-500 mx-2">|</span>
                                 <span className="text-sm text-slate-400">{new Date().toLocaleDateString()}</span>
                               </div>
-                              {selectedFeed?.isRecording && (
+                              {selectedFeed?.isRecording && cameraHasStreamMedia(selectedFeed) && (
                                 <div className="flex items-center gap-2 bg-red-500/20 backdrop-blur-md px-4 py-2 rounded-lg border border-red-500/30">
                                   <span className="w-3 h-3 bg-red-500 rounded-full animate-pulse"></span>
                                   <span className="text-sm font-bold text-red-400">● REC</span>
@@ -1715,7 +1808,9 @@ const Monitoring = () => {
                           {/* Center Content */}
                           <div className="absolute inset-0 flex items-center justify-center p-4">
                             {selectedCamera ? (
-                              liveStreamEl('default') ?? (
+                              selectedFeed && cameraHasStreamMedia(selectedFeed) ? (
+                                <MonitoringLiveMedia feed={selectedFeed} variant="default" />
+                              ) : (
                                 <div className="text-center">
                                   {selectedCamera.startsWith('drone-') ? (
                                     <>
@@ -1851,7 +1946,7 @@ const Monitoring = () => {
                             </CardTitle>
                           </div>
                           <Badge className="bg-green-500/20 text-green-400 border border-green-500/30 text-xs flex-shrink-0">
-                            {(assignedCameras.length > 0 ? assignedCameras : cameras).filter(c => c.status === 'online' || c.status === 'recording').length} Online
+                            {activeCameraList.filter(cameraFeedLooksLive).length} Online
                           </Badge>
                         </div>
                         <CardDescription className="text-xs text-slate-400 mt-1">
@@ -1890,9 +1985,9 @@ const Monitoring = () => {
                         
                         {/* Camera Grid - Horizontal scrollable on mobile, grid on larger screens */}
                         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
-                          {(assignedCameras.length > 0 ? assignedCameras : cameras).map((camera) => {
+                          {activeCameraList.map((camera) => {
                             const isDrone = camera.id.startsWith('drone-');
-                            const isOnline = camera.status === 'online' || camera.status === 'recording';
+                            const isOnline = cameraFeedLooksLive(camera);
                             const isSelected = selectedCamera === camera.id;
                             
                             return (
