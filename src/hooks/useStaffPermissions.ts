@@ -255,49 +255,75 @@ export function useStaffPermissions(): StaffPermissionsReturn {
         return;
       }
       
-      // Check admin_staff table
-      const { data: staffData, error: staffError } = await (supabase as any)
+      // admin_staff.id is the row PK; auth users are linked via user_id (or legacy email-only rows).
+      const staffSelect = 'id, email, full_name, role, status, user_id';
+      let staffData: {
+        id: string;
+        email: string | null;
+        full_name: string | null;
+        role: string;
+        status: string;
+        user_id: string | null;
+      } | null = null;
+
+      const { data: byUserId, error: errUserId } = await (supabase as any)
         .from('admin_staff')
-        .select('id, email, full_name, role, status')
-        .eq('id', user.id)
+        .select(staffSelect)
+        .eq('user_id', user.id)
         .eq('status', 'active')
         .maybeSingle();
-      
-      if (staffError) {
-        console.error('Error fetching staff data:', staffError);
-        // Table might not exist - check user_roles for admin
-        const { data: roleData } = await supabase
+
+      if (errUserId) {
+        console.error('Error fetching admin_staff by user_id:', errUserId);
+      } else if (byUserId) {
+        staffData = byUserId;
+      }
+
+      if (!staffData && user.email) {
+        const em = user.email.trim().toLowerCase();
+        const { data: byEmail, error: errEmail } = await (supabase as any)
+          .from('admin_staff')
+          .select(staffSelect)
+          .ilike('email', em)
+          .eq('status', 'active')
+          .maybeSingle();
+        if (errEmail) {
+          console.error('Error fetching admin_staff by email:', errEmail);
+        } else if (byEmail) {
+          staffData = byEmail;
+        }
+      }
+
+      const applyUserRolesAdminFallback = async (): Promise<boolean> => {
+        const { data: roleData, error: roleErr } = await supabase
           .from('user_roles')
           .select('role')
           .eq('user_id', user.id)
           .maybeSingle();
-        
-        if (roleData?.role === 'admin') {
-          const adminRole = STAFF_ROLES.admin;
-          setState({
-            loading: false,
-            staffId: user.id,
-            staffEmail: user.email || null,
-            staffName: 'Admin',
-            staffRole: 'admin',
-            roleDetails: adminRole,
-            isAdmin: true,
-            isSuperAdmin: false,
-            accessibleTabs: adminRole.allowedTabs as AdminTab[],
-            error: null
-          });
-          return;
+        if (roleErr) {
+          console.error('Error fetching user_roles:', roleErr);
+          return false;
         }
-        
-        setState(prev => ({
-          ...prev,
+        const r = roleData?.role;
+        if (r !== 'admin' && r !== 'super_admin' && r !== 'administrator') return false;
+        const cfg = r === 'super_admin' ? STAFF_ROLES.super_admin : STAFF_ROLES.admin;
+        setState({
           loading: false,
-          error: 'Not a staff member'
-        }));
-        return;
-      }
-      
+          staffId: user.id,
+          staffEmail: user.email || null,
+          staffName: cfg.name,
+          staffRole: r === 'administrator' ? 'admin' : r,
+          roleDetails: cfg,
+          isAdmin: true,
+          isSuperAdmin: r === 'super_admin',
+          accessibleTabs: cfg.allowedTabs as AdminTab[],
+          error: null,
+        });
+        return true;
+      };
+
       if (!staffData) {
+        if (await applyUserRolesAdminFallback()) return;
         setState({
           loading: false,
           staffId: null,
@@ -308,7 +334,7 @@ export function useStaffPermissions(): StaffPermissionsReturn {
           isAdmin: false,
           isSuperAdmin: false,
           accessibleTabs: [],
-          error: 'No staff record found'
+          error: 'No staff record found',
         });
         return;
       }
@@ -319,10 +345,10 @@ export function useStaffPermissions(): StaffPermissionsReturn {
         loading: false,
         staffId: staffData.id,
         staffEmail: staffData.email,
-        staffName: staffData.full_name,
+        staffName: staffData.full_name || staffData.email || 'Staff',
         staffRole: staffData.role,
         roleDetails: role,
-        isAdmin: ['admin', 'super_admin'].includes(staffData.role),
+        isAdmin: ['admin', 'super_admin', 'administrator'].includes(staffData.role),
         isSuperAdmin: staffData.role === 'super_admin',
         accessibleTabs: role.allowedTabs as AdminTab[],
         error: null
@@ -355,21 +381,22 @@ export function useStaffPermissions(): StaffPermissionsReturn {
 
   // Permission check functions
   const checkTabAccess = useCallback((tab: AdminTab): boolean => {
-    // If still loading, check localStorage directly for staff role
+    // If still loading, infer from localStorage so tab bar does not disappear on first paint
     if (state.loading) {
       const storedRole = localStorage.getItem('admin_staff_role');
       if (storedRole) {
-        // Check if it's a full admin role
         if (['admin', 'super_admin', 'administrator'].includes(storedRole)) {
           return true;
         }
-        // Otherwise, check the role's allowed tabs
         const roleConfig = STAFF_ROLES[storedRole];
         if (roleConfig) {
           return roleConfig.allowedTabs.includes(tab);
         }
       }
-      // Fallback: if admin_authenticated but no role, deny access during loading
+      const userRole = localStorage.getItem('user_role');
+      if (userRole === 'admin' || userRole === 'super_admin') {
+        return true;
+      }
       return false;
     }
     if (state.isAdmin || state.isSuperAdmin) return true;
