@@ -124,8 +124,8 @@ export const VideoPlayer = ({ video, isOpen, onClose, onVideoUpdate }: VideoPlay
         `${SUPABASE_URL}/rest/v1/video_comments?video_id=eq.${video.id}&is_approved=eq.true&order=created_at.desc`,
         {
           headers: {
-            'apikey': ANON_KEY,
-            'Authorization': `Bearer ${ANON_KEY}`,
+            'apikey': SUPABASE_ANON_KEY,
+            'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
           }
         }
       );
@@ -184,8 +184,8 @@ export const VideoPlayer = ({ video, isOpen, onClose, onVideoUpdate }: VideoPlay
           `${SUPABASE_URL}/rest/v1/video_likes?video_id=eq.${video.id}&user_id=eq.${userId}&select=id`,
           {
             headers: {
-              'apikey': ANON_KEY,
-              'Authorization': `Bearer ${accessToken || ANON_KEY}`,
+              'apikey': SUPABASE_ANON_KEY,
+              'Authorization': `Bearer ${accessToken || SUPABASE_ANON_KEY}`,
             }
           }
         );
@@ -234,8 +234,8 @@ export const VideoPlayer = ({ video, isOpen, onClose, onVideoUpdate }: VideoPlay
         const response = await fetch(deleteUrl, {
           method: 'DELETE',
           headers: {
-            'apikey': ANON_KEY,
-            'Authorization': `Bearer ${accessToken || ANON_KEY}`,
+            'apikey': SUPABASE_ANON_KEY,
+            'Authorization': `Bearer ${accessToken || SUPABASE_ANON_KEY}`,
           },
         });
 
@@ -261,8 +261,8 @@ export const VideoPlayer = ({ video, isOpen, onClose, onVideoUpdate }: VideoPlay
         const response = await fetch(`${SUPABASE_URL}/rest/v1/video_likes`, {
           method: 'POST',
           headers: {
-            'apikey': ANON_KEY,
-            'Authorization': `Bearer ${accessToken || ANON_KEY}`,
+            'apikey': SUPABASE_ANON_KEY,
+            'Authorization': `Bearer ${accessToken || SUPABASE_ANON_KEY}`,
             'Content-Type': 'application/json',
             'Prefer': 'return=minimal',
           },
@@ -282,8 +282,8 @@ export const VideoPlayer = ({ video, isOpen, onClose, onVideoUpdate }: VideoPlay
           await fetch(deleteUrl, {
             method: 'DELETE',
             headers: {
-              'apikey': ANON_KEY,
-              'Authorization': `Bearer ${accessToken || ANON_KEY}`,
+              'apikey': SUPABASE_ANON_KEY,
+              'Authorization': `Bearer ${accessToken || SUPABASE_ANON_KEY}`,
             },
           });
           setIsLiked(false);
@@ -366,8 +366,8 @@ export const VideoPlayer = ({ video, isOpen, onClose, onVideoUpdate }: VideoPlay
       const response = await fetch(`${SUPABASE_URL}/rest/v1/video_comments`, {
         method: 'POST',
         headers: {
-          'apikey': ANON_KEY,
-          'Authorization': `Bearer ${accessToken || ANON_KEY}`,
+          'apikey': SUPABASE_ANON_KEY,
+          'Authorization': `Bearer ${accessToken || SUPABASE_ANON_KEY}`,
           'Content-Type': 'application/json',
           'Prefer': 'return=minimal',
         },

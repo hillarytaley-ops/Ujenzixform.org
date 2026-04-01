@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { useSearchParams } from 'react-router-dom';
 import Navigation from '@/components/Navigation';
@@ -240,6 +240,56 @@ const Monitoring = () => {
 
   const activeCameraList = assignedCameras.length > 0 ? assignedCameras : cameras;
 
+  const selectedFeed = useMemo(
+    () =>
+      selectedCamera == null
+        ? null
+        : activeCameraList.find((c) => c.id === selectedCamera) ?? null,
+    [activeCameraList, selectedCamera]
+  );
+
+  const liveStreamEl = (variant: 'fullscreen' | 'default'): React.ReactNode => {
+    if (!selectedFeed) return null;
+    const embed = selectedFeed.embed_code;
+    const streamUrl = selectedFeed.stream_url;
+    if (embed != null && String(embed).trim() !== '') {
+      return (
+        <div
+          className={
+            variant === 'fullscreen'
+              ? 'w-full max-w-6xl px-4 max-h-[72vh] overflow-auto'
+              : 'w-full max-w-5xl px-4 max-h-[min(60vh,560px)] overflow-auto'
+          }
+        >
+          <div
+            className="w-full [&_iframe]:max-w-full [&_video]:max-w-full"
+            dangerouslySetInnerHTML={{ __html: String(embed) }}
+          />
+        </div>
+      );
+    }
+    if (streamUrl != null && String(streamUrl).trim() !== '') {
+      return (
+        <div
+          className={
+            variant === 'fullscreen'
+              ? 'w-full max-w-6xl max-h-[72vh] flex items-center justify-center bg-black rounded-lg overflow-hidden'
+              : 'w-full max-w-5xl max-h-[min(60vh,560px)] flex items-center justify-center bg-black rounded-lg overflow-hidden'
+          }
+        >
+          <video
+            key={String(streamUrl)}
+            controls
+            playsInline
+            className="max-h-full max-w-full object-contain"
+            src={String(streamUrl)}
+          />
+        </div>
+      );
+    }
+    return null;
+  };
+
   const [projects] = useState<ProjectMonitoring[]>([
     {
       id: 'proj-001',
@@ -356,7 +406,8 @@ const Monitoring = () => {
         name: cam.name,
         location: cam.location || 'Location not specified',
         projectSite: requestData.project_name,
-        status: cam.is_active ? 'online' : 'offline',
+        // DB may return null; treat non-false as visible for assigned cameras
+        status: cam.is_active === false ? 'offline' : 'online',
         quality: cam.resolution || '1080p',
         viewers: 1,
         uptime: 'Live',
@@ -478,11 +529,11 @@ const Monitoring = () => {
       let dbRole: string | null = null;
       try {
         const response = await fetch(
-          `https://wuuyjjpgzgeimiptuuws.supabase.co/rest/v1/user_roles?user_id=eq.${userId}&select=role`,
+          `${SUPABASE_URL}/rest/v1/user_roles?user_id=eq.${userId}&select=role`,
           {
             headers: {
-              'apikey': ANON_KEY,
-              'Authorization': `Bearer ${accessToken || ANON_KEY}`,
+              'apikey': SUPABASE_ANON_KEY,
+              'Authorization': `Bearer ${accessToken || SUPABASE_ANON_KEY}`,
             }
           }
         );
@@ -534,7 +585,7 @@ const Monitoring = () => {
           supabase,
           monitoringRestOpts(
             SUPABASE_URL,
-            ANON_KEY,
+            SUPABASE_ANON_KEY,
             userId,
             accessToken
           )
@@ -1368,7 +1419,7 @@ const Monitoring = () => {
                     </p>
                   </div>
                   <Badge variant="outline" className="bg-green-50">
-                    {cameras.filter(c => c.status === 'online' || c.status === 'recording').length} Online
+                    {activeCameraList.filter(c => c.status === 'online' || c.status === 'recording').length} Online
                   </Badge>
                 </div>
 
@@ -1387,10 +1438,10 @@ const Monitoring = () => {
                         )}
                         <div>
                           <h2 className="text-lg font-semibold text-white">
-                            {selectedCamera ? cameras.find(c => c.id === selectedCamera)?.name : 'Select a Camera'}
+                            {selectedCamera ? selectedFeed?.name : 'Select a Camera'}
                           </h2>
                           <p className="text-xs text-slate-400">
-                            {selectedCamera ? cameras.find(c => c.id === selectedCamera)?.projectSite : 'Choose from the camera list'}
+                            {selectedCamera ? selectedFeed?.projectSite : 'Choose from the camera list'}
                           </p>
                         </div>
                       </div>
@@ -1398,15 +1449,15 @@ const Monitoring = () => {
                         {selectedCamera && (
                           <>
                             <Badge className="bg-slate-700/50 text-cyan-400 border border-cyan-500/30">
-                              {cameras.find(c => c.id === selectedCamera)?.quality}
+                              {selectedFeed?.quality}
                             </Badge>
                             <Badge className={`${
-                              cameras.find(c => c.id === selectedCamera)?.status === 'online' || cameras.find(c => c.id === selectedCamera)?.status === 'recording'
+                              selectedFeed?.status === 'online' || selectedFeed?.status === 'recording'
                                 ? 'bg-green-500/20 text-green-400 border border-green-500/30'
                                 : 'bg-red-500/20 text-red-400 border border-red-500/30'
                             }`}>
                               <span className="w-2 h-2 rounded-full bg-current mr-2 animate-pulse"></span>
-                              {cameras.find(c => c.id === selectedCamera)?.status?.toUpperCase()}
+                              {selectedFeed?.status?.toUpperCase()}
                             </Badge>
                           </>
                         )}
@@ -1441,37 +1492,39 @@ const Monitoring = () => {
                       <div className="absolute bottom-20 right-4 w-12 h-12 border-r-2 border-b-2 border-cyan-400/60"></div>
                       
                       {/* Center Content */}
-                      <div className="absolute inset-0 flex items-center justify-center">
+                      <div className="absolute inset-0 flex items-center justify-center p-4">
                         {selectedCamera ? (
-                          <div className="text-center">
-                            {selectedCamera.startsWith('drone-') ? (
-                              <>
-                                <div className="relative mb-8">
-                                  <Plane className="h-32 w-32 mx-auto text-purple-400" />
-                                  <div className="absolute inset-0 h-32 w-32 mx-auto rounded-full bg-purple-500/30 blur-3xl animate-pulse"></div>
-                                </div>
-                                <p className="text-4xl font-bold bg-gradient-to-r from-purple-300 to-purple-100 bg-clip-text text-transparent mb-3">
-                                  Drone Aerial Feed
-                                </p>
-                                <p className="text-xl font-mono text-purple-300/70">
-                                  {cameras.find(c => c.id === selectedCamera)?.quality} • Live Streaming
-                                </p>
-                              </>
-                            ) : (
-                              <>
-                                <div className="relative mb-8">
-                                  <Camera className="h-32 w-32 mx-auto text-cyan-400" />
-                                  <div className="absolute inset-0 h-32 w-32 mx-auto rounded-full bg-cyan-500/30 blur-3xl animate-pulse"></div>
-                                </div>
-                                <p className="text-4xl font-bold bg-gradient-to-r from-cyan-300 to-cyan-100 bg-clip-text text-transparent mb-3">
-                                  Live Camera Feed
-                                </p>
-                                <p className="text-xl font-mono text-cyan-300/70">
-                                  {cameras.find(c => c.id === selectedCamera)?.quality} • Streaming
-                                </p>
-                              </>
-                            )}
-                          </div>
+                          liveStreamEl('fullscreen') ?? (
+                            <div className="text-center">
+                              {selectedCamera.startsWith('drone-') ? (
+                                <>
+                                  <div className="relative mb-8">
+                                    <Plane className="h-32 w-32 mx-auto text-purple-400" />
+                                    <div className="absolute inset-0 h-32 w-32 mx-auto rounded-full bg-purple-500/30 blur-3xl animate-pulse"></div>
+                                  </div>
+                                  <p className="text-4xl font-bold bg-gradient-to-r from-purple-300 to-purple-100 bg-clip-text text-transparent mb-3">
+                                    Drone Aerial Feed
+                                  </p>
+                                  <p className="text-xl font-mono text-purple-300/70">
+                                    {selectedFeed?.quality} • Live Streaming
+                                  </p>
+                                </>
+                              ) : (
+                                <>
+                                  <div className="relative mb-8">
+                                    <Camera className="h-32 w-32 mx-auto text-cyan-400" />
+                                    <div className="absolute inset-0 h-32 w-32 mx-auto rounded-full bg-cyan-500/30 blur-3xl animate-pulse"></div>
+                                  </div>
+                                  <p className="text-4xl font-bold bg-gradient-to-r from-cyan-300 to-cyan-100 bg-clip-text text-transparent mb-3">
+                                    Live Camera Feed
+                                  </p>
+                                  <p className="text-xl font-mono text-cyan-300/70">
+                                    {selectedFeed?.quality} • Streaming (add stream URL or embed in admin)
+                                  </p>
+                                </>
+                              )}
+                            </div>
+                          )
                         ) : (
                           <div className="text-center">
                             <Monitor className="h-32 w-32 mx-auto text-slate-600 mb-8" />
@@ -1499,16 +1552,16 @@ const Monitoring = () => {
                             
                             <div className="flex items-center gap-6 text-sm">
                               <div className="flex items-center gap-2 text-slate-400">
-                                <Wifi className={`h-5 w-5 ${(cameras.find(c => c.id === selectedCamera)?.signalStrength || 0) > 70 ? 'text-green-400' : 'text-amber-400'}`} />
-                                <span>{cameras.find(c => c.id === selectedCamera)?.signalStrength}%</span>
+                                <Wifi className={`h-5 w-5 ${(selectedFeed?.signalStrength || 0) > 70 ? 'text-green-400' : 'text-amber-400'}`} />
+                                <span>{selectedFeed?.signalStrength}%</span>
                               </div>
                               <div className="flex items-center gap-2 text-slate-400">
                                 <Eye className="h-5 w-5" />
-                                <span>{cameras.find(c => c.id === selectedCamera)?.viewers} viewers</span>
+                                <span>{selectedFeed?.viewers} viewers</span>
                               </div>
                               <div className="flex items-center gap-2 text-slate-400">
                                 <Clock className="h-5 w-5" />
-                                <span>{cameras.find(c => c.id === selectedCamera)?.uptime}</span>
+                                <span>{selectedFeed?.uptime}</span>
                               </div>
                             </div>
                             
@@ -1545,10 +1598,10 @@ const Monitoring = () => {
                             )}
                             <div>
                               <CardTitle className="text-base md:text-lg text-white">
-                                {selectedCamera ? cameras.find(c => c.id === selectedCamera)?.name : 'Select a Camera'}
+                                {selectedCamera ? selectedFeed?.name : 'Select a Camera'}
                               </CardTitle>
                               <CardDescription className="text-xs text-slate-400">
-                                {selectedCamera ? cameras.find(c => c.id === selectedCamera)?.projectSite : 'Choose from the list below'}
+                                {selectedCamera ? selectedFeed?.projectSite : 'Choose from the list below'}
                               </CardDescription>
                             </div>
                           </div>
@@ -1556,15 +1609,15 @@ const Monitoring = () => {
                             {selectedCamera && (
                               <>
                                 <Badge className="bg-slate-700/50 text-cyan-400 border border-cyan-500/30 text-xs">
-                                  {cameras.find(c => c.id === selectedCamera)?.quality}
+                                  {selectedFeed?.quality}
                                 </Badge>
                                 <Badge className={`text-xs ${
-                                  cameras.find(c => c.id === selectedCamera)?.status === 'online' || cameras.find(c => c.id === selectedCamera)?.status === 'recording'
+                                  selectedFeed?.status === 'online' || selectedFeed?.status === 'recording'
                                     ? 'bg-green-500/20 text-green-400 border border-green-500/30'
                                     : 'bg-red-500/20 text-red-400 border border-red-500/30'
                                 }`}>
                                   <span className="w-2 h-2 rounded-full bg-current mr-1 animate-pulse"></span>
-                                  {cameras.find(c => c.id === selectedCamera)?.status?.toUpperCase()}
+                                  {selectedFeed?.status?.toUpperCase()}
                                 </Badge>
                               </>
                             )}
@@ -1650,7 +1703,7 @@ const Monitoring = () => {
                                 <span className="text-slate-500 mx-2">|</span>
                                 <span className="text-sm text-slate-400">{new Date().toLocaleDateString()}</span>
                               </div>
-                              {cameras.find(c => c.id === selectedCamera)?.isRecording && (
+                              {selectedFeed?.isRecording && (
                                 <div className="flex items-center gap-2 bg-red-500/20 backdrop-blur-md px-4 py-2 rounded-lg border border-red-500/30">
                                   <span className="w-3 h-3 bg-red-500 rounded-full animate-pulse"></span>
                                   <span className="text-sm font-bold text-red-400">● REC</span>
@@ -1660,57 +1713,59 @@ const Monitoring = () => {
                           )}
                           
                           {/* Center Content */}
-                          <div className="absolute inset-0 flex items-center justify-center">
+                          <div className="absolute inset-0 flex items-center justify-center p-4">
                             {selectedCamera ? (
-                              <div className="text-center">
-                                {selectedCamera.startsWith('drone-') ? (
-                                  <>
-                                    <div className="relative mb-6">
-                                      <Plane className="h-24 w-24 mx-auto text-purple-400" />
-                                      <div className="absolute inset-0 h-24 w-24 mx-auto rounded-full bg-purple-500/30 blur-2xl animate-pulse"></div>
-                                    </div>
-                                    <p className="text-3xl font-bold bg-gradient-to-r from-purple-300 to-purple-100 bg-clip-text text-transparent mb-2">
-                                      Drone Aerial Feed
-                                    </p>
-                                    <p className="text-lg font-mono text-purple-300/70">
-                                      {cameras.find(c => c.id === selectedCamera)?.quality} • Live Streaming
-                                    </p>
-                                    <div className="mt-4 flex items-center justify-center gap-3">
-                                      <Badge className="bg-purple-500/20 text-purple-300 border border-purple-500/30 px-4 py-2">
-                                        <Plane className="h-4 w-4 mr-2" />
-                                        Aerial View Active
-                                      </Badge>
-                                      <Badge className="bg-slate-700/50 text-slate-300 border border-slate-600/50 px-4 py-2">
-                                        <Eye className="h-4 w-4 mr-2" />
-                                        {cameras.find(c => c.id === selectedCamera)?.viewers} Viewers
-                                      </Badge>
-                                    </div>
-                                  </>
-                                ) : (
-                                  <>
-                                    <div className="relative mb-6">
-                                      <Camera className="h-24 w-24 mx-auto text-cyan-400" />
-                                      <div className="absolute inset-0 h-24 w-24 mx-auto rounded-full bg-cyan-500/30 blur-2xl animate-pulse"></div>
-                                    </div>
-                                    <p className="text-3xl font-bold bg-gradient-to-r from-cyan-300 to-cyan-100 bg-clip-text text-transparent mb-2">
-                                      Live Camera Feed
-                                    </p>
-                                    <p className="text-lg font-mono text-cyan-300/70">
-                                      {cameras.find(c => c.id === selectedCamera)?.quality} • Streaming
-                                    </p>
-                                    <div className="mt-4 flex items-center justify-center gap-3">
-                                      <Badge className="bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 px-4 py-2">
-                                        <Video className="h-4 w-4 mr-2" />
-                                        HD Quality
-                                      </Badge>
-                                      <Badge className="bg-slate-700/50 text-slate-300 border border-slate-600/50 px-4 py-2">
-                                        <Eye className="h-4 w-4 mr-2" />
-                                        {cameras.find(c => c.id === selectedCamera)?.viewers} Viewers
-                                      </Badge>
-                                    </div>
-                                  </>
-                                )}
-                              </div>
+                              liveStreamEl('default') ?? (
+                                <div className="text-center">
+                                  {selectedCamera.startsWith('drone-') ? (
+                                    <>
+                                      <div className="relative mb-6">
+                                        <Plane className="h-24 w-24 mx-auto text-purple-400" />
+                                        <div className="absolute inset-0 h-24 w-24 mx-auto rounded-full bg-purple-500/30 blur-2xl animate-pulse"></div>
+                                      </div>
+                                      <p className="text-3xl font-bold bg-gradient-to-r from-purple-300 to-purple-100 bg-clip-text text-transparent mb-2">
+                                        Drone Aerial Feed
+                                      </p>
+                                      <p className="text-lg font-mono text-purple-300/70">
+                                        {selectedFeed?.quality} • Live Streaming
+                                      </p>
+                                      <div className="mt-4 flex items-center justify-center gap-3">
+                                        <Badge className="bg-purple-500/20 text-purple-300 border border-purple-500/30 px-4 py-2">
+                                          <Plane className="h-4 w-4 mr-2" />
+                                          Aerial View Active
+                                        </Badge>
+                                        <Badge className="bg-slate-700/50 text-slate-300 border border-slate-600/50 px-4 py-2">
+                                          <Eye className="h-4 w-4 mr-2" />
+                                          {selectedFeed?.viewers} Viewers
+                                        </Badge>
+                                      </div>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <div className="relative mb-6">
+                                        <Camera className="h-24 w-24 mx-auto text-cyan-400" />
+                                        <div className="absolute inset-0 h-24 w-24 mx-auto rounded-full bg-cyan-500/30 blur-2xl animate-pulse"></div>
+                                      </div>
+                                      <p className="text-3xl font-bold bg-gradient-to-r from-cyan-300 to-cyan-100 bg-clip-text text-transparent mb-2">
+                                        Live Camera Feed
+                                      </p>
+                                      <p className="text-lg font-mono text-cyan-300/70">
+                                        {selectedFeed?.quality} • Streaming (add stream URL or embed in admin)
+                                      </p>
+                                      <div className="mt-4 flex items-center justify-center gap-3">
+                                        <Badge className="bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 px-4 py-2">
+                                          <Video className="h-4 w-4 mr-2" />
+                                          HD Quality
+                                        </Badge>
+                                        <Badge className="bg-slate-700/50 text-slate-300 border border-slate-600/50 px-4 py-2">
+                                          <Eye className="h-4 w-4 mr-2" />
+                                          {selectedFeed?.viewers} Viewers
+                                        </Badge>
+                                      </div>
+                                    </>
+                                  )}
+                                </div>
+                              )
                             ) : (
                               <div className="text-center">
                                 <Monitor className="h-24 w-24 mx-auto text-slate-600 mb-6" />
@@ -1738,12 +1793,12 @@ const Monitoring = () => {
                                 
                                 <div className="flex items-center gap-4 text-sm">
                                   <div className="hidden sm:flex items-center gap-2 text-slate-400">
-                                    <Wifi className={`h-4 w-4 ${(cameras.find(c => c.id === selectedCamera)?.signalStrength || 0) > 70 ? 'text-green-400' : 'text-amber-400'}`} />
-                                    <span>{cameras.find(c => c.id === selectedCamera)?.signalStrength}%</span>
+                                    <Wifi className={`h-4 w-4 ${(selectedFeed?.signalStrength || 0) > 70 ? 'text-green-400' : 'text-amber-400'}`} />
+                                    <span>{selectedFeed?.signalStrength}%</span>
                                   </div>
                                   <div className="hidden sm:flex items-center gap-2 text-slate-400">
                                     <Clock className="h-4 w-4" />
-                                    <span>{cameras.find(c => c.id === selectedCamera)?.uptime}</span>
+                                    <span>{selectedFeed?.uptime}</span>
                                   </div>
                                 </div>
                                 

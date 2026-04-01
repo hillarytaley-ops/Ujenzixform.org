@@ -219,8 +219,8 @@ const PrivateClientDashboard = () => {
           `${SUPABASE_URL}/rest/v1/purchase_orders?buyer_id=eq.${userId}&order=created_at.desc`,
           {
             headers: {
-              'apikey': ANON_KEY,
-              'Authorization': `Bearer ${accessToken || ANON_KEY}`,
+              'apikey': SUPABASE_ANON_KEY,
+              'Authorization': `Bearer ${accessToken || SUPABASE_ANON_KEY}`,
               'Content-Type': 'application/json',
             }
           }
@@ -287,8 +287,8 @@ const PrivateClientDashboard = () => {
             `${SUPABASE_URL}/rest/v1/delivery_requests?builder_id=eq.${userId}&order=created_at.desc`,
             {
               headers: {
-                'apikey': ANON_KEY,
-                'Authorization': `Bearer ${accessToken || ANON_KEY}`,
+                'apikey': SUPABASE_ANON_KEY,
+                'Authorization': `Bearer ${accessToken || SUPABASE_ANON_KEY}`,
               }
             }
           );
@@ -408,8 +408,8 @@ const PrivateClientDashboard = () => {
           `${SUPABASE_URL}/rest/v1/purchase_orders?buyer_id=eq.${user.id}&order=created_at.desc`,
           {
             headers: {
-              'apikey': ANON_KEY,
-              'Authorization': `Bearer ${accessToken || ANON_KEY}`,
+              'apikey': SUPABASE_ANON_KEY,
+              'Authorization': `Bearer ${accessToken || SUPABASE_ANON_KEY}`,
               'Content-Type': 'application/json',
             }
           }
@@ -470,8 +470,8 @@ const PrivateClientDashboard = () => {
             `${SUPABASE_URL}/rest/v1/delivery_requests?builder_id=eq.${user.id}&order=created_at.desc`,
             {
               headers: {
-                'apikey': ANON_KEY,
-                'Authorization': `Bearer ${accessToken || ANON_KEY}`,
+                'apikey': SUPABASE_ANON_KEY,
+                'Authorization': `Bearer ${accessToken || SUPABASE_ANON_KEY}`,
                 'Content-Type': 'application/json',
               }
             }
@@ -1042,8 +1042,8 @@ const PrivateClientDashboard = () => {
                                         `${SUPABASE_URL}/rest/v1/material_items?purchase_order_id=eq.${order.id}&order=item_sequence.asc`,
                                         {
                                           headers: {
-                                            'apikey': ANON_KEY,
-                                            'Authorization': `Bearer ${accessToken || ANON_KEY}`,
+                                            'apikey': SUPABASE_ANON_KEY,
+                                            'Authorization': `Bearer ${accessToken || SUPABASE_ANON_KEY}`,
                                             'Content-Type': 'application/json',
                                           }
                                         }
@@ -1066,8 +1066,8 @@ const PrivateClientDashboard = () => {
                                           `${SUPABASE_URL}/rest/v1/order_items?order_id=eq.${order.id}`,
                                           {
                                             headers: {
-                                              'apikey': ANON_KEY,
-                                              'Authorization': `Bearer ${accessToken || ANON_KEY}`,
+                                              'apikey': SUPABASE_ANON_KEY,
+                                              'Authorization': `Bearer ${accessToken || SUPABASE_ANON_KEY}`,
                                               'Content-Type': 'application/json',
                                             }
                                           }
