@@ -38,11 +38,12 @@ with a real stream URL, or another format OpenCV and VLC can open directly.
 MONITORING AND ACCESS CONTROL
 --------------------------------------------------------------------------------
 
-Row-level security for cameras and site_vision_events was tightened (migration
-20260401120000): project-scoped camera SELECT for authenticated users, admin
-manage-all, no anon table reads; site vision events follow the same camera access;
-guest monitoring links use a SECURITY DEFINER RPC (resolve_monitoring_access_code)
-so assigned cameras load without exposing the cameras table to anon REST.
+Row-level security for cameras and site_vision_events is tightened in the
+consolidated migration 20260331120000_platform_security_consolidated.sql:
+project-scoped camera SELECT for authenticated users, admin manage-all, no anon
+table reads; site vision events follow the same camera access; guest monitoring
+links use a SECURITY DEFINER RPC (resolve_monitoring_access_code) so assigned
+cameras load without exposing the cameras table to anon REST.
 Further hardening (e.g. Edge-only stream URLs, audit every read) can still be added
 for the strictest deployments.
 

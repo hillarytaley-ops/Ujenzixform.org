@@ -1,12 +1,117 @@
 -- =============================================================================
--- Multi-tenant camera + site vision RLS; staff login throttle + hash backfill;
--- monitoring access-code RPC (anon-safe) for assigned cameras only.
+-- CONSOLIDATED platform security (single migration)
+-- =============================================================================
+-- Combines former:
+--   20260331120000_admin_staff_login_security_logs.sql
+--   20260401120000_monitoring_multitenant_rls_staff_login_hardening.sql
+--
+-- Contents:
+--   • Security log INSERT RLS (admin_security_logs, security_events)
+--   • admin_staff columns + bootstrap; drop broad anon SELECT (RPC login only)
+--   • Multi-tenant cameras + site_vision_events RLS; secure camera RPCs
+--   • resolve_monitoring_access_code (guest access-code camera load)
+--   • staff_login_throttle + verify_admin_staff_login (rate limit + hash backfill)
+--
+-- Requires: public.is_admin_no_rls(), public.is_admin() (from earlier migrations).
+-- Idempotent where possible (DROP POLICY IF EXISTS, CREATE OR REPLACE).
+--
+-- If your DB already recorded the two separate migration versions, use
+-- supabase migration repair once after switching to this single file.
 -- =============================================================================
 
 CREATE EXTENSION IF NOT EXISTS pgcrypto WITH SCHEMA extensions;
 
 -- ---------------------------------------------------------------------------
--- 1) Who may see a camera row (admin, project owner, optional project_members)
+-- A) admin_security_logs + security_events: tighten anon INSERT
+-- ---------------------------------------------------------------------------
+DROP POLICY IF EXISTS "admin_security_logs_insert_all" ON public.admin_security_logs;
+DROP POLICY IF EXISTS "admin_security_logs_insert" ON public.admin_security_logs;
+DROP POLICY IF EXISTS "admin_security_logs_insert_authenticated" ON public.admin_security_logs;
+DROP POLICY IF EXISTS "admin_security_logs_insert_anon" ON public.admin_security_logs;
+
+CREATE POLICY "admin_security_logs_insert_authenticated"
+ON public.admin_security_logs FOR INSERT
+TO authenticated
+WITH CHECK (true);
+
+CREATE POLICY "admin_security_logs_insert_anon"
+ON public.admin_security_logs FOR INSERT
+TO anon
+WITH CHECK (
+  event_type IN (
+    'staff_login',
+    'login_attempt',
+    'login_failed',
+    'account_locked',
+    'security_event'
+  )
+  AND (email IS NULL OR char_length(email) <= 320)
+  AND (details IS NULL OR char_length(details::text) <= 12000)
+);
+
+DROP POLICY IF EXISTS "security_events_insert_all" ON public.security_events;
+DROP POLICY IF EXISTS "security_events_insert" ON public.security_events;
+DROP POLICY IF EXISTS "security_events_insert_authenticated" ON public.security_events;
+DROP POLICY IF EXISTS "security_events_insert_anon" ON public.security_events;
+
+CREATE POLICY "security_events_insert_authenticated"
+ON public.security_events FOR INSERT
+TO authenticated
+WITH CHECK (
+  user_id = auth.uid()
+  OR public.is_admin()
+  OR (user_id IS NULL AND public.is_admin())
+);
+
+CREATE POLICY "security_events_insert_anon"
+ON public.security_events FOR INSERT
+TO anon
+WITH CHECK (
+  severity IN ('low', 'medium', 'high', 'critical')
+  AND event_type IS NOT NULL
+  AND char_length(event_type::text) <= 128
+  AND (details IS NULL OR pg_column_size(details) <= 20000)
+);
+
+-- ---------------------------------------------------------------------------
+-- B) admin_staff columns + bootstrap staff_code
+-- ---------------------------------------------------------------------------
+ALTER TABLE public.admin_staff ADD COLUMN IF NOT EXISTS full_name TEXT;
+ALTER TABLE public.admin_staff ADD COLUMN IF NOT EXISTS staff_code_hash TEXT;
+ALTER TABLE public.admin_staff ADD COLUMN IF NOT EXISTS last_login timestamptz;
+
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'admin_staff' AND column_name = 'name'
+  ) THEN
+    UPDATE public.admin_staff s
+    SET full_name = COALESCE(NULLIF(TRIM(s.full_name), ''), NULLIF(TRIM(s.name), ''), 'Staff Member')
+    WHERE s.full_name IS NULL OR TRIM(s.full_name) = '';
+  ELSE
+    UPDATE public.admin_staff s
+    SET full_name = COALESCE(NULLIF(TRIM(s.full_name), ''), 'Staff Member')
+    WHERE s.full_name IS NULL OR TRIM(s.full_name) = '';
+  END IF;
+END $$;
+
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'admin_staff' AND column_name = 'staff_code'
+  ) THEN
+    UPDATE public.admin_staff
+    SET staff_code = COALESCE(NULLIF(TRIM(staff_code), ''), 'UJPRO-2024-0001')
+    WHERE LOWER(email) = 'hillarytaley@gmail.com';
+  END IF;
+END $$;
+
+DROP POLICY IF EXISTS "Allow public read for login verification" ON public.admin_staff;
+
+-- ---------------------------------------------------------------------------
+-- C) Camera / site vision multi-tenant access
 -- ---------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION public.auth_can_access_camera(p_camera_id uuid)
 RETURNS boolean
@@ -34,7 +139,6 @@ BEGIN
     RETURN false;
   END IF;
 
-  -- Unassigned cameras: admin only (handled above)
   IF v_project IS NULL THEN
     RETURN false;
   END IF;
@@ -78,9 +182,6 @@ GRANT EXECUTE ON FUNCTION public.auth_can_access_camera(uuid) TO authenticated;
 COMMENT ON FUNCTION public.auth_can_access_camera(uuid) IS
   'RLS helper: true if JWT user may view this camera (admin, project owner via builder_id/profile, or project_members).';
 
--- ---------------------------------------------------------------------------
--- 2) Cameras: drop all policies, reapply strict multi-tenant set
--- ---------------------------------------------------------------------------
 DO $$
 DECLARE
   pol RECORD;
@@ -108,9 +209,6 @@ USING (public.auth_can_access_camera(id));
 REVOKE ALL ON public.cameras FROM anon;
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.cameras TO authenticated;
 
--- ---------------------------------------------------------------------------
--- 3) Site vision events: project-scoped SELECT (not all authenticated users)
--- ---------------------------------------------------------------------------
 DO $sv$
 BEGIN
   IF EXISTS (
@@ -118,6 +216,7 @@ BEGIN
     WHERE table_schema = 'public' AND table_name = 'site_vision_events'
   ) THEN
     EXECUTE 'DROP POLICY IF EXISTS "site_vision_events_select_authenticated" ON public.site_vision_events';
+    EXECUTE 'DROP POLICY IF EXISTS "site_vision_events_select_scoped" ON public.site_vision_events';
     EXECUTE $p$
       CREATE POLICY "site_vision_events_select_scoped"
       ON public.site_vision_events FOR SELECT TO authenticated
@@ -129,9 +228,6 @@ BEGIN
   END IF;
 END $sv$;
 
--- ---------------------------------------------------------------------------
--- 4) Secure camera RPCs: no anon; enforce same rules as RLS
--- ---------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION public.get_camera_stream_secure(camera_uuid uuid)
 RETURNS TABLE (
   camera_id uuid,
@@ -244,7 +340,7 @@ GRANT EXECUTE ON FUNCTION public.get_secure_camera_info(uuid) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.get_camera_directory() TO authenticated;
 
 -- ---------------------------------------------------------------------------
--- 5) Monitoring access code → request + cameras (anon + auth; code-validated only)
+-- D) Monitoring access code → assigned cameras only (anon + authenticated)
 -- ---------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION public.resolve_monitoring_access_code(p_code text)
 RETURNS jsonb
@@ -327,7 +423,7 @@ COMMENT ON FUNCTION public.resolve_monitoring_access_code(text) IS
   'Guest / client monitoring: returns approved request summary and only assigned cameras for a valid access code.';
 
 -- ---------------------------------------------------------------------------
--- 6) Staff login rate limit (DB-side; complements client lockout)
+-- E) Staff login throttle + verify_admin_staff_login (final)
 -- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS public.staff_login_throttle (
   email_norm text PRIMARY KEY,
@@ -410,9 +506,6 @@ REVOKE ALL ON FUNCTION public._staff_login_throttle_check(text) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public._staff_login_throttle_fail(text) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public._staff_login_throttle_clear(text) FROM PUBLIC;
 
--- ---------------------------------------------------------------------------
--- 7) Backfill staff_code_hash; verify_admin_staff_login + rate limit
--- ---------------------------------------------------------------------------
 UPDATE public.admin_staff s
 SET staff_code_hash = encode(
   extensions.digest(convert_to(upper(trim(s.staff_code)), 'UTF8'), 'sha256'),
@@ -511,3 +604,6 @@ $$;
 
 REVOKE ALL ON FUNCTION public.verify_admin_staff_login(text, text) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.verify_admin_staff_login(text, text) TO anon, authenticated;
+
+COMMENT ON FUNCTION public.verify_admin_staff_login(text, text) IS
+  'Staff portal login: rate-limited; verifies email + code (hash and/or legacy plaintext). No broad anon SELECT on admin_staff.';
