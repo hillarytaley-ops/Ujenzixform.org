@@ -12,6 +12,7 @@ Welcome to the UjenziXform documentation. This folder contains comprehensive doc
 
 | Document | Description |
 |----------|-------------|
+| [**Ops runbook (start here)**](./OPS_RUNBOOK.md) | Single merged checklist: deploy, env, migrations, monitoring smoke, vision worker, links to all deep docs |
 | [Complete workflow](./MRADIPRO_COMPLETE_WORKFLOW_DOCUMENTATION.md) (legacy filename) | Full UjenziXform platform overview with all workflows |
 | [Pending & future work (plain text, printable)](./UJENZIXFORM_PENDING_AND_FUTURE_WORK.txt) | Layman summary of gaps, TODOs, and roadmap-style items |
 

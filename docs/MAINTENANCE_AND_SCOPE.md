@@ -4,6 +4,8 @@
 
 The app spans many domains (marketplace, admin, delivery, monitoring, security tooling). That power comes with **ongoing maintenance cost**. This file maps where things live and how to shrink “unknowns” before a release.
 
+**Merged ops checklist (deploy, env, migrations, smoke tests, vision worker):** see [OPS_RUNBOOK.md](./OPS_RUNBOOK.md).
+
 ## Module map (where to look)
 
 | Area | Primary locations |
