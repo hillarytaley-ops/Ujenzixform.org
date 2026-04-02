@@ -36,6 +36,7 @@ const Delivery = React.lazy(() => import("./pages/Delivery"));
 const Scanners = React.lazy(() => import("./pages/Scanners"));
 const Analytics = React.lazy(() => import("./pages/Analytics"));
 const DeliveryProviderApplication = React.lazy(() => import("./pages/DeliveryProviderApplication"));
+const DeliveryRegistration = React.lazy(() => import("./pages/DeliveryRegistration"));
 
 // Dashboard imports - lazy loaded (heavy components). AdminDashboard is static — avoids stale lazy chunk → HTML MIME errors after deploy.
 const SupplierDashboard = React.lazy(() => import("./pages/SupplierDashboard"));
@@ -303,6 +304,7 @@ const App = () => {
                     
                     {/* Registration Routes */}
                     <Route path="/supplier-registration" element={<SuspenseWrapper><SupplierRegistration /></SuspenseWrapper>} />
+                    <Route path="/delivery-registration" element={<SuspenseWrapper><DeliveryRegistration /></SuspenseWrapper>} />
                     <Route path="/supplier-marketplace" element={<SuspenseWrapper><Suppliers /></SuspenseWrapper>} />
                     
                     {/* Admin Route - Redirect /admin to /admin-dashboard */}
