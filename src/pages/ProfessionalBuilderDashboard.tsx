@@ -3747,7 +3747,16 @@ const ProfessionalBuilderDashboardPage = () => {
                     </div>
                     <Button 
                       className="w-full bg-gradient-to-r from-cyan-500 to-teal-500 hover:from-cyan-600 hover:to-teal-600"
-                      onClick={() => navigate('/monitoring')}
+                      onClick={() => {
+                        const code = monitoringRequests.find(
+                          (r) => isMonitoringApprovedStatus(r.status) && r.access_code
+                        )?.access_code;
+                        navigate(
+                          code
+                            ? `/monitoring?access_code=${encodeURIComponent(String(code).trim())}`
+                            : '/monitoring'
+                        );
+                      }}
                     >
                       <Eye className="h-4 w-4 mr-2" />
                       Open Monitoring Page
@@ -4104,7 +4113,13 @@ const ProfessionalBuilderDashboardPage = () => {
                             )}
                             <Button 
                               className="w-full bg-green-600 hover:bg-green-700"
-                              onClick={() => navigate('/monitoring')}
+                              onClick={() =>
+                                navigate(
+                                  request.access_code
+                                    ? `/monitoring?access_code=${encodeURIComponent(String(request.access_code).trim())}`
+                                    : '/monitoring'
+                                )
+                              }
                             >
                               <Eye className="h-4 w-4 mr-2" />
                               Access Live Cameras

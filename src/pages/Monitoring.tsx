@@ -88,6 +88,41 @@ function cameraHasStreamMedia(feed: CameraFeed | null | undefined): boolean {
   );
 }
 
+/** When signed in, prefer stream URL from get_camera_stream_secure (auth_can_access_camera + active check). */
+async function enrichCameraFeedsWithSecureStream(feeds: CameraFeed[]): Promise<CameraFeed[]> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user || feeds.length === 0) return feeds;
+
+  return Promise.all(
+    feeds.map(async (cam) => {
+      if (String(cam.embed_code ?? '').trim() !== '') return cam;
+      try {
+        let row: Record<string, unknown> | null = null;
+        if (import.meta.env.VITE_CAMERA_STREAM_VIA_EDGE === 'true') {
+          const { data, error } = await supabase.functions.invoke('camera-stream-url', {
+            body: { camera_id: cam.id },
+          });
+          if (error) return cam;
+          const payload = data as { row?: Record<string, unknown> | null } | null;
+          row = payload?.row ?? null;
+        } else {
+          const { data, error } = await supabase.rpc('get_camera_stream_secure', { camera_uuid: cam.id });
+          if (error || !data?.length) return cam;
+          row = data[0] as unknown as Record<string, unknown>;
+        }
+        if (!row) return cam;
+        const granted = row.access_granted ?? row.authorized;
+        if (!granted) return cam;
+        const url = row.stream_url != null ? String(row.stream_url).trim() : '';
+        if (url) return { ...cam, stream_url: url };
+      } catch {
+        /* keep resolve_monitoring_access_code payload */
+      }
+      return cam;
+    })
+  );
+}
+
 function youtubeOrVimeoEmbedUrl(pageUrl: string): string | null {
   try {
     const u = new URL(pageUrl);
@@ -424,6 +459,15 @@ const Monitoring = () => {
     }
   }, [accessCodeFromUrl]);
 
+  // After access-code cameras load, select first camera so the main player is not stuck on "no selection"
+  useEffect(() => {
+    if (assignedCameras.length === 0) return;
+    setSelectedCamera((prev) => {
+      if (prev && assignedCameras.some((c) => c.id === prev)) return prev;
+      return assignedCameras[0].id;
+    });
+  }, [assignedCameras]);
+
   useEffect(() => {
     // Set default tab based on role
     if (userRole === 'admin') {
@@ -449,7 +493,16 @@ const Monitoring = () => {
         throw new Error(rpcError.message || 'Failed to resolve access code');
       }
 
-      const payload = rpcData as {
+      let rawPayload: unknown = rpcData;
+      if (typeof rawPayload === 'string') {
+        try {
+          rawPayload = JSON.parse(rawPayload);
+        } catch {
+          rawPayload = null;
+        }
+      }
+
+      const payload = rawPayload as {
         ok?: boolean;
         reason?: string;
         request?: { id?: string; project_name?: string; status?: string; access_code?: string };
@@ -488,8 +541,8 @@ const Monitoring = () => {
       }
 
       // Transform to CameraFeed format
-      const transformedCameras = camerasData.map((cam: any) => ({
-        id: cam.id,
+      const transformedCameras: CameraFeed[] = camerasData.map((cam: any) => ({
+        id: String(cam.id),
         name: cam.name,
         location: cam.location || 'Location not specified',
         projectSite: requestData.project_name,
@@ -508,12 +561,13 @@ const Monitoring = () => {
         supports_two_way_audio: cam.supports_two_way_audio === true,
       }));
 
-      setAssignedCameras(transformedCameras);
-      console.log('📹 ✅ Loaded', transformedCameras.length, 'cameras');
+      const enriched = await enrichCameraFeedsWithSecureStream(transformedCameras);
+      setAssignedCameras(enriched);
+      console.log('📹 ✅ Loaded', enriched.length, 'cameras');
       
       toast({
         title: '✅ Cameras Loaded',
-        description: `${transformedCameras.length} camera(s) loaded for ${requestData.project_name}`,
+        description: `${enriched.length} camera(s) loaded for ${requestData.project_name}`,
       });
 
     } catch (error) {
