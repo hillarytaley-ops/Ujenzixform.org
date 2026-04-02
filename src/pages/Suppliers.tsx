@@ -379,7 +379,7 @@ const Suppliers = () => {
                   description="Transport & logistics services"
                   gradient="from-purple-600 to-purple-700"
                   borderColor="purple"
-                  explorePath="/delivery-auth"
+                  explorePath="/delivery"
                   features={["Get jobs", "Earn per delivery"]}
                 />
               </div>

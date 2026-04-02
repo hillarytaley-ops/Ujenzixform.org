@@ -12,7 +12,7 @@
  * ║   ┌─────────────────────────────────────────────────────────────────────────────┐   ║
  * ║   │  1. Database role is SOURCE OF TRUTH, not localStorage                     │   ║
  * ║   │  2. Users with different roles are BLOCKED, not allowed to sign in         │   ║
- * ║   │  3. Role is ALWAYS created in database during sign-in if missing           │   ║
+ * ║   │  3. Delivery role is not auto-created — use /delivery/apply to apply       │   ║
  * ║   │  4. Verified: Supplier/Builder users cannot access delivery portal         │   ║
  * ║   │  5. localStorage is only trusted if user_role_id matches current user      │   ║
  * ║   └─────────────────────────────────────────────────────────────────────────────┘   ║
@@ -21,9 +21,9 @@
  * ║   1. Get authenticated user from Supabase                                           ║
  * ║   2. Clear stale localStorage if user_role_id doesn't match                         ║
  * ║   3. Check DATABASE for actual role (source of truth)                               ║
- * ║   4. If role is 'delivery' → redirect to dashboard                                  ║
- * ║   5. If role is different → BLOCK access, sign out                                  ║
- * ║   6. If no role → CREATE 'delivery' role and redirect                               ║
+ * ║   4. If role is delivery / delivery_provider → redirect to dashboard                 ║
+ * ║   5. If role is different → wrong portal (keep or clear session per branch)        ║
+ * ║   6. If no delivery role → redirect to /delivery/apply (partner application)       ║
  * ║                                                                                      ║
  * ╚══════════════════════════════════════════════════════════════════════════════════════╝
  */
@@ -433,22 +433,10 @@ const DeliverySignIn = () => {
           dbRole = roleData?.[0]?.role || null;
         }
       } catch (roleError) {
-        console.log('🚚 Role fetch error/timeout, checking metadata...');
+        console.log('🚚 Role fetch error/timeout');
       }
       
       console.log('🚚 Database role:', dbRole);
-      
-      // If no role in DB, check user metadata (set during registration)
-      if (!dbRole) {
-        const metadataRole = authData.user.user_metadata?.role;
-        console.log('🚚 Metadata role:', metadataRole);
-        
-        // If metadata says delivery, use that
-        if (metadataRole === 'delivery' || metadataRole === 'delivery_provider') {
-          dbRole = metadataRole;
-          console.log('🚚 Using metadata role:', dbRole);
-        }
-      }
       
       // If user has a DIFFERENT role (not delivery/admin), redirect them
       if (dbRole && dbRole !== 'delivery' && dbRole !== 'delivery_provider' && dbRole !== 'admin') {
@@ -469,22 +457,17 @@ const DeliverySignIn = () => {
         return;
       }
       
-      // If NO role in database and no metadata, BLOCK them - they must register first
       if (!dbRole) {
-        console.log('🚚 No role found - user must register first');
-        toast({
-          variant: "destructive",
-          title: "❌ Not Registered",
-          description: "You are not registered as a Delivery Provider. Please register first using the link below.",
-          duration: 5000
-        });
-        // Clear the session
-        localStorage.removeItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
-        localStorage.removeItem('access_token');
+        console.log('🚚 No user_roles row — sending user to partner application');
         localStorage.removeItem('user_role');
-        localStorage.removeItem('user_role_id');
-        localStorage.removeItem('user_role_verified');
+        localStorage.setItem('user_role_id', userId);
+        toast({
+          title: "Signed in",
+          description: "Complete your delivery partner application. You get dashboard access after approval.",
+          duration: 6000
+        });
         setLoading(false);
+        window.location.replace('/delivery/apply');
         return;
       }
       
@@ -553,8 +536,7 @@ const DeliverySignIn = () => {
         password: password,
         options: {
           data: {
-            role: 'delivery',
-            user_type: 'delivery'
+            delivery_partner_application: true,
           },
           emailRedirectTo: undefined
         }
@@ -646,21 +628,49 @@ const DeliverySignIn = () => {
             return;
           }
           
-          // SECURITY: Do NOT auto-create roles for visitors
-          // If no role exists, block them and require registration
           if (!existingRole?.role) {
-            console.log('🚫 SECURITY: No role found - blocking access, user must register first');
+            console.log('🚚 New account after sign-in — redirect to partner application');
+            if (signInData.session) {
+              localStorage.setItem(
+                'sb-wuuyjjpgzgeimiptuuws-auth-token',
+                JSON.stringify({
+                  access_token: signInData.session.access_token,
+                  refresh_token: signInData.session.refresh_token,
+                  expires_at: signInData.session.expires_at,
+                  expires_in: signInData.session.expires_in,
+                  token_type: signInData.session.token_type,
+                  user: signInData.user,
+                })
+              );
+              localStorage.setItem('access_token', signInData.session.access_token);
+            }
+            localStorage.setItem('user_role_id', signInData.user.id);
+            localStorage.setItem('user_email', userEmail);
+            localStorage.removeItem('user_role');
             toast({
-              variant: "destructive",
-              title: "❌ Not Registered",
-              description: "You are not registered as a Delivery Provider. Please register first using the registration link below.",
-              duration: 5000
+              title: "You're signed in",
+              description: "Complete your delivery partner application next.",
+              duration: 6000
             });
-            await supabase.auth.signOut();
             setLoading(false);
+            window.location.replace('/delivery/apply');
             return;
           }
 
+          if (signInData.session) {
+            localStorage.setItem(
+              'sb-wuuyjjpgzgeimiptuuws-auth-token',
+              JSON.stringify({
+                access_token: signInData.session.access_token,
+                refresh_token: signInData.session.refresh_token,
+                expires_at: signInData.session.expires_at,
+                expires_in: signInData.session.expires_in,
+                token_type: signInData.session.token_type,
+                user: signInData.user,
+              })
+            );
+            localStorage.setItem('access_token', signInData.session.access_token);
+          }
           localStorage.setItem('user_role', existingRole.role);
           localStorage.setItem('user_role_id', signInData.user.id);
           localStorage.setItem('user_role_verified', Date.now().toString());
@@ -699,38 +709,59 @@ const DeliverySignIn = () => {
         return;
       }
       
-      // SECURITY: Do NOT auto-create roles for visitors
-      // If no role exists, block them and require registration
       if (!existingRole?.role) {
-        console.log('🚫 SECURITY: No role found (session exists) - blocking access');
-        toast({
-          variant: "destructive",
-          title: "❌ Not Registered",
-          description: "You are not registered as a Delivery Provider. Please register first.",
-          duration: 5000
-        });
-        await supabase.auth.signOut();
+        console.log('🚚 Session after sign-up — redirect to partner application');
+        if (authData.session) {
+          localStorage.setItem(
+            'sb-wuuyjjpgzgeimiptuuws-auth-token',
+            JSON.stringify({
+              access_token: authData.session.access_token,
+              refresh_token: authData.session.refresh_token,
+              expires_at: authData.session.expires_at,
+              expires_in: authData.session.expires_in,
+              token_type: authData.session.token_type,
+              user: authData.user,
+            })
+          );
+          localStorage.setItem('access_token', authData.session.access_token);
+        }
+        localStorage.setItem('user_role_id', userId);
+        localStorage.setItem('user_email', userEmail);
         localStorage.removeItem('user_role');
-        localStorage.removeItem('user_role_id');
+        toast({
+          title: "Account created",
+          description: "Complete your delivery partner application. Dashboard access is granted after approval.",
+          duration: 8000
+        });
         setLoading(false);
+        window.location.replace('/delivery/apply');
         return;
       }
 
+      if (authData.session) {
+        localStorage.setItem(
+          'sb-wuuyjjpgzgeimiptuuws-auth-token',
+          JSON.stringify({
+            access_token: authData.session.access_token,
+            refresh_token: authData.session.refresh_token,
+            expires_at: authData.session.expires_at,
+            expires_in: authData.session.expires_in,
+            token_type: authData.session.token_type,
+            user: authData.user,
+          })
+        );
+        localStorage.setItem('access_token', authData.session.access_token);
+      }
       localStorage.setItem('user_role', existingRole.role);
       localStorage.setItem('user_role_id', userId);
       localStorage.setItem('user_role_verified', Date.now().toString());
-      saveUserSession(userId, userEmail, 'delivery');
-
-      supabase.auth.updateUser({
-        data: { role: 'delivery', user_type: 'delivery' }
-      }).catch(() => {});
+      saveUserSession(userId, userEmail, existingRole.role);
 
       toast({
         title: "✅ Account Created!",
         description: "Welcome! Redirecting to dashboard...",
       });
 
-      // Redirect IMMEDIATELY
       window.location.replace('/delivery-dashboard');
       return;
 
@@ -799,7 +830,7 @@ const DeliverySignIn = () => {
                   <TabsTrigger value="signin">Sign In</TabsTrigger>
                   <TabsTrigger value="signup">
                     <UserPlus className="h-4 w-4 mr-1" />
-                    Quick Sign Up
+                    New account
                   </TabsTrigger>
                 </TabsList>
 
@@ -816,7 +847,7 @@ const DeliverySignIn = () => {
                   <Alert className="bg-teal-50 border-teal-200">
                     <UserPlus className="h-4 w-4 text-teal-600" />
                     <AlertDescription className="text-sm text-teal-800">
-                      <strong>Instant Access:</strong> Create your delivery account and get immediate access - no email confirmation needed!
+                      <strong>Apply to partner:</strong> Create an account, then complete the application. The delivery dashboard is available after admin approval.
                     </AlertDescription>
                   </Alert>
                 </TabsContent>
@@ -877,7 +908,7 @@ const DeliverySignIn = () => {
                   ) : isSignUp ? (
                     <>
                       <UserPlus className="mr-2 h-4 w-4" />
-                      Create Delivery Account
+                      Create account and apply
                     </>
                   ) : (
                     <>
@@ -898,9 +929,9 @@ const DeliverySignIn = () => {
               </Button>
               
               <div className="text-center text-sm text-muted-foreground">
-                Don't have an account?{" "}
-                <Link to="/delivery-registration" className="text-teal-600 hover:underline font-medium">
-                  Register as Delivery Provider
+                Want to become a partner?{" "}
+                <Link to="/delivery/apply" className="text-teal-600 hover:underline font-medium">
+                  Apply as delivery provider
                 </Link>
               </div>
               

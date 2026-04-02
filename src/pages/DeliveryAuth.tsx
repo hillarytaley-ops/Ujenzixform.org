@@ -1,5 +1,6 @@
 /**
- * DeliveryAuth - BUILD v16 - PRE-FILL FROM GENERAL LOGIN
+ * DeliveryAuth — sign-in for approved delivery providers; "Apply" tab sends users
+ * to /delivery/apply without granting the delivery role (admin approves applications).
  */
 
 import React, { useState, useRef, useEffect } from 'react';
@@ -33,7 +34,7 @@ if ((cachedRole === ROLE || cachedRole === 'delivery_provider') && cachedUserId)
   window.location.replace(DASHBOARD);
 }
 
-console.log('🔐 DeliveryAuth BUILD v16 - PRE-FILL FROM GENERAL LOGIN');
+const APPLY_PATH = '/delivery/apply';
 
 const DeliveryAuth: React.FC = () => {
   const { toast } = useToast();
@@ -85,7 +86,7 @@ const DeliveryAuth: React.FC = () => {
             
             toast({
               title: '👋 Welcome!',
-              description: 'Complete your delivery provider registration below.',
+              description: 'Continue to the partner application — we review every submission before activation.',
             });
           }
         }
@@ -113,7 +114,7 @@ const DeliveryAuth: React.FC = () => {
           
           toast({
             title: '👋 Welcome!',
-            description: 'Complete your delivery provider registration below.',
+            description: 'Continue to the partner application — we review every submission before activation.',
           });
         }
       } catch (error) {
@@ -167,31 +168,25 @@ const DeliveryAuth: React.FC = () => {
 
       redirecting.current = true;
       
-      // SECURITY: Strict role checking - NO auto-assignment
       if (!dbRole) {
-        // User has NO role - they must register first!
-        console.log('🔐 SECURITY: No role found - user needs to register');
-        // DON'T sign out the user or remove their email - just show error
-        localStorage.removeItem('user_role'); // Only remove role, keep email
+        localStorage.removeItem('user_role');
         setIsLoading(false);
         redirecting.current = false;
-        toast({ 
-          title: '❌ Account Not Registered', 
-          description: 'You must register as a Delivery Provider first. Please use the Sign Up tab.',
-          variant: 'destructive',
-          duration: 6000
+        toast({
+          title: 'Signed in',
+          description: 'Continue your delivery partner application. Accounts are activated after review.',
         });
-        setActiveTab('signup');
+        window.location.href = APPLY_PATH;
         return;
       }
       
-      if (dbRole !== ROLE) {
+      if (dbRole !== ROLE && dbRole !== 'delivery_provider') {
         const correctDashboard = ROLE_DASHBOARDS[dbRole] || '/home';
         localStorage.setItem('user_role', dbRole);
         toast({ title: 'Wrong Portal', description: `You are registered as ${dbRole}. Redirecting to your dashboard.` });
         window.location.href = correctDashboard;
       } else {
-        localStorage.setItem('user_role', ROLE);
+        localStorage.setItem('user_role', dbRole);
         window.location.href = DASHBOARD;
       }
     } catch (err: any) {
@@ -218,41 +213,40 @@ const DeliveryAuth: React.FC = () => {
         );
         const roleCheckData = await roleCheckResponse.json();
         const currentRole = roleCheckData?.[0]?.role;
-        
-        if (currentRole) {
-          console.log('🔐 Updating role from', currentRole, 'to', ROLE);
-          await fetch(`${SUPABASE_URL}/rest/v1/user_roles?user_id=eq.${userId}`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${accessToken}`, 'Prefer': 'return=minimal' },
-            body: JSON.stringify({ role: ROLE }),
-          });
-        } else {
-          console.log('🔐 Inserting new role:', ROLE);
-          await fetch(`${SUPABASE_URL}/rest/v1/user_roles`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${accessToken}`, 'Prefer': 'return=minimal' },
-            body: JSON.stringify({ user_id: userId, role: ROLE }),
-          });
+
+        if (currentRole === ROLE || currentRole === 'delivery_provider') {
+          localStorage.setItem('user_role', currentRole);
+          localStorage.setItem('user_role_id', userId);
+          localStorage.setItem('user_email', email);
+          toast({ title: 'Welcome back', description: 'Redirecting to your dashboard...' });
+          window.location.href = DASHBOARD;
+          return;
         }
-        
-        // Update profile
+
         await fetch(`${SUPABASE_URL}/rest/v1/profiles?user_id=eq.${userId}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${accessToken}`, 'Prefer': 'return=minimal' },
-          body: JSON.stringify({ 
+          body: JSON.stringify({
             full_name: fullName.trim(),
             company_name: companyName.trim() || null,
             phone: phone || null,
             location: location || null,
           }),
         });
-        
-        localStorage.setItem('user_role', ROLE);
+
+        if (currentRole) {
+          localStorage.setItem('user_role', currentRole);
+        } else {
+          localStorage.removeItem('user_role');
+        }
         localStorage.setItem('user_role_id', userId);
         localStorage.setItem('user_email', email);
-        
-        toast({ title: '✅ Delivery Provider Profile Created!', description: 'Redirecting to your dashboard...' });
-        window.location.href = DASHBOARD;
+
+        toast({
+          title: 'Profile saved',
+          description: 'Opening the delivery partner application — your role is assigned only after approval.',
+        });
+        window.location.href = APPLY_PATH;
         return;
       }
       
@@ -279,9 +273,7 @@ const DeliveryAuth: React.FC = () => {
         const roleCheckData = await roleCheckResponse.json();
         const currentRole = roleCheckData?.[0]?.role;
         
-        if (currentRole === ROLE || currentRole === 'delivery') {
-          // Already a delivery provider - just redirect
-          console.log('🔐 User is already a delivery provider, redirecting...');
+        if (currentRole === ROLE || currentRole === 'delivery_provider') {
           localStorage.setItem('sb-wuuyjjpgzgeimiptuuws-auth-token', JSON.stringify({
             access_token: accessToken,
             refresh_token: signInData.refresh_token,
@@ -297,38 +289,18 @@ const DeliveryAuth: React.FC = () => {
           window.location.href = DASHBOARD;
           return;
         }
-        
-        // Update or insert role
-        if (currentRole) {
-          console.log('🔐 Updating role from', currentRole, 'to', ROLE);
-          await fetch(`${SUPABASE_URL}/rest/v1/user_roles?user_id=eq.${userId}`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${accessToken}`, 'Prefer': 'return=minimal' },
-            body: JSON.stringify({ role: ROLE }),
-          });
-        } else {
-          console.log('🔐 Inserting new role:', ROLE);
-          await fetch(`${SUPABASE_URL}/rest/v1/user_roles`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${accessToken}`, 'Prefer': 'return=minimal' },
-            body: JSON.stringify({ user_id: userId, role: ROLE }),
-          });
-        }
-        
-        // Update profile
-        console.log('🔐 Updating profile...');
+
         await fetch(`${SUPABASE_URL}/rest/v1/profiles?user_id=eq.${userId}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${accessToken}`, 'Prefer': 'return=minimal' },
-          body: JSON.stringify({ 
+          body: JSON.stringify({
             full_name: fullName.trim(),
             company_name: companyName.trim() || null,
             phone: phone || null,
             location: location || null,
           }),
         });
-        
-        // Store session and redirect
+
         localStorage.setItem('sb-wuuyjjpgzgeimiptuuws-auth-token', JSON.stringify({
           access_token: accessToken,
           refresh_token: signInData.refresh_token,
@@ -337,12 +309,19 @@ const DeliveryAuth: React.FC = () => {
           token_type: signInData.token_type,
           user: signInData.user
         }));
-        localStorage.setItem('user_role', ROLE);
+        if (currentRole) {
+          localStorage.setItem('user_role', currentRole);
+        } else {
+          localStorage.removeItem('user_role');
+        }
         localStorage.setItem('user_role_id', userId);
         localStorage.setItem('user_email', signInData.user.email || '');
-        
-        toast({ title: '✅ Profile Updated!', description: 'Redirecting to your dashboard...' });
-        window.location.href = DASHBOARD;
+
+        toast({
+          title: 'Signed in',
+          description: 'Opening the delivery partner application. You are not a provider until approved.',
+        });
+        window.location.href = APPLY_PATH;
         return;
       }
       
@@ -351,7 +330,11 @@ const DeliveryAuth: React.FC = () => {
       const response = await fetch(`${SUPABASE_URL}/auth/v1/signup`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON_KEY },
-        body: JSON.stringify({ email: email.trim(), password, data: { full_name: fullName.trim(), role: ROLE, company_name: companyName.trim() } }),
+        body: JSON.stringify({
+          email: email.trim(),
+          password,
+          data: { full_name: fullName.trim(), company_name: companyName.trim() || undefined },
+        }),
       });
       const data = await response.json();
       
@@ -366,19 +349,37 @@ const DeliveryAuth: React.FC = () => {
         return; 
       }
       
-      // Insert role into user_roles table
-      if (data.user?.id) {
-        console.log('🔐 Inserting role for new user:', data.user.id, ROLE);
-        try {
-          await fetch(`${SUPABASE_URL}/rest/v1/user_roles`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${data.access_token || SUPABASE_ANON_KEY}`, 'Prefer': 'return=minimal' },
-            body: JSON.stringify({ user_id: data.user.id, role: ROLE }),
-          });
-        } catch (roleErr) { console.log('🔐 Role insert error:', roleErr); }
+      const accessToken = data.access_token ?? data.session?.access_token;
+      const refreshToken = data.refresh_token ?? data.session?.refresh_token;
+      const expiresIn = data.expires_in ?? data.session?.expires_in;
+
+      if (accessToken && data.user && typeof expiresIn === 'number') {
+        localStorage.setItem(
+          'sb-wuuyjjpgzgeimiptuuws-auth-token',
+          JSON.stringify({
+            access_token: accessToken,
+            refresh_token: refreshToken,
+            expires_at: Math.floor(Date.now() / 1000) + expiresIn,
+            expires_in: expiresIn,
+            token_type: data.token_type ?? data.session?.token_type ?? 'bearer',
+            user: data.user,
+          })
+        );
+        localStorage.setItem('user_role_id', data.user.id);
+        localStorage.setItem('user_email', data.user.email || email.trim());
+        localStorage.removeItem('user_role');
+        toast({
+          title: 'Account created',
+          description: 'Complete your delivery partner application next. We activate accounts after review.',
+        });
+        window.location.href = APPLY_PATH;
+        return;
       }
-      
-      toast({ title: 'Account created!', description: 'Please check your email to verify.' });
+
+      toast({
+        title: 'Check your email',
+        description: 'Verify your account, then sign in and open Apply to become a delivery partner.',
+      });
       setActiveTab('signin');
     } catch (err: any) {
       toast({ title: 'Registration failed', description: err.message, variant: 'destructive' });
@@ -403,12 +404,19 @@ const DeliveryAuth: React.FC = () => {
           </div>
           <Card className="border-0 shadow-2xl">
             <CardHeader className="text-center pb-2">
-              <CardTitle className="text-2xl">{activeTab === 'signin' ? 'Welcome Back' : 'Create Account'}</CardTitle>
-              <CardDescription>{activeTab === 'signin' ? 'Sign in to your dashboard' : `Register as a ${TITLE}`}</CardDescription>
+              <CardTitle className="text-2xl">{activeTab === 'signin' ? 'Welcome Back' : 'Apply as partner'}</CardTitle>
+              <CardDescription>
+                {activeTab === 'signin'
+                  ? 'Sign in if you are already an approved delivery partner'
+                  : 'Create an account and submit an application — approval required before dashboard access'}
+              </CardDescription>
             </CardHeader>
             <CardContent>
               <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'signin' | 'signup')}>
-                <TabsList className="grid w-full grid-cols-2 mb-6"><TabsTrigger value="signin">Sign In</TabsTrigger><TabsTrigger value="signup">Sign Up</TabsTrigger></TabsList>
+                <TabsList className="grid w-full grid-cols-2 mb-6">
+                  <TabsTrigger value="signin">Sign In</TabsTrigger>
+                  <TabsTrigger value="signup">Apply</TabsTrigger>
+                </TabsList>
                 <TabsContent value="signin">
                   <form onSubmit={handleSignIn} className="space-y-4">
                     <div className="space-y-2"><Label>Email</Label><div className="relative"><Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" /><Input type="email" placeholder="your@email.com" value={email} onChange={(e) => setEmail(e.target.value)} className="pl-10" required /></div></div>
@@ -422,7 +430,7 @@ const DeliveryAuth: React.FC = () => {
                       <Alert className="bg-green-50 border-green-200">
                         <CheckCircle className="h-4 w-4 text-green-600" />
                         <AlertDescription className="text-green-800">
-                          <strong>Already logged in!</strong> Complete your delivery provider profile below.
+                          <strong>Signed in.</strong> Save your details below, then you will open the full partner application. The delivery role is assigned only after admin approval.
                         </AlertDescription>
                       </Alert>
                     )}
@@ -462,11 +470,11 @@ const DeliveryAuth: React.FC = () => {
                     
                     <Button type="submit" className="w-full bg-gradient-to-r from-purple-500 to-purple-600" disabled={isLoading}>
                       {isLoading ? (
-                        <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Creating...</>
+                        <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Please wait...</>
                       ) : isPrefilledFromLogin ? (
-                        'Complete Registration'
+                        'Continue to application'
                       ) : (
-                        'Create Account'
+                        'Create account and apply'
                       )}
                     </Button>
                   </form>
