@@ -119,12 +119,20 @@ serve(async (req) => {
     const isSuccess = status === 'Success' || status === 'Sent'
 
     if (isSuccess && first) {
+      const messagingEnv = username === 'sandbox' ? 'sandbox' : 'live'
+      const deliveryHint =
+        messagingEnv === 'sandbox'
+          ? "Sandbox mode: Africa's Talking returned Success, but SMS is only delivered to numbers you added as sandbox test phones in the AT dashboard. Real handsets will not receive until you use live credentials (username + API key from production) and an approved sender ID."
+          : undefined
+
       return new Response(
         JSON.stringify({
           success: true,
           messageId: first.messageId,
           cost: first.cost,
-          status: first.status
+          status: first.status,
+          messagingEnv,
+          ...(deliveryHint ? { deliveryHint } : {}),
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )

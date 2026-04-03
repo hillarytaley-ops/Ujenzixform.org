@@ -19,6 +19,8 @@ interface TestResult {
   success: boolean;
   messageId?: string;
   error?: string;
+  messagingEnv?: 'sandbox' | 'live';
+  deliveryHint?: string;
   timestamp: Date;
 }
 
@@ -76,17 +78,23 @@ export const SMSTestPanel: React.FC = () => {
         success: result.success,
         messageId: result.messageId,
         error: result.error,
+        messagingEnv: result.messagingEnv,
+        deliveryHint: result.deliveryHint,
         timestamp: new Date()
       };
 
       setTestResults(prev => [testResult, ...prev].slice(0, 10));
 
       if (result.success) {
+        const sandbox = result.messagingEnv === 'sandbox';
         toast({
-          title: '✅ SMS Sent!',
-          description: result.messageId
-            ? `Message ID: ${result.messageId}`
-            : 'Delivered via send-sms edge function.',
+          title: sandbox ? "✅ Accepted by Africa's Talking (sandbox)" : '✅ SMS Sent!',
+          description:
+            sandbox && result.deliveryHint
+              ? `${result.deliveryHint.slice(0, 220)}${result.deliveryHint.length > 220 ? '…' : ''}`
+              : result.messageId
+                ? `Message ID: ${result.messageId}`
+                : 'Delivered via send-sms edge function.',
         });
       } else {
         toast({
@@ -302,6 +310,13 @@ export const SMSTestPanel: React.FC = () => {
                       ID: {result.messageId}
                     </p>
                   )}
+                  {result.success && result.messagingEnv === 'sandbox' && (
+                    <p className="text-xs text-amber-800 dark:text-amber-200 mt-2 p-2 rounded-md bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800">
+                      <strong>Sandbox:</strong> AT returned Success, but phones only receive SMS if this number is a{' '}
+                      <strong>registered sandbox test phone</strong> in Africa&apos;s Talking. For real delivery, set
+                      Supabase secrets to your <strong>live</strong> username + API key (and approved sender ID).
+                    </p>
+                  )}
                   {result.error && (
                     <p className="text-xs text-red-600 mt-1">
                       {result.error}
@@ -338,10 +353,22 @@ export const SMSTestPanel: React.FC = () => {
           </div>
           
           <div className="mt-4 p-3 bg-yellow-50 dark:bg-yellow-950/30 rounded-lg border border-yellow-200 dark:border-yellow-800">
-            <p className="font-medium text-yellow-800 dark:text-yellow-200">🚀 To Enable Real SMS:</p>
-            <p className="text-yellow-700 dark:text-yellow-300 mt-1">
-              Deploy the Supabase Edge Function or set up a backend server to proxy requests to Africa's Talking API (required due to CORS restrictions).
-            </p>
+            <p className="font-medium text-yellow-800 dark:text-yellow-200">Real delivery checklist</p>
+            <ul className="text-yellow-700 dark:text-yellow-300 mt-1 list-disc list-inside space-y-1">
+              <li>
+                Deploy <code className="text-xs">send-sms</code> and set Supabase secrets{' '}
+                <code className="text-xs">AFRICASTALKING_API_KEY</code>,{' '}
+                <code className="text-xs">AFRICASTALKING_USERNAME</code>.
+              </li>
+              <li>
+                If username is <code className="text-xs">sandbox</code>, add each test phone in the Africa&apos;s Talking
+                sandbox dashboard — otherwise you will see Success + an AT message ID but <strong>no SMS on the device</strong>.
+              </li>
+              <li>
+                For production, use your <strong>live</strong> AT username and key, plus an approved{' '}
+                <code className="text-xs">AFRICASTALKING_SENDER_ID</code> when required.
+              </li>
+            </ul>
           </div>
         </CardContent>
       </Card>

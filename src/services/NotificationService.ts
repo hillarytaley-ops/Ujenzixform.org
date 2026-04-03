@@ -34,6 +34,10 @@ export interface NotificationResult {
   success: boolean;
   messageId?: string;
   error?: string;
+  /** From Edge `send-sms`: Africa's Talking sandbox vs live API. */
+  messagingEnv?: 'sandbox' | 'live';
+  /** Human hint when API success does not mean the phone received SMS (e.g. sandbox). */
+  deliveryHint?: string;
 }
 
 export interface NotificationTemplate {
@@ -198,6 +202,8 @@ class NotificationService {
       simulated?: boolean;
       error?: string;
       messageId?: string;
+      messagingEnv?: 'sandbox' | 'live';
+      deliveryHint?: string;
       details?: unknown;
       debug?: { messagingEnv?: string; includedFromParameter?: boolean };
     } | null;
@@ -239,7 +245,12 @@ class NotificationService {
     }
 
     await this.logNotification('sms', recipients.join(','), message.message, true);
-    return { success: true, messageId: payload.messageId };
+    return {
+      success: true,
+      messageId: payload.messageId,
+      messagingEnv: payload.messagingEnv,
+      deliveryHint: payload.deliveryHint,
+    };
   }
 
   /**
@@ -291,10 +302,15 @@ class NotificationService {
       results.push(await this.sendWhatsApp({ to: recipient, message: whatsappMessage }));
     }
 
+    const smsMeta = results.find(
+      (r) => r.messagingEnv != null || (r.deliveryHint != null && r.deliveryHint.length > 0),
+    );
     return {
-      success: results.every(r => r.success),
-      messageId: results.map(r => r.messageId).join(','),
-      error: results.find(r => r.error)?.error
+      success: results.every((r) => r.success),
+      messageId: results.map((r) => r.messageId).join(','),
+      error: results.find((r) => r.error)?.error,
+      messagingEnv: smsMeta?.messagingEnv,
+      deliveryHint: smsMeta?.deliveryHint,
     };
   }
 
