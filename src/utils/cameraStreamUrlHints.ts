@@ -3,6 +3,12 @@
  * Browsers only play a subset of URLs in <video src>; share pages and RTSP are common pitfalls.
  */
 
+/** Browsers cannot open rtsp:// or rtsps:// in &lt;video&gt; or hls.js — convert to HLS/WebRTC first. */
+export function isRtspStreamUrl(url: string): boolean {
+  const lower = url.trim().toLowerCase();
+  return lower.startsWith('rtsp://') || lower.startsWith('rtsps://');
+}
+
 /** True when URL should be played with hls.js (or Safari native HLS), not a plain progressive file. */
 export function isHlsPlaylistUrl(url: string): boolean {
   const u = url.trim().toLowerCase();
@@ -19,7 +25,7 @@ export function shouldUseSharePageHintInsteadOfVideoTag(url: string): boolean {
   const trimmed = url.trim();
   if (!trimmed) return true;
   const lower = trimmed.toLowerCase();
-  if (lower.startsWith('rtsp://') || lower.startsWith('rtsps://')) return true;
+  if (isRtspStreamUrl(trimmed)) return true;
   if (!lower.startsWith('http://') && !lower.startsWith('https://')) return true;
   try {
     const parsed = new URL(trimmed);

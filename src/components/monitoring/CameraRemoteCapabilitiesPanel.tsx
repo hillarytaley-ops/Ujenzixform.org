@@ -1,6 +1,7 @@
 import React from 'react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
+import { DOCS_INFRA_VENDOR_ML_BOUNDARIES } from '@/config/docsLinks';
 import { Mic, Video, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, Home } from 'lucide-react';
 
 export interface CameraRemoteCapabilitiesPanelProps {
@@ -20,8 +21,17 @@ export const CameraRemoteCapabilitiesPanel: React.FC<CameraRemoteCapabilitiesPan
     return (
       <div className="px-4 pb-4 pt-0 border-t border-slate-700/40">
         <p className="text-xs text-slate-500 mt-3">
-          This camera is set up for viewing only. Your admin can enable PTZ or site audio for compatible hardware in
-          Admin → Monitoring when those integrations are rolled out.
+          This camera is set up for viewing only. PTZ, talk-back, byte-level stream relay, and custom site-vision models
+          need <strong>gateway / infra / ML work</strong> — not a missing toggle in this app. See{' '}
+          <a
+            href={DOCS_INFRA_VENDOR_ML_BOUNDARIES}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-cyan-400 underline underline-offset-2"
+          >
+            Infra, vendor &amp; ML boundaries
+          </a>
+          .
         </p>
       </div>
     );
@@ -32,9 +42,22 @@ export const CameraRemoteCapabilitiesPanel: React.FC<CameraRemoteCapabilitiesPan
       <Alert className="border-amber-500/30 bg-amber-500/5">
         <Video className="h-4 w-4 text-amber-400" />
         <AlertTitle className="text-amber-200 text-sm">Remote control and site audio</AlertTitle>
-        <AlertDescription className="text-xs text-slate-400 mt-1">
-          These controls will talk to your camera through a secure server path (vendor cloud, ONVIF bridge, or WebRTC).
-          Wiring is not active yet; flags below show which capabilities this camera is intended to support.
+        <AlertDescription className="text-xs text-slate-400 mt-1 space-y-2">
+          <p>
+            These controls require a <strong>secure server path</strong> (vendor cloud, ONVIF bridge, or WebRTC) — camera
+            credentials must not live in the browser. This repo does not ship that gateway yet; flags below show intended
+            hardware support only.
+          </p>
+          <p>
+            <a
+              href={DOCS_INFRA_VENDOR_ML_BOUNDARIES}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-amber-200/90 underline underline-offset-2"
+            >
+              Read PTZ, relay, and custom CV scope →
+            </a>
+          </p>
         </AlertDescription>
       </Alert>
 

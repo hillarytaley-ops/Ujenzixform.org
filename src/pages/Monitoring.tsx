@@ -54,7 +54,16 @@ import { MonitoringServiceRequest } from '@/components/builders/MonitoringServic
 import { CameraRemoteCapabilitiesPanel } from '@/components/monitoring/CameraRemoteCapabilitiesPanel';
 import { HlsVideoPlayer } from '@/components/monitoring/HlsVideoPlayer';
 import { cn } from '@/lib/utils';
-import { isHlsPlaylistUrl, shouldUseSharePageHintInsteadOfVideoTag } from '@/utils/cameraStreamUrlHints';
+import {
+  isHlsPlaylistUrl,
+  isRtspStreamUrl,
+  shouldUseSharePageHintInsteadOfVideoTag,
+} from '@/utils/cameraStreamUrlHints';
+import {
+  DOCS_INFRA_VENDOR_ML_BOUNDARIES,
+  DOCS_MEDIAMTX_RTSP_TO_HLS,
+  DOCS_MONITORING_VISION_STATUS,
+} from '@/config/docsLinks';
 
 interface CameraFeed {
   id: string;
@@ -155,20 +164,119 @@ function youtubeOrVimeoEmbedUrl(pageUrl: string): string | null {
   return null;
 }
 
-function StreamPlaybackHelp({ rawUrl }: { rawUrl: string }) {
+type StreamPlaybackHelpHint = 'rtsp' | 'hls-failed' | 'generic';
+
+function StreamPlaybackHelp({
+  rawUrl,
+  hint,
+}: {
+  rawUrl: string;
+  hint?: StreamPlaybackHelpHint;
+}) {
+  const mode: StreamPlaybackHelpHint =
+    hint ?? (isRtspStreamUrl(rawUrl) ? 'rtsp' : 'generic');
+
+  if (mode === 'rtsp') {
+    return (
+      <div className="max-w-xl mx-auto text-center p-6 rounded-lg bg-slate-900/95 border border-cyan-500/40 space-y-4">
+        <p className="text-cyan-100 text-sm font-semibold">RTSP does not play in the browser</p>
+        <p className="text-slate-300 text-xs leading-relaxed text-left">
+          Browsers cannot use <code className="text-[11px] bg-slate-800 px-1 rounded">rtsp://</code> or{' '}
+          <code className="text-[11px] bg-slate-800 px-1 rounded">rtsps://</code> in the Monitoring player. Use an{' '}
+          <strong>HLS (.m3u8)</strong> URL (this app uses hls.js / Safari HLS) or a direct HTTPS <strong>.mp4</strong> /{' '}
+          <strong>.webm</strong> link, or paste vendor <strong>iframe</strong> embed HTML in admin.
+        </p>
+        <div className="text-left text-xs text-slate-400 space-y-2 border border-slate-700/80 rounded-md p-3 bg-slate-950/50">
+          <p className="font-medium text-slate-300">Fastest path: RTSP → HLS on site</p>
+          <ol className="list-decimal list-inside space-y-1">
+            <li>
+              Run the <strong>MediaMTX</strong> Docker example from this repo on a mini PC / NVR (same LAN as the camera).
+            </li>
+            <li>
+              Put the resulting <code className="text-[11px]">…/site/index.m3u8</code> URL into{' '}
+              <strong>cameras.stream_url</strong>. Remote viewers need HTTPS, VPN, or tunnel — see infra doc.
+            </li>
+          </ol>
+        </div>
+        <div className="flex flex-wrap gap-2 justify-center">
+          <Button variant="outline" size="sm" asChild className="text-slate-200 border-slate-600">
+            <a href={DOCS_MEDIAMTX_RTSP_TO_HLS} target="_blank" rel="noopener noreferrer">
+              MediaMTX example (README)
+            </a>
+          </Button>
+          <Button variant="outline" size="sm" asChild className="text-slate-200 border-slate-600">
+            <a href={DOCS_INFRA_VENDOR_ML_BOUNDARIES} target="_blank" rel="noopener noreferrer">
+              HLS relay &amp; remote viewing
+            </a>
+          </Button>
+          <Button variant="ghost" size="sm" asChild className="text-slate-500">
+            <a href={rawUrl} target="_blank" rel="noopener noreferrer">
+              Copy / test in VLC
+            </a>
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  if (mode === 'hls-failed') {
+    return (
+      <div className="max-w-lg mx-auto text-center p-6 rounded-lg bg-slate-900/95 border border-amber-500/40 space-y-3">
+        <p className="text-amber-100 text-sm font-medium">HLS playlist failed to play</p>
+        <p className="text-slate-400 text-xs leading-relaxed text-left">
+          Check that the <strong>.m3u8</strong> URL is reachable from <em>your</em> browser (not only the server), uses{' '}
+          <strong>HTTPS</strong> when the app is on HTTPS, and that the media server sends{' '}
+          <strong>CORS</strong> headers so hls.js can fetch segments. For hiding the origin or proxying segments, see the
+          relay section in the infra doc.
+        </p>
+        <div className="flex flex-wrap gap-2 justify-center">
+          <Button variant="outline" size="sm" asChild className="text-slate-200 border-slate-600">
+            <a href={DOCS_INFRA_VENDOR_ML_BOUNDARIES} target="_blank" rel="noopener noreferrer">
+              Infra: relay &amp; strict streaming
+            </a>
+          </Button>
+          <Button variant="outline" size="sm" asChild className="text-slate-200 border-slate-600">
+            <a href={rawUrl} target="_blank" rel="noopener noreferrer">
+              Open playlist in new tab
+            </a>
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="max-w-lg mx-auto text-center p-6 rounded-lg bg-slate-900/95 border border-amber-500/40">
       <p className="text-amber-100 text-sm font-medium mb-2">
         This link is not playing as a direct video in your browser.
       </p>
-      <p className="text-slate-400 text-xs leading-relaxed mb-4">
+      <p className="text-slate-400 text-xs leading-relaxed mb-4 text-left">
         Many camera “share” pages (GoPro, vendor portals, etc.) are <strong>websites</strong>, not video files. Use a
-        direct <strong>.mp4</strong> / <strong>.webm</strong> URL, an <strong>HLS (.m3u8)</strong> playlist (Chrome/Firefox use
-        hls.js; Safari uses native HLS — origin must allow CORS),
-        a <strong>YouTube or Vimeo</strong> page link, or paste your vendor’s <strong>iframe embed</strong> HTML in the
-        admin embed field. <strong>RTSP</strong> needs a gateway (convert to HLS/WebRTC). See project doc{' '}
-        <span className="text-slate-300">MONITORING_AND_VISION_STATUS.md</span>.
+        direct <strong>.mp4</strong> / <strong>.webm</strong> URL, an <strong>HLS (.m3u8)</strong> playlist, a{' '}
+        <strong>YouTube or Vimeo</strong> page link, or paste your vendor’s <strong>iframe embed</strong> HTML in the admin
+        embed field. <strong>RTSP</strong> → convert with MediaMTX (see link below). Product status:{' '}
+        <a
+          href={DOCS_MONITORING_VISION_STATUS}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-cyan-400 underline underline-offset-2"
+        >
+          Monitoring &amp; vision status
+        </a>
+        .
       </p>
+      <div className="flex flex-wrap gap-2 justify-center mb-3">
+        <Button variant="outline" size="sm" asChild className="text-slate-200 border-slate-600">
+          <a href={DOCS_MEDIAMTX_RTSP_TO_HLS} target="_blank" rel="noopener noreferrer">
+            RTSP → HLS (MediaMTX)
+          </a>
+        </Button>
+        <Button variant="outline" size="sm" asChild className="text-slate-200 border-slate-600">
+          <a href={DOCS_INFRA_VENDOR_ML_BOUNDARIES} target="_blank" rel="noopener noreferrer">
+            Relay / PTZ / CV scope
+          </a>
+        </Button>
+      </div>
       <Button variant="outline" size="sm" asChild className="text-slate-200 border-slate-600">
         <a href={rawUrl} target="_blank" rel="noopener noreferrer">
           Open link in new tab
@@ -186,9 +294,11 @@ function MonitoringLiveMedia({
   variant: 'fullscreen' | 'default';
 }) {
   const [videoFailed, setVideoFailed] = useState(false);
+  const [hlsFailed, setHlsFailed] = useState(false);
 
   useEffect(() => {
     setVideoFailed(false);
+    setHlsFailed(false);
   }, [feed.id, feed.stream_url, feed.embed_code]);
 
   const shell = cn(
@@ -235,7 +345,7 @@ function MonitoringLiveMedia({
 
   if (isHlsPlaylistUrl(rawUrl)) {
     if (hlsFailed) {
-      return <StreamPlaybackHelp rawUrl={rawUrl} />;
+      return <StreamPlaybackHelp rawUrl={rawUrl} hint="hls-failed" />;
     }
     return (
       <div className={cn(shell, 'items-center justify-center')}>
