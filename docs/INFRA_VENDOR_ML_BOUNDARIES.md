@@ -2,6 +2,8 @@
 
 **Purpose:** These topics are **not bugs in the React app**. They are fulfilled with **external services, hardware ops, or ML programs**. This document is the single place that says what UjenziXform ships in-repo vs what **you** (or a vendor) must provide.
 
+**Step-by-step work plan (do this in order):** [MONITORING_STREAMING_IMPLEMENTATION_STEPS.md](./MONITORING_STREAMING_IMPLEMENTATION_STEPS.md) — RTSP→HLS (MediaMTX), HTTPS/CORS, optional relay, PTZ gateway, custom CV.
+
 After this file exists, “fix RTSP / WhatsApp / PTZ in the SPA” is mis-scoped unless the ticket explicitly adds **gateway code** or **new Edge functions** here — follow the sections below instead.
 
 ---

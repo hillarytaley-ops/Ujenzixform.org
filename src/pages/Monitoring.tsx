@@ -62,6 +62,7 @@ import {
 import {
   DOCS_INFRA_VENDOR_ML_BOUNDARIES,
   DOCS_MEDIAMTX_RTSP_TO_HLS,
+  DOCS_MONITORING_STREAMING_STEPS,
   DOCS_MONITORING_VISION_STATUS,
 } from '@/config/docsLinks';
 
@@ -199,6 +200,11 @@ function StreamPlaybackHelp({
           </ol>
         </div>
         <div className="flex flex-wrap gap-2 justify-center">
+          <Button variant="outline" size="sm" asChild className="text-slate-200 border-slate-600">
+            <a href={DOCS_MONITORING_STREAMING_STEPS} target="_blank" rel="noopener noreferrer">
+              Full checklist (all parts)
+            </a>
+          </Button>
           <Button variant="outline" size="sm" asChild className="text-slate-200 border-slate-600">
             <a href={DOCS_MEDIAMTX_RTSP_TO_HLS} target="_blank" rel="noopener noreferrer">
               MediaMTX example (README)
