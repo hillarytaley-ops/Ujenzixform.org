@@ -121,6 +121,8 @@ Keep the laptop **plugged in** and **not sleeping** if this runs 24/7.
 - **Never** put `SUPABASE_SERVICE_ROLE_KEY` in the React app or Vercel client env.
 - This key bypasses RLS; only this worker (or trusted backends) should use it.
 
+**Optional — no service role on the box:** deploy Edge `camera-vision-upload-ticket`, apply migration `20260403160000_site_vision_captures_bucket.sql`, set `SITE_VISION_DEVICE_SECRET` on the project, then `POST` to the function with header `X-Site-Vision-Device-Secret` and body `{"camera_id":"<uuid>","file_extension":"jpeg"}`; `PUT` bytes to `signedUrl`. Thumbnails in the app still need a **signed read** URL or a follow-up RPC because the bucket is private — see `docs/SITE_VISION_ADVANCED_INTEGRATION.md`.
+
 ## Operations
 
 - **10 cameras**: one round-robin loop per cycle is fine; increase `SAMPLE_INTERVAL_SEC` if CPU is high.

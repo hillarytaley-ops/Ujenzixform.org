@@ -31,6 +31,12 @@ export const RATE_LIMITS: Record<string, RateLimitConfig> = {
     maxRequests: 40,
     blockDurationMs: 10 * 60 * 1000,
   },
+  /** Minting signed Storage upload URLs for site-vision captures (JWT per user, device path per IP). */
+  vision_upload_ticket: {
+    windowMs: 60 * 1000,
+    maxRequests: 30,
+    blockDurationMs: 10 * 60 * 1000,
+  },
   registration: {
     windowMs: 60 * 60 * 1000,
     maxRequests: 3,

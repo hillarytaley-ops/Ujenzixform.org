@@ -20,5 +20,9 @@ verify_jwt = false
 [functions.camera-stream-url]
 verify_jwt = true
 
+# JWT or X-Site-Vision-Device-Secret validated inside the function (field devices have no session).
+[functions.camera-vision-upload-ticket]
+verify_jwt = false
+
 [functions.rate-limit]
 verify_jwt = false

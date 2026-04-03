@@ -32,7 +32,8 @@
     "mobile:build:ios": "npm run build && npx cap sync ios",
     "supabase:login": "supabase login",
     "supabase:link": "supabase link",
-    "supabase:deploy-send-sms": "supabase functions deploy send-sms"
+    "supabase:deploy-send-sms": "supabase functions deploy send-sms",
+    "supabase:deploy-camera-vision-upload-ticket": "supabase functions deploy camera-vision-upload-ticket"
   },
   "dependencies": {
     "@capacitor/android": "^7.4.3",

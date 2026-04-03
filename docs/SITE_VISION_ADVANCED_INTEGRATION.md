@@ -37,14 +37,21 @@ No single repo change replaces steps 1–2; the worker is already the integratio
 
 ## 4. Edge-signed ingest (field PC without service role)
 
-**Pattern:**
+**Shipped in this repo:**
 
-1. Field device authenticates to an **Edge Function** (device secret in header, or mTLS later).
-2. Function verifies device + optional `camera_id`, then returns a **short-lived signed upload URL** (Supabase Storage `createSignedUploadUrl` or S3 presigned PUT).
-3. Worker uploads **frames or clips** with that URL; **no service role** on the device.
-4. **RLS** on `site_vision_events` stays tied to normal user access; optional `storage` policies restrict reads.
+| Piece | Location |
+|--------|-----------|
+| Bucket + Storage RLS | Migration `supabase/migrations/20260403160000_site_vision_captures_bucket.sql` — private bucket **`site-vision-captures`**, paths `{camera_id}/{yyyy-mm-dd}/{uuid}.{ext}` |
+| Edge Function | `supabase/functions/camera-vision-upload-ticket` — `POST` JSON with `camera_id` (UUID) and optional `file_extension` (`jpeg`, `png`, `webp`; default `webp`) — response `{ bucket, path, signedUrl, token }` |
 
-Requires: a **bucket** (e.g. `site-vision-captures`), policies, and one deployed function — not yet wired in this repo by default.
+**Auth (choose one):**
+
+1. **Logged-in user:** `Authorization: Bearer <Supabase access token>` — must pass `auth_can_access_camera(camera_id)`.
+2. **Field device:** set Edge secret **`SITE_VISION_DEVICE_SECRET`** on the project, then send header **`X-Site-Vision-Device-Secret: <same value>`** — function checks the `cameras` row exists (no full RLS parity with builders; rotate the secret if the device is compromised).
+
+**Client upload:** `PUT` the image bytes to `signedUrl` with `Content-Type` matching the extension (`image/jpeg`, `image/png`, or `image/webp`). The bucket is **private**; for thumbnails in `site_vision_events.payload.thumbnail_url`, generate a **signed read URL** with the service role (or add a small read helper later).
+
+**Deploy:** `supabase functions deploy camera-vision-upload-ticket` (see `supabase/config.toml`: `verify_jwt = false` because device path has no JWT). Per-user / per-IP rate limits use `vision_upload_ticket` in `supabase/functions/_shared/rateLimitCore.ts`.
 
 ---
 

@@ -10,7 +10,7 @@ Single reference for what **exists today** vs **planned / future**. Aligns engin
 | **Optional YOLO** | **Shipped (opt-in)** | `USE_YOLO=1` + `ultralytics`; generic COCO-style classes, not per-material Kenya catalog. |
 | **Custom CV (per-material, PPE models, etc.)** | **Not built** | Would need labeled data, training pipeline, and worker changes beyond current YOLO hook. |
 | **Thumbnails on every alert** | **Partial** | Worker payload may include `thumbnail_url` / `snapshot_url` / `image_url` / `frame_url`; Analytics **Site vision** table shows a preview column when present. Polished frame capture + storage policy is still ops-dependent. |
-| **Edge-signed ingest (no service role on field PC)** | **Future** | Today the documented path uses service role on the worker. Alternatives: short-lived upload tokens via Edge, signed URLs to Storage, or VPN to a central ingest. |
+| **Edge-signed ingest (no service role on field PC)** | **Shipped (optional)** | Bucket `site-vision-captures` + Edge `camera-vision-upload-ticket` mints signed PUT URLs; JWT or `X-Site-Vision-Device-Secret` when `SITE_VISION_DEVICE_SECRET` is set. See `docs/SITE_VISION_ADVANCED_INTEGRATION.md`. Default worker path still uses service role. |
 
 ## Streams (builder Monitoring page + admin cameras)
 
@@ -44,7 +44,7 @@ Single reference for what **exists today** vs **planned / future**. Aligns engin
 
 ## Related docs
 
-- `docs/SITE_VISION_ADVANCED_INTEGRATION.md` — Custom CV, RTSP→HLS, relay, signed ingest (roadmap).
+- `docs/SITE_VISION_ADVANCED_INTEGRATION.md` — Custom CV, RTSP→HLS, relay, signed ingest (optional Edge path shipped).
 - `docs/EDGE_THROTTLING_AND_STREAM_RELAY.md` — Edge functions, stream URL, throttling.
 - `docs/OPS_RUNBOOK.md` — Playable stream expectations, deploy checklist.
 - `workers/site-vision/README.md` — Worker env vars, YOLO, motion.
