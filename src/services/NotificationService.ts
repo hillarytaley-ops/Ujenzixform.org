@@ -105,10 +105,11 @@ export const NOTIFICATION_TEMPLATES: Record<string, NotificationTemplate> = {
 };
 
 class NotificationService {
+  /** Optional; if unset, edge function omits `from` (sandbox default) or uses AFRICASTALKING_SENDER_ID on server. */
   private senderId: string;
 
   constructor() {
-    this.senderId = import.meta.env.VITE_AFRICASTALKING_SENDER_ID || 'UjenziXform';
+    this.senderId = (import.meta.env.VITE_AFRICASTALKING_SENDER_ID as string | undefined)?.trim() || '';
   }
 
   /**
@@ -159,7 +160,7 @@ class NotificationService {
       console.log('📱 SMS (simulated):', {
         to: recipients.join(', '),
         message: message.message,
-        from: message.from || this.senderId,
+        from: message.from?.trim() || this.senderId || '(edge default)',
       });
       await this.logNotification('sms', recipients.join(','), message.message, true, 'Simulated');
       return {
@@ -170,13 +171,14 @@ class NotificationService {
       };
     }
 
+    const fromHeader = (message.from?.trim() || this.senderId) || undefined;
     const { data, error } = await invokeEdgeFunction(
       'send-sms',
       {
         body: {
           to: recipients.length === 1 ? recipients[0] : recipients,
           message: message.message,
-          from: message.from || this.senderId,
+          ...(fromHeader ? { from: fromHeader } : {}),
         },
       },
       { channel: 'notification_service_sms' }

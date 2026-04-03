@@ -26,7 +26,9 @@ serve(async (req) => {
     // Get credentials from environment
     const username = Deno.env.get('AFRICASTALKING_USERNAME') || 'sandbox'
     const apiKey = Deno.env.get('AFRICASTALKING_API_KEY')
-    const senderId = from || Deno.env.get('AFRICASTALKING_SENDER_ID') || 'UjenziXform'
+    const senderFromBody = typeof from === 'string' ? from.trim() : ''
+    const senderFromEnv = Deno.env.get('AFRICASTALKING_SENDER_ID')?.trim() ?? ''
+    const senderId = senderFromBody || senderFromEnv
 
     if (!apiKey) {
       return new Response(
@@ -62,20 +64,35 @@ serve(async (req) => {
       ? 'https://api.sandbox.africastalking.com/version1/messaging'
       : 'https://api.africastalking.com/version1/messaging'
 
-    // Send SMS via Africa's Talking
+    // `from` must be an approved sender on your AT account; "UjenziXform" causes InvalidSenderId until registered.
+    // Sandbox: omit `from` when unset so AT applies the sandbox default short code.
+    // Live: require explicit sender (secret or body).
+    const params = new URLSearchParams({
+      username: username,
+      to: recipients,
+      message: message,
+    })
+    if (senderId) {
+      params.set('from', senderId)
+    } else if (username !== 'sandbox') {
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error:
+            'Missing sender: set Supabase secret AFRICASTALKING_SENDER_ID to your approved live sender ID / short code.',
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
     const response = await fetch(baseUrl, {
       method: 'POST',
       headers: {
-        'Accept': 'application/json',
+        Accept: 'application/json',
         'Content-Type': 'application/x-www-form-urlencoded',
-        'apiKey': apiKey
+        apiKey: apiKey,
       },
-      body: new URLSearchParams({
-        username: username,
-        to: recipients,
-        message: message,
-        from: senderId
-      })
+      body: params,
     })
 
     const rawText = await response.text()

@@ -130,11 +130,13 @@ export const SMSTestPanel: React.FC = () => {
                 <p className="text-sm text-muted-foreground">
                   {edgeSmsEnabled ? (
                     <>
-                      Calls Supabase Edge Function <code className="text-xs">send-sms</code> (Africa&apos;s
-                      Talking). Set secrets <code className="text-xs">AFRICASTALKING_API_KEY</code> and{' '}
-                      <code className="text-xs">AFRICASTALKING_USERNAME</code> in Supabase, deploy{' '}
-                      <code className="text-xs">send-sms</code>, and use sandbox numbers until production is
-                      approved.
+                      Calls Edge Function <code className="text-xs">send-sms</code>. Secrets:{' '}
+                      <code className="text-xs">AFRICASTALKING_API_KEY</code>,{' '}
+                      <code className="text-xs">AFRICASTALKING_USERNAME</code> (use{' '}
+                      <code className="text-xs">sandbox</code> for sandbox). Optional{' '}
+                      <code className="text-xs">AFRICASTALKING_SENDER_ID</code> — only if AT approved that ID;
+                      if you see <strong>InvalidSenderId</strong>, leave it unset for sandbox (default sender)
+                      or set the exact short code / sender from your AT dashboard.
                     </>
                   ) : (
                     <>
