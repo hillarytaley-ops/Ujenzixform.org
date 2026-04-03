@@ -110,8 +110,13 @@ serve(async (req) => {
           ? trimmed
           : `Africa's Talking returned non-JSON (HTTP ${response.status}). Check API key and endpoint.`
       if (response.status === 401 || response.status === 403) {
+        const whereKey =
+          username === 'sandbox'
+            ? " Edge is using the SANDBOX endpoint. In Africa's Talking, switch to Sandbox (environment toggle), open Sandbox API credentials, and paste that key into Supabase secret AFRICASTALKING_API_KEY. Live/production keys always fail here."
+            : " Edge is using the LIVE endpoint. AFRICASTALKING_USERNAME must be your production app username (not the word sandbox) and AFRICASTALKING_API_KEY must be the live app's key. Sandbox keys always fail here."
+        error += whereKey
         error +=
-          " Pair sandbox API key with AFRICASTALKING_USERNAME=sandbox (Sandbox dashboard). For live SMS, use your production app username + production API key from account.africastalking.com — keys are not interchangeable."
+          " Keys must be set in Supabase Dashboard → Edge Functions → Secrets for this project (not in Vercel or .env on your PC). Wait ~5 minutes after generating a new AT key."
       }
       return new Response(
         JSON.stringify({

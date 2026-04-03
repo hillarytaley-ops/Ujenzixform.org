@@ -24,6 +24,19 @@ interface TestResult {
   timestamp: Date;
 }
 
+function supabaseProjectDashboardSecretsUrl(): string | null {
+  const raw = import.meta.env.VITE_SUPABASE_URL;
+  if (typeof raw !== 'string' || !raw.trim()) return null;
+  try {
+    const host = new URL(raw.trim()).hostname;
+    const m = /^([a-z0-9]+)\.supabase\.co$/i.exec(host);
+    const ref = m?.[1];
+    return ref ? `https://supabase.com/dashboard/project/${ref}/settings/functions` : null;
+  } catch {
+    return null;
+  }
+}
+
 export const SMSTestPanel: React.FC = () => {
   const [phoneNumber, setPhoneNumber] = useState('+254798441351');
   const [selectedTemplate, setSelectedTemplate] = useState('WELCOME');
@@ -33,6 +46,7 @@ export const SMSTestPanel: React.FC = () => {
   const { toast } = useToast();
 
   const edgeSmsEnabled = notificationService.isConfigured();
+  const secretsDashboardUrl = supabaseProjectDashboardSecretsUrl();
 
   const handleSendTestSMS = async () => {
     if (!phoneNumber) {
@@ -159,6 +173,50 @@ export const SMSTestPanel: React.FC = () => {
               {edgeSmsEnabled ? 'Edge' : 'Simulation'}
             </Badge>
           </div>
+          {edgeSmsEnabled && (
+            <div className="mt-4 p-3 rounded-md border border-amber-200 bg-amber-50/90 dark:bg-amber-950/30 dark:border-amber-800 text-sm text-amber-950 dark:text-amber-100">
+              <p className="font-medium">If you see &quot;authentication is invalid&quot; (401)</p>
+              <ul className="mt-2 list-disc list-inside space-y-1 text-amber-900/90 dark:text-amber-100/90">
+                <li>
+                  Update secrets only in{' '}
+                  <strong>Supabase</strong> (Edge Function runtime), not Vercel and not <code className="text-xs">.env.local</code>.
+                  {secretsDashboardUrl ? (
+                    <>
+                      {' '}
+                      <a
+                        href={secretsDashboardUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="underline font-medium"
+                      >
+                        Open Edge Function settings for this project
+                      </a>
+                      .
+                    </>
+                  ) : null}
+                </li>
+                <li>
+                  <code className="text-xs">AFRICASTALKING_USERNAME=sandbox</code> requires the API key from Africa&apos;s Talking{' '}
+                  <strong>Sandbox</strong> dashboard — not the key from your live app.
+                </li>
+                <li>
+                  Live SMS needs your <strong>production</strong> username + <strong>production</strong> key (separate from sandbox).
+                </li>
+                <li>
+                  After generating a new key in AT, wait about <strong>5 minutes</strong> before testing (
+                  <a
+                    href="https://help.africastalking.com/en/articles/1036048-why-am-i-getting-the-error-supplied-authentication-is-invalid"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="underline"
+                  >
+                    Africa&apos;s Talking help
+                  </a>
+                  ).
+                </li>
+              </ul>
+            </div>
+          )}
         </CardContent>
       </Card>
 

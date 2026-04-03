@@ -109,6 +109,13 @@ These should **NEVER** be prefixed with `VITE_` as they would be exposed to the 
 5. The web app calls `send-sms` via the Supabase client — **do not** put `AFRICASTALKING_API_KEY` in any `VITE_` variable.
 6. Optional in `.env.local`: `VITE_AFRICASTALKING_SENDER_ID` (passed as `from` when sending) and `VITE_SMS_SIMULATE_ONLY=true` to force console-only SMS during local dev.
 
+### Still seeing "The supplied authentication is invalid" (401)?
+
+- **Secrets live in Supabase only** — Dashboard → **Project Settings** → **Edge Functions** → **Secrets**. Updating Vercel env vars or a local `.env` file does **not** change what `send-sms` uses.
+- **`AFRICASTALKING_USERNAME=sandbox`** → use the API key from Africa's Talking **Sandbox** (toggle environment in the AT dashboard, then copy the sandbox key). A newly generated **live** key will still return 401 with `username=sandbox`.
+- **Live SMS** → set `AFRICASTALKING_USERNAME` to your **production app username** (not the word `sandbox`) and use the **live** API key for that app.
+- After rotating a key in AT, wait **~5 minutes** before testing ([AT help](https://help.africastalking.com/en/articles/1036048-why-am-i-getting-the-error-supplied-authentication-is-invalid)).
+
 ## Security Best Practices
 
 1. **Never commit credentials** - Add `.env.local` to `.gitignore`
