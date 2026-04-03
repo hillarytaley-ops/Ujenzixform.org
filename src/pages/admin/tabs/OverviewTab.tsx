@@ -95,8 +95,9 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
               Recent Activity
             </CardTitle>
             <p className="text-sm text-gray-500">
-              Includes suppliers, builders, and delivery rows from registration tables. Use{' '}
-              <span className="text-gray-400">Open</span> to jump to User Registrations for full forms and documents.
+              Suppliers and builders: use <span className="text-gray-400">Open</span> for User Registrations (full forms
+              and documents). Delivery rows open <span className="text-gray-400">Delivery applications</span> (approve /
+              reject pipeline).
             </p>
           </CardHeader>
           <CardContent>
@@ -131,8 +132,14 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
                       size="sm"
                       variant="ghost"
                       className="h-8 px-2 text-gray-400 hover:text-white"
-                      title="Open User Registrations for full details and documents"
-                      onClick={() => onTabChange('registrations')}
+                      title={
+                        reg.type === 'delivery'
+                          ? 'Open Delivery applications (full application & approval)'
+                          : 'Open User Registrations for full details and documents'
+                      }
+                      onClick={() =>
+                        onTabChange(reg.type === 'delivery' ? 'delivery-apps' : 'registrations')
+                      }
                     >
                       <ExternalLink className="h-4 w-4" />
                     </Button>

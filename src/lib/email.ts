@@ -373,11 +373,15 @@ export const sendEmailViaEdgeFunction = async (params: SendEmailParams): Promise
 
     const { error } = await supabase.functions.invoke('send-email', { body: params });
     if (error) {
+      const { reportEdgeFunctionFailure } = await import('@/lib/edgeFunctionTelemetry');
+      reportEdgeFunctionFailure('send-email', error, { hasRecipient: !!params.to });
       return { success: false, error: error.message };
     }
     return { success: true };
   } catch (error) {
     console.error('Email sending error:', error);
+    const { reportEdgeFunctionFailure } = await import('@/lib/edgeFunctionTelemetry');
+    reportEdgeFunctionFailure('send-email', error);
     return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
   }
 };
