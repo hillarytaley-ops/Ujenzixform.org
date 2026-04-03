@@ -196,9 +196,13 @@ class NotificationService {
       simulated?: boolean;
       error?: string;
       messageId?: string;
+      details?: unknown;
     } | null;
 
     if (!payload || payload.success !== true) {
+      if (payload?.details != null) {
+        console.warn('[send-sms] Africa\'s Talking details:', payload.details);
+      }
       const errMsg =
         payload?.error ||
         (payload?.simulated

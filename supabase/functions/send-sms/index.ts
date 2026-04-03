@@ -78,30 +78,65 @@ serve(async (req) => {
       })
     })
 
-    const data = await response.json()
-    console.log('Africa\'s Talking response:', data)
-
-    if (data.SMSMessageData?.Recipients?.[0]?.status === 'Success') {
-      return new Response(
-        JSON.stringify({
-          success: true,
-          messageId: data.SMSMessageData.Recipients[0].messageId,
-          cost: data.SMSMessageData.Recipients[0].cost,
-          status: data.SMSMessageData.Recipients[0].status
-        }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
-    } else {
-      const errorStatus = data.SMSMessageData?.Recipients?.[0]?.status || 'Unknown error'
+    const rawText = await response.text()
+    let data: Record<string, unknown>
+    try {
+      data = JSON.parse(rawText) as Record<string, unknown>
+    } catch {
       return new Response(
         JSON.stringify({
           success: false,
-          error: errorStatus,
-          details: data
+          error: `Africa's Talking returned non-JSON (HTTP ${response.status}). Check API key and endpoint.`,
+          details: rawText.slice(0, 400),
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
+
+    console.log('Africa\'s Talking response:', data)
+
+    const smd = data.SMSMessageData as Record<string, unknown> | undefined
+    const recList = (smd?.Recipients as Array<Record<string, unknown>> | undefined) ?? []
+    const first = recList[0]
+    const status = first?.status != null ? String(first.status) : ''
+    const isSuccess = status === 'Success' || status === 'Sent'
+
+    if (isSuccess && first) {
+      return new Response(
+        JSON.stringify({
+          success: true,
+          messageId: first.messageId,
+          cost: first.cost,
+          status: first.status
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    // Build a useful error for the admin UI (avoid generic "Unknown error")
+    let errorMsg = ''
+    if (status) errorMsg = status
+    else if (typeof smd?.Message === 'string' && smd.Message.trim()) {
+      errorMsg = smd.Message.trim()
+    } else if (!response.ok) {
+      errorMsg = `HTTP ${response.status} from Africa's Talking`
+    } else if (first && Object.keys(first).length > 0) {
+      errorMsg = `Recipient: ${JSON.stringify(first)}`
+    } else if (recList.length === 0) {
+      errorMsg =
+        'No recipients in AT response (check phone format, sandbox test numbers, username sandbox vs live, and sender ID).'
+    } else {
+      errorMsg = JSON.stringify(smd ?? data).slice(0, 500)
+    }
+
+    return new Response(
+      JSON.stringify({
+        success: false,
+        error: errorMsg,
+        details: data
+      }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    )
 
   } catch (error) {
     console.error('SMS Error:', error)
