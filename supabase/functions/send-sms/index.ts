@@ -23,9 +23,9 @@ serve(async (req) => {
   try {
     const { to, message, from } = await req.json() as SMSRequest
 
-    // Get credentials from environment
-    const username = Deno.env.get('AFRICASTALKING_USERNAME') || 'sandbox'
-    const apiKey = Deno.env.get('AFRICASTALKING_API_KEY')
+    // Get credentials from environment (trim — trailing newline in secrets breaks AT auth)
+    const username = (Deno.env.get('AFRICASTALKING_USERNAME') || 'sandbox').trim()
+    const apiKey = Deno.env.get('AFRICASTALKING_API_KEY')?.trim()
     const senderFromBody = typeof from === 'string' ? from.trim() : ''
     const senderFromEnv = Deno.env.get('AFRICASTALKING_SENDER_ID')?.trim() ?? ''
     const senderId = senderFromBody || senderFromEnv
@@ -100,11 +100,25 @@ serve(async (req) => {
     try {
       data = JSON.parse(rawText) as Record<string, unknown>
     } catch {
+      const trimmed = rawText.trim().slice(0, 500)
+      const looksPlain =
+        trimmed.length > 0 &&
+        !trimmed.startsWith('<') &&
+        !trimmed.startsWith('{')
+      let error =
+        looksPlain && trimmed.length < 400
+          ? trimmed
+          : `Africa's Talking returned non-JSON (HTTP ${response.status}). Check API key and endpoint.`
+      if (response.status === 401 || response.status === 403) {
+        error +=
+          " Pair sandbox API key with AFRICASTALKING_USERNAME=sandbox (Sandbox dashboard). For live SMS, use your production app username + production API key from account.africastalking.com — keys are not interchangeable."
+      }
       return new Response(
         JSON.stringify({
           success: false,
-          error: `Africa's Talking returned non-JSON (HTTP ${response.status}). Check API key and endpoint.`,
-          details: rawText.slice(0, 400),
+          error,
+          details: trimmed,
+          debug: { messagingEnv: username === 'sandbox' ? 'sandbox' : 'live' },
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
