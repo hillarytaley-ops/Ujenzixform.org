@@ -9,6 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
 import { ShoppingCart, Plus, Minus, Trash2, CreditCard, QrCode, Receipt, Shield } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { invokeEdgeFunction } from "@/lib/invokeEdgeFunction";
 import { toast } from "sonner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
@@ -241,8 +242,9 @@ const PrivateBuilderDirectPurchase = () => {
 
       // If delivery is required, notify delivery providers
       if (deliveryRequired && deliveryAddress) {
-        try {
-          await supabase.functions.invoke('notify-delivery-providers', {
+        const { error: notifyErr } = await invokeEdgeFunction(
+          'notify-delivery-providers',
+          {
             body: {
               request_type: 'private_purchase',
               request_id: receipt.receipt_id,
@@ -257,9 +259,11 @@ const PrivateBuilderDirectPurchase = () => {
               special_instructions: specialInstructions,
               priority_level: 'normal'
             }
-          });
-        } catch (deliveryError) {
-          console.error('Error notifying delivery providers:', deliveryError);
+          },
+          { request_type: 'private_purchase', request_id: receipt.receipt_id }
+        );
+        if (notifyErr) {
+          console.error('Error notifying delivery providers:', notifyErr);
         }
       }
 

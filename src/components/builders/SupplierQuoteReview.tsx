@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/dialog";
 import { useToast } from '@/hooks/use-toast';
 import { SUPABASE_ANON_KEY, SUPABASE_URL, supabase } from '@/integrations/supabase/client';
+import { invokeEdgeFunction } from '@/lib/invokeEdgeFunction';
 import { DeliveryPromptDialog } from './DeliveryPromptDialog';
 import {
   hasUsableDeliveryCoordinates,
@@ -692,11 +693,10 @@ export const SupplierQuoteReview: React.FC<SupplierQuoteReviewProps> = ({
             const drData = await drRes.json();
             const drId = Array.isArray(drData) ? drData[0]?.id : drData?.id;
             if (drId) {
-              try {
-                await fetch(`${SUPABASE_URL}/functions/v1/notify-delivery-providers`, {
-                  method: 'POST',
-                  headers: { ...headers },
-                  body: JSON.stringify({
+              const { error: notifyErr } = await invokeEdgeFunction(
+                'notify-delivery-providers',
+                {
+                  body: {
                     request_type: 'quote_accepted',
                     request_id: drId,
                     builder_id: effectiveBuilderId,
@@ -709,9 +709,13 @@ export const SupplierQuoteReview: React.FC<SupplierQuoteReviewProps> = ({
                     })),
                     priority_level: 'normal',
                     po_number: purchaseOrderForDelivery.po_number
-                  })
-                });
-              } catch (_) {}
+                  }
+                },
+                { request_type: 'quote_accepted', request_id: drId }
+              );
+              if (notifyErr) {
+                console.warn('notify-delivery-providers failed:', notifyErr);
+              }
             }
           } else {
             console.warn('⚠️ Auto-create delivery_request failed (dialog will allow manual):', await drRes.text());
@@ -804,13 +808,10 @@ export const SupplierQuoteReview: React.FC<SupplierQuoteReviewProps> = ({
       }
 
       if (deliveryRequest) {
-        try {
-          const notifyController = new AbortController();
-          setTimeout(() => notifyController.abort(), 8000);
-          await fetch(`${SUPABASE_URL}/functions/v1/notify-delivery-providers`, {
-            method: 'POST',
-            headers: { ...headers },
-            body: JSON.stringify({
+        const { error: notifyErr } = await invokeEdgeFunction(
+          'notify-delivery-providers',
+          {
+            body: {
               request_type: 'quote_accepted',
               request_id: deliveryRequest.id,
               builder_id: effectiveBuilderId,
@@ -824,12 +825,14 @@ export const SupplierQuoteReview: React.FC<SupplierQuoteReviewProps> = ({
               special_instructions: acceptedPurchaseOrder.special_instructions,
               priority_level: 'normal',
               po_number: acceptedPurchaseOrder.po_number
-            }),
-            signal: notifyController.signal
-          });
+            }
+          },
+          { request_type: 'quote_accepted', request_id: deliveryRequest.id }
+        );
+        if (notifyErr) {
+          console.error('Error notifying delivery providers:', notifyErr);
+        } else {
           console.log('Delivery providers notified successfully');
-        } catch (notifyError) {
-          console.error('Error notifying delivery providers:', notifyError);
         }
       }
 

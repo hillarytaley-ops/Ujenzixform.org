@@ -11,6 +11,7 @@
  */
 
 import { SUPABASE_ANON_KEY, SUPABASE_URL, supabase } from '@/integrations/supabase/client';
+import { invokeEdgeFunction } from '@/lib/invokeEdgeFunction';
 
 export interface TrackingNumberResult {
   trackingNumber: string;
@@ -1557,35 +1558,43 @@ class TrackingNumberService {
       `);
 
       if (notification.builderPhone?.trim()) {
-        try {
-          const { error: smsErr } = await supabase.functions.invoke('send-sms', {
+        const { error: smsErr } = await invokeEdgeFunction(
+          'send-sms',
+          {
             body: {
               to: notification.builderPhone.trim(),
               message: `UjenziXform: Delivery accepted. Track: ${notification.trackingNumber}. Open the app for details.`,
             },
-          });
-          if (smsErr) {
-            console.warn('⚠️ SMS edge function:', smsErr.message);
-          }
-        } catch (e) {
-          console.warn('⚠️ SMS notification failed:', e);
+          },
+          { channel: 'tracking_accept_sms', trackingNumber: notification.trackingNumber }
+        );
+        if (smsErr) {
+          const msg =
+            smsErr && typeof smsErr === 'object' && 'message' in smsErr
+              ? String((smsErr as { message: string }).message)
+              : String(smsErr);
+          console.warn('⚠️ SMS edge function:', msg);
         }
       }
 
       if (notification.builderEmail?.trim()) {
-        try {
-          const { error: emailErr } = await supabase.functions.invoke('send-email', {
+        const { error: emailErr } = await invokeEdgeFunction(
+          'send-email',
+          {
             body: {
               to: notification.builderEmail.trim(),
               subject: 'Delivery assigned — your tracking number',
               html: `<p>Your delivery has been accepted.</p><p>Tracking number: <strong>${notification.trackingNumber}</strong></p><p>Open UjenziXform for live updates.</p>`,
             },
-          });
-          if (emailErr) {
-            console.warn('⚠️ Email edge function:', emailErr.message);
-          }
-        } catch (e) {
-          console.warn('⚠️ Email notification failed:', e);
+          },
+          { channel: 'tracking_accept_email', trackingNumber: notification.trackingNumber }
+        );
+        if (emailErr) {
+          const msg =
+            emailErr && typeof emailErr === 'object' && 'message' in emailErr
+              ? String((emailErr as { message: string }).message)
+              : String(emailErr);
+          console.warn('⚠️ Email edge function:', msg);
         }
       }
 

@@ -6,6 +6,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { invokeEdgeFunction } from '@/lib/invokeEdgeFunction';
 import { DeliveryPromptDialog } from './DeliveryPromptDialog';
 import {
   hasUsableDeliveryCoordinates,
@@ -108,8 +109,9 @@ export const QuoteComparison: React.FC<QuoteComparisonProps> = ({ orderId, build
       }
 
       if (deliveryRequest) {
-        try {
-          await supabase.functions.invoke('notify-delivery-providers', {
+        const { error: notifyErr } = await invokeEdgeFunction(
+          'notify-delivery-providers',
+          {
             body: {
               request_type: 'quote_accepted',
               request_id: deliveryRequest.id,
@@ -124,10 +126,13 @@ export const QuoteComparison: React.FC<QuoteComparisonProps> = ({ orderId, build
               priority_level: 'normal',
               po_number: acceptedPurchaseOrder.po_number
             }
-          });
+          },
+          { request_type: 'quote_accepted', request_id: deliveryRequest.id }
+        );
+        if (notifyErr) {
+          console.error('Error notifying delivery providers:', notifyErr);
+        } else {
           console.log('Delivery providers notified successfully');
-        } catch (notifyError) {
-          console.error('Error notifying delivery providers:', notifyError);
         }
       }
 

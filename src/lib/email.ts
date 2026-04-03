@@ -19,6 +19,7 @@
  */
 
 import { supabase } from '@/integrations/supabase/client';
+import { invokeEdgeFunction } from '@/lib/invokeEdgeFunction';
 
 // Email templates for different notifications
 export const emailTemplates = {
@@ -371,17 +372,21 @@ export const sendEmailViaEdgeFunction = async (params: SendEmailParams): Promise
       }
     }
 
-    const { error } = await supabase.functions.invoke('send-email', { body: params });
+    const { error } = await invokeEdgeFunction(
+      'send-email',
+      { body: params },
+      { hasRecipient: !!params.to }
+    );
     if (error) {
-      const { reportEdgeFunctionFailure } = await import('@/lib/edgeFunctionTelemetry');
-      reportEdgeFunctionFailure('send-email', error, { hasRecipient: !!params.to });
-      return { success: false, error: error.message };
+      const msg =
+        error && typeof error === 'object' && 'message' in error
+          ? String((error as { message: string }).message)
+          : 'send-email failed';
+      return { success: false, error: msg };
     }
     return { success: true };
   } catch (error) {
     console.error('Email sending error:', error);
-    const { reportEdgeFunctionFailure } = await import('@/lib/edgeFunctionTelemetry');
-    reportEdgeFunctionFailure('send-email', error);
     return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
   }
 };

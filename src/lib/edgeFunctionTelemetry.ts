@@ -1,6 +1,6 @@
 /**
- * Central place to report Edge Function failures to Sentry (and keep console/toast at call sites).
- * Phase 2: migrate each `supabase.functions.invoke(...)` to use a small wrapper that calls this on error.
+ * Reports Edge Function failures to Sentry. Prefer `invokeEdgeFunction` from `./invokeEdgeFunction`
+ * so invoke + telemetry stay in one place.
  */
 import { captureError, captureMessage } from '@/lib/sentry';
 

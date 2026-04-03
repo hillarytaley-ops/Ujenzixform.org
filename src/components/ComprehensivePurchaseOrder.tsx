@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { FileText, Calendar, Plus, Trash2, Send } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { invokeEdgeFunction } from "@/lib/invokeEdgeFunction";
 
 interface PurchaseOrderItem {
   id: string;
@@ -185,8 +186,9 @@ const ComprehensivePurchaseOrder = () => {
       
       // If delivery is required, notify delivery providers
       if (deliveryRequired && deliveryAddress) {
-        try {
-          await supabase.functions.invoke('notify-delivery-providers', {
+        const { error: notifyErr } = await invokeEdgeFunction(
+          'notify-delivery-providers',
+          {
             body: {
               request_type: 'purchase_order',
               request_id: poData.id,
@@ -200,12 +202,14 @@ const ComprehensivePurchaseOrder = () => {
               special_instructions: specialInstructions,
               priority_level: 'normal'
             }
-          });
-          
-          toast.success("Purchase order created and delivery providers notified");
-        } catch (deliveryError) {
-          console.error('Error notifying delivery providers:', deliveryError);
+          },
+          { request_type: 'purchase_order', request_id: poData.id }
+        );
+        if (notifyErr) {
+          console.error('Error notifying delivery providers:', notifyErr);
           toast.success("Purchase order created successfully");
+        } else {
+          toast.success("Purchase order created and delivery providers notified");
         }
       } else {
         toast.success("Purchase order created and sent to supplier for confirmation");
