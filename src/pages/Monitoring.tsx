@@ -52,8 +52,9 @@ import { DeliveryRouteTracker } from '@/components/delivery/DeliveryRouteTracker
 import { CameraAccessRequest } from '@/components/builders/CameraAccessRequest';
 import { MonitoringServiceRequest } from '@/components/builders/MonitoringServiceRequest';
 import { CameraRemoteCapabilitiesPanel } from '@/components/monitoring/CameraRemoteCapabilitiesPanel';
+import { HlsVideoPlayer } from '@/components/monitoring/HlsVideoPlayer';
 import { cn } from '@/lib/utils';
-import { shouldUseSharePageHintInsteadOfVideoTag } from '@/utils/cameraStreamUrlHints';
+import { isHlsPlaylistUrl, shouldUseSharePageHintInsteadOfVideoTag } from '@/utils/cameraStreamUrlHints';
 
 interface CameraFeed {
   id: string;
@@ -162,7 +163,8 @@ function StreamPlaybackHelp({ rawUrl }: { rawUrl: string }) {
       </p>
       <p className="text-slate-400 text-xs leading-relaxed mb-4">
         Many camera “share” pages (GoPro, vendor portals, etc.) are <strong>websites</strong>, not video files. Use a
-        direct <strong>.mp4</strong> / <strong>.webm</strong> URL, an <strong>HLS (.m3u8)</strong> stream where supported,
+        direct <strong>.mp4</strong> / <strong>.webm</strong> URL, an <strong>HLS (.m3u8)</strong> playlist (Chrome/Firefox use
+        hls.js; Safari uses native HLS — origin must allow CORS),
         a <strong>YouTube or Vimeo</strong> page link, or paste your vendor’s <strong>iframe embed</strong> HTML in the
         admin embed field. <strong>RTSP</strong> needs a gateway (convert to HLS/WebRTC). See project doc{' '}
         <span className="text-slate-300">MONITORING_AND_VISION_STATUS.md</span>.
@@ -229,6 +231,17 @@ function MonitoringLiveMedia({
     !youtubeOrVimeoEmbedUrl(rawUrl)
   ) {
     return <StreamPlaybackHelp rawUrl={rawUrl} />;
+  }
+
+  if (isHlsPlaylistUrl(rawUrl)) {
+    if (hlsFailed) {
+      return <StreamPlaybackHelp rawUrl={rawUrl} />;
+    }
+    return (
+      <div className={cn(shell, 'items-center justify-center')}>
+        <HlsVideoPlayer src={rawUrl} onFatalError={() => setHlsFailed(true)} />
+      </div>
+    );
   }
 
   if (videoFailed) {

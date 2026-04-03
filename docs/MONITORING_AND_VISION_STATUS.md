@@ -16,8 +16,9 @@ Single reference for what **exists today** vs **planned / future**. Aligns engin
 
 | Area | Status | Notes |
 |------|--------|--------|
-| **Share / gallery URLs (GoPro Quik web, etc.)** | **Not playable as `<video src>`** | These are **HTML pages**, not media URLs. The Monitoring player detects many such patterns and shows guidance **without** waiting for `error` events. Use **direct** `.mp4` / `.webm`, **HLS** where the browser supports it (or add `hls.js` later), **YouTube/Vimeo** page links (we rewrite to embed), or **iframe embed HTML** in admin. |
-| **RTSP / RTSPS** | **Not in-browser** | Browsers cannot play RTSP natively. Needs **transmux** (e.g. FFmpeg → HLS/WebRTC) or a vendor gateway. |
+| **Share / gallery URLs (GoPro Quik web, etc.)** | **Not playable as `<video src>`** | These are **HTML pages**, not media URLs. The Monitoring player detects many such patterns and shows guidance **without** waiting for `error` events. Use **direct** `.mp4` / `.webm`, **YouTube/Vimeo** page links (we rewrite to embed), or **iframe embed HTML** in admin. |
+| **HLS (.m3u8) in browser** | **Shipped** | Monitoring uses **`hls.js`** (Chrome/Firefox/Edge) + **native HLS** (Safari) when the URL looks like an HLS playlist. Origin must send **CORS** headers for segment fetches. |
+| **RTSP / RTSPS** | **Not in-browser** | Browsers cannot play RTSP natively. Needs **transmux** (e.g. FFmpeg / MediaMTX → **HLS** or **WebRTC**) or a vendor gateway; then use the HLS URL in Monitoring. |
 | **Secure URL fetch** | **Shipped** | `get_camera_stream_secure` RPC; optional **`camera-stream-url`** Edge Function + `VITE_CAMERA_STREAM_VIA_EDGE=true`. See `docs/EDGE_THROTTLING_AND_STREAM_RELAY.md`. |
 
 ## Monitoring hardening
@@ -43,6 +44,7 @@ Single reference for what **exists today** vs **planned / future**. Aligns engin
 
 ## Related docs
 
+- `docs/SITE_VISION_ADVANCED_INTEGRATION.md` — Custom CV, RTSP→HLS, relay, signed ingest (roadmap).
 - `docs/EDGE_THROTTLING_AND_STREAM_RELAY.md` — Edge functions, stream URL, throttling.
 - `docs/OPS_RUNBOOK.md` — Playable stream expectations, deploy checklist.
 - `workers/site-vision/README.md` — Worker env vars, YOLO, motion.

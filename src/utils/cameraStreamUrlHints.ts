@@ -3,6 +3,18 @@
  * Browsers only play a subset of URLs in <video src>; share pages and RTSP are common pitfalls.
  */
 
+/** True when URL should be played with hls.js (or Safari native HLS), not a plain progressive file. */
+export function isHlsPlaylistUrl(url: string): boolean {
+  const u = url.trim().toLowerCase();
+  if (u.includes('.m3u8')) return true;
+  try {
+    const p = new URL(url.trim());
+    return p.pathname.endsWith('.m3u8') || p.pathname.endsWith('/playlist.m3u8');
+  } catch {
+    return false;
+  }
+}
+
 export function shouldUseSharePageHintInsteadOfVideoTag(url: string): boolean {
   const trimmed = url.trim();
   if (!trimmed) return true;
