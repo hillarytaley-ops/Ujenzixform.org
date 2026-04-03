@@ -4,6 +4,8 @@ Pulls **active** cameras from Supabase (`cameras` with `stream_url` set), sample
 
 The UjenziXform app reads that table on **Analytics → Site vision** (no service key in the browser).
 
+**Product status (streams, hardening, PTZ, admin JWT):** [`docs/MONITORING_AND_VISION_STATUS.md`](../docs/MONITORING_AND_VISION_STATUS.md).
+
 **Plain-language downloads (paragraph format, `.txt`):**
 
 - [`SITE_VISION_WORKER_LAYMANS_GUIDE.txt`](./SITE_VISION_WORKER_LAYMANS_GUIDE.txt) — what the worker does and how to run it.

@@ -53,6 +53,7 @@ import { CameraAccessRequest } from '@/components/builders/CameraAccessRequest';
 import { MonitoringServiceRequest } from '@/components/builders/MonitoringServiceRequest';
 import { CameraRemoteCapabilitiesPanel } from '@/components/monitoring/CameraRemoteCapabilitiesPanel';
 import { cn } from '@/lib/utils';
+import { shouldUseSharePageHintInsteadOfVideoTag } from '@/utils/cameraStreamUrlHints';
 
 interface CameraFeed {
   id: string;
@@ -153,6 +154,28 @@ function youtubeOrVimeoEmbedUrl(pageUrl: string): string | null {
   return null;
 }
 
+function StreamPlaybackHelp({ rawUrl }: { rawUrl: string }) {
+  return (
+    <div className="max-w-lg mx-auto text-center p-6 rounded-lg bg-slate-900/95 border border-amber-500/40">
+      <p className="text-amber-100 text-sm font-medium mb-2">
+        This link is not playing as a direct video in your browser.
+      </p>
+      <p className="text-slate-400 text-xs leading-relaxed mb-4">
+        Many camera “share” pages (GoPro, vendor portals, etc.) are <strong>websites</strong>, not video files. Use a
+        direct <strong>.mp4</strong> / <strong>.webm</strong> URL, an <strong>HLS (.m3u8)</strong> stream where supported,
+        a <strong>YouTube or Vimeo</strong> page link, or paste your vendor’s <strong>iframe embed</strong> HTML in the
+        admin embed field. <strong>RTSP</strong> needs a gateway (convert to HLS/WebRTC). See project doc{' '}
+        <span className="text-slate-300">MONITORING_AND_VISION_STATUS.md</span>.
+      </p>
+      <Button variant="outline" size="sm" asChild className="text-slate-200 border-slate-600">
+        <a href={rawUrl} target="_blank" rel="noopener noreferrer">
+          Open link in new tab
+        </a>
+      </Button>
+    </div>
+  );
+}
+
 function MonitoringLiveMedia({
   feed,
   variant,
@@ -201,25 +224,15 @@ function MonitoringLiveMedia({
     );
   }
 
+  if (
+    shouldUseSharePageHintInsteadOfVideoTag(rawUrl) &&
+    !youtubeOrVimeoEmbedUrl(rawUrl)
+  ) {
+    return <StreamPlaybackHelp rawUrl={rawUrl} />;
+  }
+
   if (videoFailed) {
-    return (
-      <div className="max-w-lg mx-auto text-center p-6 rounded-lg bg-slate-900/95 border border-amber-500/40">
-        <p className="text-amber-100 text-sm font-medium mb-2">
-          This link is not playing as a direct video in your browser.
-        </p>
-        <p className="text-slate-400 text-xs leading-relaxed mb-4">
-          Many camera “share” pages (GoPro, vendor portals, etc.) are <strong>websites</strong>, not video files. Use a
-          direct <strong>.mp4</strong> / <strong>.webm</strong> URL, an <strong>HLS (.m3u8)</strong> stream where supported,
-          a <strong>YouTube or Vimeo</strong> page link, or paste your vendor’s <strong>iframe embed</strong> HTML in the
-          admin embed field.
-        </p>
-        <Button variant="outline" size="sm" asChild className="text-slate-200 border-slate-600">
-          <a href={rawUrl} target="_blank" rel="noopener noreferrer">
-            Open link in new tab
-          </a>
-        </Button>
-      </div>
-    );
+    return <StreamPlaybackHelp rawUrl={rawUrl} />;
   }
 
   return (

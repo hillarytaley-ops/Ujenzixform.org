@@ -4301,6 +4301,29 @@ const AdminDashboard = () => {
               </AlertDescription>
             </Alert>
 
+            <Alert className="bg-slate-900/40 border-slate-600/50">
+              <Lock className="h-4 w-4 text-slate-300" />
+              <AlertTitle className="text-slate-100">One clear admin sign-in story</AlertTitle>
+              <AlertDescription className="text-slate-300/90 text-sm space-y-2">
+                <p>
+                  Material Analytics and site vision tabs query Supabase with the <strong>current session</strong>. If you
+                  use the <strong>staff Admin Login</strong> (localStorage session only) without a Supabase JWT, live rows
+                  can be empty while the dashboard shell still opens.
+                </p>
+                <p>
+                  For a single story aligned with RLS everywhere, sign in as admin via{' '}
+                  <Link to="/auth" className="underline font-medium text-white">
+                    main auth
+                  </Link>{' '}
+                  or set <code className="text-xs bg-slate-800 px-1 rounded">VITE_REQUIRE_SUPABASE_SESSION_FOR_ADMIN=true</code>{' '}
+                  so the admin shell requires a JWT (see <code className="text-xs bg-slate-800 px-1">vite-env.d.ts</code>).
+                </p>
+                <p className="text-xs text-slate-400">
+                  Full matrix: <code className="bg-slate-800 px-1">docs/MONITORING_AND_VISION_STATUS.md</code>
+                </p>
+              </AlertDescription>
+            </Alert>
+
             {/* Mock preview stats (local demo only) */}
             <div className="grid md:grid-cols-3 lg:grid-cols-6 gap-4">
               <Card className="bg-gradient-to-br from-pink-900/40 to-pink-800/20 border-pink-700/50">

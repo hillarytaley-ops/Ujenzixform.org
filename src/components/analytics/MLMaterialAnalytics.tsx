@@ -67,6 +67,8 @@ interface SiteVisionEvent {
   title: string;
   detail: string;
   confidence: number;
+  /** Set when worker stores a public/signed image URL in payload */
+  thumbnailUrl?: string | null;
 }
 
 interface CameraRow {
@@ -180,6 +182,18 @@ function buildSiteVisionEvents(
 
 type VisionDisplayMode = 'live_db' | 'empty_cameras' | 'demo';
 
+function extractVisionThumbnailUrl(p: Record<string, unknown>): string | null {
+  const keys = ['thumbnail_url', 'snapshot_url', 'image_url', 'frame_url', 'thumb_url'] as const;
+  for (const k of keys) {
+    const v = p[k];
+    if (typeof v === 'string') {
+      const t = v.trim();
+      if (t.startsWith('http://') || t.startsWith('https://')) return t;
+    }
+  }
+  return null;
+}
+
 function mapDbEventTypeToVisionKind(eventType: string): VisionEventKind {
   const t = eventType.toLowerCase().replace(/_/g, '');
   if (/(vehicle|truck|car|bus)/.test(t)) return 'vehicle';
@@ -218,6 +232,7 @@ function mapDbRowToSiteVisionEvent(row: {
     title: row.label || row.event_type.replace(/_/g, ' '),
     detail,
     confidence: row.confidence != null ? Number(row.confidence) : 75,
+    thumbnailUrl: extractVisionThumbnailUrl(p),
   };
 }
 
@@ -657,7 +672,9 @@ export const MLMaterialAnalytics: React.FC<MaterialAnalytics> = ({ projectId, us
               <AlertTitle className="text-green-900">Live vision data</AlertTitle>
               <AlertDescription className="text-green-900/90">
                 Events below are loaded from <code className="text-xs bg-white/80 px-1 rounded">site_vision_events</code>{' '}
-                (edge or cloud worker). Open Monitoring for raw video to verify alerts.
+                (edge or cloud worker). Open Monitoring for raw video to verify alerts. Preview thumbnails appear when
+                the worker includes <code className="text-xs bg-white/80 px-1 rounded">thumbnail_url</code> (or
+                snapshot/image URL fields) in each row&apos;s <code className="text-xs bg-white/80 px-1 rounded">payload</code>.
               </AlertDescription>
             </Alert>
           )}
@@ -822,6 +839,7 @@ export const MLMaterialAnalytics: React.FC<MaterialAnalytics> = ({ projectId, us
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b text-left text-muted-foreground">
+                    <th className="py-2 pr-3 font-medium w-[88px]">Preview</th>
                     <th className="py-2 pr-4 font-medium">Time</th>
                     <th className="py-2 pr-4 font-medium">Camera</th>
                     <th className="py-2 pr-4 font-medium">Type</th>
@@ -832,6 +850,30 @@ export const MLMaterialAnalytics: React.FC<MaterialAnalytics> = ({ projectId, us
                 <tbody>
                   {visionBlock.events.slice(0, 25).map((e) => (
                     <tr key={e.id} className="border-b border-border/60">
+                      <td className="py-2 pr-3 align-top">
+                        {e.thumbnailUrl ? (
+                          <a
+                            href={e.thumbnailUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="block w-[72px] h-[54px] rounded-md overflow-hidden border border-border bg-muted shrink-0"
+                          >
+                            <img
+                              src={e.thumbnailUrl}
+                              alt=""
+                              className="w-full h-full object-cover"
+                              loading="lazy"
+                            />
+                          </a>
+                        ) : (
+                          <div
+                            className="w-[72px] h-[54px] rounded-md border border-dashed border-muted-foreground/30 bg-muted/40 flex items-center justify-center text-[10px] text-muted-foreground text-center leading-tight px-1"
+                            title="Worker did not attach an image URL for this event"
+                          >
+                            No frame
+                          </div>
+                        )}
+                      </td>
                       <td className="py-2 pr-4 whitespace-nowrap">
                         {new Date(e.at).toLocaleString(undefined, {
                           month: 'short',
