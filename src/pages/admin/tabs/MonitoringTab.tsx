@@ -48,10 +48,13 @@ import {
   Radio,
   HelpCircle,
   Mic,
+  Sun,
 } from 'lucide-react';
 import { CameraRecord, CameraFormData, CameraConnectionType } from '../types';
 import { StatsCard, StatsGrid } from '../components/StatsCard';
 import { CameraPermissionGuide, CameraSetupBanner } from '@/components/camera/CameraPermissionGuide';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { DOCS_CAMERAS_HIKVISION, DOCS_MONITORING_STREAMING_STEPS } from '@/config/docsLinks';
 import { CameraGridSkeleton } from '@/components/ui/loading-skeleton';
 import { FriendlyError } from '@/components/ui/friendly-error';
 import { DataTable, StatusBadge, Column, RowAction } from '../components/DataTable';
@@ -102,6 +105,13 @@ const connectionTypes: {
     label: 'Mobile Phone',
     icon: Smartphone,
     description: 'Use your phone as a camera with IP Webcam app',
+    fields: ['stream_url'],
+  },
+  {
+    value: 'vendor_cellular',
+    label: 'Solar / 4G IP',
+    icon: Sun,
+    description: 'Cellular or solar IP camera (e.g. Hikvision): HLS/HTTPS URL or vendor embed',
     fields: ['stream_url'],
   },
 ];
@@ -922,6 +932,7 @@ const CameraModal: React.FC<CameraModalProps> = ({
                     <SelectItem value="bullet">Bullet Camera</SelectItem>
                     <SelectItem value="thermal">Thermal Camera</SelectItem>
                     <SelectItem value="360">360° Camera</SelectItem>
+                    <SelectItem value="solar_4g">Solar / 4G IP</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -952,7 +963,7 @@ const CameraModal: React.FC<CameraModalProps> = ({
               <Globe className="h-4 w-4" />
               Connection Type
             </h3>
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
               {connectionTypes.map((type) => (
                 <button
                   key={type.value}
@@ -994,13 +1005,19 @@ const CameraModal: React.FC<CameraModalProps> = ({
             {requiredFields.includes('stream_url') && (
               <div>
                 <Label className="text-gray-300">
-                  {formData.connection_type === 'mobile' ? 'IP Webcam URL' : 'Camera URL'}
+                  {formData.connection_type === 'mobile'
+                    ? 'IP Webcam URL'
+                    : formData.connection_type === 'vendor_cellular'
+                      ? 'Stream URL (HTTPS / HLS)'
+                      : 'Camera URL'}
                 </Label>
                 <Input
                   placeholder={
-                    formData.connection_type === 'mobile' 
-                      ? 'http://192.168.1.100:8080/video' 
-                      : 'https://camera.example.com/stream'
+                    formData.connection_type === 'mobile'
+                      ? 'http://192.168.1.100:8080/video'
+                      : formData.connection_type === 'vendor_cellular'
+                        ? 'https://your-relay.example.com/hls/site/index.m3u8'
+                        : 'https://camera.example.com/stream'
                   }
                   className="bg-slate-800 border-slate-700 text-white mt-1"
                   value={formData.stream_url}
@@ -1009,7 +1026,42 @@ const CameraModal: React.FC<CameraModalProps> = ({
                 <p className="text-xs text-gray-500 mt-1">
                   {formData.connection_type === 'mobile' && 'Get this URL from your IP Webcam app'}
                   {formData.connection_type === 'url' && 'Paste the link to your camera viewer or stream'}
+                  {formData.connection_type === 'vendor_cellular' &&
+                    'Use an HLS (.m3u8) or direct HTTPS video URL — not rtsp:// (browsers cannot play RTSP). For vendor iframe viewers, switch to Embed code.'}
                 </p>
+                {formData.connection_type === 'vendor_cellular' && (
+                  <Alert className="mt-3 border-cyan-500/40 bg-slate-900/80 text-slate-200 [&>svg]:text-cyan-400">
+                    <Sun className="h-4 w-4" />
+                    <AlertTitle className="text-cyan-100 text-sm">Hikvision-style solar / 4G kits</AlertTitle>
+                    <AlertDescription className="text-xs text-slate-400 leading-relaxed space-y-2">
+                      <p>
+                        UjenziXform Monitoring matches what works in a normal browser: HLS, HTTPS video, YouTube/Vimeo, or
+                        pasted iframe embed. Raw camera RTSP belongs behind MediaMTX or your vendor relay.
+                      </p>
+                      <div className="flex flex-wrap gap-2 pt-1">
+                        <a
+                          href={DOCS_CAMERAS_HIKVISION}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 text-cyan-400 hover:underline"
+                        >
+                          <ExternalLink className="h-3 w-3" />
+                          Hikvision / 4G checklist
+                        </a>
+                        <span className="text-slate-600">·</span>
+                        <a
+                          href={DOCS_MONITORING_STREAMING_STEPS}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 text-cyan-400 hover:underline"
+                        >
+                          <ExternalLink className="h-3 w-3" />
+                          Streaming implementation steps
+                        </a>
+                      </div>
+                    </AlertDescription>
+                  </Alert>
+                )}
               </div>
             )}
 
@@ -1077,7 +1129,17 @@ const CameraModal: React.FC<CameraModalProps> = ({
                   onChange={(e) => setFormData((prev) => ({ ...prev, embed_code: e.target.value }))}
                 />
                 <p className="text-xs text-gray-500 mt-1">
-                  Paste the embed code provided by your camera system or cloud service
+                  Paste the embed code provided by your camera system or cloud service (e.g. Hik-Connect / vendor iframe).
+                  See{' '}
+                  <a
+                    href={DOCS_CAMERAS_HIKVISION}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-cyan-400 hover:underline"
+                  >
+                    Hikvision / 4G notes
+                  </a>
+                  .
                 </p>
               </div>
             )}

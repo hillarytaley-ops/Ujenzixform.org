@@ -15,6 +15,15 @@ import {
   PaginationState,
 } from '../types';
 
+/** Non-empty JSONB credentials for cameras.ip-style connections */
+function credentialsPayloadFromForm(d: Partial<CameraFormData>): Record<string, unknown> | undefined {
+  const o: Record<string, unknown> = {};
+  if (d.username?.trim()) o.username = d.username.trim();
+  if (d.password !== undefined && String(d.password).length > 0) o.password = d.password;
+  if (d.port !== undefined && d.port !== null && !Number.isNaN(Number(d.port))) o.port = d.port;
+  return Object.keys(o).length > 0 ? o : undefined;
+}
+
 // Hook for fetching dashboard statistics
 export const useAdminStats = () => {
   const [stats, setStats] = useState<DashboardStats>({
@@ -428,8 +437,18 @@ export const useCameras = () => {
           project_id,
           stream_url,
           is_active,
+          connection_type,
+          embed_code,
+          camera_type,
+          ip_address,
+          credentials,
+          resolution,
+          fps,
+          recording_enabled,
+          motion_detection,
           supports_ptz,
           supports_two_way_audio,
+          last_connected,
           created_at,
           updated_at,
           projects:project_id (name)
@@ -438,30 +457,37 @@ export const useCameras = () => {
 
       if (error) throw error;
 
-      const formattedCameras: CameraRecord[] = (data || []).map((cam: Record<string, unknown>) => ({
-        id: cam.id as string,
-        name: (cam.name as string) || 'Unnamed Camera',
-        location: cam.location as string | null,
-        project_id: cam.project_id as string | null,
-        project_name: (cam.projects as { name: string } | null)?.name || undefined,
-        stream_url: cam.stream_url as string | null,
-        is_active: (cam.is_active as boolean) ?? true,
-        camera_type: 'ip', // Default value - column doesn't exist in DB yet
-        connection_type: 'url', // Default value - column doesn't exist in DB yet
-        ip_address: null,
-        credentials: null,
-        embed_code: null,
-        resolution: null,
-        fps: null,
-        recording_enabled: false,
-        motion_detection: false,
-        supports_ptz: (cam.supports_ptz as boolean) ?? false,
-        supports_two_way_audio: (cam.supports_two_way_audio as boolean) ?? false,
-        status: (cam.is_active as boolean) ? 'online' : 'offline',
-        last_connected: null,
-        created_at: cam.created_at as string,
-        updated_at: cam.updated_at as string,
-      }));
+      const formattedCameras: CameraRecord[] = (data || []).map((cam: Record<string, unknown>) => {
+        const credsRaw = cam.credentials;
+        const credentials =
+          credsRaw && typeof credsRaw === 'object' && !Array.isArray(credsRaw)
+            ? (credsRaw as CameraRecord['credentials'])
+            : null;
+        return {
+          id: cam.id as string,
+          name: (cam.name as string) || 'Unnamed Camera',
+          location: cam.location as string | null,
+          project_id: cam.project_id as string | null,
+          project_name: (cam.projects as { name: string } | null)?.name || undefined,
+          stream_url: cam.stream_url as string | null,
+          is_active: (cam.is_active as boolean) ?? true,
+          camera_type: (cam.camera_type as string) || 'ip',
+          connection_type: (cam.connection_type as CameraRecord['connection_type']) || 'url',
+          ip_address: (cam.ip_address as string | null) ?? null,
+          credentials,
+          embed_code: (cam.embed_code as string | null) ?? null,
+          resolution: (cam.resolution as string | null) ?? null,
+          fps: (cam.fps as number | null) ?? null,
+          recording_enabled: (cam.recording_enabled as boolean) ?? false,
+          motion_detection: (cam.motion_detection as boolean) ?? false,
+          supports_ptz: (cam.supports_ptz as boolean) ?? false,
+          supports_two_way_audio: (cam.supports_two_way_audio as boolean) ?? false,
+          status: cam.is_active ? 'online' : 'offline',
+          last_connected: (cam.last_connected as string | null) ?? null,
+          created_at: cam.created_at as string,
+          updated_at: cam.updated_at as string,
+        };
+      });
 
       setCameras(formattedCameras);
     } catch (error) {
@@ -481,16 +507,27 @@ export const useCameras = () => {
     try {
       const client = supabase;
 
-      const { error } = await client
-        .from('cameras')
-        .insert({
-          name: cameraData.name,
-          location: cameraData.location || null,
-          stream_url: cameraData.stream_url || null,
-          is_active: cameraData.is_active ?? true,
-          supports_ptz: cameraData.supports_ptz ?? false,
-          supports_two_way_audio: cameraData.supports_two_way_audio ?? false,
-        });
+      const streamUrl = cameraData.stream_url?.trim() ? cameraData.stream_url.trim() : null;
+      const embedCode = cameraData.embed_code?.trim() ? cameraData.embed_code.trim() : null;
+      const insertPayload: Record<string, unknown> = {
+        name: cameraData.name,
+        location: cameraData.location || null,
+        stream_url: streamUrl,
+        is_active: cameraData.is_active ?? true,
+        supports_ptz: cameraData.supports_ptz ?? false,
+        supports_two_way_audio: cameraData.supports_two_way_audio ?? false,
+        connection_type: cameraData.connection_type || 'url',
+        camera_type: cameraData.camera_type || 'ip',
+        embed_code: embedCode,
+        resolution: cameraData.resolution || null,
+        recording_enabled: cameraData.recording_enabled ?? false,
+        motion_detection: cameraData.motion_detection ?? false,
+        ip_address: cameraData.ip_address?.trim() || null,
+      };
+      const creds = credentialsPayloadFromForm(cameraData);
+      if (creds) insertPayload.credentials = creds;
+
+      const { error } = await client.from('cameras').insert(insertPayload);
 
       if (error) throw error;
 
@@ -523,11 +560,23 @@ export const useCameras = () => {
       // Only include columns that exist in the database
       if (cameraData.name !== undefined) updateData.name = cameraData.name;
       if (cameraData.location !== undefined) updateData.location = cameraData.location || null;
-      if (cameraData.stream_url !== undefined) updateData.stream_url = cameraData.stream_url || null;
+      if (cameraData.stream_url !== undefined) {
+        updateData.stream_url = cameraData.stream_url?.trim() ? cameraData.stream_url.trim() : null;
+      }
       if (cameraData.is_active !== undefined) updateData.is_active = cameraData.is_active;
       if (cameraData.supports_ptz !== undefined) updateData.supports_ptz = cameraData.supports_ptz;
       if (cameraData.supports_two_way_audio !== undefined)
         updateData.supports_two_way_audio = cameraData.supports_two_way_audio;
+      if (cameraData.connection_type !== undefined) updateData.connection_type = cameraData.connection_type;
+      if (cameraData.camera_type !== undefined) updateData.camera_type = cameraData.camera_type;
+      if (cameraData.embed_code !== undefined) {
+        updateData.embed_code = cameraData.embed_code?.trim() ? cameraData.embed_code.trim() : null;
+      }
+      if (cameraData.resolution !== undefined) updateData.resolution = cameraData.resolution || null;
+      if (cameraData.recording_enabled !== undefined) updateData.recording_enabled = cameraData.recording_enabled;
+      if (cameraData.motion_detection !== undefined) updateData.motion_detection = cameraData.motion_detection;
+      if (cameraData.ip_address !== undefined) updateData.ip_address = cameraData.ip_address?.trim() || null;
+      // Do not PATCH credentials here: the form often omits password on edit, which would wipe stored JSONB.
 
       const { error } = await client
         .from('cameras')

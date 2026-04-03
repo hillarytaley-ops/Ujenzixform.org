@@ -217,15 +217,16 @@ export interface TrackingUpdate {
 // Camera Record
 // Camera Connection Types
 export type CameraConnectionType = 
-  | 'url'           // Simple URL link (current behavior)
-  | 'rtsp'          // RTSP stream (rtsp://...)
-  | 'hls'           // HLS stream (.m3u8)
-  | 'webrtc'        // WebRTC peer connection
-  | 'ip_camera'     // Direct IP camera with credentials
-  | 'onvif'         // ONVIF protocol
-  | 'embedded'      // Embedded iframe viewer
-  | 'usb'           // Local USB camera
-  | 'mobile';       // Mobile device camera (phone/tablet)
+  | 'url'               // Simple URL link (current behavior)
+  | 'rtsp'              // RTSP stream (rtsp://...)
+  | 'hls'               // HLS stream (.m3u8)
+  | 'webrtc'            // WebRTC peer connection
+  | 'ip_camera'         // Direct IP camera with credentials
+  | 'onvif'             // ONVIF protocol
+  | 'embedded'          // Embedded iframe viewer
+  | 'usb'               // Local USB camera
+  | 'mobile'            // Mobile device camera (phone/tablet)
+  | 'vendor_cellular';  // Solar / 4G IP kits (Hikvision-style): HLS/HTTPS or embed, not rtsp:// in browser
 
 export interface CameraCredentials {
   username?: string;

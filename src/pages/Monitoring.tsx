@@ -60,6 +60,7 @@ import {
   shouldUseSharePageHintInsteadOfVideoTag,
 } from '@/utils/cameraStreamUrlHints';
 import {
+  DOCS_CAMERAS_HIKVISION,
   DOCS_INFRA_VENDOR_ML_BOUNDARIES,
   DOCS_MEDIAMTX_RTSP_TO_HLS,
   DOCS_MONITORING_STREAMING_STEPS,
@@ -213,6 +214,11 @@ function StreamPlaybackHelp({
           <Button variant="outline" size="sm" asChild className="text-slate-200 border-slate-600">
             <a href={DOCS_INFRA_VENDOR_ML_BOUNDARIES} target="_blank" rel="noopener noreferrer">
               HLS relay &amp; remote viewing
+            </a>
+          </Button>
+          <Button variant="outline" size="sm" asChild className="text-slate-200 border-slate-600">
+            <a href={DOCS_CAMERAS_HIKVISION} target="_blank" rel="noopener noreferrer">
+              Hikvision / solar 4G kits
             </a>
           </Button>
           <Button variant="ghost" size="sm" asChild className="text-slate-500">
