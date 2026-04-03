@@ -18,6 +18,7 @@ import {
   Truck,
   Package,
   ClipboardList,
+  ExternalLink,
 } from 'lucide-react';
 import { DashboardStats, RegistrationRecord, AppPage } from '../types';
 import { StatsCard, StatsGrid } from '../components/StatsCard';
@@ -93,17 +94,21 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
               <Activity className="h-5 w-5 text-blue-500" />
               Recent Activity
             </CardTitle>
+            <p className="text-sm text-gray-500">
+              Includes suppliers, builders, and delivery rows from registration tables. Use{' '}
+              <span className="text-gray-400">Open</span> to jump to User Registrations for full forms and documents.
+            </p>
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
               {registrations.slice(0, 6).map((reg) => (
                 <div
-                  key={reg.id}
-                  className="flex items-center justify-between p-3 bg-slate-800/50 rounded-lg"
+                  key={`${reg.type}-${reg.id}`}
+                  className="flex items-center justify-between gap-2 p-3 bg-slate-800/50 rounded-lg"
                 >
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-3 min-w-0 flex-1">
                     <div
-                      className={`w-2 h-2 rounded-full ${
+                      className={`w-2 h-2 rounded-full shrink-0 ${
                         reg.status === 'approved'
                           ? 'bg-green-500'
                           : reg.status === 'rejected'
@@ -111,15 +116,27 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
                           : 'bg-yellow-500'
                       }`}
                     ></div>
-                    <div>
-                      <p className="text-sm text-white">{reg.name}</p>
+                    <div className="min-w-0">
+                      <p className="text-sm text-white truncate">{reg.name}</p>
                       <p className="text-xs text-gray-400">
                         {reg.type} registration •{' '}
                         {new Date(reg.created_at).toLocaleDateString()}
                       </p>
                     </div>
                   </div>
-                  {getStatusBadge(reg.status)}
+                  <div className="flex items-center gap-2 shrink-0">
+                    {getStatusBadge(reg.status)}
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      className="h-8 px-2 text-gray-400 hover:text-white"
+                      title="Open User Registrations for full details and documents"
+                      onClick={() => onTabChange('registrations')}
+                    >
+                      <ExternalLink className="h-4 w-4" />
+                    </Button>
+                  </div>
                 </div>
               ))}
               {registrations.length === 0 && (

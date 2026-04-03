@@ -3,6 +3,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { AlertTriangle, RefreshCw, Home } from 'lucide-react';
+import { captureError } from '@/lib/sentry';
 
 interface Props {
   children: ReactNode;
@@ -36,18 +37,16 @@ export class DeliveryErrorBoundary extends Component<Props, State> {
     this.logError(error, errorInfo);
   }
 
-  logError = async (error: Error, errorInfo: React.ErrorInfo) => {
+  logError = (error: Error, errorInfo: React.ErrorInfo) => {
     try {
-      // In a real app, send to error monitoring service
-      console.error('Error boundary caught:', {
-        error: error.message,
-        stack: error.stack,
+      captureError(error, {
+        source: 'DeliveryErrorBoundary',
         componentStack: errorInfo.componentStack,
-        timestamp: new Date().toISOString()
       });
-    } catch (logError) {
-      console.error('Failed to log error:', logError);
+    } catch {
+      /* Sentry optional */
     }
+    console.error('DeliveryErrorBoundary:', error.message, errorInfo.componentStack);
   };
 
   handleRetry = () => {

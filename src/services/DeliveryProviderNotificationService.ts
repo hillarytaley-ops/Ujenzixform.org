@@ -13,6 +13,7 @@
 import { supabase } from '@/integrations/supabase/client';
 import notificationService from './NotificationService';
 import { sendEmailViaEdgeFunction } from '@/lib/email';
+import { captureError, captureMessage } from '@/lib/sentry';
 
 export interface DeliveryRequestDetails {
   id?: string;
@@ -100,7 +101,13 @@ class DeliveryProviderNotificationService {
       const { success } = await sendEmailViaEdgeFunction({ to: email, subject, html });
       return success;
     } catch (e: unknown) {
-      console.warn('⚠️ Email notification error:', e instanceof Error ? e.message : e);
+      const msg = e instanceof Error ? e.message : String(e);
+      console.warn('⚠️ Email notification error:', msg);
+      if (e instanceof Error) {
+        captureError(e, { channel: 'delivery_email', requestId: requestDetails.id });
+      } else {
+        captureMessage(`delivery_notify_email: ${msg}`, 'warning');
+      }
       return false;
     }
   }
@@ -137,14 +144,18 @@ class DeliveryProviderNotificationService {
         .insert(notificationData as any);
       
       if (error) {
-        // Table might not exist - log but don't fail
         console.warn('⚠️ Could not create in-app notification:', error.message);
+        captureMessage(`delivery_notify_in_app: ${error.message}`, 'warning');
         return false;
       }
       
       return true;
-    } catch (error: any) {
-      console.warn('⚠️ In-app notification error:', error?.message);
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : String(error);
+      console.warn('⚠️ In-app notification error:', msg);
+      if (error instanceof Error) {
+        captureError(error, { channel: 'delivery_in_app' });
+      }
       return false;
     }
   }
@@ -171,8 +182,14 @@ class DeliveryProviderNotificationService {
       });
 
       return result.success;
-    } catch (error: any) {
-      console.warn('⚠️ SMS notification error:', error?.message);
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : String(error);
+      console.warn('⚠️ SMS notification error:', msg);
+      if (error instanceof Error) {
+        captureError(error, { channel: 'delivery_sms', requestId: requestDetails.id });
+      } else {
+        captureMessage(`delivery_notify_sms: ${msg}`, 'warning');
+      }
       return false;
     }
   }

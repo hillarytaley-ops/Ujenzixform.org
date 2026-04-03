@@ -1602,6 +1602,7 @@ const ProfessionalBuilderDashboardPage = () => {
     }
     
     try {
+      let projectCreatedWithoutClientNameColumn = false;
       const projectData: Record<string, any> = {
         builder_id: userId,
         name: newProject.name.trim(),
@@ -1663,18 +1664,51 @@ const ProfessionalBuilderDashboardPage = () => {
       console.log('📁 Response status:', response.status);
 
       if (!response.ok) {
-        const errorText = await response.text();
+        let errorText = await response.text();
         console.error('❌ Project creation failed:', response.status, errorText);
-        
-        let errorMessage = 'Failed to create project. ';
-        try {
-          const errorJson = JSON.parse(errorText);
-          errorMessage += errorJson.message || errorJson.error || errorText;
-        } catch {
-          errorMessage += errorText || 'Please check your connection and try again.';
+        const missingClientNameCol =
+          projectData.client_name &&
+          /client_name|column.*does not exist|schema cache/i.test(errorText);
+        if (missingClientNameCol) {
+          const retryBody = { ...projectData };
+          delete retryBody.client_name;
+          if (newProject.client_name?.trim()) {
+            retryBody.description = [retryBody.description, `Client: ${newProject.client_name.trim()}`]
+              .filter(Boolean)
+              .join('\n\n');
+          }
+          const retryCtl = new AbortController();
+          const retryTid = setTimeout(() => retryCtl.abort(), 10000);
+          try {
+            response = await fetch(`${SUPABASE_URL}/rest/v1/builder_projects`, {
+              method: 'POST',
+              headers: {
+                apikey: SUPABASE_ANON_KEY,
+                Authorization: `Bearer ${accessToken || SUPABASE_ANON_KEY}`,
+                'Content-Type': 'application/json',
+                Prefer: 'return=representation',
+              },
+              body: JSON.stringify(retryBody),
+              signal: retryCtl.signal,
+            });
+          } finally {
+            clearTimeout(retryTid);
+          }
+          errorText = response.ok ? '' : await response.text();
+          if (response.ok && missingClientNameCol) {
+            projectCreatedWithoutClientNameColumn = true;
+          }
         }
-        
-        throw new Error(errorMessage);
+        if (!response.ok) {
+          let errorMessage = 'Failed to create project. ';
+          try {
+            const errorJson = JSON.parse(errorText);
+            errorMessage += errorJson.message || errorJson.error || errorText;
+          } catch {
+            errorMessage += errorText || 'Please check your connection and try again.';
+          }
+          throw new Error(errorMessage);
+        }
       }
 
       const data = await response.json();
@@ -1725,7 +1759,11 @@ const ProfessionalBuilderDashboardPage = () => {
       
       toast({
         title: "🏗️ Project Created!",
-        description: `"${newProject.name}" has been created successfully. You can now order materials for this project.`,
+        description:
+          `"${createdProject.name}" has been created successfully. You can now order materials for this project.` +
+          (projectCreatedWithoutClientNameColumn
+            ? ' Client name was saved in the project description (add builder_projects.client_name via migration 20260219 on this environment to use the dedicated field).'
+            : ''),
       });
 
       // Refresh projects list in background (non-blocking, with timeout)

@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Building, ShoppingCart, FileText, UserPlus, LogIn, Store } from "lucide-react";
+import { Building, ShoppingCart, FileText, UserPlus, LogIn, Store, Truck } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import Navigation from "@/components/Navigation";
 import Footer from "@/components/Footer";
@@ -140,7 +140,7 @@ const SuppliersMobileOptimized = () => {
           <div className="max-w-4xl mx-auto" id="portals">
             <p className="text-white/50 text-sm font-medium mb-6 uppercase tracking-widest">Choose Your Portal</p>
             
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+            <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-5">
               {/* Private Client Portal */}
               <div className="group bg-gradient-to-br from-emerald-600 to-emerald-700 rounded-2xl p-6 border border-emerald-500/30 hover:border-emerald-400 transition-all duration-300 hover:scale-[1.03] hover:shadow-xl hover:shadow-emerald-500/20">
                 <div className="w-14 h-14 bg-white/20 rounded-2xl flex items-center justify-center mb-4 mx-auto group-hover:scale-110 transition-transform">
@@ -203,6 +203,27 @@ const SuppliersMobileOptimized = () => {
                   </Link>
                 </div>
               </div>
+
+              {/* Delivery partner — same as desktop: hub + apply, not a stripped mobile stub */}
+              <div className="group bg-gradient-to-br from-purple-600 to-purple-700 rounded-2xl p-6 border border-purple-500/30 hover:border-purple-400 transition-all duration-300 hover:scale-[1.03] hover:shadow-xl hover:shadow-purple-500/20">
+                <div className="w-14 h-14 bg-white/20 rounded-2xl flex items-center justify-center mb-4 mx-auto group-hover:scale-110 transition-transform">
+                  <Truck className="h-7 w-7 text-white" />
+                </div>
+                <h3 className="text-white font-bold text-xl mb-2">Delivery</h3>
+                <p className="text-purple-100/70 text-sm mb-5">Apply to haul jobs; sign in when approved</p>
+                <div className="flex flex-col gap-2">
+                  <Link to="/delivery" className="w-full">
+                    <Button className="w-full bg-white text-purple-700 hover:bg-purple-50 font-semibold h-11">
+                      Explore
+                    </Button>
+                  </Link>
+                  <Link to="/delivery-signin" className="w-full">
+                    <Button variant="outline" className="w-full border-white/50 text-white hover:bg-white/10 h-11">
+                      Sign In
+                    </Button>
+                  </Link>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -235,6 +256,19 @@ const SuppliersMobileOptimized = () => {
                             <Badge className="bg-blue-600">
                               <ShoppingCart className="h-3 w-3 mr-1" />
                               Purchase Orders
+                            </Badge>
+                          </div>
+                        </div>
+                      )}
+                      {(userRole === 'delivery' || userRole === 'delivery_provider') && (
+                        <div className="space-y-2">
+                          <p className="text-gray-700">
+                            <strong className="text-purple-600">Delivery partner:</strong> Accept jobs and update deliveries from your dashboard.
+                          </p>
+                          <div className="flex gap-2 flex-wrap">
+                            <Badge className="bg-purple-600">
+                              <Truck className="h-3 w-3 mr-1" />
+                              Deliveries
                             </Badge>
                           </div>
                         </div>
@@ -292,6 +326,14 @@ const SuppliersMobileOptimized = () => {
                           </Button>
                         </Link>
                       )}
+                      {(userRole === 'delivery' || userRole === 'delivery_provider') && (
+                        <Link to="/delivery-dashboard">
+                          <Button className="bg-purple-600 hover:bg-purple-700">
+                            <Truck className="h-4 w-4 mr-2" />
+                            Delivery dashboard
+                          </Button>
+                        </Link>
+                      )}
                     </div>
                   </div>
                 </CardContent>
@@ -334,7 +376,7 @@ const SuppliersMobileOptimized = () => {
                 </div>
                 
                 {/* 3 Sign-in Portals Grid */}
-                <div className="grid md:grid-cols-3 gap-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6">
                   {/* Private Client Portal - Green */}
                   <Card className="border-2 border-green-500 shadow-lg hover:shadow-xl transition-shadow">
                     <CardHeader className="text-center bg-gradient-to-br from-green-500 to-emerald-600 text-white rounded-t-lg">
@@ -458,6 +500,44 @@ const SuppliersMobileOptimized = () => {
                           <Button variant="outline" className="w-full border-amber-500 text-amber-700 hover:bg-amber-50">
                             <UserPlus className="h-4 w-4 mr-2" />
                             Register
+                          </Button>
+                        </Link>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* Delivery partner */}
+                  <Card className="border-2 border-purple-500 shadow-lg hover:shadow-xl transition-shadow">
+                    <CardHeader className="text-center bg-gradient-to-br from-purple-600 to-purple-800 text-white rounded-t-lg">
+                      <div className="mx-auto w-12 h-12 bg-white/20 rounded-full flex items-center justify-center mb-2">
+                        <Truck className="h-6 w-6 text-white" />
+                      </div>
+                      <CardTitle className="text-xl">Delivery</CardTitle>
+                      <CardDescription className="text-purple-100">
+                        Apply to partner, then use the dashboard when approved
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="pt-4 space-y-4">
+                      <ul className="space-y-2 text-sm text-gray-700">
+                        <li className="flex items-center gap-2">
+                          <span className="text-purple-600">✓</span>
+                          Same flows as desktop marketplace
+                        </li>
+                        <li className="flex items-center gap-2">
+                          <span className="text-purple-600">✓</span>
+                          Hauling and logistics jobs
+                        </li>
+                      </ul>
+                      <div className="space-y-2">
+                        <Link to="/delivery" className="block">
+                          <Button className="w-full bg-purple-600 hover:bg-purple-700">
+                            Explore and apply
+                          </Button>
+                        </Link>
+                        <Link to="/delivery-signin" className="block">
+                          <Button variant="outline" className="w-full border-purple-500 text-purple-700 hover:bg-purple-50">
+                            <LogIn className="h-4 w-4 mr-2" />
+                            Sign In
                           </Button>
                         </Link>
                       </div>

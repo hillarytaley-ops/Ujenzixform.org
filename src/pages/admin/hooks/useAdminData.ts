@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { captureError } from '@/utils/errorTracking';
 import {
   DashboardStats,
   UserRecord,
@@ -149,17 +150,20 @@ export const useRegistrations = () => {
       setLoading(true);
       const client = supabase;
 
-      // Fetch all registration/application types in parallel
-      // Try delivery_provider_registrations first (less strict RLS), fallback to delivery_providers
-      const [suppliersRes, deliveryRegsRes, deliveryProvidersRes] = await Promise.all([
+      const [
+        suppliersRes,
+        buildersRes,
+        deliveryRegsRes,
+        deliveryProvidersRes,
+      ] = await Promise.all([
         client.from('supplier_applications').select('*').order('created_at', { ascending: false }),
+        client.from('builder_registrations').select('*').order('created_at', { ascending: false }),
         client.from('delivery_provider_registrations').select('*').order('created_at', { ascending: false }),
         client.from('delivery_providers').select('*').order('created_at', { ascending: false }),
       ]);
 
       const allRegistrations: RegistrationRecord[] = [];
 
-      // Format suppliers from supplier_applications
       if (suppliersRes.data) {
         suppliersRes.data.forEach((s: Record<string, unknown>) => {
           allRegistrations.push({
@@ -177,34 +181,84 @@ export const useRegistrations = () => {
         });
       }
 
-      // Format delivery - prefer registrations table, fallback to providers table
-      const deliveryData = deliveryRegsRes.data || deliveryProvidersRes.data || [];
-      if (deliveryData.length > 0) {
-        deliveryData.forEach((d: Record<string, unknown>) => {
+      if (buildersRes.data) {
+        buildersRes.data.forEach((b: Record<string, unknown>) => {
           allRegistrations.push({
-            id: d.id as string,
-            type: 'delivery',
-            name: (d.full_name as string) || (d.provider_name as string) || 'N/A',
-            email: (d.email as string) || 'N/A',
-            phone: d.phone as string | undefined,
-            company_name: (d.company_name as string) || (d.provider_name as string) || undefined,
-            county: (d.county as string) || (d.address as string) || (Array.isArray(d.service_counties) ? (d.service_counties as string[])[0] : undefined),
-            vehicle_type: d.vehicle_type as string | undefined,
-            service_areas: (d.service_areas as string[]) || (d.service_counties as string[]) || undefined,
-            status: (d.status as string) || ((d.is_verified as boolean) ? 'approved' : 'pending'),
-            created_at: d.created_at as string,
+            id: b.id as string,
+            type: 'builder',
+            name: (b.full_name as string) || 'N/A',
+            email: (b.email as string) || 'N/A',
+            phone: b.phone as string | undefined,
+            company_name: b.company_name as string | undefined,
+            county: (b.county as string) || undefined,
+            builder_category: (b.builder_category as string) || (b.builder_type as string) || undefined,
+            status: (b.status as string) || 'pending',
+            created_at: b.created_at as string,
           });
         });
       }
 
-      // Sort by created_at descending
-      allRegistrations.sort((a, b) => 
-        new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      const regRows = (deliveryRegsRes.data || []) as Record<string, unknown>[];
+      const provRows = (deliveryProvidersRes.data || []) as Record<string, unknown>[];
+      const regEmails = new Set(
+        regRows.map((r) => String(r.email || '').toLowerCase()).filter(Boolean)
+      );
+      const regAuthIds = new Set(
+        regRows.map((r) => r.auth_user_id as string | undefined).filter(Boolean) as string[]
+      );
+
+      regRows.forEach((d) => {
+        allRegistrations.push({
+          id: d.id as string,
+          type: 'delivery',
+          name: (d.full_name as string) || (d.provider_name as string) || 'N/A',
+          email: (d.email as string) || 'N/A',
+          phone: d.phone as string | undefined,
+          company_name: (d.company_name as string) || (d.provider_name as string) || undefined,
+          county:
+            (d.county as string) ||
+            (d.address as string) ||
+            (Array.isArray(d.service_counties) ? (d.service_counties as string[])[0] : undefined),
+          vehicle_type: d.vehicle_type as string | undefined,
+          service_areas: (d.service_areas as string[]) || (d.service_counties as string[]) || undefined,
+          status: (d.status as string) || 'pending',
+          created_at: d.created_at as string,
+        });
+      });
+
+      provRows.forEach((d) => {
+        const email = String(d.email || '').toLowerCase();
+        const uid = d.user_id as string | undefined;
+        if (email && regEmails.has(email)) return;
+        if (uid && regAuthIds.has(uid)) return;
+        allRegistrations.push({
+          id: d.id as string,
+          type: 'delivery',
+          name: (d.full_name as string) || (d.provider_name as string) || 'N/A',
+          email: (d.email as string) || 'N/A',
+          phone: d.phone as string | undefined,
+          company_name: (d.company_name as string) || (d.provider_name as string) || undefined,
+          county:
+            (d.county as string) ||
+            (d.address as string) ||
+            (Array.isArray(d.service_counties) ? (d.service_counties as string[])[0] : undefined),
+          vehicle_type: d.vehicle_type as string | undefined,
+          service_areas: (d.service_areas as string[]) || (d.service_counties as string[]) || undefined,
+          status:
+            (d.status as string) ||
+            ((d.is_verified as boolean) ? 'approved' : 'pending'),
+          created_at: d.created_at as string,
+        });
+      });
+
+      allRegistrations.sort(
+        (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
       );
 
       setRegistrations(allRegistrations);
     } catch (error) {
       console.error('Error fetching registrations:', error);
+      void captureError(error, { component: 'useRegistrations', action: 'fetchRegistrations' });
       toast({
         title: 'Error',
         description: 'Failed to load registrations',
@@ -232,17 +286,30 @@ export const useRegistrations = () => {
           .eq('id', id);
         if (error) throw error;
       } else if (type === 'delivery') {
-        // For delivery providers, update is_verified field
+        const now = new Date().toISOString();
+        const { data: regRows, error: regErr } = await client
+          .from('delivery_provider_registrations')
+          .update({ status: newStatus, updated_at: now })
+          .eq('id', id)
+          .select('id');
+        if (regErr) throw regErr;
+        if (!regRows?.length) {
+          const { error: provErr } = await client
+            .from('delivery_providers')
+            .update({
+              is_verified: newStatus === 'approved',
+              updated_at: now,
+            })
+            .eq('id', id);
+          if (provErr) throw provErr;
+        }
+      } else if (type === 'builder') {
         const { error } = await client
-          .from('delivery_providers')
-          .update({ 
-            is_verified: newStatus === 'approved', 
-            updated_at: new Date().toISOString() 
-          })
+          .from('builder_registrations')
+          .update({ status: newStatus, updated_at: new Date().toISOString() })
           .eq('id', id);
         if (error) throw error;
       } else {
-        // For other types, try to update profiles or user_roles
         const { error } = await client
           .from('profiles')
           .update({ updated_at: new Date().toISOString() })
@@ -258,6 +325,7 @@ export const useRegistrations = () => {
       fetchRegistrations();
     } catch (error) {
       console.error('Error updating status:', error);
+      void captureError(error, { component: 'useRegistrations', action: 'updateStatus' });
       toast({
         title: 'Error',
         description: 'Failed to update registration status',
