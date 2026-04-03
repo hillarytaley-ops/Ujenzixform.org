@@ -48,9 +48,12 @@ Goal: core marketplace and admin flows **boringly reliable** before investing in
 
 ### F. Site vision worker (on-site / VM, optional for core marketplace)
 
-- [ ] Migration `site_vision_events` applied.
-- [ ] Run Python venv **or** Docker from [`workers/site-vision/README.md`](../workers/site-vision/README.md) (see also `Dockerfile`, `docker-compose.yml`).
-- [ ] Service role key only on the worker host—never in the SPA.
+**Not a blocker for core marketplace / Kenya builders go-live** unless you promise site-vision analytics in the contract.
+
+- [ ] Migration `site_vision_events` applied (and optional Storage bucket `site-vision-captures` if you use signed frame upload — see [SITE_VISION_ADVANCED_INTEGRATION](./SITE_VISION_ADVANCED_INTEGRATION.md)).
+- [ ] Run Python venv **or** Docker from [`workers/site-vision/README.md`](../workers/site-vision/README.md) (`Dockerfile`, `docker-compose.yml`; compose already sets `restart: unless-stopped` for Linux/mini-PC).
+- [ ] **24/7 on site:** your ops choice — e.g. Docker with `restart: unless-stopped`, or on Windows a **Task Scheduler** job at startup + “run on failure” / **NSSM** wrapping `python main.py` or Docker Desktop’s restart policy. Disable sleep on the box if it must run overnight.
+- [ ] Service role key only on the worker host—never in the SPA (optional: Edge `camera-vision-upload-ticket` + device secret to avoid service role on field PCs — same advanced doc).
 - [ ] Confirm events on **Analytics → Site vision** when the worker runs.
 
 ### G. People / escalation (fill in for your org)

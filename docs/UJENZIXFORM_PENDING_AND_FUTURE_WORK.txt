@@ -46,9 +46,8 @@ fully attach saved thumbnail images to every alert in a polished way. Events
 today are mostly metadata plus optional payloads.
 
 Writing events with the Supabase service role on a laptop is acceptable for a
-pilot; a stricter design might later route inserts through a signed HTTP edge
-function so the long-lived key never sits on a field PC. That hardening step
-remains optional.
+pilot. For field PCs without a service role, the repo ships an optional Edge
+path (signed Storage upload ticket) documented in docs/SITE_VISION_ADVANCED_INTEGRATION.md.
 
 Consumer-style links such as GoPro cloud gallery pages are still not valid
 stream addresses for the worker. The product still assumes you supply RTSP, HLS
@@ -108,14 +107,14 @@ OPERATIONS AND DOCUMENTATION
 
 The site vision worker can run as a manual Python process (see
 workers/site-vision/README.md) or as Docker: workers/site-vision/Dockerfile and
-docker-compose.yml. For Windows production, wrap the same image or venv in a
-scheduled task or Windows Service if you need auto-restart on boot; that OS
-wrapper is still an ops choice rather than a checked-in installer.
+docker-compose.yml (compose uses restart: unless-stopped). For Windows, use Task
+Scheduler, NSSM, or Docker Desktop restart policy if you need boot-time start
+and auto-restart; that host wrapper stays your ops choice (no checked-in MSI).
 
-The application has many detailed markdown documents in the docs folder, but
-there is no single short “operations manual” that merges vision, monitoring,
-payments, and admin into one printable booklet unless you assemble it from
-several files.
+Single entry point for release checklists (deploy, env, migrations, monitoring
+smoke, optional vision worker): docs/OPS_RUNBOOK.md. Long-form detail remains in
+the linked docs from that file; there is no separate printed booklet beyond
+exporting or printing that runbook plus the sections you need.
 
 
 REMOTE PTZ AND TWO-WAY AUDIO (MONITORING)
@@ -140,8 +139,8 @@ is a motion-first pipeline with a packaged Docker path for on-site deployment,
 but not yet a full custom smart-site CV product; security and notification
 layers deserve another pass for strict production; several UI and payment
 paths still carry TODO markers; and keeping the vision worker running 24/7 on
-site hardware remains an operational responsibility alongside the Vercel web
-app.
+site hardware is documented in docs/OPS_RUNBOOK.md and workers/site-vision but
+remains your ops responsibility on the physical host (not the hosted web app).
 
 ================================================================================
 End of document

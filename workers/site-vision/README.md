@@ -129,6 +129,18 @@ Keep the laptop **plugged in** and **not sleeping** if this runs 24/7.
 - **RTSP on LAN**: run this worker **on the same network** as the NVR/cameras.
 - **HLS in cloud**: worker can run on a small VPS if the URL is reachable.
 
+### Running 24/7 (site ops)
+
+This process is **not** part of Vercel or Supabase hosting — you keep it alive on the site PC or VM.
+
+| Host | Practical approach |
+|------|---------------------|
+| **Docker (Linux / WSL2 / mini PC)** | `docker compose up -d` — `restart: unless-stopped` is already in `docker-compose.yml`. |
+| **Docker (Windows)** | Same, or `docker run ... --restart unless-stopped`; ensure Docker starts at login/boot if required. |
+| **Python venv (Windows)** | Task Scheduler: trigger “At startup”, action run `E:\path\to\.venv\Scripts\python.exe E:\path\to\main.py`, start in worker directory; optionally “Restart on failure”. Or wrap with [NSSM](https://nssm.cc/) as a service. **Disable sleep** on the machine for overnight runs. |
+
+Merged release checklist (where this fits vs payments, migrations, monitoring): [`docs/OPS_RUNBOOK.md`](../docs/OPS_RUNBOOK.md).
+
 ## Troubleshooting
 
 - **`Client.__init__() got an unexpected keyword argument 'proxy'`:** pip installed a **new** `gotrue` (e.g. 2.9) while `supabase 2.3.4` keeps **`httpx<0.26`**. Reinstall from `requirements.txt` — we pin **`gotrue==2.4.2`** so it matches `httpx` 0.25.x.
