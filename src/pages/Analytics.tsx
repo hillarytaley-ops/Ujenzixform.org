@@ -178,9 +178,10 @@ const Analytics = () => {
             </Button>
           </div>
         ) : (
-          <MLMaterialAnalytics 
+          <MLMaterialAnalytics
             userId={user.id}
             userRole={userRole as any}
+            staffPortalOnly={isAdminSession}
           />
         )}
 

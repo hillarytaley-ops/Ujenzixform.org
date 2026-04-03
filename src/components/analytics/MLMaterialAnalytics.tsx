@@ -30,6 +30,7 @@ import {
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { refreshSessionIfNeeded } from '@/lib/supabaseSession';
+import { captureError } from '@/lib/sentry';
 import { useToast } from '@/hooks/use-toast';
 
 interface MaterialUsage {
@@ -53,6 +54,8 @@ interface MaterialAnalytics {
   projectId?: string;
   userId: string;
   userRole: 'builder' | 'supplier' | 'admin';
+  /** True when admin opened /analytics via staff portal (localStorage) without a Supabase JWT — RLS hides cameras / site vision. */
+  staffPortalOnly?: boolean;
 }
 
 type VisionEventKind = 'material' | 'safety' | 'perimeter' | 'vehicle';
@@ -240,7 +243,11 @@ function filterEventsSince(events: SiteVisionEvent[], sinceMs: number) {
   return events.filter((e) => new Date(e.at).getTime() >= sinceMs);
 }
 
-export const MLMaterialAnalytics: React.FC<MaterialAnalytics> = ({ projectId, userId }) => {
+export const MLMaterialAnalytics: React.FC<MaterialAnalytics> = ({
+  projectId,
+  userId,
+  staffPortalOnly = false,
+}) => {
   const [loading, setLoading] = useState(true);
   const [materialUsage, setMaterialUsage] = useState<MaterialUsage[]>([]);
   const [insights, setInsights] = useState<MLInsight[]>([]);
@@ -373,6 +380,9 @@ export const MLMaterialAnalytics: React.FC<MaterialAnalytics> = ({ projectId, us
       setPredictions(generatePredictions(processedData));
     } catch (error) {
       console.error('Error in material analytics:', error);
+      if (error instanceof Error) {
+        captureError(error, { area: 'MLMaterialAnalytics.loadAnalytics' });
+      }
       toast({
         title: 'Analytics Error',
         description: 'Failed to load material analytics',
@@ -556,6 +566,25 @@ export const MLMaterialAnalytics: React.FC<MaterialAnalytics> = ({ projectId, us
 
   return (
     <div className="space-y-6">
+      {staffPortalOnly && (
+        <Alert className="border-blue-300 bg-blue-50 dark:bg-blue-950/30 dark:border-blue-800">
+          <Shield className="h-4 w-4 text-blue-800 dark:text-blue-200" />
+          <AlertTitle className="text-blue-950 dark:text-blue-100">Staff portal session (no Supabase JWT)</AlertTitle>
+          <AlertDescription className="text-blue-900/90 dark:text-blue-100/90 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <span>
+              You are signed in as admin via the <strong>staff portal</strong>. This page loads cameras and site vision
+              with your <strong>Supabase session</strong>. Without it, you may see demo data or empty panels even though
+              the database has rows. Sign in with your admin Google / email account to match RLS, or set{' '}
+              <code className="text-xs bg-white/70 dark:bg-blue-900/50 px-1 rounded">VITE_REQUIRE_SUPABASE_SESSION_FOR_ADMIN=true</code>{' '}
+              if you want to require that everywhere.
+            </span>
+            <Button size="sm" variant="secondary" className="shrink-0" asChild>
+              <Link to="/auth">Sign in with Supabase</Link>
+            </Button>
+          </AlertDescription>
+        </Alert>
+      )}
+
       <Alert className="border-amber-200 bg-amber-50">
         <Lightbulb className="h-4 w-4 text-amber-800" />
         <AlertTitle className="text-amber-950">Basics today</AlertTitle>
@@ -653,8 +682,10 @@ export const MLMaterialAnalytics: React.FC<MaterialAnalytics> = ({ projectId, us
               <AlertTitle>Demo site vision</AlertTitle>
               <AlertDescription className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                 <span>
-                  No cameras returned from the database (or you are on an offline admin session). Sample events
-                  show how material and safety analytics will look once Monitoring cameras are configured.
+                  No cameras returned from the database
+                  {staffPortalOnly ? ' — common when using the staff portal without a Supabase sign-in' : ''}. Sample
+                  events show how material and safety analytics will look once Monitoring cameras are configured (and your
+                  session can read them).
                 </span>
                 <Button size="sm" variant="outline" asChild className="shrink-0">
                   <Link to="/monitoring">
