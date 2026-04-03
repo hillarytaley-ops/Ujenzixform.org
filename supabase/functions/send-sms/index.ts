@@ -158,11 +158,27 @@ serve(async (req) => {
       }
     }
 
+    if (errorMsg.includes('InvalidSenderId')) {
+      const parts = [
+        ' InvalidSenderId fix:',
+        '1) Supabase → Edge secrets: DELETE wrong AFRICASTALKING_SENDER_ID or set it to your sandbox SMS short code (create at account.africastalking.com/apps/sandbox/sms/shortcodes/create).',
+        '2) For sandbox API key, set AFRICASTALKING_USERNAME exactly to sandbox (not your app name — otherwise the live API is used).',
+        senderId
+          ? '3) You are sending from "' + senderId + '" — that ID is not approved on this AT app.'
+          : '3) No from field was sent; AT still rejected default — set AFRICASTALKING_SENDER_ID to your sandbox short code.',
+      ]
+      errorMsg += ' ' + parts.join(' ')
+    }
+
     return new Response(
       JSON.stringify({
         success: false,
         error: errorMsg,
-        details: data
+        details: data,
+        debug: {
+          messagingEnv: username === 'sandbox' ? 'sandbox' : 'live',
+          includedFromParameter: Boolean(senderId),
+        },
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )

@@ -199,11 +199,15 @@ class NotificationService {
       error?: string;
       messageId?: string;
       details?: unknown;
+      debug?: { messagingEnv?: string; includedFromParameter?: boolean };
     } | null;
 
     if (!payload || payload.success !== true) {
       if (payload?.details != null) {
         console.warn('[send-sms] Africa\'s Talking details:', payload.details);
+      }
+      if (payload?.debug != null) {
+        console.warn('[send-sms] debug:', payload.debug);
       }
       let errMsg =
         payload?.error ||
