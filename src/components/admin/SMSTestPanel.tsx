@@ -146,16 +146,19 @@ export const SMSTestPanel: React.FC = () => {
               <div>
                 <p className="font-medium">
                   {edgeSmsEnabled
-                    ? 'Live SMS path (send-sms)'
+                    ? 'SMS via Supabase Edge (send-sms)'
                     : 'SMS simulation (VITE_SMS_SIMULATE_ONLY)'}
                 </p>
                 <p className="text-sm text-muted-foreground">
                   {edgeSmsEnabled ? (
                     <>
-                      Calls Edge Function <code className="text-xs">send-sms</code>. Secrets:{' '}
-                      <code className="text-xs">AFRICASTALKING_API_KEY</code>,{' '}
-                      <code className="text-xs">AFRICASTALKING_USERNAME</code> (use{' '}
-                      <code className="text-xs">sandbox</code> for sandbox). Optional{' '}
+                      <strong>Edge</strong> only means the request runs on Supabase — it is not &quot;going live&quot; with
+                      Africa&apos;s Talking. Whether AT uses <strong>sandbox</strong> or <strong>their production API</strong>{' '}
+                      is controlled by one secret:{' '}
+                      <code className="text-xs">AFRICASTALKING_USERNAME</code>. Set it to exactly{' '}
+                      <code className="text-xs">sandbox</code> until you are ready for real SMS; any other value calls
+                      AT&apos;s live endpoint. Also set <code className="text-xs">AFRICASTALKING_API_KEY</code> (sandbox key
+                      matches <code className="text-xs">sandbox</code>). Optional{' '}
                       <code className="text-xs">AFRICASTALKING_SENDER_ID</code> — only if AT approved that ID;
                       if you see <strong>InvalidSenderId</strong>, leave it unset for sandbox (default sender)
                       or set the exact short code / sender from your AT dashboard.
@@ -170,12 +173,20 @@ export const SMSTestPanel: React.FC = () => {
               </div>
             </div>
             <Badge variant="secondary" className={edgeSmsEnabled ? 'bg-green-100 text-green-900' : 'bg-blue-100 text-blue-800'}>
-              {edgeSmsEnabled ? 'Edge' : 'Simulation'}
+              {edgeSmsEnabled ? 'Edge function' : 'Simulation'}
             </Badge>
           </div>
           {edgeSmsEnabled && (
             <div className="mt-4 p-3 rounded-md border border-amber-200 bg-amber-50/90 dark:bg-amber-950/30 dark:border-amber-800 text-sm text-amber-950 dark:text-amber-100">
-              <p className="font-medium">If you see &quot;authentication is invalid&quot; (401)</p>
+              <p className="font-medium">If the error says Edge is using the LIVE Africa&apos;s Talking endpoint</p>
+              <p className="mt-1 text-amber-900/90 dark:text-amber-100/90">
+                You have not &quot;gone live&quot; on our side — your Supabase secret{' '}
+                <code className="text-xs">AFRICASTALKING_USERNAME</code> is set to something other than the word{' '}
+                <code className="text-xs">sandbox</code> (e.g. your app name). Change it to exactly{' '}
+                <code className="text-xs">sandbox</code> and use your <strong>Sandbox</strong> API key from Africa&apos;s
+                Talking. No code deploy needed after saving secrets.
+              </p>
+              <p className="font-medium mt-3">If you see &quot;authentication is invalid&quot; (401)</p>
               <ul className="mt-2 list-disc list-inside space-y-1 text-amber-900/90 dark:text-amber-100/90">
                 <li>
                   Update secrets only in{' '}
