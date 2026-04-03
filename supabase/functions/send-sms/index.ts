@@ -26,7 +26,7 @@ serve(async (req) => {
     // Get credentials from environment
     const username = Deno.env.get('AFRICASTALKING_USERNAME') || 'sandbox'
     const apiKey = Deno.env.get('AFRICASTALKING_API_KEY')
-    const senderId = from || Deno.env.get('AFRICASTALKING_SENDER_ID') || 'MradiPro'
+    const senderId = from || Deno.env.get('AFRICASTALKING_SENDER_ID') || 'UjenziXform'
 
     if (!apiKey) {
       return new Response(

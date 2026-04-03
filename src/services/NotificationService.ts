@@ -1,22 +1,20 @@
 /**
  * Notification Service
- * Handles SMS and WhatsApp notifications via Africa's Talking API
- * 
- * SETUP REQUIRED:
- * 1. Create account at https://africastalking.com
- * 2. Get API Key and Username
- * 3. Add to environment variables:
- *    - VITE_AFRICASTALKING_USERNAME
- *    - VITE_AFRICASTALKING_API_KEY
- *    - VITE_AFRICASTALKING_SENDER_ID (optional)
- * 
- * For WhatsApp:
- * 1. Apply for WhatsApp Business API access
- * 2. Or use Twilio WhatsApp API as alternative
+ * SMS goes through Supabase Edge Function `send-sms` (Africa's Talking).
+ * Never put AFRICASTALKING_API_KEY in Vite — set secrets on Supabase only.
+ *
+ * Setup:
+ * 1. https://africastalking.com — API key + username (sandbox or production).
+ * 2. Supabase → Project Settings → Edge Functions → Secrets:
+ *    AFRICASTALKING_API_KEY, AFRICASTALKING_USERNAME, optional AFRICASTALKING_SENDER_ID
+ * 3. Deploy: supabase functions deploy send-sms
+ * 4. Optional Vite: VITE_AFRICASTALKING_SENDER_ID (short code / sender id for `from`)
+ * 5. Local simulation only: VITE_SMS_SIMULATE_ONLY=true
  */
 
 import { supabase } from '@/integrations/supabase/client';
 import { DEFAULT_SITE_URL } from '@/config/appIdentity';
+import { invokeEdgeFunction } from '@/lib/invokeEdgeFunction';
 
 // Types
 export interface SMSMessage {
@@ -107,16 +105,10 @@ export const NOTIFICATION_TEMPLATES: Record<string, NotificationTemplate> = {
 };
 
 class NotificationService {
-  private apiUsername: string;
-  private apiKey: string;
   private senderId: string;
-  private baseUrl: string;
 
   constructor() {
-    this.apiUsername = import.meta.env.VITE_AFRICASTALKING_USERNAME || '';
-    this.apiKey = import.meta.env.VITE_AFRICASTALKING_API_KEY || '';
     this.senderId = import.meta.env.VITE_AFRICASTALKING_SENDER_ID || 'UjenziXform';
-    this.baseUrl = 'https://api.africastalking.com/version1';
   }
 
   /**
@@ -153,42 +145,75 @@ class NotificationService {
   }
 
   /**
-   * Send SMS - Currently in simulation mode
-   * To enable real SMS:
-   * 1. Deploy the Supabase Edge Function (supabase/functions/send-sms)
-   * 2. Or set up a backend proxy server
-   * 
-   * For now, SMS is simulated and logged to console
+   * Send SMS via Edge Function `send-sms` (Africa's Talking credentials on Supabase).
+   * Set VITE_SMS_SIMULATE_ONLY=true to skip the network and log to console instead.
    */
   async sendSMS(message: SMSMessage): Promise<NotificationResult> {
-    const recipients = Array.isArray(message.to) 
-      ? message.to.map(p => this.formatPhoneNumber(p))
+    const recipients = Array.isArray(message.to)
+      ? message.to.map((p) => this.formatPhoneNumber(p))
       : [this.formatPhoneNumber(message.to)];
 
-    const formattedMessage = {
-      to: recipients.join(', '),
-      message: message.message,
-      from: message.from || this.senderId,
-      timestamp: new Date().toISOString()
-    };
+    const simulateOnly = import.meta.env.VITE_SMS_SIMULATE_ONLY === 'true';
 
-    // Log the SMS that would be sent
-    console.log('📱 SMS Notification:', formattedMessage);
-    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-    console.log(`📞 To: ${formattedMessage.to}`);
-    console.log(`📝 Message: ${formattedMessage.message}`);
-    console.log(`🏷️ From: ${formattedMessage.from}`);
-    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    if (simulateOnly) {
+      console.log('📱 SMS (simulated):', {
+        to: recipients.join(', '),
+        message: message.message,
+        from: message.from || this.senderId,
+      });
+      await this.logNotification('sms', recipients.join(','), message.message, true, 'Simulated');
+      return {
+        success: true,
+        messageId: 'sim-' + Date.now(),
+        error:
+          "Simulation mode (VITE_SMS_SIMULATE_ONLY). Unset to send via Africa's Talking / send-sms.",
+      };
+    }
 
-    // Try to log to database (will silently fail if table doesn't exist)
-    await this.logNotification('sms', recipients.join(','), message.message, true, 'Simulated');
+    const { data, error } = await invokeEdgeFunction(
+      'send-sms',
+      {
+        body: {
+          to: recipients.length === 1 ? recipients[0] : recipients,
+          message: message.message,
+          from: message.from || this.senderId,
+        },
+      },
+      { channel: 'notification_service_sms' }
+    );
 
-    // Return success with simulation note
-    return {
-      success: true,
-      messageId: 'sim-' + Date.now(),
-      error: '✅ SMS simulated successfully! Check browser console for details. To send real SMS, deploy the Edge Function or set up a backend server.'
-    };
+    if (error) {
+      const errMsg =
+        error && typeof error === 'object' && 'message' in error
+          ? String((error as { message: string }).message)
+          : String(error);
+      await this.logNotification('sms', recipients.join(','), message.message, false, errMsg);
+      return { success: false, error: errMsg };
+    }
+
+    const payload = data as {
+      success?: boolean;
+      simulated?: boolean;
+      error?: string;
+      messageId?: string;
+    } | null;
+
+    if (!payload || payload.success !== true) {
+      const errMsg =
+        payload?.error ||
+        (payload?.simulated
+          ? "Africa's Talking API key not set on Supabase (secret AFRICASTALKING_API_KEY)."
+          : 'SMS was not accepted by the gateway.');
+      await this.logNotification('sms', recipients.join(','), message.message, false, errMsg);
+      return {
+        success: false,
+        messageId: payload?.messageId,
+        error: errMsg,
+      };
+    }
+
+    await this.logNotification('sms', recipients.join(','), message.message, true);
+    return { success: true, messageId: payload.messageId };
   }
 
   /**
@@ -400,10 +425,10 @@ class NotificationService {
   }
 
   /**
-   * Check if API is configured
+   * True when sendSMS will call the `send-sms` edge function (not VITE_SMS_SIMULATE_ONLY).
    */
   isConfigured(): boolean {
-    return !!(this.apiKey && this.apiUsername);
+    return import.meta.env.VITE_SMS_SIMULATE_ONLY !== 'true';
   }
 }
 

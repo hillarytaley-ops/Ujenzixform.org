@@ -8,6 +8,7 @@
  */
 
 import { supabase } from '@/integrations/supabase/client';
+import { notificationService } from '@/services/NotificationService';
 
 interface DeliveryRequest {
   id: string;
@@ -236,23 +237,10 @@ ${alertData.delivery.distance_km}km - KES ${alertData.delivery.estimated_cost.to
 Login to accept
 - UjenziPro`;
 
-    // In production, integrate with Africa's Talking
-    console.log('📱 SMS sent to:', alertData.providerPhone);
-    console.log('Message:', message);
+    const phone = alertData.providerPhone?.trim?.();
+    if (!phone) return;
 
-    /* Production code:
-    const africasTalking = require('africastalking')({
-      apiKey: process.env.AFRICASTALKING_API_KEY,
-      username: process.env.AFRICASTALKING_USERNAME
-    });
-
-    const sms = africasTalking.SMS;
-    await sms.send({
-      to: [alertData.providerPhone],
-      message: message,
-      from: 'UjenziPro'
-    });
-    */
+    await notificationService.sendSMS({ to: phone, message });
   }
 
   /**

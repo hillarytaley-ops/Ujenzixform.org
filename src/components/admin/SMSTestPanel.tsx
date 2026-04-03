@@ -30,8 +30,7 @@ export const SMSTestPanel: React.FC = () => {
   const [testResults, setTestResults] = useState<TestResult[]>([]);
   const { toast } = useToast();
 
-  // SMS is currently in simulation mode
-  const isConfigured = false; // Will be true when Edge Function is deployed
+  const edgeSmsEnabled = notificationService.isConfigured();
 
   const handleSendTestSMS = async () => {
     if (!phoneNumber) {
@@ -85,9 +84,9 @@ export const SMSTestPanel: React.FC = () => {
       if (result.success) {
         toast({
           title: '✅ SMS Sent!',
-          description: result.error?.includes('simulated') 
-            ? 'Message simulated (check Africa\'s Talking Simulator)'
-            : `Message ID: ${result.messageId}`
+          description: result.messageId
+            ? `Message ID: ${result.messageId}`
+            : 'Delivered via send-sms edge function.',
         });
       } else {
         toast({
@@ -111,22 +110,43 @@ export const SMSTestPanel: React.FC = () => {
   return (
     <div className="space-y-6">
       {/* Configuration Status */}
-      <Card className="border-blue-500/50 bg-blue-50/50 dark:bg-blue-950/20">
+      <Card
+        className={
+          edgeSmsEnabled
+            ? 'border-green-500/50 bg-green-50/50 dark:bg-green-950/20'
+            : 'border-blue-500/50 bg-blue-50/50 dark:bg-blue-950/20'
+        }
+      >
         <CardContent className="p-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <CheckCircle className="h-5 w-5 text-blue-500" />
+              <CheckCircle className={`h-5 w-5 ${edgeSmsEnabled ? 'text-green-600' : 'text-blue-500'}`} />
               <div>
                 <p className="font-medium">
-                  SMS Simulation Mode Active
+                  {edgeSmsEnabled
+                    ? 'Live SMS path (send-sms)'
+                    : 'SMS simulation (VITE_SMS_SIMULATE_ONLY)'}
                 </p>
                 <p className="text-sm text-muted-foreground">
-                  Messages are logged to browser console. Check DevTools (F12) → Console to see SMS details.
+                  {edgeSmsEnabled ? (
+                    <>
+                      Calls Supabase Edge Function <code className="text-xs">send-sms</code> (Africa&apos;s
+                      Talking). Set secrets <code className="text-xs">AFRICASTALKING_API_KEY</code> and{' '}
+                      <code className="text-xs">AFRICASTALKING_USERNAME</code> in Supabase, deploy{' '}
+                      <code className="text-xs">send-sms</code>, and use sandbox numbers until production is
+                      approved.
+                    </>
+                  ) : (
+                    <>
+                      Console-only. Remove <code className="text-xs">VITE_SMS_SIMULATE_ONLY</code> to invoke
+                      the edge function.
+                    </>
+                  )}
                 </p>
               </div>
             </div>
-            <Badge variant="secondary" className="bg-blue-100 text-blue-800">
-              Simulation
+            <Badge variant="secondary" className={edgeSmsEnabled ? 'bg-green-100 text-green-900' : 'bg-blue-100 text-blue-800'}>
+              {edgeSmsEnabled ? 'Edge' : 'Simulation'}
             </Badge>
           </div>
         </CardContent>

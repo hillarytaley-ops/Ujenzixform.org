@@ -92,7 +92,22 @@ These should **NEVER** be prefixed with `VITE_` as they would be exposed to the 
 | `STRIPE_SECRET_KEY` | Payment processing | Supabase Edge Functions |
 | `RESEND_API_KEY` | Email sending | Supabase Edge Functions |
 | `AFRICASTALKING_API_KEY` | SMS notifications | Supabase Edge Functions |
-| `AFRICASTALKING_USERNAME` | SMS account | Supabase Edge Functions |
+| `AFRICASTALKING_USERNAME` | SMS account (`sandbox` for sandbox API) | Supabase Edge Functions |
+| `AFRICASTALKING_SENDER_ID` | Optional short code / sender ID | Supabase Edge Functions |
+
+### Africa's Talking (SMS) — finish setup
+
+1. Create an account at [Africa's Talking](https://africastalking.com) and generate an API key.
+2. For testing, keep username `sandbox` and add [sandbox test numbers](https://developers.africastalking.com/docs/sms/sandbox) in the AT dashboard.
+3. In Supabase: **Project Settings → Edge Functions → Secrets**, add the three variables above (minimum: `AFRICASTALKING_API_KEY`, `AFRICASTALKING_USERNAME`).
+4. Deploy the function from the repo root:
+
+   ```bash
+   supabase functions deploy send-sms
+   ```
+
+5. The web app calls `send-sms` via the Supabase client — **do not** put `AFRICASTALKING_API_KEY` in any `VITE_` variable.
+6. Optional in `.env.local`: `VITE_AFRICASTALKING_SENDER_ID` (passed as `from` when sending) and `VITE_SMS_SIMULATE_ONLY=true` to force console-only SMS during local dev.
 
 ## Security Best Practices
 
