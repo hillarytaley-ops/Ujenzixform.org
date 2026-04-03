@@ -203,11 +203,27 @@ class NotificationService {
       if (payload?.details != null) {
         console.warn('[send-sms] Africa\'s Talking details:', payload.details);
       }
-      const errMsg =
+      let errMsg =
         payload?.error ||
         (payload?.simulated
           ? "Africa's Talking API key not set on Supabase (secret AFRICASTALKING_API_KEY)."
           : 'SMS was not accepted by the gateway.');
+      // AT often returns status text "Unknown error" — expand from details for the admin toast
+      if (
+        errMsg === 'Unknown error' &&
+        payload?.details &&
+        typeof payload.details === 'object' &&
+        'SMSMessageData' in payload.details
+      ) {
+        const smd = (payload.details as { SMSMessageData?: { Message?: string; Recipients?: unknown[] } })
+          .SMSMessageData;
+        const row = smd?.Recipients?.[0];
+        const parts = [
+          smd?.Message,
+          row != null ? JSON.stringify(row) : null,
+        ].filter(Boolean) as string[];
+        if (parts.length > 0) errMsg = parts.join(' — ');
+      }
       await this.logNotification('sms', recipients.join(','), message.message, false, errMsg);
       return {
         success: false,

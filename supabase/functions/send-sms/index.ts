@@ -113,20 +113,32 @@ serve(async (req) => {
       )
     }
 
-    // Build a useful error for the admin UI (avoid generic "Unknown error")
+    // AT sometimes sets Recipients[0].status to the literal "Unknown error" — add Message + row details
+    const atBulkMessage = typeof smd?.Message === 'string' ? smd.Message.trim() : ''
     let errorMsg = ''
-    if (status) errorMsg = status
-    else if (typeof smd?.Message === 'string' && smd.Message.trim()) {
-      errorMsg = smd.Message.trim()
-    } else if (!response.ok) {
-      errorMsg = `HTTP ${response.status} from Africa's Talking`
-    } else if (first && Object.keys(first).length > 0) {
-      errorMsg = `Recipient: ${JSON.stringify(first)}`
-    } else if (recList.length === 0) {
-      errorMsg =
-        'No recipients in AT response (check phone format, sandbox test numbers, username sandbox vs live, and sender ID).'
-    } else {
-      errorMsg = JSON.stringify(smd ?? data).slice(0, 500)
+    if (status && status !== 'Unknown error') {
+      errorMsg = status
+    } else if (atBulkMessage) {
+      errorMsg = atBulkMessage
+    } else if (status) {
+      errorMsg = status
+    }
+    if (first && Object.keys(first).length > 0) {
+      const row = JSON.stringify(first)
+      if (!errorMsg || errorMsg === 'Unknown error') {
+        errorMsg = row
+      } else if (!errorMsg.includes(row.slice(0, 80))) {
+        errorMsg = `${errorMsg} · ${row}`
+      }
+    }
+    if (!errorMsg || errorMsg === 'Unknown error') {
+      if (!response.ok) errorMsg = `HTTP ${response.status} from Africa's Talking`
+      else if (recList.length === 0) {
+        errorMsg =
+          'No recipients in AT response (sandbox: add this phone as a test number; check sender ID and username sandbox vs live).'
+      } else {
+        errorMsg = JSON.stringify(smd ?? data).slice(0, 500)
+      }
     }
 
     return new Response(
