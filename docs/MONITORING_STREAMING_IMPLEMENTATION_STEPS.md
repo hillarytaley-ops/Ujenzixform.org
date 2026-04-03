@@ -12,13 +12,32 @@ Use this as **your** runbook. The UjenziXform **web app** already plays **HLS (`
 |--------|------|
 | **Vercel** | Hosts the **UjenziXform web app** (HTML/JS). Correct place for the SPA. |
 | **Hostinger (domain)** | Usually **DNS only**: point `yourdomain.com` to Vercel ([Vercel custom domains](https://vercel.com/docs/concepts/projects/domains): add domain in Vercel, set Hostinger DNS to the records Vercel shows — often **A** / **CNAME** to `cname.vercel-dns.com` or similar). |
-| **Camera HLS (MediaMTX)** | **Does not run on Vercel.** Vercel has no long-lived process pulling RTSP. HLS must be served from a **machine that can see the camera** (site LAN) plus a **reachable HTTPS URL** for browsers (see Part A). |
+| **Camera HLS** | **Does not run on Vercel.** The browser needs an **HTTPS** (or same-origin) **HLS / MP4 / embed** URL. That can come from **vendor cloud**, a **tunnel**, or a **small LAN runner** (see **Avoiding an on-site PC** below + Part A). |
 
 **If Hostinger is shared hosting only (no VPS):** use it for **email** and **DNS**; keep the app on Vercel. Do not expect cPanel shared hosting to replace MediaMTX for RTSP.
 
 **If Hostinger is a VPS:** you *could* run **nginx/Caddy + TLS** on a subdomain like `streams.example.com`, but the VPS must still **reach the camera RTSP** (rare for a cloud VPS unless you use **VPN/site-to-site** from the site to that server). Typical pattern remains: **MediaMTX on-site** + **Cloudflare Tunnel**, **Tailscale**, or **port-forward** to publish HLS as **HTTPS**.
 
 **Env / links:** After the domain moves, set `VITE_SITE_URL` (and any canonical URL in Vercel) to `https://your-hostinger-domain` so emails and deep links match production.
+
+---
+
+## Avoiding an on-site PC or NVR-side Docker
+
+**Reality check:** A standard **RTSP** URL like `rtsp://192.168.x.x/...` only works **on the same network as the camera** (or via VPN into that network). The **internet** (Vercel, Hostinger, builders’ phones on 4G) cannot magically open that URL unless **something** bridges camera ↔ HTTPS.
+
+If you want **not** to run MediaMTX on a construction **PC or NVR**, these are the realistic product choices:
+
+| Approach | On-site hardware? | Tradeoff |
+|----------|-------------------|----------|
+| **A. Vendor cloud stream** | Often **none** beyond the camera/NVR you already bought | Use brands that give a **stable HTTPS / HLS / embed** link or **iframe** for live view. Paste that into **`cameras.stream_url`** or **`embed_code`** in admin. **Best match** if you want zero site server. |
+| **B. Cameras that “phone home”** | Camera only (Wi‑Fi / 4G) | Many **cellular or cloud-managed** cameras push video to the vendor; you use their **playback URL** in Monitoring (if CORS/embed allows — sometimes iframe only). |
+| **C. Cloud NVR / VSaaS** | Camera + subscription | You pay a **hosted NVR**; cameras use **outbound** connections; you embed or link what the vendor documents. |
+| **D. Port-forward RTSP or HLS from site router** | Router config only | **Discouraged:** exposes the camera path to the open internet; abuse and bandwidth risk. |
+| **E. Outbound-only tunnel (no “server PC”)** | Minimal: **router with Tailscale**, or a **tiny plug device** (Pi, GL.iNet, etc.) that only opens an **outbound** tunnel | MediaMTX can run **in the cloud** or at home **only if** the tunnel makes the camera RTSP **reachable to that runner** — still engineering, but the **site** might not be a “Windows PC.” |
+| **F. Site vision worker** | For **analytics** (OpenCV), something must read RTSP — often the **same** small box as (E) or a laptop when someone is on site | Different from Monitoring playback; see [workers/site-vision/README.md](../workers/site-vision/README.md). |
+
+**Summary:** To **avoid a site PC entirely**, standardise on **cameras/NVRs whose live view is already a browser-safe URL or iframe** (option A–C). If you only have **raw RTSP on LAN**, physics requires either **something on LAN** that converts or forwards it, or **unsafe** exposure — there is no Vercel-only fix.
 
 ---
 
