@@ -6,6 +6,22 @@ Use this as **your** runbook. The UjenziXform **web app** already plays **HLS (`
 
 ---
 
+## Your stack: Vercel + domain on Hostinger
+
+| Piece | Role |
+|--------|------|
+| **Vercel** | Hosts the **UjenziXform web app** (HTML/JS). Correct place for the SPA. |
+| **Hostinger (domain)** | Usually **DNS only**: point `yourdomain.com` to Vercel ([Vercel custom domains](https://vercel.com/docs/concepts/projects/domains): add domain in Vercel, set Hostinger DNS to the records Vercel shows — often **A** / **CNAME** to `cname.vercel-dns.com` or similar). |
+| **Camera HLS (MediaMTX)** | **Does not run on Vercel.** Vercel has no long-lived process pulling RTSP. HLS must be served from a **machine that can see the camera** (site LAN) plus a **reachable HTTPS URL** for browsers (see Part A). |
+
+**If Hostinger is shared hosting only (no VPS):** use it for **email** and **DNS**; keep the app on Vercel. Do not expect cPanel shared hosting to replace MediaMTX for RTSP.
+
+**If Hostinger is a VPS:** you *could* run **nginx/Caddy + TLS** on a subdomain like `streams.example.com`, but the VPS must still **reach the camera RTSP** (rare for a cloud VPS unless you use **VPN/site-to-site** from the site to that server). Typical pattern remains: **MediaMTX on-site** + **Cloudflare Tunnel**, **Tailscale**, or **port-forward** to publish HLS as **HTTPS**.
+
+**Env / links:** After the domain moves, set `VITE_SITE_URL` (and any canonical URL in Vercel) to `https://your-hostinger-domain` so emails and deep links match production.
+
+---
+
 ## Part A — RTSP cameras play inside Monitoring (required path: RTSP → HLS)
 
 Browsers will **never** play `rtsp://` directly. You must expose **HLS** (or MP4 over HTTPS) that the **viewer’s browser** can request.
