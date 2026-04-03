@@ -137,9 +137,9 @@ This process is **not** part of Vercel or Supabase hosting — you keep it alive
 |------|---------------------|
 | **Docker (Linux / WSL2 / mini PC)** | `docker compose up -d` — `restart: unless-stopped` is already in `docker-compose.yml`. |
 | **Docker (Windows)** | Same, or `docker run ... --restart unless-stopped`; ensure Docker starts at login/boot if required. |
-| **Python venv (Windows)** | Task Scheduler: trigger “At startup”, action run `E:\path\to\.venv\Scripts\python.exe E:\path\to\main.py`, start in worker directory; optionally “Restart on failure”. Or wrap with [NSSM](https://nssm.cc/) as a service. **Disable sleep** on the machine for overnight runs. |
+| **Python venv (Windows)** | Task Scheduler: trigger “At startup”, action run `E:\path\to\.venv\Scripts\python.exe E:\path\to\main.py`, start in worker directory; optionally “Restart on failure”. Or wrap with [NSSM](https://nssm.cc/) as a service. **Disable sleep** on the machine for overnight runs. Example script (edit paths): [`scripts/register-windows-task.example.ps1`](./scripts/register-windows-task.example.ps1). |
 
-Merged release checklist (where this fits vs payments, migrations, monitoring): [`docs/OPS_RUNBOOK.md`](../docs/OPS_RUNBOOK.md).
+Merged release checklist (where this fits vs payments, migrations, monitoring): [`docs/OPS_RUNBOOK.md`](../docs/OPS_RUNBOOK.md). **Infra vs app scope** (RTSP, WhatsApp, relay, PTZ, ML): [`docs/INFRA_VENDOR_ML_BOUNDARIES.md`](../docs/INFRA_VENDOR_ML_BOUNDARIES.md).
 
 ## Troubleshooting
 

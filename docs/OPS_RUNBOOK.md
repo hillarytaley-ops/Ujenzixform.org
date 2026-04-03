@@ -9,7 +9,7 @@
 1. **Operationalize what ships today** — migrations applied everywhere, Vercel env vars match Supabase, monitoring access-code flow smoke-tested, optional Edge flags only if you deploy functions.
 2. **Payments and notifications** — end-to-end where you promise them (see payment guide and delivery notification docs).
 3. **Hardening** — monitoring RLS assumptions, staff secrets, admin session/JWT alignment ([SECURITY_OPERATIONS](./SECURITY_OPERATIONS.md)).
-4. **Later phases** — site vision worker at scale, custom CV, PTZ / two-way audio via a gateway ([UJENZIXFORM_PENDING_AND_FUTURE_WORK.txt](./UJENZIXFORM_PENDING_AND_FUTURE_WORK.txt)). **What exists vs future (monitoring / vision):** [MONITORING_AND_VISION_STATUS.md](./MONITORING_AND_VISION_STATUS.md).
+4. **Later phases** — site vision worker at scale, custom CV, PTZ / two-way audio via a gateway ([UJENZIXFORM_PENDING_AND_FUTURE_WORK.txt](./UJENZIXFORM_PENDING_AND_FUTURE_WORK.txt)). **What exists vs future (monitoring / vision):** [MONITORING_AND_VISION_STATUS.md](./MONITORING_AND_VISION_STATUS.md). **What is intentionally outside the SPA** (WhatsApp Meta API, RTSP→HLS gateway, relay, PTZ bridge, ML program, 24/7 host): [INFRA_VENDOR_ML_BOUNDARIES.md](./INFRA_VENDOR_ML_BOUNDARIES.md).
 
 Goal: core marketplace and admin flows **boringly reliable** before investing in vision/PTZ depth.
 

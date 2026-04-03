@@ -44,6 +44,7 @@ Single reference for what **exists today** vs **planned / future**. Aligns engin
 
 ## Related docs
 
+- `docs/INFRA_VENDOR_ML_BOUNDARIES.md` — **Canonical:** WhatsApp, RTSP/HLS gateway, relay, PTZ, custom CV, worker host — what the app does vs what you provision (includes MediaMTX example).
 - `docs/SITE_VISION_ADVANCED_INTEGRATION.md` — Custom CV, RTSP→HLS, relay, signed ingest (optional Edge path shipped).
 - `docs/EDGE_THROTTLING_AND_STREAM_RELAY.md` — Edge functions, stream URL, throttling.
 - `docs/OPS_RUNBOOK.md` — Playable stream expectations, deploy checklist.

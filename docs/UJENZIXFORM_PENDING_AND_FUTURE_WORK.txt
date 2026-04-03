@@ -10,6 +10,19 @@ save as PDF from your editor or printer dialog.
 The list reflects the codebase and product discussions as of early 2026. It is
 not a promise of delivery order; use it as a planning checklist.
 
+INFRA / VENDOR / ML (SCOPE "CLOSED" IN DOCS)
+--------------------------------------------------------------------------------
+Several recurring questions — WhatsApp Business API, RTSP inside the browser,
+byte-level HLS relay, PTZ/two-way audio gateway, custom CV/PPE products, and
+keeping the vision worker on 24/7 on a physical PC — are not missing React
+components. They need Meta onboarding, transcoding hardware or Docker (example:
+docs/examples/mediamtx-rtsp-to-hls), extra Edge/VM relay architecture, ONVIF or
+vendor bridges, ML datasets, and Windows/Task Scheduler or Docker restart on
+site. The single canonical explanation and checklists live in:
+docs/INFRA_VENDOR_ML_BOUNDARIES.md
+Use that file before filing bugs titled "fix RTSP" or "enable WhatsApp" against
+the web app alone.
+
 
 DIFFERENTIATORS — WHAT EXISTS NOW VS WHAT COMES NEXT
 --------------------------------------------------------------------------------

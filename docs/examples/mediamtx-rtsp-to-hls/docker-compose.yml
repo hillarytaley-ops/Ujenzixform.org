@@ -1,0 +1,11 @@
+# Pull RTSP from a camera and expose HLS on :8888 for UjenziXform Monitoring.
+# See README.md in this folder.
+
+services:
+  mediamtx:
+    image: bluenviron/mediamtx:latest
+    restart: unless-stopped
+    ports:
+      - "8888:8888"
+    volumes:
+      - ./mediamtx.yml:/mediamtx.yml:ro

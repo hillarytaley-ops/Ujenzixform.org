@@ -2,6 +2,8 @@
 
 Practical notes for the four areas that are **not** fully productized in the SPA alone.
 
+**Canonical scope split (WhatsApp, RTSP gateway, relay, PTZ, ML, worker host):** [INFRA_VENDOR_ML_BOUNDARIES.md](./INFRA_VENDOR_ML_BOUNDARIES.md) — includes a runnable **MediaMTX** example under `docs/examples/mediamtx-rtsp-to-hls/`.
+
 ## 1. Custom CV (per-material, PPE, fine-tuned models)
 
 **Today:** `workers/site-vision` supports optional **YOLO** (`USE_YOLO=1`) with generic COCO-style weights.
