@@ -116,6 +116,10 @@ These should **NEVER** be prefixed with `VITE_` as they would be exposed to the 
 - **Live SMS** → set `AFRICASTALKING_USERNAME` to your **production app username** (not the word `sandbox`) and use the **live** API key for that app.
 - After rotating a key in AT, wait **~5 minutes** before testing ([AT help](https://help.africastalking.com/en/articles/1036048-why-am-i-getting-the-error-supplied-authentication-is-invalid)).
 
+### Sign in with Apple (OAuth)
+
+The **Apple** button on `/auth` is wired in code; enable the provider in Supabase and complete Apple Developer steps: **[OAUTH_APPLE_SETUP.md](./OAUTH_APPLE_SETUP.md)**.
+
 ## Security Best Practices
 
 1. **Never commit credentials** - Add `.env.local` to `.gitignore`

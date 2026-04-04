@@ -229,10 +229,38 @@ const Auth = () => {
   };
 
   const signInWithProvider = async (provider: 'google' | 'github' | 'apple') => {
-    await supabase.auth.signInWithOAuth({
-      provider,
-      options: { redirectTo: `${window.location.origin}/home` },
-    });
+    if (formLoading) return;
+    setFormLoading(true);
+    try {
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider,
+        options: {
+          redirectTo: `${window.location.origin}/home`,
+          skipBrowserRedirect: false,
+        },
+      });
+      if (error) {
+        toast({
+          variant: 'destructive',
+          title: `${provider === 'apple' ? 'Apple' : provider === 'google' ? 'Google' : 'GitHub'} sign-in failed`,
+          description: error.message,
+        });
+        setFormLoading(false);
+        return;
+      }
+      if (data?.url) {
+        window.location.assign(data.url);
+      } else {
+        setFormLoading(false);
+      }
+    } catch (err: unknown) {
+      toast({
+        variant: 'destructive',
+        title: 'Sign-in failed',
+        description: err instanceof Error ? err.message : 'Unknown error',
+      });
+      setFormLoading(false);
+    }
   };
 
   return (
