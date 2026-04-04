@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -49,6 +49,7 @@ import { supabase, SUPABASE_URL, SUPABASE_ANON_KEY } from "@/integrations/supaba
 import { useToast } from "@/hooks/use-toast";
 import { format } from 'date-fns';
 import { getPrefetchedOrders } from '@/services/dataPrefetch';
+import { fetchBuyerRolesMap, isOrderInNotDispatchedBucket } from '@/utils/supplierPrivateBuilderOrders';
 
 interface OrderItem {
   name: string;
@@ -691,6 +692,7 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, in
       const buyerIds = [...new Set(purchaseOrders.map((po: any) => po.buyer_id).filter(Boolean))];
       let buyerProfiles: Record<string, any> = {};
       
+      let buyerRolesMap: Record<string, string> = {};
       if (buyerIds.length > 0) {
         try {
           const profilesResponse = await fetch(
@@ -704,6 +706,7 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, in
         } catch (e) {
           console.log('Profiles fetch failed');
         }
+        buyerRolesMap = await fetchBuyerRolesMap(buyerIds, headers, SUPABASE_URL);
       }
 
       // Enrich from delivery_requests so provider-accepted status shows even if purchase_orders wasn't updated
@@ -1024,7 +1027,7 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, in
           created_at: po.created_at,
           updated_at: po.updated_at || po.created_at,
           order_type: isQuoteRequest ? 'quote_request' : 'direct_purchase',
-          buyer_role: po.buyer_role || 'unknown',
+          buyer_role: buyerRolesMap[po.buyer_id] || po.buyer_role || 'unknown',
           delivery_provider_id: resolvedProviderId || undefined,
           delivery_provider_name: resolvedProviderName || undefined,
           delivery_provider_phone: resolvedProviderPhone || undefined,
@@ -1056,7 +1059,7 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, in
             created_at: po.created_at,
             updated_at: po.updated_at || po.created_at,
             order_type: (po.po_number?.startsWith('QR-') ? 'quote_request' : 'direct_purchase') as Order['order_type'],
-            buyer_role: po.buyer_role || 'unknown',
+            buyer_role: buyerRolesMap[po.buyer_id] || po.buyer_role || 'unknown',
             delivery_provider_id: po.delivery_provider_id,
             delivery_provider_name: po.delivery_provider_name,
             delivery_provider_phone: po.delivery_provider_phone,
@@ -1145,6 +1148,14 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, in
     };
     return flow[currentStatus];
   };
+
+  const privateBuilderOrdersAttentionCount = useMemo(
+    () =>
+      orders.filter(
+        (o) => o.buyer_role === 'private_client' && isOrderInNotDispatchedBucket(o.status)
+      ).length,
+    [orders]
+  );
 
   // Filter orders
   const filteredOrders = orders.filter(order => {
@@ -1538,8 +1549,18 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, in
             value="not_dispatched" 
             className="data-[state=active]:bg-amber-500 data-[state=active]:text-white"
           >
-            <Clock className="h-4 w-4 mr-2" />
-            Not Dispatched ({notDispatchedOrders.length})
+            <Clock className="h-4 w-4 mr-2 shrink-0" />
+            <span className="inline-flex flex-wrap items-center gap-1.5">
+              Not Dispatched ({notDispatchedOrders.length})
+              {privateBuilderOrdersAttentionCount > 0 && (
+                <span
+                  className="rounded-full bg-emerald-600 px-1.5 py-0.5 text-[10px] font-bold leading-none text-white"
+                  title="From Private Builders"
+                >
+                  PB {privateBuilderOrdersAttentionCount > 99 ? '99+' : privateBuilderOrdersAttentionCount}
+                </span>
+              )}
+            </span>
           </TabsTrigger>
           <TabsTrigger 
             value="shipped" 

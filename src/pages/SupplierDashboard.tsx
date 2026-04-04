@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { Link } from "react-router-dom";
 import { useUrlTabSync } from "@/hooks/useUrlTabSync";
 import { supabase, SUPABASE_URL, SUPABASE_ANON_KEY } from "@/integrations/supabase/client";
@@ -68,6 +68,11 @@ import { EnhancedQRCodeManager } from "@/components/qr/EnhancedQRCodeManager";
 import { ProfileEditDialog } from "@/components/profile/ProfileEditDialog";
 import { ProfileViewDialog } from "@/components/profile/ProfileViewDialog";
 import { InventoryManager } from "@/components/supplier/InventoryManager";
+import {
+  countPrivateBuilderOrdersNeedingAttention,
+  fetchBuyerRolesMap,
+  isOrderInNotDispatchedBucket,
+} from "@/utils/supplierPrivateBuilderOrders";
 import { OrderHistory } from "@/components/orders/OrderHistory";
 import { ReviewsList, SupplierRatingSummary } from "@/components/reviews/ReviewSystem";
 import { UserAnalyticsDashboard } from "@/components/analytics/UserAnalyticsDashboard";
@@ -676,6 +681,13 @@ const SupplierDashboard = () => {
   });
   const [processingQuote, setProcessingQuote] = useState(false);
   const [loadingQuotes, setLoadingQuotes] = useState(false);
+  const [buyerRoleByUserId, setBuyerRoleByUserId] = useState<Record<string, string>>({});
+  const privateBuilderAlertedPoIdsRef = useRef<Set<string>>(new Set());
+  const supplierAlertContextRef = useRef<{
+    supplierIds: string[];
+    userId: string;
+    supplierRecordId: string | null;
+  }>({ supplierIds: [], userId: '', supplierRecordId: null });
 
   const analyticsSupplierIds = useMemo(() => {
     if (resolvedSupplierIds.length > 0) return resolvedSupplierIds;
@@ -683,10 +695,15 @@ const SupplierDashboard = () => {
     return supplierRecordId ? [...new Set([user.id, supplierRecordId])] : [user.id];
   }, [resolvedSupplierIds, user?.id, supplierRecordId]);
 
-  const viewOrdersNavBadgeCount = useMemo(
+  const quoteNavBadgeCount = useMemo(
     () => countQuotesPendingSupplierResponse(quoteRequests),
     [quoteRequests]
   );
+  const privateBuilderOrdersBadgeCount = useMemo(
+    () => countPrivateBuilderOrdersNeedingAttention(ordersForOrdersTab, buyerRoleByUserId),
+    [ordersForOrdersTab, buyerRoleByUserId]
+  );
+  const viewOrdersNavBadgeCount = quoteNavBadgeCount + privateBuilderOrdersBadgeCount;
   const viewOrdersNavBadgeLabel =
     viewOrdersNavBadgeCount > 99 ? '99+' : String(viewOrdersNavBadgeCount);
 
@@ -1020,6 +1037,51 @@ const SupplierDashboard = () => {
     }
   };
 
+  useEffect(() => {
+    const supplierIds =
+      resolvedSupplierIds.length > 0
+        ? [...resolvedSupplierIds]
+        : ([supplierRecordId, user?.id].filter(Boolean) as string[]);
+    supplierAlertContextRef.current = {
+      supplierIds,
+      userId: user?.id || '',
+      supplierRecordId: supplierRecordId || null,
+    };
+  }, [resolvedSupplierIds, supplierRecordId, user?.id]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const buyerIds = [
+        ...new Set(ordersForOrdersTab.map((o: { buyer_id?: string }) => o.buyer_id).filter(Boolean)),
+      ] as string[];
+      if (buyerIds.length === 0) {
+        if (!cancelled) setBuyerRoleByUserId({});
+        return;
+      }
+      let accessToken = '';
+      try {
+        const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+        if (storedSession) {
+          const parsed = JSON.parse(storedSession);
+          accessToken = parsed.access_token || '';
+        }
+      } catch {
+        /* ignore */
+      }
+      const headers: Record<string, string> = {
+        apikey: SUPABASE_ANON_KEY,
+        'Content-Type': 'application/json',
+      };
+      if (accessToken) headers.Authorization = `Bearer ${accessToken}`;
+      const map = await fetchBuyerRolesMap(buyerIds, headers, SUPABASE_URL);
+      if (!cancelled) setBuyerRoleByUserId(map);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [ordersForOrdersTab]);
+
   // Fetch quote requests on mount and when user changes
   useEffect(() => {
     // Try to get user ID from multiple sources
@@ -1055,6 +1117,71 @@ const SupplierDashboard = () => {
         (payload: any) => {
           console.log('📬 NEW quote request detected:', payload.new?.po_number, 'supplier_id:', payload.new?.supplier_id);
           fetchQuoteRequests();
+          const row = payload.new;
+          const sid = row?.supplier_id != null ? String(row.supplier_id) : '';
+          const ctx = supplierAlertContextRef.current;
+          const matchesSupplier =
+            !!sid &&
+            (ctx.supplierIds.includes(sid) ||
+              (ctx.supplierRecordId && sid === ctx.supplierRecordId) ||
+              sid === ctx.userId);
+          if (!matchesSupplier) return;
+
+          let accessToken = '';
+          try {
+            const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+            if (storedSession) {
+              const parsed = JSON.parse(storedSession);
+              accessToken = parsed.access_token || '';
+            }
+          } catch {
+            /* ignore */
+          }
+          const authHeaders: Record<string, string> = {
+            apikey: SUPABASE_ANON_KEY,
+            'Content-Type': 'application/json',
+          };
+          if (accessToken) authHeaders.Authorization = `Bearer ${accessToken}`;
+
+          fetch(`${SUPABASE_URL}/rest/v1/rpc/get_supplier_orders_for_current_user`, {
+            method: 'POST',
+            headers: authHeaders,
+            body: JSON.stringify({ _limit: 500 }),
+            cache: 'no-store',
+          })
+            .then((res) => (res.ok ? res.json() : []))
+            .then((data: unknown) => {
+              const list = Array.isArray(data) ? data : [];
+              if (list.length) setOrdersForOrdersTab(list as any[]);
+            })
+            .catch(() => {});
+
+          void (async () => {
+            if (!row?.id || privateBuilderAlertedPoIdsRef.current.has(row.id)) return;
+            const roleMap = await fetchBuyerRolesMap(
+              row.buyer_id ? [String(row.buyer_id)] : [],
+              authHeaders,
+              SUPABASE_URL
+            );
+            if (!row.buyer_id || roleMap[row.buyer_id] !== 'private_client') return;
+            if (!isOrderInNotDispatchedBucket(row.status)) return;
+            privateBuilderAlertedPoIdsRef.current.add(row.id);
+            toast.message('New order from Private Builder', {
+              description: row.po_number || 'Open View Orders → Orders tab',
+              duration: 10_000,
+            });
+            if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+              try {
+                new Notification('UjenziXform — Private Builder order', {
+                  body: row.po_number ? `Order ${row.po_number}` : 'New order needs your attention',
+                  tag: `pb-po-${row.id}`,
+                  icon: '/pwa-icon-192.png',
+                });
+              } catch {
+                /* ignore */
+              }
+            }
+          })();
         }
       )
       .on('postgres_changes', 
@@ -2085,7 +2212,7 @@ const SupplierDashboard = () => {
                 {viewOrdersNavBadgeCount > 0 && (
                   <span
                     className="absolute -right-2 -top-2 flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold leading-none text-white ring-2 ring-white dark:ring-slate-800"
-                    aria-label={`${viewOrdersNavBadgeCount} quotes need your response`}
+                    aria-label={`${viewOrdersNavBadgeCount} items need attention (quotes or private builder orders)`}
                   >
                     {viewOrdersNavBadgeLabel}
                   </span>
@@ -2355,6 +2482,31 @@ const SupplierDashboard = () => {
                 </CardDescription>
               </CardHeader>
               <CardContent>
+                {privateBuilderOrdersBadgeCount > 0 &&
+                  typeof Notification !== 'undefined' &&
+                  Notification.permission === 'default' && (
+                    <Alert
+                      className={`mb-4 ${isDarkMode ? 'border-emerald-500/40 bg-slate-800/90' : 'border-emerald-200 bg-emerald-50'}`}
+                    >
+                      <Bell className="h-4 w-4 text-emerald-600" />
+                      <AlertTitle className={isDarkMode ? 'text-emerald-200' : 'text-emerald-900'}>
+                        Alerts for Private Builder orders
+                      </AlertTitle>
+                      <AlertDescription className={`flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between ${isDarkMode ? 'text-slate-300' : 'text-emerald-900'}`}>
+                        <span className="text-sm">
+                          Enable browser notifications to get a device alert when a Private Builder places an order.
+                        </span>
+                        <Button
+                          type="button"
+                          size="sm"
+                          className="shrink-0 bg-emerald-600 hover:bg-emerald-700"
+                          onClick={() => void Notification.requestPermission()}
+                        >
+                          Enable notifications
+                        </Button>
+                      </AlertDescription>
+                    </Alert>
+                  )}
                 <Tabs value={viewOrdersSubTab} onValueChange={setViewOrdersSubTab} className="space-y-4">
                   <div
                     className={`rounded-xl border-2 shadow-md p-3 sm:p-4 ${
@@ -2395,10 +2547,18 @@ const SupplierDashboard = () => {
                           data-[state=active]:border-blue-600 data-[state=active]:bg-blue-600 data-[state=active]:text-white data-[state=active]:shadow-md
                           data-[state=inactive]:border-slate-200 data-[state=inactive]:bg-white data-[state=inactive]:text-slate-800
                           dark:data-[state=inactive]:border-slate-600 dark:data-[state=inactive]:bg-slate-800 dark:data-[state=inactive]:text-slate-100
-                          flex items-center justify-center gap-2`}
+                          flex flex-wrap items-center justify-center gap-1.5`}
                       >
                         <Package className="h-5 w-5 sm:h-6 sm:w-6 shrink-0" />
-                        <span>Orders</span>
+                        <span className="whitespace-nowrap">Orders</span>
+                        {privateBuilderOrdersBadgeCount > 0 && (
+                          <span
+                            className="min-w-[1.25rem] rounded-full bg-emerald-600 px-1.5 py-0.5 text-center text-xs font-bold text-white"
+                            title="Private Builder orders awaiting dispatch"
+                          >
+                            {privateBuilderOrdersBadgeCount > 99 ? '99+' : privateBuilderOrdersBadgeCount}
+                          </span>
+                        )}
                       </TabsTrigger>
                       <TabsTrigger
                         value="dispatch"
