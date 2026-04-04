@@ -1,13 +1,30 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { supabase } from '@/integrations/supabase/client';
-import { Receipt, Edit, CheckCircle2, CreditCard, Loader2, Send, Download } from 'lucide-react';
+import {
+  Receipt,
+  Edit,
+  CheckCircle2,
+  CreditCard,
+  Loader2,
+  Send,
+  Download,
+  AlertTriangle,
+} from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 interface Invoice {
@@ -29,6 +46,7 @@ interface Invoice {
   is_editable: boolean;
   acknowledged_at?: string;
   created_at?: string;
+  notes?: string | null;
   purchase_order?: {
     po_number?: string;
   };
@@ -55,6 +73,9 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [saving, setSaving] = useState(false);
   const [acknowledging, setAcknowledging] = useState(false);
+  const [payInvoice, setPayInvoice] = useState<Invoice | null>(null);
+  const [paymentReference, setPaymentReference] = useState('');
+  const [recordingPayment, setRecordingPayment] = useState(false);
   const { toast } = useToast();
 
   // Form state for editing
@@ -187,6 +208,21 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
     }
   }, [userId, userRole, supplierRecordId]);
 
+  const builderPayPrompt = useMemo(() => {
+    if (userRole !== 'builder') {
+      return { needAcknowledge: [] as Invoice[], needPayment: [] as Invoice[] };
+    }
+    const unpaid = (i: Invoice) => (i.payment_status || 'pending') !== 'paid';
+    const needAcknowledge = invoices.filter(
+      (i) => i.status === 'sent' && !i.acknowledged_at && unpaid(i)
+    );
+    const needPayment = invoices.filter(
+      (i) =>
+        unpaid(i) && (i.status === 'acknowledged' || !!i.acknowledged_at)
+    );
+    return { needAcknowledge, needPayment };
+  }, [invoices, userRole]);
+
   const handleEditInvoice = (invoice: Invoice) => {
     if (!invoice.is_editable) {
       toast({
@@ -240,6 +276,37 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
 
       if (error) throw error;
 
+      const poId = editingInvoice.purchase_order_id;
+      const firstTimeSent = editingInvoice.status !== 'sent';
+      if (userRole === 'supplier' && firstTimeSent && poId) {
+        const { data: poRow } = await supabase
+          .from('purchase_orders')
+          .select('delivery_provider_id, po_number')
+          .eq('id', poId)
+          .maybeSingle();
+        const providerUid = poRow?.delivery_provider_id as string | undefined;
+        if (providerUid) {
+          const poLabel = poRow?.po_number ? ` #${poRow.po_number}` : '';
+          const { error: nErr } = await supabase.from('notifications').insert({
+            user_id: providerUid,
+            type: 'invoice_pay_builder_prompt',
+            title: 'Pay the professional builder now',
+            message: `Invoice ${editingInvoice.invoice_number} was forwarded to the builder for order${poLabel}. Complete payment to the builder immediately (per your delivery agreement).`,
+            priority: 'urgent',
+            data: {
+              invoice_id: editingInvoice.id,
+              purchase_order_id: poId,
+              invoice_number: editingInvoice.invoice_number,
+            },
+            action_url: '/delivery-dashboard?tab=pay',
+            action_label: 'Open Pay tab',
+          });
+          if (nErr) {
+            console.warn('Invoice forward: could not notify delivery provider:', nErr.message);
+          }
+        }
+      }
+
       toast({
         title: "Invoice Updated",
         description: "Invoice has been updated and sent to builder",
@@ -276,8 +343,8 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
       if (error) throw error;
 
       toast({
-        title: "Invoice Acknowledged",
-        description: "You can now proceed with payment",
+        title: "Invoice acknowledged",
+        description: "Pay your supplier immediately — use Pay now on this invoice.",
       });
 
       fetchInvoices();
@@ -290,6 +357,47 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
       });
     } finally {
       setAcknowledging(false);
+    }
+  };
+
+  const handleRecordPayment = async () => {
+    if (!payInvoice) return;
+    try {
+      setRecordingPayment(true);
+      const ref = paymentReference.trim();
+      const stamp = new Date().toISOString();
+      const line = ref
+        ? `\n[${stamp}] Builder marked paid — reference: ${ref}`
+        : `\n[${stamp}] Builder marked paid`;
+      const nextNotes = `${payInvoice.notes || ''}${line}`.trim();
+
+      const { error } = await supabase
+        .from('invoices')
+        .update({
+          payment_status: 'paid',
+          notes: nextNotes,
+          updated_at: stamp,
+        })
+        .eq('id', payInvoice.id);
+
+      if (error) throw error;
+
+      toast({
+        title: "Payment recorded",
+        description: "This invoice is marked paid. Your supplier can see the update on their side.",
+      });
+      setPayInvoice(null);
+      setPaymentReference('');
+      fetchInvoices();
+    } catch (error: any) {
+      console.error('Error recording payment:', error);
+      toast({
+        title: "Could not record payment",
+        description: error.message || "Update failed. Try again or contact support.",
+        variant: "destructive",
+      });
+    } finally {
+      setRecordingPayment(false);
     }
   };
 
@@ -326,6 +434,35 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
         </Button>
       </div>
 
+      {userRole === 'builder' &&
+        (builderPayPrompt.needAcknowledge.length > 0 ||
+          builderPayPrompt.needPayment.length > 0) && (
+          <Alert className="border-amber-500/60 bg-amber-50 text-amber-950 dark:border-amber-600 dark:bg-amber-950/40 dark:text-amber-50">
+            <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+            <AlertTitle className="text-amber-950 dark:text-amber-50">
+              Pay suppliers without delay
+            </AlertTitle>
+            <AlertDescription className="space-y-2 text-amber-900/90 dark:text-amber-100/90">
+              {builderPayPrompt.needAcknowledge.length > 0 && (
+                <p>
+                  <strong>{builderPayPrompt.needAcknowledge.length}</strong> invoice
+                  {builderPayPrompt.needAcknowledge.length === 1 ? ' was' : 's were'} forwarded by your
+                  supplier{builderPayPrompt.needAcknowledge.length === 1 ? '' : 's'}. Acknowledge each one,
+                  then <strong>pay immediately</strong> using <strong>Pay now</strong>.
+                </p>
+              )}
+              {builderPayPrompt.needPayment.length > 0 && (
+                <p>
+                  <strong>{builderPayPrompt.needPayment.length}</strong> invoice
+                  {builderPayPrompt.needPayment.length === 1 ? ' is' : 's are'} ready for payment — complete
+                  transfer (M-Pesa, bank, etc.) per your agreement, then tap <strong>Pay now</strong> to record
+                  it.
+                </p>
+              )}
+            </AlertDescription>
+          </Alert>
+        )}
+
       {invoices.length === 0 ? (
         <Card>
           <CardContent className="py-10 text-center text-muted-foreground text-sm">
@@ -341,9 +478,22 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
               <div>
                 <CardTitle>{invoice.invoice_number}</CardTitle>
                 <p className="text-sm text-gray-500">
-                  PO: {invoice.purchase_order?.po_number || 'N/A'} • 
+                  PO: {invoice.purchase_order?.po_number || 'N/A'} •{' '}
                   {invoice.supplier?.company_name || 'Supplier'}
                 </p>
+                {userRole === 'builder' && invoice.status === 'sent' && !invoice.acknowledged_at && (
+                  <p className="mt-2 text-sm font-medium text-amber-800 dark:text-amber-200">
+                    Forwarded by your supplier — acknowledge, then pay immediately.
+                  </p>
+                )}
+                {userRole === 'builder' &&
+                  (invoice.status === 'acknowledged' || invoice.acknowledged_at) &&
+                  invoice.payment_status !== 'paid' && (
+                    <p className="mt-2 text-sm font-semibold text-red-700 dark:text-red-300">
+                      Payment due now — pay {invoice.supplier?.company_name || 'the supplier'} as soon as
+                      possible.
+                    </p>
+                  )}
               </div>
               {getStatusBadge(invoice.status, invoice.payment_status)}
             </div>
@@ -369,7 +519,7 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
                 </div>
               </div>
 
-              <div className="flex gap-2 pt-4 border-t">
+              <div className="flex flex-wrap gap-2 pt-4 border-t">
                 {userRole === 'supplier' && invoice.is_editable && (
                   <Button
                     variant="outline"
@@ -384,7 +534,7 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
                   <Button
                     onClick={() => handleAcknowledgeInvoice(invoice)}
                     disabled={acknowledging}
-                    className="flex-1"
+                    className="flex-1 min-w-[140px] bg-amber-600 hover:bg-amber-700"
                   >
                     {acknowledging ? (
                       <>
@@ -394,20 +544,28 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
                     ) : (
                       <>
                         <CheckCircle2 className="h-4 w-4 mr-2" />
-                        Acknowledge Invoice
+                        Acknowledge (then pay)
                       </>
                     )}
                   </Button>
                 )}
 
-                {invoice.status === 'acknowledged' && invoice.payment_status !== 'paid' && (
-                  <Button className="flex-1">
-                    <CreditCard className="h-4 w-4 mr-2" />
-                    Process Payment
-                  </Button>
-                )}
+                {userRole === 'builder' &&
+                  (invoice.status === 'acknowledged' || !!invoice.acknowledged_at) &&
+                  invoice.payment_status !== 'paid' && (
+                    <Button
+                      className="flex-1 min-w-[140px] bg-red-600 hover:bg-red-700"
+                      onClick={() => {
+                        setPaymentReference('');
+                        setPayInvoice(invoice);
+                      }}
+                    >
+                      <CreditCard className="h-4 w-4 mr-2" />
+                      Pay now
+                    </Button>
+                  )}
 
-                <Button variant="outline">
+                <Button variant="outline" type="button">
                   <Download className="h-4 w-4 mr-2" />
                   Download
                 </Button>
@@ -416,6 +574,78 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
           </CardContent>
         </Card>
       ))}
+
+      <Dialog
+        open={!!payInvoice}
+        onOpenChange={(open) => {
+          if (!open) {
+            setPayInvoice(null);
+            setPaymentReference('');
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Pay supplier immediately</DialogTitle>
+            <DialogDescription>
+              Complete payment outside the app (M-Pesa, bank transfer, cheque, etc.) as agreed with your
+              supplier, then record it here so your records stay accurate.
+            </DialogDescription>
+          </DialogHeader>
+          {payInvoice && (
+            <div className="space-y-3 py-2">
+              <div className="rounded-md border bg-muted/50 px-3 py-2 text-sm">
+                <p className="font-medium">{payInvoice.invoice_number}</p>
+                <p className="text-muted-foreground">
+                  {payInvoice.supplier?.company_name || 'Supplier'} ·{' '}
+                  <span className="font-semibold text-foreground">
+                    KES {Number(payInvoice.total_amount).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                  </span>
+                </p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="pay-ref">Payment reference (optional)</Label>
+                <Input
+                  id="pay-ref"
+                  placeholder="e.g. M-Pesa confirmation code"
+                  value={paymentReference}
+                  onChange={(e) => setPaymentReference(e.target.value)}
+                />
+              </div>
+            </div>
+          )}
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              variant="outline"
+              type="button"
+              onClick={() => {
+                setPayInvoice(null);
+                setPaymentReference('');
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              className="bg-red-600 hover:bg-red-700"
+              disabled={recordingPayment}
+              onClick={() => void handleRecordPayment()}
+            >
+              {recordingPayment ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Saving…
+                </>
+              ) : (
+                <>
+                  <CreditCard className="h-4 w-4 mr-2" />
+                  I've paid — record payment
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Edit Invoice Dialog */}
       <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>

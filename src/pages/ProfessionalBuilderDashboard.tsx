@@ -3579,7 +3579,8 @@ const ProfessionalBuilderDashboardPage = () => {
 
                   <TabsContent value="invoice-list" className="mt-0 space-y-2">
                     <p className="text-sm text-muted-foreground">
-                      View, acknowledge, and process invoices.
+                      When a supplier forwards an invoice, acknowledge it and use <strong>Pay now</strong> to
+                      settle and record payment without delay.
                     </p>
                     {user?.id && <InvoiceManagement userId={user.id} userRole="builder" />}
                   </TabsContent>
