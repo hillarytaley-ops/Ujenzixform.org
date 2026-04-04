@@ -719,7 +719,7 @@ export const DispatchScanner: React.FC<DispatchScannerProps> = ({
         
         // Final fallback: anon key (will likely fail due to RLS, but better than nothing)
         console.warn('⚠️ Using anon key as final fallback (may return 0 results due to RLS)');
-        return ANON_KEY;
+        return SUPABASE_ANON_KEY;
       };
       
       // Get fresh access token
@@ -728,7 +728,7 @@ export const DispatchScanner: React.FC<DispatchScannerProps> = ({
       console.log('✅ Got access token for fetchOrders');
       
       const headers: Record<string, string> = {
-        'apikey': ANON_KEY,
+        'apikey': SUPABASE_ANON_KEY,
         'Authorization': `Bearer ${accessToken}`,
         'Content-Type': 'application/json'
       };
@@ -1267,12 +1267,12 @@ export const DispatchScanner: React.FC<DispatchScannerProps> = ({
     if (deliveryRequired && !hasDeliveryProvider && selectedOrder.id) {
       try {
         // Get access token
-        let accessToken = ANON_KEY;
+        let accessToken = SUPABASE_ANON_KEY;
         try {
           const stored = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
           if (stored) {
             const parsed = JSON.parse(stored);
-            accessToken = parsed.access_token || ANON_KEY;
+            accessToken = parsed.access_token || SUPABASE_ANON_KEY;
           }
         } catch (e) {}
         
@@ -1281,7 +1281,7 @@ export const DispatchScanner: React.FC<DispatchScannerProps> = ({
           `${SUPABASE_URL}/rest/v1/delivery_requests?purchase_order_id=eq.${selectedOrder.id}&provider_id=not.is.null&select=provider_id,status&limit=1`,
           {
             headers: {
-              'apikey': ANON_KEY,
+              'apikey': SUPABASE_ANON_KEY,
               'Authorization': `Bearer ${accessToken}`,
             }
           }
@@ -1401,7 +1401,7 @@ export const DispatchScanner: React.FC<DispatchScannerProps> = ({
           
           // Final fallback: anon key
           console.warn('⚠️ Using anon key as final fallback');
-          return ANON_KEY;
+          return SUPABASE_ANON_KEY;
         };
         
         // Get fresh access token
@@ -1435,7 +1435,7 @@ export const DispatchScanner: React.FC<DispatchScannerProps> = ({
           `${SUPABASE_URL}/rest/v1/material_items?qr_code=eq.${qrCode}&select=id,purchase_order_id,qr_code,material_type,item_sequence,quantity,dispatch_scanned,dispatch_scan_count&limit=1`,
           {
             headers: {
-              'apikey': ANON_KEY,
+              'apikey': SUPABASE_ANON_KEY,
               'Authorization': `Bearer ${accessToken}`,
               'Content-Type': 'application/json'
             },
@@ -1492,7 +1492,7 @@ export const DispatchScanner: React.FC<DispatchScannerProps> = ({
                   `${SUPABASE_URL}/rest/v1/purchase_orders?id=eq.${dbItem.purchase_order_id}&select=po_number&limit=1`,
                   {
                     headers: {
-                      'apikey': ANON_KEY,
+                      'apikey': SUPABASE_ANON_KEY,
                       'Authorization': `Bearer ${accessToken}`,
                       'Content-Type': 'application/json'
                     },
@@ -1656,7 +1656,7 @@ export const DispatchScanner: React.FC<DispatchScannerProps> = ({
         
         // Final fallback: anon key
         console.warn('⚠️ Using anon key as final fallback');
-        return ANON_KEY;
+        return SUPABASE_ANON_KEY;
       };
       
       // Get fresh access token
@@ -1684,7 +1684,7 @@ export const DispatchScanner: React.FC<DispatchScannerProps> = ({
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'apikey': ANON_KEY,
+            'apikey': SUPABASE_ANON_KEY,
             'Authorization': `Bearer ${accessToken}`,
           },
           body: JSON.stringify(body)
@@ -1700,7 +1700,7 @@ export const DispatchScanner: React.FC<DispatchScannerProps> = ({
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
-              'apikey': ANON_KEY,
+              'apikey': SUPABASE_ANON_KEY,
               'Authorization': `Bearer ${accessToken}`,
             },
             body: JSON.stringify(body)
