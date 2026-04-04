@@ -366,6 +366,7 @@ export const prefetchDashboardData = async (
         result = await prefetchBuilderData(userId, accessToken);
         break;
       case 'delivery_provider':
+      case 'delivery':
         result = await prefetchDeliveryData(userId, accessToken);
         break;
       case 'admin':

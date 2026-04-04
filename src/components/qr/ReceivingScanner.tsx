@@ -350,7 +350,7 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
     }
     const run = async () => {
       // REST + user JWT (same pattern as Delivery Dashboard validation) — supabase-js can return 0 rows under RLS while REST with Bearer works.
-      let accessToken = ANON_KEY;
+      let accessToken = SUPABASE_ANON_KEY;
       try {
         const stored = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
         if (stored) {
@@ -361,7 +361,7 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
         /* ignore */
       }
       const headers: Record<string, string> = {
-        apikey: ANON_KEY,
+        apikey: SUPABASE_ANON_KEY,
         Authorization: `Bearer ${accessToken}`,
         'Content-Type': 'application/json'
       };
@@ -915,7 +915,7 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
         
         // Final fallback: anon key
         console.warn('⚠️ Using anon key as final fallback');
-        return ANON_KEY;
+        return SUPABASE_ANON_KEY;
       };
       
       // Get fresh access token
@@ -943,7 +943,7 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'apikey': ANON_KEY,
+            'apikey': SUPABASE_ANON_KEY,
             'Authorization': `Bearer ${accessToken}`,
           },
           body: JSON.stringify(body)
@@ -959,7 +959,7 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
-              'apikey': ANON_KEY,
+              'apikey': SUPABASE_ANON_KEY,
               'Authorization': `Bearer ${accessToken}`,
             },
             body: JSON.stringify(body)
