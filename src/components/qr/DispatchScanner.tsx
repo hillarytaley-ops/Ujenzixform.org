@@ -2093,17 +2093,17 @@ export const DispatchScanner: React.FC<DispatchScannerProps> = ({
     return (
       <div className="space-y-6">
         {/* Header */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-2xl font-bold flex items-center gap-2">
-              <Truck className="h-7 w-7 text-blue-600" />
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0">
+            <h2 className="text-xl sm:text-2xl font-bold flex items-center gap-2">
+              <Truck className="h-6 w-6 sm:h-7 sm:w-7 shrink-0 text-blue-600" />
               Dispatch Scanner
             </h2>
-            <p className="text-muted-foreground mt-1">
+            <p className="text-muted-foreground mt-1 text-sm sm:text-base">
               Select an order to dispatch its materials
             </p>
           </div>
-          <Button variant="outline" onClick={fetchOrders} disabled={loadingOrders}>
+          <Button variant="outline" onClick={fetchOrders} disabled={loadingOrders} className="w-full sm:w-auto shrink-0">
             <RefreshCw className={`h-4 w-4 mr-2 ${loadingOrders ? 'animate-spin' : ''}`} />
             Refresh
           </Button>
@@ -2185,14 +2185,14 @@ export const DispatchScanner: React.FC<DispatchScannerProps> = ({
   return (
     <div className="space-y-4">
       {/* Back Button & Order Info Header */}
-      <div className="flex items-start justify-between gap-4">
-        <Button variant="ghost" onClick={goBackToOrderSelection} className="shrink-0">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+        <Button variant="ghost" onClick={goBackToOrderSelection} className="shrink-0 self-start">
           <ArrowLeft className="h-4 w-4 mr-2" />
           Back to Orders
         </Button>
         
-        <div className="flex-1 text-right">
-          <h2 className="text-xl font-bold">Order #{selectedOrder.order_number || 'Loading...'}</h2>
+        <div className="min-w-0 sm:flex-1 sm:text-right">
+          <h2 className="text-lg sm:text-xl font-bold break-words">Order #{selectedOrder.order_number || 'Loading...'}</h2>
           <p className="text-sm text-muted-foreground">{selectedOrder.buyer_name}</p>
         </div>
       </div>
@@ -2252,20 +2252,20 @@ export const DispatchScanner: React.FC<DispatchScannerProps> = ({
       {!allItemsScanned && (
         <Card className="border-2 border-green-500 shadow-lg">
           <CardHeader className="bg-green-50 border-b border-green-200 py-3">
-            <CardTitle className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <div className="bg-green-600 p-2 rounded-lg">
+            <CardTitle className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex items-center gap-2 min-w-0">
+                <div className="bg-green-600 p-2 rounded-lg shrink-0">
                   <Camera className="h-5 w-5 text-white" />
                 </div>
-                <div>
-                  <span className="text-green-800">📷 Scan Physical QR Codes</span>
+                <div className="min-w-0">
+                  <span className="text-green-800 text-sm sm:text-base">📷 Scan Physical QR Codes</span>
                   <p className="text-xs font-normal text-green-600 mt-0.5">
                     Point camera at QR stickers on materials
                   </p>
                 </div>
               </div>
               {availableCameras.length > 0 && (
-                <Badge className="bg-green-600">
+                <Badge className="bg-green-600 w-fit shrink-0">
                   {availableCameras.length} camera{availableCameras.length > 1 ? 's' : ''}
                 </Badge>
               )}
@@ -2312,11 +2312,11 @@ export const DispatchScanner: React.FC<DispatchScannerProps> = ({
             )}
             
             {/* Camera View - Larger and more prominent */}
-            <div className="relative bg-black rounded-xl overflow-hidden w-full" style={{ aspectRatio: '4/3', minHeight: '500px', maxHeight: '70vh' }}>
+            <div className="relative bg-black rounded-xl overflow-hidden w-full min-h-[min(50vh,320px)] sm:min-h-[400px] md:min-h-[500px] max-h-[70vh]" style={{ aspectRatio: '4/3' }}>
               <div 
                 id={scannerContainerId} 
-                className="w-full h-full"
-                style={{ width: '100%', height: '100%', minHeight: '500px' }}
+                className="w-full h-full min-h-[min(50vh,320px)] sm:min-h-[400px] md:min-h-[500px]"
+                style={{ width: '100%', height: '100%' }}
               />
               
               {!isScanning && !cameraError && (
@@ -2478,7 +2478,7 @@ export const DispatchScanner: React.FC<DispatchScannerProps> = ({
                   }}
                 />
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>Condition</Label>
                   <Select value={materialCondition} onValueChange={setMaterialCondition}>
@@ -2616,51 +2616,55 @@ const OrderCard: React.FC<{
         }
       }}
     >
-      <CardContent className="py-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${
+      <CardContent className="py-3 px-3 sm:py-4 sm:px-6">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-3 sm:gap-4 min-w-0">
+            <div className={`w-11 h-11 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center shrink-0 ${
               isComplete ? 'bg-green-100' : 'bg-amber-100'
             }`}>
               {isComplete ? (
-                <CheckCircle className="h-6 w-6 text-green-600" />
+                <CheckCircle className="h-5 w-5 sm:h-6 sm:w-6 text-green-600" />
               ) : (
-                <Package className="h-6 w-6 text-amber-600" />
+                <Package className="h-5 w-5 sm:h-6 sm:w-6 text-amber-600" />
               )}
             </div>
-            <div>
-              <p className="font-bold text-lg">Order #{order.order_number || 'Loading...'}</p>
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <User className="h-3 w-3" />
-                <span>{order.buyer_name}</span>
+            <div className="min-w-0">
+              <p className="font-bold text-base sm:text-lg break-words">Order #{order.order_number || 'Loading...'}</p>
+              <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs sm:text-sm text-muted-foreground">
+                <User className="h-3 w-3 shrink-0" />
+                <span className="break-words">{order.buyer_name}</span>
                 {orderDate && (
                   <>
-                    <span>•</span>
-                    <Clock className="h-3 w-3" />
-                    <span>{orderDate.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })}</span>
+                    <span className="hidden sm:inline">•</span>
+                    <span className="flex items-center gap-1">
+                      <Clock className="h-3 w-3 shrink-0" />
+                      {orderDate.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })}
+                    </span>
                   </>
                 )}
               </div>
             </div>
           </div>
           
-          <div className="flex items-center gap-3">
-            <div className="text-right">
-              <p className="text-sm font-medium">
+          <div className="flex items-center justify-between gap-3 pt-2 sm:pt-0 border-t sm:border-t-0 border-border/50 sm:justify-end sm:gap-4">
+            <div className="text-left sm:text-right min-w-0 flex-1 sm:flex-none sm:min-w-[7rem]">
+              <p className="text-xs sm:text-sm font-medium">
                 {order.dispatched_items}/{order.total_items} dispatched
               </p>
               <Progress 
                 value={(order.dispatched_items / order.total_items) * 100} 
-                className="h-2 w-24 mt-1"
+                className="h-2 w-full sm:w-24 mt-1"
               />
             </div>
-            <div className="flex flex-col items-end gap-1">
-              <Badge className={isComplete ? 'bg-green-600' : 'bg-amber-600'}>
-                {isComplete ? 'Complete' : `${order.pending_items} pending`}
-              </Badge>
-              <span className="text-xs text-blue-600 font-medium">Tap to select →</span>
+            <div className="flex items-center gap-2 shrink-0">
+              <div className="flex flex-col items-end gap-1">
+                <Badge className={isComplete ? 'bg-green-600' : 'bg-amber-600'}>
+                  {isComplete ? 'Complete' : `${order.pending_items} pending`}
+                </Badge>
+                <span className="text-[10px] sm:text-xs text-blue-600 font-medium whitespace-nowrap">Tap to open</span>
+              </div>
+              <ArrowRight className="h-5 w-5 text-muted-foreground shrink-0" aria-hidden />
             </div>
-            <ArrowRight className="h-5 w-5 text-muted-foreground" />
           </div>
         </div>
       </CardContent>

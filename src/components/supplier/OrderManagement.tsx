@@ -1608,7 +1608,7 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, in
 
       {/* Order Details Dialog */}
       <Dialog open={!!selectedOrder} onOpenChange={(open) => !open && setSelectedOrder(null)}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-2xl w-[calc(100vw-1.5rem)] max-h-[90vh] overflow-y-auto sm:w-full">
           {selectedOrder && (
             <>
               <DialogHeader>
@@ -1642,7 +1642,7 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, in
               
               <div className="space-y-6">
                 {/* Customer Info */}
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <Card>
                     <CardHeader className="pb-2">
                       <CardTitle className="text-sm">Customer Information</CardTitle>

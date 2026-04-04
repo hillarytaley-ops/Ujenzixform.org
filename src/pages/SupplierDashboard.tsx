@@ -2088,96 +2088,96 @@ const SupplierDashboard = () => {
         </div>
       </section>
 
-      <main className="container mx-auto px-4 py-8">
-        {/* Stats Cards */}
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-8">
+      <main className="container mx-auto px-3 py-6 sm:px-4 sm:py-8">
+        {/* Stats Cards — single column on narrow phones, then scale up */}
+        <div className="grid grid-cols-1 min-[380px]:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4 mb-6 sm:mb-8">
           <Card className={`${cardBg} shadow-lg hover:shadow-xl transition-shadow`}>
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className={`text-sm ${mutedText}`}>{t('supplier.stats.products')}</p>
-                  <p className={`text-2xl font-bold ${textColor}`}>{stats.totalProducts}</p>
+            <CardContent className="p-3 sm:p-4">
+              <div className="flex items-center justify-between gap-2 min-w-0">
+                <div className="min-w-0">
+                  <p className={`text-xs sm:text-sm ${mutedText}`}>{t('supplier.stats.products')}</p>
+                  <p className={`text-xl sm:text-2xl font-bold ${textColor}`}>{stats.totalProducts}</p>
                 </div>
-                <div className="p-3 bg-blue-100 rounded-full">
-                  <Package className="h-6 w-6 text-blue-600" />
+                <div className="p-2.5 sm:p-3 bg-blue-100 rounded-full shrink-0">
+                  <Package className="h-5 w-5 sm:h-6 sm:w-6 text-blue-600" />
                 </div>
               </div>
             </CardContent>
           </Card>
 
           <Card className={`${cardBg} shadow-lg hover:shadow-xl transition-shadow`}>
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className={`text-sm ${mutedText}`}>{t('supplier.stats.totalOrders')}</p>
-                  <p className={`text-2xl font-bold ${textColor}`}>{stats.totalOrders}</p>
+            <CardContent className="p-3 sm:p-4">
+              <div className="flex items-center justify-between gap-2 min-w-0">
+                <div className="min-w-0">
+                  <p className={`text-xs sm:text-sm ${mutedText}`}>{t('supplier.stats.totalOrders')}</p>
+                  <p className={`text-xl sm:text-2xl font-bold ${textColor}`}>{stats.totalOrders}</p>
                 </div>
-                <div className="p-3 bg-green-100 rounded-full">
-                  <ShoppingCart className="h-6 w-6 text-green-600" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className={`${cardBg} shadow-lg hover:shadow-xl transition-shadow`}>
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className={`text-sm ${mutedText}`}>{t('supplier.stats.pending')}</p>
-                  <p className="text-2xl font-bold text-yellow-600">{pendingOrdersDisplay}</p>
-                </div>
-                <div className="p-3 bg-yellow-100 rounded-full">
-                  <Clock className="h-6 w-6 text-yellow-600" />
+                <div className="p-2.5 sm:p-3 bg-green-100 rounded-full shrink-0">
+                  <ShoppingCart className="h-5 w-5 sm:h-6 sm:w-6 text-green-600" />
                 </div>
               </div>
             </CardContent>
           </Card>
 
           <Card className={`${cardBg} shadow-lg hover:shadow-xl transition-shadow`}>
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className={`text-sm ${mutedText}`}>{t('supplier.stats.revenue')}</p>
-                  <p className={`text-xl font-bold ${textColor}`}>{formatCurrency(stats.totalRevenue)}</p>
+            <CardContent className="p-3 sm:p-4">
+              <div className="flex items-center justify-between gap-2 min-w-0">
+                <div className="min-w-0">
+                  <p className={`text-xs sm:text-sm ${mutedText}`}>{t('supplier.stats.pending')}</p>
+                  <p className="text-xl sm:text-2xl font-bold text-yellow-600">{pendingOrdersDisplay}</p>
                 </div>
-                <div className="p-3 bg-emerald-100 rounded-full">
-                  <DollarSign className="h-6 w-6 text-emerald-600" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className={`${cardBg} shadow-lg hover:shadow-xl transition-shadow`}>
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className={`text-sm ${mutedText}`}>{t('supplier.stats.customers')}</p>
-                  <p className={`text-2xl font-bold ${textColor}`}>{stats.totalCustomers}</p>
-                </div>
-                <div className="p-3 bg-purple-100 rounded-full">
-                  <Users className="h-6 w-6 text-purple-600" />
+                <div className="p-2.5 sm:p-3 bg-yellow-100 rounded-full shrink-0">
+                  <Clock className="h-5 w-5 sm:h-6 sm:w-6 text-yellow-600" />
                 </div>
               </div>
             </CardContent>
           </Card>
 
           <Card className={`${cardBg} shadow-lg hover:shadow-xl transition-shadow`}>
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className={`text-sm ${mutedText}`}>{t('supplier.stats.rating')}</p>
-                  <p className={`text-2xl font-bold ${textColor}`}>{stats.averageRating || '4.5'}</p>
+            <CardContent className="p-3 sm:p-4">
+              <div className="flex items-center justify-between gap-2 min-w-0">
+                <div className="min-w-0">
+                  <p className={`text-xs sm:text-sm ${mutedText}`}>{t('supplier.stats.revenue')}</p>
+                  <p className={`text-base sm:text-lg md:text-xl font-bold ${textColor} break-words leading-tight`}>{formatCurrency(stats.totalRevenue)}</p>
                 </div>
-                <div className="p-3 bg-amber-100 rounded-full">
-                  <Star className="h-6 w-6 text-amber-600" />
+                <div className="p-2.5 sm:p-3 bg-emerald-100 rounded-full shrink-0">
+                  <DollarSign className="h-5 w-5 sm:h-6 sm:w-6 text-emerald-600" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className={`${cardBg} shadow-lg hover:shadow-xl transition-shadow`}>
+            <CardContent className="p-3 sm:p-4">
+              <div className="flex items-center justify-between gap-2 min-w-0">
+                <div className="min-w-0">
+                  <p className={`text-xs sm:text-sm ${mutedText}`}>{t('supplier.stats.customers')}</p>
+                  <p className={`text-xl sm:text-2xl font-bold ${textColor}`}>{stats.totalCustomers}</p>
+                </div>
+                <div className="p-2.5 sm:p-3 bg-purple-100 rounded-full shrink-0">
+                  <Users className="h-5 w-5 sm:h-6 sm:w-6 text-purple-600" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className={`${cardBg} shadow-lg hover:shadow-xl transition-shadow`}>
+            <CardContent className="p-3 sm:p-4">
+              <div className="flex items-center justify-between gap-2 min-w-0">
+                <div className="min-w-0">
+                  <p className={`text-xs sm:text-sm ${mutedText}`}>{t('supplier.stats.rating')}</p>
+                  <p className={`text-xl sm:text-2xl font-bold ${textColor}`}>{stats.averageRating || '4.5'}</p>
+                </div>
+                <div className="p-2.5 sm:p-3 bg-amber-100 rounded-full shrink-0">
+                  <Star className="h-5 w-5 sm:h-6 sm:w-6 text-amber-600" />
                 </div>
               </div>
             </CardContent>
           </Card>
         </div>
 
-        {/* Navigation Cards — full-width grid; lg+ one row of eight equal cells */}
-        <div className="mb-6 grid w-full grid-cols-2 gap-2 sm:grid-cols-4 sm:gap-3 md:grid-cols-4 lg:grid-cols-8">
+        {/* Navigation Cards — 2 cols on phone, 3 on small phones, then 4 / 8 */}
+        <div className="mb-6 grid w-full grid-cols-2 gap-2 min-[420px]:grid-cols-3 sm:grid-cols-4 sm:gap-3 md:grid-cols-4 lg:grid-cols-8">
           <Button 
             className={`h-auto w-full min-w-0 py-3 sm:py-4 transition-all ${activeTab === 'overview' 
               ? 'bg-gradient-to-r from-slate-600 to-slate-700 ring-2 ring-slate-400 shadow-lg' 

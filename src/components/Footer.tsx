@@ -35,8 +35,8 @@ const Footer = () => {
             </p>
           </div>
 
-          {/* For Builders + For Suppliers: one row, two columns on mobile */}
-          <div className="grid grid-cols-2 gap-6 md:contents text-center md:text-left">
+          {/* For Builders + For Suppliers: stack on very narrow screens */}
+          <div className="grid grid-cols-1 min-[400px]:grid-cols-2 gap-6 md:contents text-center md:text-left">
             <div className="flex flex-col h-full min-h-0 rounded-xl border border-gray-800/60 bg-gray-800/25 p-5 md:p-6">
               <h4 className="font-semibold mb-4">For Builders</h4>
               <ul className="space-y-2 text-gray-400 flex-1">

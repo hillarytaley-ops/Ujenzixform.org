@@ -2139,7 +2139,7 @@ export const EnhancedQRCodeManager: React.FC<EnhancedQRCodeManagerProps> = ({
 
       {/* Scan to Dispatch + status tabs — single control bar */}
       <div
-        className="flex flex-row items-stretch rounded-lg border border-cyan-200 dark:border-cyan-800 bg-muted/40 dark:bg-muted/20 shadow-sm overflow-hidden"
+        className="flex flex-col md:flex-row md:items-stretch rounded-lg border border-cyan-200 dark:border-cyan-800 bg-muted/40 dark:bg-muted/20 shadow-sm overflow-hidden"
         role="toolbar"
         aria-label="Dispatch scan and order status filters"
       >
@@ -2147,18 +2147,18 @@ export const EnhancedQRCodeManager: React.FC<EnhancedQRCodeManagerProps> = ({
           type="button"
           size="sm"
           onClick={() => navigate('/supplier-dispatch-scanner')}
-          className="inline-flex items-center rounded-none h-auto min-h-10 px-4 py-2.5 shrink-0 border-0 border-r border-cyan-200 dark:border-cyan-800 bg-green-600 hover:bg-green-700 text-white shadow-none"
+          className="inline-flex items-center justify-center rounded-none h-auto min-h-10 px-4 py-2.5 shrink-0 border-0 md:border-r border-cyan-200 dark:border-cyan-800 bg-green-600 hover:bg-green-700 text-white shadow-none w-full md:w-auto"
         >
           <Scan className="h-4 w-4 sm:h-5 sm:w-5 mr-2 shrink-0" />
           <span className="font-semibold whitespace-nowrap">Scan to Dispatch</span>
         </Button>
-        <div className="flex flex-1 min-w-0 overflow-x-auto divide-x divide-cyan-200 dark:divide-cyan-800">
+        <div className="flex flex-1 min-w-0 flex-col sm:flex-row sm:overflow-x-auto divide-y sm:divide-y-0 sm:divide-x divide-cyan-200 dark:divide-cyan-800">
           <Button 
             type="button"
             variant={viewMode === 'awaiting_dispatch' ? 'default' : 'ghost'}
             size="sm"
             onClick={() => setViewMode('awaiting_dispatch')}
-            className={`rounded-none flex-1 min-w-[9.5rem] justify-center h-auto min-h-10 py-2.5 ${viewMode === 'awaiting_dispatch' ? 'bg-amber-600 hover:bg-amber-600 text-white' : ''}`}
+            className={`rounded-none w-full sm:flex-1 sm:min-w-[9.5rem] justify-center h-auto min-h-10 py-2.5 ${viewMode === 'awaiting_dispatch' ? 'bg-amber-600 hover:bg-amber-600 text-white' : ''}`}
             title="Orders awaiting dispatch - Print labels and scan QR codes"
           >
             <Clock className="h-4 w-4 mr-1 shrink-0" />
@@ -2169,7 +2169,7 @@ export const EnhancedQRCodeManager: React.FC<EnhancedQRCodeManagerProps> = ({
             variant={viewMode === 'dispatched' ? 'default' : 'ghost'}
             size="sm"
             onClick={() => setViewMode('dispatched')}
-            className={`rounded-none flex-1 min-w-[8.5rem] justify-center h-auto min-h-10 py-2.5 ${viewMode === 'dispatched' ? 'bg-green-600 hover:bg-green-600 text-white' : ''}`}
+            className={`rounded-none w-full sm:flex-1 sm:min-w-[8.5rem] justify-center h-auto min-h-10 py-2.5 ${viewMode === 'dispatched' ? 'bg-green-600 hover:bg-green-600 text-white' : ''}`}
             title="Orders that have been dispatched - QR codes scanned"
           >
             <Truck className="h-4 w-4 mr-1 shrink-0" />
@@ -2180,7 +2180,7 @@ export const EnhancedQRCodeManager: React.FC<EnhancedQRCodeManagerProps> = ({
             variant={viewMode === 'in_transit' ? 'default' : 'ghost'}
             size="sm"
             onClick={() => setViewMode('in_transit')}
-            className={`rounded-none flex-1 min-w-[8rem] justify-center h-auto min-h-10 py-2.5 ${viewMode === 'in_transit' ? 'bg-blue-600 hover:bg-blue-600 text-white' : ''}`}
+            className={`rounded-none w-full sm:flex-1 sm:min-w-[8rem] justify-center h-auto min-h-10 py-2.5 ${viewMode === 'in_transit' ? 'bg-blue-600 hover:bg-blue-600 text-white' : ''}`}
             title="Orders in transit to destination"
           >
             <Package className="h-4 w-4 mr-1 shrink-0" />
@@ -2191,7 +2191,7 @@ export const EnhancedQRCodeManager: React.FC<EnhancedQRCodeManagerProps> = ({
             variant={viewMode === 'delivered' ? 'default' : 'ghost'}
             size="sm"
             onClick={() => setViewMode('delivered')}
-            className={`rounded-none flex-1 min-w-[8rem] justify-center h-auto min-h-10 py-2.5 ${viewMode === 'delivered' ? 'bg-purple-600 hover:bg-purple-600 text-white' : ''}`}
+            className={`rounded-none w-full sm:flex-1 sm:min-w-[8rem] justify-center h-auto min-h-10 py-2.5 ${viewMode === 'delivered' ? 'bg-purple-600 hover:bg-purple-600 text-white' : ''}`}
             title="Orders delivered and received"
           >
             <CheckCircle className="h-4 w-4 mr-1 shrink-0" />
@@ -2202,14 +2202,14 @@ export const EnhancedQRCodeManager: React.FC<EnhancedQRCodeManagerProps> = ({
 
       {/* Summary Cards - Status-based sections */}
       {items.length > 0 && (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 min-[400px]:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
           <Card 
             className={`border-2 cursor-pointer transition-all ${viewMode === 'awaiting_dispatch' ? 'bg-amber-100 border-amber-400 ring-2 ring-amber-300' : 'bg-amber-50 border-amber-200 hover:border-amber-400'}`}
             onClick={() => setViewMode('awaiting_dispatch')}
           >
-            <CardContent className="p-4 text-center">
-              <Clock className="h-8 w-8 mx-auto text-amber-600 mb-2" />
-              <p className="text-2xl font-bold text-amber-700">{awaitingDispatchOrders.length}</p>
+            <CardContent className="p-3 sm:p-4 text-center">
+              <Clock className="h-7 w-7 sm:h-8 sm:w-8 mx-auto text-amber-600 mb-2" />
+              <p className="text-xl sm:text-2xl font-bold text-amber-700">{awaitingDispatchOrders.length}</p>
               <p className="text-sm text-amber-600 font-medium">Awaiting Dispatch</p>
               <p className="text-xs text-amber-500">Ready for processing</p>
             </CardContent>
@@ -2218,25 +2218,25 @@ export const EnhancedQRCodeManager: React.FC<EnhancedQRCodeManagerProps> = ({
             className={`border-2 cursor-pointer transition-all ${viewMode === 'dispatched' ? 'bg-green-100 border-green-400 ring-2 ring-green-300' : 'bg-green-50 border-green-200 hover:border-green-400'}`}
             onClick={() => setViewMode('dispatched')}
           >
-            <CardContent className="p-4 text-center">
-              <Truck className="h-8 w-8 mx-auto text-green-600 mb-2" />
-              <p className="text-2xl font-bold text-green-700">{dispatchedOrders.length}</p>
+            <CardContent className="p-3 sm:p-4 text-center">
+              <Truck className="h-7 w-7 sm:h-8 sm:w-8 mx-auto text-green-600 mb-2" />
+              <p className="text-xl sm:text-2xl font-bold text-green-700">{dispatchedOrders.length}</p>
               <p className="text-sm text-green-600 font-medium">Dispatched Orders</p>
               <p className="text-xs text-green-500">Shipped materials</p>
             </CardContent>
           </Card>
           <Card className="bg-blue-50 border-blue-200">
-            <CardContent className="p-4 text-center">
-              <Package className="h-8 w-8 mx-auto text-blue-600 mb-2" />
-              <p className="text-2xl font-bold text-blue-700">{items.filter(i => i.dispatch_scanned).length}</p>
+            <CardContent className="p-3 sm:p-4 text-center">
+              <Package className="h-7 w-7 sm:h-8 sm:w-8 mx-auto text-blue-600 mb-2" />
+              <p className="text-xl sm:text-2xl font-bold text-blue-700">{items.filter(i => i.dispatch_scanned).length}</p>
               <p className="text-sm text-blue-600">Items Dispatched</p>
               <p className="text-xs text-blue-500">QR codes scanned</p>
             </CardContent>
           </Card>
           <Card className="bg-purple-50 border-purple-200">
-            <CardContent className="p-4 text-center">
-              <User className="h-8 w-8 mx-auto text-purple-600 mb-2" />
-              <p className="text-2xl font-bold text-purple-700">{orderGroups.length}</p>
+            <CardContent className="p-3 sm:p-4 text-center">
+              <User className="h-7 w-7 sm:h-8 sm:w-8 mx-auto text-purple-600 mb-2" />
+              <p className="text-xl sm:text-2xl font-bold text-purple-700">{orderGroups.length}</p>
               <p className="text-sm text-purple-600">Total Orders</p>
               <p className="text-xs text-purple-500">{clientGroups.length} clients</p>
             </CardContent>
@@ -2610,7 +2610,7 @@ export const EnhancedQRCodeManager: React.FC<EnhancedQRCodeManagerProps> = ({
                       </div>
                     )}
                   </div>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2">
+                  <div className="grid grid-cols-1 min-[420px]:grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 sm:gap-2">
                     {group.items.map((item) => (
                       <CompactQRCard 
                         key={item.id}
@@ -2984,10 +2984,10 @@ const QRCodeCard: React.FC<{
         )}
 
         {/* QR Code and Details Row */}
-        <div className="flex gap-4">
+        <div className="flex flex-col sm:flex-row gap-4 items-center sm:items-start">
           {/* QR Code Image */}
           <div 
-            className="p-2 bg-white rounded-lg border-2 border-cyan-200 shadow cursor-pointer hover:scale-[1.02] transition-transform flex-shrink-0"
+            className="p-2 bg-white rounded-lg border-2 border-cyan-200 shadow cursor-pointer hover:scale-[1.02] transition-transform flex-shrink-0 mx-auto sm:mx-0"
             onClick={onViewFullSize}
             title="Click to view full size"
           >
@@ -3000,8 +3000,8 @@ const QRCodeCard: React.FC<{
           </div>
 
           {/* Item Details */}
-          <div className="flex-1 space-y-2">
-            <div className="grid grid-cols-2 gap-2">
+          <div className="flex-1 space-y-2 w-full min-w-0">
+            <div className="grid grid-cols-2 gap-2 max-w-md mx-auto sm:mx-0 sm:max-w-none">
               <div className="bg-gray-100 p-2 rounded text-center">
                 <p className="text-gray-600 text-xs font-medium">Quantity</p>
                 <p className="font-bold text-gray-900">{item.quantity} {item.unit}</p>
@@ -3117,7 +3117,7 @@ const QRCodeFullDialog: React.FC<{
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl w-[95vw] max-h-[95vh] overflow-y-auto">
+      <DialogContent className="max-w-2xl w-[min(100vw-1rem,42rem)] max-h-[95vh] overflow-y-auto p-4 sm:p-6">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-2xl">
             <QrCode className="h-7 w-7 text-cyan-600" />
@@ -3150,18 +3150,18 @@ const QRCodeFullDialog: React.FC<{
           )}
 
           {/* MASSIVE QR Code - use img to avoid canvas mount timing issues */}
-          <div className="p-6 bg-white rounded-2xl shadow-2xl border-4 border-cyan-300">
+          <div className="p-3 sm:p-6 bg-white rounded-2xl shadow-2xl border-4 border-cyan-300 max-w-full">
             {qrDataUrl ? (
-              <img src={qrDataUrl} alt="QR Code" width={400} height={400} className="rounded-lg" />
+              <img src={qrDataUrl} alt="QR Code" width={400} height={400} className="rounded-lg w-full max-w-[min(100%,400px)] h-auto mx-auto" />
             ) : (
-              <div className="w-[400px] h-[400px] rounded-lg bg-gray-100 animate-pulse flex items-center justify-center">
+              <div className="w-full max-w-[min(100%,400px)] aspect-square rounded-lg bg-gray-100 animate-pulse flex items-center justify-center mx-auto">
                 <RefreshCw className="h-12 w-12 text-gray-400 animate-spin" />
               </div>
             )}
           </div>
           
           {/* Scan Status */}
-          <div className="w-full grid grid-cols-2 gap-4">
+          <div className="w-full grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
             <div className={`p-4 rounded-xl text-center ${item.dispatch_scanned ? 'bg-green-100 border-2 border-green-400' : 'bg-gray-100 border-2 border-gray-300'}`}>
               <div className="flex items-center justify-center gap-2 mb-2">
                 {item.dispatch_scanned ? <ShieldCheck className="h-6 w-6 text-green-600" /> : <ShieldX className="h-6 w-6 text-gray-400" />}
@@ -3194,7 +3194,7 @@ const QRCodeFullDialog: React.FC<{
           </div>
           
           {/* Item Details */}
-          <div className="w-full grid grid-cols-3 gap-4">
+          <div className="w-full grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
             <div className="bg-cyan-50 p-4 rounded-xl text-center">
               <p className="text-cyan-600 text-sm font-medium">Item #</p>
               <p className="font-bold text-2xl">{item.item_sequence}</p>
@@ -3280,15 +3280,15 @@ const OrderAccordionItem: React.FC<{
   
   return (
     <AccordionItem value={group.order_id} className="border-2 rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-shadow">
-      <AccordionTrigger className={`px-5 py-4 bg-gradient-to-r ${headerColor} ${headerHoverColor}`}>
-        <div className="flex items-center justify-between w-full pr-4">
-          <div className="flex items-center gap-4">
-            <div className={`w-14 h-14 rounded-xl bg-gradient-to-br ${iconBgColor} flex items-center justify-center shadow-lg`}>
-              {showShippedBadge ? <Truck className="h-7 w-7 text-white" /> : <Package className="h-7 w-7 text-white" />}
+      <AccordionTrigger className={`px-3 py-3 sm:px-5 sm:py-4 bg-gradient-to-r ${headerColor} ${headerHoverColor}`}>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between w-full pr-2 sm:pr-4 min-w-0">
+          <div className="flex items-start gap-3 sm:gap-4 min-w-0 flex-1">
+            <div className={`w-12 h-12 sm:w-14 sm:h-14 rounded-xl bg-gradient-to-br ${iconBgColor} flex items-center justify-center shadow-lg shrink-0`}>
+              {showShippedBadge ? <Truck className="h-6 w-6 sm:h-7 sm:w-7 text-white" /> : <Package className="h-6 w-6 sm:h-7 sm:w-7 text-white" />}
             </div>
-            <div className="text-left">
-              <div className="flex items-center gap-2">
-                <p className="font-bold text-xl text-slate-800">Order #{group.order_number || 'Loading...'}</p>
+            <div className="text-left min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <p className="font-bold text-base sm:text-xl text-slate-800 break-all">Order #{group.order_number || 'Loading...'}</p>
                 {showShippedBadge && (
                   <Badge className="bg-green-600 text-white">
                     <Truck className="h-3 w-3 mr-1" />
@@ -3313,12 +3313,12 @@ const OrderAccordionItem: React.FC<{
               </div>
             </div>
           </div>
-          <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-2 flex-wrap w-full sm:w-auto sm:justify-end sm:shrink-0">
             {selectionMode && (
               <Button 
                 size="sm" 
                 variant="outline"
-                className="border-orange-300 text-orange-700 hover:bg-orange-50"
+                className="border-orange-300 text-orange-700 hover:bg-orange-50 w-full sm:w-auto"
                 onClick={(e) => {
                   e.stopPropagation();
                   if (areAllOrderItemsSelected(group)) {
@@ -3336,32 +3336,32 @@ const OrderAccordionItem: React.FC<{
               </Button>
             )}
             {selectionMode && getSelectedCountForOrder(group) > 0 && (
-              <Badge className="bg-orange-500">
+              <Badge className="bg-orange-500 w-fit">
                 {getSelectedCountForOrder(group)} selected
               </Badge>
             )}
             {/* Single clear status badge */}
             {group.pending_items > 0 && (
-              <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-300 font-semibold">
-                <Clock className="h-3 w-3 mr-1" />
+              <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-300 font-semibold whitespace-normal text-left">
+                <Clock className="h-3 w-3 mr-1 shrink-0" />
                 Awaiting Dispatch ({group.pending_items})
               </Badge>
             )}
             {group.pending_items === 0 && group.dispatched_items > 0 && group.received_items === 0 && (
-              <Badge variant="outline" className="bg-green-50 text-green-700 border-green-300 font-semibold">
-                <Truck className="h-3 w-3 mr-1" />
+              <Badge variant="outline" className="bg-green-50 text-green-700 border-green-300 font-semibold whitespace-normal">
+                <Truck className="h-3 w-3 mr-1 shrink-0" />
                 Dispatched ({group.dispatched_items})
               </Badge>
             )}
             {group.received_items > 0 && group.received_items < group.total_items && (
-              <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-300 font-semibold">
-                <Package className="h-3 w-3 mr-1" />
+              <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-300 font-semibold whitespace-normal">
+                <Package className="h-3 w-3 mr-1 shrink-0" />
                 In Transit ({group.received_items}/{group.total_items})
               </Badge>
             )}
             {group.received_items === group.total_items && (
-              <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-300 font-semibold">
-                <CheckCircle className="h-3 w-3 mr-1" />
+              <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-300 font-semibold whitespace-normal">
+                <CheckCircle className="h-3 w-3 mr-1 shrink-0" />
                 Delivered ({group.total_items})
               </Badge>
             )}
@@ -3369,7 +3369,7 @@ const OrderAccordionItem: React.FC<{
             {group.pending_items > 0 && (
               <Button 
                 size="sm" 
-                className="ml-2 bg-green-600 hover:bg-green-700 text-white"
+                className="sm:ml-2 bg-green-600 hover:bg-green-700 text-white w-full sm:w-auto"
                 onClick={(e) => {
                   e.stopPropagation();
                   printOrderQRCodes(group);
@@ -3432,7 +3432,7 @@ const OrderAccordionItem: React.FC<{
             </div>
           )}
         </div>
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2">
+        <div className="grid grid-cols-1 min-[420px]:grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 sm:gap-2">
           {group.items.map((item) => (
             <CompactQRCard 
               key={item.id}
