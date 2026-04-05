@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { useSearchParams } from 'react-router-dom';
+import { sanitizeCameraEmbedHtml } from '@/utils/sanitizeHtml';
 import Navigation from '@/components/Navigation';
 import Footer from '@/components/Footer';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -318,13 +319,14 @@ function MonitoringLiveMedia({
     variant === 'fullscreen' ? 'min-h-[min(72vh,720px)] max-h-[80vh]' : 'min-h-[min(52vh,520px)] max-h-[min(70vh,640px)]'
   );
 
-  const embed = feed.embed_code != null && String(feed.embed_code).trim() !== '';
-  if (embed) {
+  const rawEmbed = feed.embed_code != null ? String(feed.embed_code) : '';
+  const safeEmbed = sanitizeCameraEmbedHtml(rawEmbed);
+  if (safeEmbed) {
     return (
       <div className={cn(shell, 'overflow-auto')}>
         <div
           className="w-full flex-1 min-h-[280px] [&_iframe]:w-full [&_iframe]:min-h-[240px] [&_iframe]:max-w-full"
-          dangerouslySetInnerHTML={{ __html: String(feed.embed_code) }}
+          dangerouslySetInnerHTML={{ __html: safeEmbed }}
         />
       </div>
     );

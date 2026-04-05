@@ -27,17 +27,55 @@
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from './types';
 
-// Centralized Supabase configuration - import these instead of hardcoding
-export const SUPABASE_URL = "https://wuuyjjpgzgeimiptuuws.supabase.co";
-export const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo";
+// Prefer VITE_SUPABASE_* for rotation and multi-environment deploys. Dev fallback matches prior embedded defaults.
+const LEGACY_DEV_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
+const LEGACY_DEV_ANON_KEY =
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
+
+function resolveSupabaseUrl(): string {
+  const v = (import.meta.env.VITE_SUPABASE_URL as string | undefined)?.trim();
+  if (v) return v;
+  if (import.meta.env.DEV) {
+    console.warn('[supabase] VITE_SUPABASE_URL unset; using legacy dev project URL');
+    return LEGACY_DEV_URL;
+  }
+  throw new Error(
+    'Missing VITE_SUPABASE_URL. Set it in your environment (e.g. Vercel project env) for production builds.'
+  );
+}
+
+function resolveSupabaseAnonKey(): string {
+  const v = (import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined)?.trim();
+  if (v) return v;
+  if (import.meta.env.DEV) {
+    console.warn('[supabase] VITE_SUPABASE_ANON_KEY unset; using legacy dev anon key');
+    return LEGACY_DEV_ANON_KEY;
+  }
+  throw new Error(
+    'Missing VITE_SUPABASE_ANON_KEY. Set it in your environment for production builds — use the anon key, never service_role.'
+  );
+}
+
+export const SUPABASE_URL = resolveSupabaseUrl();
+export const SUPABASE_ANON_KEY = resolveSupabaseAnonKey();
 
 // Alias for backward compatibility
 const SUPABASE_PUBLISHABLE_KEY = SUPABASE_ANON_KEY;
 
-// Optional: set VITE_SUPABASE_AUTH_STORAGE=session to use sessionStorage (clears when the tab
-// closes; slightly reduces XSS window vs long-lived localStorage — not a substitute for CSP / no XSS).
-const authStorage =
-  import.meta.env.VITE_SUPABASE_AUTH_STORAGE === 'session' ? sessionStorage : localStorage;
+/**
+ * Session storage:
+ * - Production default: sessionStorage (smaller XSS theft window; session ends when the tab/window closes).
+ * - Persistent login: set VITE_SUPABASE_AUTH_STORAGE=local
+ * - Force session: set VITE_SUPABASE_AUTH_STORAGE=session
+ */
+function resolveAuthStorage(): Storage {
+  const explicit = (import.meta.env.VITE_SUPABASE_AUTH_STORAGE as string | undefined)?.trim().toLowerCase();
+  if (explicit === 'session') return sessionStorage;
+  if (explicit === 'local') return localStorage;
+  return import.meta.env.PROD ? sessionStorage : localStorage;
+}
+
+const authStorage = resolveAuthStorage();
 
 // Import the supabase client like this:
 // import { supabase } from "@/integrations/supabase/client";

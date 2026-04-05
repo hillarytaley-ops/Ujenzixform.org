@@ -3,6 +3,9 @@ import react from "@vitejs/plugin-react-swc";
 import path from "path";
 import { execSync } from "node:child_process";
 
+/** Dev-only fallback when `.env` has no Supabase URL (matches previous embedded default). */
+const LEGACY_DEV_SUPABASE_URL = "https://wuuyjjpgzgeimiptuuws.supabase.co";
+
 /** Canonical site URL for og:image / og:url (Vercel preview vs production). */
 function resolveSiteOrigin(): string {
   const explicit = process.env.VITE_PUBLIC_SITE_URL?.trim();
@@ -45,7 +48,29 @@ export default defineConfig(({ mode }) => {
         name: "inject-site-origin-meta",
         transformIndexHtml(html) {
           const origin = resolveSiteOrigin();
-          return html.replaceAll("%UJENZI_SITE_ORIGIN%", origin);
+          const env = loadEnv(mode, process.cwd(), "");
+          let supabaseUrl = env.VITE_SUPABASE_URL?.trim();
+          if (!supabaseUrl && mode === "development") {
+            supabaseUrl = LEGACY_DEV_SUPABASE_URL;
+          }
+          let supabaseOrigin = "";
+          if (supabaseUrl) {
+            try {
+              supabaseOrigin = new URL(supabaseUrl).origin;
+            } catch {
+              supabaseOrigin = "";
+            }
+          }
+          let out = html.replaceAll("%UJENZI_SITE_ORIGIN%", origin);
+          if (supabaseOrigin) {
+            out = out.replaceAll("%UJENZI_SUPABASE_ORIGIN%", supabaseOrigin);
+          } else {
+            out = out.replace(
+              /\s*<link rel="preconnect" href="%UJENZI_SUPABASE_ORIGIN%" crossorigin>\s*/i,
+              "\n"
+            );
+          }
+          return out;
         },
       },
     ],

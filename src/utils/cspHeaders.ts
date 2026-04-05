@@ -1,22 +1,34 @@
 // Content Security Policy configuration
 // Environment-aware CSP directives for enhanced security
 //
-// Tailwind and many UI libs need 'unsafe-inline' on style-src; removing it without a build-time
-// nonce pipeline often breaks the app. Tighten further on the edge (e.g. nonces) when you can test thoroughly.
+// - style-src 'unsafe-inline': Tailwind + Radix often need this without a nonce pipeline.
+// - script-src 'unsafe-inline' (production): required today because `initGoogleAnalytics` injects
+//   an inline gtag bootstrap. Index.html no longer uses inline scripts (see public/build-cleanup.js).
+// - Tighten further with script nonces + external GA init when you can test thoroughly.
 import { SUPABASE_URL } from '@/integrations/supabase/client';
 
 const isDevelopment = import.meta.env.MODE === 'development';
 
 const supabaseWss = SUPABASE_URL.replace(/^https:/i, 'wss:');
 
+/** Third-party script hosts (Stripe, Turnstile, GA loader, Paystack checkout). */
+const SCRIPT_HOSTS = [
+  SUPABASE_URL,
+  'https://challenges.cloudflare.com',
+  'https://js.stripe.com',
+  'https://www.googletagmanager.com',
+  'https://js.paystack.co',
+  'https://maps.googleapis.com',
+  'https://www.google.com',
+  'https://www.gstatic.com',
+] as const;
+
 export const CSP_DIRECTIVES = {
   'default-src': ["'self'"],
   'script-src': [
     "'self'",
-    ...(isDevelopment ? ["'unsafe-inline'", "'unsafe-eval'"] : []), // Only allow in development
-    SUPABASE_URL,
-    'https://challenges.cloudflare.com', // For Turnstile CAPTCHA
-    'https://js.stripe.com' // For payment processing
+    ...(isDevelopment ? ["'unsafe-inline'", "'unsafe-eval'"] : ["'unsafe-inline'"]),
+    ...SCRIPT_HOSTS,
   ],
   'style-src': [
     "'self'",
@@ -29,7 +41,12 @@ export const CSP_DIRECTIVES = {
     'blob:',
     SUPABASE_URL,
     'https://*.supabase.co',
-    'https://images.unsplash.com' // For placeholder images
+    'https://images.unsplash.com', // For placeholder images
+    'https://www.google-analytics.com',
+    'https://www.googletagmanager.com',
+    'https://*.tile.openstreetmap.org',
+    'https://*.basemaps.cartocdn.com',
+    'https://commondatastorage.googleapis.com',
   ],
   'font-src': [
     "'self'",
@@ -43,12 +60,26 @@ export const CSP_DIRECTIVES = {
     'https://ipapi.co',
     'https://api.ipify.org',
     'https://api.stripe.com', // For payment processing
+    'https://api.paystack.co',
+    'https://*.ingest.sentry.io',
+    'https://*.ingest.de.sentry.io',
+    'https://*.sentry.io',
+    'https://www.google-analytics.com',
+    'https://region1.google-analytics.com',
+    'https://analytics.google.com',
+    'https://www.googletagmanager.com',
+    'https://maps.googleapis.com',
+    'https://*.googleapis.com',
+    'https://nominatim.openstreetmap.org',
+    'https://www.google.com',
     supabaseWss // WebSocket connections
   ],
   'frame-src': [
     "'self'",
+    'https://www.google.com',
     'https://challenges.cloudflare.com',
     'https://js.stripe.com', // For Stripe Elements
+    'https://checkout.paystack.com',
     'https://www.youtube.com', // For YouTube video embeds
     'https://youtube.com', // For YouTube video embeds
     'https://player.vimeo.com', // For Vimeo video embeds
@@ -59,7 +90,7 @@ export const CSP_DIRECTIVES = {
     'blob:' // For service workers
   ],
   'manifest-src': ["'self'"],
-  'media-src': ["'self'", 'blob:', 'data:'],
+  'media-src': ["'self'", 'blob:', 'data:', 'https://commondatastorage.googleapis.com'],
   'object-src': ["'none'"],
   'base-uri': ["'self'"],
   'form-action': ["'self'"],
@@ -112,15 +143,16 @@ export const injectCSP = (nonce?: string) => {
   document.head.appendChild(meta);
 };
 
-// Security headers configuration for server-side implementation
+/**
+ * Suggested headers for edge/server config. Do **not** set Cross-Origin-Embedder-Policy /
+ * Cross-Origin-Opener-Policy to isolate on the main document unless every subresource
+ * (Supabase, Stripe, maps, embeds) is compatible — it breaks typical SPA integrations.
+ */
 export const SECURITY_HEADERS = {
   'X-Frame-Options': 'DENY',
   'X-Content-Type-Options': 'nosniff',
   'X-XSS-Protection': '1; mode=block',
   'Referrer-Policy': 'strict-origin-when-cross-origin',
-  'Permissions-Policy': 'camera=(), microphone=(), geolocation=(self), payment=(), usb=()',
+  'Permissions-Policy': 'camera=(self), microphone=(), geolocation=(self), payment=(), usb=()',
   'Strict-Transport-Security': 'max-age=31536000; includeSubDomains; preload',
-  'Cross-Origin-Embedder-Policy': 'require-corp',
-  'Cross-Origin-Opener-Policy': 'same-origin',
-  'Cross-Origin-Resource-Policy': 'same-origin'
 };

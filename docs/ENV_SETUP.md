@@ -23,6 +23,12 @@ VITE_SUPABASE_URL=https://your-project-id.supabase.co
 VITE_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 ```
 
+### Auth session storage (optional)
+
+- **Default:** production builds use `sessionStorage` (session clears when the browser tab/window closes; smaller theft window if XSS ever runs). Development defaults to `localStorage` for convenience.
+- **Stay logged in across browser restarts (production):** set `VITE_SUPABASE_AUTH_STORAGE=local`.
+- **Always use tab-scoped session:** set `VITE_SUPABASE_AUTH_STORAGE=session`.
+
 ## Optional Variables
 
 ### Security - reCAPTCHA
