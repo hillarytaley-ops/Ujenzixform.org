@@ -238,9 +238,9 @@ export const DispatchScanner: React.FC<DispatchScannerProps> = ({
       #${scannerContainerId} canvas {
         display: none !important;
       }
+      /* Library overlay uses video dims on a full-height container → broken corners; we hide it and draw our own frame */
       #${scannerContainerId} #qr-shaded-region {
-        pointer-events: none !important;
-        z-index: 2 !important;
+        display: none !important;
       }
       #${scannerContainerId} .html5-qrcode-element {
         width: 100% !important;
@@ -1117,19 +1117,11 @@ export const DispatchScanner: React.FC<DispatchScannerProps> = ({
         };
       }
 
-      // Calculate qrbox size based on viewport - use 70% of viewport width, max 400px, min 250px
-      const viewportWidth = window.innerWidth;
-      const qrboxSize = Math.max(250, Math.min(Math.floor(viewportWidth * 0.7), 400));
-      
       const scannerConfig = {
-        fps: 30, // Increased FPS for better detection
-        qrbox: function(viewfinderWidth: number, viewfinderHeight: number) {
-          // Use calculated size but ensure it fits within viewfinder (80% of smaller dimension)
-          const maxSize = Math.min(viewfinderWidth, viewfinderHeight) * 0.8;
-          const size = Math.min(qrboxSize, maxSize);
-          return { width: Math.floor(size), height: Math.floor(size) };
-        },
-        aspectRatio: 1.0, // Square aspect ratio
+        fps: 30,
+        // No qrbox: library shaded region is sized from video while stretched to a taller parent → misaligned white corners.
+        // Full-frame decode + object-fit: fill keeps sampling consistent; UI frame is our centered overlay (sibling of this div).
+        aspectRatio: 1.0,
         rememberLastUsedCamera: true,
         supportedScanTypes: [],
         formatsToSupport: [Html5QrcodeSupportedFormats.QR_CODE],
@@ -1139,11 +1131,10 @@ export const DispatchScanner: React.FC<DispatchScannerProps> = ({
         }
       };
 
-      console.log('🎥 Starting scanner with config:', { 
-        cameraConfig, 
-        qrboxSize,
-        viewportWidth,
-        fps: scannerConfig.fps 
+      console.log('🎥 Starting scanner with config:', {
+        cameraConfig,
+        fps: scannerConfig.fps,
+        fullFrame: true,
       });
 
       await scannerRef.current.start(
@@ -2315,9 +2306,20 @@ export const DispatchScanner: React.FC<DispatchScannerProps> = ({
               
               {isScanning && (
                 <>
-                  {/* Corner frame comes from html5-qrcode #qr-shaded-region only (avoid second misaligned box) */}
-                  <div className="absolute bottom-4 left-0 right-0 text-center z-[3] pointer-events-none">
-                    <span className="bg-green-600 text-white text-sm px-4 py-2 rounded-full shadow-lg animate-pulse inline-flex items-center gap-2">
+                  {/* Centered target — must be sibling of #dispatch-qr-scanner, not inside it (library owns that DOM) */}
+                  <div
+                    className="absolute inset-0 z-[4] flex items-center justify-center pointer-events-none p-4"
+                    aria-hidden
+                  >
+                    <div className="relative aspect-square w-[min(82vw,22rem)] max-h-[min(52vh,22rem)] shrink-0">
+                      <div className="absolute left-0 top-0 h-12 w-12 rounded-tl-lg border-l-[4px] border-t-[4px] border-white drop-shadow-md" />
+                      <div className="absolute right-0 top-0 h-12 w-12 rounded-tr-lg border-r-[4px] border-t-[4px] border-white drop-shadow-md" />
+                      <div className="absolute bottom-0 left-0 h-12 w-12 rounded-bl-lg border-b-[4px] border-l-[4px] border-white drop-shadow-md" />
+                      <div className="absolute bottom-0 right-0 h-12 w-12 rounded-br-lg border-b-[4px] border-r-[4px] border-white drop-shadow-md" />
+                    </div>
+                  </div>
+                  <div className="absolute bottom-4 left-0 right-0 z-[5] text-center pointer-events-none">
+                    <span className="inline-flex items-center gap-2 rounded-full bg-green-600 px-4 py-2 text-sm text-white shadow-lg animate-pulse">
                       <Scan className="h-4 w-4" />
                       Scanning... Point at QR code
                     </span>

@@ -199,8 +199,7 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
         display: none !important;
       }
       #${scannerContainerId} #qr-shaded-region {
-        pointer-events: none !important;
-        z-index: 2 !important;
+        display: none !important;
       }
       #${scannerContainerId} .html5-qrcode-element {
         width: 100% !important;
@@ -607,17 +606,8 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
         console.log('📷 Using facing mode:', facing);
       }
 
-      // Match DispatchScanner: qrbox ~70% viewport width, capped 250–400px, higher FPS, native detector when available
-      const viewportWidth = window.innerWidth;
-      const qrboxSize = Math.max(250, Math.min(Math.floor(viewportWidth * 0.7), 400));
-
       const scannerConfig = {
         fps: 30,
-        qrbox: function (viewfinderWidth: number, viewfinderHeight: number) {
-          const maxSize = Math.min(viewfinderWidth, viewfinderHeight) * 0.8;
-          const size = Math.min(qrboxSize, maxSize);
-          return { width: Math.floor(size), height: Math.floor(size) };
-        },
         aspectRatio: 1.0,
         rememberLastUsedCamera: true,
         supportedScanTypes: [],
@@ -630,9 +620,8 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
 
       console.log('🎥 Starting scanner with config:', {
         cameraConfig,
-        qrboxSize,
-        viewportWidth,
         fps: scannerConfig.fps,
+        fullFrame: true,
       });
 
       await scannerRef.current.start(
@@ -1488,8 +1477,19 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
 
             {isScanning && (
               <>
-                <div className="absolute bottom-4 left-0 right-0 text-center z-[3] pointer-events-none">
-                  <span className="bg-green-600 text-white text-sm px-4 py-2 rounded-full shadow-lg animate-pulse inline-flex items-center gap-2">
+                <div
+                  className="absolute inset-0 z-[4] flex items-center justify-center pointer-events-none p-4"
+                  aria-hidden
+                >
+                  <div className="relative aspect-square w-[min(82vw,22rem)] max-h-[min(52vh,22rem)] shrink-0">
+                    <div className="absolute left-0 top-0 h-12 w-12 rounded-tl-lg border-l-[4px] border-t-[4px] border-white drop-shadow-md" />
+                    <div className="absolute right-0 top-0 h-12 w-12 rounded-tr-lg border-r-[4px] border-t-[4px] border-white drop-shadow-md" />
+                    <div className="absolute bottom-0 left-0 h-12 w-12 rounded-bl-lg border-b-[4px] border-l-[4px] border-white drop-shadow-md" />
+                    <div className="absolute bottom-0 right-0 h-12 w-12 rounded-br-lg border-b-[4px] border-r-[4px] border-white drop-shadow-md" />
+                  </div>
+                </div>
+                <div className="absolute bottom-4 left-0 right-0 z-[5] text-center pointer-events-none">
+                  <span className="inline-flex items-center gap-2 rounded-full bg-green-600 px-4 py-2 text-sm text-white shadow-lg animate-pulse">
                     <Scan className="h-4 w-4" />
                     Scanning... Point at QR code
                   </span>
