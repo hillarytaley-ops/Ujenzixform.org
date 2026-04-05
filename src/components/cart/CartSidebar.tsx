@@ -27,10 +27,7 @@ import { useCart, CartItem } from '@/contexts/CartContext';
 import { ShoppingCart, Trash2, Plus, Minus, Package, X, FileText, CreditCard, Scale, Store, Users, Truck, Video, Building2, MapPin } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase, SUPABASE_URL, SUPABASE_ANON_KEY } from '@/integrations/supabase/client';
-import {
-  readPersistedAuthUserSync,
-  getAccessTokenWithPersistenceFallback,
-} from '@/utils/supabaseAccessToken';
+import { readAuthUserIdSync, readAuthSessionForRest } from '@/utils/supabaseAccessToken';
 import { CartPriceComparison } from './CartPriceComparison';
 import { CartPriceComparisonAll } from './CartPriceComparisonAll';
 import { MultiSupplierQuoteDialog } from './MultiSupplierQuoteDialog';
@@ -54,43 +51,6 @@ interface BuilderProject {
 const CART_NO_PROJECT_SELECT_VALUE = '__ujenzi_no_project__';
 
 // Parse Supabase/PostgREST error response so we can show the real server error (e.g. trigger/DB message)
-/** Dev/prod mismatch: some builds still have sessions under the legacy project key. */
-const LEGACY_SUPABASE_AUTH_KEY = 'sb-wuuyjjpgzgeimiptuuws-auth-token';
-
-function readCartUserIdSync(): string {
-  const id = readPersistedAuthUserSync().id;
-  if (id) return id;
-  try {
-    const raw = localStorage.getItem(LEGACY_SUPABASE_AUTH_KEY);
-    if (raw) {
-      const p = JSON.parse(raw) as { user?: { id?: string } };
-      if (p?.user?.id) return p.user.id;
-    }
-  } catch {
-    /* ignore */
-  }
-  return '';
-}
-
-async function readCartSessionForRest(): Promise<{ userId: string | null; accessToken: string | null }> {
-  const { data: { user } } = await supabase.auth.getUser();
-  let userId: string | null = user?.id || readCartUserIdSync() || null;
-  let accessToken = await getAccessTokenWithPersistenceFallback();
-  if (!accessToken) {
-    try {
-      const raw = localStorage.getItem(LEGACY_SUPABASE_AUTH_KEY);
-      if (raw) {
-        const p = JSON.parse(raw) as { access_token?: string };
-        if (p.access_token) accessToken = p.access_token;
-      }
-    } catch {
-      /* ignore */
-    }
-  }
-  if (!userId) userId = readCartUserIdSync() || null;
-  return { userId, accessToken: accessToken || null };
-}
-
 const parseSupabaseError = (body: string, status: number): string => {
   if (!body || !body.trim()) return `Server ${status}`;
   try {
@@ -161,7 +121,7 @@ export const CartSidebar: React.FC = () => {
 
     setLoadingProjects(true);
     try {
-      const userId = readCartUserIdSync();
+      const userId = readAuthUserIdSync();
       if (!userId) return;
 
       const { data: raw, error } = await supabase
@@ -295,7 +255,7 @@ export const CartSidebar: React.FC = () => {
     }
     
     try {
-      const { userId, accessToken } = await readCartSessionForRest();
+      const { userId, accessToken } = await readAuthSessionForRest();
       if (!userId || !accessToken) {
         toast({
           title: 'Sign in required',
@@ -479,7 +439,7 @@ export const CartSidebar: React.FC = () => {
     console.log('🛒 BuyNow: Starting purchase process...');
     
     try {
-      const { userId, accessToken } = await readCartSessionForRest();
+      const { userId, accessToken } = await readAuthSessionForRest();
       if (!userId || !accessToken) {
         toast({
           title: 'Sign in required',

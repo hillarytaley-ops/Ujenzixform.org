@@ -82,3 +82,43 @@ export async function getAccessTokenWithPersistenceFallback(): Promise<string> {
   }
   return readPersistedAccessTokenSync();
 }
+
+/** Older deploys / dev may still persist under this fixed project ref key. */
+const LEGACY_SUPABASE_AUTH_KEY = "sb-wuuyjjpgzgeimiptuuws-auth-token";
+
+function readLegacyAuthBlob(): ParsedAuthBlob | null {
+  try {
+    const raw = localStorage.getItem(LEGACY_SUPABASE_AUTH_KEY);
+    return raw ? parseAuthBlob(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Sync user id: current project storage key, then legacy key (matches cart checkout). */
+export function readAuthUserIdSync(): string {
+  const id = readPersistedAuthUserSync().id;
+  if (id) return id;
+  const legacy = readLegacyAuthBlob();
+  if (legacy?.user?.id) return legacy.user.id;
+  return "";
+}
+
+/**
+ * User id + JWT for PostgREST fetch() calls (cart checkout, delivery prompt, etc.).
+ * Prefer live Supabase session; fall back to persisted storage and legacy key.
+ */
+export async function readAuthSessionForRest(): Promise<{
+  userId: string | null;
+  accessToken: string | null;
+}> {
+  const { data: { user } } = await supabase.auth.getUser();
+  let userId: string | null = user?.id || readAuthUserIdSync() || null;
+  let accessToken = await getAccessTokenWithPersistenceFallback();
+  if (!accessToken) {
+    const t = readLegacyAuthBlob()?.access_token;
+    if (t) accessToken = t;
+  }
+  if (!userId) userId = readAuthUserIdSync() || null;
+  return { userId, accessToken: accessToken || null };
+}

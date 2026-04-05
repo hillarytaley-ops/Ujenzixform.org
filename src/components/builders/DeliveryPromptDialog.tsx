@@ -39,6 +39,7 @@ import {
   Map as MapIcon
 } from 'lucide-react';
 import { supabase, SUPABASE_URL, SUPABASE_ANON_KEY } from '@/integrations/supabase/client';
+import { readAuthSessionForRest } from '@/utils/supabaseAccessToken';
 import { useToast } from '@/hooks/use-toast';
 import { MonitoringServicePrompt } from './MonitoringServicePrompt';
 import { deliveryProviderNotificationService } from '@/services/DeliveryProviderNotificationService';
@@ -393,21 +394,7 @@ export const DeliveryPromptDialog: React.FC<DeliveryPromptDialogProps> = ({
     console.log('🚚 Starting delivery request...');
 
     try {
-      // Get user from localStorage (faster than Supabase call)
-      let userId: string | null = null;
-      let accessToken: string | null = null;
-      
-      try {
-        const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
-        if (storedSession) {
-          const parsed = JSON.parse(storedSession);
-          userId = parsed.user?.id;
-          accessToken = parsed.access_token;
-        }
-      } catch (e) {
-        console.warn('Could not parse stored session');
-      }
-      
+      const { userId, accessToken } = await readAuthSessionForRest();
       if (!userId || !accessToken) {
         throw new Error('User not authenticated');
       }
@@ -1238,16 +1225,15 @@ export const DeliveryPromptDialog: React.FC<DeliveryPromptDialogProps> = ({
     console.log('📦 Setting order as pickup...');
     
     try {
-      // Get access token from localStorage
-      let accessToken: string | null = null;
-      try {
-        const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
-        if (storedSession) {
-          const parsed = JSON.parse(storedSession);
-          accessToken = parsed.access_token;
-        }
-      } catch (e) {
-        console.warn('Could not parse stored session');
+      const { accessToken } = await readAuthSessionForRest();
+      if (!accessToken) {
+        toast({
+          title: 'Sign in required',
+          description: 'Please sign in again to update your order.',
+          variant: 'destructive',
+        });
+        setSubmitting(false);
+        return;
       }
 
       // Update purchase order using fetch with timeout
@@ -1257,7 +1243,7 @@ export const DeliveryPromptDialog: React.FC<DeliveryPromptDialogProps> = ({
           method: 'PATCH',
           headers: {
             'apikey': SUPABASE_ANON_KEY,
-            'Authorization': accessToken ? `Bearer ${accessToken}` : `Bearer ${SUPABASE_ANON_KEY}`,
+            'Authorization': `Bearer ${accessToken}`,
             'Content-Type': 'application/json',
             'Prefer': 'return=minimal'
           },
