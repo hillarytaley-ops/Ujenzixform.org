@@ -1714,6 +1714,7 @@ export const useDeliveryProviderData = () => {
               // Only show orders that are in "Awaiting Dispatch" (all items have dispatch_scanned = FALSE)
               // This enforces the rule: delivery providers can only accept orders from Awaiting Dispatch
               let materialItemsData: any[] = [];
+              let materialItemsResponseOk = false;
               
               if (poIdsToCheck.length > 0) {
                 try {
@@ -1729,6 +1730,7 @@ export const useDeliveryProviderData = () => {
                     }
                   );
                   
+                  materialItemsResponseOk = materialItemsResponse.ok;
                   if (materialItemsResponse.ok) {
                     materialItemsData = await materialItemsResponse.json();
                   }
@@ -1736,6 +1738,12 @@ export const useDeliveryProviderData = () => {
                   console.warn('⚠️ Could not fetch material_items for validation:', e);
                 }
               }
+              
+              // If material_items returns nothing (RLS gap, network) we cannot prove scan state — still show
+              // assigned deliveries that passed purchase_orders validation so drivers see accepted/dispatched work.
+              const materialItemsInconclusive =
+                !materialItemsResponseOk ||
+                (materialItemsResponseOk && Array.isArray(materialItemsData) && materialItemsData.length === 0);
               
               // Group material_items by purchase_order_id
               const itemsByOrder: Record<string, any[]> = {};
@@ -1806,8 +1814,14 @@ export const useDeliveryProviderData = () => {
                 } else if (isFallbackLabel) {
                   // Do NOT keep Order-xxx fallback — user does not want these on Schedule
                   continue;
+                } else if (materialItemsInconclusive && (hasValidPO || hasValidOrderNumber)) {
+                  console.warn('⚠️ Keeping assigned delivery without material_items rows (inconclusive fetch):', {
+                    order_number: item.order_number,
+                    purchase_order_id: item.purchase_order_id?.substring(0, 8)
+                  });
+                  validatedDeliveries.push(item);
                 } else {
-                  // No material_items found for this order - exclude it
+                  // We got material_items for some POs but none for this order — likely no line items
                   console.warn('🚫 Removing order with no material_items data:', {
                     order_number: item.order_number,
                     purchase_order_id: item.purchase_order_id?.substring(0, 8),

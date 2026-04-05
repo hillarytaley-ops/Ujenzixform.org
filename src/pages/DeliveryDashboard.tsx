@@ -220,6 +220,10 @@ const DeliveryDashboard = () => {
   const [linkingDeliveries, setLinkingDeliveries] = useState(false);
   const [notificationCount, setNotificationCount] = useState(0);
   const [pendingNotificationCount, setPendingNotificationCount] = useState(0);
+  /** Unread supplier alerts: invoice forwarded to builder — provider must pay builder. */
+  const [builderInvoicePayPrompts, setBuilderInvoicePayPrompts] = useState<
+    { id: string; title: string; message: string }[]
+  >([]);
   const acceptingDeliveryRef = useRef<string | null>(null); // Prevent double-clicks on Accept
 
   // Chart data - DYNAMIC: Calculate from real delivery data
@@ -514,6 +518,7 @@ const DeliveryDashboard = () => {
               // Add null check to prevent "is not a constructor" errors
               if (!existingOrders || !Array.isArray(existingOrders)) {
                 console.warn('⚠️ Invalid validation response:', existingOrders);
+                setActiveDeliveries(isolatedActiveDeliveries.map((d: any) => formatDelivery(d)));
                 return;
               }
               // Use object-based lookup instead of Set to avoid minification errors
@@ -553,6 +558,7 @@ const DeliveryDashboard = () => {
               });
               const poIdsForMaterialCheck = Object.keys(poIdsForMaterialCheckObj);
               let materialItemsData: any[] = [];
+              let materialItemsResponseOk = false;
               
               if (poIdsForMaterialCheck.length > 0) {
                 try {
@@ -568,6 +574,7 @@ const DeliveryDashboard = () => {
                     }
                   );
                   
+                  materialItemsResponseOk = materialItemsResponse.ok;
                   if (materialItemsResponse.ok) {
                     materialItemsData = await materialItemsResponse.json();
                   }
@@ -575,6 +582,10 @@ const DeliveryDashboard = () => {
                   console.warn('⚠️ Could not fetch material_items for validation:', e);
                 }
               }
+              
+              const materialItemsInconclusive =
+                !materialItemsResponseOk ||
+                (materialItemsResponseOk && Array.isArray(materialItemsData) && materialItemsData.length === 0);
               
               // Group material_items by purchase_order_id
               const itemsByOrder: Record<string, any[]> = {};
@@ -623,15 +634,20 @@ const DeliveryDashboard = () => {
                   
                   // Order exists and has items - keep it (categorization will handle dispatch status)
                   return true;
-                } else {
-                  // No material_items found for this order - exclude it
-                  console.warn('🚫 Removing order with no material_items data:', {
-                    order_number: d.order_number,
-                    purchase_order_id: d.purchase_order_id?.substring(0, 8),
-                    reason: 'No material_items found'
-                  });
-                  return false;
                 }
+                if (materialItemsInconclusive) {
+                  console.warn('⚠️ Keeping scheduled delivery without material_items rows (inconclusive fetch):', {
+                    order_number: d.order_number,
+                    purchase_order_id: d.purchase_order_id?.substring(0, 8)
+                  });
+                  return true;
+                }
+                console.warn('🚫 Removing order with no material_items data:', {
+                  order_number: d.order_number,
+                  purchase_order_id: d.purchase_order_id?.substring(0, 8),
+                  reason: 'No material_items found'
+                });
+                return false;
               });
               
               console.log('✅ VALIDATION: Removed', isolatedActiveDeliveries.length - validDeliveries.length, 'non-existent orders');
@@ -1763,6 +1779,34 @@ const DeliveryDashboard = () => {
     }
   }, [user?.id]);
 
+  const refreshBuilderInvoicePayPrompts = useCallback(async () => {
+    if (!user?.id) {
+      setBuilderInvoicePayPrompts([]);
+      return;
+    }
+    const { data, error } = await supabase
+      .from('notifications')
+      .select('id, title, message')
+      .eq('user_id', user.id)
+      .eq('type', 'invoice_pay_builder_prompt')
+      .eq('read', false)
+      .order('created_at', { ascending: false })
+      .limit(10);
+    if (error) {
+      console.warn('Builder invoice pay prompts:', error.message);
+      return;
+    }
+    setBuilderInvoicePayPrompts(data || []);
+  }, [user?.id]);
+
+  const dismissBuilderPayPrompt = useCallback(async (id: string) => {
+    await supabase
+      .from('notifications')
+      .update({ read: true, read_at: new Date().toISOString() })
+      .eq('id', id);
+    setBuilderInvoicePayPrompts((prev) => prev.filter((p) => p.id !== id));
+  }, []);
+
   // Real-time subscription for delivery updates - including material_items (receive scans)
   // CRITICAL: material_items subscription catches receive_scanned updates so orders move to Delivered tab
   useEffect(() => {
@@ -2121,6 +2165,48 @@ const DeliveryDashboard = () => {
       loadNotificationCounts();
     }
   }, [activeTab, user?.id, loadNotificationCounts]);
+
+  // Supplier forwarded an invoice to the builder: prompt provider to pay immediately
+  useEffect(() => {
+    if (!user?.id) return;
+    void refreshBuilderInvoicePayPrompts();
+    const ch = supabase
+      .channel(`provider-invoice-pay-${user.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'notifications',
+          filter: `user_id=eq.${user.id}`,
+        },
+        (payload) => {
+          const row = payload.new as { type?: string; title?: string; message?: string };
+          if (row?.type !== 'invoice_pay_builder_prompt') return;
+          playNewRequestAlarm();
+          toast({
+            variant: 'destructive',
+            title: row.title || 'Pay the professional builder now',
+            description:
+              row.message ||
+              'An invoice was forwarded to the builder. Complete your payment to the builder immediately.',
+            duration: 14000,
+          });
+          if ('Notification' in window && Notification.permission === 'granted') {
+            new Notification('Ujenzi — Pay builder invoice', {
+              body: row.message || 'Complete payment to the builder now.',
+              icon: '/ujenzixform-logo.png',
+              tag: 'ujenzi-invoice-pay-builder',
+            });
+          }
+          void refreshBuilderInvoicePayPrompts();
+        }
+      )
+      .subscribe();
+    return () => {
+      void supabase.removeChannel(ch);
+    };
+  }, [user?.id, refreshBuilderInvoicePayPrompts, toast]);
 
   // Request browser notification permission on load so alarm notifications work when new request arrives
   useEffect(() => {
@@ -2582,7 +2668,14 @@ const DeliveryDashboard = () => {
             }`}
             onClick={() => setActiveTab('pay')}
           >
-            <DollarSign className="h-5 w-5" />
+            <span className="relative inline-flex">
+              <DollarSign className="h-5 w-5" />
+              {builderInvoicePayPrompts.length > 0 && (
+                <Badge className="absolute -top-2 -right-2 min-w-[18px] h-[18px] flex items-center justify-center text-[10px] font-bold px-1 py-0 bg-red-600 text-white ring-2 ring-white shadow-md rounded-full">
+                  {builderInvoicePayPrompts.length > 9 ? '9+' : builderInvoicePayPrompts.length}
+                </Badge>
+              )}
+            </span>
             <span className="text-xs font-medium">Pay</span>
           </Button>
           <Button 
@@ -2636,6 +2729,42 @@ const DeliveryDashboard = () => {
             <span className="text-xs font-medium">Support</span>
           </Button>
         </div>
+
+        {builderInvoicePayPrompts.length > 0 && (
+          <Alert
+            className={`mb-6 border-red-300 ${isDarkMode ? 'bg-red-950/40 border-red-800' : 'bg-red-50'}`}
+          >
+            <AlertCircle className="h-5 w-5 text-red-600" />
+            <AlertDescription className={`${isDarkMode ? 'text-red-100' : 'text-red-900'} space-y-3`}>
+              <div>
+                <p className="font-semibold">Action required: pay the professional builder</p>
+                <p className="text-sm mt-1 opacity-95">
+                  {builderInvoicePayPrompts[0]?.message}
+                  {builderInvoicePayPrompts.length > 1
+                    ? ` (+${builderInvoicePayPrompts.length - 1} more)`
+                    : ''}
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  size="sm"
+                  className="bg-red-600 hover:bg-red-700"
+                  onClick={() => setActiveTab('pay')}
+                >
+                  Open Pay tab now
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className={isDarkMode ? 'border-red-800 text-red-200' : 'border-red-300'}
+                  onClick={() => void dismissBuilderPayPrompt(builderInvoicePayPrompts[0].id)}
+                >
+                  Dismiss this alert
+                </Button>
+              </div>
+            </AlertDescription>
+          </Alert>
+        )}
 
         {/* Main Content Tabs - Hidden TabsList, controlled by card buttons above */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
