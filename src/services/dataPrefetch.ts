@@ -313,33 +313,36 @@ const prefetchBuilderData = async (userId: string, accessToken: string): Promise
 const prefetchDeliveryData = async (userId: string, accessToken: string): Promise<PrefetchResult> => {
   console.log('📦 Prefetch: Starting delivery provider data prefetch...');
   const result: PrefetchResult = {};
-  
-  // Prefetch data in parallel
-  const [deliveries, profile] = await Promise.all([
-    // Fetch delivery requests
-    fastFetch(
-      `${SUPABASE_URL}/rest/v1/delivery_requests?or=(provider_id.eq.${userId},assigned_driver_id.eq.${userId})&order=created_at.desc&limit=50`,
-      accessToken,
-      4000
-    ),
-    // Fetch provider profile
-    fastFetch(
-      `${SUPABASE_URL}/rest/v1/delivery_providers?user_id=eq.${userId}&select=*&limit=1`,
-      accessToken,
-      2000
-    ),
-  ]);
-  
-  if (deliveries) {
-    setCachedData(`delivery_requests_${userId}`, deliveries);
-    console.log('📦 Prefetch: Cached', deliveries.length, 'delivery requests');
-  }
-  
+
+  // Resolve delivery_providers.id first — delivery_requests.provider_id is often the provider row UUID, not auth uid
+  const profile = await fastFetch(
+    `${SUPABASE_URL}/rest/v1/delivery_providers?user_id=eq.${userId}&select=*&limit=1`,
+    accessToken,
+    2000
+  );
+
   if (profile && profile.length > 0) {
     result.profile = profile[0];
     setCachedData(`delivery_profile_${userId}`, profile[0]);
   }
-  
+
+  const dpId = profile?.[0]?.id as string | undefined;
+  const orClause =
+    dpId && String(dpId) !== String(userId)
+      ? `(provider_id.eq.${userId},provider_id.eq.${dpId})`
+      : `(provider_id.eq.${userId})`;
+
+  const deliveries = await fastFetch(
+    `${SUPABASE_URL}/rest/v1/delivery_requests?or=${orClause}&order=created_at.desc&limit=50`,
+    accessToken,
+    4000
+  );
+
+  if (deliveries) {
+    setCachedData(`delivery_requests_${userId}`, deliveries);
+    console.log('📦 Prefetch: Cached', deliveries.length, 'delivery requests');
+  }
+
   return result;
 };
 

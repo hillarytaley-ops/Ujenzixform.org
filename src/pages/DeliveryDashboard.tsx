@@ -997,9 +997,13 @@ const DeliveryDashboard = () => {
   const deliveriesForScheduleLogic = useMemo(() => {
     const hookMapped = (isolatedActiveDeliveries || []).map(mapIsolatedRowToActiveDeliveryQuick);
     if (hookMapped.length === 0) return activeDeliveries;
-    const byId = new Map(activeDeliveries.map((d) => [String(d.id), d]));
+    // Plain object — avoid `new Map()` here (prod minify has caused "is not a constructor" in this dashboard).
+    const byId: Record<string, ActiveDelivery> = {};
+    activeDeliveries.forEach((d) => {
+      byId[String(d.id)] = d;
+    });
     return hookMapped.map((h) => {
-      const e = byId.get(String(h.id));
+      const e = byId[String(h.id)];
       if (!e) return h;
       return {
         ...h,
