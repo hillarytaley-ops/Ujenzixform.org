@@ -73,6 +73,12 @@ import {
   fetchBuyerRolesMap,
   isOrderInNotDispatchedBucket,
 } from "@/utils/supplierPrivateBuilderOrders";
+import {
+  getAccessTokenWithPersistenceFallback,
+  persistedSessionStorageKey,
+  readPersistedAccessTokenSync,
+  readPersistedAuthUserSync,
+} from "@/utils/supabaseAccessToken";
 import { OrderHistory } from "@/components/orders/OrderHistory";
 import { ReviewsList, SupplierRatingSummary } from "@/components/reviews/ReviewSystem";
 import { UserAnalyticsDashboard } from "@/components/analytics/UserAnalyticsDashboard";
@@ -772,14 +778,11 @@ const SupplierDashboard = () => {
     let userEmail = user?.email;
     
     if (!userId) {
-      try {
-        const stored = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
-        if (stored) {
-          const parsed = JSON.parse(stored);
-          userId = parsed.user?.id;
-          userEmail = parsed.user?.email;
-        }
-      } catch (e) {}
+      const fromStore = readPersistedAuthUserSync();
+      if (fromStore.id) {
+        userId = fromStore.id;
+        userEmail = fromStore.email;
+      }
     }
     if (!userId) {
       userId = localStorage.getItem('user_id') || undefined;
@@ -794,22 +797,7 @@ const SupplierDashboard = () => {
     setLoadingQuotes(true);
     console.log('🔄 Fetching quotes for supplier userId:', userId, 'email:', userEmail);
     
-    // Get auth token from localStorage for faster access
     let accessToken: string | null = null;
-    try {
-      const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
-      if (storedSession) {
-        const parsed = JSON.parse(storedSession);
-        accessToken =
-          parsed.access_token ||
-          parsed.currentSession?.access_token ||
-          parsed.session?.access_token ||
-          null;
-      }
-    } catch (e) {
-      console.warn('Could not get session from localStorage');
-    }
-
     try {
       const { data: { session } } = await Promise.race([
         supabase.auth.getSession(),
@@ -817,10 +805,11 @@ const SupplierDashboard = () => {
           setTimeout(() => resolve({ data: { session: null } }), 5000)
         ),
       ]);
-      if (!accessToken && session?.access_token) accessToken = session.access_token;
+      accessToken = session?.access_token || null;
     } catch {
       /* ignore */
     }
+    if (!accessToken) accessToken = readPersistedAccessTokenSync() || null;
     
     const headers: Record<string, string> = {
       'apikey': SUPABASE_ANON_KEY,
@@ -1059,16 +1048,7 @@ const SupplierDashboard = () => {
         if (!cancelled) setBuyerRoleByUserId({});
         return;
       }
-      let accessToken = '';
-      try {
-        const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
-        if (storedSession) {
-          const parsed = JSON.parse(storedSession);
-          accessToken = parsed.access_token || '';
-        }
-      } catch {
-        /* ignore */
-      }
+      const accessToken = await getAccessTokenWithPersistenceFallback();
       const headers: Record<string, string> = {
         apikey: SUPABASE_ANON_KEY,
         'Content-Type': 'application/json',
@@ -1087,13 +1067,8 @@ const SupplierDashboard = () => {
     // Try to get user ID from multiple sources
     let userId = user?.id;
     if (!userId) {
-      try {
-        const stored = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
-        if (stored) {
-          const parsed = JSON.parse(stored);
-          userId = parsed.user?.id;
-        }
-      } catch (e) {}
+      const fromStore = readPersistedAuthUserSync();
+      if (fromStore.id) userId = fromStore.id;
     }
     if (!userId) {
       userId = localStorage.getItem('user_id') || undefined;
@@ -1127,16 +1102,7 @@ const SupplierDashboard = () => {
               sid === ctx.userId);
           if (!matchesSupplier) return;
 
-          let accessToken = '';
-          try {
-            const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
-            if (storedSession) {
-              const parsed = JSON.parse(storedSession);
-              accessToken = parsed.access_token || '';
-            }
-          } catch {
-            /* ignore */
-          }
+          const accessToken = readPersistedAccessTokenSync();
           const authHeaders: Record<string, string> = {
             apikey: SUPABASE_ANON_KEY,
             'Content-Type': 'application/json',
@@ -1210,19 +1176,8 @@ const SupplierDashboard = () => {
     if (!selectedQuote) return;
     
     setProcessingQuote(true);
-    
-    // Get auth token from localStorage for faster access
-    let accessToken: string | null = null;
-    try {
-      const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
-      if (storedSession) {
-        const parsed = JSON.parse(storedSession);
-        accessToken = parsed.access_token;
-      }
-    } catch (e) {
-      console.warn('Could not get session from localStorage');
-    }
-    
+
+    const accessToken = await getAccessTokenWithPersistenceFallback();
     if (!accessToken) {
       toast.error('Not authenticated', {
         description: 'Please sign in again to continue.',
@@ -1499,17 +1454,7 @@ const SupplierDashboard = () => {
       if (!user) return;
 
       // Use native fetch with auth headers to avoid Supabase client timeouts
-      // Get access token from localStorage
-      let accessToken = '';
-      try {
-        const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
-        if (storedSession) {
-          const parsed = JSON.parse(storedSession);
-          accessToken = parsed.access_token || '';
-        }
-      } catch (e) {
-        console.warn('Could not get access token');
-      }
+      const accessToken = await getAccessTokenWithPersistenceFallback();
       
       const authHeaders: Record<string, string> = { 
         'apikey': SUPABASE_ANON_KEY,
@@ -1926,7 +1871,13 @@ const SupplierDashboard = () => {
     localStorage.removeItem('user_name');
     localStorage.removeItem('user_id');
     localStorage.removeItem('supplier_id');
-    localStorage.removeItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+    try {
+      const sk = persistedSessionStorageKey();
+      localStorage.removeItem(sk);
+      sessionStorage.removeItem(sk);
+    } catch {
+      /* ignore */
+    }
     sessionStorage.clear();
     window.location.replace('/auth');
     signOut().catch(() => {});
