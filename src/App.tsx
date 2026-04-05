@@ -105,6 +105,15 @@ const SuspenseWrapper: React.FC<{ children: React.ReactNode }> = ({ children }) 
   </React.Suspense>
 );
 
+/** `/builder-dashboard` is a legacy shared URL; private clients must not be sent to the professional builder route. */
+const BuilderDashboardEntryRedirect = () => {
+  const role = typeof window !== "undefined" ? localStorage.getItem("user_role") : null;
+  if (role === "private_client") {
+    return <Navigate to="/private-client-dashboard" replace />;
+  }
+  return <Navigate to="/professional-builder-dashboard" replace />;
+};
+
 // Optimized QueryClient with aggressive caching for better performance
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -317,10 +326,8 @@ const App = () => {
                         <AdminDashboard />
                       </RoleProtectedRoute>
                     } />
-                    {/* Redirect /builder-dashboard to appropriate dashboard based on role */}
-                    <Route path="/builder-dashboard" element={
-                      <Navigate to="/professional-builder-dashboard" replace />
-                    } />
+                    {/* Legacy URL: send private clients to their dashboard, not professional (avoids RoleProtectedRoute bounce) */}
+                    <Route path="/builder-dashboard" element={<BuilderDashboardEntryRedirect />} />
                     <Route path="/supplier-dashboard" element={
                       <RoleProtectedRoute allowedRoles={['supplier', 'admin']}>
                         <SuspenseWrapper><SupplierDashboard /></SuspenseWrapper>

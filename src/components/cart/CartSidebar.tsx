@@ -27,6 +27,10 @@ import { useCart, CartItem } from '@/contexts/CartContext';
 import { ShoppingCart, Trash2, Plus, Minus, Package, X, FileText, CreditCard, Scale, Store, Users, Truck, Video, Building2, MapPin } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase, SUPABASE_URL, SUPABASE_ANON_KEY } from '@/integrations/supabase/client';
+import {
+  readPersistedAuthUserSync,
+  getAccessTokenWithPersistenceFallback,
+} from '@/utils/supabaseAccessToken';
 import { CartPriceComparison } from './CartPriceComparison';
 import { CartPriceComparisonAll } from './CartPriceComparisonAll';
 import { MultiSupplierQuoteDialog } from './MultiSupplierQuoteDialog';
@@ -50,6 +54,43 @@ interface BuilderProject {
 const CART_NO_PROJECT_SELECT_VALUE = '__ujenzi_no_project__';
 
 // Parse Supabase/PostgREST error response so we can show the real server error (e.g. trigger/DB message)
+/** Dev/prod mismatch: some builds still have sessions under the legacy project key. */
+const LEGACY_SUPABASE_AUTH_KEY = 'sb-wuuyjjpgzgeimiptuuws-auth-token';
+
+function readCartUserIdSync(): string {
+  const id = readPersistedAuthUserSync().id;
+  if (id) return id;
+  try {
+    const raw = localStorage.getItem(LEGACY_SUPABASE_AUTH_KEY);
+    if (raw) {
+      const p = JSON.parse(raw) as { user?: { id?: string } };
+      if (p?.user?.id) return p.user.id;
+    }
+  } catch {
+    /* ignore */
+  }
+  return '';
+}
+
+async function readCartSessionForRest(): Promise<{ userId: string | null; accessToken: string | null }> {
+  const { data: { user } } = await supabase.auth.getUser();
+  let userId: string | null = user?.id || readCartUserIdSync() || null;
+  let accessToken = await getAccessTokenWithPersistenceFallback();
+  if (!accessToken) {
+    try {
+      const raw = localStorage.getItem(LEGACY_SUPABASE_AUTH_KEY);
+      if (raw) {
+        const p = JSON.parse(raw) as { access_token?: string };
+        if (p.access_token) accessToken = p.access_token;
+      }
+    } catch {
+      /* ignore */
+    }
+  }
+  if (!userId) userId = readCartUserIdSync() || null;
+  return { userId, accessToken: accessToken || null };
+}
+
 const parseSupabaseError = (body: string, status: number): string => {
   if (!body || !body.trim()) return `Server ${status}`;
   try {
@@ -120,18 +161,7 @@ export const CartSidebar: React.FC = () => {
 
     setLoadingProjects(true);
     try {
-      let userId = '';
-      let accessToken = '';
-      
-      try {
-        const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
-        if (storedSession) {
-          const parsed = JSON.parse(storedSession);
-          userId = parsed.user?.id || '';
-          accessToken = parsed.access_token || '';
-        }
-      } catch (e) {}
-
+      const userId = readCartUserIdSync();
       if (!userId) return;
 
       const { data: raw, error } = await supabase
@@ -265,21 +295,7 @@ export const CartSidebar: React.FC = () => {
     }
     
     try {
-      // Get user from localStorage (faster than Supabase call)
-      let userId: string | null = null;
-      let accessToken: string | null = null;
-      
-      try {
-        const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
-        if (storedSession) {
-          const parsed = JSON.parse(storedSession);
-          userId = parsed.user?.id;
-          accessToken = parsed.access_token;
-        }
-      } catch (e) {
-        console.warn('Could not parse stored session');
-      }
-      
+      const { userId, accessToken } = await readCartSessionForRest();
       if (!userId || !accessToken) {
         toast({
           title: 'Sign in required',
@@ -463,21 +479,7 @@ export const CartSidebar: React.FC = () => {
     console.log('🛒 BuyNow: Starting purchase process...');
     
     try {
-      // Get user from localStorage (faster than Supabase call)
-      let userId: string | null = null;
-      let accessToken: string | null = null;
-      
-      try {
-        const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
-        if (storedSession) {
-          const parsed = JSON.parse(storedSession);
-          userId = parsed.user?.id;
-          accessToken = parsed.access_token;
-        }
-      } catch (e) {
-        console.warn('Could not parse stored session');
-      }
-      
+      const { userId, accessToken } = await readCartSessionForRest();
       if (!userId || !accessToken) {
         toast({
           title: 'Sign in required',
@@ -488,7 +490,7 @@ export const CartSidebar: React.FC = () => {
         window.location.href = '/private-client-auth';
         return;
       }
-      
+
       console.log('🛒 BuyNow: User ID:', userId);
 
       // Generate PO number
@@ -518,6 +520,11 @@ export const CartSidebar: React.FC = () => {
         console.log('📦 Using supplier from cart item:', validatedSupplierId);
       }
       
+      const restHeaders: Record<string, string> = {
+        apikey: SUPABASE_ANON_KEY,
+        Authorization: `Bearer ${accessToken}`,
+      };
+
       // STEP 2: If no supplier from cart, find supplier who has PRICED these products
       if (!validatedSupplierId && productIds.length > 0) {
         console.log('🔍 Finding supplier who priced these products...');
@@ -526,7 +533,7 @@ export const CartSidebar: React.FC = () => {
           const productIdsParam = productIds.join(',');
           const pricesResponse = await fetchWithTimeout(
             `${SUPABASE_URL}/rest/v1/supplier_product_prices?product_id=in.(${productIdsParam})&select=supplier_id&limit=1`,
-            { headers: { 'apikey': SUPABASE_ANON_KEY } },
+            { headers: restHeaders },
             5000
           );
           
@@ -540,7 +547,7 @@ export const CartSidebar: React.FC = () => {
               try {
                 const nameResponse = await fetchWithTimeout(
                   `${SUPABASE_URL}/rest/v1/suppliers?id=eq.${validatedSupplierId}&select=company_name`,
-                  { headers: { 'apikey': SUPABASE_ANON_KEY } },
+                  { headers: restHeaders },
                   3000
                 );
                 if (nameResponse.ok) {
@@ -563,7 +570,7 @@ export const CartSidebar: React.FC = () => {
         try {
           const supplierResponse = await fetchWithTimeout(
             `${SUPABASE_URL}/rest/v1/suppliers?select=id,company_name&limit=1`,
-            { headers: { 'apikey': SUPABASE_ANON_KEY } },
+            { headers: restHeaders },
             5000
           );
           
@@ -580,12 +587,22 @@ export const CartSidebar: React.FC = () => {
         }
       }
       
-      // STEP 4: Fallback - use user ID (may fail FK, but we'll handle it)
-      if (!validatedSupplierId) {
-        console.warn('⚠️ No supplier found, using user ID as fallback');
-        validatedSupplierId = userId;
+      if (
+        !validatedSupplierId ||
+        validatedSupplierId === userId ||
+        validatedSupplierId === 'admin-catalog' ||
+        validatedSupplierId === 'general'
+      ) {
+        toast({
+          title: 'Choose a supplier first',
+          description:
+            'Open “Compare Prices Across Suppliers” in your cart, tap Select on the supplier you want, then use Buy Now. That locks your order to the right supplier.',
+          variant: 'destructive',
+        });
+        setIsProcessing(false);
+        return;
       }
-      
+
       console.log('✅ Final supplier for order:', validatedSupplierId, supplierName);
       
       // Get selected project details for delivery address

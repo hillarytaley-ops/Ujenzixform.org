@@ -43,6 +43,7 @@ Guards: **Public** = no `AuthRequired`; **Session** = `AuthRequired`; **Role** =
 | `/professional-builder-dashboard` | Role | `professional_builder`, `builder`, `admin` |
 | `/supplier-dispatch-scanner` | Role | `supplier`, `admin` |
 | `/admin/*` shortcuts | Navigate | → `/admin-dashboard?tab=…` |
+| `/builder-dashboard` | Navigate | **Legacy:** `private_client` → `/private-client-dashboard`; others → `/professional-builder-dashboard` (see `App.tsx`) |
 
 When you add a route: update **`App.tsx`**, this table, and **`authChrome.ts`** if the page should hide floating chat/social.
 

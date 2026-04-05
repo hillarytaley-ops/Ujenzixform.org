@@ -211,9 +211,9 @@ const Suppliers = () => {
   // Get dashboard path based on user role
   const getDashboardPath = () => {
     if (userRole === 'professional_builder') return '/professional-builder-dashboard';
-    if (userRole === 'private_client') return '/builder-dashboard';
+    if (userRole === 'private_client') return '/private-client-dashboard';
     if (userRole === 'supplier') return '/supplier-dashboard';
-    return '/builder-dashboard';
+    return '/professional-builder-dashboard';
   };
 
   return (
@@ -410,8 +410,9 @@ const Suppliers = () => {
                     className="bg-white/10 border-white/30 text-white hover:bg-white/20"
                     onClick={() => navigate(
                       userRole === 'professional_builder' ? '/professional-builder-dashboard' :
+                      userRole === 'private_client' ? '/private-client-dashboard' :
                       userRole === 'supplier' ? '/supplier-dashboard' :
-                      '/builder-dashboard'
+                      '/professional-builder-dashboard'
                     )}
                   >
                     ← Back to Dashboard
