@@ -1,6 +1,7 @@
-import { defineConfig, loadEnv } from "vite";
+import { defineConfig, loadEnv, type Plugin } from "vite";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
+import fs from "node:fs";
 import { execSync } from "node:child_process";
 
 /** Dev-only fallback when `.env` has no Supabase URL (matches previous embedded default). */
@@ -29,6 +30,43 @@ function resolveAppBuildId(): string {
   }
 }
 
+/**
+ * Production-only: emits `/ga-bootstrap.js` (same-origin) so GA loads without inline script (stricter CSP).
+ * When `VITE_GA_MEASUREMENT_ID` is unset, nothing is injected.
+ */
+function gaBootstrapPlugin(): Plugin {
+  let outDir = "dist";
+  let mode = "development";
+
+  return {
+    name: "ga-bootstrap",
+    apply: "build",
+    configResolved(config) {
+      outDir = config.build.outDir;
+      mode = config.mode;
+    },
+    transformIndexHtml(html) {
+      if (mode !== "production") return html;
+      const env = loadEnv(mode, process.cwd(), "");
+      if (!env.VITE_GA_MEASUREMENT_ID?.trim()) return html;
+      return html.replace(
+        "</body>",
+        '    <script defer src="/ga-bootstrap.js"></script>\n  </body>'
+      );
+    },
+    closeBundle() {
+      if (mode !== "production") return;
+      const env = loadEnv(mode, process.cwd(), "");
+      const gaId = env.VITE_GA_MEASUREMENT_ID?.trim();
+      if (!gaId) return;
+      const id = JSON.stringify(gaId);
+      const source = `(function(){var id=${id};window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}window.gtag=gtag;var s=document.createElement("script");s.async=true;s.src="https://www.googletagmanager.com/gtag/js?id="+encodeURIComponent(id);s.onload=function(){gtag("js",new Date());gtag("config",id,{page_path:window.location.pathname,send_page_view:true});};document.head.appendChild(s);})();`;
+      fs.mkdirSync(outDir, { recursive: true });
+      fs.writeFileSync(path.join(outDir, "ga-bootstrap.js"), source, "utf8");
+    },
+  };
+}
+
 export default defineConfig(({ mode }) => {
   // Load env file based on mode (ensures .env.local is properly loaded)
   loadEnv(mode, process.cwd(), '');
@@ -44,6 +82,7 @@ export default defineConfig(({ mode }) => {
     },
     plugins: [
       react(),
+      gaBootstrapPlugin(),
       {
         name: "inject-site-origin-meta",
         transformIndexHtml(html) {

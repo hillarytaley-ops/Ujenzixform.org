@@ -80,6 +80,8 @@ VITE_SENTRY_DEV_ENABLED=true
 VITE_GA_MEASUREMENT_ID=G-...
 ```
 
+When this is set, **production** `npm run build` injects `<script defer src="/ga-bootstrap.js">` and writes that file into `dist/`. The bootstrap loads gtag from `googletagmanager.com` **without inline script**, which matches a strict `script-src` (no `'unsafe-inline'`) on Vercel. Omit the variable if you do not use GA.
+
 ### Feature Flags
 
 ```env

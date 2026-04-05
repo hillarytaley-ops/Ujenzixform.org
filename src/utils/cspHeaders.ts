@@ -1,10 +1,12 @@
 // Content Security Policy configuration
 // Environment-aware CSP directives for enhanced security
 //
-// - style-src 'unsafe-inline': Tailwind + Radix often need this without a nonce pipeline.
-// - script-src 'unsafe-inline' (production): required today because `initGoogleAnalytics` injects
-//   an inline gtag bootstrap. Index.html no longer uses inline scripts (see public/build-cleanup.js).
-// - Tighten further with script nonces + external GA init when you can test thoroughly.
+// - style-src 'unsafe-inline': required because the app uses many React `style={{...}}` attributes
+//   and JSX `<style>` blocks (e.g. Monitoring, charts, QR scanners). Removing it needs a large
+//   migration to CSS modules / external sheets + nonces.
+// - script-src (production): no 'unsafe-inline' — GA is bootstrapped from same-origin
+//   `/ga-bootstrap.js` when `VITE_GA_MEASUREMENT_ID` is set (see vite.config.ts). Dev still allows
+//   inline/eval for Vite HMR and the GA dev loader.
 import { SUPABASE_URL } from '@/integrations/supabase/client';
 
 const isDevelopment = import.meta.env.MODE === 'development';
@@ -27,12 +29,12 @@ export const CSP_DIRECTIVES = {
   'default-src': ["'self'"],
   'script-src': [
     "'self'",
-    ...(isDevelopment ? ["'unsafe-inline'", "'unsafe-eval'"] : ["'unsafe-inline'"]),
+    ...(isDevelopment ? ["'unsafe-inline'", "'unsafe-eval'"] : []),
     ...SCRIPT_HOSTS,
   ],
   'style-src': [
     "'self'",
-    "'unsafe-inline'", // Required for styled-components and Tailwind
+    "'unsafe-inline'", // React inline styles + JSX <style> (see file header)
     'https://fonts.googleapis.com'
   ],
   'img-src': [
@@ -115,14 +117,13 @@ export const generateNonce = (): string => {
   return btoa(String.fromCharCode(...array));
 };
 
-// Enhanced CSP with nonce support for production
+// Enhanced CSP with nonce support (optional third-party inline scripts)
 export const generateCSPWithNonce = (nonce?: string): string => {
   const directives = { ...CSP_DIRECTIVES };
   
-  // In production, use nonce instead of unsafe-inline for scripts
   if (!isDevelopment && nonce) {
-    directives['script-src'] = directives['script-src'].filter(src => 
-      src !== "'unsafe-inline'" && src !== "'unsafe-eval'"
+    directives['script-src'] = directives['script-src'].filter(
+      (src) => src !== "'unsafe-inline'" && src !== "'unsafe-eval'"
     );
     directives['script-src'].push(`'nonce-${nonce}'`);
   }

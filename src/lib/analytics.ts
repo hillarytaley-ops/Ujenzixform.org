@@ -23,6 +23,11 @@ const isGAAvailable = () => {
 /**
  * Initialize Google Analytics
  * Call this in main.tsx or App.tsx
+ *
+ * Production: `vite` emits `/ga-bootstrap.js` and injects `<script defer src="/ga-bootstrap.js">`
+ * when `VITE_GA_MEASUREMENT_ID` is set — no inline script (stricter CSP). This function only
+ * ensures a `gtag` stub exists if the deferred bootstrap has not run yet.
+ * Development: loads gtag.js + bootstrap via DOM (CSP allows inline scripts in dev).
  */
 export const initGoogleAnalytics = () => {
   if (!GA_MEASUREMENT_ID) {
@@ -30,31 +35,36 @@ export const initGoogleAnalytics = () => {
     return;
   }
 
-  // Add GA script to head
+  window.dataLayer = window.dataLayer || [];
+  window.gtag =
+    window.gtag ||
+    function gtagStub(...args: unknown[]) {
+      window.dataLayer.push(args);
+    };
+
+  if (import.meta.env.PROD) {
+    console.log('✅ Google Analytics: production bootstrap (/ga-bootstrap.js when configured)');
+    return;
+  }
+
   const script1 = document.createElement('script');
   script1.async = true;
   script1.src = `https://www.googletagmanager.com/gtag/js?id=${GA_MEASUREMENT_ID}`;
   document.head.appendChild(script1);
 
-  // Initialize gtag
   const script2 = document.createElement('script');
-  script2.innerHTML = `
+  script2.textContent = `
     window.dataLayer = window.dataLayer || [];
     function gtag(){dataLayer.push(arguments);}
     gtag('js', new Date());
-    gtag('config', '${GA_MEASUREMENT_ID}', {
+    gtag('config', ${JSON.stringify(GA_MEASUREMENT_ID)}, {
       page_path: window.location.pathname,
       send_page_view: true
     });
   `;
   document.head.appendChild(script2);
 
-  // Make gtag available globally
-  window.gtag = window.gtag || function() {
-    (window.dataLayer = window.dataLayer || []).push(arguments);
-  };
-
-  console.log('✅ Google Analytics initialized');
+  console.log('✅ Google Analytics initialized (development)');
 };
 
 /**
