@@ -31,6 +31,25 @@ function resolveAppBuildId(): string {
 }
 
 /**
+ * Unique per Vercel deploy (changes even on rebuild of same commit). Falls back to git SHA.
+ * Injected into index.html so build-cleanup.js can bust stale SW/cache when chunks change.
+ */
+function resolveAssetBuildId(): string {
+  const deploy = process.env.VERCEL_DEPLOYMENT_ID?.trim();
+  if (deploy) return deploy;
+  const fullSha =
+    process.env.VERCEL_GIT_COMMIT_SHA ||
+    process.env.CF_PAGES_COMMIT_SHA ||
+    process.env.GITHUB_SHA;
+  if (fullSha) return String(fullSha).slice(0, 12);
+  try {
+    return execSync("git rev-parse HEAD", { encoding: "utf-8" }).trim().slice(0, 12);
+  } catch {
+    return "local-" + Date.now();
+  }
+}
+
+/**
  * Production-only: emits `/ga-bootstrap.js` (same-origin) so GA loads without inline script (stricter CSP).
  * When `VITE_GA_MEASUREMENT_ID` is unset, nothing is injected.
  */
@@ -100,7 +119,11 @@ export default defineConfig(({ mode }) => {
               supabaseOrigin = "";
             }
           }
-          let out = html.replaceAll("%UJENZI_SITE_ORIGIN%", origin);
+          const assetBuildId =
+            mode === "development" ? "dev" : resolveAssetBuildId();
+          let out = html
+            .replaceAll("%UJENZI_SITE_ORIGIN%", origin)
+            .replaceAll("%UJENZI_ASSET_BUILD_ID%", assetBuildId);
           if (supabaseOrigin) {
             out = out.replaceAll("%UJENZI_SUPABASE_ORIGIN%", supabaseOrigin);
           } else {
