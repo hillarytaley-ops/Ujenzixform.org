@@ -63,6 +63,39 @@ export interface DeliveryRequestForScanner {
   status?: string;
 }
 
+/** When REST returns no material_items (RLS), load rows via SECURITY DEFINER RPC (same assignment rules as DB policies). */
+async function mergeMaterialItemsFromProviderRpc(poIds: string[], itemsByPo: Map<string, any[]>): Promise<void> {
+  const missing = poIds.filter((id) => (itemsByPo.get(id) || []).length === 0);
+  if (missing.length === 0) return;
+  try {
+    const { data, error } = await supabase.rpc('get_material_items_rows_for_provider_receive', {
+      p_po_ids: missing,
+    });
+    if (error) {
+      console.warn('get_material_items_rows_for_provider_receive:', error.message);
+      return;
+    }
+    let rows: any[] = [];
+    if (Array.isArray(data)) rows = data;
+    else if (data != null && typeof data === 'string') {
+      try {
+        const p = JSON.parse(data);
+        rows = Array.isArray(p) ? p : [];
+      } catch {
+        rows = [];
+      }
+    }
+    for (const row of rows) {
+      const pid = row.purchase_order_id;
+      if (!pid) continue;
+      if (!itemsByPo.has(pid)) itemsByPo.set(pid, []);
+      itemsByPo.get(pid)!.push(row);
+    }
+  } catch (e) {
+    console.warn('mergeMaterialItemsFromProviderRpc:', e);
+  }
+}
+
 interface ReceivingScannerProps {
   /** Called after successful scan. Passes true if the full order was completed (all items received). */
   onDeliveryComplete?: (orderCompleted?: boolean) => void;
@@ -429,6 +462,7 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
           itemsByPo.get(pid)!.push(row);
         });
       }
+      await mergeMaterialItemsFromProviderRpc(poIds, itemsByPo);
       return buildOrdersFromPoIds(poIds, byPoId, poMap, itemsByPo);
     };
     try {
@@ -438,8 +472,8 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
         setOrders(ordersArray);
         if (ordersArray.length > 0 && ordersArray.some((o) => !o.items_loaded)) {
           toast.info(
-            'Some orders have no line items visible to your account (database access). Nothing was marked received by you — fix RLS or run the material_items migration so items load.',
-            { duration: 9000 }
+            'Some orders still have no line items after the server fallback. Apply the latest Supabase migration (get_material_items_rows_for_provider_receive) or ask an admin to check material_items for those orders.',
+            { duration: 10000 }
           );
         }
       }
@@ -517,6 +551,7 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
         if (!itemsByPo.has(pid)) itemsByPo.set(pid, []);
         itemsByPo.get(pid)!.push(row);
       });
+      await mergeMaterialItemsFromProviderRpc(poIds, itemsByPo);
       const ordersArray = buildOrdersFromPoIds(poIds, byPoId, poMap, itemsByPo);
       setOrders(ordersArray);
     };
@@ -1335,8 +1370,8 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
                   Line items not loaded ({orders.filter((o) => !o.items_loaded).length})
                 </h3>
                 <p className="text-sm text-muted-foreground">
-                  These orders are assigned to you, but no QR line items were returned. They are{' '}
-                  <strong>not</strong> marked as received — this is usually RLS on <code className="text-xs">material_items</code> or missing rows. Ask an admin to verify access; you cannot scan until items appear.
+                  The app could not read QR line items for these orders on the normal connection (database permissions).{' '}
+                  <strong>You did not complete delivery in the system for them.</strong> After deploy, we load them through a secure server function; if this box remains, an admin must apply the latest Supabase migration or confirm rows exist in <code className="text-xs">material_items</code>.
                 </p>
                 {orders.filter((o) => !o.items_loaded).map((order) => (
                   <Card key={order.id} className="border-red-200 bg-red-50/50 dark:bg-red-950/20">
@@ -1344,7 +1379,7 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
                       <div>
                         <p className="font-semibold">Order #{order.order_number}</p>
                         <p className="text-sm text-muted-foreground">{order.buyer_name}</p>
-                        <p className="text-xs text-red-700 mt-1">No material_items visible — not counted as delivered</p>
+                        <p className="text-xs text-red-700 mt-1">QR lines not visible yet — not counted as delivered by you</p>
                       </div>
                       <Badge variant="outline" className="border-red-400 text-red-800">
                         Fix access
