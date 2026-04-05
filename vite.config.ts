@@ -35,7 +35,10 @@ function resolveAppBuildId(): string {
  * Injected into index.html so build-cleanup.js can bust stale SW/cache when chunks change.
  */
 function resolveAssetBuildId(): string {
-  const deploy = process.env.VERCEL_DEPLOYMENT_ID?.trim();
+  const deploy =
+    process.env.VERCEL_DEPLOYMENT_ID?.trim() ||
+    process.env.VERCEL_ID?.trim() ||
+    process.env.CF_PAGES_DEPLOYMENT_ID?.trim();
   if (deploy) return deploy;
   const fullSha =
     process.env.VERCEL_GIT_COMMIT_SHA ||

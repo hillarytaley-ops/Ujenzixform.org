@@ -4,6 +4,10 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { captureError } from "@/lib/sentry";
+import {
+  isChunkLoadFailureMessage,
+  scheduleChunkReloadRecovery,
+} from "@/utils/chunkLoadRecovery";
 
 // Error types for better categorization
 type ErrorType = 'network' | 'auth' | 'validation' | 'notfound' | 'permission' | 'unknown';
@@ -123,6 +127,10 @@ export class EnhancedErrorBoundary extends React.Component<EnhancedErrorBoundary
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
     console.error('🚨 Error caught by boundary:', error, errorInfo);
     this.setState({ errorInfo });
+
+    if (isChunkLoadFailureMessage(error.message)) {
+      void scheduleChunkReloadRecovery();
+    }
     
     // Call custom error handler if provided
     if (this.props.onError) {

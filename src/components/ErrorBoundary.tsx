@@ -3,6 +3,10 @@ import { AlertTriangle, RefreshCw, Home, MessageCircle, Zap } from 'lucide-react
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { logError } from '@/utils/errorHandler';
+import {
+  isChunkLoadFailureMessage,
+  scheduleChunkReloadRecovery,
+} from '@/utils/chunkLoadRecovery';
 
 interface Props {
   children: ReactNode;
@@ -17,22 +21,11 @@ interface State {
   isAutoReloading: boolean;
 }
 
-// Key for tracking reload attempts in sessionStorage
 const CHUNK_ERROR_RELOAD_KEY = 'ujenzixform_chunk_reload_attempt';
 const CHUNK_ERROR_TIMESTAMP_KEY = 'ujenzixform_chunk_reload_timestamp';
 
-/**
- * Check if error is a chunk loading error (stale deployment)
- */
 function isChunkLoadingError(error: Error): boolean {
-  const message = error.message.toLowerCase();
-  return (
-    message.includes('failed to fetch dynamically imported module') ||
-    message.includes('loading chunk') ||
-    message.includes('loading css chunk') ||
-    message.includes('failed to load module script') ||
-    (message.includes('mime type') && message.includes('text/html'))
-  );
+  return isChunkLoadFailureMessage(error.message);
 }
 
 /**
@@ -81,40 +74,6 @@ async function clearAllCaches(): Promise<void> {
 }
 
 /**
- * Check if we should auto-reload (prevent infinite loops)
- */
-function shouldAutoReload(): boolean {
-  const lastAttempt = sessionStorage.getItem(CHUNK_ERROR_TIMESTAMP_KEY);
-  const attemptCount = parseInt(sessionStorage.getItem(CHUNK_ERROR_RELOAD_KEY) || '0', 10);
-  
-  // Don't auto-reload if we've already tried 2 times in this session
-  if (attemptCount >= 2) {
-    console.log('⚠️ Max auto-reload attempts reached');
-    return false;
-  }
-  
-  // Don't auto-reload if we just tried within the last 10 seconds
-  if (lastAttempt) {
-    const timeSinceLastAttempt = Date.now() - parseInt(lastAttempt, 10);
-    if (timeSinceLastAttempt < 10000) {
-      console.log('⚠️ Too soon since last reload attempt');
-      return false;
-    }
-  }
-  
-  return true;
-}
-
-/**
- * Mark that we're attempting a reload
- */
-function markReloadAttempt(): void {
-  const currentCount = parseInt(sessionStorage.getItem(CHUNK_ERROR_RELOAD_KEY) || '0', 10);
-  sessionStorage.setItem(CHUNK_ERROR_RELOAD_KEY, String(currentCount + 1));
-  sessionStorage.setItem(CHUNK_ERROR_TIMESTAMP_KEY, String(Date.now()));
-}
-
-/**
  * Global Error Boundary Component
  * Catches JavaScript errors anywhere in the child component tree
  * Automatically handles chunk loading errors from stale deployments
@@ -144,27 +103,12 @@ export class ErrorBoundary extends Component<Props, State> {
     this.setState({ errorInfo });
     logError(error, `ErrorBoundary: ${errorInfo.componentStack}`);
     
-    // Handle chunk loading errors automatically
     if (isChunkLoadingError(error)) {
-      console.log('🔄 Chunk loading error detected - attempting automatic recovery...');
-      
-      if (shouldAutoReload()) {
-        this.setState({ isAutoReloading: true });
-        markReloadAttempt();
-        
-        try {
-          await clearAllCaches();
-          
-          // Small delay to ensure caches are cleared
-          setTimeout(() => {
-            console.log('🔄 Reloading page with fresh assets...');
-            // Force reload bypassing cache
-            window.location.href = window.location.href.split('?')[0] + '?_refresh=' + Date.now();
-          }, 500);
-        } catch (e) {
-          console.error('Failed to clear caches:', e);
-          this.setState({ isAutoReloading: false });
-        }
+      console.log('🔄 Chunk loading error — scheduling deploy recovery reload...');
+      this.setState({ isAutoReloading: true });
+      const scheduled = await scheduleChunkReloadRecovery();
+      if (!scheduled) {
+        this.setState({ isAutoReloading: false });
       }
     }
   }

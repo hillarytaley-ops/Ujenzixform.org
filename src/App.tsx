@@ -1,4 +1,5 @@
 import React, { useEffect } from "react";
+import { lazyImport } from "@/utils/lazyImport";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -19,56 +20,56 @@ import AdminAuth from "./pages/AdminAuth";
 import AdminDashboard from "./pages/AdminDashboard";
 
 // Lazy load non-critical pages for better bundle splitting
-const Builders = React.lazy(() => import("./pages/Builders"));
-const BuilderRegistration = React.lazy(() => import("./pages/BuilderRegistration"));
-const ProfessionalBuilderRegistration = React.lazy(() => import("./pages/ProfessionalBuilderRegistration"));
-const PrivateBuilderRegistration = React.lazy(() => import("./pages/PrivateBuilderRegistration"));
-const Suppliers = React.lazy(() => import("./pages/Suppliers"));
-const BuilderPortal = React.lazy(() => import("./pages/BuilderPortal"));
-const About = React.lazy(() => import("./pages/About"));
-const Contact = React.lazy(() => import("./pages/Contact"));
-const ResetPassword = React.lazy(() => import("./pages/ResetPassword"));
-const Feedback = React.lazy(() => import("./pages/Feedback"));
-const Careers = React.lazy(() => import("./pages/Careers"));
-const Tracking = React.lazy(() => import("./pages/Tracking"));
-const Monitoring = React.lazy(() => import("./pages/Monitoring"));
-const Delivery = React.lazy(() => import("./pages/Delivery"));
-const Scanners = React.lazy(() => import("./pages/Scanners"));
-const Analytics = React.lazy(() => import("./pages/Analytics"));
-const DeliveryProviderApplication = React.lazy(() => import("./pages/DeliveryProviderApplication"));
-const DeliveryRegistration = React.lazy(() => import("./pages/DeliveryRegistration"));
+const Builders = lazyImport(() => import("./pages/Builders"));
+const BuilderRegistration = lazyImport(() => import("./pages/BuilderRegistration"));
+const ProfessionalBuilderRegistration = lazyImport(() => import("./pages/ProfessionalBuilderRegistration"));
+const PrivateBuilderRegistration = lazyImport(() => import("./pages/PrivateBuilderRegistration"));
+const Suppliers = lazyImport(() => import("./pages/Suppliers"));
+const BuilderPortal = lazyImport(() => import("./pages/BuilderPortal"));
+const About = lazyImport(() => import("./pages/About"));
+const Contact = lazyImport(() => import("./pages/Contact"));
+const ResetPassword = lazyImport(() => import("./pages/ResetPassword"));
+const Feedback = lazyImport(() => import("./pages/Feedback"));
+const Careers = lazyImport(() => import("./pages/Careers"));
+const Tracking = lazyImport(() => import("./pages/Tracking"));
+const Monitoring = lazyImport(() => import("./pages/Monitoring"));
+const Delivery = lazyImport(() => import("./pages/Delivery"));
+const Scanners = lazyImport(() => import("./pages/Scanners"));
+const Analytics = lazyImport(() => import("./pages/Analytics"));
+const DeliveryProviderApplication = lazyImport(() => import("./pages/DeliveryProviderApplication"));
+const DeliveryRegistration = lazyImport(() => import("./pages/DeliveryRegistration"));
 
 // Dashboard imports - lazy loaded (heavy components). AdminDashboard is static — avoids stale lazy chunk → HTML MIME errors after deploy.
-const SupplierDashboard = React.lazy(() => import("./pages/SupplierDashboard"));
-const DeliveryDashboard = React.lazy(() => import("./pages/DeliveryDashboard"));
+const SupplierDashboard = lazyImport(() => import("./pages/SupplierDashboard"));
+const DeliveryDashboard = lazyImport(() => import("./pages/DeliveryDashboard"));
 
 // Additional pages - lazy loaded
-const SupplierRegistration = React.lazy(() => import("./pages/SupplierRegistration"));
-const SupplierSignIn = React.lazy(() => import("./pages/SupplierSignIn"));
-const BuilderSignIn = React.lazy(() => import("./pages/BuilderSignIn"));
-const DeliverySignIn = React.lazy(() => import("./pages/DeliverySignIn"));
-const DeliveryReceivingScanner = React.lazy(() => import("./pages/DeliveryReceivingScanner"));
-const SupplierDispatchScanner = React.lazy(() => import("./pages/SupplierDispatchScanner"));
+const SupplierRegistration = lazyImport(() => import("./pages/SupplierRegistration"));
+const SupplierSignIn = lazyImport(() => import("./pages/SupplierSignIn"));
+const BuilderSignIn = lazyImport(() => import("./pages/BuilderSignIn"));
+const DeliverySignIn = lazyImport(() => import("./pages/DeliverySignIn"));
+const DeliveryReceivingScanner = lazyImport(() => import("./pages/DeliveryReceivingScanner"));
+const SupplierDispatchScanner = lazyImport(() => import("./pages/SupplierDispatchScanner"));
 
 // Sign-in pages - lazy loaded
-const PrivateClientSignIn = React.lazy(() => import("./pages/PrivateClientSignIn"));
-const ProfessionalBuilderSignIn = React.lazy(() => import("./pages/ProfessionalBuilderSignIn"));
-const PrivateClientDashboard = React.lazy(() => import("./pages/PrivateClientDashboard"));
-const ProfessionalBuilderDashboardPage = React.lazy(() => import("./pages/ProfessionalBuilderDashboard"));
-const PublicBuilderProfile = React.lazy(() => import("./pages/PublicBuilderProfile"));
+const PrivateClientSignIn = lazyImport(() => import("./pages/PrivateClientSignIn"));
+const ProfessionalBuilderSignIn = lazyImport(() => import("./pages/ProfessionalBuilderSignIn"));
+const PrivateClientDashboard = lazyImport(() => import("./pages/PrivateClientDashboard"));
+const ProfessionalBuilderDashboardPage = lazyImport(() => import("./pages/ProfessionalBuilderDashboard"));
+const PublicBuilderProfile = lazyImport(() => import("./pages/PublicBuilderProfile"));
 
 // Unified Auth page - single auth page for all roles
-const UnifiedAuth = React.lazy(() => import("./pages/UnifiedAuth"));
+const UnifiedAuth = lazyImport(() => import("./pages/UnifiedAuth"));
 
 // Role-specific auth pages - each role has its own auth page
-const PrivateClientAuth = React.lazy(() => import("./pages/PrivateClientAuth"));
-const ProfessionalBuilderAuth = React.lazy(() => import("./pages/ProfessionalBuilderAuth"));
-const SupplierAuth = React.lazy(() => import("./pages/SupplierAuth"));
-const DeliveryAuth = React.lazy(() => import("./pages/DeliveryAuth"));
+const PrivateClientAuth = lazyImport(() => import("./pages/PrivateClientAuth"));
+const ProfessionalBuilderAuth = lazyImport(() => import("./pages/ProfessionalBuilderAuth"));
+const SupplierAuth = lazyImport(() => import("./pages/SupplierAuth"));
+const DeliveryAuth = lazyImport(() => import("./pages/DeliveryAuth"));
 
 // Legal pages - lazy loaded
-const PrivacyPolicy = React.lazy(() => import("./pages/PrivacyPolicy"));
-const TermsOfService = React.lazy(() => import("./pages/TermsOfService"));
+const PrivacyPolicy = lazyImport(() => import("./pages/PrivacyPolicy"));
+const TermsOfService = lazyImport(() => import("./pages/TermsOfService"));
 
 // Auth Guard
 import { AuthRequired } from "@/components/security/AuthRequired";
