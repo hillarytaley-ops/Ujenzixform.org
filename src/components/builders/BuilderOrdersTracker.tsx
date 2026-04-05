@@ -32,6 +32,7 @@ import {
   Phone
 } from 'lucide-react';
 import { SUPABASE_ANON_KEY, SUPABASE_URL, supabase } from '@/integrations/supabase/client';
+import { readAuthSessionForRest, readPersistedAccessTokenSync } from '@/utils/supabaseAccessToken';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import QRCode from 'qrcode';
@@ -245,22 +246,13 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
       setLoading(true);
       
       console.log('🔍 BuilderOrdersTracker: Fetching orders for builder:', builderId);
-      
-      // Use native fetch with timeout for faster loading
-      // Get access token from localStorage
-      const stored = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
-      let accessToken = '';
-      if (stored) {
-        try {
-          const parsed = JSON.parse(stored);
-          accessToken = parsed.access_token || '';
-        } catch (e) {}
-      }
-      
-      const headers: Record<string, string> = { 'apikey': SUPABASE_ANON_KEY };
-      if (accessToken) {
-        headers['Authorization'] = `Bearer ${accessToken}`;
-      }
+
+      const { accessToken } = await readAuthSessionForRest();
+      const bearer = accessToken || SUPABASE_ANON_KEY;
+      const headers: Record<string, string> = {
+        apikey: SUPABASE_ANON_KEY,
+        Authorization: `Bearer ${bearer}`,
+      };
 
       if (!builderId?.trim()) {
         setOrders([]);
@@ -750,21 +742,12 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
 
   const fetchScanEvents = async () => {
     try {
-      // Use native fetch with timeout for faster loading
-      // Get access token from localStorage
-      const stored = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
-      let accessToken = '';
-      if (stored) {
-        try {
-          const parsed = JSON.parse(stored);
-          accessToken = parsed.access_token || '';
-        } catch (e) {}
-      }
-      
-      const headers: Record<string, string> = { 'apikey': SUPABASE_ANON_KEY };
-      if (accessToken) {
-        headers['Authorization'] = `Bearer ${accessToken}`;
-      }
+      const { accessToken } = await readAuthSessionForRest();
+      const bearer = accessToken || SUPABASE_ANON_KEY;
+      const headers: Record<string, string> = {
+        apikey: SUPABASE_ANON_KEY,
+        Authorization: `Bearer ${bearer}`,
+      };
       
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 8000);
@@ -870,19 +853,12 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
           // Fetch order information for the new scan
           let enrichedScan: ScanEvent = { ...newScan };
           try {
-            const stored = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
-            let accessToken = '';
-            if (stored) {
-              try {
-                const parsed = JSON.parse(stored);
-                accessToken = parsed.access_token || '';
-              } catch (e) {}
-            }
-            const headers: Record<string, string> = { 'apikey': SUPABASE_ANON_KEY };
-            if (accessToken) {
-              headers['Authorization'] = `Bearer ${accessToken}`;
-            }
-            
+            const bearer = readPersistedAccessTokenSync() || SUPABASE_ANON_KEY;
+            const headers: Record<string, string> = {
+              apikey: SUPABASE_ANON_KEY,
+              Authorization: `Bearer ${bearer}`,
+            };
+
             // Fetch material item info
             const itemRes = await fetch(
               `${SUPABASE_URL}/rest/v1/material_items?qr_code=eq.${newScan.qr_code}&select=purchase_order_id,material_type&limit=1`,

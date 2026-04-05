@@ -45,6 +45,11 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import { SUPABASE_ANON_KEY, SUPABASE_URL, supabase } from '@/integrations/supabase/client';
+import {
+  getAccessTokenWithPersistenceFallback,
+  readAuthUserIdSync,
+  readPersistedAccessTokenSync,
+} from '@/utils/supabaseAccessToken';
 
 interface TrackingNumber {
   id: string;
@@ -98,8 +103,10 @@ export const TrackingTab: React.FC<TrackingTabProps> = ({
   // Get userId from props or localStorage fallback
   const getUserId = (): string => {
     if (propUserId) return propUserId;
-    
-    // Try localStorage user_id
+
+    const fromSession = readAuthUserIdSync();
+    if (fromSession) return fromSession;
+
     const storedUserId = localStorage.getItem('user_id');
     if (storedUserId) return storedUserId;
     
@@ -121,22 +128,6 @@ export const TrackingTab: React.FC<TrackingTabProps> = ({
   };
 
   const userId = getUserId();
-
-  const getAccessToken = useCallback(() => {
-    try {
-      const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
-      if (storedSession) {
-        const parsed = JSON.parse(storedSession);
-        return (
-          parsed.access_token ||
-          parsed.currentSession?.access_token ||
-          parsed.session?.access_token ||
-          ''
-        );
-      }
-    } catch (e) {}
-    return '';
-  }, []);
 
   // Helper function to map delivery status to tracking status
   const mapDeliveryStatusToTrackingStatus = (status: string): TrackingNumber['status'] => {
@@ -160,20 +151,7 @@ export const TrackingTab: React.FC<TrackingTabProps> = ({
   const fetchTrackingNumbers = useCallback(async () => {
     setLoading(true);
     try {
-      let accessToken = getAccessToken();
-      if (!accessToken) {
-        try {
-          const { data: { session } } = await Promise.race([
-            supabase.auth.getSession(),
-            new Promise<{ data: { session: null } }>((resolve) =>
-              setTimeout(() => resolve({ data: { session: null } }), 5000)
-            ),
-          ]);
-          accessToken = session?.access_token || '';
-        } catch {
-          /* ignore */
-        }
-      }
+      const accessToken = await getAccessTokenWithPersistenceFallback();
       const authHeader = `Bearer ${accessToken || SUPABASE_ANON_KEY}`;
       
       console.log('📦 TrackingTab: Starting fetch for userId:', userId, 'role:', userRole);
@@ -458,7 +436,7 @@ export const TrackingTab: React.FC<TrackingTabProps> = ({
     } finally {
       setLoading(false);
     }
-  }, [userId, userRole, propUserId, getAccessToken, supplierScopeIds?.join(',')]);
+  }, [userId, userRole, propUserId, supplierScopeIds?.join(',')]);
 
   useEffect(() => {
     if (userId) {
@@ -518,7 +496,7 @@ export const TrackingTab: React.FC<TrackingTabProps> = ({
             {
               headers: {
                 'apikey': SUPABASE_ANON_KEY,
-                'Authorization': `Bearer ${getAccessToken() || SUPABASE_ANON_KEY}`,
+                Authorization: `Bearer ${readPersistedAccessTokenSync() || SUPABASE_ANON_KEY}`,
               }
             }
           );

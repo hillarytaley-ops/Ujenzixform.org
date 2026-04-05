@@ -144,16 +144,15 @@ const PrivateClientDashboard = () => {
   const [deliveryAddressNeededNotifications, setDeliveryAddressNeededNotifications] = useState<{ id: string; title: string; message: string; action_url?: string }[]>([]);
 
   useEffect(() => {
-    // Set loading false after 3 seconds max to prevent infinite loading
     const timeout = setTimeout(() => {
       setLoading(false);
-    }, 3000);
-    
+    }, 12000);
+
     checkAuth().finally(() => {
       clearTimeout(timeout);
       setLoading(false);
     });
-    
+
     return () => clearTimeout(timeout);
   }, []);
 
@@ -402,60 +401,78 @@ const PrivateClientDashboard = () => {
         // Continue anyway - localStorage already verified role
       }
 
-      // Orders: rely on RLS (buyer_id may be auth.uid() or profiles.id — URL filter hid profile-id rows)
+      const { accessToken: restAccessToken } = await readAuthSessionForRest();
+      const restBearer = restAccessToken || SUPABASE_ANON_KEY;
+
+      // Orders: REST + JWT from persistence (same as loadData). RLS filters buyer rows; no buyer_id URL filter.
       console.log('📦 Fetching orders for user:', user.id);
       try {
-        const { data: ordersData, error: ordersErr } = await supabase
-          .from('purchase_orders')
-          .select('*')
-          .order('created_at', { ascending: false });
+        const ordersResponse = await fetch(
+          `${SUPABASE_URL}/rest/v1/purchase_orders?order=created_at.desc`,
+          {
+            headers: {
+              apikey: SUPABASE_ANON_KEY,
+              Authorization: `Bearer ${restBearer}`,
+              'Content-Type': 'application/json',
+            },
+          }
+        );
 
-        if (ordersErr) {
-          console.error('📦 Orders query error:', ordersErr.message);
+        let ordersPayload: any[] = [];
+        if (ordersResponse.ok) {
+          ordersPayload = await ordersResponse.json();
         } else {
-          console.log('📦 Private client orders loaded:', ordersData?.length || 0, ordersData);
+          console.error('📦 Orders REST failed:', ordersResponse.status, await ordersResponse.text());
+          const { data: fallbackRows, error: fbErr } = await supabase
+            .from('purchase_orders')
+            .select('*')
+            .order('created_at', { ascending: false });
+          if (fbErr) {
+            console.error('📦 Orders fallback error:', fbErr.message);
+          } else {
+            ordersPayload = fallbackRows || [];
+          }
+        }
 
-          const fetchedOrders = (ordersData || []).map((order: any) => ({
-            ...order,
-            delivery_required: order.delivery_required !== false,
-            delivery_provider_id: order.delivery_provider_id || null,
-            delivery_provider_name: order.delivery_provider_name || null,
-            delivery_status: order.delivery_status || null,
-          }));
-          setOrders(fetchedOrders);
-          console.log('📦 Orders set to state:', fetchedOrders.length);
+        console.log('📦 Private client orders loaded:', ordersPayload?.length || 0, ordersPayload);
 
-          const totalOrders = fetchedOrders.length;
-          const pendingOrders = fetchedOrders.filter(
-            (o: Order) =>
-              o.status === 'pending' || o.status === 'quoted' || o.status === 'processing'
-          ).length;
-          const completedOrders = fetchedOrders.filter(
+        const fetchedOrders = (ordersPayload || []).map((order: any) => ({
+          ...order,
+          delivery_required: order.delivery_required !== false,
+          delivery_provider_id: order.delivery_provider_id || null,
+          delivery_provider_name: order.delivery_provider_name || null,
+          delivery_status: order.delivery_status || null,
+        }));
+        setOrders(fetchedOrders);
+        console.log('📦 Orders set to state:', fetchedOrders.length);
+
+        const totalOrders = fetchedOrders.length;
+        const pendingOrders = fetchedOrders.filter(
+          (o: Order) =>
+            o.status === 'pending' || o.status === 'quoted' || o.status === 'processing'
+        ).length;
+        const completedOrders = fetchedOrders.filter(
+          (o: Order) =>
+            o.status === 'completed' || o.status === 'delivered' || o.status === 'confirmed'
+        ).length;
+        const totalSpent = fetchedOrders
+          .filter(
             (o: Order) =>
               o.status === 'completed' || o.status === 'delivered' || o.status === 'confirmed'
-          ).length;
-          const totalSpent = fetchedOrders
-            .filter(
-              (o: Order) =>
-                o.status === 'completed' || o.status === 'delivered' || o.status === 'confirmed'
-            )
-            .reduce((sum: number, o: Order) => sum + (o.total_amount || 0), 0);
+          )
+          .reduce((sum: number, o: Order) => sum + (o.total_amount || 0), 0);
 
-          setStats({
-            totalOrders,
-            pendingOrders,
-            completedOrders,
-            totalSpent,
-          });
+        setStats({
+          totalOrders,
+          pendingOrders,
+          completedOrders,
+          totalSpent,
+        });
 
-          console.log('📦 Private client stats:', { totalOrders, pendingOrders, completedOrders, totalSpent });
-        }
+        console.log('📦 Private client stats:', { totalOrders, pendingOrders, completedOrders, totalSpent });
       } catch (ordersError) {
         console.error('📦 Error fetching orders:', ordersError);
       }
-
-      const { accessToken: restAccessToken } = await readAuthSessionForRest();
-      const restBearer = restAccessToken || SUPABASE_ANON_KEY;
 
       // Fetch delivery requests for this user using direct REST API
       // builder_id references profiles.id (see delivery_requests_builder_id_fkey)
@@ -1183,7 +1200,10 @@ const PrivateClientDashboard = () => {
                     user?.id || readAuthUserIdSync() || localStorage.getItem('user_id') || '';
                   
                   return builderId ? (
-                    <BuilderOrdersTracker builderId={builderId} />
+                    <BuilderOrdersTracker
+                      key={`${builderId}-${profile?.id ?? ''}`}
+                      builderId={builderId}
+                    />
                   ) : (
                     <div className="text-center py-12 text-gray-500">
                       <QrCode className="h-16 w-16 mx-auto mb-4 text-gray-300" />
