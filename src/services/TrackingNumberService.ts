@@ -12,6 +12,7 @@
 
 import { SUPABASE_ANON_KEY, SUPABASE_URL, supabase } from '@/integrations/supabase/client';
 import { invokeEdgeFunction } from '@/lib/invokeEdgeFunction';
+import { getAccessTokenWithPersistenceFallback } from '@/utils/supabaseAccessToken';
 
 export interface TrackingNumberResult {
   trackingNumber: string;
@@ -32,6 +33,12 @@ export interface BuilderNotification {
 }
 
 class TrackingNumberService {
+  /** Bearer JWT for PostgREST: live session, then persisted storage (session + local + legacy key). */
+  private async bearerForRest(): Promise<string> {
+    const t = await getAccessTokenWithPersistenceFallback();
+    return t || SUPABASE_ANON_KEY;
+  }
+
   /**
    * Generate a unique tracking number
    * Format: TRK-YYYYMMDD-XXXXX (e.g., TRK-20251213-A7B3C)
@@ -79,47 +86,12 @@ class TrackingNumberService {
       // First, get the delivery request to check its expected delivery date
       // Use direct REST API call with timeout to avoid Supabase client hanging
       console.log('📦 Step 1: Fetching delivery request...');
-      // Get access token - try localStorage first (faster), then getSession as fallback
-      let accessToken = SUPABASE_ANON_KEY;
-      try {
-        console.log('🔑 Getting access token...');
-        
-        // Try localStorage first (much faster, no async call)
-        const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
-        if (storedSession) {
-          try {
-            const parsed = JSON.parse(storedSession);
-            if (parsed.access_token) {
-              accessToken = parsed.access_token;
-              console.log('✅ Access token obtained from localStorage');
-            }
-          } catch (e) {
-            console.warn('⚠️ Could not parse stored session');
-          }
-        }
-        
-        // If localStorage didn't work, try getSession (with timeout)
-        if (accessToken === SUPABASE_ANON_KEY) {
-          console.log('🔑 Trying getSession() as fallback...');
-          const sessionPromise = supabase.auth.getSession();
-          const sessionTimeout = new Promise<never>((_, reject) => {
-            setTimeout(() => reject(new Error('Session timeout')), 2000);
-          });
-          
-          const { data: { session } } = await Promise.race([sessionPromise, sessionTimeout]) as any;
-          if (session?.access_token) {
-            accessToken = session.access_token;
-            console.log('✅ Session token obtained from getSession()');
-          }
-        }
-      } catch (e) {
-        console.warn('⚠️ Could not get session token:', e);
-        // If we still have anon key, this will fail on UPDATE operations due to RLS
-        // But we'll try anyway and show a clear error
-      }
-      
+      console.log('🔑 Getting access token...');
+      const accessToken = await this.bearerForRest();
       if (accessToken === SUPABASE_ANON_KEY) {
         console.warn('⚠️ Using anon key - UPDATE operations may fail due to RLS policies');
+      } else {
+        console.log('✅ Access token obtained for REST');
       }
       
       // Use direct fetch with timeout - wrap in Promise.race for extra safety
@@ -1479,21 +1451,31 @@ class TrackingNumberService {
    * Notify builder of their new tracking number
    */
   private async notifyBuilder(notification: BuilderNotification): Promise<void> {
-    try {
-      // Get access token
-      let accessToken = SUPABASE_ANON_KEY;
-      try {
-        const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
-        if (storedSession) {
-          const parsed = JSON.parse(storedSession);
-          if (parsed.access_token) {
-            accessToken = parsed.access_token;
-          }
-        }
-      } catch (e) {
-        // Use anon key
+    const insertBuilderNotificationViaTable = async () => {
+      const { error: fbErr } = await supabase.from('notifications').insert({
+        user_id: notification.builderId,
+        type: 'delivery_accepted',
+        title: '🚚 Delivery Provider Assigned!',
+        message: `Your delivery has been accepted! Track it with: ${notification.trackingNumber}`,
+        data: {
+          tracking_number: notification.trackingNumber,
+          provider_name: notification.providerName,
+          pickup_address: notification.pickupAddress,
+          delivery_address: notification.deliveryAddress,
+          material_type: notification.materialType,
+          estimated_pickup: notification.estimatedPickupDate,
+        },
+        read: false,
+        action_url: '/tracking',
+      });
+      if (fbErr) {
+        console.warn('⚠️ Fallback notifications.insert failed:', fbErr.message);
       }
-      
+    };
+
+    try {
+      const accessToken = await this.bearerForRest();
+
       // Use send_user_notification RPC (SECURITY DEFINER) - matches schema, allows provider to notify builder
       const notificationPromise = fetch(
         `${SUPABASE_URL}/rest/v1/rpc/send_user_notification`,
@@ -1530,14 +1512,16 @@ class TrackingNumberService {
       
       try {
         const response = await Promise.race([notificationPromise, notificationTimeout]);
-        
+
         if (!response.ok) {
           const errorText = await response.text();
           console.warn('⚠️ Notification insert failed:', response.status, errorText);
+          await insertBuilderNotificationViaTable();
         }
       } catch (error: any) {
         if (error.message === 'Notification insert timeout') {
           console.warn('⚠️ Notification insert timed out after 3 seconds');
+          await insertBuilderNotificationViaTable();
         } else {
           throw error;
         }
@@ -1638,20 +1622,8 @@ class TrackingNumberService {
     trackingNumber: string
   ): Promise<void> {
     try {
-      // Get access token
-      let accessToken = SUPABASE_ANON_KEY;
-      try {
-        const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
-        if (storedSession) {
-          const parsed = JSON.parse(storedSession);
-          if (parsed.access_token) {
-            accessToken = parsed.access_token;
-          }
-        }
-      } catch (e) {
-        // Use anon key
-      }
-      
+      const accessToken = await this.bearerForRest();
+
       // Check if tracking entry already exists with timeout
       const checkPromise = fetch(
         `${SUPABASE_URL}/rest/v1/delivery_tracking?delivery_id=eq.${deliveryRequestId}&select=id&limit=1`,
@@ -1868,20 +1840,8 @@ class TrackingNumberService {
    */
   async generateMissingTrackingNumbers(builderId?: string): Promise<{ created: number; errors: number }> {
     console.log('🔧 Generating missing tracking numbers...', builderId ? `for builder: ${builderId}` : 'for all builders');
-    // Get access token
-    let accessToken = SUPABASE_ANON_KEY;
-    try {
-      const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
-      if (storedSession) {
-        const parsed = JSON.parse(storedSession);
-        if (parsed.access_token) {
-          accessToken = parsed.access_token;
-        }
-      }
-    } catch (e) {
-      // Use anon key
-    }
-    
+    const accessToken = await this.bearerForRest();
+
     try {
       // Fetch all accepted delivery requests
       let drUrl = `${SUPABASE_URL}/rest/v1/delivery_requests?status=in.(accepted,assigned)&select=id,purchase_order_id,builder_id,provider_id,delivery_address,pickup_address,material_type,preferred_date,pickup_date,tracking_number&order=created_at.desc&limit=1000`;

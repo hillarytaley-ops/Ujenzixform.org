@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { SUPABASE_ANON_KEY, SUPABASE_URL, supabase } from '@/integrations/supabase/client';
+import { readAuthSessionForRest } from '@/utils/supabaseAccessToken';
 import { trackingNumberService } from '@/services/TrackingNumberService';
 import { cleanupDuplicateDeliveryRequests, cleanupDuplicatePurchaseOrders, checkForDuplicateDeliveryRequests, deleteDeliveryRequestsWithoutAddress, deleteDuplicateDeliveryRequestsByCompositeKey } from '@/utils/cleanupDuplicateDeliveryRequests';
 import { checkDeliveryAddress } from '@/utils/checkDeliveryAddress';
@@ -92,34 +93,16 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
   const [checkingAddress, setCheckingAddress] = useState<string | null>(null); // Track which address is being checked
   const { toast } = useToast();
 
-  // Helper to get auth headers
-  const getAuthHeaders = () => {
-    try {
-      const stored = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
-      let accessToken = '';
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        accessToken = parsed.access_token || '';
-      }
-      
-      const headers: Record<string, string> = {
-        'apikey': SUPABASE_ANON_KEY,
-        'Content-Type': 'application/json'
-      };
-      if (accessToken) {
-        headers['Authorization'] = `Bearer ${accessToken}`;
-      }
-      
-      return { url: SUPABASE_URL, headers };
-    } catch (e) {
-      return {
-        url: SUPABASE_URL,
-        headers: {
-          'apikey': SUPABASE_ANON_KEY,
-          'Content-Type': 'application/json'
-        }
-      };
+  const getAuthHeaders = async () => {
+    const { accessToken } = await readAuthSessionForRest();
+    const headers: Record<string, string> = {
+      apikey: SUPABASE_ANON_KEY,
+      'Content-Type': 'application/json',
+    };
+    if (accessToken) {
+      headers.Authorization = `Bearer ${accessToken}`;
     }
+    return { url: SUPABASE_URL, headers };
   };
 
   // COMPLETELY RESTRUCTURED: Simple, clear logic
@@ -128,7 +111,7 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
       setLoading(true);
       console.log('🔄 RESTRUCTURED: Loading notifications...');
       
-      const { url, headers } = getAuthHeaders();
+      const { url, headers } = await getAuthHeaders();
 
       let providerLat: number | undefined;
       let providerLng: number | undefined;
@@ -1297,8 +1280,8 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
     setRejectingId(requestId);
     
     try {
-      const { url, headers } = getAuthHeaders();
-      
+      const { url, headers } = await getAuthHeaders();
+
       // Update delivery_request status to rejected
       const response = await fetch(
         `${url}/rest/v1/delivery_requests?id=eq.${requestId}`,
