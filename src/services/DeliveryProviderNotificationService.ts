@@ -403,14 +403,23 @@ class DeliveryProviderNotificationService {
       }
     });
 
+    const NOTIFICATION_DEADLINE_MS = 25000;
+    let deadlineId: ReturnType<typeof setTimeout>;
     const timeoutPromise = new Promise<boolean[]>((resolve) => {
-      setTimeout(() => {
-        console.log('⏱️ Notification timeout reached');
+      deadlineId = setTimeout(() => {
+        console.warn(
+          '⏱️ Notification deadline reached; some provider channels may still be in flight'
+        );
         resolve(providers.map(() => false));
-      }, 15000);
+      }, NOTIFICATION_DEADLINE_MS);
     });
 
-    const results = await Promise.race([Promise.all(notificationPromises), timeoutPromise]);
+    const allDone = Promise.all(notificationPromises).then((r) => {
+      clearTimeout(deadlineId);
+      return r;
+    });
+
+    const results = await Promise.race([allDone, timeoutPromise]);
 
     results.forEach((success) => {
       if (success) {
