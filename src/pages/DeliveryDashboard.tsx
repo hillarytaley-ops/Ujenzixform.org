@@ -160,6 +160,39 @@ interface DeliveryHistory {
   order_number?: string; // Include order_number for display and matching
 }
 
+/** Map hook rows to dashboard cards immediately — avoids empty Schedule while async DR fetch + validation run */
+function mapIsolatedRowToActiveDeliveryQuick(d: any): ActiveDelivery {
+  const addr =
+    (d.delivery_location && String(d.delivery_location).trim()) ||
+    (d.delivery_address && String(d.delivery_address).trim()) ||
+    'Delivery address missing - contact builder';
+  return {
+    id: String(d.id ?? ''),
+    pickup_location: d.pickup_location || d.pickup_address || 'N/A',
+    delivery_location: addr,
+    material_type: d.material_type || d.item_description || 'Materials',
+    quantity: String(d.quantity ?? d.estimated_weight ?? 'N/A'),
+    customer_name:
+      (typeof d.builder_name === 'string' && d.builder_name.trim()) ||
+      (typeof d.builder_email === 'string' ? d.builder_email.split('@')[0]?.trim() : '') ||
+      'Builder',
+    customer_phone: (d.builder_phone && String(d.builder_phone).trim()) || '',
+    status: d.status || 'pending',
+    estimated_time: d.estimated_time || '30 mins',
+    price: Number(d.price || d.delivery_fee || d.estimated_cost || 0),
+    distance: Number(d.distance || 0),
+    urgency: d.urgency || d.priority_level,
+    special_instructions: d.special_instructions,
+    created_at: d.created_at,
+    purchase_order_id: d.purchase_order_id,
+    order_number: d.order_number,
+    _categorized_status: d._categorized_status,
+    _items_count: d._items_count,
+    _dispatched_count: d._dispatched_count,
+    _received_count: d._received_count,
+  };
+}
+
 const DeliveryDashboard = () => {
   const { user, signOut } = useAuth();
   const { t } = useLanguage();
@@ -349,6 +382,8 @@ const DeliveryDashboard = () => {
     // Transform active deliveries - ONLY THIS PROVIDER'S DELIVERIES
     console.log('📋 Dashboard sync: isolatedActiveDeliveries.length =', isolatedActiveDeliveries?.length ?? 0);
     if (isolatedActiveDeliveries && isolatedActiveDeliveries.length > 0) {
+      // Show assigned jobs immediately — deliveryCategories reads activeDeliveries; async validation used to leave [] until done and often cleared all rows when purchase_orders RLS returned 0 matches
+      setActiveDeliveries(isolatedActiveDeliveries.map(mapIsolatedRowToActiveDeliveryQuick));
       // CRITICAL: Fetch delivery_requests to get builder-provided delivery_address
       // The builder fills in delivery_address in delivery_requests table during delivery request
       // This is the address that should appear on the delivery card, not "To be provided"
@@ -546,6 +581,14 @@ const DeliveryDashboard = () => {
                 
                 return orderExists;
               });
+
+              if (ordersThatExist.length === 0 && isolatedActiveDeliveries.length > 0) {
+                console.warn(
+                  '⚠️ purchase_orders validation matched 0 rows for assigned deliveries (RLS or mismatch) — keeping data from provider hook'
+                );
+                setActiveDeliveries(isolatedActiveDeliveries.map((d: any) => formatDelivery(d)));
+                return;
+              }
               
               // Additional validation: Check material_items scan status
               // Only show orders that are in "Awaiting Dispatch" (all items have dispatch_scanned = FALSE)
@@ -652,7 +695,14 @@ const DeliveryDashboard = () => {
               
               console.log('✅ VALIDATION: Removed', isolatedActiveDeliveries.length - validDeliveries.length, 'non-existent orders');
               console.log('✅ VALIDATION: Valid orders count:', validDeliveries.length);
-              setActiveDeliveries(validDeliveries.map((d: any) => formatDelivery(d)));
+              if (validDeliveries.length === 0 && isolatedActiveDeliveries.length > 0) {
+                console.warn(
+                  '⚠️ Post material_items filter: 0 deliveries — keeping provider hook list so Schedule is not blank'
+                );
+                setActiveDeliveries(isolatedActiveDeliveries.map((d: any) => formatDelivery(d)));
+              } else {
+                setActiveDeliveries(validDeliveries.map((d: any) => formatDelivery(d)));
+              }
               return;
             }
           }
