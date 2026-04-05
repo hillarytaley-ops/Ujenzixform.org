@@ -33,6 +33,7 @@ Goal: core marketplace and admin flows **boringly reliable** before investing in
 ### C. Supabase: migrations and database
 
 - [ ] `supabase link` to the correct project; `supabase db push` (or run pending SQL) so **production** matches repo ([PRODUCTION_SETUP](./PRODUCTION_SETUP.md) if you use it).
+- [ ] **RLS vs routes:** after migrations, smoke-test **one dashboard path per role** from [AUTH_AND_ROUTES_MATRIX](./AUTH_AND_ROUTES_MATRIX.md) with a real non-admin account (not only service role or admin JWT).
 - [ ] Monitoring / cameras: ensure `resolve_monitoring_access_code`, `auth_can_access_camera`, and related migrations are applied (e.g. `20260331120000_*`, `20260401140000_*`).
 - [ ] Optional: run project-specific verify scripts under `supabase/` if present (e.g. provider RPC checks mentioned in [DEPLOYMENT](./DEPLOYMENT.md)).
 
@@ -76,6 +77,7 @@ Goal: core marketplace and admin flows **boringly reliable** before investing in
 | Deploy & cache | [DEPLOYMENT](./DEPLOYMENT.md) |
 | Security & RLS mindset | [SECURITY_OPERATIONS](./SECURITY_OPERATIONS.md) |
 | Module map | [MAINTENANCE_AND_SCOPE](./MAINTENANCE_AND_SCOPE.md) |
+| Routes ↔ roles ↔ RLS | [AUTH_AND_ROUTES_MATRIX](./AUTH_AND_ROUTES_MATRIX.md) |
 | Edge + camera stream flag | [EDGE_THROTTLING_AND_STREAM_RELAY](./EDGE_THROTTLING_AND_STREAM_RELAY.md) |
 | Payments | [PAYMENT_INTEGRATION_GUIDE](./PAYMENT_INTEGRATION_GUIDE.md), [workflows/PAYMENT_AND_SECURITY_FLOWS](./workflows/PAYMENT_AND_SECURITY_FLOWS.md) |
 | Admin / staff | [ADMIN_SETUP](./ADMIN_SETUP.md), [ADMIN_STAFF_GUIDE](./ADMIN_STAFF_GUIDE.md) |

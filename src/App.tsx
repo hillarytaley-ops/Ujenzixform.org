@@ -86,6 +86,7 @@ import { OfflineIndicator } from "@/components/OfflineIndicator";
 
 // PWA Install Prompt
 import { PWAInstallPrompt } from "@/components/pwa/PWAInstallPrompt";
+import { shouldHideFloatingChrome } from "@/config/authChrome";
 
 // Optimized loading component with skeleton animation
 const PageLoader = () => (
@@ -117,17 +118,11 @@ const queryClient = new QueryClient({
   },
 });
 
-// Component that hides floating widgets on auth pages
+// Component that hides floating widgets on auth pages (paths: src/config/authChrome.ts)
 const FloatingWidgets = () => {
   const location = useLocation();
-  
-  // Hide on auth-related pages
-  const authPaths = ['/', '/auth', '/admin-login', '/reset-password', '/builder-signin', '/supplier-signin', '/delivery-signin', '/professional-builder-signin', '/private-builder-signin'];
-  const isAuthPage = authPaths.some(path => location.pathname === path) || 
-                     location.pathname.includes('-registration') ||
-                     location.pathname.includes('-signin');
-  
-  if (isAuthPage) {
+
+  if (shouldHideFloatingChrome(location.pathname)) {
     return null;
   }
   
@@ -224,6 +219,7 @@ const App = () => {
                 {showChat && <FloatingWidgets />}
                 
                 <EnhancedErrorBoundary>
+                {/* Route / guard inventory: docs/AUTH_AND_ROUTES_MATRIX.md */}
                 <Routes>
                     {/* Public Routes - Accessible to everyone after single sign in */}
                     <Route path="/" element={<Auth />} />
@@ -305,7 +301,6 @@ const App = () => {
                     {/* Registration Routes */}
                     <Route path="/supplier-registration" element={<SuspenseWrapper><SupplierRegistration /></SuspenseWrapper>} />
                     <Route path="/delivery-registration" element={<SuspenseWrapper><DeliveryRegistration /></SuspenseWrapper>} />
-                    <Route path="/supplier-marketplace" element={<SuspenseWrapper><Suppliers /></SuspenseWrapper>} />
                     
                     {/* Admin Route - Redirect /admin to /admin-dashboard */}
                     <Route path="/admin" element={<Navigate to="/admin-dashboard" replace />} />

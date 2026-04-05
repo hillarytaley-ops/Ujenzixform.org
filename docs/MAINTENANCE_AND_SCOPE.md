@@ -6,11 +6,13 @@ The app spans many domains (marketplace, admin, delivery, monitoring, security t
 
 **Merged ops checklist (deploy, env, migrations, smoke tests, vision worker):** see [OPS_RUNBOOK.md](./OPS_RUNBOOK.md).
 
+**Auth URLs, `RoleProtectedRoute`, and RLS alignment:** see [AUTH_AND_ROUTES_MATRIX.md](./AUTH_AND_ROUTES_MATRIX.md). Floating chat/social chrome uses `src/config/authChrome.ts` so auth entry paths stay consistent with `App.tsx`.
+
 ## Module map (where to look)
 
 | Area | Primary locations |
 |------|-------------------|
-| Routes / pages | `src/pages/`, `src/App.tsx` (or router entry) |
+| Routes / pages | `src/pages/`, `src/App.tsx`; route ↔ role map [AUTH_AND_ROUTES_MATRIX.md](./AUTH_AND_ROUTES_MATRIX.md) |
 | Shared UI | `src/components/`, `src/components/ui/` |
 | Supabase client usage | `src/integrations/supabase/` |
 | RLS and schema | `supabase/migrations/` |
@@ -63,7 +65,7 @@ Run locally or in CI (see `.github/workflows/ci.yml`):
 After deploy:
 
 4. Smoke-test **your** critical paths (auth, checkout or PO, one admin action).
-5. Confirm **RLS** with a non-admin test user (not only the dashboard as superuser).
+5. Confirm **RLS** with a non-admin test user (not only the dashboard as superuser). Use [AUTH_AND_ROUTES_MATRIX.md](./AUTH_AND_ROUTES_MATRIX.md) to pick one path per role and verify DB access matches the UI guard.
 6. Optional: Lighthouse or axe on top landing and one authenticated screen.
 7. Production: enable **Sentry** (if used), host analytics, and Supabase metrics for latency and errors.
 
