@@ -146,6 +146,9 @@ interface ActiveDelivery {
   _items_count?: number;
   _dispatched_count?: number;
   _received_count?: number;
+  /** purchase_orders.status — when delivered here, hide from Schedule even if delivery_requests.status lags */
+  po_status?: string;
+  purchase_order_status?: string;
 }
 
 interface DeliveryHistory {
@@ -190,6 +193,8 @@ function mapIsolatedRowToActiveDeliveryQuick(d: any): ActiveDelivery {
     _items_count: d._items_count,
     _dispatched_count: d._dispatched_count,
     _received_count: d._received_count,
+    po_status: d.po_status || d.purchase_order_status,
+    purchase_order_status: d.purchase_order_status || d.po_status,
   };
 }
 
@@ -505,7 +510,9 @@ const DeliveryDashboard = () => {
             _categorized_status: d._categorized_status,
             _items_count: d._items_count,
             _dispatched_count: d._dispatched_count,
-            _received_count: d._received_count
+            _received_count: d._received_count,
+            po_status: d.po_status || d.purchase_order_status,
+            purchase_order_status: d.purchase_order_status || d.po_status
           };
         };
       
@@ -983,36 +990,74 @@ const DeliveryDashboard = () => {
     _received_count: row._received_count,
   }), []);
 
+  /**
+   * Schedule tab source: prefer hook data so async validation cannot zero out the list while
+   * isolatedActiveDeliveries still has assigned jobs. Merge in enriched addresses from activeDeliveries.
+   */
+  const deliveriesForScheduleLogic = useMemo(() => {
+    const hookMapped = (isolatedActiveDeliveries || []).map(mapIsolatedRowToActiveDeliveryQuick);
+    if (hookMapped.length === 0) return activeDeliveries;
+    const byId = new Map(activeDeliveries.map((d) => [String(d.id), d]));
+    return hookMapped.map((h) => {
+      const e = byId.get(String(h.id));
+      if (!e) return h;
+      return {
+        ...h,
+        delivery_location: e.delivery_location || h.delivery_location,
+        pickup_location: e.pickup_location || h.pickup_location,
+        customer_name: e.customer_name || h.customer_name,
+        customer_phone: e.customer_phone || h.customer_phone,
+        material_type: e.material_type || h.material_type,
+        status: e.status || h.status,
+        order_number: e.order_number || h.order_number,
+        purchase_order_id: e.purchase_order_id || h.purchase_order_id,
+        _categorized_status: e._categorized_status ?? h._categorized_status,
+        _items_count: e._items_count ?? h._items_count,
+        _dispatched_count: e._dispatched_count ?? h._dispatched_count,
+        _received_count: e._received_count ?? h._received_count,
+        po_status: e.po_status || h.po_status,
+        purchase_order_status: e.purchase_order_status || h.purchase_order_status,
+      };
+    });
+  }, [isolatedActiveDeliveries, activeDeliveries]);
+
   // Single source of truth (legacy fallback when unified returns empty): categorize each delivery so badge counts and tab content always match
   // RULE: Accept → order moves to Scheduled; order STAYS in Scheduled until delivery scan (all items receive_scanned); then it moves to History.
   // CRITICAL: Dispatch scan must NOT remove orders from Schedule - they stay until delivery scan.
   const deliveryCategories = useMemo(() => {
+    const isDeliveredStatus = (s: string) => s === 'delivered' || s === 'completed';
     const getCategory = (d: any): 'scheduled' | 'delivered' => {
+      const po = String(d.po_status || d.purchase_order_status || '').toLowerCase();
+      if (po && isDeliveredStatus(po)) return 'delivered';
+
       const cat = String(d._categorized_status || d.status || '').toLowerCase();
-      // Only "delivered" leaves the Schedule tab; everything else stays in Schedule until delivery scan
-      if (cat === 'delivered' || cat === 'completed') return 'delivered';
-      const allReceived = d._items_count != null && d._received_count != null &&
-        d._items_count > 0 && d._received_count >= d._items_count;
+      if (isDeliveredStatus(cat)) return 'delivered';
+
+      const allReceived =
+        d._items_count != null &&
+        d._received_count != null &&
+        d._items_count > 0 &&
+        d._received_count >= d._items_count;
       if (allReceived) return 'delivered';
-      // All non-delivered orders (accepted, assigned, in_transit, dispatched, shipped, etc.) stay in Schedule until delivery scan
+
       return 'scheduled';
     };
     const scheduled: any[] = [];
     const deliveredFromActive: any[] = [];
-    activeDeliveries.forEach(d => {
+    deliveriesForScheduleLogic.forEach((d) => {
       const c = getCategory(d);
       if (c === 'scheduled') scheduled.push(d);
       else deliveredFromActive.push(d);
     });
 
     console.log('📊 Delivery categorization (Schedule = until delivery scan):', {
-      total: activeDeliveries.length,
+      total: deliveriesForScheduleLogic.length,
       scheduled: scheduled.length,
       delivered: deliveredFromActive.length
     });
 
     return { scheduled, inTransit: [] as any[], deliveredFromActive };
-  }, [activeDeliveries]);
+  }, [deliveriesForScheduleLogic]);
 
   // Calculate Deliveries badge count - must match Scheduled tab logic EXACTLY
   const deliveriesBadgeCount = useMemo(() => {
