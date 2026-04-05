@@ -27,6 +27,7 @@ import {
   getCartProjectName,
   getCartProjectLocation,
 } from '@/utils/builderCartProject';
+import { readAuthSessionForRest } from '@/utils/supabaseAccessToken';
 import { useToast } from '@/hooks/use-toast';
 import { 
   Scale, 
@@ -298,18 +299,14 @@ export const CartPriceComparisonAll: React.FC<CartPriceComparisonAllProps> = ({
     setSending(true);
     let userId: string | null = null;
     let accessToken: string | null = null;
-    
     try {
-      const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
-      if (storedSession) {
-        const parsed = JSON.parse(storedSession);
-        userId = parsed.user?.id;
-        accessToken = parsed.access_token;
-      }
+      const session = await readAuthSessionForRest();
+      userId = session.userId;
+      accessToken = session.accessToken;
     } catch (e) {
-      console.warn('Could not parse stored session');
+      console.warn('Could not read auth session for quotes', e);
     }
-    
+
     if (!userId || !accessToken) {
       toast({
         title: 'Sign in required',
