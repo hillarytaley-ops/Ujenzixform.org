@@ -32,7 +32,8 @@ import {
   FileText,
   Star
 } from 'lucide-react';
-import { SUPABASE_ANON_KEY, SUPABASE_URL, supabase } from '@/integrations/supabase/client';
+import { SUPABASE_ANON_KEY, SUPABASE_URL } from '@/integrations/supabase/client';
+import { getAccessTokenWithPersistenceFallback } from '@/utils/supabaseAccessToken';
 import { useToast } from '@/hooks/use-toast';
 
 interface QuoteRequest {
@@ -57,29 +58,35 @@ interface QuoteRequest {
 
 interface PendingQuoteRequestsProps {
   builderId: string;
+  /** When PO rows store `profiles.id` as `buyer_id`, pass it so queries match RLS. */
+  profileId?: string | null;
 }
 
-export const PendingQuoteRequests: React.FC<PendingQuoteRequestsProps> = ({ builderId }) => {
+function resolveOwnerIds(builderId: string, profileId?: string | null): string[] {
+  const ids = new Set<string>();
+  if (builderId) ids.add(builderId);
+  if (profileId && profileId !== builderId) ids.add(profileId);
+  return [...ids];
+}
+
+export const PendingQuoteRequests: React.FC<PendingQuoteRequestsProps> = ({
+  builderId,
+  profileId = null,
+}) => {
   const [requests, setRequests] = useState<QuoteRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedRequest, setSelectedRequest] = useState<QuoteRequest | null>(null);
   const [showDetailsDialog, setShowDetailsDialog] = useState(false);
   const { toast } = useToast();
 
-  // Helper to get auth token from localStorage
-  const getAuthHeaders = (): Record<string, string> => {
-    const headers: Record<string, string> = { 'apikey': SUPABASE_ANON_KEY, 'Content-Type': 'application/json' };
-    
-    try {
-      const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
-      if (storedSession) {
-        const parsed = JSON.parse(storedSession);
-        if (parsed.access_token) {
-          headers['Authorization'] = `Bearer ${parsed.access_token}`;
-        }
-      }
-    } catch (e) {
-      console.warn('Could not get auth token');
+  const getAuthHeaders = async (): Promise<Record<string, string>> => {
+    const token = await getAccessTokenWithPersistenceFallback();
+    const headers: Record<string, string> = {
+      apikey: SUPABASE_ANON_KEY,
+      'Content-Type': 'application/json',
+    };
+    if (token) {
+      headers.Authorization = `Bearer ${token}`;
     }
     return headers;
   };
@@ -89,34 +96,61 @@ export const PendingQuoteRequests: React.FC<PendingQuoteRequestsProps> = ({ buil
     // Safety timeout
     const safetyTimeout = setTimeout(() => setLoading(false), 15000);
     return () => clearTimeout(safetyTimeout);
-  }, [builderId]);
+  }, [builderId, profileId]);
 
   const fetchQuoteRequests = async () => {
-    if (!builderId) {
+    const ownerIds = resolveOwnerIds(builderId, profileId);
+    if (ownerIds.length === 0) {
       setLoading(false);
       return;
     }
     
     setLoading(true);
-    const headers = getAuthHeaders();
+    const headers = await getAuthHeaders();
+    if (!headers.Authorization) {
+      setLoading(false);
+      setRequests([]);
+      return;
+    }
     
     try {
       // Fetch only PENDING quote requests (awaiting supplier response)
       // Quoted requests are shown in the "Supplier Responses" tab
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 8000);
-      
-      const ordersResponse = await fetch(
-        `${SUPABASE_URL}/rest/v1/purchase_orders?buyer_id=eq.${builderId}&status=eq.pending&order=created_at.desc`,
-        { headers, signal: controller.signal, cache: 'no-store' }
-      );
-      clearTimeout(timeoutId);
+      let buyerRes: Response | undefined;
+      let builderRes: Response | undefined;
+      try {
+        const idIn = ownerIds.join(',');
+        const urlBuyer = `${SUPABASE_URL}/rest/v1/purchase_orders?buyer_id=in.(${idIn})&status=eq.pending&order=created_at.desc&select=*`;
+        const urlBuilder = `${SUPABASE_URL}/rest/v1/purchase_orders?builder_id=in.(${idIn})&status=eq.pending&order=created_at.desc&select=*`;
 
-      if (!ordersResponse.ok) {
-        throw new Error(`Orders fetch failed: ${ordersResponse.status}`);
+        [buyerRes, builderRes] = await Promise.all([
+          fetch(urlBuyer, { headers, signal: controller.signal, cache: 'no-store' }),
+          fetch(urlBuilder, { headers, signal: controller.signal, cache: 'no-store' }),
+        ]);
+      } finally {
+        clearTimeout(timeoutId);
+      }
+
+      if (!buyerRes?.ok && !builderRes?.ok) {
+        throw new Error(`Orders fetch failed: ${buyerRes?.status} / ${builderRes?.status}`);
       }
       
-      const ordersData = await ordersResponse.json();
+      const byId = new Map<string, Record<string, unknown>>();
+      for (const res of [buyerRes, builderRes]) {
+        if (!res?.ok) continue;
+        const chunk = await res.json();
+        for (const row of Array.isArray(chunk) ? chunk : []) {
+          const id = (row as { id?: string })?.id;
+          if (id) byId.set(id, row as Record<string, unknown>);
+        }
+      }
+      const ordersData = [...byId.values()].sort((a, b) => {
+        const ca = String(a.created_at ?? '');
+        const cb = String(b.created_at ?? '');
+        return cb.localeCompare(ca);
+      });
       console.log('📋 Quote requests loaded:', ordersData?.length || 0);
 
       // Fetch supplier details

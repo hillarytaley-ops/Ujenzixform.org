@@ -616,52 +616,47 @@ const ProfessionalBuilderDashboardPage = () => {
     }
 
     try {
-      let accessToken = SUPABASE_ANON_KEY;
-      try {
-        const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
-        if (storedSession) {
-          const parsed = JSON.parse(storedSession);
-          accessToken = parsed.access_token || SUPABASE_ANON_KEY;
-        }
-      } catch (e) {
-        console.warn('Could not get auth token');
+      const accessToken = await getAccessToken();
+      if (!accessToken) {
+        setSupplierResponseCount(0);
+        return;
       }
 
       const headers: Record<string, string> = {
         'apikey': SUPABASE_ANON_KEY,
-        'Authorization': `Bearer ${accessToken}`,
-        'Content-Type': 'application/json'
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
       };
 
-      // Count purchase orders with supplier responses (statuses: quoted, quote_responded, quote_revised, quote_viewed_by_builder)
       const statusFilter = ['quote_responded', 'quote_revised', 'quote_viewed_by_builder', 'quoted'];
-      const statusParam = statusFilter.join(','); // PostgREST in() expects unquoted values
-      
+      const statusParam = statusFilter.join(',');
+
       const buyerIds = new Set<string>([builderId]);
       if (profileBuyerId && profileBuyerId !== builderId) {
         buyerIds.add(profileBuyerId);
       }
-      const buyerIn = [...buyerIds].join(',');
+      const idIn = [...buyerIds].join(',');
 
-      const response = await fetch(
-        `${SUPABASE_URL}/rest/v1/purchase_orders?buyer_id=in.(${buyerIn})&status=in.(${statusParam})&supplier_id=not.is.null&select=id&limit=1000`,
-        { headers, cache: 'no-store' }
-      );
+      const urlBuyer = `${SUPABASE_URL}/rest/v1/purchase_orders?buyer_id=in.(${idIn})&status=in.(${statusParam})&supplier_id=not.is.null&select=id&limit=1000`;
+      const urlBuilder = `${SUPABASE_URL}/rest/v1/purchase_orders?builder_id=in.(${idIn})&status=in.(${statusParam})&supplier_id=not.is.null&select=id&limit=1000`;
 
-      if (response.ok) {
-        const data = await response.json();
-        const seen = new Set<string>();
+      const [resBuyer, resBuilder] = await Promise.all([
+        fetch(urlBuyer, { headers, cache: 'no-store' }),
+        fetch(urlBuilder, { headers, cache: 'no-store' }),
+      ]);
+
+      const seen = new Set<string>();
+      for (const res of [resBuyer, resBuilder]) {
+        if (!res.ok) continue;
+        const data = await res.json();
         for (const row of Array.isArray(data) ? data : []) {
           const id = (row as { id?: string })?.id;
           if (id) seen.add(id);
         }
-        const count = seen.size;
-        setSupplierResponseCount(count);
-        console.log('📊 Supplier response count:', count);
-      } else {
-        console.error('Failed to fetch supplier response count:', response.status);
-        setSupplierResponseCount(0);
       }
+      const count = seen.size;
+      setSupplierResponseCount(count);
+      console.log('📊 Supplier response count:', count);
     } catch (error) {
       console.error('Error fetching supplier response count:', error);
       setSupplierResponseCount(0);
@@ -3093,12 +3088,19 @@ const ProfessionalBuilderDashboardPage = () => {
                   
                   {/* My Quote Requests - Sent quotes awaiting supplier response */}
                   <TabsContent value="my-requests" className="mt-0">
-                    <PendingQuoteRequests builderId={user?.id || ''} />
+                    <PendingQuoteRequests
+                      builderId={user?.id || ''}
+                      profileId={profile?.id ?? null}
+                    />
                   </TabsContent>
                   
                   {/* Supplier Responses - Quotes that suppliers have responded to */}
                   <TabsContent value="supplier-quotes" className="mt-0">
-                    <SupplierQuoteReview builderId={user?.id || ''} showOnlyQuoted={true} />
+                    <SupplierQuoteReview
+                      builderId={user?.id || ''}
+                      profileId={profile?.id ?? null}
+                      showOnlyQuoted={true}
+                    />
                   </TabsContent>
                 </Tabs>
               </CardContent>

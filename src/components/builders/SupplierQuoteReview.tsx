@@ -15,6 +15,10 @@ import {
 } from "@/components/ui/dialog";
 import { useToast } from '@/hooks/use-toast';
 import { SUPABASE_ANON_KEY, SUPABASE_URL, supabase } from '@/integrations/supabase/client';
+import {
+  getAccessTokenWithPersistenceFallback,
+  readPersistedAuthUserSync,
+} from '@/utils/supabaseAccessToken';
 import { invokeEdgeFunction } from '@/lib/invokeEdgeFunction';
 import { DeliveryPromptDialog } from './DeliveryPromptDialog';
 import {
@@ -40,7 +44,10 @@ import {
 } from 'lucide-react';
 
 interface SupplierQuoteReviewProps {
+  /** Auth user id (Supabase `auth.users.id`). */
   builderId: string;
+  /** `profiles.id` when PO rows use it as `purchase_orders.buyer_id` (common in this app). */
+  profileId?: string | null;
   isDarkMode?: boolean;
   showOnlyQuoted?: boolean; // When true, only show quotes that suppliers have responded to
 }
@@ -81,6 +88,7 @@ interface QuotationRequest {
 
 export const SupplierQuoteReview: React.FC<SupplierQuoteReviewProps> = ({ 
   builderId,
+  profileId = null,
   isDarkMode = false,
   showOnlyQuoted = false 
 }) => {
@@ -94,22 +102,26 @@ export const SupplierQuoteReview: React.FC<SupplierQuoteReviewProps> = ({
   const [acceptedPurchaseOrder, setAcceptedPurchaseOrder] = useState<any>(null);
   const { toast } = useToast();
 
-  // Helper to get auth headers
-  const getAuthHeaders = (): Record<string, string> => {
-    const headers: Record<string, string> = { 'apikey': SUPABASE_ANON_KEY, 'Content-Type': 'application/json' };
-    
-    try {
-      const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
-      if (storedSession) {
-        const parsed = JSON.parse(storedSession);
-        if (parsed.access_token) {
-          headers['Authorization'] = `Bearer ${parsed.access_token}`;
-        }
-      }
-    } catch (e) {
-      console.warn('Could not get auth token');
-    }
+  const getAuthHeaders = async (): Promise<Record<string, string>> => {
+    const headers: Record<string, string> = {
+      apikey: SUPABASE_ANON_KEY,
+      'Content-Type': 'application/json',
+    };
+    const token = await getAccessTokenWithPersistenceFallback();
+    if (token) headers.Authorization = `Bearer ${token}`;
     return headers;
+  };
+
+  /** Buyer/builder UUIDs used on `purchase_orders` (auth uid and/or profiles.id). */
+  const resolveOwnerIds = (): string[] => {
+    const ids = new Set<string>();
+    if (builderId) ids.add(builderId);
+    if (profileId) ids.add(profileId);
+    if (ids.size === 0) {
+      const u = readPersistedAuthUserSync();
+      if (u.id) ids.add(u.id);
+    }
+    return [...ids];
   };
 
   // Helper function to transform orders to quote format
@@ -179,105 +191,91 @@ export const SupplierQuoteReview: React.FC<SupplierQuoteReviewProps> = ({
   };
 
   useEffect(() => {
+    const ownerIds = resolveOwnerIds();
+    if (ownerIds.length === 0) return;
+
     fetchQuotes();
-    
-    // Safety timeout
+
     const safetyTimeout = setTimeout(() => setLoading(false), 15000);
-    
-    // Set up real-time subscription to purchase_orders changes
-    const subscription = supabase
-      .channel('builder-quotes-changes')
-      .on(
+
+    const channel = supabase.channel(`builder-quotes-changes-${ownerIds.join('-')}`);
+    for (const oid of ownerIds) {
+      channel.on(
         'postgres_changes',
         {
           event: '*',
           schema: 'public',
           table: 'purchase_orders',
-          filter: `buyer_id=eq.${builderId}`
+          filter: `buyer_id=eq.${oid}`,
         },
         (payload) => {
           console.log('📬 Quote update received:', payload);
-          fetchQuotes(); // Refresh when any change happens
+          fetchQuotes();
         }
-      )
-      .subscribe();
-    
+      );
+    }
+    channel.subscribe();
+
     return () => {
       clearTimeout(safetyTimeout);
-      subscription.unsubscribe();
+      supabase.removeChannel(channel);
     };
-  }, [builderId]);
+  }, [builderId, profileId]);
 
-  // Helper to get builder ID reliably
   const getEffectiveBuilderId = (): string => {
     if (builderId) return builderId;
-    try {
-      const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
-      if (storedSession) {
-        const parsed = JSON.parse(storedSession);
-        return parsed.user?.id || '';
-      }
-    } catch (e) {
-      console.warn('Could not get user ID from localStorage');
-    }
-    return '';
+    const u = readPersistedAuthUserSync();
+    return u.id || '';
   };
 
   const fetchQuotes = async () => {
-    const effectiveBuilderId = getEffectiveBuilderId();
-    
-    if (!effectiveBuilderId) {
-      console.log('❌ SupplierQuoteReview: No builderId provided and no fallback available');
+    const ownerIds = resolveOwnerIds();
+
+    if (ownerIds.length === 0) {
+      console.log('❌ SupplierQuoteReview: No builder/profile id for quote fetch');
       setLoading(false);
       return;
     }
-    
-    console.log('🔄 SupplierQuoteReview: Fetching quotes for builder:', effectiveBuilderId, '(prop was:', builderId, ')');
+
+    const ownerIn = ownerIds.join(',');
+    console.log('🔄 SupplierQuoteReview: Fetching quotes for owner id(s):', ownerIn);
     setLoading(true);
-    const headers = getAuthHeaders();
-    
+    const headers = await getAuthHeaders();
+
     try {
-      // Fetch purchase orders using native fetch
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 8000);
-      
-      // Query by buyer_id first - filter by status based on showOnlyQuoted prop
-      // When showOnlyQuoted is true, only show quotes that suppliers have responded to
-      // Include both new status flow and legacy statuses for backward compatibility
-      const statusFilter = showOnlyQuoted 
+
+      const statusFilter = showOnlyQuoted
         ? ['quote_responded', 'quote_revised', 'quote_viewed_by_builder', 'quoted']
         : ['quote_created', 'quote_received_by_supplier', 'quote_responded', 'quote_revised', 'quote_viewed_by_builder', 'quote_accepted', 'quote_rejected', 'pending', 'quoted', 'confirmed', 'rejected'];
-      
-      // Build query with proper PostgREST syntax for multiple status values (unquoted)
-      // Also filter to only show quotes that have a supplier assigned (supplier_id IS NOT NULL)
+
       const statusParam = statusFilter.join(',');
-      const queryUrl = `${SUPABASE_URL}/rest/v1/purchase_orders?buyer_id=eq.${effectiveBuilderId}&status=in.(${statusParam})&supplier_id=not.is.null&order=updated_at.desc`;
-      console.log('🔗 SupplierQuoteReview query URL:', queryUrl, '(showOnlyQuoted:', showOnlyQuoted, ')');
-      console.log('📊 Status filter:', statusFilter);
-      
+      const queryUrl = `${SUPABASE_URL}/rest/v1/purchase_orders?buyer_id=in.(${ownerIn})&status=in.(${statusParam})&supplier_id=not.is.null&order=updated_at.desc`;
+      console.log('🔗 SupplierQuoteReview buyer query (showOnlyQuoted:', showOnlyQuoted, ')');
+
       const ordersResponse = await fetch(queryUrl, { headers, signal: controller.signal, cache: 'no-store' });
       clearTimeout(timeoutId);
 
       if (!ordersResponse.ok) {
         throw new Error(`Orders fetch failed: ${ordersResponse.status}`);
       }
-      
+
       const purchaseOrders = await ordersResponse.json();
-      console.log('📋 SupplierQuoteReview: Orders found by buyer_id:', purchaseOrders?.length || 0);
-      
-      // Also try fetching by builder_id to catch all orders
+      console.log('📋 SupplierQuoteReview: Orders by buyer_id in (...):', purchaseOrders?.length || 0);
+
       let allOrders = [...(purchaseOrders || [])];
-      
+
       try {
         const builderIdController = new AbortController();
         const builderIdTimeout = setTimeout(() => builderIdController.abort(), 5000);
-        
-          const builderStatusFilter = showOnlyQuoted 
-            ? ['quote_responded', 'quote_revised', 'quote_viewed_by_builder', 'quoted']
-            : ['quote_created', 'quote_received_by_supplier', 'quote_responded', 'quote_revised', 'quote_viewed_by_builder', 'quote_accepted', 'quote_rejected', 'pending', 'quoted', 'confirmed', 'rejected'];
-          const builderStatusParam = builderStatusFilter.join(',');
-          const builderIdResponse = await fetch(
-            `${SUPABASE_URL}/rest/v1/purchase_orders?builder_id=eq.${effectiveBuilderId}&status=in.(${builderStatusParam})&supplier_id=not.is.null&order=updated_at.desc`,
+
+        const builderStatusFilter = showOnlyQuoted
+          ? ['quote_responded', 'quote_revised', 'quote_viewed_by_builder', 'quoted']
+          : ['quote_created', 'quote_received_by_supplier', 'quote_responded', 'quote_revised', 'quote_viewed_by_builder', 'quote_accepted', 'quote_rejected', 'pending', 'quoted', 'confirmed', 'rejected'];
+        const builderStatusParam = builderStatusFilter.join(',');
+        const builderIdResponse = await fetch(
+          `${SUPABASE_URL}/rest/v1/purchase_orders?builder_id=in.(${ownerIn})&status=in.(${builderStatusParam})&supplier_id=not.is.null&order=updated_at.desc`,
           { headers, signal: builderIdController.signal, cache: 'no-store' }
         );
         clearTimeout(builderIdTimeout);
@@ -376,7 +374,7 @@ export const SupplierQuoteReview: React.FC<SupplierQuoteReviewProps> = ({
 
   const handleAcceptQuote = async (quote: QuotationRequest) => {
     setProcessingId(quote.id);
-    const headers = getAuthHeaders();
+    const headers = await getAuthHeaders();
     
     // Safety timeout: Always clear processing state after 30 seconds max
     const safetyTimeout = setTimeout(() => {
@@ -757,7 +755,7 @@ export const SupplierQuoteReview: React.FC<SupplierQuoteReviewProps> = ({
   // cause "Delivery address missing" on the provider card. Only fetch the request the dialog created and notify.
   const handleDeliveryRequested = async () => {
     if (!acceptedPurchaseOrder) return;
-    const headers = getAuthHeaders();
+    const headers = await getAuthHeaders();
     const effectiveBuilderId = getEffectiveBuilderId();
     
     try {
@@ -863,7 +861,7 @@ export const SupplierQuoteReview: React.FC<SupplierQuoteReviewProps> = ({
 
   const handleRejectQuote = async () => {
     if (!selectedQuote) return;
-    const headers = getAuthHeaders();
+    const headers = await getAuthHeaders();
     
     setProcessingId(selectedQuote.id);
     try {
