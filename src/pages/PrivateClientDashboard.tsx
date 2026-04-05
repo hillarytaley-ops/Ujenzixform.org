@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useNavigate, Link } from "react-router-dom";
 import { supabase, SUPABASE_URL, SUPABASE_ANON_KEY } from "@/integrations/supabase/client";
+import { readAuthSessionForRest, readAuthUserIdSync, persistedSessionStorageKey } from "@/utils/supabaseAccessToken";
 
 /** delivery_requests.builder_id FK → profiles.id; also match auth uid for legacy rows */
 function encodeDeliveryRequestsBuilderOr(userId: string, profileId?: string | null): string {
@@ -158,16 +159,7 @@ const PrivateClientDashboard = () => {
 
   // Fetch "Delivery address needed" prompts (when driver clicked Check Address) so builder sees them
   useEffect(() => {
-    let userId = user?.id;
-    if (!userId) {
-      try {
-        const stored = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
-        if (stored) {
-          const parsed = JSON.parse(stored);
-          userId = parsed.user?.id || '';
-        }
-      } catch {}
-    }
+    const userId = user?.id || readAuthUserIdSync();
     if (!userId) return;
     const fetchPrompts = async () => {
       try {
@@ -201,34 +193,24 @@ const PrivateClientDashboard = () => {
   // Immediate data loader - runs on mount for orders and monitoring
   useEffect(() => {
     const loadData = async () => {
-      // Get user ID from localStorage first (fastest)
-      let userId = '';
-      let accessToken = '';
-      
-      try {
-        const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
-        if (storedSession) {
-          const parsed = JSON.parse(storedSession);
-          userId = parsed.user?.id || '';
-          accessToken = parsed.access_token || '';
-        }
-      } catch (e) {}
-      
+      const { userId, accessToken } = await readAuthSessionForRest();
+      const bearer = accessToken || SUPABASE_ANON_KEY;
+
       if (!userId) {
-        console.log('📦 DIRECT: No user ID in localStorage');
+        console.log('📦 DIRECT: No user in session storage');
         return;
       }
-      
+
       console.log('📦 DIRECT: Loading data for user:', userId);
-      
-      // Fetch orders directly
+
+      // RLS returns rows where buyer_id is auth uid OR profiles.id (do not filter buyer_id in URL)
       try {
         const ordersResponse = await fetch(
-          `${SUPABASE_URL}/rest/v1/purchase_orders?buyer_id=eq.${userId}&order=created_at.desc`,
+          `${SUPABASE_URL}/rest/v1/purchase_orders?order=created_at.desc`,
           {
             headers: {
               'apikey': SUPABASE_ANON_KEY,
-              'Authorization': `Bearer ${accessToken || SUPABASE_ANON_KEY}`,
+              'Authorization': `Bearer ${bearer}`,
               'Content-Type': 'application/json',
             }
           }
@@ -273,7 +255,7 @@ const PrivateClientDashboard = () => {
       try {
         const { rows: data } = await fetchMyMonitoringServiceRequests(
           supabase,
-          monitoringRestOpts(SUPABASE_URL, SUPABASE_ANON_KEY, userId, accessToken)
+          monitoringRestOpts(SUPABASE_URL, SUPABASE_ANON_KEY, userId, bearer)
         );
         console.log('📹 DIRECT: Got', data?.length || 0, 'monitoring requests');
         if (data && data.length > 0) {
@@ -296,7 +278,7 @@ const PrivateClientDashboard = () => {
             {
               headers: {
                 apikey: SUPABASE_ANON_KEY,
-                Authorization: `Bearer ${accessToken || SUPABASE_ANON_KEY}`,
+                Authorization: `Bearer ${bearer}`,
               },
             }
           );
@@ -316,7 +298,7 @@ const PrivateClientDashboard = () => {
             {
               headers: {
                 'apikey': SUPABASE_ANON_KEY,
-                'Authorization': `Bearer ${accessToken || SUPABASE_ANON_KEY}`,
+                'Authorization': `Bearer ${bearer}`,
               }
             }
           );
@@ -368,21 +350,23 @@ const PrivateClientDashboard = () => {
         .select('*')
         .eq('user_id', user.id)
         .maybeSingle();
-      
+
+      let profileByIdForDr: typeof profileByUserId = null;
+
       if (profileByUserId) {
         setProfile(profileByUserId);
       } else {
-        // Fallback to id column or use auth metadata
         const { data: profileById } = await supabase
           .from('profiles')
           .select('*')
           .eq('id', user.id)
           .maybeSingle();
-        
+
+        profileByIdForDr = profileById;
+
         if (profileById) {
           setProfile(profileById);
         } else {
-          // Use auth user metadata as fallback
           setProfile({
             id: user.id,
             user_id: user.id,
@@ -418,56 +402,43 @@ const PrivateClientDashboard = () => {
         // Continue anyway - localStorage already verified role
       }
 
-      // Fetch real orders from purchase_orders table using direct REST API
-      // Get access token for authenticated request
-      let accessToken = '';
-      try {
-        const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
-        if (storedSession) {
-          const parsed = JSON.parse(storedSession);
-          accessToken = parsed.access_token || '';
-        }
-      } catch (e) {}
-
+      // Orders: rely on RLS (buyer_id may be auth.uid() or profiles.id — URL filter hid profile-id rows)
       console.log('📦 Fetching orders for user:', user.id);
-      
       try {
-        const ordersResponse = await fetch(
-          `${SUPABASE_URL}/rest/v1/purchase_orders?buyer_id=eq.${user.id}&order=created_at.desc`,
-          {
-            headers: {
-              'apikey': SUPABASE_ANON_KEY,
-              'Authorization': `Bearer ${accessToken || SUPABASE_ANON_KEY}`,
-              'Content-Type': 'application/json',
-            }
-          }
-        );
+        const { data: ordersData, error: ordersErr } = await supabase
+          .from('purchase_orders')
+          .select('*')
+          .order('created_at', { ascending: false });
 
-        if (ordersResponse.ok) {
-          const ordersData = await ordersResponse.json();
+        if (ordersErr) {
+          console.error('📦 Orders query error:', ordersErr.message);
+        } else {
           console.log('📦 Private client orders loaded:', ordersData?.length || 0, ordersData);
-          
-          // Map orders and include delivery fields
+
           const fetchedOrders = (ordersData || []).map((order: any) => ({
             ...order,
-            delivery_required: order.delivery_required !== false, // Default to true if not explicitly false
+            delivery_required: order.delivery_required !== false,
             delivery_provider_id: order.delivery_provider_id || null,
             delivery_provider_name: order.delivery_provider_name || null,
-            delivery_status: order.delivery_status || null
+            delivery_status: order.delivery_status || null,
           }));
           setOrders(fetchedOrders);
           console.log('📦 Orders set to state:', fetchedOrders.length);
-          
-          // Calculate real stats from orders
+
           const totalOrders = fetchedOrders.length;
-          const pendingOrders = fetchedOrders.filter((o: Order) => 
-            o.status === 'pending' || o.status === 'quoted' || o.status === 'processing'
+          const pendingOrders = fetchedOrders.filter(
+            (o: Order) =>
+              o.status === 'pending' || o.status === 'quoted' || o.status === 'processing'
           ).length;
-          const completedOrders = fetchedOrders.filter((o: Order) => 
-            o.status === 'completed' || o.status === 'delivered' || o.status === 'confirmed'
+          const completedOrders = fetchedOrders.filter(
+            (o: Order) =>
+              o.status === 'completed' || o.status === 'delivered' || o.status === 'confirmed'
           ).length;
           const totalSpent = fetchedOrders
-            .filter((o: Order) => o.status === 'completed' || o.status === 'delivered' || o.status === 'confirmed')
+            .filter(
+              (o: Order) =>
+                o.status === 'completed' || o.status === 'delivered' || o.status === 'confirmed'
+            )
             .reduce((sum: number, o: Order) => sum + (o.total_amount || 0), 0);
 
           setStats({
@@ -476,20 +447,21 @@ const PrivateClientDashboard = () => {
             completedOrders,
             totalSpent,
           });
-          
+
           console.log('📦 Private client stats:', { totalOrders, pendingOrders, completedOrders, totalSpent });
-        } else {
-          console.error('📦 Orders fetch failed:', ordersResponse.status, await ordersResponse.text());
         }
       } catch (ordersError) {
         console.error('📦 Error fetching orders:', ordersError);
       }
 
+      const { accessToken: restAccessToken } = await readAuthSessionForRest();
+      const restBearer = restAccessToken || SUPABASE_ANON_KEY;
+
       // Fetch delivery requests for this user using direct REST API
       // builder_id references profiles.id (see delivery_requests_builder_id_fkey)
       console.log('🚚 Fetching deliveries for user:', user.id);
       
-      const profileForDr = profileByUserId || profileById;
+      const profileForDr = profileByUserId || profileByIdForDr;
       try {
         let allDeliveries: any[] = [];
         
@@ -501,7 +473,7 @@ const PrivateClientDashboard = () => {
             {
               headers: {
                 'apikey': SUPABASE_ANON_KEY,
-                'Authorization': `Bearer ${accessToken || SUPABASE_ANON_KEY}`,
+                'Authorization': `Bearer ${restBearer}`,
                 'Content-Type': 'application/json',
               }
             }
@@ -562,7 +534,7 @@ const PrivateClientDashboard = () => {
         console.log('📹 Fetching monitoring requests for user:', user.id);
         const { rows: data } = await fetchMyMonitoringServiceRequests(
           supabase,
-          monitoringRestOpts(SUPABASE_URL, SUPABASE_ANON_KEY, user.id, accessToken)
+          monitoringRestOpts(SUPABASE_URL, SUPABASE_ANON_KEY, user.id, restBearer)
         );
         console.log('📹 Monitoring requests loaded:', data?.length || 0, 'requests');
         if (data && data.length > 0) {
@@ -630,17 +602,10 @@ const PrivateClientDashboard = () => {
         additionalNotes: ''
       });
 
-      // Refresh monitoring requests
-      let at = "";
-      try {
-        const raw = localStorage.getItem("sb-wuuyjjpgzgeimiptuuws-auth-token");
-        if (raw) at = JSON.parse(raw).access_token || "";
-      } catch {
-        /* noop */
-      }
+      const { accessToken: at } = await readAuthSessionForRest();
       const { rows: newData } = await fetchMyMonitoringServiceRequests(
         supabase,
-        monitoringRestOpts(SUPABASE_URL, SUPABASE_ANON_KEY, user.id, at)
+        monitoringRestOpts(SUPABASE_URL, SUPABASE_ANON_KEY, user.id, at || SUPABASE_ANON_KEY)
       );
       setMonitoringRequests(newData || []);
 
@@ -671,6 +636,13 @@ const PrivateClientDashboard = () => {
     localStorage.removeItem('user_email');
     localStorage.removeItem('user_name');
     localStorage.removeItem('user_id');
+    try {
+      const k = persistedSessionStorageKey();
+      localStorage.removeItem(k);
+      sessionStorage.removeItem(k);
+    } catch {
+      /* noop */
+    }
     localStorage.removeItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
     sessionStorage.clear();
     window.location.replace('/auth');
@@ -1065,21 +1037,15 @@ const PrivateClientDashboard = () => {
                                   // Fetch items if not already loaded
                                   if (!Array.isArray(order.items) || order.items.length === 0) {
                                     try {
-                                      let accessToken = '';
-                                      try {
-                                        const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
-                                        if (storedSession) {
-                                          const parsed = JSON.parse(storedSession);
-                                          accessToken = parsed.access_token || '';
-                                        }
-                                      } catch (e) {}
-                                      
+                                      const { accessToken } = await readAuthSessionForRest();
+                                      const bearer = accessToken || SUPABASE_ANON_KEY;
+
                                       const itemsResponse = await fetch(
                                         `${SUPABASE_URL}/rest/v1/material_items?purchase_order_id=eq.${order.id}&order=item_sequence.asc`,
                                         {
                                           headers: {
                                             'apikey': SUPABASE_ANON_KEY,
-                                            'Authorization': `Bearer ${accessToken || SUPABASE_ANON_KEY}`,
+                                            'Authorization': `Bearer ${bearer}`,
                                             'Content-Type': 'application/json',
                                           }
                                         }
@@ -1103,7 +1069,7 @@ const PrivateClientDashboard = () => {
                                           {
                                             headers: {
                                               'apikey': SUPABASE_ANON_KEY,
-                                              'Authorization': `Bearer ${accessToken || SUPABASE_ANON_KEY}`,
+                                              'Authorization': `Bearer ${bearer}`,
                                               'Content-Type': 'application/json',
                                             }
                                           }
@@ -1213,20 +1179,8 @@ const PrivateClientDashboard = () => {
               <CardContent>
                 {(() => {
                   // Get builderId with localStorage fallback
-                  let builderId = user?.id || '';
-                  if (!builderId) {
-                    try {
-                      const stored = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
-                      if (stored) {
-                        const parsed = JSON.parse(stored);
-                        builderId = parsed.user?.id || '';
-                      }
-                    } catch (e) {}
-                    // Also check other localStorage keys
-                    if (!builderId) {
-                      builderId = localStorage.getItem('user_id') || '';
-                    }
-                  }
+                  const builderId =
+                    user?.id || readAuthUserIdSync() || localStorage.getItem('user_id') || '';
                   
                   return builderId ? (
                     <BuilderOrdersTracker builderId={builderId} />
@@ -1365,16 +1319,7 @@ const PrivateClientDashboard = () => {
               </CardHeader>
               <CardContent>
                 <TrackingTab
-                  userId={user?.id || localStorage.getItem('user_id') || (() => {
-                    try {
-                      const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
-                      if (storedSession) {
-                        const parsed = JSON.parse(storedSession);
-                        return parsed.user?.id || '';
-                      }
-                    } catch (e) {}
-                    return '';
-                  })()}
+                  userId={user?.id || readAuthUserIdSync() || localStorage.getItem('user_id') || ''}
                   userRole="private_client"
                   userName={profile?.full_name || user?.email?.split('@')[0]}
                 />
@@ -1786,17 +1731,10 @@ const PrivateClientDashboard = () => {
                                       title: "Quote Accepted! 🎉",
                                       description: "Your monitoring service is now active. You can access your cameras.",
                                     });
-                                    // Refresh the list
-                                    let tok = "";
-                                    try {
-                                      const r = localStorage.getItem("sb-wuuyjjpgzgeimiptuuws-auth-token");
-                                      if (r) tok = JSON.parse(r).access_token || "";
-                                    } catch {
-                                      /* noop */
-                                    }
+                                    const { accessToken: tok } = await readAuthSessionForRest();
                                     const { rows } = await fetchMyMonitoringServiceRequests(
                                       supabase,
-                                      monitoringRestOpts(SUPABASE_URL, SUPABASE_ANON_KEY, user?.id, tok)
+                                      monitoringRestOpts(SUPABASE_URL, SUPABASE_ANON_KEY, user?.id, tok || SUPABASE_ANON_KEY)
                                     );
                                     setMonitoringRequests(rows || []);
                                   } catch (error) {
@@ -1826,17 +1764,10 @@ const PrivateClientDashboard = () => {
                                       title: "Quote Declined",
                                       description: "You can request a new quote anytime.",
                                     });
-                                    // Refresh the list
-                                    let tok2 = "";
-                                    try {
-                                      const r = localStorage.getItem("sb-wuuyjjpgzgeimiptuuws-auth-token");
-                                      if (r) tok2 = JSON.parse(r).access_token || "";
-                                    } catch {
-                                      /* noop */
-                                    }
+                                    const { accessToken: tok2 } = await readAuthSessionForRest();
                                     const { rows } = await fetchMyMonitoringServiceRequests(
                                       supabase,
-                                      monitoringRestOpts(SUPABASE_URL, SUPABASE_ANON_KEY, user?.id, tok2)
+                                      monitoringRestOpts(SUPABASE_URL, SUPABASE_ANON_KEY, user?.id, tok2 || SUPABASE_ANON_KEY)
                                     );
                                     setMonitoringRequests(rows || []);
                                   } catch (error) {
