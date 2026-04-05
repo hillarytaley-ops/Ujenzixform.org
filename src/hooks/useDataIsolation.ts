@@ -412,6 +412,29 @@ async function enrichDeliveryRowsWithBuilderProfiles(
 }
 
 /**
+ * Supabase RPC returning JSONB sometimes arrives as a parsed array, a JSON string, or wrapped.
+ * normalize so get_active_deliveries_for_provider always yields a row list.
+ */
+function parseActiveDeliveriesRpcPayload(data: unknown): any[] {
+  if (data == null) return [];
+  if (Array.isArray(data)) return data;
+  if (typeof data === 'string') {
+    const t = data.trim();
+    if (!t) return [];
+    try {
+      const p = JSON.parse(t);
+      return Array.isArray(p) ? p : [];
+    } catch {
+      return [];
+    }
+  }
+  if (typeof data === 'object' && data !== null && Array.isArray((data as { data?: unknown }).data)) {
+    return (data as { data: any[] }).data;
+  }
+  return [];
+}
+
+/**
  * Hook to fetch delivery provider-specific data with isolation
  */
 export const useDeliveryProviderData = () => {
@@ -459,7 +482,9 @@ export const useDeliveryProviderData = () => {
     console.log('📦 useDeliveryProviderData: Fetching data for userId:', userId);
     setLoading(true);
     setError(null);
-    
+    // CRITICAL: reset each run — stale count skipped the full fetch and left Schedule empty/wrong
+    fastPathCountRef.current = 0;
+
     // ⚡ FAST PATH: Immediately load accepted orders to show in Schedule tab
     // This runs first and sets data instantly, then the full fetch continues in background
     try {
@@ -629,8 +654,8 @@ export const useDeliveryProviderData = () => {
         }
       }
 
-      if (fastResponse.ok || fastData.length > 0) {
-        
+      // Always run this block: fastData can be empty when RLS hides rows; RPC fallback still applies
+      {
         // Helper to check if order number is real
         const isRealOrder = (orderNum: string | null) => {
           if (!orderNum || !orderNum.trim()) return false;
@@ -749,7 +774,34 @@ export const useDeliveryProviderData = () => {
           // RPC DISABLED: get_material_items_scan_status_for_provider was causing timeouts
           // Categorization is done based on delivery_requests.status only (no RPC enrichment)
         } else {
-          console.log('⚡ FAST PATH: No accepted orders found, continuing full fetch...');
+          console.log('⚡ FAST PATH: REST built 0 scheduled rows; trying get_active_deliveries_for_provider (bypasses RLS)...');
+          try {
+            const rpcPromise = (supabase as any).rpc('get_active_deliveries_for_provider');
+            const rpcResult = await Promise.race([
+              rpcPromise,
+              new Promise<{ data: null; error: Error }>((_, rej) =>
+                setTimeout(() => rej(new Error('RPC timeout')), 8000)
+              ),
+            ]).catch(() => ({ data: null, error: true as const }));
+            const rpcRows = parseActiveDeliveriesRpcPayload((rpcResult as { data?: unknown })?.data);
+            const validRpc = rpcRows.filter((d: any) => d && (d.id || d.purchase_order_id));
+            if (validRpc.length > 0) {
+              const rpcEnriched = await enrichDeliveryRowsWithBuilderProfiles(
+                validRpc,
+                accessToken,
+                SUPABASE_URL,
+                SUPABASE_ANON_KEY
+              );
+              setActiveDeliveries(rpcEnriched);
+              fastPathCountRef.current = rpcEnriched.length;
+              setLoading(false);
+              console.log('⚡ FAST PATH: RPC returned', validRpc.length, 'active deliveries');
+              return;
+            }
+            console.log('⚡ FAST PATH: RPC also empty, continuing full fetch...');
+          } catch (rpcFastErr: any) {
+            console.warn('⚡ FAST PATH: RPC get_active_deliveries_for_provider failed:', rpcFastErr?.message || rpcFastErr);
+          }
         }
       }
     } catch (e) {
@@ -846,13 +898,7 @@ export const useDeliveryProviderData = () => {
           rpcPromise,
           new Promise<{ data: null; error: Error }>((_, rj) => setTimeout(() => rj({ data: null, error: new Error('RPC timeout') }), 10000))
         ]).catch(() => ({ data: null, error: true })) as { data: unknown; error: unknown };
-        const rpcData = Array.isArray(rpcResult?.data) ? rpcResult.data : (typeof rpcResult?.data === 'object' && rpcResult?.data !== null && Array.isArray((rpcResult.data as any)?.data) ? (rpcResult.data as any).data : null);
-        let rpcDeliveries: any[] = [];
-        if (rpcData && Array.isArray(rpcData)) {
-          rpcDeliveries = rpcData;
-        } else if (rpcData && typeof rpcData === 'object' && !Array.isArray(rpcData)) {
-          rpcDeliveries = [rpcData];
-        }
+        const rpcDeliveries = parseActiveDeliveriesRpcPayload(rpcResult?.data);
         // RPC is authoritative - use all returned data
         const validRpc = rpcDeliveries.filter((d: any) => d && (d.id || d.purchase_order_id));
         if (validRpc.length > 0) {
