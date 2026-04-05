@@ -51,6 +51,8 @@ interface Order {
   pending_items: number;
   created_at: string;
   items: OrderItem[];
+  /** False when no material_items rows were returned for this PO (RLS, network, or not generated yet) — must NOT treat as "fully received" */
+  items_loaded: boolean;
 }
 
 /** Delivery row from dashboard (useDataIsolation) - single source of truth so scanner shows same list as Deliveries tab */
@@ -288,7 +290,30 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
     const orderMap: Record<string, Order> = {};
     for (const poId of poIds) {
       const items = itemsByPo.get(poId) || [];
-      const allReceived = items.length > 0 && items.every(
+      // CRITICAL: Zero rows from material_items is NOT "everything received" — it usually means RLS hid rows
+      // or line items were never generated. Previously pending_items became 0 and orders wrongly showed under "Fully Received".
+      if (items.length === 0) {
+        const meta = byPoId.get(poId);
+        const poMeta = poMap.get(poId);
+        const displayNumber = meta?.order_number || poMeta?.po_number || `Order ${poId.slice(0, 8)}`;
+        orderMap[poId] = {
+          id: poId,
+          order_number: displayNumber,
+          buyer_id: '',
+          buyer_name: 'Client',
+          buyer_email: '',
+          buyer_phone: '',
+          total_items: 0,
+          received_items: 0,
+          pending_items: 0,
+          created_at: poMeta?.created_at || poId,
+          items: [],
+          items_loaded: false
+        };
+        continue;
+      }
+
+      const allReceived = items.every(
         (i: any) => i.receive_scanned === true || (i.receive_scan_count ?? 0) >= (i.quantity ?? 1)
       );
       if (allReceived) continue;
@@ -329,7 +354,8 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
         received_items: receivedItems,
         pending_items: pendingItems,
         created_at: poMeta?.created_at || poId,
-        items: orderItems
+        items: orderItems,
+        items_loaded: true
       };
     }
     return Object.values(orderMap)
@@ -410,8 +436,11 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
       if (runId === loadRunIdRef.current) {
         hasOrdersRef.current = ordersArray.length > 0;
         setOrders(ordersArray);
-        if (ordersArray.length > 0 && ordersArray.some((o) => o.items.length === 0)) {
-          toast.info('Some orders have no items loaded. Apply migration 20260429 in Supabase for full scan.', { duration: 6000 });
+        if (ordersArray.length > 0 && ordersArray.some((o) => !o.items_loaded)) {
+          toast.info(
+            'Some orders have no line items visible to your account (database access). Nothing was marked received by you — fix RLS or run the material_items migration so items load.',
+            { duration: 9000 }
+          );
         }
       }
     } catch (err: any) {
@@ -542,6 +571,13 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
   }, [userRole, dashboardListFingerprint, loadFromDashboardList, fetchDeliveries]);
 
   const selectDelivery = (order: Order) => {
+    if (!order.items_loaded || order.items.length === 0) {
+      toast.error('Line items not available', {
+        description: 'This order has no scannable rows loaded for your account. Fix material_items access first.',
+        duration: 6000
+      });
+      return;
+    }
     setSelectedOrder(order);
     setScanResults([]);
     setAllItemsScanned(order.pending_items === 0);
@@ -1292,13 +1328,39 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
           </Card>
         ) : (
           <div className="space-y-4">
-            {orders.filter((o) => o.pending_items > 0).length > 0 && (
+            {orders.filter((o) => !o.items_loaded).length > 0 && (
+              <div className="space-y-3">
+                <h3 className="font-semibold text-red-700 flex items-center gap-2">
+                  <AlertCircle className="h-5 w-5" />
+                  Line items not loaded ({orders.filter((o) => !o.items_loaded).length})
+                </h3>
+                <p className="text-sm text-muted-foreground">
+                  These orders are assigned to you, but no QR line items were returned. They are{' '}
+                  <strong>not</strong> marked as received — this is usually RLS on <code className="text-xs">material_items</code> or missing rows. Ask an admin to verify access; you cannot scan until items appear.
+                </p>
+                {orders.filter((o) => !o.items_loaded).map((order) => (
+                  <Card key={order.id} className="border-red-200 bg-red-50/50 dark:bg-red-950/20">
+                    <CardContent className="py-4 flex items-center justify-between" role="status">
+                      <div>
+                        <p className="font-semibold">Order #{order.order_number}</p>
+                        <p className="text-sm text-muted-foreground">{order.buyer_name}</p>
+                        <p className="text-xs text-red-700 mt-1">No material_items visible — not counted as delivered</p>
+                      </div>
+                      <Badge variant="outline" className="border-red-400 text-red-800">
+                        Fix access
+                      </Badge>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
+            {orders.filter((o) => o.items_loaded && o.pending_items > 0).length > 0 && (
               <div className="space-y-3">
                 <h3 className="font-semibold text-amber-700 flex items-center gap-2">
                   <Clock className="h-5 w-5" />
-                  Pending Receive ({orders.filter((o) => o.pending_items > 0).length})
+                  Pending Receive ({orders.filter((o) => o.items_loaded && o.pending_items > 0).length})
                 </h3>
-                {orders.filter((o) => o.pending_items > 0).map((order) => (
+                {orders.filter((o) => o.items_loaded && o.pending_items > 0).map((order) => (
                   <Card key={order.id} className="cursor-pointer hover:border-orange-400 transition-colors" onClick={() => selectDelivery(order)}>
                     <CardContent className="py-4 flex items-center justify-between">
                       <div>
@@ -1312,13 +1374,13 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
                 ))}
               </div>
             )}
-            {orders.filter((o) => o.pending_items === 0).length > 0 && (
+            {orders.filter((o) => o.items_loaded && o.pending_items === 0 && o.items.length > 0).length > 0 && (
               <div className="space-y-3 mt-6">
                 <h3 className="font-semibold text-green-700 flex items-center gap-2">
                   <CheckCircle className="h-5 w-5" />
-                  Fully Received ({orders.filter((o) => o.pending_items === 0).length})
+                  Fully Received ({orders.filter((o) => o.items_loaded && o.pending_items === 0 && o.items.length > 0).length})
                 </h3>
-                {orders.filter((o) => o.pending_items === 0).map((order) => (
+                {orders.filter((o) => o.items_loaded && o.pending_items === 0 && o.items.length > 0).map((order) => (
                   <Card key={order.id} className="cursor-pointer hover:border-green-400 opacity-90" onClick={() => selectDelivery(order)}>
                     <CardContent className="py-4 flex items-center justify-between">
                       <div>
