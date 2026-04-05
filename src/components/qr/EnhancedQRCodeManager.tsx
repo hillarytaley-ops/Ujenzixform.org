@@ -20,6 +20,11 @@ import { useNavigate } from 'react-router-dom';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/components/ui/use-toast';
 import { SUPABASE_ANON_KEY, SUPABASE_URL, supabase } from '@/integrations/supabase/client';
+import {
+  getAccessTokenWithPersistenceFallback,
+  readPersistedAccessTokenSync,
+  readPersistedAuthUserSync,
+} from '@/utils/supabaseAccessToken';
 import { useAuth } from '@/contexts/AuthContext';
 import QRCodeLib from 'qrcode';
 import { getPrefetchedQRCodes } from '@/services/dataPrefetch';
@@ -476,34 +481,42 @@ export const EnhancedQRCodeManager: React.FC<EnhancedQRCodeManagerProps> = ({
     };
   }, []);
 
-  // Helper to get user ID from localStorage as fallback
+  /** SessionStorage + localStorage + legacy hardcoded key (prod uses dynamic sb-*-auth-token). */
   const getUserFromStorage = (): { id: string; accessToken: string } | null => {
+    const tok = readPersistedAccessTokenSync();
+    const { id: uid } = readPersistedAuthUserSync();
+    if (uid && tok) return { id: uid, accessToken: tok };
     try {
       const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
       if (storedSession) {
         const parsed = JSON.parse(storedSession);
-        const uid =
+        const id =
           parsed.user?.id ||
           parsed.currentSession?.user?.id ||
           parsed.session?.user?.id;
-        const tok =
+        const token =
           parsed.access_token ||
           parsed.currentSession?.access_token ||
           parsed.session?.access_token;
-        if (uid && tok) {
-          return { id: uid, accessToken: tok };
-        }
+        if (id && token) return { id, accessToken: token };
       }
-    } catch (e) {
-      console.warn('Could not get user from localStorage');
+    } catch {
+      /* ignore */
     }
     return null;
   };
 
-  /** localStorage first, then bounded getSession() — avoids hanging forever on auth */
+  /** Persisted session first, then bounded getSession() — avoids hanging forever on auth */
   const resolveQrAuth = async (): Promise<{ id: string; accessToken: string } | null> => {
-    const fromLs = getUserFromStorage();
-    if (fromLs?.id && fromLs?.accessToken) return fromLs;
+    const fromStore = getUserFromStorage();
+    if (fromStore?.id && fromStore?.accessToken) return fromStore;
+    try {
+      const token = await getAccessTokenWithPersistenceFallback();
+      const { id } = readPersistedAuthUserSync();
+      if (id && token) return { id, accessToken: token };
+    } catch {
+      /* ignore */
+    }
     try {
       const { data: { session } } = await Promise.race([
         supabase.auth.getSession(),
@@ -517,7 +530,7 @@ export const EnhancedQRCodeManager: React.FC<EnhancedQRCodeManagerProps> = ({
     } catch {
       /* ignore */
     }
-    return fromLs;
+    return fromStore;
   };
 
   // Helper function to add timeout to any promise
@@ -537,11 +550,16 @@ export const EnhancedQRCodeManager: React.FC<EnhancedQRCodeManagerProps> = ({
     const cachedSupplierId = localStorage.getItem('supplier_id');
     const auth = await resolveQrAuth();
 
-    if (auth?.id && cachedRole) {
-      console.log('⚡ QR Manager: Using auth - userId:', auth.id, 'role:', cachedRole);
-      setUserRole(cachedRole);
+    if (auth?.id && (cachedRole || propSupplierId)) {
+      const effectiveRole = cachedRole || (propSupplierId ? 'supplier' : null);
+      if (!effectiveRole) {
+        await checkAuthAndFetch();
+        return;
+      }
+      console.log('⚡ QR Manager: Using auth - userId:', auth.id, 'role:', effectiveRole);
+      setUserRole(effectiveRole);
 
-      if (cachedRole === 'supplier') {
+      if (effectiveRole === 'supplier') {
         const supplierId = propSupplierId || cachedSupplierId || auth.id;
         setResolvedSupplierId(supplierId);
         try {
@@ -562,7 +580,7 @@ export const EnhancedQRCodeManager: React.FC<EnhancedQRCodeManagerProps> = ({
         return;
       }
 
-      if (cachedRole === 'admin') {
+      if (effectiveRole === 'admin') {
         await fetchMaterialItemsFast('admin', auth.id, null, auth.accessToken);
         return;
       }
@@ -1094,12 +1112,12 @@ export const EnhancedQRCodeManager: React.FC<EnhancedQRCodeManagerProps> = ({
           let realOrderNumbersCount = 0;
           purchaseOrders.forEach((po: any) => {
             if (groups[po.id]) {
-              // ONLY set order_number if we have a real po_number from purchase_orders
               if (po.po_number) {
                 groups[po.id].order_number = po.po_number;
                 realOrderNumbersCount++;
               } else {
-                console.warn('⚠️ Purchase order', po.id, 'has no po_number - will be filtered out');
+                groups[po.id].order_number = `Order ${String(po.id).replace(/-/g, '').slice(0, 8)}`;
+                console.warn('⚠️ Purchase order', po.id, 'has no po_number — using short id for QR tabs');
               }
               groups[po.id].delivery_provider_id = po.delivery_provider_id;
               groups[po.id].delivery_provider_name = po.delivery_provider_name;
@@ -1144,13 +1162,14 @@ export const EnhancedQRCodeManager: React.FC<EnhancedQRCodeManagerProps> = ({
     const delivered: OrderGroup[] = [];
     
     sortedGroups.forEach(group => {
-      // CRITICAL: Only process orders with REAL order_numbers (from purchase_orders.po_number)
-      // Filter out orders without real order numbers to avoid showing fake/fallback numbers
-      if (!group.order_number || group.order_number === 'unknown' || group.order_id === 'unknown') {
-        console.warn('🚫 Filtering out order without real order_number:', group.order_id, 'order_number:', group.order_number);
-        return; // Skip this order - it doesn't have a real order number
+      if (group.order_id === 'unknown') {
+        console.warn('🚫 Skipping material rows with unknown purchase_order_id');
+        return;
       }
-      
+      if (!group.order_number || group.order_number === 'unknown') {
+        group.order_number = `Order ${group.order_id.replace(/-/g, '').slice(0, 8)}`;
+      }
+
       const hasDispatchedItems = group.items.some(item => item.dispatch_scanned === true);
       const hasReceivedItems = group.items.some(item => item.receive_scanned === true);
       const allItemsDispatched = group.items.every(item => item.dispatch_scanned === true);
