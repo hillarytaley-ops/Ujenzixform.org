@@ -10,6 +10,9 @@ import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { useToast } from "@/hooks/use-toast";
 import { UserRole } from "@/types/userProfile";
 import { supabase, SUPABASE_URL, SUPABASE_ANON_KEY } from "@/integrations/supabase/client";
+import { readAuthSessionForRest } from "@/utils/supabaseAccessToken";
+
+const supabaseRestBase = `${SUPABASE_URL.replace(/\/+$/, "")}/rest/v1`;
 import { MapPin, Package, Truck, Calendar, Shield, AlertTriangle, Navigation, Copy, Check, Map as MapIcon } from "lucide-react";
 import { deliveryProviderNotificationService } from "@/services/DeliveryProviderNotificationService";
 import { MapLocationPicker } from "@/components/location/MapLocationPicker";
@@ -383,31 +386,23 @@ const DeliveryRequest = () => {
     }, 30000);
 
     try {
-      // Get user from localStorage first (faster)
-      let user: any = null;
-      try {
-        const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
-        if (storedSession) {
-          const parsed = JSON.parse(storedSession);
-          user = parsed?.user;
-          console.log('🚚 DeliveryRequest: Got user from localStorage:', user?.email);
+      console.log('🚚 DeliveryRequest: Trying Supabase auth...');
+      const userResult = await withTimeout(
+        supabase.auth.getUser(),
+        8000,
+        { data: { user: null }, error: null }
+      );
+      let user = userResult.data?.user;
+
+      if (!user?.id) {
+        const { userId } = await readAuthSessionForRest();
+        if (userId) {
+          user = { id: userId, email: undefined };
+          console.log('🚚 DeliveryRequest: Using user id from persisted session');
         }
-      } catch (e) {
-        console.log('🚚 DeliveryRequest: localStorage fallback failed');
       }
 
-      // Fallback to Supabase auth with timeout
-      if (!user) {
-        console.log('🚚 DeliveryRequest: Trying Supabase auth...');
-        const userResult = await withTimeout(
-          supabase.auth.getUser(),
-          5000,
-          { data: { user: null }, error: null }
-        );
-        user = userResult.data?.user;
-      }
-
-      if (!user) {
+      if (!user?.id) {
         clearTimeout(safetyTimeout);
         throw new Error('User not authenticated. Please log in again.');
       }
@@ -479,18 +474,13 @@ const DeliveryRequest = () => {
       }
 
       console.log('🚚 DeliveryRequest: Inserting delivery request via REST API...');
-      
-      // Get access token from localStorage
-      let accessToken = SUPABASE_ANON_KEY;
-      try {
-        const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
-        if (storedSession) {
-          const parsed = JSON.parse(storedSession);
-          accessToken = parsed?.access_token || SUPABASE_ANON_KEY;
-        }
-      } catch (e) {
-        console.log('🚚 DeliveryRequest: Using anon key for insert');
+
+      const { accessToken: sessionToken } = await readAuthSessionForRest();
+      if (!sessionToken) {
+        clearTimeout(safetyTimeout);
+        throw new Error('Session expired. Please sign in again.');
       }
+      const accessToken = sessionToken;
 
       // Use direct REST API with AbortController for reliable timeout
       const controller = new AbortController();
@@ -498,7 +488,7 @@ const DeliveryRequest = () => {
       
       try {
         const response = await fetch(
-          `${SUPABASE_URL}/rest/v1/delivery_requests`,
+          `${supabaseRestBase}/delivery_requests`,
           {
             method: 'POST',
             headers: {
