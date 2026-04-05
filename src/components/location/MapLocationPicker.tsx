@@ -274,8 +274,13 @@ const GoogleMapLocationPicker: React.FC<MapLocationPickerProps & { apiKey: strin
     const map = new maps.Map(mapsDivRef.current, {
       center: { lat: defaultLat, lng: defaultLng },
       zoom: defaultZoom,
+      /** Roadmap always has coverage; Satellite/Hybrid often shows "no imagery" in rural Kenya. */
+      mapTypeId: 'roadmap',
       streetViewControl: false,
       mapTypeControl: true,
+      mapTypeControlOptions: {
+        mapTypeIds: ['roadmap', 'terrain'],
+      },
       fullscreenControl: true,
       gestureHandling: 'greedy',
       restriction: {

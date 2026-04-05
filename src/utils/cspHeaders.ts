@@ -49,6 +49,10 @@ export const CSP_DIRECTIVES = {
     'https://*.tile.openstreetmap.org',
     'https://*.basemaps.cartocdn.com',
     'https://commondatastorage.googleapis.com',
+    // Google Maps raster tiles (mt/khms/mts hosts) — required for map imagery under CSP
+    'https://*.googleapis.com',
+    'https://*.gstatic.com',
+    'https://*.google.com',
   ],
   'font-src': [
     "'self'",
