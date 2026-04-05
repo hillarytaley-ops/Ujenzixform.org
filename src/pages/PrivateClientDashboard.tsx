@@ -6,6 +6,14 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useNavigate, Link } from "react-router-dom";
 import { supabase, SUPABASE_URL, SUPABASE_ANON_KEY } from "@/integrations/supabase/client";
+
+/** delivery_requests.builder_id FK → profiles.id; also match auth uid for legacy rows */
+function encodeDeliveryRequestsBuilderOr(userId: string, profileId?: string | null): string {
+  const ids = [...new Set([userId, profileId].filter(Boolean) as string[])];
+  if (ids.length === 0) return "";
+  const inner = ids.map((id) => `builder_id.eq.${id}`).join(",");
+  return encodeURIComponent(`(${inner})`);
+}
 import {
   fetchMyMonitoringServiceRequests,
   monitoringRestOpts,
@@ -281,10 +289,30 @@ const PrivateClientDashboard = () => {
         console.log('🚚 DIRECT: Fetching deliveries for user:', userId);
         let allDeliveries: any[] = [];
         
-        // Query by builder_id (delivery_requests table uses builder_id, not user_id)
+        let profileIdForDr = "";
+        try {
+          const pres = await fetch(
+            `${SUPABASE_URL}/rest/v1/profiles?user_id=eq.${userId}&select=id&limit=1`,
+            {
+              headers: {
+                apikey: SUPABASE_ANON_KEY,
+                Authorization: `Bearer ${accessToken || SUPABASE_ANON_KEY}`,
+              },
+            }
+          );
+          if (pres.ok) {
+            const rows = await pres.json();
+            profileIdForDr = rows[0]?.id ?? "";
+          }
+        } catch {
+          /* non-fatal */
+        }
+        const drOr = encodeDeliveryRequestsBuilderOr(userId, profileIdForDr);
+
+        // builder_id is profiles.id (FK); include auth uid for any legacy rows
         try {
           const deliveryResponse = await fetch(
-            `${SUPABASE_URL}/rest/v1/delivery_requests?builder_id=eq.${userId}&order=created_at.desc`,
+            `${SUPABASE_URL}/rest/v1/delivery_requests?or=${drOr}&order=created_at.desc`,
             {
               headers: {
                 'apikey': SUPABASE_ANON_KEY,
@@ -458,16 +486,18 @@ const PrivateClientDashboard = () => {
       }
 
       // Fetch delivery requests for this user using direct REST API
-      // Query by builder_id (delivery_requests table uses builder_id, not user_id)
+      // builder_id references profiles.id (see delivery_requests_builder_id_fkey)
       console.log('🚚 Fetching deliveries for user:', user.id);
       
+      const profileForDr = profileByUserId || profileById;
       try {
         let allDeliveries: any[] = [];
         
-        // Query by builder_id
+        const drOr = encodeDeliveryRequestsBuilderOr(user.id, profileForDr?.id);
+
         try {
           const deliveryResponse = await fetch(
-            `${SUPABASE_URL}/rest/v1/delivery_requests?builder_id=eq.${user.id}&order=created_at.desc`,
+            `${SUPABASE_URL}/rest/v1/delivery_requests?or=${drOr}&order=created_at.desc`,
             {
               headers: {
                 'apikey': SUPABASE_ANON_KEY,
@@ -507,10 +537,16 @@ const PrivateClientDashboard = () => {
         
         // Fallback to Supabase client
         try {
+          const pid = profileForDr?.id;
+          const orParts = [
+            `user_id.eq.${user.id}`,
+            `builder_id.eq.${user.id}`,
+            ...(pid ? [`builder_id.eq.${pid}`] : []),
+          ];
           const { data: deliveryData, error } = await supabase
             .from('delivery_requests')
             .select('*')
-            .or(`user_id.eq.${user.id},builder_id.eq.${user.id}`)
+            .or(orParts.join(','))
             .order('created_at', { ascending: false });
 
           if (!error && deliveryData) {

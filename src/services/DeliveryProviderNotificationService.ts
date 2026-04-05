@@ -126,7 +126,10 @@ class DeliveryProviderNotificationService {
         title: '🚚 New Delivery Request Available!',
         message: `New delivery: ${requestDetails.pickup_address} → ${requestDetails.delivery_address}. Material: ${requestDetails.material_type || 'Construction materials'}. Date: ${new Date(requestDetails.pickup_date).toLocaleDateString()}.`,
         data: {
-          request_id: requestDetails.id,
+          request_id:
+            requestDetails.id != null && requestDetails.id !== ''
+              ? String(requestDetails.id)
+              : undefined,
           po_number: requestDetails.po_number,
           pickup_address: requestDetails.pickup_address,
           delivery_address: requestDetails.delivery_address,
