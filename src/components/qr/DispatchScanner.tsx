@@ -14,7 +14,22 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { SUPABASE_ANON_KEY, SUPABASE_URL, supabase } from '@/integrations/supabase/client';
+import {
+  getAccessTokenWithPersistenceFallback,
+  readPersistedAccessTokenSync,
+  readPersistedAuthUserSync,
+} from '@/utils/supabaseAccessToken';
 import { Html5Qrcode, Html5QrcodeScannerState, Html5QrcodeSupportedFormats } from 'html5-qrcode';
+
+/** Strip BOM / zero-width / nulls so camera output matches DB `material_items.qr_code`. */
+function normalizeQrCode(raw: string): string {
+  if (raw == null || typeof raw !== 'string') return '';
+  return raw
+    .replace(/^\uFEFF/, '')
+    .replace(/\0/g, '')
+    .replace(/[\u200B-\u200D\uFEFF]/g, '')
+    .trim();
+}
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // INTERFACES
@@ -296,8 +311,10 @@ export const DispatchScanner: React.FC<DispatchScannerProps> = ({
     ]);
   };
 
-  // Helper to get user from localStorage
   const getUserFromStorage = (): { id: string; accessToken: string } | null => {
+    const tok = readPersistedAccessTokenSync();
+    const { id } = readPersistedAuthUserSync();
+    if (id && tok) return { id, accessToken: tok };
     try {
       const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
       if (storedSession) {
@@ -306,8 +323,8 @@ export const DispatchScanner: React.FC<DispatchScannerProps> = ({
           return { id: parsed.user.id, accessToken: parsed.access_token };
         }
       }
-    } catch (e) {
-      console.warn('Could not get user from localStorage');
+    } catch {
+      /* ignore */
     }
     return null;
   };
@@ -602,7 +619,11 @@ export const DispatchScanner: React.FC<DispatchScannerProps> = ({
       // Helper function to get fresh access token with refresh
       // Checks expiration and refreshes if needed
       const getFreshAccessToken = async (): Promise<string> => {
-        // First, check localStorage but verify expiration
+        const fromSession = await getAccessTokenWithPersistenceFallback();
+        if (fromSession) return fromSession;
+        const syncTok = readPersistedAccessTokenSync();
+        if (syncTok) return syncTok;
+        // Then, check localStorage but verify expiration
         try {
           const stored = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
           if (stored) {
@@ -1118,24 +1139,26 @@ export const DispatchScanner: React.FC<DispatchScannerProps> = ({
         cameraConfig,
         scannerConfig,
         (decodedText, decodedResult) => {
-          console.log('✅ QR CODE DETECTED!', { decodedText, decodedResult });
+          const cleaned = normalizeQrCode(decodedText);
+          console.log('✅ QR CODE DETECTED!', { decodedText, cleaned, decodedResult });
+          if (!cleaned) return;
           const now = Date.now();
           
           // Quick debounce: prevent rapid duplicate scans within 2 seconds (same code)
-          if (decodedText === lastScannedRef.current && now - lastScanTimeRef.current < 2000) {
+          if (cleaned === lastScannedRef.current && now - lastScanTimeRef.current < 2000) {
             console.log('⏭️ Skipping duplicate scan (within 2 seconds)');
             return;
           }
-          const lastProcessedAt = recentlyProcessedRef.current.get(decodedText);
+          const lastProcessedAt = recentlyProcessedRef.current.get(cleaned);
           // Only skip if this exact code was successfully processed very recently (debounce double-tap)
           // After 2.5s allow same code again so multiple units with same QR (legacy) can be scanned
           if (lastProcessedAt != null && now - lastProcessedAt < 2500) {
-            console.log('⏭️ Skipping recently processed QR code (debounce):', decodedText.substring(0, 30));
+            console.log('⏭️ Skipping recently processed QR code (debounce):', cleaned.substring(0, 30));
             return;
           }
-          if (lastProcessedAt != null) recentlyProcessedRef.current.delete(decodedText);
+          if (lastProcessedAt != null) recentlyProcessedRef.current.delete(cleaned);
           
-          lastScannedRef.current = decodedText;
+          lastScannedRef.current = cleaned;
           lastScanTimeRef.current = now;
           
           // Vibrate on successful scan (mobile)
@@ -1159,8 +1182,8 @@ export const DispatchScanner: React.FC<DispatchScannerProps> = ({
             console.warn('⚠️ Could not play beep sound:', e);
           }
           
-          toast.success(`✅ QR Code scanned: ${decodedText.substring(0, 20)}...`);
-          processQRScan(decodedText, 'mobile_camera');
+          // Validate in processQRScan (toast there on success/failure — avoids success + invalid double toast)
+          void processQRScan(cleaned, 'mobile_camera');
         },
         (errorMessage) => {
           // Filter out common expected errors that occur during normal scanning
@@ -1249,9 +1272,14 @@ export const DispatchScanner: React.FC<DispatchScannerProps> = ({
   // ─────────────────────────────────────────────────────────────────────────────
   // QR SCAN PROCESSING
   // ─────────────────────────────────────────────────────────────────────────────
-  const processQRScan = async (qrCode: string, scannerType: 'mobile_camera' | 'physical_scanner' | 'web_scanner') => {
+  const processQRScan = async (rawQr: string, scannerType: 'mobile_camera' | 'physical_scanner' | 'web_scanner') => {
     if (!selectedOrder) {
       toast.error('No order selected');
+      return;
+    }
+    const qrCode = normalizeQrCode(rawQr);
+    if (!qrCode) {
+      toast.error('Invalid QR Code', { description: 'Could not read a valid code from the scan.' });
       return;
     }
 
@@ -1266,15 +1294,10 @@ export const DispatchScanner: React.FC<DispatchScannerProps> = ({
     // (trigger only fires on 'accepted', but delivery can be 'assigned' too)
     if (deliveryRequired && !hasDeliveryProvider && selectedOrder.id) {
       try {
-        // Get access token
-        let accessToken = SUPABASE_ANON_KEY;
-        try {
-          const stored = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
-          if (stored) {
-            const parsed = JSON.parse(stored);
-            accessToken = parsed.access_token || SUPABASE_ANON_KEY;
-          }
-        } catch (e) {}
+        let accessToken =
+          (await getAccessTokenWithPersistenceFallback()) ||
+          readPersistedAccessTokenSync() ||
+          SUPABASE_ANON_KEY;
         
         // Check delivery_requests for this order
         const drResponse = await fetch(
@@ -1314,8 +1337,9 @@ export const DispatchScanner: React.FC<DispatchScannerProps> = ({
     // VALIDATE: Check if this QR code belongs to the selected order
     // Prefer an unscanned item so multiple units (same or different codes) all get scanned
     // ═══════════════════════════════════════════════════════════════════════════
-    let matchingItem = selectedOrder.items.find(item => item.qr_code === qrCode && !item.dispatch_scanned)
-      || selectedOrder.items.find(item => item.qr_code === qrCode);
+    let matchingItem = selectedOrder.items.find(
+      (item) => normalizeQrCode(item.qr_code) === qrCode && !item.dispatch_scanned
+    ) || selectedOrder.items.find((item) => normalizeQrCode(item.qr_code) === qrCode);
     
     // If not found in cache, verify with database (QR codes might have been generated after order was loaded)
     if (!matchingItem) {
@@ -1323,84 +1347,19 @@ export const DispatchScanner: React.FC<DispatchScannerProps> = ({
       try {
         // Helper function to get fresh access token with refresh
         const getFreshAccessToken = async (): Promise<string> => {
+          const persisted = await getAccessTokenWithPersistenceFallback();
+          if (persisted) return persisted;
+          const sync = readPersistedAccessTokenSync();
+          if (sync) return sync;
           try {
-            // First, try to get current session (auto-refreshes if expired)
             const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-            
-            if (session?.access_token && !sessionError) {
-              // Update localStorage with fresh token
-              try {
-                const sessionData = {
-                  access_token: session.access_token,
-                  refresh_token: session.refresh_token,
-                  expires_at: session.expires_at,
-                  expires_in: session.expires_in,
-                  token_type: session.token_type,
-                  user: session.user
-                };
-                localStorage.setItem('sb-wuuyjjpgzgeimiptuuws-auth-token', JSON.stringify(sessionData));
-                console.log('✅ Got fresh token from session and saved to localStorage');
-              } catch (e) {
-                console.warn('⚠️ Could not save token to localStorage:', e);
-              }
-              
-              return session.access_token;
-            } else {
-              // No session, try to refresh
-              console.log('🔄 No session found, attempting refresh...');
-              const { data: { session: newSession }, error: refreshError } = await supabase.auth.refreshSession();
-              
-              if (newSession?.access_token && !refreshError) {
-                // Update localStorage with refreshed token
-                try {
-                  const sessionData = {
-                    access_token: newSession.access_token,
-                    refresh_token: newSession.refresh_token,
-                    expires_at: newSession.expires_at,
-                    expires_in: newSession.expires_in,
-                    token_type: newSession.token_type,
-                    user: newSession.user
-                  };
-                  localStorage.setItem('sb-wuuyjjpgzgeimiptuuws-auth-token', JSON.stringify(sessionData));
-                  console.log('✅ Session refreshed and saved to localStorage');
-                } catch (e) {
-                  console.warn('⚠️ Could not save refreshed token to localStorage:', e);
-                }
-                
-                return newSession.access_token;
-              } else {
-                console.warn('⚠️ Session refresh failed:', refreshError);
-              }
-            }
-          } catch (e) {
-            console.warn('⚠️ Error getting/refreshing session:', e);
+            if (session?.access_token && !sessionError) return session.access_token;
+            const { data: { session: newSession }, error: refreshError } = await supabase.auth.refreshSession();
+            if (newSession?.access_token && !refreshError) return newSession.access_token;
+          } catch {
+            /* ignore */
           }
-          
-          // Fallback to localStorage (only if session refresh failed)
-          try {
-            const stored = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
-            if (stored) {
-              const parsed = JSON.parse(stored);
-              if (parsed.access_token) {
-                // Check if token is expired
-                const tokenExp = parsed.expires_at ? new Date(parsed.expires_at * 1000) : null;
-                const now = new Date();
-                const buffer = 5 * 60 * 1000; // 5 minutes
-                
-                if (tokenExp && tokenExp.getTime() > now.getTime() + buffer) {
-                  console.log('📦 Using token from localStorage (valid)');
-                  return parsed.access_token;
-                } else {
-                  console.warn('⚠️ Token in localStorage is expired, cannot use');
-                }
-              }
-            }
-          } catch (e) {
-            console.warn('⚠️ Could not get token from localStorage:', e);
-          }
-          
-          // Final fallback: anon key
-          console.warn('⚠️ Using anon key as final fallback');
+          console.warn('⚠️ Dispatch verify: using anon key (RLS may hide QR rows)');
           return SUPABASE_ANON_KEY;
         };
         
@@ -1430,9 +1389,9 @@ export const DispatchScanner: React.FC<DispatchScannerProps> = ({
           return response;
         };
         
-        // Check database to see what order this QR code belongs to
+        // Check database to see what order this QR code belongs to (encode value for PostgREST)
         const verifyResponse = await makeRequestWithRetry(
-          `${SUPABASE_URL}/rest/v1/material_items?qr_code=eq.${qrCode}&select=id,purchase_order_id,qr_code,material_type,item_sequence,quantity,dispatch_scanned,dispatch_scan_count&limit=1`,
+          `${SUPABASE_URL}/rest/v1/material_items?qr_code=eq.${encodeURIComponent(qrCode)}&select=id,purchase_order_id,qr_code,material_type,item_sequence,quantity,dispatch_scanned,dispatch_scan_count&limit=1`,
           {
             headers: {
               'apikey': SUPABASE_ANON_KEY,
@@ -1593,7 +1552,10 @@ export const DispatchScanner: React.FC<DispatchScannerProps> = ({
       // Helper function to get fresh access token with refresh
       // Try localStorage FIRST to avoid auth.getSession() timeout
       const getFreshAccessToken = async (): Promise<string> => {
-        // First, try localStorage (fastest, no network call)
+        const prefer = await getAccessTokenWithPersistenceFallback();
+        if (prefer) return prefer;
+        const sync = readPersistedAccessTokenSync();
+        if (sync) return sync;
         try {
           const stored = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
           if (stored) {
@@ -1607,7 +1569,6 @@ export const DispatchScanner: React.FC<DispatchScannerProps> = ({
           console.warn('⚠️ Could not get token from localStorage:', e);
         }
         
-        // If localStorage doesn't have token, try session with timeout
         try {
           const { data: { session }, error: sessionError } = await withTimeout(
             supabase.auth.getSession(),
@@ -1902,7 +1863,7 @@ export const DispatchScanner: React.FC<DispatchScannerProps> = ({
           const dispatchScanned = scanData.dispatch_scanned === true;
           const dispatchScanCount = scanData.dispatch_scan_count ?? (dispatchScanned ? (scanData.quantity ?? 1) : 0);
           const updatedItems = prev.items.map(item =>
-            item.qr_code === qrCode
+            normalizeQrCode(item.qr_code) === qrCode
               ? {
                   ...item,
                   dispatch_scanned: dispatchScanned,
@@ -1942,7 +1903,7 @@ export const DispatchScanner: React.FC<DispatchScannerProps> = ({
         const count = scanData.dispatch_scan_count ?? (scanData.dispatch_scanned ? qty : 0);
         const remainingForThis = scanData.dispatch_scanned ? 0 : Math.max(0, qty - count);
         const remainingOthers = selectedOrder.items
-          .filter(i => i.qr_code !== qrCode)
+          .filter(i => normalizeQrCode(i.qr_code) !== qrCode)
           .reduce((s, i) => s + (i.dispatch_scanned ? 0 : Math.max(0, (i.quantity || 1) - (i.dispatch_scan_count || 0))), 0);
         const remainingItems = remainingForThis + remainingOthers;
         
