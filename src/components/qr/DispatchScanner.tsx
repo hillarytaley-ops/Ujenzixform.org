@@ -216,20 +216,31 @@ export const DispatchScanner: React.FC<DispatchScannerProps> = ({
     
     const style = document.createElement('style');
     style.id = styleId;
+    // html5-qrcode maps qrRegion using videoWidth/clientWidth and videoHeight/clientHeight.
+    // object-fit: cover breaks that (cropped feed ≠ full buffer scaling) → shaded box & white corners drift.
+    // Use fill so the element rect matches what the library expects (stretch is acceptable for scanning).
     style.textContent = `
       #${scannerContainerId} {
         width: 100% !important;
         height: 100% !important;
-        min-height: 500px !important;
+        min-height: min(50vh, 320px) !important;
+        position: relative !important;
+        overflow: hidden !important;
+        background: #000 !important;
       }
       #${scannerContainerId} video {
         width: 100% !important;
         height: 100% !important;
-        object-fit: cover !important;
+        object-fit: fill !important;
+        object-position: center center !important;
+        display: block !important;
       }
       #${scannerContainerId} canvas {
-        width: 100% !important;
-        height: 100% !important;
+        display: none !important;
+      }
+      #${scannerContainerId} #qr-shaded-region {
+        pointer-events: none !important;
+        z-index: 2 !important;
       }
       #${scannerContainerId} .html5-qrcode-element {
         width: 100% !important;
@@ -2273,11 +2284,11 @@ export const DispatchScanner: React.FC<DispatchScannerProps> = ({
             )}
             
             {/* Camera View - Larger and more prominent */}
-            <div className="relative bg-black rounded-xl overflow-hidden w-full min-h-[min(50vh,320px)] sm:min-h-[400px] md:min-h-[500px] max-h-[70vh]" style={{ aspectRatio: '4/3' }}>
-              <div 
-                id={scannerContainerId} 
+            <div className="relative bg-black rounded-xl overflow-hidden w-full min-h-[min(50vh,320px)] sm:min-h-[400px] md:min-h-[500px] max-h-[70vh]">
+              <div
+                id={scannerContainerId}
                 className="w-full h-full min-h-[min(50vh,320px)] sm:min-h-[400px] md:min-h-[500px]"
-                style={{ width: '100%', height: '100%' }}
+                style={{ width: '100%', height: '100%', minHeight: 'inherit' }}
               />
               
               {!isScanning && !cameraError && (
@@ -2304,14 +2315,8 @@ export const DispatchScanner: React.FC<DispatchScannerProps> = ({
               
               {isScanning && (
                 <>
-                  {/* Scanning overlay with corners */}
-                  <div className="absolute inset-0 pointer-events-none">
-                    <div className="absolute top-8 left-8 w-16 h-16 border-l-4 border-t-4 border-green-400 rounded-tl-lg" />
-                    <div className="absolute top-8 right-8 w-16 h-16 border-r-4 border-t-4 border-green-400 rounded-tr-lg" />
-                    <div className="absolute bottom-20 left-8 w-16 h-16 border-l-4 border-b-4 border-green-400 rounded-bl-lg" />
-                    <div className="absolute bottom-20 right-8 w-16 h-16 border-r-4 border-b-4 border-green-400 rounded-br-lg" />
-                  </div>
-                  <div className="absolute bottom-4 left-0 right-0 text-center">
+                  {/* Corner frame comes from html5-qrcode #qr-shaded-region only (avoid second misaligned box) */}
+                  <div className="absolute bottom-4 left-0 right-0 text-center z-[3] pointer-events-none">
                     <span className="bg-green-600 text-white text-sm px-4 py-2 rounded-full shadow-lg animate-pulse inline-flex items-center gap-2">
                       <Scan className="h-4 w-4" />
                       Scanning... Point at QR code

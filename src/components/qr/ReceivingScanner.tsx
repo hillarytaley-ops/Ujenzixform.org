@@ -172,7 +172,7 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
     };
   }, []);
 
-  // Match DispatchScanner: video/canvas fill the large viewport (no letterboxing gaps)
+  // object-fit: cover breaks html5-qrcode shaded region vs video buffer mapping — use fill (see DispatchScanner).
   useEffect(() => {
     const styleId = 'receiving-scanner-custom-styles';
     if (document.getElementById(styleId)) return;
@@ -184,15 +184,23 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
         width: 100% !important;
         height: 100% !important;
         min-height: 500px !important;
+        position: relative !important;
+        overflow: hidden !important;
+        background: #000 !important;
       }
       #${scannerContainerId} video {
         width: 100% !important;
         height: 100% !important;
-        object-fit: cover !important;
+        object-fit: fill !important;
+        object-position: center center !important;
+        display: block !important;
       }
       #${scannerContainerId} canvas {
-        width: 100% !important;
-        height: 100% !important;
+        display: none !important;
+      }
+      #${scannerContainerId} #qr-shaded-region {
+        pointer-events: none !important;
+        z-index: 2 !important;
       }
       #${scannerContainerId} .html5-qrcode-element {
         width: 100% !important;
@@ -1450,14 +1458,11 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
             </Alert>
           )}
 
-          <div
-            className="relative bg-black rounded-xl overflow-hidden w-full"
-            style={{ aspectRatio: '4/3', minHeight: '500px', maxHeight: '70vh' }}
-          >
+          <div className="relative bg-black rounded-xl overflow-hidden w-full min-h-[500px] max-h-[70vh]">
             <div
               id={scannerContainerId}
               className="w-full h-full"
-              style={{ width: '100%', height: '100%', minHeight: '500px' }}
+              style={{ width: '100%', height: '100%', minHeight: 'inherit' }}
             />
 
             {!isScanning && !cameraError && (
@@ -1483,13 +1488,7 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
 
             {isScanning && (
               <>
-                <div className="absolute inset-0 pointer-events-none">
-                  <div className="absolute top-8 left-8 w-16 h-16 border-l-4 border-t-4 border-green-400 rounded-tl-lg" />
-                  <div className="absolute top-8 right-8 w-16 h-16 border-r-4 border-t-4 border-green-400 rounded-tr-lg" />
-                  <div className="absolute bottom-20 left-8 w-16 h-16 border-l-4 border-b-4 border-green-400 rounded-bl-lg" />
-                  <div className="absolute bottom-20 right-8 w-16 h-16 border-r-4 border-b-4 border-green-400 rounded-br-lg" />
-                </div>
-                <div className="absolute bottom-4 left-0 right-0 text-center">
+                <div className="absolute bottom-4 left-0 right-0 text-center z-[3] pointer-events-none">
                   <span className="bg-green-600 text-white text-sm px-4 py-2 rounded-full shadow-lg animate-pulse inline-flex items-center gap-2">
                     <Scan className="h-4 w-4" />
                     Scanning... Point at QR code
