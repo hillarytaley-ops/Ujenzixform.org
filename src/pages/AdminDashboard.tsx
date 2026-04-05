@@ -75,6 +75,7 @@ import {
   FolderOpen,
   History,
   Timer,
+  Loader2,
   Gauge,
   PieChart,
   LineChart,
@@ -109,6 +110,7 @@ import { Camera, UserCog, MessageCircle, Link2, Navigation as NavigationIcon } f
 import { CameraAssignment } from "@/components/admin/CameraAssignment";
 import { TrackingTab } from "@/components/tracking/TrackingTab";
 import { KenyaDeliveryMap } from "@/components/admin/KenyaDeliveryMap";
+import { deliveryProviderNotificationService } from "@/services/DeliveryProviderNotificationService";
 import {
   Table,
   TableBody,
@@ -342,6 +344,10 @@ interface BuilderDeliveryRequest {
   tracking_updates?: any;
   created_at: string;
   updated_at: string;
+  pickup_latitude?: number | null;
+  pickup_longitude?: number | null;
+  delivery_latitude?: number | null;
+  delivery_longitude?: number | null;
 }
 
 // Camera Management Interface
@@ -387,6 +393,7 @@ const AdminDashboard = () => {
   const [mlActivities, setMLActivities] = useState<MLActivity[]>([]);
   const [deliveryApplications, setDeliveryApplications] = useState<DeliveryApplication[]>([]);
   const [builderDeliveryRequests, setBuilderDeliveryRequests] = useState<BuilderDeliveryRequest[]>([]);
+  const [alertingNearbyId, setAlertingNearbyId] = useState<string | null>(null);
   const [mlStats, setMLStats] = useState<MLStats>({
     totalPredictions: 0,
     successRate: 0,
@@ -1083,12 +1090,20 @@ const AdminDashboard = () => {
         if (builderIds.length > 0) {
           try {
             const profilesResponse = await fetch(
-              `${SUPABASE_URL}/rest/v1/profiles?id=in.(${builderIds.join(',')})&select=id,full_name`,
+              `${SUPABASE_URL}/rest/v1/profiles?id=in.(${builderIds.join(',')})&select=id,full_name,company_name`,
               { headers }
             );
             if (profilesResponse.ok) {
               const profiles = await profilesResponse.json();
-              profileMap = new Map(profiles?.map((p: any) => [p.id, p.full_name]) || []);
+              profileMap = new Map(
+                profiles?.map((p: any) => {
+                  const label =
+                    [p.full_name, p.company_name].find(
+                      (x: string | null | undefined) => x && String(x).trim().length > 0
+                    ) || null;
+                  return [p.id, label];
+                }) || []
+              );
             }
           } catch (e) {
             console.log('Could not fetch builder profiles');
@@ -1099,7 +1114,18 @@ const AdminDashboard = () => {
           id: req.id || '',
           builder_id: req.builder_id || '',
           builder_email: req.builder_email || '',
-          builder_name: profileMap.get(req.builder_id) || req.builder_email?.split('@')[0] || 'Unknown Builder',
+          builder_name:
+            profileMap.get(req.builder_id) ||
+            req.builder_email?.split('@')[0] ||
+            'Unknown Builder',
+          pickup_latitude:
+            typeof req.pickup_latitude === 'number' ? req.pickup_latitude : null,
+          pickup_longitude:
+            typeof req.pickup_longitude === 'number' ? req.pickup_longitude : null,
+          delivery_latitude:
+            typeof req.delivery_latitude === 'number' ? req.delivery_latitude : null,
+          delivery_longitude:
+            typeof req.delivery_longitude === 'number' ? req.delivery_longitude : null,
           // Support both old column names (pickup_location) and new column names (pickup_address)
           pickup_location: req.pickup_location || req.pickup_address || '',
           pickup_address: req.pickup_address || req.pickup_location || '',
@@ -3361,6 +3387,69 @@ const AdminDashboard = () => {
                           <div className="flex flex-col gap-2 min-w-[180px]">
                             {request.status === 'pending' && (
                               <>
+                                <Button
+                                  size="sm"
+                                  className="bg-amber-600 hover:bg-amber-700 text-white"
+                                  disabled={alertingNearbyId === request.id}
+                                  onClick={async () => {
+                                    setAlertingNearbyId(request.id);
+                                    try {
+                                      const result =
+                                        await deliveryProviderNotificationService.notifyNearbyProviders(
+                                          {
+                                            id: request.id,
+                                            pickup_address:
+                                              request.pickup_address ||
+                                              request.pickup_location ||
+                                              '',
+                                            delivery_address:
+                                              request.dropoff_address ||
+                                              request.dropoff_location ||
+                                              '',
+                                            pickup_date:
+                                              request.preferred_date ||
+                                              new Date().toISOString().slice(0, 10),
+                                            material_type: request.item_description,
+                                            special_instructions:
+                                              request.special_instructions || undefined,
+                                            pickup_latitude: request.pickup_latitude,
+                                            pickup_longitude: request.pickup_longitude,
+                                            delivery_latitude: request.delivery_latitude,
+                                            delivery_longitude: request.delivery_longitude,
+                                          },
+                                          { radiusKm: 75 }
+                                        );
+                                      if (result.errors.length > 0) {
+                                        toast({
+                                          variant: 'destructive',
+                                          title: 'Nearby alert',
+                                          description: result.errors.join(' '),
+                                        });
+                                      } else {
+                                        toast({
+                                          title: 'Nearby drivers alerted',
+                                          description: `Notified ${result.notified} of ${result.totalProviders} provider(s) in range (SMS / in-app / email where configured).`,
+                                        });
+                                      }
+                                    } catch (e: unknown) {
+                                      toast({
+                                        variant: 'destructive',
+                                        title: 'Alert failed',
+                                        description:
+                                          e instanceof Error ? e.message : 'Could not alert providers.',
+                                      });
+                                    } finally {
+                                      setAlertingNearbyId(null);
+                                    }
+                                  }}
+                                >
+                                  {alertingNearbyId === request.id ? (
+                                    <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                                  ) : (
+                                    <NavigationIcon className="h-4 w-4 mr-1" />
+                                  )}
+                                  Alert nearby drivers
+                                </Button>
                                 <Button
                                   size="sm"
                                   className="bg-blue-600 hover:bg-blue-700"

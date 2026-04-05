@@ -19,6 +19,7 @@ import { SUPABASE_ANON_KEY, SUPABASE_URL, supabase } from '@/integrations/supaba
 import { trackingNumberService } from '@/services/TrackingNumberService';
 import { cleanupDuplicateDeliveryRequests, cleanupDuplicatePurchaseOrders, checkForDuplicateDeliveryRequests, deleteDeliveryRequestsWithoutAddress, deleteDuplicateDeliveryRequestsByCompositeKey } from '@/utils/cleanupDuplicateDeliveryRequests';
 import { checkDeliveryAddress } from '@/utils/checkDeliveryAddress';
+import { haversineKm, resolveJobCoordinates } from '@/utils/deliveryProximity';
 
 interface Notification {
   id: string;
@@ -40,6 +41,10 @@ interface Notification {
   delivery_request_id?: string; // The actual delivery_request ID for accepting
   provider_id?: string | null; // Provider who accepted this delivery (null = unaccepted)
   provider_name?: string; // Name of provider who accepted (if available)
+  /** Straight-line distance from provider last GPS to job delivery/pickup point */
+  distanceKm?: number;
+  /** Within NEARBY_RADIUS_KM of job (when provider has current_latitude/longitude) */
+  nearby?: boolean;
 }
 
 interface NotificationSettings {
@@ -124,6 +129,33 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
       console.log('🔄 RESTRUCTURED: Loading notifications...');
       
       const { url, headers } = getAuthHeaders();
+
+      let providerLat: number | undefined;
+      let providerLng: number | undefined;
+      if (userId) {
+        try {
+          const ploc = await fetch(
+            `${url}/rest/v1/delivery_providers?user_id=eq.${userId}&select=current_latitude,current_longitude&limit=1`,
+            { headers, cache: 'no-store' }
+          );
+          if (ploc.ok) {
+            const prow = await ploc.json();
+            const row = Array.isArray(prow) ? prow[0] : null;
+            if (
+              row &&
+              typeof row.current_latitude === 'number' &&
+              typeof row.current_longitude === 'number'
+            ) {
+              providerLat = row.current_latitude;
+              providerLng = row.current_longitude;
+            }
+          }
+        } catch {
+          /* non-fatal */
+        }
+      }
+
+      const NEARBY_RADIUS_KM = 80;
       const finalNotifications: Notification[] = [];
       const seenPurchaseOrderIds = new Set<string>(); // Track which purchase_orders we've already added
       const seenPONumbers = new Set<string>(); // Track which po_numbers we've already added (CRITICAL for deduplication)
@@ -135,7 +167,7 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
       // CRITICAL: MUST include delivery_address field - this is the address filled by builder in delivery request form
       // CRITICAL: Also fetch pickup_address and all address-related fields to ensure we get the builder-provided address
       const drResponse = await fetch(
-        `${url}/rest/v1/delivery_requests?order=created_at.desc&limit=200&select=id,status,purchase_order_id,provider_id,delivery_address,pickup_address,delivery_coordinates,material_type,quantity,created_at,builder_id,rejection_reason,estimated_cost,budget_range`,
+        `${url}/rest/v1/delivery_requests?order=created_at.desc&limit=200&select=id,status,purchase_order_id,provider_id,delivery_address,pickup_address,delivery_coordinates,material_type,quantity,created_at,builder_id,rejection_reason,estimated_cost,budget_range,delivery_latitude,delivery_longitude,pickup_latitude,pickup_longitude`,
         { headers, cache: 'no-store' }
       );
       
@@ -857,6 +889,26 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
           }
           addedPONumbers.add(normalizedPONumber);
         }
+        const jobPt = resolveJobCoordinates({
+          delivery_latitude: dr.delivery_latitude,
+          delivery_longitude: dr.delivery_longitude,
+          pickup_latitude: dr.pickup_latitude,
+          pickup_longitude: dr.pickup_longitude,
+          delivery_address: deliveryAddr,
+          pickup_address: dr.pickup_address || dr.pickup_location || '',
+        });
+        let distanceKm: number | undefined;
+        let nearby = false;
+        if (
+          jobPt &&
+          typeof providerLat === 'number' &&
+          typeof providerLng === 'number'
+        ) {
+          const d = haversineKm(jobPt.lat, jobPt.lng, providerLat, providerLng);
+          distanceKm = Math.round(d * 10) / 10;
+          nearby = d <= NEARBY_RADIUS_KM;
+        }
+
         finalNotifications.push({
           id: `dr-${dr.id}`, // Use delivery_request id as notification id
           type: 'new_delivery',
@@ -876,7 +928,9 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
           po_number: poNumber || undefined, // CRITICAL: Include po_number for deduplication
           delivery_request_id: dr.id, // For accepting
           provider_id: dr.provider_id || null, // Provider who accepted (null = unaccepted)
-          provider_name: dr.provider_name || dr.delivery_provider_name || undefined // Provider name if available
+          provider_name: dr.provider_name || dr.delivery_provider_name || undefined, // Provider name if available
+          distanceKm,
+          nearby,
         });
       }
       
@@ -1203,8 +1257,16 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
       }
       
       console.log(`✅ ABSOLUTELY UNIQUE: ${absolutelyUnique.length} notifications (removed ${finalDuplicatesRemoved} duplicates in final cleanup)`);
-      
-      setNotifications(absolutelyUnique);
+
+      const sortedByProximity = [...absolutelyUnique].sort((a, b) => {
+        if (a.nearby && !b.nearby) return -1;
+        if (!a.nearby && b.nearby) return 1;
+        const da = a.distanceKm ?? Infinity;
+        const db = b.distanceKm ?? Infinity;
+        return da - db;
+      });
+
+      setNotifications(sortedByProximity);
       // Don't set unreadCount here - it will be set from uniqueNotifications
       
     } catch (error: any) {
@@ -1212,7 +1274,7 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [userId]);
 
   // Reject delivery handler
   const handleRejectDelivery = async (requestId: string) => {
@@ -2342,6 +2404,14 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
                         {notification.status === 'pending' && (
                           <Badge className="bg-orange-500 text-white text-[10px] px-1.5 py-0 animate-pulse">
                             NEW
+                          </Badge>
+                        )}
+                        {notification.nearby && (
+                          <Badge className="bg-emerald-600 text-white text-[10px] px-1.5 py-0">
+                            Near you
+                            {notification.distanceKm != null
+                              ? ` · ${notification.distanceKm} km`
+                              : ''}
                           </Badge>
                         )}
                       </div>

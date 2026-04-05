@@ -178,6 +178,10 @@ export interface BuilderDeliveryRequest {
   builder_id: string;
   builder_email?: string;
   builder_name?: string;
+  pickup_latitude?: number | null;
+  pickup_longitude?: number | null;
+  delivery_latitude?: number | null;
+  delivery_longitude?: number | null;
   pickup_location?: string;
   pickup_address?: string;
   dropoff_location?: string;

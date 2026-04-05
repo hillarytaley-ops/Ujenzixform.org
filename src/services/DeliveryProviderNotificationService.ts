@@ -14,6 +14,13 @@ import { supabase } from '@/integrations/supabase/client';
 import notificationService from './NotificationService';
 import { sendEmailViaEdgeFunction } from '@/lib/email';
 import { captureError, captureMessage } from '@/lib/sentry';
+import {
+  filterProvidersByProximity,
+  haversineKm,
+  resolveJobCoordinates,
+  serviceAreaMatchesAddress,
+  type JobCoordinates,
+} from '@/utils/deliveryProximity';
 
 export interface DeliveryRequestDetails {
   id?: string;
@@ -27,6 +34,10 @@ export interface DeliveryRequestDetails {
   budget_range?: string;
   special_instructions?: string;
   builder_name?: string;
+  pickup_latitude?: number | null;
+  pickup_longitude?: number | null;
+  delivery_latitude?: number | null;
+  delivery_longitude?: number | null;
 }
 
 interface DeliveryProvider {
@@ -38,14 +49,20 @@ interface DeliveryProvider {
   is_active: boolean;
   is_verified: boolean;
   service_areas?: string[];
+  current_latitude?: number | null;
+  current_longitude?: number | null;
 }
 
-interface NotificationResult {
+export interface NotificationResult {
   totalProviders: number;
   notified: number;
   failed: number;
   errors: string[];
+  /** Providers matched by proximity / service area (when location used) */
+  inRangeCount?: number;
 }
+
+const DEFAULT_RADIUS_KM = 75;
 
 /**
  * Service to notify all registered delivery providers about new delivery requests
@@ -60,7 +77,9 @@ class DeliveryProviderNotificationService {
       console.log('🚚 Fetching active delivery providers...');
       const { data, error } = await supabase
         .from('delivery_providers')
-        .select('id, user_id, provider_name, phone, email, is_active, is_verified, service_areas')
+        .select(
+          'id, user_id, provider_name, phone, email, is_active, is_verified, service_areas, current_latitude, current_longitude'
+        )
         .eq('is_active', true);
 
       if (error) {
@@ -117,28 +136,32 @@ class DeliveryProviderNotificationService {
    */
   async createInAppNotification(
     userId: string,
-    requestDetails: DeliveryRequestDetails
+    requestDetails: DeliveryRequestDetails,
+    dataExtras?: Record<string, unknown> | null
   ): Promise<boolean> {
     try {
+      const baseData: Record<string, unknown> = {
+        request_id:
+          requestDetails.id != null && requestDetails.id !== ''
+            ? String(requestDetails.id)
+            : undefined,
+        po_number: requestDetails.po_number,
+        pickup_address: requestDetails.pickup_address,
+        delivery_address: requestDetails.delivery_address,
+        pickup_date: requestDetails.pickup_date,
+        material_type: requestDetails.material_type,
+        quantity: requestDetails.quantity,
+        weight_kg: requestDetails.weight_kg,
+        budget_range: requestDetails.budget_range,
+        ...(dataExtras && Object.keys(dataExtras).length ? dataExtras : {}),
+      };
+      const nearby = Boolean(dataExtras?.nearby_job);
       const notificationData = {
         user_id: userId,
         type: 'delivery_request',
-        title: '🚚 New Delivery Request Available!',
+        title: nearby ? '📍 Delivery near you' : '🚚 New Delivery Request Available!',
         message: `New delivery: ${requestDetails.pickup_address} → ${requestDetails.delivery_address}. Material: ${requestDetails.material_type || 'Construction materials'}. Date: ${new Date(requestDetails.pickup_date).toLocaleDateString()}.`,
-        data: {
-          request_id:
-            requestDetails.id != null && requestDetails.id !== ''
-              ? String(requestDetails.id)
-              : undefined,
-          po_number: requestDetails.po_number,
-          pickup_address: requestDetails.pickup_address,
-          delivery_address: requestDetails.delivery_address,
-          pickup_date: requestDetails.pickup_date,
-          material_type: requestDetails.material_type,
-          quantity: requestDetails.quantity,
-          weight_kg: requestDetails.weight_kg,
-          budget_range: requestDetails.budget_range
-        },
+        data: baseData,
         read: false
       };
 
@@ -260,136 +283,284 @@ class DeliveryProviderNotificationService {
     }
   }
 
+  private proximityExtrasForProvider(
+    provider: DeliveryProvider,
+    job: JobCoordinates | null | undefined,
+    radiusKm: number,
+    addressBlob: string
+  ): Record<string, unknown> | null {
+    if (!job) return null;
+    const plat = provider.current_latitude;
+    const plng = provider.current_longitude;
+    const hasGps =
+      typeof plat === 'number' &&
+      typeof plng === 'number' &&
+      Number.isFinite(plat) &&
+      Number.isFinite(plng);
+    if (hasGps) {
+      const d = haversineKm(job.lat, job.lng, plat, plng);
+      return {
+        nearby_job: d <= radiusKm,
+        distance_km: Math.round(d * 10) / 10,
+        job_lat: job.lat,
+        job_lng: job.lng,
+        job_coordinate_source: job.source,
+        proximity_radius_km: radiusKm,
+      };
+    }
+    const areaMatch = serviceAreaMatchesAddress(provider.service_areas || [], addressBlob);
+    return {
+      nearby_job: areaMatch,
+      distance_km: null,
+      job_lat: job.lat,
+      job_lng: job.lng,
+      job_coordinate_source: job.source,
+      proximity_radius_km: radiusKm,
+      matched_by_service_area: areaMatch,
+    };
+  }
+
   /**
-   * Notify ALL registered delivery providers about a new delivery request
-   * This implements the "first-come-first-served" matching system
+   * Notify a specific list of providers (shared by broadcast and nearby flows).
    */
-  async notifyAllProviders(requestDetails: DeliveryRequestDetails): Promise<NotificationResult> {
+  async notifyProviderList(
+    providers: DeliveryProvider[],
+    requestDetails: DeliveryRequestDetails,
+    options?: {
+      jobCoords?: JobCoordinates | null;
+      radiusKm?: number;
+    }
+  ): Promise<NotificationResult> {
     const result: NotificationResult = {
-      totalProviders: 0,
+      totalProviders: providers.length,
       notified: 0,
       failed: 0,
-      errors: []
+      errors: [],
     };
 
+    const job = options?.jobCoords ?? null;
+    const radiusKm = options?.radiusKm ?? DEFAULT_RADIUS_KM;
+    const addressBlob = `${requestDetails.pickup_address}\n${requestDetails.delivery_address}`;
+
+    if (providers.length === 0) {
+      return result;
+    }
+
+    console.log(`📢 Notifying ${providers.length} delivery provider(s)...`);
+
+    const notificationPromises = providers.map(async (provider, index) => {
+      try {
+        const notificationResults = {
+          inApp: false,
+          sms: false,
+          email: false,
+          queued: false,
+        };
+
+        const extras = this.proximityExtrasForProvider(provider, job, radiusKm, addressBlob);
+
+        if (provider.user_id) {
+          notificationResults.inApp = await this.createInAppNotification(
+            provider.user_id,
+            requestDetails,
+            extras
+          );
+        }
+
+        if (provider.phone) {
+          notificationResults.sms = await this.sendSMSNotification(provider.phone, requestDetails);
+        }
+
+        if (provider.email?.includes('@')) {
+          notificationResults.email = await this.sendEmailNotification(provider.email, requestDetails);
+        }
+
+        if (requestDetails.id) {
+          notificationResults.queued = await this.queueProviderNotification(
+            provider.id,
+            requestDetails.id,
+            index + 1
+          );
+        }
+
+        const success =
+          notificationResults.inApp ||
+          notificationResults.sms ||
+          notificationResults.email ||
+          notificationResults.queued;
+
+        if (success) {
+          console.log(`✅ Notified provider: ${provider.provider_name} (${provider.phone || 'no phone'})`);
+        } else {
+          console.warn(`⚠️ Failed to notify provider: ${provider.provider_name}`);
+        }
+
+        return success;
+      } catch (error: unknown) {
+        const msg = error instanceof Error ? error.message : String(error);
+        console.error(`❌ Error notifying ${provider.provider_name}:`, msg);
+        return false;
+      }
+    });
+
+    const timeoutPromise = new Promise<boolean[]>((resolve) => {
+      setTimeout(() => {
+        console.log('⏱️ Notification timeout reached');
+        resolve(providers.map(() => false));
+      }, 15000);
+    });
+
+    const results = await Promise.race([Promise.all(notificationPromises), timeoutPromise]);
+
+    results.forEach((success) => {
+      if (success) {
+        result.notified++;
+      } else {
+        result.failed++;
+      }
+    });
+
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    console.log(`📊 Notification Summary:`);
+    console.log(`   Total Providers: ${result.totalProviders}`);
+    console.log(`   Successfully Notified: ${result.notified}`);
+    console.log(`   Failed: ${result.failed}`);
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+
+    return result;
+  }
+
+  /**
+   * Admin / staff: only providers within range (GPS) or matching service areas (no GPS).
+   * Does not fall back to all providers.
+   */
+  async notifyNearbyProviders(
+    requestDetails: DeliveryRequestDetails,
+    opts?: { radiusKm?: number }
+  ): Promise<NotificationResult> {
+    const radiusKm = opts?.radiusKm ?? DEFAULT_RADIUS_KM;
+    const job = resolveJobCoordinates({
+      delivery_latitude: requestDetails.delivery_latitude,
+      delivery_longitude: requestDetails.delivery_longitude,
+      pickup_latitude: requestDetails.pickup_latitude,
+      pickup_longitude: requestDetails.pickup_longitude,
+      delivery_address: requestDetails.delivery_address,
+      pickup_address: requestDetails.pickup_address,
+    });
+
+    if (!job) {
+      return {
+        totalProviders: 0,
+        notified: 0,
+        failed: 0,
+        errors: [
+          'No delivery coordinates found. Add a map pin on the delivery request or include lat,lng in the address so nearby drivers can be matched.',
+        ],
+        inRangeCount: 0,
+      };
+    }
+
+    const all = await this.getActiveProviders();
+    const addressBlob = `${requestDetails.pickup_address}\n${requestDetails.delivery_address}`;
+    const filtered = filterProvidersByProximity(all, job.lat, job.lng, radiusKm, addressBlob);
+
+    if (filtered.length === 0) {
+      return {
+        totalProviders: 0,
+        notified: 0,
+        failed: 0,
+        errors: [
+          `No active providers within ${radiusKm} km (or with a matching service area for this address). Widen the radius or ask drivers to update GPS / service areas.`,
+        ],
+        inRangeCount: 0,
+      };
+    }
+
+    console.log('🔔 Nearby provider alert:', {
+      requestId: requestDetails.id,
+      radiusKm,
+      matched: filtered.length,
+      job,
+    });
+
+    const result = await this.notifyProviderList(filtered, requestDetails, {
+      jobCoords: job,
+      radiusKm,
+    });
+    result.inRangeCount = filtered.length;
+    return result;
+  }
+
+  /**
+   * Notify delivery providers about a new delivery request.
+   * When coordinates exist, prefers nearby providers (GPS or service area); falls back to all if none match.
+   */
+  async notifyAllProviders(requestDetails: DeliveryRequestDetails): Promise<NotificationResult> {
     try {
       console.log('🔔 Starting delivery provider notifications...');
       console.log('📦 Request details:', {
         id: requestDetails.id,
         pickup: requestDetails.pickup_address,
         delivery: requestDetails.delivery_address,
-        date: requestDetails.pickup_date
+        date: requestDetails.pickup_date,
       });
 
-      // Get all active providers
-      const providers = await this.getActiveProviders();
-      result.totalProviders = providers.length;
-
-      if (providers.length === 0) {
+      const all = await this.getActiveProviders();
+      if (all.length === 0) {
         console.log('⚠️ No active delivery providers found');
-        result.errors.push('No active delivery providers available');
-        return result;
+        return {
+          totalProviders: 0,
+          notified: 0,
+          failed: 0,
+          errors: ['No active delivery providers available'],
+        };
       }
 
-      console.log(`📢 Notifying ${providers.length} delivery providers...`);
-
-      // Notify each provider in parallel (with limit)
-      const notificationPromises = providers.map(async (provider, index) => {
-        try {
-          const notificationResults = {
-            inApp: false,
-            sms: false,
-            email: false,
-            queued: false
-          };
-
-          // 1. Create in-app notification
-          if (provider.user_id) {
-            notificationResults.inApp = await this.createInAppNotification(
-              provider.user_id,
-              requestDetails
-            );
-          }
-
-          // 2. Send SMS notification (if phone available)
-          if (provider.phone) {
-            notificationResults.sms = await this.sendSMSNotification(
-              provider.phone,
-              requestDetails
-            );
-          }
-
-          // 3. Email (when address is on file and API route is configured)
-          if (provider.email?.includes('@')) {
-            notificationResults.email = await this.sendEmailNotification(
-              provider.email,
-              requestDetails
-            );
-          }
-
-          // 4. Queue the provider for this request
-          if (requestDetails.id) {
-            notificationResults.queued = await this.queueProviderNotification(
-              provider.id,
-              requestDetails.id,
-              index + 1
-            );
-          }
-
-          const success =
-            notificationResults.inApp ||
-            notificationResults.sms ||
-            notificationResults.email ||
-            notificationResults.queued;
-          
-          if (success) {
-            console.log(`✅ Notified provider: ${provider.provider_name} (${provider.phone || 'no phone'})`);
-          } else {
-            console.warn(`⚠️ Failed to notify provider: ${provider.provider_name}`);
-          }
-
-          return success;
-        } catch (error: any) {
-          console.error(`❌ Error notifying ${provider.provider_name}:`, error?.message);
-          return false;
-        }
+      const job = resolveJobCoordinates({
+        delivery_latitude: requestDetails.delivery_latitude,
+        delivery_longitude: requestDetails.delivery_longitude,
+        pickup_latitude: requestDetails.pickup_latitude,
+        pickup_longitude: requestDetails.pickup_longitude,
+        delivery_address: requestDetails.delivery_address,
+        pickup_address: requestDetails.pickup_address,
       });
 
-      // Wait for all notifications (with 15 second total timeout)
-      const timeoutPromise = new Promise<boolean[]>((resolve) => {
-        setTimeout(() => {
-          console.log('⏱️ Notification timeout reached');
-          resolve(providers.map(() => false));
-        }, 15000);
-      });
+      const addressBlob = `${requestDetails.pickup_address}\n${requestDetails.delivery_address}`;
+      let target = all;
+      let inRangeCount: number | undefined;
 
-      const results = await Promise.race([
-        Promise.all(notificationPromises),
-        timeoutPromise
-      ]);
-
-      // Count successes and failures
-      results.forEach((success) => {
-        if (success) {
-          result.notified++;
+      if (job) {
+        const filtered = filterProvidersByProximity(all, job.lat, job.lng, DEFAULT_RADIUS_KM, addressBlob);
+        if (filtered.length > 0) {
+          target = filtered;
+          inRangeCount = filtered.length;
+          console.log(`📍 Proximity filter: ${filtered.length} provider(s) in range / service area (of ${all.length})`);
         } else {
-          result.failed++;
+          console.log('📍 No providers matched proximity; notifying all active providers');
+          target = all;
         }
+      }
+
+      const result = await this.notifyProviderList(target, requestDetails, {
+        jobCoords: job,
+        radiusKm: DEFAULT_RADIUS_KM,
       });
-
-      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-      console.log(`📊 Notification Summary:`);
-      console.log(`   Total Providers: ${result.totalProviders}`);
-      console.log(`   Successfully Notified: ${result.notified}`);
-      console.log(`   Failed: ${result.failed}`);
-      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-
+      result.inRangeCount = inRangeCount;
+      if (job && target === all && inRangeCount === undefined) {
+        result.errors.push(
+          'No drivers matched nearby filters; all active providers were notified.'
+        );
+      }
       return result;
-
-    } catch (error: any) {
-      console.error('❌ Error in notifyAllProviders:', error?.message || error);
-      result.errors.push(error?.message || 'Unknown error');
-      return result;
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : String(error);
+      console.error('❌ Error in notifyAllProviders:', msg);
+      return {
+        totalProviders: 0,
+        notified: 0,
+        failed: 0,
+        errors: [msg || 'Unknown error'],
+      };
     }
   }
 

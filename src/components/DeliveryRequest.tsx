@@ -538,7 +538,11 @@ const DeliveryRequest = () => {
           quantity: parseInt(formData.quantity) || 1,
           weight_kg: parseFloat(formData.weight) || undefined,
           budget_range: formData.budgetRange || undefined,
-          special_instructions: formData.specialInstructions.trim() || undefined
+          special_instructions: formData.specialInstructions.trim() || undefined,
+          pickup_latitude: requestData.pickup_latitude ?? null,
+          pickup_longitude: requestData.pickup_longitude ?? null,
+          delivery_latitude: requestData.delivery_latitude ?? null,
+          delivery_longitude: requestData.delivery_longitude ?? null,
         }).then(result => {
           console.log(`✅ Delivery providers notified: ${result.notified}/${result.totalProviders}`);
           deliveryProviderNotificationService.logNotificationEvent(deliveryRequest.id, result);
