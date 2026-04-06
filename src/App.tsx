@@ -88,6 +88,7 @@ import { OfflineIndicator } from "@/components/OfflineIndicator";
 // PWA Install Prompt
 import { PWAInstallPrompt } from "@/components/pwa/PWAInstallPrompt";
 import { shouldHideFloatingChrome } from "@/config/authChrome";
+import { AUTH_ROUTE_ALIASES, SUPPLIERS_PAGE_PATHS } from "@/config/authRouteAliases";
 
 // Optimized loading component with skeleton animation
 const PageLoader = () => (
@@ -257,6 +258,10 @@ const App = () => {
                     <Route path="/" element={<Auth />} />
                     <Route path="/auth" element={<Auth />} />
                     <Route path="/unified-auth" element={<SuspenseWrapper><UnifiedAuth /></SuspenseWrapper>} />
+
+                    {AUTH_ROUTE_ALIASES.map(({ path: aliasPath, to }) => (
+                      <Route key={aliasPath} path={aliasPath} element={<Navigate to={to} replace />} />
+                    ))}
                     
                     {/* Role-specific auth pages - SECURE: each role has its own auth */}
                     <Route path="/private-client-auth" element={<SuspenseWrapper><PrivateClientAuth /></SuspenseWrapper>} />
@@ -268,9 +273,9 @@ const App = () => {
                     
                     {/* All pages accessible after sign in - no repeated auth required */}
                     <Route path="/home" element={<Index />} />
-                    <Route path="/suppliers" element={<SuspenseWrapper><Suppliers /></SuspenseWrapper>} />
-                    <Route path="/suppliers-mobile" element={<SuspenseWrapper><Suppliers /></SuspenseWrapper>} />
-                    <Route path="/supplier-marketplace" element={<SuspenseWrapper><Suppliers /></SuspenseWrapper>} />
+                    {SUPPLIERS_PAGE_PATHS.map((p) => (
+                      <Route key={p} path={p} element={<SuspenseWrapper><Suppliers /></SuspenseWrapper>} />
+                    ))}
                     <Route path="/builders" element={<SuspenseWrapper><Builders /></SuspenseWrapper>} />
                     <Route path="/builder/:builderId" element={<SuspenseWrapper><PublicBuilderProfile /></SuspenseWrapper>} />
                     <Route path="/about" element={<SuspenseWrapper><About /></SuspenseWrapper>} />

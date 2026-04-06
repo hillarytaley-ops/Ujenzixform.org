@@ -23,6 +23,25 @@ const getSupabase = () => {
   return null;
 };
 
+/** Matches any `sb-<ref>-auth-token` blob (sessionStorage in prod, localStorage in dev / legacy). */
+function readSupabaseSessionBlobRaw() {
+  try {
+    const stores = [sessionStorage, localStorage];
+    for (const store of stores) {
+      for (let i = 0; i < store.length; i++) {
+        const k = store.key(i);
+        if (k && /^sb-.+-auth-token$/.test(k)) {
+          const v = store.getItem(k);
+          if (v && v.trim().length > 2) return v;
+        }
+      }
+    }
+  } catch (e) {
+    /* ignore */
+  }
+  return null;
+}
+
 // ═══════════════════════════════════════════════════════════════
 // TEST 1: User Authentication Flow
 // ═══════════════════════════════════════════════════════════════
@@ -35,8 +54,7 @@ async function testAuthFlow() {
     const supabaseUrl = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
     const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
     
-    // Check if user is logged in via localStorage
-    const session = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+    const session = readSupabaseSessionBlobRaw();
     if (session) {
       const parsed = JSON.parse(session);
       results.push(formatResult('Session exists', true, `User: ${parsed.user?.email || 'Unknown'}`));

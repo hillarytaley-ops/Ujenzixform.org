@@ -49,11 +49,8 @@ import {
   Volume2
 } from "lucide-react";
 import { BuilderProfileEdit } from "@/components/builders/BuilderProfileEdit";
-import { BuilderVideoPortfolio } from "@/components/builders/BuilderVideoPortfolio";
 import { BuilderOrdersTracker } from "@/components/builders/BuilderOrdersTracker";
-import { OrderHistory } from "@/components/orders/OrderHistory";
 import { ReviewPrompt } from "@/components/reviews/ReviewSystem";
-import { UserAnalyticsDashboard } from "@/components/analytics/UserAnalyticsDashboard";
 import { BarChart3, Star } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -77,9 +74,6 @@ import {
 } from "@/components/ui/dialog";
 import { SupplierQuoteReview } from "@/components/builders/SupplierQuoteReview";
 import { PendingQuoteRequests } from "@/components/builders/PendingQuoteRequests";
-import DeliveryRequest from "@/components/DeliveryRequest";
-import { InAppCommunication } from "@/components/communication/InAppCommunication";
-import { TrackingTab } from "@/components/tracking/TrackingTab";
 import { Navigation as NavigationIcon, Navigation, Settings, QrCode } from "lucide-react";
 import { DashboardMobileActionSheet } from "@/components/dashboard/DashboardMobileActionSheet";
 import { ProfileEditDialog } from "@/components/profile/ProfileEditDialog";
@@ -98,14 +92,63 @@ import {
   resolveMonitoringToProjectId,
 } from "@/utils/builderProjectPurchaseOrders";
 import { formatKesCompact } from "@/utils/kesFormat";
-import { DeliveryNoteWorkflow } from "@/components/delivery/DeliveryNoteWorkflow";
-import { GRNView } from "@/components/delivery/GRNView";
-import { InvoiceManagement } from "@/components/invoices/InvoiceManagement";
 import { MissingDeliveryAddressAlert } from "@/components/builders/MissingDeliveryAddressAlert";
 import {
   fetchMyMonitoringServiceRequests,
   monitoringRestOpts,
 } from "@/utils/myMonitoringServiceRequests";
+
+const BuilderDashboardTabFallback = () => (
+  <div
+    className="flex justify-center py-10 text-sm text-muted-foreground"
+    role="status"
+    aria-busy="true"
+  >
+    Loading…
+  </div>
+);
+
+function BuilderDashboardTabSuspense({ children }: { children: React.ReactNode }) {
+  return (
+    <React.Suspense fallback={<BuilderDashboardTabFallback />}>{children}</React.Suspense>
+  );
+}
+
+const LazyDeliveryRequest = React.lazy(() => import("@/components/DeliveryRequest"));
+const LazyTrackingTab = React.lazy(() =>
+  import("@/components/tracking/TrackingTab").then((m) => ({ default: m.TrackingTab }))
+);
+const LazyDeliveryNoteWorkflow = React.lazy(() =>
+  import("@/components/delivery/DeliveryNoteWorkflow").then((m) => ({
+    default: m.DeliveryNoteWorkflow,
+  }))
+);
+const LazyGRNView = React.lazy(() =>
+  import("@/components/delivery/GRNView").then((m) => ({ default: m.GRNView }))
+);
+const LazyInvoiceManagement = React.lazy(() =>
+  import("@/components/invoices/InvoiceManagement").then((m) => ({
+    default: m.InvoiceManagement,
+  }))
+);
+const LazyInAppCommunication = React.lazy(() =>
+  import("@/components/communication/InAppCommunication").then((m) => ({
+    default: m.InAppCommunication,
+  }))
+);
+const LazyBuilderVideoPortfolio = React.lazy(() =>
+  import("@/components/builders/BuilderVideoPortfolio").then((m) => ({
+    default: m.BuilderVideoPortfolio,
+  }))
+);
+const LazyUserAnalyticsDashboard = React.lazy(() =>
+  import("@/components/analytics/UserAnalyticsDashboard").then((m) => ({
+    default: m.UserAnalyticsDashboard,
+  }))
+);
+const LazyOrderHistory = React.lazy(() =>
+  import("@/components/orders/OrderHistory").then((m) => ({ default: m.OrderHistory }))
+);
 
 type PurchaseOrderProjectRow = {
   project_id?: string | null;
@@ -3201,7 +3244,9 @@ const ProfessionalBuilderDashboardPage = () => {
                           </div>
                         </div>
                         
-                        <DeliveryRequest />
+                        <BuilderDashboardTabSuspense>
+                          <LazyDeliveryRequest />
+                        </BuilderDashboardTabSuspense>
                       </CardContent>
                     </Card>
                   </TabsContent>
@@ -3472,20 +3517,22 @@ const ProfessionalBuilderDashboardPage = () => {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <TrackingTab
-                  userId={user?.id || authUser?.id || localStorage.getItem('user_id') || (() => {
-                    try {
-                      const storedSession = readPersistedAuthRawStringSync();
-                      if (storedSession) {
-                        const parsed = JSON.parse(storedSession);
-                        return parsed.user?.id || '';
-                      }
-                    } catch (e) {}
-                    return '';
-                  })()}
-                  userRole="professional_builder"
-                  userName={profile?.full_name || user?.email?.split('@')[0]}
-                />
+                <BuilderDashboardTabSuspense>
+                  <LazyTrackingTab
+                    userId={user?.id || authUser?.id || localStorage.getItem('user_id') || (() => {
+                      try {
+                        const storedSession = readPersistedAuthRawStringSync();
+                        if (storedSession) {
+                          const parsed = JSON.parse(storedSession);
+                          return parsed.user?.id || '';
+                        }
+                      } catch (e) {}
+                      return '';
+                    })()}
+                    userRole="professional_builder"
+                    userName={profile?.full_name || user?.email?.split('@')[0]}
+                  />
+                </BuilderDashboardTabSuspense>
               </CardContent>
             </Card>
           </TabsContent>
@@ -3556,13 +3603,15 @@ const ProfessionalBuilderDashboardPage = () => {
                       Sign delivery notes and verify materials received.
                     </p>
                     {user?.id && (
-                      <DeliveryNoteWorkflow
-                        builderAuthUserId={user.id}
-                        builderProfileId={profile?.id ?? null}
-                        onComplete={() => {
-                          void fetchInvoiceHubBadgeCount(profile?.id ?? null, user.id);
-                        }}
-                      />
+                      <BuilderDashboardTabSuspense>
+                        <LazyDeliveryNoteWorkflow
+                          builderAuthUserId={user.id}
+                          builderProfileId={profile?.id ?? null}
+                          onComplete={() => {
+                            void fetchInvoiceHubBadgeCount(profile?.id ?? null, user.id);
+                          }}
+                        />
+                      </BuilderDashboardTabSuspense>
                     )}
                   </TabsContent>
 
@@ -3570,7 +3619,11 @@ const ProfessionalBuilderDashboardPage = () => {
                     <p className="text-sm text-muted-foreground">
                       View all GRNs for accepted deliveries.
                     </p>
-                    {user?.id && <GRNView userId={user.id} userRole="builder" />}
+                    {user?.id && (
+                      <BuilderDashboardTabSuspense>
+                        <LazyGRNView userId={user.id} userRole="builder" />
+                      </BuilderDashboardTabSuspense>
+                    )}
                   </TabsContent>
 
                   <TabsContent value="invoice-list" className="mt-0 space-y-2">
@@ -3578,7 +3631,11 @@ const ProfessionalBuilderDashboardPage = () => {
                       When a supplier forwards an invoice, acknowledge it and use <strong>Pay now</strong> to
                       settle and record payment without delay.
                     </p>
-                    {user?.id && <InvoiceManagement userId={user.id} userRole="builder" />}
+                    {user?.id && (
+                      <BuilderDashboardTabSuspense>
+                        <LazyInvoiceManagement userId={user.id} userRole="builder" />
+                      </BuilderDashboardTabSuspense>
+                    )}
                   </TabsContent>
                 </Tabs>
               </CardContent>
@@ -3654,12 +3711,14 @@ const ProfessionalBuilderDashboardPage = () => {
                     <div className="space-y-6">
                       {/* In-App Communication */}
                       {user && (
-                        <InAppCommunication
-                          userId={user.id}
-                          userName={user.email || 'Builder'}
-                          userRole="professional_builder"
-                          isDarkMode={false}
-                        />
+                        <BuilderDashboardTabSuspense>
+                          <LazyInAppCommunication
+                            userId={user.id}
+                            userName={user.email || 'Builder'}
+                            userRole="professional_builder"
+                            isDarkMode={false}
+                          />
+                        </BuilderDashboardTabSuspense>
                       )}
 
                       {/* Quick Contact Info */}
@@ -4241,10 +4300,9 @@ const ProfessionalBuilderDashboardPage = () => {
                 </div>
 
                 {/* Video Portfolio Component */}
-                <BuilderVideoPortfolio 
-                  builderId={user?.id || ''} 
-                  isOwner={true}
-                />
+                <BuilderDashboardTabSuspense>
+                  <LazyBuilderVideoPortfolio builderId={user?.id || ''} isOwner={true} />
+                </BuilderDashboardTabSuspense>
               </CardContent>
             </Card>
           </TabsContent>
@@ -4258,7 +4316,11 @@ const ProfessionalBuilderDashboardPage = () => {
                 <CardDescription>View all your orders and download invoices</CardDescription>
               </CardHeader>
               <CardContent>
-                {user && <OrderHistory userId={user.id} userRole="professional_builder" />}
+                {user && (
+                  <BuilderDashboardTabSuspense>
+                    <LazyOrderHistory userId={user.id} userRole="professional_builder" />
+                  </BuilderDashboardTabSuspense>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
@@ -4266,7 +4328,11 @@ const ProfessionalBuilderDashboardPage = () => {
           {/* Analytics Tab */}
           <TabsContent value="my-analytics">
             <div className="space-y-6">
-              {user && <UserAnalyticsDashboard userId={user.id} userRole="professional_builder" />}
+              {user && (
+                <BuilderDashboardTabSuspense>
+                  <LazyUserAnalyticsDashboard userId={user.id} userRole="professional_builder" />
+                </BuilderDashboardTabSuspense>
+              )}
             </div>
           </TabsContent>
         </Tabs>

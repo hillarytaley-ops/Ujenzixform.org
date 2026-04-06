@@ -7,6 +7,8 @@
 | Concern | Location |
 |--------|----------|
 | **Recommended entry URLs** (new users / campaigns) | `src/config/authEntryRoutes.ts` (`AUTH_ENTRY_ROUTES`) |
+| **Short auth aliases** (`/login`, `/builder/login`, …) | `src/config/authRouteAliases.ts` (`AUTH_ROUTE_ALIASES`) |
+| **Legacy auth key string guard** | `npm run check:auth-keys` → `scripts/check-legacy-supabase-auth-key.mjs` |
 | Route table | `src/App.tsx` (`<Routes>`) |
 | Role-only pages | `RoleProtectedRoute` in `src/components/security/RoleProtectedRoute.tsx` (`allowedRoles`, `DASHBOARDS`) |
 | Session required (any role) | `AuthRequired` in `src/components/security/AuthRequired.tsx` |
