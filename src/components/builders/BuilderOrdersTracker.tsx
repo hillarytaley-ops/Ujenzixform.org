@@ -26,6 +26,7 @@ import {
   ShieldCheck,
   ShieldX,
   AlertCircle,
+  AlertTriangle,
   Edit,
   XCircle,
   FileText,
@@ -34,6 +35,13 @@ import {
 import { SUPABASE_ANON_KEY, SUPABASE_URL, supabase } from '@/integrations/supabase/client';
 import { readAuthSessionForRest, readPersistedAccessTokenSync } from '@/utils/supabaseAccessToken';
 import { useToast } from '@/hooks/use-toast';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { DeliveryPromptDialog } from './DeliveryPromptDialog';
+import {
+  builderFulfillmentOrderChoice,
+  hasActiveDeliveryRequestForOrder,
+  purchaseOrderRequiresDeliveryProvider,
+} from '@/utils/purchaseOrderFulfillment';
 import { format } from 'date-fns';
 import QRCode from 'qrcode';
 
@@ -71,6 +79,58 @@ interface PurchaseOrder {
   qr_code_generated: boolean;
   created_at: string;
   material_items?: MaterialItem[];
+  delivery_required?: boolean | null;
+  builder_fulfillment_choice?: string | null;
+  project_name?: string;
+  delivery_provider_id?: string | null;
+  delivery_provider_name?: string | null;
+  delivery_provider_phone?: string | null;
+  delivery_status?: string;
+}
+
+/** Statuses where the builder may open Request / re-request delivery (before pickup is chosen). */
+const BUILDER_DELIVERY_DIALOG_STATUSES = new Set<string>([
+  'confirmed',
+  'pending',
+  'quoted',
+  'processing',
+  'shipped',
+  'awaiting_delivery_request',
+  'order_created',
+  'delivery_requested',
+  'awaiting_delivery_provider',
+  'quote_created',
+  'quote_received_by_supplier',
+  'quote_responded',
+  'quote_revised',
+  'quote_viewed_by_builder',
+  'quote_accepted',
+  'ready_for_dispatch',
+  'delivery_assigned',
+]);
+
+function buildPurchaseOrderForDeliveryDialog(order: PurchaseOrder) {
+  const items =
+    Array.isArray(order.items) && order.items.length > 0
+      ? order.items
+      : (order.material_items || []).map((mi) => ({
+          material_name: mi.material_type,
+          name: mi.material_type,
+          quantity: mi.quantity,
+          unit: mi.unit,
+        }));
+  return {
+    id: order.id,
+    po_number: order.po_number,
+    supplier_id: order.supplier_id,
+    total_amount: order.total_amount,
+    delivery_address: order.delivery_address || '',
+    delivery_date: order.delivery_date || '',
+    items,
+    project_name: order.project_name,
+    status: order.status,
+    builder_fulfillment_choice: order.builder_fulfillment_choice,
+  };
 }
 
 interface ScanEvent {
@@ -106,6 +166,10 @@ function providerDisplayName(order: {
 
 function providerDisplayPhone(order: { delivery_provider_phone?: string | null }): string {
   return (order.delivery_provider_phone || '').trim();
+}
+
+function orderHasAssignedProvider(order: PurchaseOrder): boolean {
+  return !!(order.delivery_provider_id || providerDisplayName(order));
 }
 
 // Large QR Code Dialog for scanning
@@ -239,6 +303,11 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
   const [selectedQRItem, setSelectedQRItem] = useState<MaterialItem | null>(null);
   const [showQRDialog, setShowQRDialog] = useState(false);
   const [activeFilter, setActiveFilter] = useState<OrderFilter>('pending'); // Default to pending orders
+  const [deliveryRequestsList, setDeliveryRequestsList] = useState<
+    { id: string; purchase_order_id?: string; status?: string | null }[]
+  >([]);
+  const [showDeliveryPrompt, setShowDeliveryPrompt] = useState(false);
+  const [selectedOrderForDelivery, setSelectedOrderForDelivery] = useState<PurchaseOrder | null>(null);
   const { toast } = useToast();
 
   const fetchOrders = async () => {
@@ -256,6 +325,7 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
 
       if (!builderId?.trim()) {
         setOrders([]);
+        setDeliveryRequestsList([]);
         setLoading(false);
         return;
       }
@@ -299,6 +369,7 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
 
       if (!ordersData || ordersData.length === 0) {
         setOrders([]);
+        setDeliveryRequestsList([]);
         setLoading(false);
         return;
       }
@@ -336,23 +407,28 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
         itemsByOrder.get(orderId)!.push(item);
       });
 
-      // Fetch delivery requests to get provider information for orders
+      // All delivery_requests for these POs (incl. rows without provider) — for active-request detection + provider map
       let deliveryRequestsMap = new Map<string, any>();
       try {
         const drController = new AbortController();
         const drTimeoutId = setTimeout(() => drController.abort(), 5000);
-        
-        // Fetch delivery requests that are accepted/assigned for these orders - include provider_id to get provider details
-        // Do not filter by status — some rows use other status values but still carry provider_id
+
         const drResponse = await fetch(
-          `${SUPABASE_URL}/rest/v1/delivery_requests?purchase_order_id=in.(${orderIdsParam})&provider_id=not.is.null&select=purchase_order_id,provider_id,status,accepted_at,updated_at,created_at`,
+          `${SUPABASE_URL}/rest/v1/delivery_requests?purchase_order_id=in.(${orderIdsParam})&select=id,purchase_order_id,provider_id,status,accepted_at,updated_at,created_at`,
           { headers, signal: drController.signal, cache: 'no-store' }
         );
         clearTimeout(drTimeoutId);
-        
+
         if (drResponse.ok) {
-          const deliveryRequests = await drResponse.json();
+          const deliveryRequests = (await drResponse.json()) as any[];
           console.log('🚚 Delivery requests fetched:', deliveryRequests.length);
+          setDeliveryRequestsList(
+            (deliveryRequests || []).map((dr) => ({
+              id: dr.id,
+              purchase_order_id: dr.purchase_order_id,
+              status: dr.status,
+            }))
+          );
 
           const rank = (s: string) => {
             const x = (s || '').toLowerCase();
@@ -1537,6 +1613,99 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
                 </div>
               </div>
             </div>
+
+            {(() => {
+              const choice = builderFulfillmentOrderChoice(order);
+              const needsProvider = purchaseOrderRequiresDeliveryProvider(order);
+              const hasProvider = orderHasAssignedProvider(order);
+              const activeDr = hasActiveDeliveryRequestForOrder(order.id, deliveryRequestsList);
+              if (['completed', 'cancelled', 'received', 'delivered', 'verified'].includes(order.status)) {
+                return null;
+              }
+              const statusOk = BUILDER_DELIVERY_DIALOG_STATUSES.has(order.status);
+              const openDialog = () => {
+                setSelectedOrderForDelivery(order);
+                setShowDeliveryPrompt(true);
+              };
+
+              if (choice === 'pickup') {
+                return (
+                  <Alert className="border-slate-200 bg-slate-50">
+                    <Package className="h-4 w-4 text-slate-600" />
+                    <AlertDescription className="text-sm text-slate-800">
+                      <strong>Pickup selected.</strong> No delivery provider will be assigned for this order.
+                    </AlertDescription>
+                  </Alert>
+                );
+              }
+
+              if (!statusOk) return null;
+
+              if (needsProvider && hasProvider) {
+                return (
+                  <Alert className="border-green-200 bg-green-50">
+                    <Truck className="h-4 w-4 text-green-700" />
+                    <AlertDescription className="text-sm text-green-900">
+                      <strong>Delivery is in progress.</strong> A provider is assigned. Use the details above for contact and status.
+                    </AlertDescription>
+                  </Alert>
+                );
+              }
+
+              if (needsProvider && !hasProvider && activeDr) {
+                return (
+                  <Alert className="border-blue-200 bg-blue-50">
+                    <Clock className="h-4 w-4 text-blue-700" />
+                    <AlertDescription className="text-sm text-blue-900">
+                      <strong>Waiting for a delivery provider.</strong> Your request is in the provider queue. Providers are not notified again until you submit a new request from this order.
+                    </AlertDescription>
+                  </Alert>
+                );
+              }
+
+              const showRequestButton =
+                (order.status === 'awaiting_delivery_request' && choice === 'pending') ||
+                (needsProvider && !hasProvider && !activeDr) ||
+                (!needsProvider && statusOk);
+
+              if (!showRequestButton) return null;
+
+              const isRerequest = needsProvider && !hasProvider && !activeDr;
+              return (
+                <Alert className={isRerequest ? 'border-orange-200 bg-orange-50' : 'border-amber-200 bg-amber-50'}>
+                  <Truck className={`h-4 w-4 shrink-0 ${isRerequest ? 'text-orange-700' : 'text-amber-700'}`} />
+                  <AlertDescription className="text-sm space-y-2 text-gray-900">
+                    <p>
+                      {isRerequest ? (
+                        <>
+                          <strong>Re-request delivery.</strong> This order is set for delivery but there is no assigned provider and no active open request tied to it. Use the button below only when you want providers notified again — refreshing the page does not send anything by itself.
+                        </>
+                      ) : order.status === 'awaiting_delivery_request' && choice === 'pending' ? (
+                        <>
+                          <strong>Finish delivery or pickup.</strong> Choose delivery (with a real address or GPS) or pickup below. Providers are notified only after you complete that step.
+                        </>
+                      ) : (
+                        <>
+                          <strong>Request delivery.</strong> Use the button when you want materials delivered. Providers are notified only after you confirm.
+                        </>
+                      )}
+                    </p>
+                    <Button
+                      type="button"
+                      size="sm"
+                      className="bg-blue-600 hover:bg-blue-700"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        openDialog();
+                      }}
+                    >
+                      <Truck className="h-3.5 w-3.5 mr-1" />
+                      {isRerequest ? 'Re-request delivery' : 'Request delivery'}
+                    </Button>
+                  </AlertDescription>
+                </Alert>
+              );
+            })()}
             
             {/* Delivery Info */}
             <div className="space-y-3">
@@ -1848,6 +2017,33 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
           </Button>
         </CardHeader>
         <CardContent className="space-y-4">
+          {orders.some(
+            (o) =>
+              o.status === 'awaiting_delivery_request' &&
+              builderFulfillmentOrderChoice(o) === 'pending'
+          ) && (
+            <Alert className="border-amber-200 bg-amber-50 dark:bg-amber-950/30">
+              <AlertTriangle className="h-4 w-4 text-amber-700" />
+              <AlertDescription className="text-sm text-amber-900 dark:text-amber-100">
+                <strong>Finish delivery or pickup.</strong> Some orders need you to choose delivery (with a real address or GPS) or pickup. Providers are notified only after you complete{' '}
+                <strong>Request delivery</strong> on the order — refreshing does not send anything by itself.
+              </AlertDescription>
+            </Alert>
+          )}
+          {orders.some(
+            (o) =>
+              purchaseOrderRequiresDeliveryProvider(o) &&
+              !orderHasAssignedProvider(o) &&
+              !hasActiveDeliveryRequestForOrder(o.id, deliveryRequestsList)
+          ) && (
+            <Alert className="border-orange-200 bg-orange-50 dark:bg-orange-950/30">
+              <Truck className="h-4 w-4 text-orange-700" />
+              <AlertDescription className="text-sm text-orange-900 dark:text-orange-100">
+                <strong>Re-request delivery if needed.</strong> An order is marked for delivery but has no assigned provider and no active open delivery request. Expand the order and use{' '}
+                <strong>Re-request delivery</strong> when you want providers notified again.
+              </AlertDescription>
+            </Alert>
+          )}
           {filteredOrders.length === 0 ? (
             <div className="text-center py-8">
               <Package className="h-12 w-12 text-gray-300 mx-auto mb-3" />
@@ -2075,6 +2271,29 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
           setSelectedQRItem(null);
         }} 
         item={selectedQRItem} 
+      />
+
+      <DeliveryPromptDialog
+        isOpen={showDeliveryPrompt}
+        onOpenChange={(open) => {
+          setShowDeliveryPrompt(open);
+          if (!open) setSelectedOrderForDelivery(null);
+        }}
+        purchaseOrder={
+          selectedOrderForDelivery
+            ? buildPurchaseOrderForDeliveryDialog(selectedOrderForDelivery)
+            : null
+        }
+        onDeliveryRequested={() => {
+          setShowDeliveryPrompt(false);
+          setSelectedOrderForDelivery(null);
+          void fetchOrders();
+        }}
+        onDeclined={() => {
+          setShowDeliveryPrompt(false);
+          setSelectedOrderForDelivery(null);
+          void fetchOrders();
+        }}
       />
     </div>
   );
