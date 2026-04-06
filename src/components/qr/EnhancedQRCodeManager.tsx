@@ -24,6 +24,7 @@ import { getAccessTokenWithPersistenceFallback, readPersistedAccessTokenSync, re
 import { useAuth } from '@/contexts/AuthContext';
 import QRCodeLib from 'qrcode';
 import { getPrefetchedQRCodes } from '@/services/dataPrefetch';
+import { purchaseOrderRequiresDeliveryProvider } from '@/utils/purchaseOrderFulfillment';
 
 interface MaterialItem {
   id: string;
@@ -84,6 +85,7 @@ interface OrderGroup {
   delivery_provider_phone?: string;
   delivery_status?: string;
   delivery_required?: boolean;
+  builder_fulfillment_choice?: string | null;
 }
 
 interface EnhancedQRCodeManagerProps {
@@ -394,7 +396,10 @@ export const EnhancedQRCodeManager: React.FC<EnhancedQRCodeManagerProps> = ({
                     delivery_provider_name: payload.new.delivery_provider_name,
                     delivery_provider_phone: payload.new.delivery_provider_phone,
                     delivery_status: payload.new.delivery_status,
-                    delivery_required: payload.new.delivery_required || false
+                    delivery_required: payload.new.delivery_required || false,
+                    builder_fulfillment_choice:
+                      (payload.new as { builder_fulfillment_choice?: string | null }).builder_fulfillment_choice ??
+                      group.builder_fulfillment_choice,
                   };
                 }
                 return group;
@@ -409,7 +414,10 @@ export const EnhancedQRCodeManager: React.FC<EnhancedQRCodeManagerProps> = ({
                     delivery_provider_name: payload.new.delivery_provider_name,
                     delivery_provider_phone: payload.new.delivery_provider_phone,
                     delivery_status: payload.new.delivery_status,
-                    delivery_required: payload.new.delivery_required || false
+                    delivery_required: payload.new.delivery_required || false,
+                    builder_fulfillment_choice:
+                      (payload.new as { builder_fulfillment_choice?: string | null }).builder_fulfillment_choice ??
+                      group.builder_fulfillment_choice,
                   };
                 }
                 return group;
@@ -423,7 +431,10 @@ export const EnhancedQRCodeManager: React.FC<EnhancedQRCodeManagerProps> = ({
                     delivery_provider_name: payload.new.delivery_provider_name,
                     delivery_provider_phone: payload.new.delivery_provider_phone,
                     delivery_status: payload.new.delivery_status,
-                    delivery_required: payload.new.delivery_required || false
+                    delivery_required: payload.new.delivery_required || false,
+                    builder_fulfillment_choice:
+                      (payload.new as { builder_fulfillment_choice?: string | null }).builder_fulfillment_choice ??
+                      group.builder_fulfillment_choice,
                   };
                 }
                 return group;
@@ -437,7 +448,10 @@ export const EnhancedQRCodeManager: React.FC<EnhancedQRCodeManagerProps> = ({
                     delivery_provider_name: payload.new.delivery_provider_name,
                     delivery_provider_phone: payload.new.delivery_provider_phone,
                     delivery_status: payload.new.delivery_status,
-                    delivery_required: payload.new.delivery_required || false
+                    delivery_required: payload.new.delivery_required || false,
+                    builder_fulfillment_choice:
+                      (payload.new as { builder_fulfillment_choice?: string | null }).builder_fulfillment_choice ??
+                      group.builder_fulfillment_choice,
                   };
                 }
                 return group;
@@ -451,7 +465,10 @@ export const EnhancedQRCodeManager: React.FC<EnhancedQRCodeManagerProps> = ({
                     delivery_provider_name: payload.new.delivery_provider_name,
                     delivery_provider_phone: payload.new.delivery_provider_phone,
                     delivery_status: payload.new.delivery_status,
-                    delivery_required: payload.new.delivery_required || false
+                    delivery_required: payload.new.delivery_required || false,
+                    builder_fulfillment_choice:
+                      (payload.new as { builder_fulfillment_choice?: string | null }).builder_fulfillment_choice ??
+                      group.builder_fulfillment_choice,
                   };
                 }
                 return group;
@@ -1051,7 +1068,8 @@ export const EnhancedQRCodeManager: React.FC<EnhancedQRCodeManagerProps> = ({
           delivery_provider_name: undefined,
           delivery_provider_phone: undefined,
           delivery_status: undefined,
-          delivery_required: false
+          delivery_required: false,
+          builder_fulfillment_choice: null,
         };
       }
       
@@ -1096,7 +1114,7 @@ export const EnhancedQRCodeManager: React.FC<EnhancedQRCodeManagerProps> = ({
         const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
         
         const purchaseOrdersResponse = await fetch(
-          `${SUPABASE_URL}/rest/v1/purchase_orders?id=in.(${orderIds.join(',')})&select=id,po_number,delivery_provider_id,delivery_provider_name,delivery_provider_phone,delivery_status,delivery_required`,
+          `${SUPABASE_URL}/rest/v1/purchase_orders?id=in.(${orderIds.join(',')})&select=id,po_number,delivery_provider_id,delivery_provider_name,delivery_provider_phone,delivery_status,delivery_required,builder_fulfillment_choice`,
           { headers, cache: 'no-store', signal: controller.signal }
         );
         clearTimeout(timeoutId);
@@ -1120,6 +1138,7 @@ export const EnhancedQRCodeManager: React.FC<EnhancedQRCodeManagerProps> = ({
               groups[po.id].delivery_provider_phone = po.delivery_provider_phone;
               groups[po.id].delivery_status = po.delivery_status;
               groups[po.id].delivery_required = po.delivery_required || false;
+              groups[po.id].builder_fulfillment_choice = po.builder_fulfillment_choice ?? null;
             }
           });
           console.log('✅ Assigned real order_numbers to', realOrderNumbersCount, 'orders');
@@ -2601,7 +2620,7 @@ export const EnhancedQRCodeManager: React.FC<EnhancedQRCodeManagerProps> = ({
                       )}
                     </div>
                     {/* Delivery Provider Information */}
-                    {group.delivery_required && (
+                    {purchaseOrderRequiresDeliveryProvider(group) && (
                       <div className="mt-2 pt-2 border-t border-blue-200">
                         {group.delivery_provider_id ? (
                           <div className="flex items-center gap-2">
@@ -3423,7 +3442,7 @@ const OrderAccordionItem: React.FC<{
             )}
           </div>
           {/* Delivery Provider - show for dispatched/in-transit/delivered orders */}
-          {(group.delivery_required || group.delivery_provider_id) && (
+          {(purchaseOrderRequiresDeliveryProvider(group) || group.delivery_provider_id) && (
             <div className="mt-2 pt-2 border-t border-blue-200">
               {group.delivery_provider_id ? (
                 <div className="flex items-center gap-2 flex-wrap">

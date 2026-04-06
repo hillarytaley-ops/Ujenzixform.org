@@ -48,6 +48,7 @@ import {
 } from "lucide-react";
 import { supabase, SUPABASE_URL, SUPABASE_ANON_KEY } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { purchaseOrderRequiresDeliveryProvider } from "@/utils/purchaseOrderFulfillment";
 import { format } from 'date-fns';
 import { getPrefetchedOrders } from '@/services/dataPrefetch';
 import { fetchBuyerRolesMap, isOrderInNotDispatchedBucket } from '@/utils/supplierPrivateBuilderOrders';
@@ -85,6 +86,7 @@ interface Order {
   delivery_accepted_at?: string;
   estimated_delivery_time?: string;
   delivery_required?: boolean; // Track if builder requested delivery
+  builder_fulfillment_choice?: string | null;
 }
 
 interface OrderManagementProps {
@@ -155,6 +157,7 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, in
         delivery_accepted_at: po.delivery_accepted_at,
         estimated_delivery_time: po.estimated_delivery_time,
         delivery_required: po.delivery_required || false,
+        builder_fulfillment_choice: po.builder_fulfillment_choice ?? null,
       };
     });
   };
@@ -404,7 +407,7 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, in
                   .from('purchase_orders')
                   .select('id, supplier_id, po_number')
                   .eq('buyer_id', payload.new.builder_id)
-                  .eq('delivery_required', true)
+                  .or('delivery_required.eq.true,builder_fulfillment_choice.eq.delivery')
                   .is('delivery_provider_id', null)
                   .order('created_at', { ascending: false })
                   .limit(5);
@@ -1037,7 +1040,8 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, in
           delivery_assigned_at: po.delivery_assigned_at || undefined,
           delivery_accepted_at: po.delivery_accepted_at || undefined,
           estimated_delivery_time: po.estimated_delivery_time || undefined,
-          delivery_required: po.delivery_required || false
+          delivery_required: po.delivery_required || false,
+          builder_fulfillment_choice: po.builder_fulfillment_choice ?? null,
         };
       });
       } catch (mapErr) {
@@ -1069,7 +1073,8 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, in
             delivery_assigned_at: po.delivery_assigned_at,
             delivery_accepted_at: po.delivery_accepted_at,
             estimated_delivery_time: po.estimated_delivery_time,
-            delivery_required: po.delivery_required || false
+            delivery_required: po.delivery_required || false,
+            builder_fulfillment_choice: po.builder_fulfillment_choice ?? null,
           };
         });
       }
@@ -1226,7 +1231,7 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, in
 
     // Delivery column: only provider display name + phone (order # stays in its own column)
     const getDeliveryStatusBadge = (order: Order) => {
-      const requiresDelivery = order.delivery_required !== false;
+      const requiresDelivery = purchaseOrderRequiresDeliveryProvider(order);
 
       const nameLine = (): string => {
         const n = order.delivery_provider_name?.trim();
@@ -1380,7 +1385,7 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, in
                         <p className="text-[10px] text-green-600 mt-1">✓ Builder Accepted</p>
                       )}
                       {/* Show if delivery was requested */}
-                      {order.delivery_required && !order.delivery_provider_id && (
+                      {purchaseOrderRequiresDeliveryProvider(order) && !order.delivery_provider_id && (
                         <p className="text-[10px] text-blue-600 mt-1">📦 Delivery Requested</p>
                       )}
                       {/* Show when delivery provider accepted */}

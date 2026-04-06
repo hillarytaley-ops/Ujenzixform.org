@@ -1,3 +1,6 @@
+-- Deploy before shipping client that POST/PATCHes builder_fulfillment_choice (e.g. cart, quote accept).
+-- Apply after: 20260407100000_mark_delivery_requested_include_confirmed.sql
+--
 -- Explicit builder choice: pending | delivery | pickup (removes ambiguity with delivery_required false alone)
 -- Plus conservative repair for legacy rows that were flagged for delivery but never got an open delivery_request.
 

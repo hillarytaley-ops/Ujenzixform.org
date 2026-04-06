@@ -15,6 +15,7 @@ import {
 import { toast } from 'sonner';
 import { SUPABASE_ANON_KEY, SUPABASE_URL, supabase } from '@/integrations/supabase/client';
 import { LEGACY_SUPABASE_AUTH_STORAGE_KEY, getAccessTokenWithPersistenceFallback, readPersistedAccessTokenSync, readPersistedAuthRawStringSync, readPersistedAuthUserSync } from '@/utils/supabaseAccessToken';
+import { purchaseOrderRequiresDeliveryProvider } from '@/utils/purchaseOrderFulfillment';
 import { Html5Qrcode, Html5QrcodeScannerState, Html5QrcodeSupportedFormats } from 'html5-qrcode';
 
 /** Strip BOM / zero-width / nulls so camera output matches DB `material_items.qr_code`. */
@@ -60,6 +61,7 @@ interface Order {
   delivery_provider_id?: string | null;
   delivery_provider_name?: string | null;
   delivery_required?: boolean;
+  builder_fulfillment_choice?: string | null;
 }
 
 interface ScanResult {
@@ -974,7 +976,8 @@ export const DispatchScanner: React.FC<DispatchScannerProps> = ({
             items: [],
             delivery_provider_id: deliveryProviderId,
             delivery_provider_name: deliveryProviderName,
-            delivery_required: purchaseOrder?.delivery_required !== false // Default to true if not explicitly false
+            delivery_required: purchaseOrder?.delivery_required === true,
+            builder_fulfillment_choice: purchaseOrder?.builder_fulfillment_choice ?? null,
           };
         }
 
@@ -1285,7 +1288,7 @@ export const DispatchScanner: React.FC<DispatchScannerProps> = ({
     // VALIDATE: Delivery provider required before dispatch
     // Check both purchase_order.delivery_provider_id and delivery_requests.provider_id
     // ═══════════════════════════════════════════════════════════════════════════
-    const deliveryRequired = selectedOrder.delivery_required !== false; // Default to true if not explicitly false
+    const deliveryRequired = purchaseOrderRequiresDeliveryProvider(selectedOrder);
     let hasDeliveryProvider = selectedOrder.delivery_provider_id && selectedOrder.delivery_provider_id.trim() !== '';
     
     // If order doesn't have provider_id, check delivery_requests directly
@@ -2157,7 +2160,7 @@ export const DispatchScanner: React.FC<DispatchScannerProps> = ({
       </div>
 
       {/* Delivery Provider Warning */}
-      {selectedOrder.delivery_required !== false && !selectedOrder.delivery_provider_id && (
+      {purchaseOrderRequiresDeliveryProvider(selectedOrder) && !selectedOrder.delivery_provider_id && (
         <Alert className="border-amber-300 bg-amber-50">
           <AlertCircle className="h-4 w-4 text-amber-600" />
           <AlertDescription className="text-amber-800">
