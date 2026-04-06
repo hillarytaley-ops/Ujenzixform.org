@@ -172,6 +172,20 @@ function orderHasAssignedProvider(order: PurchaseOrder): boolean {
   return !!(order.delivery_provider_id || providerDisplayName(order));
 }
 
+/** Matches orange list-banner logic: delivery required, no provider, no active open DR (non-terminal, not pickup). */
+function shouldShowRerequestDelivery(
+  order: PurchaseOrder,
+  deliveryRows: { purchase_order_id?: string; status?: string | null }[]
+): boolean {
+  if (['completed', 'cancelled', 'received', 'delivered', 'verified'].includes(order.status)) return false;
+  if (builderFulfillmentOrderChoice(order) === 'pickup') return false;
+  return (
+    purchaseOrderRequiresDeliveryProvider(order) &&
+    !orderHasAssignedProvider(order) &&
+    !hasActiveDeliveryRequestForOrder(order.id, deliveryRows)
+  );
+}
+
 // Large QR Code Dialog for scanning
 const QRCodeDialog: React.FC<{ 
   isOpen: boolean; 
@@ -1436,79 +1450,104 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
     return (
     <Card key={order.id} className="border overflow-hidden">
       <CardContent className="p-0">
-        {/* Order header — one horizontal row; avoids stacked “letter columns” on narrow viewports */}
-        <button
-          type="button"
-          className="flex w-full min-w-0 items-center gap-2 sm:gap-3 px-3 py-2.5 text-left hover:bg-gray-50/90 transition-colors"
-          onClick={() => setExpandedOrder(isExpanded ? null : order.id)}
-        >
-          <div className="shrink-0 rounded-lg bg-blue-50 p-1.5">
-            <QrCode className="h-5 w-5 text-blue-600" aria-hidden />
-          </div>
-          <div className="min-w-0 flex-1 overflow-hidden">
-            <p className="truncate text-sm font-semibold text-gray-900" title={order.po_number}>
-              {order.po_number}
-            </p>
-            <p className="flex items-center gap-1 truncate text-xs text-gray-500">
-              <Calendar className="h-3 w-3 shrink-0" aria-hidden />
-              <span className="truncate">{format(new Date(order.created_at), 'MMM dd, yyyy')}</span>
-              <span className="shrink-0 text-gray-400 hidden sm:inline">·</span>
-              <span className="truncate text-gray-600 hidden sm:inline">
-                KES {order.total_amount?.toLocaleString() ?? '0'}
-              </span>
-            </p>
-          </div>
-          {/* Timeline — tablet+ */}
-          <div className="hidden md:flex shrink-0 items-center gap-0.5">
-            <div className={`flex h-6 w-6 items-center justify-center rounded-full text-[10px] font-bold ${
-              ['pending', 'confirmed', 'dispatched', 'in_transit', 'delivered', 'received', 'verified'].includes(order.status)
-                ? 'bg-green-500 text-white' : 'bg-gray-200 text-gray-400'
-            }`}>✓</div>
-            <div className={`h-0.5 w-3 ${
-              ['dispatched', 'in_transit', 'delivered', 'received', 'verified'].includes(order.status) ||
-              (order.delivery_provider_id && ['pending', 'confirmed', 'quoted'].includes(order.status))
-                ? 'bg-green-500' : 'bg-gray-200'
-            }`} />
-            <div className={`flex h-6 w-6 items-center justify-center rounded-full text-[10px] font-bold ${
-              ['dispatched', 'in_transit', 'delivered', 'received', 'verified'].includes(order.status)
-                ? 'bg-orange-500 text-white' : 'bg-gray-200 text-gray-400'
-            }`}>📦</div>
-            <div className={`h-0.5 w-3 ${
-              ['in_transit', 'delivered', 'received', 'verified'].includes(order.status) ? 'bg-green-500' : 'bg-gray-200'
-            }`} />
-            <div className={`flex h-6 w-6 items-center justify-center rounded-full text-[10px] font-bold ${
-              ['in_transit', 'delivered', 'received', 'verified'].includes(order.status)
-                ? 'bg-purple-500 text-white' : 'bg-gray-200 text-gray-400'
-            }`}>🚚</div>
-            <div className={`h-0.5 w-3 ${
-              ['delivered', 'received', 'verified'].includes(order.status) ? 'bg-green-500' : 'bg-gray-200'
-            }`} />
-            <div className={`flex h-6 w-6 items-center justify-center rounded-full text-[10px] font-bold ${
-              ['delivered', 'received', 'verified'].includes(order.status)
-                ? 'bg-green-600 text-white' : 'bg-gray-200 text-gray-400'
-            }`}>✅</div>
-          </div>
-          <div className="hidden lg:block w-20 shrink-0">
-            <div className="mb-0.5 flex justify-between text-[10px] text-gray-500">
-              <span>Prog</span>
-              <span className="font-medium text-gray-700">{progress}%</span>
-            </div>
-            <div className="h-1.5 overflow-hidden rounded-full bg-gray-200">
-              <div className="h-full bg-green-500 transition-all" style={{ width: `${progress}%` }} />
-            </div>
-          </div>
-          <span className="shrink-0 text-xs font-medium text-gray-600 md:hidden">{progress}%</span>
-          <Badge
-            title={statusLabel}
-            className={`${getStatusColor(order.status)} max-w-[42vw] sm:max-w-[200px] shrink-0 truncate px-2 py-1 text-xs whitespace-nowrap inline-flex items-center gap-1`}
+        {/* Order header — main row expands; Re-request is its own control (not nested in expand button). */}
+        <div className="flex w-full min-w-0 items-center gap-1.5 sm:gap-2 px-2 py-2 sm:px-3 sm:py-2.5 hover:bg-gray-50/90 transition-colors">
+          <button
+            type="button"
+            className="flex min-w-0 flex-1 items-center gap-2 sm:gap-3 text-left rounded-md outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
+            onClick={() => setExpandedOrder(isExpanded ? null : order.id)}
           >
-            <span className="shrink-0">{getStatusIcon(order.status)}</span>
-            <span className="truncate">{statusLabel}</span>
-          </Badge>
-          <span className="shrink-0 text-gray-400" aria-hidden>
+            <div className="shrink-0 rounded-lg bg-blue-50 p-1.5">
+              <QrCode className="h-5 w-5 text-blue-600" aria-hidden />
+            </div>
+            <div className="min-w-0 flex-1 overflow-hidden">
+              <p className="truncate text-sm font-semibold text-gray-900" title={order.po_number}>
+                {order.po_number}
+              </p>
+              <p className="flex items-center gap-1 truncate text-xs text-gray-500">
+                <Calendar className="h-3 w-3 shrink-0" aria-hidden />
+                <span className="truncate">{format(new Date(order.created_at), 'MMM dd, yyyy')}</span>
+                <span className="shrink-0 text-gray-400 hidden sm:inline">·</span>
+                <span className="truncate text-gray-600 hidden sm:inline">
+                  KES {order.total_amount?.toLocaleString() ?? '0'}
+                </span>
+              </p>
+            </div>
+            {/* Timeline — tablet+ */}
+            <div className="hidden md:flex shrink-0 items-center gap-0.5">
+              <div className={`flex h-6 w-6 items-center justify-center rounded-full text-[10px] font-bold ${
+                ['pending', 'confirmed', 'dispatched', 'in_transit', 'delivered', 'received', 'verified'].includes(order.status)
+                  ? 'bg-green-500 text-white' : 'bg-gray-200 text-gray-400'
+              }`}>✓</div>
+              <div className={`h-0.5 w-3 ${
+                ['dispatched', 'in_transit', 'delivered', 'received', 'verified'].includes(order.status) ||
+                (order.delivery_provider_id && ['pending', 'confirmed', 'quoted'].includes(order.status))
+                  ? 'bg-green-500' : 'bg-gray-200'
+              }`} />
+              <div className={`flex h-6 w-6 items-center justify-center rounded-full text-[10px] font-bold ${
+                ['dispatched', 'in_transit', 'delivered', 'received', 'verified'].includes(order.status)
+                  ? 'bg-orange-500 text-white' : 'bg-gray-200 text-gray-400'
+              }`}>📦</div>
+              <div className={`h-0.5 w-3 ${
+                ['in_transit', 'delivered', 'received', 'verified'].includes(order.status) ? 'bg-green-500' : 'bg-gray-200'
+              }`} />
+              <div className={`flex h-6 w-6 items-center justify-center rounded-full text-[10px] font-bold ${
+                ['in_transit', 'delivered', 'received', 'verified'].includes(order.status)
+                  ? 'bg-purple-500 text-white' : 'bg-gray-200 text-gray-400'
+              }`}>🚚</div>
+              <div className={`h-0.5 w-3 ${
+                ['delivered', 'received', 'verified'].includes(order.status) ? 'bg-green-500' : 'bg-gray-200'
+              }`} />
+              <div className={`flex h-6 w-6 items-center justify-center rounded-full text-[10px] font-bold ${
+                ['delivered', 'received', 'verified'].includes(order.status)
+                  ? 'bg-green-600 text-white' : 'bg-gray-200 text-gray-400'
+              }`}>✅</div>
+            </div>
+            <div className="hidden lg:block w-20 shrink-0">
+              <div className="mb-0.5 flex justify-between text-[10px] text-gray-500">
+                <span>Prog</span>
+                <span className="font-medium text-gray-700">{progress}%</span>
+              </div>
+              <div className="h-1.5 overflow-hidden rounded-full bg-gray-200">
+                <div className="h-full bg-green-500 transition-all" style={{ width: `${progress}%` }} />
+              </div>
+            </div>
+            <span className="shrink-0 text-xs font-medium text-gray-600 md:hidden">{progress}%</span>
+            <Badge
+              title={statusLabel}
+              className={`${getStatusColor(order.status)} max-w-[36vw] sm:max-w-[180px] shrink-0 truncate px-2 py-1 text-xs whitespace-nowrap inline-flex items-center gap-1`}
+            >
+              <span className="shrink-0">{getStatusIcon(order.status)}</span>
+              <span className="truncate">{statusLabel}</span>
+            </Badge>
+          </button>
+          {shouldShowRerequestDelivery(order, deliveryRequestsList) ? (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              title="Notify delivery providers again"
+              className="shrink-0 h-8 border-orange-300 bg-orange-50 px-2 text-orange-900 hover:bg-orange-100"
+              onClick={(e) => {
+                e.stopPropagation();
+                setSelectedOrderForDelivery(order);
+                setShowDeliveryPrompt(true);
+              }}
+            >
+              <Truck className="h-3.5 w-3.5 sm:mr-1" />
+              <span className="hidden sm:inline text-xs font-semibold">Re-request</span>
+            </Button>
+          ) : null}
+          <button
+            type="button"
+            className="shrink-0 rounded p-1 text-gray-400 hover:bg-gray-100"
+            aria-expanded={isExpanded}
+            aria-label={isExpanded ? 'Collapse order' : 'Expand order'}
+            onClick={() => setExpandedOrder(isExpanded ? null : order.id)}
+          >
             {isExpanded ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
-          </span>
-        </button>
+          </button>
+        </div>
         
         {/* Order Details (Expanded) */}
         {isExpanded && (
@@ -1639,8 +1678,6 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
                 );
               }
 
-              if (!statusOk) return null;
-
               if (needsProvider && hasProvider) {
                 return (
                   <Alert className="border-green-200 bg-green-50">
@@ -1663,24 +1700,45 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
                 );
               }
 
+              // Re-request must NOT be gated on statusOk — PO can be dispatched/in_transit in data while still missing provider + DR.
+              if (shouldShowRerequestDelivery(order, deliveryRequestsList)) {
+                return (
+                  <Alert className="border-orange-200 bg-orange-50">
+                    <Truck className="h-4 w-4 shrink-0 text-orange-700" />
+                    <AlertDescription className="text-sm space-y-2 text-gray-900">
+                      <p>
+                        <strong>Re-request delivery.</strong> This order is set for delivery but there is no assigned provider and no active open request tied to it. Use the button below (or <strong>Re-request</strong> on the order row) only when you want providers notified again — refreshing the page does not send anything by itself.
+                      </p>
+                      <Button
+                        type="button"
+                        size="sm"
+                        className="bg-orange-700 hover:bg-orange-800 text-white"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          openDialog();
+                        }}
+                      >
+                        <Truck className="h-3.5 w-3.5 mr-1" />
+                        Re-request delivery
+                      </Button>
+                    </AlertDescription>
+                  </Alert>
+                );
+              }
+
+              if (!statusOk) return null;
+
               const showRequestButton =
-                (order.status === 'awaiting_delivery_request' && choice === 'pending') ||
-                (needsProvider && !hasProvider && !activeDr) ||
-                (!needsProvider && statusOk);
+                (order.status === 'awaiting_delivery_request' && choice === 'pending') || !needsProvider;
 
               if (!showRequestButton) return null;
 
-              const isRerequest = needsProvider && !hasProvider && !activeDr;
               return (
-                <Alert className={isRerequest ? 'border-orange-200 bg-orange-50' : 'border-amber-200 bg-amber-50'}>
-                  <Truck className={`h-4 w-4 shrink-0 ${isRerequest ? 'text-orange-700' : 'text-amber-700'}`} />
+                <Alert className="border-amber-200 bg-amber-50">
+                  <Truck className="h-4 w-4 shrink-0 text-amber-700" />
                   <AlertDescription className="text-sm space-y-2 text-gray-900">
                     <p>
-                      {isRerequest ? (
-                        <>
-                          <strong>Re-request delivery.</strong> This order is set for delivery but there is no assigned provider and no active open request tied to it. Use the button below only when you want providers notified again — refreshing the page does not send anything by itself.
-                        </>
-                      ) : order.status === 'awaiting_delivery_request' && choice === 'pending' ? (
+                      {order.status === 'awaiting_delivery_request' && choice === 'pending' ? (
                         <>
                           <strong>Finish delivery or pickup.</strong> Choose delivery (with a real address or GPS) or pickup below. Providers are notified only after you complete that step.
                         </>
@@ -1700,7 +1758,7 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
                       }}
                     >
                       <Truck className="h-3.5 w-3.5 mr-1" />
-                      {isRerequest ? 'Re-request delivery' : 'Request delivery'}
+                      Request delivery
                     </Button>
                   </AlertDescription>
                 </Alert>
@@ -2030,20 +2088,37 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
               </AlertDescription>
             </Alert>
           )}
-          {orders.some(
-            (o) =>
-              purchaseOrderRequiresDeliveryProvider(o) &&
-              !orderHasAssignedProvider(o) &&
-              !hasActiveDeliveryRequestForOrder(o.id, deliveryRequestsList)
-          ) && (
-            <Alert className="border-orange-200 bg-orange-50 dark:bg-orange-950/30">
-              <Truck className="h-4 w-4 text-orange-700" />
-              <AlertDescription className="text-sm text-orange-900 dark:text-orange-100">
-                <strong>Re-request delivery if needed.</strong> An order is marked for delivery but has no assigned provider and no active open delivery request. Expand the order and use{' '}
-                <strong>Re-request delivery</strong> when you want providers notified again.
-              </AlertDescription>
-            </Alert>
-          )}
+          {orders.some((o) => shouldShowRerequestDelivery(o, deliveryRequestsList)) &&
+            (() => {
+              const firstRerequestOrder = orders.find((o) =>
+                shouldShowRerequestDelivery(o, deliveryRequestsList)
+              );
+              return (
+                <Alert className="border-orange-200 bg-orange-50 dark:bg-orange-950/30">
+                  <Truck className="h-4 w-4 shrink-0 text-orange-800" />
+                  <AlertDescription className="text-sm text-orange-950 dark:text-orange-100 space-y-3">
+                    <p>
+                      <strong>Re-request delivery if needed.</strong> An order is marked for delivery but has no assigned provider and no active open delivery request. Use{' '}
+                      <strong>Re-request</strong> on the order row, expand for details, or open the next affected order below.
+                    </p>
+                    {firstRerequestOrder ? (
+                      <Button
+                        type="button"
+                        size="sm"
+                        className="bg-orange-800 hover:bg-orange-900 text-white border-0"
+                        onClick={() => {
+                          setSelectedOrderForDelivery(firstRerequestOrder);
+                          setShowDeliveryPrompt(true);
+                        }}
+                      >
+                        <Truck className="h-3.5 w-3.5 mr-1" />
+                        Re-request delivery ({firstRerequestOrder.po_number})
+                      </Button>
+                    ) : null}
+                  </AlertDescription>
+                </Alert>
+              );
+            })()}
           {filteredOrders.length === 0 ? (
             <div className="text-center py-8">
               <Package className="h-12 w-12 text-gray-300 mx-auto mb-3" />
