@@ -64,6 +64,7 @@ import { ProfileEditDialog } from "@/components/profile/ProfileEditDialog";
 import { ProfileViewDialog } from "@/components/profile/ProfileViewDialog";
 import { Navigation as NavigationIcon, QrCode, Settings } from "lucide-react";
 import { DashboardMobileActionSheet } from "@/components/dashboard/DashboardMobileActionSheet";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 const PrivateClientTabFallback = () => (
   <div
@@ -128,6 +129,26 @@ interface DeliveryRequest {
   purchase_order_id?: string;
   provider_name?: string;
   estimated_delivery?: string;
+}
+
+const ACTIVE_DELIVERY_REQUEST_STATUSES = new Set([
+  "pending",
+  "assigned",
+  "requested",
+  "accepted",
+  "in_transit",
+  "picked_up",
+  "out_for_delivery",
+  "scheduled",
+]);
+
+function hasActiveDeliveryRequestForOrder(orderId: string, list: DeliveryRequest[]): boolean {
+  return list.some(
+    (d) =>
+      d.purchase_order_id === orderId &&
+      d.status &&
+      ACTIVE_DELIVERY_REQUEST_STATUSES.has(String(d.status).toLowerCase())
+  );
 }
 
 const PrivateClientDashboard = () => {
@@ -467,7 +488,6 @@ const PrivateClientDashboard = () => {
 
         const fetchedOrders = (ordersPayload || []).map((order: any) => ({
           ...order,
-          delivery_required: order.delivery_required !== false,
           delivery_provider_id: order.delivery_provider_id || null,
           delivery_provider_name: order.delivery_provider_name || null,
           delivery_status: order.delivery_status || null,
@@ -1033,6 +1053,35 @@ const PrivateClientDashboard = () => {
                 ) : (
                   <div className="space-y-4">
                     <p className="text-sm text-gray-500 mb-2">Showing {orders.length} orders</p>
+                    {orders.some(
+                      (o) =>
+                        o.status === "awaiting_delivery_request" && o.delivery_required !== true
+                    ) && (
+                      <Alert className="border-amber-200 bg-amber-50 dark:bg-amber-950/30">
+                        <AlertTriangle className="h-4 w-4 text-amber-700" />
+                        <AlertDescription className="text-sm text-amber-900 dark:text-amber-100">
+                          <strong>Finish delivery or pickup.</strong> One or more orders are waiting for you to
+                          choose delivery (providers are notified only after you confirm with a real address or GPS)
+                          or pickup. Use <strong>Request Delivery</strong> on the order below — refreshing the page
+                          does not send anything to drivers until you complete that step.
+                        </AlertDescription>
+                      </Alert>
+                    )}
+                    {orders.some(
+                      (o) =>
+                        o.delivery_required === true &&
+                        !o.delivery_provider_id &&
+                        !hasActiveDeliveryRequestForOrder(o.id, deliveries)
+                    ) && (
+                      <Alert className="border-orange-200 bg-orange-50 dark:bg-orange-950/30">
+                        <Truck className="h-4 w-4 text-orange-700" />
+                        <AlertDescription className="text-sm text-orange-900 dark:text-orange-100">
+                          <strong>Re-request delivery if needed.</strong> An order is marked for delivery but there is
+                          no active delivery request in your list. Use <strong>Request Delivery</strong> on that order
+                          to notify providers again.
+                        </AlertDescription>
+                      </Alert>
+                    )}
                     {orders.map((order) => (
                       <div key={order.id} className="border rounded-lg p-4 hover:shadow-md transition-shadow">
                         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
@@ -1142,10 +1191,9 @@ const PrivateClientDashboard = () => {
                                 View Details
                               </Button>
                               {/* Delivery Button - Check if delivery was already requested during order submission */}
-                              {(order.status === 'confirmed' || order.status === 'pending' || order.status === 'quoted' || order.status === 'processing' || order.status === 'shipped') && (
-                                // If delivery was requested during order submission (delivery_required = true), show "Check Delivery Status"
-                                // Otherwise, show "Request Delivery" button
-                                order.delivery_required !== false ? (
+                              {(order.status === 'confirmed' || order.status === 'pending' || order.status === 'quoted' || order.status === 'processing' || order.status === 'shipped' || order.status === 'awaiting_delivery_request' || order.status === 'order_created' || order.status === 'delivery_requested' || order.status === 'awaiting_delivery_provider') && (
+                                // delivery_required is set true only after the builder submits delivery in DeliveryPromptDialog
+                                order.delivery_required === true ? (
                                   <Button 
                                     size="sm"
                                     variant="outline"
@@ -1999,11 +2047,6 @@ const PrivateClientDashboard = () => {
             isOpen={showDeliveryPrompt}
             onOpenChange={(open) => {
               setShowDeliveryPrompt(open);
-              if (!open) {
-                setTimeout(() => {
-                  setShowMonitoringServicePrompt(true);
-                }, 300);
-              }
             }}
             purchaseOrder={{
               id: selectedOrderForDelivery.id,
@@ -2016,6 +2059,7 @@ const PrivateClientDashboard = () => {
                 .split("T")[0],
               items: selectedOrderForDelivery.items || [],
               project_name: selectedOrderForDelivery.project_name,
+              status: selectedOrderForDelivery.status,
             }}
             onDeliveryRequested={(opts) => {
               setShowDeliveryPrompt(false);
@@ -2024,10 +2068,12 @@ const PrivateClientDashboard = () => {
                 title: "🚚 Delivery Requested!",
                 description: `Delivery has been requested for order #${selectedOrderForDelivery.po_number}. A provider will be assigned soon.`,
               });
+              void checkAuth();
             }}
             onDeclined={() => {
               setShowDeliveryPrompt(false);
               setSelectedOrderForDelivery(null);
+              void checkAuth();
             }}
           />
         </PrivateClientTabSuspense>

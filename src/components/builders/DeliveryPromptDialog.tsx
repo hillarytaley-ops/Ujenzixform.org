@@ -81,6 +81,8 @@ interface PurchaseOrder {
   delivery_date: string;
   items: PurchaseOrderItem[];
   project_name?: string;
+  /** Used to advance PO workflow (e.g. awaiting_delivery_request → delivery_requested) after a real builder submission */
+  status?: string;
 }
 
 interface DeliveryPromptDialogProps {
@@ -232,6 +234,11 @@ export const DeliveryPromptDialog: React.FC<DeliveryPromptDialogProps> = ({
       }));
     }
   }, [purchaseOrder]);
+
+  // Fresh open / different order → start at the choice step (survives refresh by reopening from dashboard)
+  useEffect(() => {
+    if (isOpen) setStep('prompt');
+  }, [isOpen, purchaseOrder?.id]);
 
   const detectMaterialType = (materialName: string): string => {
     const name = materialName.toLowerCase();
@@ -1154,6 +1161,49 @@ export const DeliveryPromptDialog: React.FC<DeliveryPromptDialogProps> = ({
         }
       }
 
+      // Builder explicitly submitted delivery — sync PO flags (quote accept no longer sets delivery_required early)
+      try {
+        const poPatchResponse = await fetchWithTimeout(
+          `${SUPABASE_URL}/rest/v1/purchase_orders?id=eq.${purchaseOrder.id}`,
+          {
+            method: 'PATCH',
+            headers: {
+              apikey: SUPABASE_ANON_KEY,
+              Authorization: `Bearer ${accessToken}`,
+              'Content-Type': 'application/json',
+              Prefer: 'return=minimal',
+            },
+            body: JSON.stringify({
+              delivery_required: true,
+              updated_at: new Date().toISOString(),
+            }),
+          },
+          8000
+        );
+        if (!poPatchResponse.ok) {
+          console.warn('⚠️ Could not set purchase_orders.delivery_required:', await poPatchResponse.text());
+        }
+
+        const rpcResponse = await fetchWithTimeout(
+          `${SUPABASE_URL}/rest/v1/rpc/mark_delivery_requested`,
+          {
+            method: 'POST',
+            headers: {
+              apikey: SUPABASE_ANON_KEY,
+              Authorization: `Bearer ${accessToken}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ po_id: purchaseOrder.id }),
+          },
+          8000
+        );
+        if (!rpcResponse.ok) {
+          console.warn('⚠️ mark_delivery_requested RPC:', await rpcResponse.text());
+        }
+      } catch (poSyncErr: any) {
+        console.warn('⚠️ PO sync after delivery request (non-blocking):', poSyncErr?.message);
+      }
+
       // Show success immediately - don't wait for notifications
       setStep('success');
       setSubmitting(false);
@@ -1263,6 +1313,8 @@ export const DeliveryPromptDialog: React.FC<DeliveryPromptDialogProps> = ({
         title: '📦 Pickup Order Confirmed!',
         description: 'You can collect your materials directly from the supplier.',
       });
+
+      if (onDeclined) onDeclined();
       
       // Close this dialog and show monitoring prompt
       onOpenChange(false);
@@ -1319,10 +1371,10 @@ export const DeliveryPromptDialog: React.FC<DeliveryPromptDialogProps> = ({
             <DialogHeader className="pb-2">
               <DialogTitle className="flex items-center gap-2">
                 <Truck className="h-5 w-5 text-green-600" />
-                Delivery Providers Notified
+                Arrange delivery or pickup?
               </DialogTitle>
               <DialogDescription className="text-xs">
-                First provider to accept will be assigned
+                Providers are only notified after you confirm delivery and send the request with a real address or GPS.
               </DialogDescription>
             </DialogHeader>
 

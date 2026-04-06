@@ -210,7 +210,7 @@ export const QuoteComparison: React.FC<QuoteComparisonProps> = ({ orderId, build
       if (quoteError) throw quoteError;
 
       // Update order status to 'confirmed'
-      // Note: delivery_required defaults to true, will be updated if user chooses pickup
+      // delivery_required stays false until the builder submits delivery in DeliveryPromptDialog (or chooses pickup there)
       const { data: orderData, error: orderError } = await supabase
         .from('purchase_orders')
         .update({ 
@@ -218,7 +218,7 @@ export const QuoteComparison: React.FC<QuoteComparisonProps> = ({ orderId, build
           accepted_quote_id: quoteId,
           supplier_id: quote.supplier_id,
           total_amount: quote.total_price,
-          delivery_required: true // Default to delivery, user can change to pickup
+          delivery_required: false
         })
         .eq('id', orderId)
         .select('*')
@@ -257,49 +257,11 @@ export const QuoteComparison: React.FC<QuoteComparisonProps> = ({ orderId, build
           unit: item.unit,
           unit_price: item.unit_price
         })),
-        project_name: orderData?.project_name
+        project_name: orderData?.project_name,
+        status: orderData?.status,
       };
 
       setAcceptedPurchaseOrder(purchaseOrderForDelivery);
-      
-      // AUTO-CREATE delivery_request only when address/coords pass DB validation (no literal "To be provided").
-      if (builderId) {
-        try {
-          const pickupAddr = purchaseOrderForDelivery.supplier_address || 'Supplier location';
-          const materialType = purchaseOrderForDelivery.items?.[0]?.material_name || 'Construction Materials';
-          const qty = purchaseOrderForDelivery.items?.reduce((s: number, i: any) => s + (i.quantity || 0), 0) || 1;
-          const canAutoCreateDr =
-            !isPlaceholderDeliveryAddress(deliveryAddress) ||
-            hasUsableDeliveryCoordinates(poCoords);
-          if (!canAutoCreateDr) {
-            console.log(
-              'ℹ️ Skipping auto delivery_request: no real address yet. Complete the delivery dialog — DB rejects placeholder addresses.'
-            );
-          } else {
-            const insertRow: Record<string, unknown> = {
-              builder_id: builderId,
-              purchase_order_id: orderId,
-              pickup_address: pickupAddr,
-              delivery_address: isPlaceholderDeliveryAddress(deliveryAddress) ? '' : deliveryAddress,
-              pickup_date: deliveryDate,
-              material_type: materialType,
-              quantity: qty,
-              status: 'pending',
-            };
-            if (hasUsableDeliveryCoordinates(poCoords)) {
-              insertRow.delivery_coordinates = String(poCoords).trim();
-            }
-            const { error: drErr } = await supabase.from('delivery_requests').insert(insertRow as any);
-            if (!drErr) {
-              console.log('✅ Auto-created delivery_request — appears on provider dashboard');
-            } else {
-              console.warn('⚠️ Auto-create delivery_request:', drErr.message);
-            }
-          }
-        } catch (e) {
-          console.warn('⚠️ Auto-create delivery_request:', e);
-        }
-      }
 
       // Show delivery confirmation dialog (for pickup or to update address)
       setTimeout(() => {
@@ -613,11 +575,7 @@ export const QuoteComparison: React.FC<QuoteComparisonProps> = ({ orderId, build
         purchaseOrder={acceptedPurchaseOrder}
         onDeliveryRequested={handleDeliveryRequested}
         onDeclined={() => {
-          // User chose pickup - no delivery, no QR codes
-          toast({
-            title: '📦 Pickup Order Confirmed!',
-            description: 'Collect your materials directly from the supplier. No QR code needed.',
-          });
+          // Pickup flow: toast already shown from DeliveryPromptDialog
         }}
       />
     </div>

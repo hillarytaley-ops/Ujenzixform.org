@@ -534,7 +534,7 @@ export const SupplierQuoteReview: React.FC<SupplierQuoteReviewProps> = ({
       const updatePayload = { 
         status: 'quote_accepted', // Will be auto-converted to 'pending' order by trigger
         total_amount: quote.quote_amount || quote.purchase_order?.total_amount,
-        delivery_required: true, // Default to delivery, user can change to pickup
+        delivery_required: false, // True only after builder confirms delivery in DeliveryPromptDialog
         updated_at: new Date().toISOString()
       };
       
@@ -620,11 +620,11 @@ export const SupplierQuoteReview: React.FC<SupplierQuoteReviewProps> = ({
       toast({
         title: '✅ Quote Accepted!',
         description: addressReadyForAutoDr
-          ? 'Order created and awaiting delivery provider allocation. QR codes will be generated when dispatched.'
+          ? 'Choose delivery or pickup in the next step. Providers are notified only after you confirm delivery with a full address or GPS.'
           : 'Use the delivery form to enter your full address (or map/GPS) so a driver can be assigned.',
       });
 
-      console.log('📦 Quote accepted, status set to pending. Order will appear in Pending Orders awaiting delivery provider.');
+      console.log('📦 Quote accepted. Builder must confirm delivery or pickup in the dialog before providers are notified.');
 
       // Prepare purchase order data for delivery/pickup choice dialog
       const deliveryDate = quote.preferred_delivery_date || quote.purchase_order?.delivery_date || new Date().toISOString().split('T')[0];
@@ -644,85 +644,11 @@ export const SupplierQuoteReview: React.FC<SupplierQuoteReviewProps> = ({
           unit: quote.unit
         }],
         project_name: quote.project_description || quote.purchase_order?.project_name,
-        special_instructions: quote.special_requirements || ''
+        special_instructions: quote.special_requirements || '',
+        status: poData?.status || quote.status,
       };
 
       setAcceptedPurchaseOrder(purchaseOrderForDelivery);
-      
-      // AUTO-CREATE delivery_request when address/coords are valid (DB rejects literal "To be provided" on INSERT).
-      const effectiveBuilderId = getEffectiveBuilderId();
-      if (effectiveBuilderId) {
-        try {
-          const pickupAddr = quote.supplier?.address || quote.supplier?.location || 'Supplier location';
-          const fullDeliveryAddr = (deliveryAddress || '').trim();
-          const materialType = (quote.purchase_order?.items?.[0]?.material_name || quote.material_name || 'Construction Materials').toString();
-          const qty = quote.purchase_order?.items?.reduce((s: number, i: any) => s + (i.quantity || 0), 0) || quote.quantity || 1;
-
-          const canAutoCreateDr =
-            !isPlaceholderDeliveryAddress(fullDeliveryAddr) ||
-            hasUsableDeliveryCoordinates(poCoords);
-
-          if (!canAutoCreateDr) {
-            console.log(
-              'ℹ️ Skipping auto delivery_request: no real address yet. Complete the delivery dialog — DB rejects placeholder addresses.'
-            );
-          } else {
-          const drPayload: Record<string, unknown> = {
-            builder_id: effectiveBuilderId,
-            purchase_order_id: quote.id,
-            pickup_address: pickupAddr,
-            delivery_address: isPlaceholderDeliveryAddress(fullDeliveryAddr) ? '' : fullDeliveryAddr,
-            pickup_date: deliveryDate,
-            material_type: materialType,
-            quantity: qty,
-            status: 'pending'
-          };
-          if (hasUsableDeliveryCoordinates(poCoords)) {
-            drPayload.delivery_coordinates = String(poCoords).trim();
-          }
-          const drRes = await fetch(`${SUPABASE_URL}/rest/v1/delivery_requests`, {
-            method: 'POST',
-            headers: { ...headers, 'Content-Type': 'application/json', 'Prefer': 'return=representation' },
-            body: JSON.stringify(drPayload),
-            cache: 'no-store'
-          });
-          if (drRes.ok) {
-            console.log('✅ Auto-created delivery_request — appears on provider dashboard');
-            const drData = await drRes.json();
-            const drId = Array.isArray(drData) ? drData[0]?.id : drData?.id;
-            if (drId) {
-              const { error: notifyErr } = await invokeEdgeFunction(
-                'notify-delivery-providers',
-                {
-                  body: {
-                    request_type: 'quote_accepted',
-                    request_id: drId,
-                    builder_id: effectiveBuilderId,
-                    pickup_address: pickupAddr,
-                    delivery_address: (drPayload.delivery_address as string) || fullDeliveryAddr,
-                    material_details: (purchaseOrderForDelivery.items || []).map((i: any) => ({
-                      material_type: i.material_name || i.name,
-                      quantity: i.quantity,
-                      unit: i.unit || 'units'
-                    })),
-                    priority_level: 'normal',
-                    po_number: purchaseOrderForDelivery.po_number
-                  }
-                },
-                { request_type: 'quote_accepted', request_id: drId }
-              );
-              if (notifyErr) {
-                console.warn('notify-delivery-providers failed:', notifyErr);
-              }
-            }
-          } else {
-            console.warn('⚠️ Auto-create delivery_request failed (dialog will allow manual):', await drRes.text());
-          }
-          }
-        } catch (e) {
-          console.warn('⚠️ Auto-create delivery_request error (dialog will allow manual):', e);
-        }
-      }
 
       // Show delivery/pickup choice dialog (for pickup or to update address if needed)
       setTimeout(() => {
@@ -1364,11 +1290,7 @@ export const SupplierQuoteReview: React.FC<SupplierQuoteReviewProps> = ({
         purchaseOrder={acceptedPurchaseOrder}
         onDeliveryRequested={handleDeliveryRequested}
         onDeclined={() => {
-          // User chose pickup - no delivery, no QR codes
-          toast({
-            title: '📦 Pickup Order Confirmed!',
-            description: 'Collect your materials directly from the supplier. No QR code needed.',
-          });
+          // Pickup flow: toast already shown from DeliveryPromptDialog
         }}
       />
     </div>
