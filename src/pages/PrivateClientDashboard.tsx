@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, lazy, Suspense } from "react";
 import { useUrlTabSync } from "@/hooks/useUrlTabSync";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -60,15 +60,44 @@ import {
   DialogTrigger,
   DialogFooter,
 } from "@/components/ui/dialog";
-import DeliveryRequest from "@/components/DeliveryRequest";
-import { DeliveryPromptDialog } from "@/components/builders/DeliveryPromptDialog";
-import { MonitoringServicePrompt } from "@/components/builders/MonitoringServicePrompt";
-import { TrackingTab } from "@/components/tracking/TrackingTab";
-import { BuilderOrdersTracker } from "@/components/builders/BuilderOrdersTracker";
 import { ProfileEditDialog } from "@/components/profile/ProfileEditDialog";
 import { ProfileViewDialog } from "@/components/profile/ProfileViewDialog";
 import { Navigation as NavigationIcon, QrCode, Settings } from "lucide-react";
 import { DashboardMobileActionSheet } from "@/components/dashboard/DashboardMobileActionSheet";
+
+const PrivateClientTabFallback = () => (
+  <div
+    className="flex justify-center py-10 text-sm text-muted-foreground"
+    role="status"
+    aria-busy="true"
+  >
+    Loading…
+  </div>
+);
+
+function PrivateClientTabSuspense({ children }: { children: React.ReactNode }) {
+  return <Suspense fallback={<PrivateClientTabFallback />}>{children}</Suspense>;
+}
+
+const LazyDeliveryRequest = lazy(() => import("@/components/DeliveryRequest"));
+const LazyTrackingTab = lazy(() =>
+  import("@/components/tracking/TrackingTab").then((m) => ({ default: m.TrackingTab }))
+);
+const LazyBuilderOrdersTracker = lazy(() =>
+  import("@/components/builders/BuilderOrdersTracker").then((m) => ({
+    default: m.BuilderOrdersTracker,
+  }))
+);
+const LazyDeliveryPromptDialog = lazy(() =>
+  import("@/components/builders/DeliveryPromptDialog").then((m) => ({
+    default: m.DeliveryPromptDialog,
+  }))
+);
+const LazyMonitoringServicePrompt = lazy(() =>
+  import("@/components/builders/MonitoringServicePrompt").then((m) => ({
+    default: m.MonitoringServicePrompt,
+  }))
+);
 
 interface Order {
   id: string;
@@ -1200,10 +1229,12 @@ const PrivateClientDashboard = () => {
                     user?.id || readAuthUserIdSync() || localStorage.getItem('user_id') || '';
                   
                   return builderId ? (
-                    <BuilderOrdersTracker
-                      key={`${builderId}-${profile?.id ?? ''}`}
-                      builderId={builderId}
-                    />
+                    <PrivateClientTabSuspense>
+                      <LazyBuilderOrdersTracker
+                        key={`${builderId}-${profile?.id ?? ""}`}
+                        builderId={builderId}
+                      />
+                    </PrivateClientTabSuspense>
                   ) : (
                     <div className="text-center py-12 text-gray-500">
                       <QrCode className="h-16 w-16 mx-auto mb-4 text-gray-300" />
@@ -1338,11 +1369,18 @@ const PrivateClientDashboard = () => {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <TrackingTab
-                  userId={user?.id || readAuthUserIdSync() || localStorage.getItem('user_id') || ''}
-                  userRole="private_client"
-                  userName={profile?.full_name || user?.email?.split('@')[0]}
-                />
+                <PrivateClientTabSuspense>
+                  <LazyTrackingTab
+                    userId={
+                      user?.id ||
+                      readAuthUserIdSync() ||
+                      localStorage.getItem("user_id") ||
+                      ""
+                    }
+                    userRole="private_client"
+                    userName={profile?.full_name || user?.email?.split("@")[0]}
+                  />
+                </PrivateClientTabSuspense>
               </CardContent>
             </Card>
           </TabsContent>
@@ -1378,7 +1416,9 @@ const PrivateClientDashboard = () => {
                   </div>
                 </div>
                 
-                <DeliveryRequest />
+                <PrivateClientTabSuspense>
+                  <LazyDeliveryRequest />
+                </PrivateClientTabSuspense>
               </CardContent>
             </Card>
           </TabsContent>
@@ -1954,40 +1994,43 @@ const PrivateClientDashboard = () => {
 
       {/* Delivery Prompt Dialog */}
       {selectedOrderForDelivery && (
-        <DeliveryPromptDialog
-          isOpen={showDeliveryPrompt}
-          onOpenChange={(open) => {
-            setShowDeliveryPrompt(open);
-            if (!open) {
-              // Show monitoring prompt after closing delivery dialog
-              setTimeout(() => {
-                setShowMonitoringServicePrompt(true);
-              }, 300);
-            }
-          }}
-          purchaseOrder={{
-            id: selectedOrderForDelivery.id,
-            po_number: selectedOrderForDelivery.po_number,
-            supplier_id: '', // Will be fetched by the dialog if needed
-            total_amount: selectedOrderForDelivery.total_amount || 0,
-            delivery_address: selectedOrderForDelivery.delivery_address || 'To be provided',
-            delivery_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-            items: selectedOrderForDelivery.items || [],
-            project_name: selectedOrderForDelivery.project_name
-          }}
-          onDeliveryRequested={(opts) => {
-            setShowDeliveryPrompt(false);
-            if (opts?.deliveryAddress) setLastDeliveryAddressFromForm(opts.deliveryAddress);
-            toast({
-              title: '🚚 Delivery Requested!',
-              description: `Delivery has been requested for order #${selectedOrderForDelivery.po_number}. A provider will be assigned soon.`,
-            });
-          }}
-          onDeclined={() => {
-            setShowDeliveryPrompt(false);
-            setSelectedOrderForDelivery(null);
-          }}
-        />
+        <PrivateClientTabSuspense>
+          <LazyDeliveryPromptDialog
+            isOpen={showDeliveryPrompt}
+            onOpenChange={(open) => {
+              setShowDeliveryPrompt(open);
+              if (!open) {
+                setTimeout(() => {
+                  setShowMonitoringServicePrompt(true);
+                }, 300);
+              }
+            }}
+            purchaseOrder={{
+              id: selectedOrderForDelivery.id,
+              po_number: selectedOrderForDelivery.po_number,
+              supplier_id: "",
+              total_amount: selectedOrderForDelivery.total_amount || 0,
+              delivery_address: selectedOrderForDelivery.delivery_address || "To be provided",
+              delivery_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+                .toISOString()
+                .split("T")[0],
+              items: selectedOrderForDelivery.items || [],
+              project_name: selectedOrderForDelivery.project_name,
+            }}
+            onDeliveryRequested={(opts) => {
+              setShowDeliveryPrompt(false);
+              if (opts?.deliveryAddress) setLastDeliveryAddressFromForm(opts.deliveryAddress);
+              toast({
+                title: "🚚 Delivery Requested!",
+                description: `Delivery has been requested for order #${selectedOrderForDelivery.po_number}. A provider will be assigned soon.`,
+              });
+            }}
+            onDeclined={() => {
+              setShowDeliveryPrompt(false);
+              setSelectedOrderForDelivery(null);
+            }}
+          />
+        </PrivateClientTabSuspense>
       )}
 
       {/* Order Details Modal */}
@@ -2120,36 +2163,39 @@ const PrivateClientDashboard = () => {
 
       {/* Monitoring Service Prompt */}
       {selectedOrderForDelivery && (
-        <MonitoringServicePrompt
-          isOpen={showMonitoringServicePrompt}
-          onOpenChange={(open) => {
-            setShowMonitoringServicePrompt(open);
-            if (!open) {
+        <PrivateClientTabSuspense>
+          <LazyMonitoringServicePrompt
+            isOpen={showMonitoringServicePrompt}
+            onOpenChange={(open) => {
+              setShowMonitoringServicePrompt(open);
+              if (!open) {
+                setSelectedOrderForDelivery(null);
+                setLastDeliveryAddressFromForm("");
+              }
+            }}
+            purchaseOrder={{
+              id: selectedOrderForDelivery.id,
+              po_number: selectedOrderForDelivery.po_number,
+              supplier_id: "",
+              total_amount: selectedOrderForDelivery.total_amount || 0,
+              delivery_address:
+                lastDeliveryAddressFromForm || selectedOrderForDelivery.delivery_address || "",
+              delivery_date: "",
+              items: selectedOrderForDelivery.items || [],
+              project_name: selectedOrderForDelivery.project_name,
+            }}
+            onServiceRequested={() => {
+              setShowMonitoringServicePrompt(false);
               setSelectedOrderForDelivery(null);
-              setLastDeliveryAddressFromForm('');
-            }
-          }}
-          purchaseOrder={{
-            id: selectedOrderForDelivery.id,
-            po_number: selectedOrderForDelivery.po_number,
-            supplier_id: '',
-            total_amount: selectedOrderForDelivery.total_amount || 0,
-            delivery_address: lastDeliveryAddressFromForm || selectedOrderForDelivery.delivery_address || '',
-            delivery_date: '',
-            items: selectedOrderForDelivery.items || [],
-            project_name: selectedOrderForDelivery.project_name
-          }}
-          onServiceRequested={() => {
-            setShowMonitoringServicePrompt(false);
-            setSelectedOrderForDelivery(null);
-            setLastDeliveryAddressFromForm('');
-          }}
-          onDeclined={() => {
-            setShowMonitoringServicePrompt(false);
-            setSelectedOrderForDelivery(null);
-            setLastDeliveryAddressFromForm('');
-          }}
-        />
+              setLastDeliveryAddressFromForm("");
+            }}
+            onDeclined={() => {
+              setShowMonitoringServicePrompt(false);
+              setSelectedOrderForDelivery(null);
+              setLastDeliveryAddressFromForm("");
+            }}
+          />
+        </PrivateClientTabSuspense>
       )}
 
       {/* Profile View Dialog */}

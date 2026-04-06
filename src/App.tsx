@@ -88,7 +88,7 @@ import { OfflineIndicator } from "@/components/OfflineIndicator";
 // PWA Install Prompt
 import { PWAInstallPrompt } from "@/components/pwa/PWAInstallPrompt";
 import { shouldHideFloatingChrome } from "@/config/authChrome";
-import { AUTH_ROUTE_ALIASES, SUPPLIERS_PAGE_PATHS } from "@/config/authRouteAliases";
+import { ALL_PUBLIC_AUTH_REDIRECTS, SUPPLIERS_PAGE_PATHS } from "@/config/authRouteAliases";
 
 // Optimized loading component with skeleton animation
 const PageLoader = () => (
@@ -259,7 +259,7 @@ const App = () => {
                     <Route path="/auth" element={<Auth />} />
                     <Route path="/unified-auth" element={<SuspenseWrapper><UnifiedAuth /></SuspenseWrapper>} />
 
-                    {AUTH_ROUTE_ALIASES.map(({ path: aliasPath, to }) => (
+                    {ALL_PUBLIC_AUTH_REDIRECTS.map(({ path: aliasPath, to }) => (
                       <Route key={aliasPath} path={aliasPath} element={<Navigate to={to} replace />} />
                     ))}
                     
@@ -327,13 +327,6 @@ const App = () => {
                     <Route path="/delivery-signin" element={<SuspenseWrapper><DeliverySignIn /></SuspenseWrapper>} />
                     <Route path="/private-client-signin" element={<SuspenseWrapper><PrivateClientSignIn /></SuspenseWrapper>} />
                     <Route path="/professional-builder-signin" element={<SuspenseWrapper><ProfessionalBuilderSignIn /></SuspenseWrapper>} />
-                    
-                    {/* Redirect common URL typos (sign-in vs signin) to correct paths */}
-                    <Route path="/supplier-sign-in" element={<Navigate to="/supplier-signin" replace />} />
-                    <Route path="/builder-sign-in" element={<Navigate to="/builder-signin" replace />} />
-                    <Route path="/delivery-sign-in" element={<Navigate to="/delivery-signin" replace />} />
-                    <Route path="/private-client-sign-in" element={<Navigate to="/private-client-signin" replace />} />
-                    <Route path="/professional-builder-sign-in" element={<Navigate to="/professional-builder-signin" replace />} />
                     
                     {/* Registration Routes */}
                     <Route path="/supplier-registration" element={<SuspenseWrapper><SupplierRegistration /></SuspenseWrapper>} />

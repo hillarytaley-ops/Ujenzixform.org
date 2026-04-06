@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from "react";
+import React, { useState, useEffect, useMemo, useRef, lazy, Suspense } from "react";
 import { Link } from "react-router-dom";
 import { useUrlTabSync } from "@/hooks/useUrlTabSync";
 import { supabase, SUPABASE_URL, SUPABASE_ANON_KEY } from "@/integrations/supabase/client";
@@ -56,18 +56,11 @@ import {
 } from "@/components/ui/dialog";
 import { useSupplierData, logDataAccessAttempt } from "@/hooks/useDataIsolation";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { SupplierCharts } from "@/components/supplier/SupplierCharts";
-import { ProductManagement } from "@/components/supplier/ProductManagement";
-import { OrderManagement } from "@/components/supplier/OrderManagement";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { DashboardMobileActionSheet } from "@/components/dashboard/DashboardMobileActionSheet";
-import { SupplierAnalyticsDashboard } from "@/components/suppliers/SupplierAnalyticsDashboard";
-import { SupplierProductManager } from "@/components/suppliers/SupplierProductManager";
 import { MessageSquare, QrCode, Boxes, BarChart3 as BarChartIcon, User, Scan } from "lucide-react";
-import { EnhancedQRCodeManager } from "@/components/qr/EnhancedQRCodeManager";
 import { ProfileEditDialog } from "@/components/profile/ProfileEditDialog";
 import { ProfileViewDialog } from "@/components/profile/ProfileViewDialog";
-import { InventoryManager } from "@/components/supplier/InventoryManager";
 import {
   countPrivateBuilderOrdersNeedingAttention,
   fetchBuyerRolesMap,
@@ -79,18 +72,78 @@ import {
   readPersistedAccessTokenSync,
   readPersistedAuthUserSync,
 } from "@/utils/supabaseAccessToken";
-import { OrderHistory } from "@/components/orders/OrderHistory";
-import { ReviewsList, SupplierRatingSummary } from "@/components/reviews/ReviewSystem";
-import { UserAnalyticsDashboard } from "@/components/analytics/UserAnalyticsDashboard";
-import { InAppCommunication } from "@/components/communication/InAppCommunication";
-import { DispatchScanner } from "@/components/qr/DispatchScanner";
 import {
   buildOrderStatusChartData,
   countOrdersInStatusBucket,
 } from "@/lib/purchaseOrderMetrics";
-import { TrackingTab } from "@/components/tracking/TrackingTab";
 import { Navigation as NavigationIcon, Receipt } from "lucide-react";
-import { SupplierInvoiceHub } from "@/components/supplier/SupplierInvoiceHub";
+
+const SupplierTabFallback = () => (
+  <div
+    className="flex justify-center py-10 text-sm text-muted-foreground"
+    role="status"
+    aria-busy="true"
+  >
+    Loading…
+  </div>
+);
+
+function SupplierTabSuspense({ children }: { children: React.ReactNode }) {
+  return <Suspense fallback={<SupplierTabFallback />}>{children}</Suspense>;
+}
+
+const LazySupplierCharts = lazy(() =>
+  import("@/components/supplier/SupplierCharts").then((m) => ({ default: m.SupplierCharts }))
+);
+const LazyProductManagement = lazy(() =>
+  import("@/components/supplier/ProductManagement").then((m) => ({ default: m.ProductManagement }))
+);
+const LazySupplierProductManager = lazy(() =>
+  import("@/components/suppliers/SupplierProductManager").then((m) => ({
+    default: m.SupplierProductManager,
+  }))
+);
+const LazyInventoryManager = lazy(() =>
+  import("@/components/supplier/InventoryManager").then((m) => ({ default: m.InventoryManager }))
+);
+const LazyOrderManagement = lazy(() =>
+  import("@/components/supplier/OrderManagement").then((m) => ({ default: m.OrderManagement }))
+);
+const LazyDispatchScanner = lazy(() =>
+  import("@/components/qr/DispatchScanner").then((m) => ({ default: m.DispatchScanner }))
+);
+const LazyEnhancedQRCodeManager = lazy(() =>
+  import("@/components/qr/EnhancedQRCodeManager").then((m) => ({ default: m.EnhancedQRCodeManager }))
+);
+const LazyTrackingTab = lazy(() =>
+  import("@/components/tracking/TrackingTab").then((m) => ({ default: m.TrackingTab }))
+);
+const LazySupplierAnalyticsDashboard = lazy(() =>
+  import("@/components/suppliers/SupplierAnalyticsDashboard").then((m) => ({
+    default: m.SupplierAnalyticsDashboard,
+  }))
+);
+const LazyInAppCommunication = lazy(() =>
+  import("@/components/communication/InAppCommunication").then((m) => ({
+    default: m.InAppCommunication,
+  }))
+);
+const LazySupplierInvoiceHub = lazy(() =>
+  import("@/components/supplier/SupplierInvoiceHub").then((m) => ({ default: m.SupplierInvoiceHub }))
+);
+
+const LazySupplierReviewsSection = lazy(async () => {
+  const m = await import("@/components/reviews/ReviewSystem");
+  function SupplierReviewsSection({ supplierId }: { supplierId: string }) {
+    return (
+      <>
+        <m.SupplierRatingSummary supplierId={supplierId} />
+        <m.ReviewsList supplierId={supplierId} />
+      </>
+    );
+  }
+  return { default: SupplierReviewsSection };
+});
 
 interface DashboardStats {
   totalProducts: number;
@@ -2318,7 +2371,9 @@ const SupplierDashboard = () => {
               </Card>
 
               {/* Quick Analytics */}
-              <SupplierCharts isDarkMode={isDarkMode} orderStatusData={orderStatusChartData} />
+              <SupplierTabSuspense>
+                <LazySupplierCharts isDarkMode={isDarkMode} orderStatusData={orderStatusChartData} />
+              </SupplierTabSuspense>
             </div>
           </TabsContent>
 
@@ -2391,7 +2446,12 @@ const SupplierDashboard = () => {
 
                   {/* Add Products Sub-Tab */}
                   <TabsContent value="add-products">
-                    <ProductManagement supplierId={supplierRecordId || user?.id || ''} isDarkMode={isDarkMode} />
+                    <SupplierTabSuspense>
+                      <LazyProductManagement
+                        supplierId={supplierRecordId || user?.id || ""}
+                        isDarkMode={isDarkMode}
+                      />
+                    </SupplierTabSuspense>
                   </TabsContent>
 
                   {/* My Products Sub-Tab */}
@@ -2403,14 +2463,22 @@ const SupplierDashboard = () => {
                           Manage your own products - add new products, update images, prices, and variants.
                         </p>
                       </div>
-                      <SupplierProductManager supplierId={supplierRecordId || user?.id || ''} />
+                      <SupplierTabSuspense>
+                        <LazySupplierProductManager supplierId={supplierRecordId || user?.id || ""} />
+                      </SupplierTabSuspense>
                     </div>
                   </TabsContent>
 
                   {/* View Inventory Sub-Tab */}
                   <TabsContent value="view-inventory">
                     {user && (
-                      <InventoryManager supplierScopeIds={analyticsSupplierIds.length > 0 ? analyticsSupplierIds : [user.id]} />
+                      <SupplierTabSuspense>
+                        <LazyInventoryManager
+                          supplierScopeIds={
+                            analyticsSupplierIds.length > 0 ? analyticsSupplierIds : [user.id]
+                          }
+                        />
+                      </SupplierTabSuspense>
                     )}
                   </TabsContent>
                 </Tabs>
@@ -2544,12 +2612,14 @@ const SupplierDashboard = () => {
 
                   {/* Orders Sub-Tab */}
                   <TabsContent value="orders">
-                    <OrderManagement 
-                      supplierId={supplierRecordId || user?.id || ''} 
-                      initialPurchaseOrders={ordersForOrdersTab}
-                      isDarkMode={isDarkMode} 
-                      onNavigateToDispatch={() => setViewOrdersSubTab('dispatch')}
-                    />
+                    <SupplierTabSuspense>
+                      <LazyOrderManagement
+                        supplierId={supplierRecordId || user?.id || ""}
+                        initialPurchaseOrders={ordersForOrdersTab}
+                        isDarkMode={isDarkMode}
+                        onNavigateToDispatch={() => setViewOrdersSubTab("dispatch")}
+                      />
+                    </SupplierTabSuspense>
                   </TabsContent>
 
                   {/* Dispatch Sub-Tab */}
@@ -2568,10 +2638,14 @@ const SupplierDashboard = () => {
                         </AlertDescription>
                       </Alert>
                       {user && (
-                        <DispatchScanner
-                          supplierScopeIds={analyticsSupplierIds.length > 0 ? analyticsSupplierIds : [user.id]}
-                          primarySupplierId={supplierRecordId || undefined}
-                        />
+                        <SupplierTabSuspense>
+                          <LazyDispatchScanner
+                            supplierScopeIds={
+                              analyticsSupplierIds.length > 0 ? analyticsSupplierIds : [user.id]
+                            }
+                            primarySupplierId={supplierRecordId || undefined}
+                          />
+                        </SupplierTabSuspense>
                       )}
                     </div>
                   </TabsContent>
@@ -2586,10 +2660,12 @@ const SupplierDashboard = () => {
           <TabsContent value="scan-qr">
             <Card className={cardBg}>
               <CardContent className="pt-6">
-                <EnhancedQRCodeManager
-                  supplierId={supplierRecordId || undefined}
-                  supplierScopeIds={analyticsSupplierIds}
-                />
+                <SupplierTabSuspense>
+                  <LazyEnhancedQRCodeManager
+                    supplierId={supplierRecordId || undefined}
+                    supplierScopeIds={analyticsSupplierIds}
+                  />
+                </SupplierTabSuspense>
               </CardContent>
             </Card>
           </TabsContent>
@@ -2617,12 +2693,19 @@ const SupplierDashboard = () => {
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                <TrackingTab
-                  userId={user?.id || localStorage.getItem('user_id') || ''}
-                  userRole="supplier"
-                  userName={supplierProfile?.company_name || supplierProfile?.full_name || user?.email?.split('@')[0] || 'Supplier'}
-                  supplierScopeIds={analyticsSupplierIds}
-                />
+                <SupplierTabSuspense>
+                  <LazyTrackingTab
+                    userId={user?.id || localStorage.getItem("user_id") || ""}
+                    userRole="supplier"
+                    userName={
+                      supplierProfile?.company_name ||
+                      supplierProfile?.full_name ||
+                      user?.email?.split("@")[0] ||
+                      "Supplier"
+                    }
+                    supplierScopeIds={analyticsSupplierIds}
+                  />
+                </SupplierTabSuspense>
               </CardContent>
             </Card>
           </TabsContent>
@@ -2643,16 +2726,18 @@ const SupplierDashboard = () => {
               </CardHeader>
               <CardContent className="space-y-10">
                 {user && (
-                  <SupplierAnalyticsDashboard 
-                    supplierId={supplierRecordId || user.id}
-                    supplierIds={analyticsSupplierIds}
-                    summaryStats={{
-                      totalOrders: stats.totalOrders,
-                      totalRevenue: stats.totalRevenue,
-                      totalCustomers: stats.totalCustomers,
-                    }}
-                    onNavigateToOrders={() => setActiveTab('view-orders')}
-                  />
+                  <SupplierTabSuspense>
+                    <LazySupplierAnalyticsDashboard
+                      supplierId={supplierRecordId || user.id}
+                      supplierIds={analyticsSupplierIds}
+                      summaryStats={{
+                        totalOrders: stats.totalOrders,
+                        totalRevenue: stats.totalRevenue,
+                        totalCustomers: stats.totalCustomers,
+                      }}
+                      onNavigateToOrders={() => setActiveTab("view-orders")}
+                    />
+                  </SupplierTabSuspense>
                 )}
 
                 {/* Reviews & reputation (moved from former Extra tab — order metrics stay in View Orders) */}
@@ -2666,8 +2751,11 @@ const SupplierDashboard = () => {
                       Ratings and feedback from builders and clients—separate from shipment tracking on the Tracking tab.
                     </p>
                   </div>
-                  {user && <SupplierRatingSummary supplierId={supplierRecordId || user.id} />}
-                  {user && <ReviewsList supplierId={supplierRecordId || user.id} />}
+                  {user && (
+                    <SupplierTabSuspense>
+                      <LazySupplierReviewsSection supplierId={supplierRecordId || user.id} />
+                    </SupplierTabSuspense>
+                  )}
                 </div>
 
                 {/* Support & messaging */}
@@ -2682,12 +2770,19 @@ const SupplierDashboard = () => {
                     </p>
                   </div>
                   {user && (
-                    <InAppCommunication
-                      userId={user.id}
-                      userName={supplierProfile?.company_name || supplierProfile?.full_name || user.email || 'Supplier'}
-                      userRole="supplier"
-                      isDarkMode={isDarkMode}
-                    />
+                    <SupplierTabSuspense>
+                      <LazyInAppCommunication
+                        userId={user.id}
+                        userName={
+                          supplierProfile?.company_name ||
+                          supplierProfile?.full_name ||
+                          user.email ||
+                          "Supplier"
+                        }
+                        userRole="supplier"
+                        isDarkMode={isDarkMode}
+                      />
+                    </SupplierTabSuspense>
                   )}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className={`p-4 rounded-lg ${isDarkMode ? 'bg-orange-900/20' : 'bg-orange-50'} border ${isDarkMode ? 'border-orange-800' : 'border-orange-200'}`}>
@@ -2722,14 +2817,16 @@ const SupplierDashboard = () => {
           {/* ═══════════════════════════════════════════════════════════════════════════════════ */}
           <TabsContent value="invoice">
             {user?.id && (
-              <SupplierInvoiceHub
-                userId={user.id}
-                supplierRecordId={supplierRecordId}
-                isDarkMode={isDarkMode}
-                textColor={textColor}
-                mutedText={mutedText}
-                cardBg={cardBg}
-              />
+              <SupplierTabSuspense>
+                <LazySupplierInvoiceHub
+                  userId={user.id}
+                  supplierRecordId={supplierRecordId}
+                  isDarkMode={isDarkMode}
+                  textColor={textColor}
+                  mutedText={mutedText}
+                  cardBg={cardBg}
+                />
+              </SupplierTabSuspense>
             )}
           </TabsContent>
 

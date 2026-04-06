@@ -8,7 +8,8 @@
 |--------|----------|
 | **Recommended entry URLs** (new users / campaigns) | `src/config/authEntryRoutes.ts` (`AUTH_ENTRY_ROUTES`) |
 | **Short auth aliases** (`/login`, `/builder/login`, …) | `src/config/authRouteAliases.ts` (`AUTH_ROUTE_ALIASES`) |
-| **Legacy auth key string guard** | `npm run check:auth-keys` → `scripts/check-legacy-supabase-auth-key.mjs` |
+| **All public auth `Navigate` shortcuts** (aliases + `*-sign-in` → `*-signin` typos) | `src/config/authRouteAliases.ts` (`ALL_PUBLIC_AUTH_REDIRECTS`), wired in `src/App.tsx` |
+| **Legacy auth key string guard** | `npm run check:auth-keys` → `scripts/check-legacy-supabase-auth-key.mjs` (repo-wide text scan with a small allowlist; not limited to `src/`) |
 | Route table | `src/App.tsx` (`<Routes>`) |
 | Role-only pages | `RoleProtectedRoute` in `src/components/security/RoleProtectedRoute.tsx` (`allowedRoles`, `DASHBOARDS`) |
 | Session required (any role) | `AuthRequired` in `src/components/security/AuthRequired.tsx` |

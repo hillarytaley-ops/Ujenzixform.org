@@ -1,5 +1,5 @@
 import { clearSupabasePersistedSessionSync, readPersistedAuthRawStringSync } from '@/utils/supabaseAccessToken';
-import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import React, { useState, useEffect, useCallback, useRef, useMemo, lazy, Suspense } from "react";
 import { Link } from "react-router-dom";
 import { useUrlTabSync } from "@/hooks/useUrlTabSync";
 import { supabase, SUPABASE_URL, SUPABASE_ANON_KEY } from "@/integrations/supabase/client";
@@ -48,12 +48,6 @@ import {
   X,
   ChevronRight
 } from "lucide-react";
-import { DeliveryCharts } from "@/components/delivery/DeliveryCharts";
-import { DeliveryMap } from "@/components/delivery/DeliveryMap";
-import { DeliveryPhotoProof } from "@/components/delivery/DeliveryPhotoProof";
-import { DeliveryNotifications } from "@/components/delivery/DeliveryNotifications";
-import { RouteOptimizer } from "@/components/delivery/RouteOptimizer";
-import { DriverGamification } from "@/components/delivery/DriverGamification";
 import { DeliveryRequestCard } from "@/components/delivery/DeliveryRequestCard";
 import { useLanguage } from "@/contexts/LanguageContext";
 
@@ -109,12 +103,55 @@ import { useToast } from "@/hooks/use-toast";
 import { useDeliveryProviderData, logDataAccessAttempt } from "@/hooks/useDataIsolation";
 import { useDeliveriesUnified, type UnifiedDeliveryRow } from "@/hooks/useDeliveriesUnified";
 import { MessageSquare, User, QrCode, Scan, RefreshCw, Link2, DollarSign } from "lucide-react";
-import { InAppCommunication } from "@/components/communication/InAppCommunication";
 import { ProfileEditDialog } from "@/components/profile/ProfileEditDialog";
 import { ProfileViewDialog } from "@/components/profile/ProfileViewDialog";
-import { ReceivingScanner } from "@/components/qr/ReceivingScanner";
-import { ArrivalScanReminder } from "@/components/delivery/ArrivalScanReminder";
-import { DeliveryPayTab } from "@/components/delivery/DeliveryPayTab";
+
+const DeliveryTabFallback = () => (
+  <div
+    className="flex justify-center py-10 text-sm text-muted-foreground"
+    role="status"
+    aria-busy="true"
+  >
+    Loading…
+  </div>
+);
+
+function DeliveryTabSuspense({ children }: { children: React.ReactNode }) {
+  return <Suspense fallback={<DeliveryTabFallback />}>{children}</Suspense>;
+}
+
+const LazyDeliveryMap = lazy(() =>
+  import("@/components/delivery/DeliveryMap").then((m) => ({ default: m.DeliveryMap }))
+);
+const LazyDeliveryCharts = lazy(() =>
+  import("@/components/delivery/DeliveryCharts").then((m) => ({ default: m.DeliveryCharts }))
+);
+const LazyDriverGamification = lazy(() =>
+  import("@/components/delivery/DriverGamification").then((m) => ({
+    default: m.DriverGamification,
+  }))
+);
+const LazyDeliveryNotifications = lazy(() =>
+  import("@/components/delivery/DeliveryNotifications").then((m) => ({
+    default: m.DeliveryNotifications,
+  }))
+);
+const LazyReceivingScanner = lazy(() =>
+  import("@/components/qr/ReceivingScanner").then((m) => ({ default: m.ReceivingScanner }))
+);
+const LazyDeliveryPayTab = lazy(() =>
+  import("@/components/delivery/DeliveryPayTab").then((m) => ({ default: m.DeliveryPayTab }))
+);
+const LazyInAppCommunication = lazy(() =>
+  import("@/components/communication/InAppCommunication").then((m) => ({
+    default: m.InAppCommunication,
+  }))
+);
+const LazyDeliveryPhotoProof = lazy(() =>
+  import("@/components/delivery/DeliveryPhotoProof").then((m) => ({
+    default: m.DeliveryPhotoProof,
+  }))
+);
 
 interface DashboardStats {
   totalDeliveries: number;
@@ -3259,23 +3296,27 @@ const DeliveryDashboard = () => {
 
           {/* Map Tab */}
           <TabsContent value="map">
-            <DeliveryMap 
-              locations={mapLocations}
-              driverLocation={{ lat: -1.2864, lng: 36.8172 }}
-              onNavigate={(location) => console.log('Navigate to:', location)}
-              onRefresh={() => console.log('Refresh map')}
-            />
+            <DeliveryTabSuspense>
+              <LazyDeliveryMap
+                locations={mapLocations}
+                driverLocation={{ lat: -1.2864, lng: 36.8172 }}
+                onNavigate={(location) => console.log("Navigate to:", location)}
+                onRefresh={() => console.log("Refresh map")}
+              />
+            </DeliveryTabSuspense>
           </TabsContent>
 
           {/* Analytics Tab - Includes Earnings and Achievements */}
           <TabsContent value="analytics">
             <div className="space-y-6">
               {/* Earnings Charts */}
-              <DeliveryCharts 
-                deliveryTrends={deliveryTrends}
-                statusDistribution={statusDistribution}
-                earningsData={earningsData}
-              />
+              <DeliveryTabSuspense>
+                <LazyDeliveryCharts
+                  deliveryTrends={deliveryTrends}
+                  statusDistribution={statusDistribution}
+                  earningsData={earningsData}
+                />
+              </DeliveryTabSuspense>
               
               {/* Achievements Section */}
               <Card className={isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white'}>
@@ -3289,10 +3330,16 @@ const DeliveryDashboard = () => {
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <DriverGamification 
-                    driverId={user?.id || ''}
-                    driverName={providerProfile?.full_name || user?.email?.split('@')[0] || 'Driver'}
-                  />
+                  <DeliveryTabSuspense>
+                    <LazyDriverGamification
+                      driverId={user?.id || ""}
+                      driverName={
+                        providerProfile?.full_name ||
+                        user?.email?.split("@")[0] ||
+                        "Driver"
+                      }
+                    />
+                  </DeliveryTabSuspense>
                 </CardContent>
               </Card>
             </div>
@@ -3300,17 +3347,18 @@ const DeliveryDashboard = () => {
 
           {/* Notifications Tab */}
           <TabsContent value="notifications">
-            <DeliveryNotifications 
-              userId={user?.id || localStorage.getItem('user_id') || ''}
-              onNotificationClick={(notification) => console.log('Notification clicked:', notification)}
-              onAcceptDelivery={(requestId) => {
-                console.log('🔔 Delivery accepted, refreshing counts...');
-                // Refresh notification counts immediately
-                loadNotificationCounts();
-                // Also refresh main data
-                refetchData();
-              }}
-            />
+            <DeliveryTabSuspense>
+              <LazyDeliveryNotifications
+                userId={user?.id || localStorage.getItem("user_id") || ""}
+                onNotificationClick={(notification) =>
+                  console.log("Notification clicked:", notification)
+                }
+                onAcceptDelivery={(_requestId) => {
+                  loadNotificationCounts();
+                  refetchData();
+                }}
+              />
+            </DeliveryTabSuspense>
           </TabsContent>
 
           {/* Scanning Tab */}
@@ -3340,7 +3388,8 @@ const DeliveryDashboard = () => {
                         </p>
                       </div>
                     </div>
-                    <ReceivingScanner
+                    <DeliveryTabSuspense>
+                      <LazyReceivingScanner
                       deliveryRequestsFromDashboard={deliveriesForReceivingScanner}
                       onRefreshRequested={() => {
                         void refetchData();
@@ -3410,6 +3459,7 @@ const DeliveryDashboard = () => {
                         console.log('✅ onDeliveryComplete callback completed - order should now appear in Delivery History tab');
                       }}
                     />
+                    </DeliveryTabSuspense>
                   </div>
 
                   {/* Scanning Instructions */}
@@ -3442,7 +3492,9 @@ const DeliveryDashboard = () => {
 
           {/* Pay Tab - Mileage & Pay */}
           <TabsContent value="pay">
-            <DeliveryPayTab isDarkMode={isDarkMode} />
+            <DeliveryTabSuspense>
+              <LazyDeliveryPayTab isDarkMode={isDarkMode} />
+            </DeliveryTabSuspense>
           </TabsContent>
 
           {/* Support Tab */}
@@ -3450,12 +3502,19 @@ const DeliveryDashboard = () => {
             <div className="space-y-6">
               {/* In-App Communication */}
               {user && (
-                <InAppCommunication
-                  userId={user.id}
-                  userName={providerProfile?.company_name || providerProfile?.full_name || user.email || 'Driver'}
-                  userRole="delivery_provider"
-                  isDarkMode={isDarkMode}
-                />
+                <DeliveryTabSuspense>
+                  <LazyInAppCommunication
+                    userId={user.id}
+                    userName={
+                      providerProfile?.company_name ||
+                      providerProfile?.full_name ||
+                      user.email ||
+                      "Driver"
+                    }
+                    userRole="delivery_provider"
+                    isDarkMode={isDarkMode}
+                  />
+                </DeliveryTabSuspense>
               )}
 
               {/* Quick Contact Info */}
@@ -3494,15 +3553,20 @@ const DeliveryDashboard = () => {
         {showProofCapture && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-2">
             <div className="max-w-md w-full max-h-[90vh] overflow-y-auto">
-              <DeliveryPhotoProof
-                deliveryId={showProofCapture}
-                deliveryType="delivery"
-                customerName={activeDeliveries.find(d => d.id === showProofCapture)?.customer_name || 'Builder'}
-                onComplete={(proof) => {
-                  console.log('Proof captured:', proof);
-                  setShowProofCapture(null);
-                }}
-              />
+              <DeliveryTabSuspense>
+                <LazyDeliveryPhotoProof
+                  deliveryId={showProofCapture}
+                  deliveryType="delivery"
+                  customerName={
+                    activeDeliveries.find((d) => d.id === showProofCapture)?.customer_name ||
+                    "Builder"
+                  }
+                  onComplete={(proof) => {
+                    console.log("Proof captured:", proof);
+                    setShowProofCapture(null);
+                  }}
+                />
+              </DeliveryTabSuspense>
               <Button 
                 variant="outline" 
                 size="sm"

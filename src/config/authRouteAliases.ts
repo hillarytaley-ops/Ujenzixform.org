@@ -26,3 +26,18 @@ export const SUPPLIERS_PAGE_PATHS = [
   "/suppliers-mobile",
   "/supplier-marketplace",
 ] as const;
+
+/** `sign-in` vs `signin` typos → canonical paths (single loop in App.tsx). */
+export const AUTH_SIGNIN_HYPHEN_REDIRECTS: readonly AuthRouteAlias[] = [
+  { path: "/supplier-sign-in", to: "/supplier-signin" },
+  { path: "/builder-sign-in", to: "/builder-signin" },
+  { path: "/delivery-sign-in", to: "/delivery-signin" },
+  { path: "/private-client-sign-in", to: "/private-client-signin" },
+  { path: "/professional-builder-sign-in", to: "/professional-builder-signin" },
+] as const;
+
+/** All `<Navigate replace />` auth-related shortcuts in one array for `App.tsx`. */
+export const ALL_PUBLIC_AUTH_REDIRECTS: readonly AuthRouteAlias[] = [
+  ...AUTH_ROUTE_ALIASES,
+  ...AUTH_SIGNIN_HYPHEN_REDIRECTS,
+];
