@@ -3108,6 +3108,7 @@ export type Database = {
       purchase_orders: {
         Row: {
           buyer_id: string
+          builder_fulfillment_choice?: string
           created_at: string
           delivery_address: string
           delivery_date: string
@@ -3133,6 +3134,7 @@ export type Database = {
         }
         Insert: {
           buyer_id: string
+          builder_fulfillment_choice?: string
           created_at?: string
           delivery_address: string
           delivery_date: string
@@ -3158,6 +3160,7 @@ export type Database = {
         }
         Update: {
           buyer_id?: string
+          builder_fulfillment_choice?: string
           created_at?: string
           delivery_address?: string
           delivery_date?: string

@@ -104,6 +104,8 @@ export const CartSidebar: React.FC = () => {
   const [lastOrderId, setLastOrderId] = useState<string | null>(null);
   const [lastOrderTotal, setLastOrderTotal] = useState<number>(0);
   const [lastOrderItems, setLastOrderItems] = useState<Array<{ material_name?: string; name?: string; quantity: number; unit?: string; unit_price?: number }>>([]);
+  const [lastOrderStatus, setLastOrderStatus] = useState<string | null>(null);
+  const [lastOrderFulfillmentChoice, setLastOrderFulfillmentChoice] = useState<string | null>(null);
   const [lastDeliveryAddress, setLastDeliveryAddress] = useState<string>('');
   
   // Project selection for linking orders to projects
@@ -334,6 +336,8 @@ export const CartSidebar: React.FC = () => {
           delivery_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
           project_name: projectName,
           status: 'pending',
+          delivery_required: false,
+          builder_fulfillment_choice: 'pending',
           items: supplierItems.map(item => ({
             material_id: catalogMaterialIdFromCartLineId(item.id),
             material_name: item.name,
@@ -582,6 +586,8 @@ export const CartSidebar: React.FC = () => {
         delivery_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
         project_name: projectName,
         status: 'confirmed',
+        delivery_required: false,
+        builder_fulfillment_choice: 'pending',
         items: items.map(item => ({
           material_id: catalogMaterialIdFromCartLineId(item.id),
           material_name: item.name,
@@ -643,6 +649,8 @@ export const CartSidebar: React.FC = () => {
       setLastOrderId(orderData.id);
       setLastOrderTotal(orderTotal);
       setLastOrderItems(orderItemsSnapshot);
+      setLastOrderStatus(orderData.status ?? 'confirmed');
+      setLastOrderFulfillmentChoice(orderData.builder_fulfillment_choice ?? 'pending');
 
       clearCart();
       setIsCartOpen(false);
@@ -1089,7 +1097,9 @@ export const CartSidebar: React.FC = () => {
           delivery_address: 'To be provided',
           delivery_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
           items: lastOrderItems,
-          project_name: 'Direct Purchase'
+          project_name: 'Direct Purchase',
+          status: lastOrderStatus ?? undefined,
+          builder_fulfillment_choice: lastOrderFulfillmentChoice ?? undefined,
         }}
         onDeliveryRequested={(opts) => {
           if (opts?.deliveryAddress) setLastDeliveryAddress(opts.deliveryAddress);
@@ -1118,6 +1128,8 @@ export const CartSidebar: React.FC = () => {
           setLastOrderId(null);
           setLastOrderTotal(0);
           setLastOrderItems([]);
+          setLastOrderStatus(null);
+          setLastOrderFulfillmentChoice(null);
           setLastDeliveryAddress('');
         }
       }}
@@ -1133,6 +1145,8 @@ export const CartSidebar: React.FC = () => {
         setLastOrderId(null);
         setLastOrderTotal(0);
         setLastOrderItems([]);
+        setLastOrderStatus(null);
+        setLastOrderFulfillmentChoice(null);
         setLastDeliveryAddress('');
       }}
       onDeclined={() => {
@@ -1140,6 +1154,8 @@ export const CartSidebar: React.FC = () => {
         setLastOrderId(null);
         setLastOrderTotal(0);
         setLastOrderItems([]);
+        setLastOrderStatus(null);
+        setLastOrderFulfillmentChoice(null);
         setLastDeliveryAddress('');
       }}
     />

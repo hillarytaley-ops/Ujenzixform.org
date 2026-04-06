@@ -6,7 +6,6 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { invokeEdgeFunction } from '@/lib/invokeEdgeFunction';
 import { DeliveryPromptDialog } from './DeliveryPromptDialog';
 import {
   hasUsableDeliveryCoordinates,
@@ -65,90 +64,10 @@ export const QuoteComparison: React.FC<QuoteComparisonProps> = ({ orderId, build
   // real address. Creating one here would use PO.delivery_address which is often "To be provided" and would
   // show "Delivery address missing" on the provider dashboard. Under NO circumstance should the provider
   // see a request without the address the builder entered on the form.
+  // Providers are notified inside DeliveryPromptDialog only (avoids duplicate edge + client notify).
   const handleDeliveryRequested = async () => {
     if (!acceptedPurchaseOrder) return;
-    
-    try {
-      let pickupAddress = acceptedPurchaseOrder.supplier_address || 'Supplier location';
-      if (acceptedPurchaseOrder.supplier_id) {
-        const { data: supplierData } = await supabase
-          .from('suppliers')
-          .select('address, company_name')
-          .eq('id', acceptedPurchaseOrder.supplier_id)
-          .maybeSingle();
-        if (supplierData) {
-          pickupAddress = supplierData.address || `${supplierData.company_name} - Pickup Location`;
-        }
-      }
-
-      // Delivery request was already created/updated by DeliveryPromptDialog with the builder's address.
-      // Fetch it (may need a short delay so the dialog's POST has committed).
-      let deliveryRequest = null;
-      const { data: existingRequest } = await supabase
-        .from('delivery_requests')
-        .select('id, status, delivery_address')
-        .eq('purchase_order_id', acceptedPurchaseOrder.id)
-        .in('status', ['pending', 'assigned', 'accepted', 'in_transit', 'picked_up', 'out_for_delivery', 'scheduled'])
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-      if (existingRequest) {
-        deliveryRequest = existingRequest;
-      } else {
-        // Dialog just created it; allow a moment for commit then refetch
-        await new Promise(r => setTimeout(r, 600));
-        const { data: refetched } = await supabase
-          .from('delivery_requests')
-          .select('id, status, delivery_address')
-          .eq('purchase_order_id', acceptedPurchaseOrder.id)
-          .order('created_at', { ascending: false })
-          .limit(1)
-          .maybeSingle();
-        if (refetched) deliveryRequest = refetched;
-      }
-
-      if (deliveryRequest) {
-        const { error: notifyErr } = await invokeEdgeFunction(
-          'notify-delivery-providers',
-          {
-            body: {
-              request_type: 'quote_accepted',
-              request_id: deliveryRequest.id,
-              builder_id: builderId,
-              pickup_address: pickupAddress,
-              delivery_address: deliveryRequest.delivery_address ?? acceptedPurchaseOrder.delivery_address,
-              material_details: acceptedPurchaseOrder.items?.map((item: any) => ({
-                material_type: item.material_name,
-                quantity: item.quantity,
-                unit: item.unit || 'units'
-              })),
-              priority_level: 'normal',
-              po_number: acceptedPurchaseOrder.po_number
-            }
-          },
-          { request_type: 'quote_accepted', request_id: deliveryRequest.id }
-        );
-        if (notifyErr) {
-          console.error('Error notifying delivery providers:', notifyErr);
-        } else {
-          console.log('Delivery providers notified successfully');
-        }
-      }
-
-      toast({
-        title: '🚚 Delivery Requested!',
-        description: 'QR codes will be generated. Nearby delivery providers have been notified.',
-      });
-      
-    } catch (error: any) {
-      console.error('Error requesting delivery:', error);
-      toast({
-        title: 'Delivery request failed',
-        description: error.message || 'Please try again from the Delivery page.',
-        variant: 'destructive',
-      });
-    }
+    console.log('ℹ️ Delivery flow complete; providers notified from DeliveryPromptDialog.');
   };
 
   useEffect(() => {
@@ -218,7 +137,8 @@ export const QuoteComparison: React.FC<QuoteComparisonProps> = ({ orderId, build
           accepted_quote_id: quoteId,
           supplier_id: quote.supplier_id,
           total_amount: quote.total_price,
-          delivery_required: false
+          delivery_required: false,
+          builder_fulfillment_choice: 'pending',
         })
         .eq('id', orderId)
         .select('*')

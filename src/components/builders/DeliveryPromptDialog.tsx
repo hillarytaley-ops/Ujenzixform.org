@@ -83,6 +83,8 @@ interface PurchaseOrder {
   project_name?: string;
   /** Used to advance PO workflow (e.g. awaiting_delivery_request → delivery_requested) after a real builder submission */
   status?: string;
+  /** pending | delivery | pickup — from purchase_orders.builder_fulfillment_choice */
+  builder_fulfillment_choice?: string | null;
 }
 
 interface DeliveryPromptDialogProps {
@@ -1175,6 +1177,7 @@ export const DeliveryPromptDialog: React.FC<DeliveryPromptDialogProps> = ({
             },
             body: JSON.stringify({
               delivery_required: true,
+              builder_fulfillment_choice: 'delivery',
               updated_at: new Date().toISOString(),
             }),
           },
@@ -1299,6 +1302,7 @@ export const DeliveryPromptDialog: React.FC<DeliveryPromptDialogProps> = ({
           },
           body: JSON.stringify({
             delivery_required: false,
+            builder_fulfillment_choice: 'pickup',
             qr_code_generated: false
           })
         },

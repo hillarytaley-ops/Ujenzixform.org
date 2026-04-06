@@ -110,6 +110,8 @@ interface Order {
   project_name: string;
   items: any[];
   delivery_required?: boolean;
+  /** pending | delivery | pickup — explicit builder choice (see migration builder_fulfillment_choice) */
+  builder_fulfillment_choice?: string | null;
   delivery_provider_id?: string | null;
   delivery_provider_name?: string | null;
   delivery_status?: string;
@@ -149,6 +151,14 @@ function hasActiveDeliveryRequestForOrder(orderId: string, list: DeliveryRequest
       d.status &&
       ACTIVE_DELIVERY_REQUEST_STATUSES.has(String(d.status).toLowerCase())
   );
+}
+
+/** Resolve choice when column missing on old cached rows */
+function orderFulfillmentChoice(o: Order): "pending" | "delivery" | "pickup" {
+  const c = (o.builder_fulfillment_choice || "").toLowerCase();
+  if (c === "pickup" || c === "delivery" || c === "pending") return c;
+  if (o.delivery_required === true) return "delivery";
+  return "pending";
 }
 
 const PrivateClientDashboard = () => {
@@ -1055,7 +1065,8 @@ const PrivateClientDashboard = () => {
                     <p className="text-sm text-gray-500 mb-2">Showing {orders.length} orders</p>
                     {orders.some(
                       (o) =>
-                        o.status === "awaiting_delivery_request" && o.delivery_required !== true
+                        o.status === "awaiting_delivery_request" &&
+                        orderFulfillmentChoice(o) === "pending"
                     ) && (
                       <Alert className="border-amber-200 bg-amber-50 dark:bg-amber-950/30">
                         <AlertTriangle className="h-4 w-4 text-amber-700" />
@@ -1069,7 +1080,7 @@ const PrivateClientDashboard = () => {
                     )}
                     {orders.some(
                       (o) =>
-                        o.delivery_required === true &&
+                        (o.delivery_required === true || orderFulfillmentChoice(o) === "delivery") &&
                         !o.delivery_provider_id &&
                         !hasActiveDeliveryRequestForOrder(o.id, deliveries)
                     ) && (
@@ -1192,8 +1203,12 @@ const PrivateClientDashboard = () => {
                               </Button>
                               {/* Delivery Button - Check if delivery was already requested during order submission */}
                               {(order.status === 'confirmed' || order.status === 'pending' || order.status === 'quoted' || order.status === 'processing' || order.status === 'shipped' || order.status === 'awaiting_delivery_request' || order.status === 'order_created' || order.status === 'delivery_requested' || order.status === 'awaiting_delivery_provider') && (
-                                // delivery_required is set true only after the builder submits delivery in DeliveryPromptDialog
-                                order.delivery_required === true ? (
+                                orderFulfillmentChoice(order) === "pickup" ? (
+                                  <Button size="sm" variant="secondary" disabled className="opacity-90">
+                                    <Package className="h-3 w-3 mr-1" />
+                                    Pickup selected
+                                  </Button>
+                                ) : order.delivery_required === true ? (
                                   <Button 
                                     size="sm"
                                     variant="outline"
@@ -2060,6 +2075,7 @@ const PrivateClientDashboard = () => {
               items: selectedOrderForDelivery.items || [],
               project_name: selectedOrderForDelivery.project_name,
               status: selectedOrderForDelivery.status,
+              builder_fulfillment_choice: selectedOrderForDelivery.builder_fulfillment_choice,
             }}
             onDeliveryRequested={(opts) => {
               setShowDeliveryPrompt(false);

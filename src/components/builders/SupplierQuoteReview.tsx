@@ -19,7 +19,6 @@ import {
   getAccessTokenWithPersistenceFallback,
   readPersistedAuthUserSync,
 } from '@/utils/supabaseAccessToken';
-import { invokeEdgeFunction } from '@/lib/invokeEdgeFunction';
 import { DeliveryPromptDialog } from './DeliveryPromptDialog';
 import {
   hasUsableDeliveryCoordinates,
@@ -535,6 +534,7 @@ export const SupplierQuoteReview: React.FC<SupplierQuoteReviewProps> = ({
         status: 'quote_accepted', // Will be auto-converted to 'pending' order by trigger
         total_amount: quote.quote_amount || quote.purchase_order?.total_amount,
         delivery_required: false, // True only after builder confirms delivery in DeliveryPromptDialog
+        builder_fulfillment_choice: 'pending',
         updated_at: new Date().toISOString()
       };
       
@@ -679,100 +679,10 @@ export const SupplierQuoteReview: React.FC<SupplierQuoteReviewProps> = ({
   // CRITICAL: Do NOT create a delivery_request here with PO.delivery_address (often "To be provided").
   // The dialog already created/updated the request with the builder's real address. Creating here would
   // cause "Delivery address missing" on the provider card. Only fetch the request the dialog created and notify.
+  // Providers are notified inside DeliveryPromptDialog only (avoids duplicate edge + client notify).
   const handleDeliveryRequested = async () => {
     if (!acceptedPurchaseOrder) return;
-    const headers = await getAuthHeaders();
-    const effectiveBuilderId = getEffectiveBuilderId();
-    
-    try {
-      let pickupAddress = acceptedPurchaseOrder.supplier_address || 'Supplier location';
-      if (acceptedPurchaseOrder.supplier_id) {
-        try {
-          const supplierController = new AbortController();
-          const supplierTimeout = setTimeout(() => supplierController.abort(), 5000);
-          const supplierResponse = await fetch(
-            `${SUPABASE_URL}/rest/v1/suppliers?or=(id.eq.${acceptedPurchaseOrder.supplier_id},user_id.eq.${acceptedPurchaseOrder.supplier_id})&select=address,location,company_name&limit=1`,
-            { headers, signal: supplierController.signal, cache: 'no-store' }
-          );
-          clearTimeout(supplierTimeout);
-          if (supplierResponse.ok) {
-            const suppliersData = await supplierResponse.json();
-            const supplierData = suppliersData?.[0];
-            if (supplierData) {
-              pickupAddress = supplierData.address || supplierData.location || `${supplierData.company_name} - Pickup Location`;
-            }
-          }
-        } catch (e) {
-          console.log('Supplier fetch timeout, using default pickup address');
-        }
-      }
-
-      // Delivery request was created by DeliveryPromptDialog with the builder's address. Fetch it.
-      let deliveryRequest = null;
-      const checkResponse = await fetch(
-        `${SUPABASE_URL}/rest/v1/delivery_requests?purchase_order_id=eq.${acceptedPurchaseOrder.id}&select=id,status,delivery_address&order=created_at.desc&limit=1`,
-        { headers, cache: 'no-store' }
-      );
-      if (checkResponse.ok) {
-        const existing = await checkResponse.json();
-        if (existing && existing.length > 0) {
-          deliveryRequest = existing[0];
-        }
-      }
-      if (!deliveryRequest) {
-        await new Promise(r => setTimeout(r, 600));
-        const retryResponse = await fetch(
-          `${SUPABASE_URL}/rest/v1/delivery_requests?purchase_order_id=eq.${acceptedPurchaseOrder.id}&select=id,status,delivery_address&order=created_at.desc&limit=1`,
-          { headers, cache: 'no-store' }
-        );
-        if (retryResponse.ok) {
-          const retryData = await retryResponse.json();
-          if (retryData?.length > 0) deliveryRequest = retryData[0];
-        }
-      }
-
-      if (deliveryRequest) {
-        const { error: notifyErr } = await invokeEdgeFunction(
-          'notify-delivery-providers',
-          {
-            body: {
-              request_type: 'quote_accepted',
-              request_id: deliveryRequest.id,
-              builder_id: effectiveBuilderId,
-              pickup_address: pickupAddress,
-              delivery_address: deliveryRequest.delivery_address ?? acceptedPurchaseOrder.delivery_address,
-              material_details: acceptedPurchaseOrder.items?.map((item: any) => ({
-                material_type: item.material_name || item.name,
-                quantity: item.quantity,
-                unit: item.unit || 'units'
-              })),
-              special_instructions: acceptedPurchaseOrder.special_instructions,
-              priority_level: 'normal',
-              po_number: acceptedPurchaseOrder.po_number
-            }
-          },
-          { request_type: 'quote_accepted', request_id: deliveryRequest.id }
-        );
-        if (notifyErr) {
-          console.error('Error notifying delivery providers:', notifyErr);
-        } else {
-          console.log('Delivery providers notified successfully');
-        }
-      }
-
-      toast({
-        title: '🚚 Delivery Requested!',
-        description: 'QR codes will be generated. Nearby delivery providers have been notified.',
-      });
-      
-    } catch (error: any) {
-      console.error('Error requesting delivery:', error);
-      toast({
-        title: 'Delivery request failed',
-        description: error.message || 'Please try again from the Delivery page.',
-        variant: 'destructive',
-      });
-    }
+    console.log('ℹ️ Delivery flow complete; providers notified from DeliveryPromptDialog.');
   };
 
   // Helper function to detect material type
