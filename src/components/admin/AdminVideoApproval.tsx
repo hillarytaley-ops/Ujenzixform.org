@@ -1,3 +1,4 @@
+import { readPersistedAuthRawStringSync } from '@/utils/supabaseAccessToken';
 import { useState, useEffect } from "react";
 import { supabase, SUPABASE_URL, SUPABASE_ANON_KEY } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -38,7 +39,7 @@ export function AdminVideoApproval() {
 
   const getAccessToken = () => {
     try {
-      const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+      const storedSession = readPersistedAuthRawStringSync();
       if (storedSession) {
         const parsed = JSON.parse(storedSession);
         return parsed.access_token || '';

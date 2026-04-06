@@ -1,3 +1,4 @@
+import { readPersistedAuthRawStringSync } from '@/utils/supabaseAccessToken';
 import React, { useState, useEffect, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -110,7 +111,7 @@ export function InAppCommunication({
   // Load messages using REST API - uses support_messages table
   const loadMessages = async () => {
     try {
-      const tokenStr = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+      const tokenStr = readPersistedAuthRawStringSync();
       const token = tokenStr ? JSON.parse(tokenStr) : null;
       const accessToken = token?.access_token;
       // First, find or create a support_chat for this user
@@ -181,7 +182,7 @@ export function InAppCommunication({
   // Load call sessions using REST API
   const loadCallSessions = async () => {
     try {
-      const tokenStr = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+      const tokenStr = readPersistedAuthRawStringSync();
       const token = tokenStr ? JSON.parse(tokenStr) : null;
       const accessToken = token?.access_token;
       const response = await fetch(
@@ -312,7 +313,7 @@ export function InAppCommunication({
     setSendingMessage(true);
     try {
       // Get auth token
-      const tokenStr = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+      const tokenStr = readPersistedAuthRawStringSync();
       if (!tokenStr) {
         throw new Error('Not authenticated');
       }
@@ -433,7 +434,7 @@ export function InAppCommunication({
   const initiateCall = async (callType: 'voice' | 'video') => {
     setLoading(true);
     try {
-      const tokenStr = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+      const tokenStr = readPersistedAuthRawStringSync();
       if (!tokenStr) {
         throw new Error('Not authenticated');
       }

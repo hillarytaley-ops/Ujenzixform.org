@@ -1,3 +1,4 @@
+import { clearSupabasePersistedSessionSync, readPersistedAuthRawStringSync } from '@/utils/supabaseAccessToken';
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from '@/integrations/supabase/client';
 /**
  * ProfileViewDialog - Simple profile view popup
@@ -65,7 +66,7 @@ export const ProfileViewDialog: React.FC<ProfileViewDialogProps> = ({
       // Try to get from session
       let sessionData: any = null;
       try {
-        const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+        const storedSession = readPersistedAuthRawStringSync();
         if (storedSession) {
           sessionData = JSON.parse(storedSession);
         }
@@ -348,7 +349,7 @@ export const ProfileViewDialog: React.FC<ProfileViewDialogProps> = ({
                   localStorage.removeItem('user_name');
                   localStorage.removeItem('user_id');
                   localStorage.removeItem('supplier_id');
-                  localStorage.removeItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+                  clearSupabasePersistedSessionSync();
                   sessionStorage.clear();
                   // Redirect immediately - don't wait for Supabase signOut
                   window.location.replace('/auth');

@@ -1,3 +1,4 @@
+import { readPersistedAuthRawStringSync } from '@/utils/supabaseAccessToken';
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -87,7 +88,7 @@ export const ArrivalScanReminder: React.FC<ArrivalScanReminderProps> = ({
     try {
       let accessToken = SUPABASE_ANON_KEY;
       try {
-        const stored = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+        const stored = readPersistedAuthRawStringSync();
         if (stored) {
           const parsed = JSON.parse(stored);
           accessToken = parsed.access_token || SUPABASE_ANON_KEY;
@@ -197,7 +198,7 @@ export const ArrivalScanReminder: React.FC<ArrivalScanReminderProps> = ({
     try {
       let accessToken = SUPABASE_ANON_KEY;
       try {
-        const stored = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+        const stored = readPersistedAuthRawStringSync();
         if (stored) {
           const parsed = JSON.parse(stored);
           accessToken = parsed.access_token || SUPABASE_ANON_KEY;

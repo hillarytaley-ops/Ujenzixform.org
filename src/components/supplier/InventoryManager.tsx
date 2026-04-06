@@ -14,6 +14,7 @@
  * ╚══════════════════════════════════════════════════════════════════════════════════════╝
  */
 
+import { readPersistedAuthRawStringSync } from '@/utils/supabaseAccessToken';
 import React, { useState, useEffect, useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -141,7 +142,7 @@ export const InventoryManager: React.FC<InventoryManagerProps> = ({ supplierScop
   const getSupabaseConfig = () => {
     let accessToken = '';
     try {
-      const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+      const storedSession = readPersistedAuthRawStringSync();
       if (storedSession) {
         const parsed = JSON.parse(storedSession);
         accessToken = parsed.access_token || '';

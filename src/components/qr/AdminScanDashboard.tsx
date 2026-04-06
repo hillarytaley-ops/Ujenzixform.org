@@ -1,3 +1,4 @@
+import { readPersistedAuthRawStringSync } from '@/utils/supabaseAccessToken';
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -248,7 +249,7 @@ export const AdminScanDashboard: React.FC = () => {
       // Get access token for authenticated requests
       let accessToken = ANON_KEY;
       try {
-        const stored = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+        const stored = readPersistedAuthRawStringSync();
         if (stored) {
           const parsed = JSON.parse(stored);
           accessToken = parsed.access_token || ANON_KEY;
@@ -347,7 +348,7 @@ export const AdminScanDashboard: React.FC = () => {
     try {
       let accessToken = ANON_KEY;
       try {
-        const stored = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+        const stored = readPersistedAuthRawStringSync();
         if (stored) {
           const parsed = JSON.parse(stored);
           accessToken = parsed.access_token || ANON_KEY;
@@ -510,7 +511,7 @@ export const AdminScanDashboard: React.FC = () => {
     try {
       let accessToken = ANON_KEY;
       try {
-        const stored = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+        const stored = readPersistedAuthRawStringSync();
         if (stored) {
           const parsed = JSON.parse(stored);
           accessToken = parsed.access_token || ANON_KEY;

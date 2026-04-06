@@ -1,3 +1,4 @@
+import { readPersistedAuthRawStringSync } from '@/utils/supabaseAccessToken';
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -42,7 +43,7 @@ export const MissingDeliveryAddressAlert: React.FC<MissingDeliveryAddressAlertPr
       setLoading(true);
       
       // Get access token
-      const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+      const storedSession = readPersistedAuthRawStringSync();
       let accessToken = '';
       if (storedSession) {
         const parsed = JSON.parse(storedSession);
@@ -179,7 +180,7 @@ export const MissingDeliveryAddressAlert: React.FC<MissingDeliveryAddressAlertPr
       setUpdating(selectedRequest.id);
 
       // Get access token
-      const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+      const storedSession = readPersistedAuthRawStringSync();
       let accessToken = '';
       if (storedSession) {
         const parsed = JSON.parse(storedSession);

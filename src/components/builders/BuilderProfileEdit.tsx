@@ -1,3 +1,4 @@
+import { readPersistedAuthRawStringSync } from '@/utils/supabaseAccessToken';
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -177,7 +178,7 @@ export const BuilderProfileEdit: React.FC<BuilderProfileEditProps> = ({
       if (!user) {
         console.log('📝 BuilderProfileEdit: Session timeout, trying localStorage fallback');
         try {
-          const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+          const storedSession = readPersistedAuthRawStringSync();
           if (storedSession) {
             const parsed = JSON.parse(storedSession);
             user = parsed?.user;
@@ -264,7 +265,7 @@ export const BuilderProfileEdit: React.FC<BuilderProfileEditProps> = ({
     console.log('📝 BuilderProfileEdit: Creating default profile from localStorage...');
     try {
       // Get user from localStorage - don't use Supabase API as it might timeout
-      const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+      const storedSession = readPersistedAuthRawStringSync();
       if (storedSession) {
         const parsed = JSON.parse(storedSession);
         const user = parsed?.user;
@@ -303,7 +304,7 @@ export const BuilderProfileEdit: React.FC<BuilderProfileEditProps> = ({
     // Get user from localStorage directly - fastest method
     let user: any = null;
     try {
-      const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+      const storedSession = readPersistedAuthRawStringSync();
       if (storedSession) {
         const parsed = JSON.parse(storedSession);
         user = parsed?.user;
@@ -337,7 +338,7 @@ export const BuilderProfileEdit: React.FC<BuilderProfileEditProps> = ({
       // Get access token from localStorage - use the user's JWT for auth
       let accessToken = '';
       try {
-        const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+        const storedSession = readPersistedAuthRawStringSync();
         if (storedSession) {
           const parsed = JSON.parse(storedSession);
           accessToken = parsed?.access_token || '';

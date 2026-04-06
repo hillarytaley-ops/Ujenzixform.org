@@ -1,3 +1,4 @@
+import { readPersistedAuthRawStringSync } from '@/utils/supabaseAccessToken';
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from '@/integrations/supabase/client';
 /**
  * Utility function to check delivery address in database
@@ -21,7 +22,7 @@ export interface DeliveryAddressCheck {
  */
 function getAuthHeaders(): { url: string; headers: Record<string, string> } {
   try {
-    const stored = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+    const stored = readPersistedAuthRawStringSync();
     let accessToken = '';
     if (stored) {
       const parsed = JSON.parse(stored);

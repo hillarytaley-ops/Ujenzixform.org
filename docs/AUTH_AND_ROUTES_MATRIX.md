@@ -6,6 +6,7 @@
 
 | Concern | Location |
 |--------|----------|
+| **Recommended entry URLs** (new users / campaigns) | `src/config/authEntryRoutes.ts` (`AUTH_ENTRY_ROUTES`) |
 | Route table | `src/App.tsx` (`<Routes>`) |
 | Role-only pages | `RoleProtectedRoute` in `src/components/security/RoleProtectedRoute.tsx` (`allowedRoles`, `DASHBOARDS`) |
 | Session required (any role) | `AuthRequired` in `src/components/security/AuthRequired.tsx` |

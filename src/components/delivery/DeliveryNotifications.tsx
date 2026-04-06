@@ -16,7 +16,7 @@ import {
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { SUPABASE_ANON_KEY, SUPABASE_URL, supabase } from '@/integrations/supabase/client';
-import { readAuthSessionForRest } from '@/utils/supabaseAccessToken';
+import { readAuthSessionForRest, readPersistedAuthRawStringSync } from '@/utils/supabaseAccessToken';
 import { trackingNumberService } from '@/services/TrackingNumberService';
 import { cleanupDuplicateDeliveryRequests, cleanupDuplicatePurchaseOrders, checkForDuplicateDeliveryRequests, deleteDeliveryRequestsWithoutAddress, deleteDuplicateDeliveryRequestsByCompositeKey } from '@/utils/cleanupDuplicateDeliveryRequests';
 import { checkDeliveryAddress } from '@/utils/checkDeliveryAddress';
@@ -1338,7 +1338,7 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
     let providerId = userId;
     if (!providerId) {
       try {
-        const stored = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+        const stored = readPersistedAuthRawStringSync();
         if (stored) {
           const parsed = JSON.parse(stored);
           providerId = parsed.user?.id || '';

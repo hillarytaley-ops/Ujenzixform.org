@@ -45,11 +45,7 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import { SUPABASE_ANON_KEY, SUPABASE_URL, supabase } from '@/integrations/supabase/client';
-import {
-  getAccessTokenWithPersistenceFallback,
-  readAuthUserIdSync,
-  readPersistedAccessTokenSync,
-} from '@/utils/supabaseAccessToken';
+import { getAccessTokenWithPersistenceFallback, readAuthUserIdSync, readPersistedAccessTokenSync, readPersistedAuthRawStringSync } from '@/utils/supabaseAccessToken';
 
 interface TrackingNumber {
   id: string;
@@ -112,7 +108,7 @@ export const TrackingTab: React.FC<TrackingTabProps> = ({
     
     // Try parsing from Supabase session
     try {
-      const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+      const storedSession = readPersistedAuthRawStringSync();
       if (storedSession) {
         const parsed = JSON.parse(storedSession);
         return (

@@ -1,3 +1,4 @@
+import { readAccessTokenSyncBestEffort } from '@/utils/supabaseAccessToken';
 import React, { useState, useRef, useEffect } from 'react';
 import { MessageCircle, X, Send, User, Loader2, Star } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -229,20 +230,8 @@ export function LiveChatWidget({ position = 'bottom-right' }: LiveChatWidgetProp
     console.log('💬 LiveChat: Starting connection...');
 
     try {
-      // Get access token if user is logged in
-      const accessToken = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
-      let token = SUPABASE_ANON_KEY;
-      
-      if (accessToken) {
-        try {
-          const parsed = JSON.parse(accessToken);
-          if (parsed?.access_token) {
-            token = parsed.access_token;
-          }
-        } catch (e) {
-          console.log('💬 LiveChat: Using anon key (no valid session)');
-        }
-      }
+      const sessionJwt = readAccessTokenSyncBestEffort();
+      const token = sessionJwt || SUPABASE_ANON_KEY;
 
       // Create conversation using direct REST API
       const controller = new AbortController();
@@ -397,18 +386,8 @@ export function LiveChatWidget({ position = 'bottom-right' }: LiveChatWidgetProp
     addMessage('user', content);
 
     try {
-      // Get access token
-      const accessToken = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
-      let token = SUPABASE_ANON_KEY;
-      
-      if (accessToken) {
-        try {
-          const parsed = JSON.parse(accessToken);
-          if (parsed?.access_token) {
-            token = parsed.access_token;
-          }
-        } catch (e) {}
-      }
+      const sessionJwt = readAccessTokenSyncBestEffort();
+      const token = sessionJwt || SUPABASE_ANON_KEY;
 
       // Send message
       const controller = new AbortController();
@@ -511,18 +490,8 @@ export function LiveChatWidget({ position = 'bottom-right' }: LiveChatWidgetProp
   const submitRating = async () => {
     if (conversationId) {
       try {
-        // Get access token
-        const accessToken = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
-        let token = SUPABASE_ANON_KEY;
-        
-        if (accessToken) {
-          try {
-            const parsed = JSON.parse(accessToken);
-            if (parsed?.access_token) {
-              token = parsed.access_token;
-            }
-          } catch (e) {}
-        }
+        const sessionJwt = readAccessTokenSyncBestEffort();
+        const token = sessionJwt || SUPABASE_ANON_KEY;
 
         await fetch(`${SUPABASE_URL}/rest/v1/conversations?id=eq.${conversationId}`, {
           method: 'PATCH',

@@ -1,3 +1,4 @@
+import { readPersistedAuthRawStringSync } from '@/utils/supabaseAccessToken';
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -255,7 +256,7 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
       // Fetch posts from builder_posts table using fetch API (bypass Supabase client)
       let accessToken = '';
       try {
-        const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+        const storedSession = readPersistedAuthRawStringSync();
         if (storedSession) {
           const parsed = JSON.parse(storedSession);
           accessToken = parsed.access_token || '';
@@ -265,7 +266,7 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
       // Get current user ID to show their own posts regardless of status
       let currentUserId: string | null = null;
       try {
-        const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+        const storedSession = readPersistedAuthRawStringSync();
         if (storedSession) {
           const parsed = JSON.parse(storedSession);
           currentUserId = parsed.user?.id;
@@ -566,7 +567,7 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
     
     console.log('📤 Checking localStorage for auth token...');
     try {
-      const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+      const storedSession = readPersistedAuthRawStringSync();
       console.log('📤 Found stored session:', !!storedSession);
       
       if (storedSession) {
@@ -609,7 +610,7 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
       // Get auth token for upload
       let accessToken = '';
       try {
-        const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+        const storedSession = readPersistedAuthRawStringSync();
         if (storedSession) {
           const parsed = JSON.parse(storedSession);
           accessToken = parsed.access_token || '';
@@ -752,7 +753,7 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
         console.log('📤 Fetching profile...');
         let accessToken = '';
         try {
-          const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+          const storedSession = readPersistedAuthRawStringSync();
           if (storedSession) {
             const parsed = JSON.parse(storedSession);
             accessToken = parsed.access_token || '';
@@ -782,7 +783,7 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
       try {
         let accessToken = '';
         try {
-          const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+          const storedSession = readPersistedAuthRawStringSync();
           if (storedSession) {
             const parsed = JSON.parse(storedSession);
             accessToken = parsed.access_token || '';
@@ -930,7 +931,7 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
     let userId: string | null = effectiveUserId || null;
     if (!userId) {
       try {
-        const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+        const storedSession = readPersistedAuthRawStringSync();
         if (storedSession) {
           const parsed = JSON.parse(storedSession);
           userId = parsed.user?.id;
@@ -969,7 +970,7 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
     try {
       let accessToken = '';
       try {
-        const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+        const storedSession = readPersistedAuthRawStringSync();
         if (storedSession) {
           const parsed = JSON.parse(storedSession);
           accessToken = parsed.access_token || '';
@@ -1040,7 +1041,7 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
     let userId: string | null = effectiveUserId || null;
     if (!userId) {
       try {
-        const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+        const storedSession = readPersistedAuthRawStringSync();
         if (storedSession) {
           const parsed = JSON.parse(storedSession);
           userId = parsed.user?.id;
@@ -1084,7 +1085,7 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
     try {
       let accessToken = '';
       try {
-        const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+        const storedSession = readPersistedAuthRawStringSync();
         if (storedSession) {
           const parsed = JSON.parse(storedSession);
           accessToken = parsed.access_token || '';

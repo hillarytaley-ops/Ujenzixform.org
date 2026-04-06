@@ -1,3 +1,4 @@
+import { clearSupabasePersistedSessionSync, readPersistedAuthRawStringSync } from '@/utils/supabaseAccessToken';
 import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { Link } from "react-router-dom";
 import { useUrlTabSync } from "@/hooks/useUrlTabSync";
@@ -404,7 +405,7 @@ const DeliveryDashboard = () => {
           try {
             let accessToken = SUPABASE_ANON_KEY;
             try {
-              const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+              const storedSession = readPersistedAuthRawStringSync();
               if (storedSession) {
                 const parsed = JSON.parse(storedSession);
                 if (parsed.access_token) accessToken = parsed.access_token;
@@ -528,7 +529,7 @@ const DeliveryDashboard = () => {
         try {
           let accessToken = SUPABASE_ANON_KEY;
           try {
-            const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+            const storedSession = readPersistedAuthRawStringSync();
             if (storedSession) {
               const parsed = JSON.parse(storedSession);
               if (parsed.access_token) accessToken = parsed.access_token;
@@ -752,7 +753,7 @@ const DeliveryDashboard = () => {
         let deliveryRequestsMap: Record<string, any> = {};
         let accessToken = SUPABASE_ANON_KEY;
         try {
-          const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+          const storedSession = readPersistedAuthRawStringSync();
           if (storedSession) {
             const parsed = JSON.parse(storedSession);
             if (parsed.access_token) accessToken = parsed.access_token;
@@ -1188,7 +1189,7 @@ const DeliveryDashboard = () => {
           const SUPABASE_URL_AGGRESSIVE = SUPABASE_URL;
           let accessTokenAggressive = SUPABASE_ANON_KEY;
           try {
-            const tokenData = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+            const tokenData = readPersistedAuthRawStringSync();
             if (tokenData) {
               const parsed = JSON.parse(tokenData);
               accessTokenAggressive = parsed.access_token || SUPABASE_ANON_KEY;
@@ -1385,7 +1386,7 @@ const DeliveryDashboard = () => {
                 try {
                   let accessToken = SUPABASE_ANON_KEY;
                   try {
-                    const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+                    const storedSession = readPersistedAuthRawStringSync();
                     if (storedSession) {
                       const parsed = JSON.parse(storedSession);
                       if (parsed.access_token) accessToken = parsed.access_token;
@@ -1576,7 +1577,7 @@ const DeliveryDashboard = () => {
     // Fallback: Check localStorage for auth
     const checkLocalAuth = () => {
       try {
-        const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+        const storedSession = readPersistedAuthRawStringSync();
         if (storedSession) {
           const parsed = JSON.parse(storedSession);
           if (parsed.user?.id) {
@@ -1613,7 +1614,7 @@ const DeliveryDashboard = () => {
     try {
       let accessToken = SUPABASE_ANON_KEY;
       try {
-        const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+        const storedSession = readPersistedAuthRawStringSync();
         if (storedSession) {
           const parsed = JSON.parse(storedSession);
           if (parsed.access_token) accessToken = parsed.access_token;
@@ -2435,7 +2436,7 @@ const DeliveryDashboard = () => {
     localStorage.removeItem('user_name');
     localStorage.removeItem('user_id');
     localStorage.removeItem('supplier_id');
-    localStorage.removeItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+    clearSupabasePersistedSessionSync();
     sessionStorage.clear();
     window.location.replace('/auth');
     signOut().catch(() => {});

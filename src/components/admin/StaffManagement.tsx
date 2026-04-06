@@ -1,3 +1,4 @@
+import { readPersistedAuthRawStringSync } from '@/utils/supabaseAccessToken';
 import { useState, useEffect } from "react";
 import { supabase, SUPABASE_URL, SUPABASE_ANON_KEY } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -186,7 +187,7 @@ export const StaffManagement = () => {
     // Get access token
     let accessToken = '';
     try {
-      const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+      const storedSession = readPersistedAuthRawStringSync();
       if (storedSession) {
         const parsed = JSON.parse(storedSession);
         accessToken = parsed.access_token || '';
@@ -251,7 +252,7 @@ export const StaffManagement = () => {
     const getCurrentUserRole = async () => {
       try {
         // First check localStorage for staff role
-        const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+        const storedSession = readPersistedAuthRawStringSync();
         if (storedSession) {
           const parsed = JSON.parse(storedSession);
           const userEmail = parsed.user?.email;

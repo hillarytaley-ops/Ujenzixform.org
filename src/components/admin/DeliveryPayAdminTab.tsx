@@ -1,3 +1,4 @@
+import { readPersistedAuthRawStringSync } from '@/utils/supabaseAccessToken';
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { MobileHorizontalScroll } from '@/components/ui/mobile-horizontal-scroll';
@@ -31,7 +32,7 @@ function isMissingMigrationError(err: { message?: string; code?: string; details
 
 function accessTokenFromStorage(): string | null {
   try {
-    const raw = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+    const raw = readPersistedAuthRawStringSync();
     if (!raw) return null;
     const p = JSON.parse(raw) as Record<string, unknown>;
     return (

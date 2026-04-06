@@ -99,9 +99,31 @@ const PageLoader = () => (
   </div>
 );
 
+/** Heavier lazy dashboards: clearer copy while chunks load (same behavior as PageLoader). */
+const DashboardPageLoader = () => (
+  <div
+    className="flex items-center justify-center min-h-screen bg-background"
+    role="status"
+    aria-live="polite"
+    aria-busy="true"
+  >
+    <div className="flex flex-col items-center gap-3 max-w-sm text-center px-4">
+      <div className="animate-spin rounded-full h-11 w-11 border-3 border-muted border-t-primary" />
+      <p className="text-foreground text-sm font-medium">Loading dashboard…</p>
+      <p className="text-muted-foreground text-xs">First open may take a few seconds while we prepare your workspace.</p>
+    </div>
+  </div>
+);
+
 // Suspense wrapper for lazy components
 const SuspenseWrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => (
   <React.Suspense fallback={<PageLoader />}>
+    {children}
+  </React.Suspense>
+);
+
+const DashboardSuspenseWrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => (
+  <React.Suspense fallback={<DashboardPageLoader />}>
     {children}
   </React.Suspense>
 );
@@ -331,32 +353,32 @@ const App = () => {
                     <Route path="/builder-dashboard" element={<BuilderDashboardEntryRedirect />} />
                     <Route path="/supplier-dashboard" element={
                       <RoleProtectedRoute allowedRoles={['supplier', 'admin']}>
-                        <SuspenseWrapper><SupplierDashboard /></SuspenseWrapper>
+                        <DashboardSuspenseWrapper><SupplierDashboard /></DashboardSuspenseWrapper>
                       </RoleProtectedRoute>
                     } />
                     <Route path="/delivery-dashboard" element={
                       <RoleProtectedRoute allowedRoles={['delivery', 'delivery_provider', 'admin']}>
-                        <SuspenseWrapper><DeliveryDashboard /></SuspenseWrapper>
+                        <DashboardSuspenseWrapper><DeliveryDashboard /></DashboardSuspenseWrapper>
                       </RoleProtectedRoute>
                     } />
                     <Route path="/private-client-dashboard" element={
                       <RoleProtectedRoute allowedRoles={['private_client', 'admin']}>
-                        <SuspenseWrapper><PrivateClientDashboard /></SuspenseWrapper>
+                        <DashboardSuspenseWrapper><PrivateClientDashboard /></DashboardSuspenseWrapper>
                       </RoleProtectedRoute>
                     } />
                     <Route path="/professional-builder-dashboard" element={
                       <RoleProtectedRoute allowedRoles={['professional_builder', 'builder', 'admin']}>
-                        <SuspenseWrapper><ProfessionalBuilderDashboardPage /></SuspenseWrapper>
+                        <DashboardSuspenseWrapper><ProfessionalBuilderDashboardPage /></DashboardSuspenseWrapper>
                       </RoleProtectedRoute>
                     } />
                     <Route path="/delivery-receiving-scanner" element={
                       <RoleProtectedRoute allowedRoles={['delivery', 'delivery_provider', 'admin']}>
-                        <SuspenseWrapper><DeliveryReceivingScanner /></SuspenseWrapper>
+                        <DashboardSuspenseWrapper><DeliveryReceivingScanner /></DashboardSuspenseWrapper>
                       </RoleProtectedRoute>
                     } />
                     <Route path="/supplier-dispatch-scanner" element={
                       <RoleProtectedRoute allowedRoles={['supplier', 'admin']}>
-                        <SuspenseWrapper><SupplierDispatchScanner /></SuspenseWrapper>
+                        <DashboardSuspenseWrapper><SupplierDispatchScanner /></DashboardSuspenseWrapper>
                       </RoleProtectedRoute>
                     } />
                     

@@ -13,6 +13,7 @@
  * ╚══════════════════════════════════════════════════════════════════════════════════════╝
  */
 
+import { readPersistedAuthRawStringSync } from '@/utils/supabaseAccessToken';
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -98,7 +99,7 @@ export const OrderHistory: React.FC<OrderHistoryProps> = ({ userId, userRole }) 
       
       // Use native fetch with timeout for faster loading
       // Get access token from localStorage
-      const stored = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+      const stored = readPersistedAuthRawStringSync();
       let accessToken = '';
       if (stored) {
         try {
@@ -209,7 +210,7 @@ export const OrderHistory: React.FC<OrderHistoryProps> = ({ userId, userRole }) 
     
     // Use native fetch with timeout for faster loading
     // Get access token from localStorage
-    const stored = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+    const stored = readPersistedAuthRawStringSync();
     let accessToken = '';
     if (stored) {
       try {

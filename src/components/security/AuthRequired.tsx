@@ -18,6 +18,7 @@
  * ╚══════════════════════════════════════════════════════════════════════════════════════╝
  */
 
+import { readPersistedAuthRawStringSync } from '@/utils/supabaseAccessToken';
 import { useEffect, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -46,7 +47,7 @@ export const AuthRequired = ({ children }: AuthRequiredProps) => {
     }
 
     // FAST PATH: Check localStorage first for instant access
-    const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+    const storedSession = readPersistedAuthRawStringSync();
     const adminAuthenticated = localStorage.getItem('admin_authenticated') === 'true';
     
     if (storedSession || adminAuthenticated) {
@@ -64,7 +65,7 @@ export const AuthRequired = ({ children }: AuthRequiredProps) => {
       if (loading) {
         setLoading(false);
         // Check localStorage one more time
-        const hasSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+        const hasSession = readPersistedAuthRawStringSync();
         if (hasSession) {
           setIsAuthenticated(true);
         } else {
@@ -106,7 +107,7 @@ export const AuthRequired = ({ children }: AuthRequiredProps) => {
       // Also check localStorage for admin authentication (fallback for admin portal)
       const adminAuthenticated = localStorage.getItem('admin_authenticated') === 'true';
       const adminLoginTime = localStorage.getItem('admin_login_time');
-      const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+      const storedSession = readPersistedAuthRawStringSync();
       
       // Check if admin session is still valid (24 hour expiry)
       const isAdminSessionValid = adminAuthenticated && adminLoginTime && 
@@ -127,7 +128,7 @@ export const AuthRequired = ({ children }: AuthRequiredProps) => {
       
       // Check localStorage fallback even on error
       const adminAuthenticated = localStorage.getItem('admin_authenticated') === 'true';
-      const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+      const storedSession = readPersistedAuthRawStringSync();
       
       if (adminAuthenticated || storedSession) {
         setIsAuthenticated(true);

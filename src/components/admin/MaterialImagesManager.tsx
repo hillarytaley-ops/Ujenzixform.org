@@ -33,6 +33,7 @@
  * ╚══════════════════════════════════════════════════════════════════════════════════════╝
  */
 
+import { readPersistedAuthRawStringSync } from '@/utils/supabaseAccessToken';
 import React, { useState, useEffect, useRef } from 'react';
 import { SUPABASE_ANON_KEY, SUPABASE_URL, supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -320,7 +321,7 @@ export const MaterialImagesManager: React.FC = () => {
     // Get auth token from localStorage
     let accessToken: string | null = null;
     try {
-      const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+      const storedSession = readPersistedAuthRawStringSync();
       if (storedSession) {
         const parsed = JSON.parse(storedSession);
         accessToken = parsed.access_token;
@@ -409,7 +410,7 @@ export const MaterialImagesManager: React.FC = () => {
     if (ids.length === 0) return;
     let accessToken: string | null = null;
     try {
-      const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+      const storedSession = readPersistedAuthRawStringSync();
       if (storedSession) {
         const parsed = JSON.parse(storedSession);
         accessToken = parsed.access_token;
@@ -453,7 +454,7 @@ export const MaterialImagesManager: React.FC = () => {
     }
     let accessToken: string | null = null;
     try {
-      const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+      const storedSession = readPersistedAuthRawStringSync();
       if (storedSession) {
         const parsed = JSON.parse(storedSession);
         accessToken = parsed.access_token;
@@ -539,7 +540,7 @@ export const MaterialImagesManager: React.FC = () => {
     // Get auth token from localStorage
     let accessToken: string | null = null;
     try {
-      const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+      const storedSession = readPersistedAuthRawStringSync();
       if (storedSession) {
         const parsed = JSON.parse(storedSession);
         accessToken = parsed.access_token;
@@ -702,7 +703,7 @@ export const MaterialImagesManager: React.FC = () => {
     // Get session from localStorage (faster than supabase.auth.getSession which can hang)
     let accessToken: string | null = null;
     try {
-      const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+      const storedSession = readPersistedAuthRawStringSync();
       if (storedSession) {
         const parsed = JSON.parse(storedSession);
         accessToken = parsed.access_token;
@@ -899,7 +900,7 @@ export const MaterialImagesManager: React.FC = () => {
     // Get session from localStorage (faster than supabase.auth.getSession which can hang)
     let accessToken: string | null = null;
     try {
-      const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+      const storedSession = readPersistedAuthRawStringSync();
       if (storedSession) {
         const parsed = JSON.parse(storedSession);
         accessToken = parsed.access_token;
@@ -1273,7 +1274,7 @@ export const MaterialImagesManager: React.FC = () => {
       // Get session from localStorage (faster than supabase.auth.getSession which can hang)
       let accessToken: string | null = null;
       try {
-        const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+        const storedSession = readPersistedAuthRawStringSync();
         if (storedSession) {
           const parsed = JSON.parse(storedSession);
           accessToken = parsed.access_token;

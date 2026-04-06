@@ -1,3 +1,4 @@
+import { clearSupabasePersistedSessionSync, readPersistedAuthRawStringSync } from '@/utils/supabaseAccessToken';
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useUrlTabSync } from "@/hooks/useUrlTabSync";
@@ -529,7 +530,7 @@ const AdminDashboard = () => {
 
     const isAdminAuthenticated = localStorage.getItem('admin_authenticated') === 'true';
     const userRole = localStorage.getItem('user_role');
-    const supabaseToken = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+    const supabaseToken = readPersistedAuthRawStringSync();
     console.log('🔐 Admin Dashboard: Initial auth check', { isAdminAuthenticated, userRole, hasToken: !!supabaseToken });
     
     // Listen for auth state changes (e.g., sign out)
@@ -552,7 +553,7 @@ const AdminDashboard = () => {
         localStorage.removeItem('user_id');
         localStorage.removeItem('staff_role');
         localStorage.removeItem('staff_name');
-        localStorage.removeItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+        clearSupabasePersistedSessionSync();
         // Redirect immediately
         window.location.replace('/admin-login');
       }
@@ -763,7 +764,7 @@ const AdminDashboard = () => {
     // Get auth token from localStorage
     let accessToken: string | null = null;
     try {
-      const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+      const storedSession = readPersistedAuthRawStringSync();
       if (storedSession) {
         const parsed = JSON.parse(storedSession);
         accessToken = parsed.access_token;
@@ -959,7 +960,7 @@ const AdminDashboard = () => {
       // Get auth token from localStorage
       let accessToken: string | null = null;
       try {
-        const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+        const storedSession = readPersistedAuthRawStringSync();
         if (storedSession) {
           const parsed = JSON.parse(storedSession);
           accessToken = parsed.access_token;
@@ -1051,7 +1052,7 @@ const AdminDashboard = () => {
     // Get auth token from localStorage
     let accessToken: string | null = null;
     try {
-      const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+      const storedSession = readPersistedAuthRawStringSync();
       if (storedSession) {
         const parsed = JSON.parse(storedSession);
         accessToken = parsed.access_token;
@@ -2065,7 +2066,7 @@ const AdminDashboard = () => {
     localStorage.removeItem('staff_name');
     
     // Clear the Supabase auth token
-    localStorage.removeItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+    clearSupabasePersistedSessionSync();
     
     // Clear session storage
     sessionStorage.clear();

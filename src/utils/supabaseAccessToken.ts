@@ -84,14 +84,66 @@ export async function getAccessTokenWithPersistenceFallback(): Promise<string> {
 }
 
 /** Older deploys / dev may still persist under this fixed project ref key. */
-const LEGACY_SUPABASE_AUTH_KEY = "sb-wuuyjjpgzgeimiptuuws-auth-token";
+export const LEGACY_SUPABASE_AUTH_STORAGE_KEY = "sb-wuuyjjpgzgeimiptuuws-auth-token";
 
 function readLegacyAuthBlob(): ParsedAuthBlob | null {
   try {
-    const raw = localStorage.getItem(LEGACY_SUPABASE_AUTH_KEY);
+    const raw = localStorage.getItem(LEGACY_SUPABASE_AUTH_STORAGE_KEY);
     return raw ? parseAuthBlob(raw) : null;
   } catch {
     return null;
+  }
+}
+
+/**
+ * Best-effort JWT without awaiting getSession (sessionStorage → localStorage → legacy localStorage).
+ * Use in sync paths; prefer readAuthSessionForRest() when you can await.
+ */
+export function readAccessTokenSyncBestEffort(): string {
+  const t = readPersistedAccessTokenSync();
+  if (t) return t;
+  return readLegacyAuthBlob()?.access_token || "";
+}
+
+/**
+ * Raw JSON session string (sessionStorage → localStorage → legacy localStorage).
+ * For callers that still JSON.parse; prefer readAccessTokenSyncBestEffort / readAuthUserIdSync when possible.
+ */
+export function readPersistedAuthRawStringSync(): string | null {
+  const key = persistedSessionStorageKey();
+  for (const store of [sessionStorage, localStorage]) {
+    try {
+      const raw = store.getItem(key);
+      if (raw && raw.trim().length > 2) return raw;
+    } catch {
+      /* ignore */
+    }
+  }
+  try {
+    const legacy = localStorage.getItem(LEGACY_SUPABASE_AUTH_STORAGE_KEY);
+    if (legacy && legacy.trim().length > 2) return legacy;
+  } catch {
+    /* ignore */
+  }
+  return null;
+}
+
+/** True if any known Supabase auth blob exists in sessionStorage or localStorage. */
+export function hasPersistedSupabaseSessionBlobSync(): boolean {
+  return !!readPersistedAuthRawStringSync();
+}
+
+/** Remove Supabase persisted session from both storages (current + legacy keys). */
+export function clearSupabasePersistedSessionSync(): void {
+  const keys = [persistedSessionStorageKey(), LEGACY_SUPABASE_AUTH_STORAGE_KEY];
+  for (const store of [sessionStorage, localStorage]) {
+    for (const k of keys) {
+      try {
+        store.removeItem(k);
+      } catch {
+        /* ignore */
+      }
+    }
   }
 }
 

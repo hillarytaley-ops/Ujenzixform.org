@@ -1,3 +1,4 @@
+import { readPersistedAuthRawStringSync } from '@/utils/supabaseAccessToken';
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from '@/integrations/supabase/client';
 /**
  * ╔══════════════════════════════════════════════════════════════════════════════════════╗
@@ -138,7 +139,7 @@ export const AdminOrdersManager: React.FC = () => {
       
       // Use native fetch with timeout
       // Get access token from localStorage
-      const stored = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+      const stored = readPersistedAuthRawStringSync();
       let accessToken = '';
       if (stored) {
         try {

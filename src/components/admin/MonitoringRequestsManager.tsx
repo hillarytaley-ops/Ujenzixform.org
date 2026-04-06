@@ -1,3 +1,4 @@
+import { readPersistedAuthRawStringSync } from '@/utils/supabaseAccessToken';
 import React, { useState, useEffect, useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -53,7 +54,7 @@ import { format } from "date-fns";
 // Helper to get access token
 const getAccessToken = (): string => {
   try {
-    const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+    const storedSession = readPersistedAuthRawStringSync();
     if (storedSession) {
       const parsed = JSON.parse(storedSession);
       return parsed?.access_token || SUPABASE_ANON_KEY;

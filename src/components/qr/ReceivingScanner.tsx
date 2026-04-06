@@ -1,3 +1,4 @@
+import { readPersistedAuthRawStringSync } from '@/utils/supabaseAccessToken';
 import React, { useRef, useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -169,7 +170,7 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
   // Helper to get user from localStorage
   const getUserFromStorage = (): { id: string; accessToken: string } | null => {
     try {
-      const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+      const storedSession = readPersistedAuthRawStringSync();
       if (storedSession) {
         const parsed = JSON.parse(storedSession);
         if (parsed.user?.id && parsed.access_token) {
@@ -418,7 +419,7 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
       // REST + user JWT (same pattern as Delivery Dashboard validation) — supabase-js can return 0 rows under RLS while REST with Bearer works.
       let accessToken = SUPABASE_ANON_KEY;
       try {
-        const stored = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+        const stored = readPersistedAuthRawStringSync();
         if (stored) {
           const p = JSON.parse(stored);
           if (p.access_token) accessToken = p.access_token;
@@ -933,7 +934,7 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
       const getFreshAccessToken = async (): Promise<string> => {
         // First, try localStorage (fastest, no network call)
         try {
-          const stored = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+          const stored = readPersistedAuthRawStringSync();
           if (stored) {
             const parsed = JSON.parse(stored);
             if (parsed.access_token) {

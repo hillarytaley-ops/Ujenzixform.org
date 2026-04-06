@@ -1,3 +1,4 @@
+import { readPersistedAuthRawStringSync } from '@/utils/supabaseAccessToken';
 import React, { useState, useEffect } from 'react';
 import Navigation from '@/components/Navigation';
 import Footer from '@/components/Footer';
@@ -134,7 +135,7 @@ const DeliveryProviderApplication = () => {
         // If no user from Supabase, try localStorage fallback
         if (!user) {
           try {
-            const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+            const storedSession = readPersistedAuthRawStringSync();
             if (storedSession) {
               const parsed = JSON.parse(storedSession);
               if (parsed.user) {
@@ -177,7 +178,7 @@ const DeliveryProviderApplication = () => {
         
         // Final fallback - try localStorage
         try {
-          const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+          const storedSession = readPersistedAuthRawStringSync();
           if (storedSession) {
             const parsed = JSON.parse(storedSession);
             if (parsed.user) {

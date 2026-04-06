@@ -1,3 +1,4 @@
+import { readPersistedAuthRawStringSync } from '@/utils/supabaseAccessToken';
 import React, { useState, useRef, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
@@ -369,7 +370,7 @@ export const BuilderStories: React.FC<BuilderStoriesProps> = ({
     let userId: string | null = currentUserId || null;
     if (!userId) {
       try {
-        const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+        const storedSession = readPersistedAuthRawStringSync();
         if (storedSession) {
           const parsed = JSON.parse(storedSession);
           userId = parsed.user?.id;
@@ -392,7 +393,7 @@ export const BuilderStories: React.FC<BuilderStoriesProps> = ({
       // Get access token
       let accessToken = '';
       try {
-        const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+        const storedSession = readPersistedAuthRawStringSync();
         if (storedSession) {
           const parsed = JSON.parse(storedSession);
           accessToken = parsed.access_token || '';

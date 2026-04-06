@@ -4,6 +4,7 @@
  * Updated: 2026-03-15 - Fixed syntax errors and added purchase_order cleanup
  */
 
+import { readPersistedAuthRawStringSync } from '@/utils/supabaseAccessToken';
 import { SUPABASE_ANON_KEY, SUPABASE_URL, supabase } from '@/integrations/supabase/client';
 
 export interface CleanupResult {
@@ -193,7 +194,7 @@ export async function cleanupDuplicateDeliveryRequests(): Promise<CleanupResult>
 
       // Cancel all duplicates - use native fetch for better reliability
       try {
-        const stored = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+        const stored = readPersistedAuthRawStringSync();
         let accessToken = '';
         if (stored) {
           const parsed = JSON.parse(stored);

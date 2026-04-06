@@ -1,3 +1,4 @@
+import { readPersistedAuthRawStringSync } from '@/utils/supabaseAccessToken';
 import React, { useState, useEffect, useRef } from "react";
 import { supabase, SUPABASE_URL, SUPABASE_ANON_KEY } from "@/integrations/supabase/client";
 import {
@@ -170,7 +171,7 @@ export const VideoPlayer = ({ video, isOpen, onClose, onVideoUpdate }: VideoPlay
       let accessToken = '';
       
       try {
-        const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+        const storedSession = readPersistedAuthRawStringSync();
         if (storedSession) {
           const parsed = JSON.parse(storedSession);
           userId = parsed.user?.id || null;
@@ -214,7 +215,7 @@ export const VideoPlayer = ({ video, isOpen, onClose, onVideoUpdate }: VideoPlay
       let accessToken = '';
       
       try {
-        const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+        const storedSession = readPersistedAuthRawStringSync();
         if (storedSession) {
           const parsed = JSON.parse(storedSession);
           userId = parsed.user?.id || null;
@@ -340,7 +341,7 @@ export const VideoPlayer = ({ video, isOpen, onClose, onVideoUpdate }: VideoPlay
       let accessToken = '';
       
       try {
-        const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+        const storedSession = readPersistedAuthRawStringSync();
         if (storedSession) {
           const parsed = JSON.parse(storedSession);
           userId = parsed.user?.id || null;

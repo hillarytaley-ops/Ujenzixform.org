@@ -20,11 +20,7 @@ import { useNavigate } from 'react-router-dom';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/components/ui/use-toast';
 import { SUPABASE_ANON_KEY, SUPABASE_URL, supabase } from '@/integrations/supabase/client';
-import {
-  getAccessTokenWithPersistenceFallback,
-  readPersistedAccessTokenSync,
-  readPersistedAuthUserSync,
-} from '@/utils/supabaseAccessToken';
+import { getAccessTokenWithPersistenceFallback, readPersistedAccessTokenSync, readPersistedAuthRawStringSync, readPersistedAuthUserSync } from '@/utils/supabaseAccessToken';
 import { useAuth } from '@/contexts/AuthContext';
 import QRCodeLib from 'qrcode';
 import { getPrefetchedQRCodes } from '@/services/dataPrefetch';
@@ -487,7 +483,7 @@ export const EnhancedQRCodeManager: React.FC<EnhancedQRCodeManagerProps> = ({
     const { id: uid } = readPersistedAuthUserSync();
     if (uid && tok) return { id: uid, accessToken: tok };
     try {
-      const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+      const storedSession = readPersistedAuthRawStringSync();
       if (storedSession) {
         const parsed = JSON.parse(storedSession);
         const id =

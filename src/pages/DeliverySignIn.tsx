@@ -28,6 +28,7 @@
  * ╚══════════════════════════════════════════════════════════════════════════════════════╝
  */
 
+import { LEGACY_SUPABASE_AUTH_STORAGE_KEY } from '@/utils/supabaseAccessToken';
 import { useState, useEffect } from "react";
 import { useNavigate, Link, useSearchParams } from "react-router-dom";
 import { supabase, SUPABASE_URL, SUPABASE_ANON_KEY } from "@/integrations/supabase/client";
@@ -400,7 +401,7 @@ const DeliverySignIn = () => {
         user: authData.user
       };
       
-      localStorage.setItem('sb-wuuyjjpgzgeimiptuuws-auth-token', JSON.stringify(session));
+      localStorage.setItem(LEGACY_SUPABASE_AUTH_STORAGE_KEY, JSON.stringify(session));
       localStorage.setItem('access_token', authData.access_token);
       localStorage.setItem('user_email', authData.user.email?.toLowerCase() || '');
       
@@ -631,8 +632,7 @@ const DeliverySignIn = () => {
           if (!existingRole?.role) {
             console.log('🚚 New account after sign-in — redirect to partner application');
             if (signInData.session) {
-              localStorage.setItem(
-                'sb-wuuyjjpgzgeimiptuuws-auth-token',
+              localStorage.setItem(LEGACY_SUPABASE_AUTH_STORAGE_KEY,
                 JSON.stringify({
                   access_token: signInData.session.access_token,
                   refresh_token: signInData.session.refresh_token,
@@ -658,8 +658,7 @@ const DeliverySignIn = () => {
           }
 
           if (signInData.session) {
-            localStorage.setItem(
-              'sb-wuuyjjpgzgeimiptuuws-auth-token',
+            localStorage.setItem(LEGACY_SUPABASE_AUTH_STORAGE_KEY,
               JSON.stringify({
                 access_token: signInData.session.access_token,
                 refresh_token: signInData.session.refresh_token,
@@ -712,8 +711,7 @@ const DeliverySignIn = () => {
       if (!existingRole?.role) {
         console.log('🚚 Session after sign-up — redirect to partner application');
         if (authData.session) {
-          localStorage.setItem(
-            'sb-wuuyjjpgzgeimiptuuws-auth-token',
+          localStorage.setItem(LEGACY_SUPABASE_AUTH_STORAGE_KEY,
             JSON.stringify({
               access_token: authData.session.access_token,
               refresh_token: authData.session.refresh_token,
@@ -739,8 +737,7 @@ const DeliverySignIn = () => {
       }
 
       if (authData.session) {
-        localStorage.setItem(
-          'sb-wuuyjjpgzgeimiptuuws-auth-token',
+        localStorage.setItem(LEGACY_SUPABASE_AUTH_STORAGE_KEY,
           JSON.stringify({
             access_token: authData.session.access_token,
             refresh_token: authData.session.refresh_token,

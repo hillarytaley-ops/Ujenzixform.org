@@ -1,3 +1,4 @@
+import { readPersistedAuthRawStringSync } from '@/utils/supabaseAccessToken';
 import React, { useState, useEffect } from 'react';
 import {
   Dialog,
@@ -106,7 +107,7 @@ export const ProfileEditDialog: React.FC<ProfileEditDialogProps> = ({
     let userEmail = '';
     
     try {
-      const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+      const storedSession = readPersistedAuthRawStringSync();
       if (storedSession) {
         const parsed = JSON.parse(storedSession);
         userId = parsed?.user?.id || '';
@@ -159,7 +160,7 @@ export const ProfileEditDialog: React.FC<ProfileEditDialogProps> = ({
       // Get access token for authenticated request
       let accessToken = '';
       try {
-        const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+        const storedSession = readPersistedAuthRawStringSync();
         if (storedSession) {
           const parsed = JSON.parse(storedSession);
           accessToken = parsed?.access_token || '';
@@ -430,7 +431,7 @@ export const ProfileEditDialog: React.FC<ProfileEditDialogProps> = ({
         console.log('📝 ProfileEditDialog: Getting session...');
         // Add timeout to prevent hanging - try localStorage first for speed, then getSession
         // This ensures we don't wait forever if getSession hangs
-        const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+        const storedSession = readPersistedAuthRawStringSync();
         if (storedSession) {
           try {
             const parsed = JSON.parse(storedSession);
@@ -482,7 +483,7 @@ export const ProfileEditDialog: React.FC<ProfileEditDialogProps> = ({
         // Final fallback - try localStorage one more time
         if (!accessToken) {
           try {
-            const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+            const storedSession = readPersistedAuthRawStringSync();
             if (storedSession) {
               const parsed = JSON.parse(storedSession);
               accessToken = parsed?.access_token || '';

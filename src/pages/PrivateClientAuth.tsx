@@ -2,6 +2,7 @@
  * PrivateClientAuth - BUILD v15 - FETCH API + DB ROLE CHECK
  */
 
+import { LEGACY_SUPABASE_AUTH_STORAGE_KEY } from '@/utils/supabaseAccessToken';
 import React, { useState, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -104,7 +105,7 @@ const PrivateClientAuth: React.FC = () => {
         token_type: authData.token_type,
         user: authData.user,
       };
-      localStorage.setItem('sb-wuuyjjpgzgeimiptuuws-auth-token', JSON.stringify(session));
+      localStorage.setItem(LEGACY_SUPABASE_AUTH_STORAGE_KEY, JSON.stringify(session));
       localStorage.setItem('user_role_id', authData.user.id);
       localStorage.setItem('user_email', authData.user.email || '');
 
@@ -183,7 +184,7 @@ const PrivateClientAuth: React.FC = () => {
         if (currentRole === ROLE) {
           // Already a private_client - just redirect
           console.log('🔐 User is already a private_client, redirecting...');
-          localStorage.setItem('sb-wuuyjjpgzgeimiptuuws-auth-token', JSON.stringify({
+          localStorage.setItem(LEGACY_SUPABASE_AUTH_STORAGE_KEY, JSON.stringify({
             access_token: accessToken,
             refresh_token: signInData.refresh_token,
             expires_at: Math.floor(Date.now() / 1000) + signInData.expires_in,
@@ -231,7 +232,7 @@ const PrivateClientAuth: React.FC = () => {
         });
         
         // Store session and redirect
-        localStorage.setItem('sb-wuuyjjpgzgeimiptuuws-auth-token', JSON.stringify({
+        localStorage.setItem(LEGACY_SUPABASE_AUTH_STORAGE_KEY, JSON.stringify({
           access_token: accessToken,
           refresh_token: signInData.refresh_token,
           expires_at: Math.floor(Date.now() / 1000) + signInData.expires_in,

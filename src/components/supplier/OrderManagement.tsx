@@ -1,3 +1,4 @@
+import { readPersistedAuthRawStringSync } from '@/utils/supabaseAccessToken';
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -208,7 +209,7 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, in
           if (!orderSupplierId || orderSupplierId !== supplierId) {
             // Also check if it matches any related supplier IDs
             try {
-              const stored = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+              const stored = readPersistedAuthRawStringSync();
               let accessToken = '';
               if (stored) {
                 const parsed = JSON.parse(stored);
@@ -568,7 +569,7 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, in
       }
       if (!userId || !accessToken) {
         try {
-          const stored = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+          const stored = readPersistedAuthRawStringSync();
           if (stored) {
             const parsed = JSON.parse(stored);
             if (!userId) userId = parsed.user?.id || parsed.currentSession?.user?.id || '';

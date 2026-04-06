@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useNavigate, Link } from "react-router-dom";
 import { supabase, SUPABASE_URL, SUPABASE_ANON_KEY } from "@/integrations/supabase/client";
-import { readAuthSessionForRest, readAuthUserIdSync, persistedSessionStorageKey } from "@/utils/supabaseAccessToken";
+import { clearSupabasePersistedSessionSync, persistedSessionStorageKey, readAuthSessionForRest, readAuthUserIdSync } from '@/utils/supabaseAccessToken';
 
 /** delivery_requests.builder_id FK → profiles.id; also match auth uid for legacy rows */
 function encodeDeliveryRequestsBuilderOr(userId: string, profileId?: string | null): string {
@@ -660,7 +660,7 @@ const PrivateClientDashboard = () => {
     } catch {
       /* noop */
     }
-    localStorage.removeItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+    clearSupabasePersistedSessionSync();
     sessionStorage.clear();
     window.location.replace('/auth');
     signOut().catch(() => {});

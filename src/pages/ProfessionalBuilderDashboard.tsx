@@ -1,3 +1,8 @@
+import {
+  clearSupabasePersistedSessionSync,
+  readAccessTokenSyncBestEffort,
+  readPersistedAuthRawStringSync,
+} from '@/utils/supabaseAccessToken';
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -739,7 +744,7 @@ const ProfessionalBuilderDashboardPage = () => {
   const getUserId = (): string => {
     if (authUser?.id) return authUser.id;
     try {
-      const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+      const storedSession = readPersistedAuthRawStringSync();
       if (storedSession) {
         const parsed = JSON.parse(storedSession);
         return parsed.user?.id || '';
@@ -796,7 +801,7 @@ const ProfessionalBuilderDashboardPage = () => {
     let userId = authUser?.id || user?.id;
     if (!userId) {
       try {
-        const stored = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+        const stored = readPersistedAuthRawStringSync();
         if (stored) {
           const parsed = JSON.parse(stored);
           userId = parsed.user?.id || '';
@@ -1271,21 +1276,10 @@ const ProfessionalBuilderDashboardPage = () => {
       // Use REST API directly with fetch to bypass Supabase client issues
       console.log('📁 Fetching projects via REST API for userId:', userId);
       
-      // CRITICAL: read localStorage first. await supabase.auth.getSession() can hang on some
+      // CRITICAL: read persisted session first. await supabase.auth.getSession() can hang on some
       // browsers/networks and never resolve — that left projects stuck empty after safety timeout.
-      let accessToken: string | null = null;
-      try {
-        const storedSession = localStorage.getItem(
-          "sb-wuuyjjpgzgeimiptuuws-auth-token"
-        );
-        if (storedSession) {
-          const parsed = JSON.parse(storedSession);
-          accessToken = parsed.access_token || null;
-          if (accessToken) console.log("📁 Got token from localStorage (fast path)");
-        }
-      } catch (e) {
-        console.warn("📁 Failed to parse auth from localStorage:", e);
-      }
+      let accessToken: string | null = readAccessTokenSyncBestEffort() || null;
+      if (accessToken) console.log("📁 Got token from persisted session (fast path)");
       if (!accessToken) {
         try {
           const sessPromise = supabase.auth.getSession();
@@ -2125,7 +2119,7 @@ const ProfessionalBuilderDashboardPage = () => {
     localStorage.removeItem('user_email');
     localStorage.removeItem('user_name');
     localStorage.removeItem('user_id');
-    localStorage.removeItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+    clearSupabasePersistedSessionSync();
     sessionStorage.clear();
     window.location.replace('/auth');
     signOut().catch(() => {});
@@ -3113,7 +3107,7 @@ const ProfessionalBuilderDashboardPage = () => {
               let builderId = profile?.id || user?.id || '';
               if (!builderId) {
                 try {
-                  const stored = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+                  const stored = readPersistedAuthRawStringSync();
                   if (stored) {
                     const parsed = JSON.parse(stored);
                     builderId = parsed.user?.id || '';
@@ -3136,7 +3130,7 @@ const ProfessionalBuilderDashboardPage = () => {
               let userId = user?.id || '';
               if (!builderId || !userId) {
                 try {
-                  const stored = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+                  const stored = readPersistedAuthRawStringSync();
                   if (stored) {
                     const parsed = JSON.parse(stored);
                     userId = parsed.user?.id || '';
@@ -3481,7 +3475,7 @@ const ProfessionalBuilderDashboardPage = () => {
                 <TrackingTab
                   userId={user?.id || authUser?.id || localStorage.getItem('user_id') || (() => {
                     try {
-                      const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+                      const storedSession = readPersistedAuthRawStringSync();
                       if (storedSession) {
                         const parsed = JSON.parse(storedSession);
                         return parsed.user?.id || '';

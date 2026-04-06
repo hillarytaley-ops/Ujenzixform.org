@@ -36,6 +36,7 @@
  * ╚══════════════════════════════════════════════════════════════════════════════════════╝
  */
 
+import { readPersistedAuthRawStringSync } from '@/utils/supabaseAccessToken';
 import React, { useState, useEffect, useRef } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -308,7 +309,7 @@ export const ProductManagement: React.FC<ProductManagementProps> = ({ supplierId
     // Get access token
     let accessToken = '';
     try {
-      const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+      const storedSession = readPersistedAuthRawStringSync();
       if (storedSession) {
         const parsed = JSON.parse(storedSession);
         accessToken = parsed.access_token || '';
@@ -377,7 +378,7 @@ export const ProductManagement: React.FC<ProductManagementProps> = ({ supplierId
       // Get access token from localStorage directly (faster than getSession)
       let accessToken = '';
       try {
-        const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+        const storedSession = readPersistedAuthRawStringSync();
         if (storedSession) {
           const parsed = JSON.parse(storedSession);
           accessToken = parsed.access_token || '';
@@ -473,7 +474,7 @@ export const ProductManagement: React.FC<ProductManagementProps> = ({ supplierId
     }
     // Last resort: try to get from localStorage
     try {
-      const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+      const storedSession = readPersistedAuthRawStringSync();
       if (storedSession) {
         const parsed = JSON.parse(storedSession);
         return parsed.user?.id || '';
@@ -493,7 +494,7 @@ export const ProductManagement: React.FC<ProductManagementProps> = ({ supplierId
     try {
       let accessToken = '';
       try {
-        const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+        const storedSession = readPersistedAuthRawStringSync();
         if (storedSession) {
           const parsed = JSON.parse(storedSession);
           accessToken = parsed.access_token || '';
@@ -552,7 +553,7 @@ export const ProductManagement: React.FC<ProductManagementProps> = ({ supplierId
       // Get access token
       let accessToken = '';
       try {
-        const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+        const storedSession = readPersistedAuthRawStringSync();
         if (storedSession) {
           const parsed = JSON.parse(storedSession);
           accessToken = parsed.access_token || '';
@@ -1848,7 +1849,7 @@ export const ProductManagement: React.FC<ProductManagementProps> = ({ supplierId
                     const effectiveSupplierId = getEffectiveSupplierId();
                     let accessToken = '';
                     try {
-                      const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+                      const storedSession = readPersistedAuthRawStringSync();
                       if (storedSession) {
                         const parsed = JSON.parse(storedSession);
                         accessToken = parsed.access_token || '';

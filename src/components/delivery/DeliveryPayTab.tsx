@@ -1,8 +1,9 @@
+import { readPersistedAuthRawStringSync } from '@/utils/supabaseAccessToken';
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { MobileHorizontalScroll } from '@/components/ui/mobile-horizontal-scroll';
-import { Route, DollarSign, RefreshCw, Package, AlertCircle } from 'lucide-react';
-import { SUPABASE_URL, SUPABASE_ANON_KEY } from '@/integrations/supabase/client';
+import { Route, DollarSign, RefreshCw, Package, AlertCircle, FileText } from 'lucide-react';
+import { supabase, SUPABASE_URL, SUPABASE_ANON_KEY } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 
 interface MileageRow {
@@ -17,10 +18,21 @@ interface MileageRow {
   status: string | null;
 }
 
+interface BuilderInvoiceRow {
+  id: string;
+  invoice_number: string;
+  total_amount: number;
+  due_date: string | null;
+  invoice_date: string | null;
+  payment_status: string | null;
+  status: string | null;
+  purchase_order?: { po_number?: string | null } | null;
+}
+
 function resolveDeliveryProviderUserId(authUserId?: string | null): string | null {
   if (authUserId) return authUserId;
   try {
-    const raw = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+    const raw = readPersistedAuthRawStringSync();
     if (raw) {
       const p = JSON.parse(raw);
       const id = p.user?.id || p.currentSession?.user?.id || p.session?.user?.id;
@@ -35,7 +47,7 @@ function resolveDeliveryProviderUserId(authUserId?: string | null): string | nul
 
 function accessTokenFromStorage(): string | null {
   try {
-    const raw = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+    const raw = readPersistedAuthRawStringSync();
     if (!raw) return null;
     const p = JSON.parse(raw);
     return (
@@ -86,6 +98,8 @@ async function fetchMileagePayRest(
 export const DeliveryPayTab: React.FC<{ isDarkMode?: boolean }> = ({ isDarkMode }) => {
   const { user, session, loading: authLoading } = useAuth();
   const [rows, setRows] = useState<MileageRow[]>([]);
+  const [builderInvoices, setBuilderInvoices] = useState<BuilderInvoiceRow[]>([]);
+  const [builderInvoicesLoading, setBuilderInvoicesLoading] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [migrationNeeded, setMigrationNeeded] = useState(false);
@@ -143,6 +157,37 @@ export const DeliveryPayTab: React.FC<{ isDarkMode?: boolean }> = ({ isDarkMode 
     }
   }, [user?.id, session?.user?.id, session?.access_token]);
 
+  const fetchBuilderInvoices = useCallback(async () => {
+    const uid = user?.id ?? session?.user?.id ?? null;
+    if (!uid) {
+      setBuilderInvoices([]);
+      return;
+    }
+    setBuilderInvoicesLoading(true);
+    try {
+      const { data, error: invErr } = await supabase
+        .from('invoices')
+        .select(
+          'id, invoice_number, total_amount, due_date, invoice_date, payment_status, status, purchase_order:purchase_orders(po_number)'
+        )
+        .neq('payment_status', 'paid')
+        .in('status', ['sent', 'acknowledged'])
+        .order('created_at', { ascending: false })
+        .limit(25);
+      if (invErr) throw invErr;
+      setBuilderInvoices((data || []) as BuilderInvoiceRow[]);
+    } catch {
+      setBuilderInvoices([]);
+    } finally {
+      setBuilderInvoicesLoading(false);
+    }
+  }, [user?.id, session?.user?.id]);
+
+  useEffect(() => {
+    if (authLoading) return;
+    void fetchBuilderInvoices();
+  }, [authLoading, fetchBuilderInvoices]);
+
   useEffect(() => {
     if (authLoading) return;
 
@@ -169,39 +214,93 @@ export const DeliveryPayTab: React.FC<{ isDarkMode?: boolean }> = ({ isDarkMode 
   const mutedText = isDarkMode ? 'text-gray-400' : 'text-gray-500';
   const cardBg = isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200';
 
-  if (loading) {
-    return (
-      <Card className={cardBg}>
-        <CardContent className="py-12 flex items-center justify-center">
-          <RefreshCw className="h-8 w-8 animate-spin text-teal-500 mr-2" />
-          <span className={mutedText}>Loading mileage and pay data...</span>
+  const builderInvoicesSection =
+    builderInvoicesLoading || builderInvoices.length > 0 ? (
+      <Card className={`${cardBg} border-red-300 dark:border-red-900/60`}>
+        <CardHeader>
+          <CardTitle className={`flex items-center gap-2 ${textColor}`}>
+            <FileText className="h-5 w-5 text-red-500 shrink-0" />
+            Pay the professional builder now
+          </CardTitle>
+          <CardDescription className={mutedText}>
+            These invoices were forwarded to the builder for orders you delivered. Pay the builder immediately (per your
+            delivery agreement).
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {builderInvoicesLoading && builderInvoices.length === 0 ? (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <RefreshCw className="h-5 w-5 animate-spin text-teal-500" />
+              Loading invoice list…
+            </div>
+          ) : (
+            <ul className="space-y-3">
+              {builderInvoices.map((inv) => (
+                <li
+                  key={inv.id}
+                  className={`rounded-lg border p-3 ${isDarkMode ? 'border-gray-600 bg-gray-900/30' : 'border-red-100 bg-red-50/50'}`}
+                >
+                  <div className="flex flex-wrap justify-between gap-2">
+                    <span className={`font-medium ${textColor}`}>{inv.invoice_number}</span>
+                    <span className="font-semibold text-red-600 dark:text-red-400">
+                      KES {Number(inv.total_amount).toLocaleString()}
+                    </span>
+                  </div>
+                  <p className={`text-sm ${mutedText} mt-1`}>
+                    Order {inv.purchase_order?.po_number || '—'} · Due{' '}
+                    {inv.due_date ? new Date(inv.due_date).toLocaleDateString() : '—'} · Status: {inv.status}
+                  </p>
+                </li>
+              ))}
+            </ul>
+          )}
         </CardContent>
       </Card>
+    ) : null;
+
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        {builderInvoicesSection}
+        <Card className={cardBg}>
+          <CardContent className="py-12 flex items-center justify-center">
+            <RefreshCw className="h-8 w-8 animate-spin text-teal-500 mr-2" />
+            <span className={mutedText}>Loading mileage and pay data...</span>
+          </CardContent>
+        </Card>
+      </div>
     );
   }
 
   if (error) {
     return (
-      <Card className={cardBg}>
-        <CardContent className="py-8">
-          <div className="flex items-center gap-2 text-amber-600">
-            <AlertCircle className="h-5 w-5" />
-            <span>{error}</span>
-          </div>
-          <button
-            type="button"
-            onClick={() => void fetchData()}
-            className="mt-4 text-teal-600 hover:underline"
-          >
-            Try again
-          </button>
-        </CardContent>
-      </Card>
+      <div className="space-y-6">
+        {builderInvoicesSection}
+        <Card className={cardBg}>
+          <CardContent className="py-8">
+            <div className="flex items-center gap-2 text-amber-600">
+              <AlertCircle className="h-5 w-5" />
+              <span>{error}</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                void fetchData();
+                void fetchBuilderInvoices();
+              }}
+              className="mt-4 text-teal-600 hover:underline"
+            >
+              Try again
+            </button>
+          </CardContent>
+        </Card>
+      </div>
     );
   }
 
   return (
     <div className="space-y-6">
+      {builderInvoicesSection}
       <Card className={cardBg}>
         <CardHeader>
           <CardTitle className={`flex items-center gap-2 ${textColor}`}>
@@ -322,7 +421,10 @@ export const DeliveryPayTab: React.FC<{ isDarkMode?: boolean }> = ({ isDarkMode 
           <div className="mt-4 flex justify-end">
             <button
               type="button"
-              onClick={() => void fetchData()}
+              onClick={() => {
+                void fetchData();
+                void fetchBuilderInvoices();
+              }}
               className="flex items-center gap-2 text-sm text-teal-600 hover:text-teal-700"
             >
               <RefreshCw className="h-4 w-4" />

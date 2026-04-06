@@ -14,11 +14,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { SUPABASE_ANON_KEY, SUPABASE_URL, supabase } from '@/integrations/supabase/client';
-import {
-  getAccessTokenWithPersistenceFallback,
-  readPersistedAccessTokenSync,
-  readPersistedAuthUserSync,
-} from '@/utils/supabaseAccessToken';
+import { LEGACY_SUPABASE_AUTH_STORAGE_KEY, getAccessTokenWithPersistenceFallback, readPersistedAccessTokenSync, readPersistedAuthRawStringSync, readPersistedAuthUserSync } from '@/utils/supabaseAccessToken';
 import { Html5Qrcode, Html5QrcodeScannerState, Html5QrcodeSupportedFormats } from 'html5-qrcode';
 
 /** Strip BOM / zero-width / nulls so camera output matches DB `material_items.qr_code`. */
@@ -327,7 +323,7 @@ export const DispatchScanner: React.FC<DispatchScannerProps> = ({
     const { id } = readPersistedAuthUserSync();
     if (id && tok) return { id, accessToken: tok };
     try {
-      const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+      const storedSession = readPersistedAuthRawStringSync();
       if (storedSession) {
         const parsed = JSON.parse(storedSession);
         if (parsed.user?.id && parsed.access_token) {
@@ -400,7 +396,7 @@ export const DispatchScanner: React.FC<DispatchScannerProps> = ({
         const getFreshAccessToken = async (): Promise<string> => {
           // First, check localStorage but verify expiration
           try {
-            const stored = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+            const stored = readPersistedAuthRawStringSync();
             if (stored) {
               const parsed = JSON.parse(stored);
               if (parsed.access_token) {
@@ -442,7 +438,7 @@ export const DispatchScanner: React.FC<DispatchScannerProps> = ({
                   token_type: session.token_type,
                   user: session.user
                 };
-                localStorage.setItem('sb-wuuyjjpgzgeimiptuuws-auth-token', JSON.stringify(sessionData));
+                localStorage.setItem(LEGACY_SUPABASE_AUTH_STORAGE_KEY, JSON.stringify(sessionData));
                 console.log('✅ Token refreshed and saved to localStorage');
               } catch (e) {
                 console.warn('⚠️ Could not save refreshed token to localStorage:', e);
@@ -512,7 +508,7 @@ export const DispatchScanner: React.FC<DispatchScannerProps> = ({
         console.log('📧 Getting user email for supplier lookup...');
         let userEmail: string | null = null;
         try {
-          const stored = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+          const stored = readPersistedAuthRawStringSync();
           if (stored) {
             const parsed = JSON.parse(stored);
             userEmail = parsed.user?.email || null;
@@ -636,7 +632,7 @@ export const DispatchScanner: React.FC<DispatchScannerProps> = ({
         if (syncTok) return syncTok;
         // Then, check localStorage but verify expiration
         try {
-          const stored = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+          const stored = readPersistedAuthRawStringSync();
           if (stored) {
             const parsed = JSON.parse(stored);
             if (parsed.access_token) {
@@ -661,7 +657,7 @@ export const DispatchScanner: React.FC<DispatchScannerProps> = ({
         // Token is expired or missing, try to refresh it
         try {
           // First, try to get refresh_token from localStorage
-          const stored = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+          const stored = readPersistedAuthRawStringSync();
           let refreshToken: string | null = null;
           if (stored) {
             try {
@@ -692,7 +688,7 @@ export const DispatchScanner: React.FC<DispatchScannerProps> = ({
                     token_type: session.token_type,
                     user: session.user
                   };
-                  localStorage.setItem('sb-wuuyjjpgzgeimiptuuws-auth-token', JSON.stringify(sessionData));
+                  localStorage.setItem(LEGACY_SUPABASE_AUTH_STORAGE_KEY, JSON.stringify(sessionData));
                   console.log('✅ Token refreshed with refresh_token and saved to localStorage');
                   return session.access_token;
                 } catch (e) {
@@ -722,7 +718,7 @@ export const DispatchScanner: React.FC<DispatchScannerProps> = ({
                 token_type: session.token_type,
                 user: session.user
               };
-              localStorage.setItem('sb-wuuyjjpgzgeimiptuuws-auth-token', JSON.stringify(sessionData));
+              localStorage.setItem(LEGACY_SUPABASE_AUTH_STORAGE_KEY, JSON.stringify(sessionData));
               console.log('✅ Token refreshed via getSession and saved to localStorage');
               return session.access_token;
             } catch (e) {
@@ -736,7 +732,7 @@ export const DispatchScanner: React.FC<DispatchScannerProps> = ({
         }
         
         // Last resort: try using expired token anyway (sometimes it still works)
-        const storedFallback = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+        const storedFallback = readPersistedAuthRawStringSync();
         if (storedFallback) {
           try {
             const parsed = JSON.parse(storedFallback);
@@ -1559,7 +1555,7 @@ export const DispatchScanner: React.FC<DispatchScannerProps> = ({
         const sync = readPersistedAccessTokenSync();
         if (sync) return sync;
         try {
-          const stored = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+          const stored = readPersistedAuthRawStringSync();
           if (stored) {
             const parsed = JSON.parse(stored);
             if (parsed.access_token) {

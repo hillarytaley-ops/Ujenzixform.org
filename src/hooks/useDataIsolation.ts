@@ -12,6 +12,7 @@
  * Updated: Feb 17, 2026 - Added robust getUserId() fallback for localStorage
  */
 
+import { readPersistedAuthRawStringSync } from '@/utils/supabaseAccessToken';
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { SUPABASE_ANON_KEY, SUPABASE_URL, supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -461,7 +462,7 @@ export const useDeliveryProviderData = () => {
     let userId = user?.id;
     if (!userId) {
       try {
-        const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+        const storedSession = readPersistedAuthRawStringSync();
         if (storedSession) {
           const parsed = JSON.parse(storedSession);
           userId = parsed.user?.id;
@@ -490,7 +491,7 @@ export const useDeliveryProviderData = () => {
     try {
       let accessToken = SUPABASE_ANON_KEY;
       try {
-        const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+        const storedSession = readPersistedAuthRawStringSync();
         if (storedSession) {
           const parsed = JSON.parse(storedSession);
           accessToken = parsed.access_token || SUPABASE_ANON_KEY;
@@ -880,7 +881,7 @@ export const useDeliveryProviderData = () => {
       // 1. From delivery_requests table - Use direct REST API to bypass RLS issues
       let accessToken = SUPABASE_ANON_KEY;
       try {
-        const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+        const storedSession = readPersistedAuthRawStringSync();
         if (storedSession) {
           const parsed = JSON.parse(storedSession);
           accessToken = parsed.access_token || SUPABASE_ANON_KEY;
@@ -2619,7 +2620,7 @@ export const useDeliveryProviderData = () => {
               const SUPABASE_URL_FALLBACK = SUPABASE_URL;
               let accessTokenFallback = SUPABASE_ANON_KEY;
               try {
-                const tokenData = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+                const tokenData = readPersistedAuthRawStringSync();
                 if (tokenData) {
                   const parsed = JSON.parse(tokenData);
                   accessTokenFallback = parsed.access_token || SUPABASE_ANON_KEY;
@@ -3184,7 +3185,7 @@ export const useDeliveryProviderData = () => {
           const SUPABASE_URL_SAFETY = SUPABASE_URL;
           let accessTokenSafety = SUPABASE_ANON_KEY;
           try {
-            const tokenData = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+            const tokenData = readPersistedAuthRawStringSync();
             if (tokenData) {
               const parsed = JSON.parse(tokenData);
               accessTokenSafety = parsed.access_token || SUPABASE_ANON_KEY;
@@ -3311,7 +3312,7 @@ export const useDeliveryProviderData = () => {
           const SUPABASE_URL_FORCE = SUPABASE_URL;
           let accessTokenForce = SUPABASE_ANON_KEY;
           try {
-            const tokenData = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+            const tokenData = readPersistedAuthRawStringSync();
             if (tokenData) {
               const parsed = JSON.parse(tokenData);
               accessTokenForce = parsed.access_token || SUPABASE_ANON_KEY;
@@ -3847,7 +3848,7 @@ export const useDeliveryProviderData = () => {
           const SUPABASE_URL_AGGRESSIVE = SUPABASE_URL;
           let accessTokenAggressive = SUPABASE_ANON_KEY;
           try {
-            const tokenData = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+            const tokenData = readPersistedAuthRawStringSync();
             if (tokenData) {
               const parsed = JSON.parse(tokenData);
               accessTokenAggressive = parsed.access_token || SUPABASE_ANON_KEY;
@@ -4153,7 +4154,7 @@ export const useDeliveryProviderData = () => {
     let userId = user?.id;
     if (!userId) {
       try {
-        const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+        const storedSession = readPersistedAuthRawStringSync();
         if (storedSession) {
           const parsed = JSON.parse(storedSession);
           userId = parsed.user?.id;
@@ -4260,7 +4261,7 @@ export const useDeliveryProviderData = () => {
     let userId = user?.id;
     if (!userId) {
       try {
-        const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+        const storedSession = readPersistedAuthRawStringSync();
         if (storedSession) {
           const parsed = JSON.parse(storedSession);
           userId = parsed.user?.id;

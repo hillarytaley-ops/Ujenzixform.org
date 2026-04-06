@@ -1,3 +1,4 @@
+import { readPersistedAuthRawStringSync } from '@/utils/supabaseAccessToken';
 import React, { useState } from 'react';
 import {
   Dialog,
@@ -457,7 +458,7 @@ export const MonitoringServicePrompt: React.FC<MonitoringServicePromptProps> = (
       let accessToken: string | null = null;
       
       try {
-        const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+        const storedSession = readPersistedAuthRawStringSync();
         if (storedSession) {
           const parsed = JSON.parse(storedSession);
           userId = parsed.user?.id;

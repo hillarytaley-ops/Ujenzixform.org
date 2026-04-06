@@ -3,6 +3,7 @@
  * to /delivery/apply without granting the delivery role (admin approves applications).
  */
 
+import { LEGACY_SUPABASE_AUTH_STORAGE_KEY, readPersistedAuthRawStringSync } from '@/utils/supabaseAccessToken';
 import React, { useState, useRef, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -57,7 +58,7 @@ const DeliveryAuth: React.FC = () => {
   useEffect(() => {
     const checkExistingAuth = async () => {
       try {
-        const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+        const storedSession = readPersistedAuthRawStringSync();
         if (storedSession) {
           const parsed = JSON.parse(storedSession);
           if (parsed?.user?.email && parsed?.access_token) {
@@ -162,7 +163,7 @@ const DeliveryAuth: React.FC = () => {
 
       // Store session
       const session = { access_token: authData.access_token, refresh_token: authData.refresh_token, expires_at: Math.floor(Date.now() / 1000) + authData.expires_in, expires_in: authData.expires_in, token_type: authData.token_type, user: authData.user };
-      localStorage.setItem('sb-wuuyjjpgzgeimiptuuws-auth-token', JSON.stringify(session));
+      localStorage.setItem(LEGACY_SUPABASE_AUTH_STORAGE_KEY, JSON.stringify(session));
       localStorage.setItem('user_role_id', authData.user.id);
       localStorage.setItem('user_email', authData.user.email || '');
 
@@ -274,7 +275,7 @@ const DeliveryAuth: React.FC = () => {
         const currentRole = roleCheckData?.[0]?.role;
         
         if (currentRole === ROLE || currentRole === 'delivery_provider') {
-          localStorage.setItem('sb-wuuyjjpgzgeimiptuuws-auth-token', JSON.stringify({
+          localStorage.setItem(LEGACY_SUPABASE_AUTH_STORAGE_KEY, JSON.stringify({
             access_token: accessToken,
             refresh_token: signInData.refresh_token,
             expires_at: Math.floor(Date.now() / 1000) + signInData.expires_in,
@@ -301,7 +302,7 @@ const DeliveryAuth: React.FC = () => {
           }),
         });
 
-        localStorage.setItem('sb-wuuyjjpgzgeimiptuuws-auth-token', JSON.stringify({
+        localStorage.setItem(LEGACY_SUPABASE_AUTH_STORAGE_KEY, JSON.stringify({
           access_token: accessToken,
           refresh_token: signInData.refresh_token,
           expires_at: Math.floor(Date.now() / 1000) + signInData.expires_in,
@@ -354,8 +355,7 @@ const DeliveryAuth: React.FC = () => {
       const expiresIn = data.expires_in ?? data.session?.expires_in;
 
       if (accessToken && data.user && typeof expiresIn === 'number') {
-        localStorage.setItem(
-          'sb-wuuyjjpgzgeimiptuuws-auth-token',
+        localStorage.setItem(LEGACY_SUPABASE_AUTH_STORAGE_KEY,
           JSON.stringify({
             access_token: accessToken,
             refresh_token: refreshToken,

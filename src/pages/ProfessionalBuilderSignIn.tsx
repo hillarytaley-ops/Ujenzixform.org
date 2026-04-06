@@ -1,3 +1,4 @@
+import { LEGACY_SUPABASE_AUTH_STORAGE_KEY, readPersistedAuthRawStringSync } from '@/utils/supabaseAccessToken';
 import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -24,7 +25,7 @@ const ProfessionalBuilderSignIn = () => {
     const checkSession = async () => {
       try {
         // Check localStorage for existing session first (fast)
-        const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+        const storedSession = readPersistedAuthRawStringSync();
         if (storedSession) {
           const parsed = JSON.parse(storedSession);
           if (parsed?.user?.id) {
@@ -152,7 +153,7 @@ const ProfessionalBuilderSignIn = () => {
         token_type: signInData.token_type,
         user: signInData.user
       };
-      localStorage.setItem('sb-wuuyjjpgzgeimiptuuws-auth-token', JSON.stringify(sessionData));
+      localStorage.setItem(LEGACY_SUPABASE_AUTH_STORAGE_KEY, JSON.stringify(sessionData));
       
       // Also update the Supabase client session
       await supabase.auth.setSession({

@@ -1,7 +1,5 @@
+import { readAccessTokenSyncBestEffort } from '@/utils/supabaseAccessToken';
 import type { SupabaseClient } from "@supabase/supabase-js";
-
-/** Matches this project's Supabase auth storage key in `integrations/supabase/client`. */
-const SB_AUTH_STORAGE = "sb-wuuyjjpgzgeimiptuuws-auth-token";
 
 export type MyMonitoringFetchOpts = {
   supabaseUrl: string;
@@ -21,12 +19,7 @@ export function monitoringRestOpts(
 ): MyMonitoringFetchOpts {
   let accessToken = accessTokenOverride?.trim() || "";
   if (!accessToken) {
-    try {
-      const raw = localStorage.getItem(SB_AUTH_STORAGE);
-      if (raw) accessToken = JSON.parse(raw).access_token || "";
-    } catch {
-      /* noop */
-    }
+    accessToken = readAccessTokenSyncBestEffort();
   }
   return {
     supabaseUrl,

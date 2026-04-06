@@ -16,6 +16,7 @@
  * ╚══════════════════════════════════════════════════════════════════════════════════════╝
  */
 
+import { readPersistedAuthRawStringSync } from '@/utils/supabaseAccessToken';
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -401,7 +402,7 @@ export const MaterialsGrid: React.FC<MaterialsGridProps> = ({ embeddedInDashboar
   // Check authentication from multiple sources for reliability
   const isAuthenticated = !!authUser || !!localStorage.getItem('user_id') || (() => {
     try {
-      const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+      const storedSession = readPersistedAuthRawStringSync();
       if (storedSession) {
         const parsed = JSON.parse(storedSession);
         return !!parsed.user?.id;
