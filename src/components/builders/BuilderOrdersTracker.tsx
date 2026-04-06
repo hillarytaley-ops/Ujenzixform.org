@@ -33,7 +33,11 @@ import {
   Phone
 } from 'lucide-react';
 import { SUPABASE_ANON_KEY, SUPABASE_URL, supabase } from '@/integrations/supabase/client';
-import { readAuthSessionForRest, readPersistedAccessTokenSync } from '@/utils/supabaseAccessToken';
+import {
+  readAccessTokenSyncBestEffort,
+  readAuthSessionForRest,
+  readPersistedAccessTokenSync,
+} from '@/utils/supabaseAccessToken';
 import { useToast } from '@/hooks/use-toast';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { DeliveryPromptDialog } from './DeliveryPromptDialog';
@@ -325,12 +329,29 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
   const { toast } = useToast();
 
   const fetchOrders = async () => {
+    /** Not cleared by useEffect — avoids stuck spinner if builderId churn cancels outer timeouts. */
+    const loadingGuard = setTimeout(() => {
+      setLoading(false);
+    }, 18000);
+
     try {
       setLoading(true);
-      
+
       console.log('🔍 BuilderOrdersTracker: Fetching orders for builder:', builderId);
 
-      const { accessToken } = await readAuthSessionForRest();
+      let accessToken: string | null = null;
+      try {
+        const session = await Promise.race([
+          readAuthSessionForRest(),
+          new Promise<null>((r) => setTimeout(() => r(null), 5000)),
+        ]);
+        accessToken = session?.accessToken || null;
+      } catch {
+        accessToken = null;
+      }
+      if (!accessToken) {
+        accessToken = readAccessTokenSyncBestEffort() || readPersistedAccessTokenSync() || null;
+      }
       const bearer = accessToken || SUPABASE_ANON_KEY;
       const headers: Record<string, string> = {
         apikey: SUPABASE_ANON_KEY,
@@ -826,6 +847,7 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
         });
       }
     } finally {
+      clearTimeout(loadingGuard);
       setLoading(false);
     }
   };
@@ -999,21 +1021,14 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
 
   useEffect(() => {
     if (builderId) {
-      fetchOrders();
-      fetchScanEvents();
+      void fetchOrders();
+      void fetchScanEvents();
       const cleanup = setupRealtimeSubscription();
-      
-      // Safety timeout - stop loading after 10 seconds max
-      const timeout = setTimeout(() => {
-        setLoading(false);
-      }, 10000);
-      
+
       return () => {
-        clearTimeout(timeout);
         if (cleanup) cleanup();
       };
     } else {
-      // No builderId - stop loading immediately
       setLoading(false);
     }
   }, [builderId]);
