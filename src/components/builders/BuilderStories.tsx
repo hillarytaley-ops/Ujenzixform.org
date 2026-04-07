@@ -201,12 +201,15 @@ interface BuilderStoriesProps {
   currentUserId?: string;
   isBuilder?: boolean;
   onCreateStory?: () => void;
+  /** When true, no outer Card — sits inside a parent feed shell */
+  embedded?: boolean;
 }
 
 export const BuilderStories: React.FC<BuilderStoriesProps> = ({
   currentUserName = 'You',
   currentUserAvatar,
   currentUserId,
+  embedded = false,
   isBuilder = false,
   onCreateStory
 }) => {
@@ -587,11 +590,8 @@ export const BuilderStories: React.FC<BuilderStoriesProps> = ({
 
   const currentStory = selectedGroup?.stories[currentStoryIndex];
 
-  return (
-    <>
-      {/* Stories Row */}
-      <Card className="bg-white dark:bg-gray-900 shadow-md rounded-xl overflow-hidden">
-        <div className="relative">
+  const storiesShell = (
+    <div className="relative">
           {/* Scroll Buttons */}
           <Button
             variant="ghost"
@@ -613,7 +613,7 @@ export const BuilderStories: React.FC<BuilderStoriesProps> = ({
           {/* Stories Container */}
           <div
             ref={scrollRef}
-            className="flex gap-2 p-4 overflow-x-auto scrollbar-hide"
+            className={embedded ? 'flex gap-2 px-3 py-2.5 overflow-x-auto scrollbar-hide' : 'flex gap-2 p-4 overflow-x-auto scrollbar-hide'}
             style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
           >
             {/* Create Story Card - Only show for builders */}
@@ -692,7 +692,19 @@ export const BuilderStories: React.FC<BuilderStoriesProps> = ({
             ))}
           </div>
         </div>
-      </Card>
+  );
+
+  return (
+    <>
+      {embedded ? (
+        <div className="overflow-hidden border-b border-slate-100 dark:border-slate-800 bg-slate-50/40 dark:bg-slate-900/20">
+          {storiesShell}
+        </div>
+      ) : (
+        <Card className="bg-white dark:bg-gray-900 shadow-md rounded-xl overflow-hidden">
+          {storiesShell}
+        </Card>
+      )}
 
       {/* Story Viewer Modal */}
       <Dialog open={!!selectedGroup} onOpenChange={() => closeStoryViewer()}>

@@ -66,6 +66,8 @@ export interface BuilderVideoPostProps {
   comments: VideoComment[];
   shares: number;
   isLiked?: boolean;
+  /** Stream layout inside one parent card (no extra shadow / radius) */
+  embedded?: boolean;
   onLike?: (postId: string) => void;
   onComment?: (postId: string, comment: string) => void;
   onShare?: (postId: string) => void;
@@ -90,6 +92,7 @@ export const BuilderVideoPost: React.FC<BuilderVideoPostProps> = ({
   comments,
   shares,
   isLiked = false,
+  embedded = false,
   onLike,
   onComment,
   onShare,
@@ -250,7 +253,13 @@ export const BuilderVideoPost: React.FC<BuilderVideoPostProps> = ({
   };
 
   return (
-    <Card className="w-full max-w-2xl mx-auto bg-white dark:bg-gray-900 shadow-md hover:shadow-lg transition-shadow duration-300 rounded-lg overflow-hidden">
+    <Card
+      className={
+        embedded
+          ? 'w-full max-w-none mx-0 rounded-none border-0 shadow-none bg-white dark:bg-gray-900 overflow-hidden'
+          : 'w-full max-w-2xl mx-auto bg-white dark:bg-gray-900 shadow-md hover:shadow-lg transition-shadow duration-300 rounded-lg overflow-hidden'
+      }
+    >
       {/* Post Header - Facebook Style */}
       <CardHeader className="p-4 pb-3">
         <div className="flex items-start justify-between">

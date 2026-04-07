@@ -1,6 +1,6 @@
 import { readPersistedAuthRawStringSync } from '@/utils/supabaseAccessToken';
 import React, { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { Textarea } from '@/components/ui/textarea';
@@ -1199,18 +1199,18 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
   });
 
   return (
-    <div className="w-full max-w-2xl mx-auto space-y-2 sm:space-y-3 px-1 sm:px-0">
-      {/* Stories Section */}
+    <div className="w-full max-w-2xl mx-auto px-1 sm:px-0">
+      <Card className="overflow-hidden rounded-xl border border-slate-200/90 dark:border-slate-800 bg-white dark:bg-gray-900 shadow-sm">
       <BuilderStories
+        embedded
         currentUserName={effectiveUserName}
         currentUserAvatar={currentUserAvatar}
         onCreateStory={() => setIsCreatingPost(true)}
       />
 
-      {/* Create Post Card - Facebook Style (Only for Builders) */}
       {canPost ? (
-        <Card className="bg-white dark:bg-gray-900 shadow-md rounded-lg">
-          <CardContent className="p-4">
+        <div className="border-t border-slate-100 dark:border-slate-800 px-3 py-3 sm:px-4">
+          <div className="space-y-3">
             <div className="flex items-center gap-3 mb-3">
               <Avatar 
                 className="h-10 w-10 cursor-pointer ring-2 ring-transparent hover:ring-blue-500 transition-all"
@@ -1438,48 +1438,42 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
                 </Button>
               </div>
             )}
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       ) : effectiveIsBuilder ? (
-        /* User IS a builder but component didn't get the prop - show posting UI */
-        <Card className="bg-gradient-to-r from-green-50 to-emerald-50 dark:from-gray-800 dark:to-gray-900 shadow-md rounded-lg border-green-200 dark:border-gray-700">
-          <CardContent className="p-4">
-            <div className="flex flex-col sm:flex-row items-center gap-4">
-              <div className="h-12 w-12 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center flex-shrink-0">
-                <Video className="h-6 w-6 text-green-600" />
+        <div className="border-t border-slate-100 dark:border-slate-800 px-3 py-3 sm:px-4 bg-gradient-to-r from-green-50/90 to-emerald-50/90 dark:from-gray-800/80 dark:to-gray-900/80">
+          <div className="flex flex-col sm:flex-row items-center gap-3 sm:gap-4">
+              <div className="h-10 w-10 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center flex-shrink-0">
+                <Video className="h-5 w-5 text-green-600" />
               </div>
-              <div className="flex-1 text-center sm:text-left">
-                <h3 className="font-semibold text-gray-900 dark:text-white">Welcome, Professional Builder!</h3>
-                <p className="text-sm text-gray-600 dark:text-gray-400">
-                  You can post videos and share your projects. Go to your dashboard to upload content.
+              <div className="flex-1 text-center sm:text-left min-w-0">
+                <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Welcome, Professional Builder!</h3>
+                <p className="text-xs text-gray-600 dark:text-gray-400">
+                  Post from your dashboard or expand below when available.
                 </p>
               </div>
-              <div className="flex flex-col sm:flex-row gap-2">
-                <Button 
-                  className="bg-green-600 hover:bg-green-700"
-                  onClick={() => window.location.href = '/professional-builder-dashboard'}
-                >
-                  Go to Dashboard
-                </Button>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+              <Button
+                size="sm"
+                className="bg-green-600 hover:bg-green-700 shrink-0"
+                onClick={() => { window.location.href = '/professional-builder-dashboard'; }}
+              >
+                Dashboard
+              </Button>
+          </div>
+        </div>
       ) : (
-        /* Visitor Notice - Cannot Post - Link to Registration */
-        <Card className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-gray-800 dark:to-gray-900 shadow-md rounded-lg border-blue-200 dark:border-gray-700">
-          <CardContent className="p-4">
-            <div className="flex flex-col sm:flex-row items-center gap-4">
-              <div className="h-12 w-12 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center flex-shrink-0">
-                <Users className="h-6 w-6 text-blue-600" />
+        <div className="border-t border-slate-100 dark:border-slate-800 px-3 py-3 sm:px-4 bg-gradient-to-r from-blue-50/90 to-indigo-50/90 dark:from-gray-800/80 dark:to-gray-900/80">
+            <div className="flex flex-col sm:flex-row items-center gap-3 sm:gap-4">
+              <div className="h-10 w-10 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center flex-shrink-0">
+                <Users className="h-5 w-5 text-blue-600" />
               </div>
-              <div className="flex-1 text-center sm:text-left">
-                <h3 className="font-semibold text-gray-900 dark:text-white">Want to share your projects?</h3>
-                <p className="text-sm text-gray-600 dark:text-gray-400">
-                  Register as a builder to post videos, share updates, and connect with clients.
+              <div className="flex-1 text-center sm:text-left min-w-0">
+                <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Want to share your projects?</h3>
+                <p className="text-xs text-gray-600 dark:text-gray-400">
+                  Register as a builder to post updates and connect with clients.
                 </p>
               </div>
-              <div className="flex flex-col sm:flex-row gap-2">
+              <div className="flex flex-col sm:flex-row gap-2 shrink-0 w-full sm:w-auto">
                 {/* For visitors not logged in - go to registration */}
                 {!effectiveUserId ? (
                   <>
@@ -1508,14 +1502,11 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
                 )}
               </div>
             </div>
-          </CardContent>
-        </Card>
+        </div>
       )}
 
-      {/* Feed Navigation & Filters */}
-      <Card className="bg-white dark:bg-gray-900 shadow-md rounded-xl overflow-hidden">
-        {/* Feed Type Tabs - Compact on mobile */}
-        <div className="flex items-center border-b overflow-x-auto">
+      <div className="border-t border-slate-100 dark:border-slate-800 bg-white dark:bg-gray-900">
+        <div className="flex items-center border-b border-slate-100 dark:border-slate-800 overflow-x-auto">
           <button
             onClick={() => setFeedType('all')}
             className={`flex items-center justify-center gap-1.5 py-2.5 px-3 sm:px-4 font-medium transition-all border-b-2 whitespace-nowrap text-sm ${
@@ -1556,8 +1547,7 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
           </button>
         </div>
 
-        {/* Filters Row - Scrollable on mobile */}
-        <div className="p-2 sm:p-3 flex items-center gap-2 overflow-x-auto">
+        <div className="px-2 py-2 sm:px-3 sm:py-2 flex items-center gap-2 overflow-x-auto bg-slate-50/50 dark:bg-slate-900/30">
           {/* Sort Dropdown */}
           <Select value={sortBy} onValueChange={(v) => setSortBy(v as any)}>
             <SelectTrigger className="w-[110px] sm:w-[130px] h-8 sm:h-9 rounded-full bg-gray-100 dark:bg-gray-800 border-0 text-xs sm:text-sm flex-shrink-0">
@@ -1625,57 +1615,48 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
             <span className="sm:hidden ml-1">{savedPosts.size}</span>
           </Button>
         </div>
-      </Card>
+      </div>
 
-      {/* Live Indicator */}
       {feedType === 'live' && (
-        <Card className="bg-gradient-to-r from-red-500 to-pink-500 text-white shadow-lg">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="relative">
-                  <Radio className="h-8 w-8 animate-pulse" />
-                  <span className="absolute -top-1 -right-1 flex h-3 w-3">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75"></span>
-                    <span className="relative inline-flex rounded-full h-3 w-3 bg-white"></span>
+        <div className="border-t border-slate-100 dark:border-slate-800 bg-gradient-to-r from-red-500 to-pink-500 text-white px-3 py-2.5 sm:px-4">
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2 min-w-0">
+                <div className="relative shrink-0">
+                  <Radio className="h-6 w-6 animate-pulse" />
+                  <span className="absolute -top-0.5 -right-0.5 flex h-2.5 w-2.5">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75" />
+                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-white" />
                   </span>
                 </div>
-                <div>
-                  <h3 className="font-bold text-lg">Live from Construction Sites</h3>
-                  <p className="text-white/80 text-sm">Watch builders working in real-time across Kenya</p>
+                <div className="min-w-0">
+                  <h3 className="font-bold text-sm leading-tight">Live from construction sites</h3>
+                  <p className="text-white/85 text-xs truncate">Real-time updates across Kenya</p>
                 </div>
               </div>
-              <Badge className="bg-white/20 text-white border-white/30">
-                3 Live Now
-              </Badge>
+              <Badge className="bg-white/20 text-white border-white/30 text-xs shrink-0">3 live</Badge>
             </div>
-          </CardContent>
-        </Card>
+        </div>
       )}
 
-      {/* Posts Feed */}
-      <div className="space-y-4">
+      <div className="border-t border-slate-100 dark:border-slate-800 divide-y divide-slate-100 dark:divide-slate-800">
         {loadingPosts ? (
-          <Card className="p-8">
-            <div className="flex flex-col items-center justify-center">
-              <Loader2 className="h-8 w-8 animate-spin text-blue-600 mb-4" />
-              <p className="text-muted-foreground">Loading posts...</p>
-            </div>
-          </Card>
+          <div className="py-10 px-4 flex flex-col items-center justify-center">
+              <Loader2 className="h-7 w-7 animate-spin text-blue-600 mb-2" />
+              <p className="text-sm text-muted-foreground">Loading posts…</p>
+          </div>
         ) : filteredPosts.length === 0 ? (
-          <Card className="p-8">
-            <div className="flex flex-col items-center justify-center text-center">
-              <Video className="h-12 w-12 text-gray-400 mb-4" />
-              <h3 className="font-semibold text-lg mb-2">No posts yet</h3>
-              <p className="text-muted-foreground">
+          <div className="py-10 px-4 flex flex-col items-center justify-center text-center">
+              <Video className="h-10 w-10 text-gray-400 mb-2" />
+              <h3 className="font-semibold text-base mb-1">No posts yet</h3>
+              <p className="text-sm text-muted-foreground">
                 Be the first to share your construction projects!
               </p>
-            </div>
-          </Card>
+          </div>
         ) : filteredPosts.map((post) => (
           <div key={post.id} className="relative">
             <BuilderVideoPost
               {...post}
+              embedded
               onLike={handleLike}
               onComment={handleComment}
               onShare={handleShare}
@@ -1702,33 +1683,33 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
         ))}
       </div>
 
-      {/* Load More - only show if we have posts and more to load */}
       {!loadingPosts && filteredPosts.length > 0 && hasMorePosts && (
-        <div className="text-center py-4">
-          <Button 
-            variant="outline" 
-            className="w-full max-w-xs rounded-full"
+        <div className="border-t border-slate-100 dark:border-slate-800 px-3 py-3 text-center bg-slate-50/40 dark:bg-slate-900/20">
+          <Button
+            variant="outline"
+            size="sm"
+            className="rounded-full"
             onClick={handleLoadMore}
             disabled={loadingMore}
           >
             {loadingMore ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Loading...
+                Loading…
               </>
             ) : (
-              'Load More Posts'
+              'Load more posts'
             )}
           </Button>
         </div>
       )}
-      
-      {/* No more posts message */}
+
       {!loadingPosts && filteredPosts.length > 0 && !hasMorePosts && (
-        <div className="text-center py-4 text-gray-500">
-          <p className="text-sm">You've seen all posts! 🎉</p>
+        <div className="border-t border-slate-100 dark:border-slate-800 px-3 py-2 text-center text-gray-500 text-xs">
+          You&apos;ve seen all posts.
         </div>
       )}
+      </Card>
     </div>
   );
 };
