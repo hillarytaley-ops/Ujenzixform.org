@@ -9,7 +9,9 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { AlertCircle, Settings, Shield, ShoppingCart, Camera, Building2, Package, Truck, FileText, Eye, CheckCircle, Lock, Smartphone, Star, MessageCircle, LogIn, Video, Users } from "lucide-react";
+import { AlertCircle, Settings, Shield, ShoppingCart, Camera, Building2, Package, Truck, FileText, Eye, CheckCircle, Lock, Smartphone, Star, MessageCircle, LogIn, Video, Users, ChevronDown } from "lucide-react";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { cn } from "@/lib/utils";
 import AnimatedSection from "@/components/AnimatedSection";
 import { BuilderGrid } from "@/components/builders/BuilderGrid";
 import { ContactBuilderModal } from "@/components/modals/ContactBuilderModal";
@@ -63,6 +65,7 @@ const Builders = () => {
   const [showContactDialog, setShowContactDialog] = useState(false);
   const [showProfileEdit, setShowProfileEdit] = useState(false);
   const [contactBuilder, setContactBuilder] = useState<any>(null);
+  const [builderPortalOpen, setBuilderPortalOpen] = useState(false);
   const { toast } = useToast();
   
   // Check if current user is a builder (can post)
@@ -312,54 +315,71 @@ const Builders = () => {
         </div>
       </section>
 
-      {/* Builder portals — single tight band */}
-      <section className="py-2.5 sm:py-3 bg-gradient-to-r from-slate-50 to-blue-50 border-b border-slate-200/80">
-        <div className="container mx-auto px-4">
-          <h2 className="text-center text-sm font-semibold text-gray-800 mb-2 tracking-tight">
-            Choose Your Builder Portal
-          </h2>
+      {/* Builder portals — collapsible to bring feeds & showcase above the fold */}
+      <Collapsible open={builderPortalOpen} onOpenChange={setBuilderPortalOpen}>
+        <section className="bg-gradient-to-r from-slate-50 to-blue-50 border-b border-slate-200/80">
+          <div className="container mx-auto px-4 py-1 sm:py-1.5">
+            <CollapsibleTrigger asChild>
+              <button
+                type="button"
+                className="flex w-full items-center justify-center gap-2 rounded-md py-2 text-sm font-semibold text-gray-800 outline-none transition-colors hover:bg-slate-100/80 focus-visible:ring-2 focus-visible:ring-blue-500/40"
+                aria-expanded={builderPortalOpen}
+              >
+                <span className="tracking-tight">Choose Your Builder Portal</span>
+                <ChevronDown
+                  className={cn(
+                    "h-4 w-4 shrink-0 text-gray-600 transition-transform duration-200",
+                    builderPortalOpen && "rotate-180"
+                  )}
+                  aria-hidden
+                />
+              </button>
+            </CollapsibleTrigger>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3 max-w-xl mx-auto">
-            <Card className="shadow-sm border border-emerald-200/90 bg-white py-0">
-              <CardContent className="p-2.5 sm:p-3 flex items-center gap-2.5">
-                <div className="w-9 h-9 bg-emerald-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                  <ShoppingCart className="h-4 w-4 text-emerald-600" />
-                </div>
-                <div className="flex-1 min-w-0 text-left">
-                  <h3 className="text-sm font-bold text-gray-900 leading-none">Private Builder</h3>
-                  <p className="text-[10px] sm:text-[11px] text-gray-500 mt-0.5 leading-tight">
-                    Home projects & purchases
-                  </p>
-                </div>
-                <Link to="/private-client-auth" className="flex-shrink-0">
-                  <Button size="sm" className="h-7 px-2.5 text-[11px] bg-emerald-600 hover:bg-emerald-700 text-white font-semibold">
-                    Explore
-                  </Button>
-                </Link>
-              </CardContent>
-            </Card>
+            <CollapsibleContent className="overflow-hidden data-[state=closed]:animate-collapsible-up data-[state=open]:animate-collapsible-down">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3 max-w-xl mx-auto pb-2.5 pt-1">
+                <Card className="shadow-sm border border-emerald-200/90 bg-white py-0">
+                  <CardContent className="p-2.5 sm:p-3 flex items-center gap-2.5">
+                    <div className="w-9 h-9 bg-emerald-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                      <ShoppingCart className="h-4 w-4 text-emerald-600" />
+                    </div>
+                    <div className="flex-1 min-w-0 text-left">
+                      <h3 className="text-sm font-bold text-gray-900 leading-none">Private Builder</h3>
+                      <p className="text-[10px] sm:text-[11px] text-gray-500 mt-0.5 leading-tight">
+                        Home projects & purchases
+                      </p>
+                    </div>
+                    <Link to="/private-client-auth" className="flex-shrink-0">
+                      <Button size="sm" className="h-7 px-2.5 text-[11px] bg-emerald-600 hover:bg-emerald-700 text-white font-semibold">
+                        Explore
+                      </Button>
+                    </Link>
+                  </CardContent>
+                </Card>
 
-            <Card className="shadow-sm border border-blue-200/90 bg-white py-0">
-              <CardContent className="p-2.5 sm:p-3 flex items-center gap-2.5">
-                <div className="w-9 h-9 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                  <Building2 className="h-4 w-4 text-blue-600" />
-                </div>
-                <div className="flex-1 min-w-0 text-left">
-                  <h3 className="text-sm font-bold text-gray-900 leading-none">Professional Builder</h3>
-                  <p className="text-[10px] sm:text-[11px] text-gray-500 mt-0.5 leading-tight">
-                    Contractors & companies
-                  </p>
-                </div>
-                <Link to="/professional-builder-auth" className="flex-shrink-0">
-                  <Button size="sm" className="h-7 px-2.5 text-[11px] bg-blue-600 hover:bg-blue-700 text-white font-semibold">
-                    Explore
-                  </Button>
-                </Link>
-              </CardContent>
-            </Card>
+                <Card className="shadow-sm border border-blue-200/90 bg-white py-0">
+                  <CardContent className="p-2.5 sm:p-3 flex items-center gap-2.5">
+                    <div className="w-9 h-9 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                      <Building2 className="h-4 w-4 text-blue-600" />
+                    </div>
+                    <div className="flex-1 min-w-0 text-left">
+                      <h3 className="text-sm font-bold text-gray-900 leading-none">Professional Builder</h3>
+                      <p className="text-[10px] sm:text-[11px] text-gray-500 mt-0.5 leading-tight">
+                        Contractors & companies
+                      </p>
+                    </div>
+                    <Link to="/professional-builder-auth" className="flex-shrink-0">
+                      <Button size="sm" className="h-7 px-2.5 text-[11px] bg-blue-600 hover:bg-blue-700 text-white font-semibold">
+                        Explore
+                      </Button>
+                    </Link>
+                  </CardContent>
+                </Card>
+              </div>
+            </CollapsibleContent>
           </div>
-        </div>
-      </section>
+        </section>
+      </Collapsible>
 
       <main className="py-20 relative overflow-hidden">
         {/* Kenyan Construction Development Background */}
