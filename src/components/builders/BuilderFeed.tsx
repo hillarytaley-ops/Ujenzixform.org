@@ -1203,15 +1203,8 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
 
   const feedBody = (
     <>
-      <BuilderStories
-        embedded
-        currentUserName={effectiveUserName}
-        currentUserAvatar={currentUserAvatar}
-        onCreateStory={() => setIsCreatingPost(true)}
-      />
-
       {canPost ? (
-        <div className="border-t border-slate-100 dark:border-slate-800 px-3 py-3 sm:px-4">
+        <div className="border-b border-slate-100 dark:border-slate-800 px-3 py-3 sm:px-4">
           <div className="space-y-3">
             <div className="flex items-center gap-3 mb-3">
               <Avatar 
@@ -1443,7 +1436,7 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
           </div>
         </div>
       ) : effectiveIsBuilder ? (
-        <div className="border-t border-slate-100 dark:border-slate-800 px-3 py-3 sm:px-4 bg-gradient-to-r from-green-50/90 to-emerald-50/90 dark:from-gray-800/80 dark:to-gray-900/80">
+        <div className="border-b border-slate-100 dark:border-slate-800 px-3 py-3 sm:px-4 bg-gradient-to-r from-green-50/90 to-emerald-50/90 dark:from-gray-800/80 dark:to-gray-900/80">
           <div className="flex flex-col sm:flex-row items-center gap-3 sm:gap-4">
               <div className="h-10 w-10 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center flex-shrink-0">
                 <Video className="h-5 w-5 text-green-600" />
@@ -1464,7 +1457,7 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
           </div>
         </div>
       ) : (
-        <div className="border-t border-slate-100 dark:border-slate-800 px-3 py-3 sm:px-4 bg-gradient-to-r from-blue-50/90 to-indigo-50/90 dark:from-gray-800/80 dark:to-gray-900/80">
+        <div className="border-b border-slate-100 dark:border-slate-800 px-3 py-3 sm:px-4 bg-gradient-to-r from-blue-50/90 to-indigo-50/90 dark:from-gray-800/80 dark:to-gray-900/80">
             <div className="flex flex-col sm:flex-row items-center gap-3 sm:gap-4">
               <div className="h-10 w-10 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center flex-shrink-0">
                 <Users className="h-5 w-5 text-blue-600" />
@@ -1506,6 +1499,13 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
             </div>
         </div>
       )}
+
+      <BuilderStories
+        embedded
+        currentUserName={effectiveUserName}
+        currentUserAvatar={currentUserAvatar}
+        onCreateStory={() => setIsCreatingPost(true)}
+      />
 
       <div className="border-t border-slate-100 dark:border-slate-800 bg-white dark:bg-gray-900">
         <div className="flex items-center border-b border-slate-100 dark:border-slate-800 overflow-x-auto">

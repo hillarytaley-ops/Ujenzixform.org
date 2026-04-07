@@ -503,18 +503,18 @@ export const BuilderFacebookLayout: React.FC<BuilderFacebookLayoutProps> = ({
 
       <div className="flex-1 min-w-0 flex flex-col order-1 lg:order-2">
         <Tabs defaultValue="feed" className="w-full flex flex-col min-h-0">
-          <div className="flex justify-center px-3 pt-3 pb-1.5">
-            <TabsList className="grid h-8 w-full max-w-sm grid-cols-2 gap-0.5 rounded-full border border-gray-200/90 bg-white p-0.5 shadow-sm dark:border-gray-700 dark:bg-gray-900">
+          <div className="w-full shrink-0 border-b border-slate-200 dark:border-slate-700">
+            <TabsList className="flex h-10 w-full items-stretch rounded-none border-0 bg-slate-100/80 p-0 text-muted-foreground shadow-none dark:bg-slate-800/70">
               <TabsTrigger
                 value="feed"
-                className="flex h-7 items-center justify-center gap-1.5 rounded-full px-2 text-xs font-semibold data-[state=active]:bg-orange-500 data-[state=active]:text-white data-[state=inactive]:text-gray-600 dark:data-[state=inactive]:text-gray-400"
+                className="flex flex-1 items-center justify-center gap-1.5 rounded-none border-r border-slate-200/90 px-2 py-0 text-xs font-semibold shadow-none data-[state=active]:bg-orange-500 data-[state=active]:text-white data-[state=active]:shadow-none data-[state=inactive]:text-gray-600 dark:border-slate-600 dark:data-[state=inactive]:text-gray-400"
               >
                 <MessageCircle className="h-3.5 w-3.5 shrink-0" />
                 <span className="truncate">Social Feed</span>
               </TabsTrigger>
               <TabsTrigger
                 value="portfolio"
-                className="flex h-7 items-center justify-center gap-1.5 rounded-full px-2 text-xs font-semibold data-[state=active]:bg-purple-600 data-[state=active]:text-white data-[state=inactive]:text-gray-600 dark:data-[state=inactive]:text-gray-400"
+                className="flex flex-1 items-center justify-center gap-1.5 rounded-none px-2 py-0 text-xs font-semibold shadow-none data-[state=active]:bg-purple-600 data-[state=active]:text-white data-[state=active]:shadow-none data-[state=inactive]:text-gray-600 dark:data-[state=inactive]:text-gray-400"
               >
                 <Video className="h-3.5 w-3.5 shrink-0" />
                 <span className="truncate">Project Showcase</span>
