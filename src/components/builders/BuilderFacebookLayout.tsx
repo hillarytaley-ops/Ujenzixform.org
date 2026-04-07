@@ -1,5 +1,5 @@
 import { readPersistedAuthRawStringSync } from '@/utils/supabaseAccessToken';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
@@ -83,6 +83,16 @@ export const BuilderFacebookLayout: React.FC<BuilderFacebookLayoutProps> = ({
   // Mobile navigation state
   const [mobileTab, setMobileTab] = useState<'feed' | 'builders' | 'create' | 'notifications' | 'menu'>('feed');
   const [showMobileSearch, setShowMobileSearch] = useState(false);
+
+  const [feedShowcaseTab, setFeedShowcaseTab] = useState<'feed' | 'portfolio'>('feed');
+  const feedShowcaseTabsRef = useRef<HTMLDivElement>(null);
+
+  const goBackToSocialFeed = () => {
+    setFeedShowcaseTab('feed');
+    requestAnimationFrame(() => {
+      feedShowcaseTabsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  };
 
   // Fetch registered professional builders from database
   useEffect(() => {
@@ -502,8 +512,16 @@ export const BuilderFacebookLayout: React.FC<BuilderFacebookLayoutProps> = ({
         </aside>
 
       <div className="flex-1 min-w-0 flex flex-col order-1 lg:order-2">
-        <Tabs defaultValue="feed" className="w-full flex flex-col min-h-0">
-          <div className="w-full shrink-0 border-b border-slate-200 dark:border-slate-700">
+        <Tabs
+          value={feedShowcaseTab}
+          onValueChange={(v) => setFeedShowcaseTab(v === 'portfolio' ? 'portfolio' : 'feed')}
+          className="w-full flex flex-col min-h-0"
+        >
+          <div
+            ref={feedShowcaseTabsRef}
+            id="builder-feed-showcase-tabs"
+            className="w-full shrink-0 border-b border-slate-200 dark:border-slate-700 scroll-mt-20"
+          >
             <TabsList className="flex h-10 w-full items-stretch rounded-none border-0 bg-slate-100/80 p-0 text-muted-foreground shadow-none dark:bg-slate-800/70">
               <TabsTrigger
                 value="feed"
@@ -538,6 +556,19 @@ export const BuilderFacebookLayout: React.FC<BuilderFacebookLayoutProps> = ({
           </TabsContent>
           
           <TabsContent value="portfolio" className="mt-0 flex-1 min-h-0 border-t border-slate-100 dark:border-slate-800">
+            <div className="sticky top-0 z-20 flex items-center gap-2 border-b border-slate-200 dark:border-slate-700 bg-white/95 px-2 py-2 backdrop-blur-sm dark:bg-gray-900/95 sm:px-3">
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-9 gap-1.5 px-2 text-gray-700 hover:bg-slate-100 dark:text-gray-200 dark:hover:bg-slate-800"
+                onClick={goBackToSocialFeed}
+                aria-label="Back to Social Feed"
+              >
+                <ArrowLeft className="h-4 w-4 shrink-0" />
+                <span className="text-sm font-medium">Back to Social Feed</span>
+              </Button>
+            </div>
             <div className="border-b border-slate-100 dark:border-slate-800 bg-slate-50/40 dark:bg-slate-900/20 px-3 py-2.5 sm:px-4">
                 <h3 className="text-base font-bold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">
                   Builder Project Showcase
