@@ -49,6 +49,8 @@ interface BuilderFeedProps {
   isBuilder?: boolean; // Whether current user is a registered builder
   onUploadVideo?: (file: File, caption: string) => void;
   onContactBuilder?: (builderId: string) => void;
+  /** Parent supplies outer chrome (e.g. unified builders + feed card) */
+  omitOuterCard?: boolean;
 }
 
 // Sample demo posts for builders
@@ -182,7 +184,8 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
   currentUserRole,
   isBuilder = false,
   onUploadVideo,
-  onContactBuilder
+  onContactBuilder,
+  omitOuterCard = false,
 }) => {
   const { toast } = useToast();
   
@@ -1198,9 +1201,8 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
     return b.timestamp.getTime() - a.timestamp.getTime();
   });
 
-  return (
-    <div className="w-full max-w-2xl mx-auto px-1 sm:px-0">
-      <Card className="overflow-hidden rounded-xl border border-slate-200/90 dark:border-slate-800 bg-white dark:bg-gray-900 shadow-sm">
+  const feedBody = (
+    <>
       <BuilderStories
         embedded
         currentUserName={effectiveUserName}
@@ -1709,6 +1711,17 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
           You&apos;ve seen all posts.
         </div>
       )}
+    </>
+  );
+
+  if (omitOuterCard) {
+    return <div className="w-full min-w-0">{feedBody}</div>;
+  }
+
+  return (
+    <div className="w-full max-w-2xl mx-auto px-1 sm:px-0">
+      <Card className="overflow-hidden rounded-xl border border-slate-200/90 dark:border-slate-800 bg-white dark:bg-gray-900 shadow-sm">
+        {feedBody}
       </Card>
     </div>
   );

@@ -1,6 +1,6 @@
 import { readPersistedAuthRawStringSync } from '@/utils/supabaseAccessToken';
 import React, { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
@@ -317,20 +317,17 @@ export const BuilderFacebookLayout: React.FC<BuilderFacebookLayoutProps> = ({
         </div>
       )}
 
-      {/* Main Content — sidebars + centered feed/showcase column */}
-      <div className="flex w-full max-w-[1280px] mx-auto flex-row flex-wrap items-start justify-center gap-2 lg:gap-3 pb-12 lg:pb-6 px-2 sm:px-3">
-        {/* Left Sidebar - Builder Profiles (Facebook Style) - Desktop Only */}
-        <div className="hidden lg:block w-60 shrink-0 order-1">
-        <div className="sticky top-20 space-y-2">
-          {/* Search Builders */}
-          <Card className="bg-white dark:bg-gray-900 shadow-md">
-            <CardHeader className="pb-2 pt-3 px-4">
-              <CardTitle className="text-base flex items-center gap-2">
+      {/* Single frame: builders list + social feed / project showcase (+ featured on xl) */}
+      <div className="w-full max-w-[1280px] mx-auto pb-12 lg:pb-6 px-2 sm:px-3">
+        <Card className="overflow-hidden rounded-xl border border-slate-200/90 dark:border-slate-800 bg-white dark:bg-gray-900 shadow-sm flex flex-col lg:flex-row items-stretch">
+        <aside className="hidden lg:block w-56 xl:w-60 shrink-0 border-b lg:border-b-0 lg:border-r border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-900/30">
+          <div className="lg:sticky lg:top-20 p-3 space-y-3 max-h-[calc(100vh-5rem)] overflow-y-auto">
+          <div>
+            <h3 className="text-base font-semibold flex items-center gap-2 text-gray-900 dark:text-white mb-2">
                 <Users className="h-5 w-5 text-blue-600" />
                 Builders
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="pt-0">
+            </h3>
+            <div>
               <div className="relative mb-2">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
                 <Input
@@ -482,35 +479,31 @@ export const BuilderFacebookLayout: React.FC<BuilderFacebookLayoutProps> = ({
                   </Button>
                 )}
               </ScrollArea>
-            </CardContent>
-          </Card>
+            </div>
+          </div>
 
-          {/* Quick Stats */}
-          <Card className="bg-gradient-to-br from-blue-600 to-blue-700 text-white shadow-lg">
-            <CardContent className="p-3">
+          <div className="rounded-xl bg-gradient-to-br from-blue-600 to-blue-700 text-white p-3 shadow-inner">
               <h3 className="font-semibold text-sm mb-2 flex items-center gap-2">
                 <Building2 className="h-4 w-4" />
                 Builder Network
               </h3>
-              <div className="grid grid-cols-2 gap-3 text-center">
+              <div className="grid grid-cols-2 gap-2 text-center">
                 <div className="bg-white/20 rounded-lg p-2">
-                  <div className="text-xl font-bold">{allBuilders.length}+</div>
+                  <div className="text-lg font-bold">{allBuilders.length}+</div>
                   <div className="text-xs opacity-90">Builders</div>
                 </div>
                 <div className="bg-white/20 rounded-lg p-2">
-                  <div className="text-xl font-bold">47</div>
+                  <div className="text-lg font-bold">47</div>
                   <div className="text-xs opacity-90">Counties</div>
                 </div>
               </div>
-            </CardContent>
-          </Card>
+          </div>
         </div>
-      </div>
+        </aside>
 
-      {/* Main column — centered as a unit between sidebars */}
-      <div className="order-2 w-full min-w-0 max-w-2xl shrink-0 mx-auto lg:mx-0">
-        <Tabs defaultValue="feed" className="w-full">
-          <div className="flex justify-center mb-1.5">
+      <div className="flex-1 min-w-0 flex flex-col order-1 lg:order-2">
+        <Tabs defaultValue="feed" className="w-full flex flex-col min-h-0">
+          <div className="flex justify-center px-3 pt-3 pb-1.5">
             <TabsList className="grid h-8 w-full max-w-sm grid-cols-2 gap-0.5 rounded-full border border-gray-200/90 bg-white p-0.5 shadow-sm dark:border-gray-700 dark:bg-gray-900">
               <TabsTrigger
                 value="feed"
@@ -529,8 +522,9 @@ export const BuilderFacebookLayout: React.FC<BuilderFacebookLayoutProps> = ({
             </TabsList>
           </div>
           
-          <TabsContent value="feed" className="mt-0">
+          <TabsContent value="feed" className="mt-0 flex-1 min-h-0">
             <BuilderFeed
+              omitOuterCard
               currentUserId={currentUserId}
               currentUserName={currentUserName}
               currentUserAvatar={currentUserAvatar}
@@ -543,33 +537,27 @@ export const BuilderFacebookLayout: React.FC<BuilderFacebookLayoutProps> = ({
             />
           </TabsContent>
           
-          <TabsContent value="portfolio" className="mt-0">
-            <Card className="bg-white dark:bg-gray-900 shadow-md">
-              <CardHeader className="space-y-1 pb-2 pt-3 px-4">
-                <CardTitle className="text-base font-bold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">
+          <TabsContent value="portfolio" className="mt-0 flex-1 min-h-0 border-t border-slate-100 dark:border-slate-800">
+            <div className="border-b border-slate-100 dark:border-slate-800 bg-slate-50/40 dark:bg-slate-900/20 px-3 py-2.5 sm:px-4">
+                <h3 className="text-base font-bold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">
                   Builder Project Showcase
-                </CardTitle>
-                <p className="text-xs text-gray-500 leading-snug">
+                </h3>
+                <p className="text-xs text-gray-500 dark:text-gray-400 leading-snug mt-0.5">
                   Completed projects from professional builders across Kenya
                 </p>
-              </CardHeader>
-              <CardContent className="pt-0 px-3 pb-3 sm:px-4">
+            </div>
+            <div className="p-2 sm:p-3 min-h-0">
                 <BuilderVideoGallery />
-              </CardContent>
-            </Card>
+            </div>
           </TabsContent>
         </Tabs>
       </div>
 
-      {/* Right Sidebar - Suggestions (Facebook Style) */}
-      <div className="hidden xl:block w-60 shrink-0 order-3">
-        <div className="sticky top-20 space-y-2">
-          {/* Sponsored / Featured Builders */}
-          <Card className="bg-white dark:bg-gray-900 shadow-md">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm text-gray-500 font-medium">Featured Builders</CardTitle>
-            </CardHeader>
-            <CardContent className="pt-0 space-y-3">
+      <aside className="hidden xl:block w-56 shrink-0 border-t xl:border-t-0 xl:border-l border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/25 order-3">
+        <div className="xl:sticky xl:top-20 p-3 space-y-3 max-h-[calc(100vh-5rem)] overflow-y-auto">
+          <div>
+            <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-2">Featured Builders</h3>
+            <div className="space-y-2">
               {loadingBuilders ? (
                 <div className="flex items-center justify-center py-4">
                   <Loader2 className="h-5 w-5 animate-spin text-orange-500" />
@@ -614,15 +602,12 @@ export const BuilderFacebookLayout: React.FC<BuilderFacebookLayoutProps> = ({
                   <p className="text-xs mt-1">Be the first to join!</p>
                 </div>
               )}
-            </CardContent>
-          </Card>
+            </div>
+          </div>
 
-          {/* Recent Activity */}
-          <Card className="bg-white dark:bg-gray-900 shadow-md">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm text-gray-500 font-medium">Recent Activity</CardTitle>
-            </CardHeader>
-            <CardContent className="pt-0 space-y-3">
+          <div className="pt-3 border-t border-slate-200 dark:border-slate-700">
+            <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-2">Recent Activity</h3>
+            <div className="space-y-3">
               {allBuilders.length > 0 ? (
                 <>
                   {allBuilders.slice(0, 2).map((builder, idx) => (
@@ -648,11 +633,11 @@ export const BuilderFacebookLayout: React.FC<BuilderFacebookLayoutProps> = ({
                   </p>
                 </div>
               )}
-            </CardContent>
-          </Card>
+            </div>
+          </div>
 
           {/* Footer Links */}
-          <div className="text-xs text-gray-400 px-2">
+          <div className="text-xs text-gray-400 pt-2 border-t border-slate-200 dark:border-slate-700">
             <div className="flex flex-wrap gap-x-2 gap-y-1">
               <a href="#" className="hover:underline">About</a>
               <span>•</span>
@@ -665,7 +650,9 @@ export const BuilderFacebookLayout: React.FC<BuilderFacebookLayoutProps> = ({
             <p className="mt-2">© 2026 UjenziXform Kenya</p>
           </div>
         </div>
-      </div>
+      </aside>
+
+        </Card>
       </div>
 
       {/* Mobile Bottom Navigation */}
