@@ -4,7 +4,7 @@
 # Security Headers
 <IfModule mod_headers.c>
     # Content Security Policy
-    Header always set Content-Security-Policy "default-src 'self'; img-src 'self' data: https: https://i.ytimg.com https://img.youtube.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; connect-src 'self' https:; frame-src 'self' https://www.youtube.com https://youtube.com https://player.vimeo.com https://vimeo.com; frame-ancestors 'none';"
+    Header always set Content-Security-Policy "default-src 'self'; img-src 'self' data: https: https://i.ytimg.com https://img.youtube.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; connect-src 'self' https:; media-src 'self' blob: data: https:; frame-src 'self' https://www.youtube.com https://youtube.com https://player.vimeo.com https://vimeo.com; frame-ancestors 'none';"
     
     # HTTP Strict Transport Security (HSTS)
     Header always set Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"

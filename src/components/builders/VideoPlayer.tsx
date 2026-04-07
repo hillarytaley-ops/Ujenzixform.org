@@ -491,7 +491,16 @@ export const VideoPlayer = ({ video, isOpen, onClose, onVideoUpdate }: VideoPlay
               src={video.video_url}
               controls
               autoPlay
+              playsInline
               className="w-full h-full max-h-[95vh] object-contain"
+              onError={() => {
+                toast({
+                  title: 'Video could not play',
+                  description:
+                    'Check your connection, try another browser, or re-export as H.264 MP4 if this was recorded on a phone.',
+                  variant: 'destructive',
+                });
+              }}
             />
           </div>
 

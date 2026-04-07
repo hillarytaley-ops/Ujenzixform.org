@@ -502,6 +502,15 @@ export const BuilderVideoGallery = ({
                   poster={video.thumbnail_url || undefined}
                   className="w-full h-full object-contain"
                   preload="metadata"
+                  playsInline
+                  onError={() =>
+                    toast({
+                      title: 'Video could not play',
+                      description:
+                        'If you are on a strict network or browser, try H.264 MP4 or open the file link directly.',
+                      variant: 'destructive',
+                    })
+                  }
                 />
                 
                 {/* Play Overlay */}

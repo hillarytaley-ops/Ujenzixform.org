@@ -96,7 +96,15 @@ export const CSP_DIRECTIVES = {
     'blob:' // For service workers
   ],
   'manifest-src': ["'self'"],
-  'media-src': ["'self'", 'blob:', 'data:', 'https://commondatastorage.googleapis.com'],
+  // Supabase Storage serves builder feed / showcase videos; without this, <video src="…supabase…"> is CSP-blocked.
+  'media-src': [
+    "'self'",
+    'blob:',
+    'data:',
+    SUPABASE_URL,
+    'https://*.supabase.co',
+    'https://commondatastorage.googleapis.com',
+  ],
   'object-src': ["'none'"],
   'base-uri': ["'self'"],
   'form-action': ["'self'"],

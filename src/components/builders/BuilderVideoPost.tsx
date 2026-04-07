@@ -351,8 +351,17 @@ export const BuilderVideoPost: React.FC<BuilderVideoPostProps> = ({
             muted={isMuted}
             loop
             playsInline
+            preload="metadata"
             onPlay={() => setIsPlaying(true)}
             onPause={() => setIsPlaying(false)}
+            onError={() => {
+              toast({
+                title: 'Video could not play',
+                description:
+                  'This file may be blocked by policy, unsupported in this browser (try H.264 MP4), or the link may be invalid. Open the video URL in a new tab to verify.',
+                variant: 'destructive',
+              });
+            }}
           />
           
           {/* Gradient overlay for better visibility */}
