@@ -225,62 +225,59 @@ const Builders = () => {
       {/* FloatingSocialSidebar now in App.tsx */}
       <Navigation />
 
-      {/* Hero Section - Ultra Compact */}
-      <section 
-        className="text-white py-8 md:py-10 relative overflow-hidden"
+      {/* Hero Section — minimal vertical footprint */}
+      <section
+        className="text-white py-4 md:py-5 relative overflow-hidden"
         role="banner"
         aria-labelledby="builders-hero-heading"
       >
         {/* Background */}
-        <div 
+        <div
           className="absolute inset-0 bg-cover bg-center"
           style={{ backgroundImage: `url('/builders-hero-bg.jpg')` }}
         />
         <div className="absolute inset-0 bg-gradient-to-r from-gray-900/90 via-gray-900/75 to-gray-900/85" />
-        
+
         <div className="container mx-auto px-4 text-center relative z-10">
           <div className="max-w-4xl mx-auto">
-            {/* Title */}
-            <h1 id="builders-hero-heading" className="text-2xl sm:text-3xl md:text-4xl font-bold mb-2">
-              <span className="text-white">Professional Builders</span>
-              {' '}
+            <h1 id="builders-hero-heading" className="text-xl sm:text-2xl md:text-3xl font-bold mb-1 leading-tight">
+              <span className="text-white">Professional Builders</span>{' '}
               <span className="text-blue-400">Directory</span>
             </h1>
-            
-            <p className="text-sm md:text-base text-white/80 mb-4 max-w-2xl mx-auto">
+
+            <p className="text-xs sm:text-sm text-white/80 mb-2 max-w-xl mx-auto leading-snug">
               Browse certified builders, compare quotes, and hire trusted professionals across Kenya.
             </p>
-            
-            {/* Action Buttons - Single Row */}
-            <div className="flex flex-wrap gap-2 justify-center mb-4">
-              <Button 
+
+            <div className="flex flex-wrap gap-1.5 justify-center mb-2">
+              <Button
                 size="sm"
                 onClick={() => setShowDashboard(false)}
-                className="bg-white text-gray-900 hover:bg-gray-100 font-semibold text-xs px-3 py-1.5"
+                className="h-8 bg-white text-gray-900 hover:bg-gray-100 font-semibold text-[11px] px-2.5"
               >
                 <Building2 className="h-3 w-3 mr-1" />
                 Browse
               </Button>
-              
+
               <Link to="/builder-registration">
-                <Button size="sm" className="bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs px-3 py-1.5">
+                <Button size="sm" className="h-8 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-[11px] px-2.5">
                   <Building2 className="h-3 w-3 mr-1" />
                   Register
                 </Button>
               </Link>
-              
+
               {!loading && userProfile && (userRoleState === 'professional_builder' || userRoleState === 'private_client') && (
                 <Link to="/professional-builder-dashboard">
-                  <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white font-semibold text-xs px-3 py-1.5">
+                  <Button size="sm" className="h-8 bg-green-600 hover:bg-green-700 text-white font-semibold text-[11px] px-2.5">
                     <Settings className="h-3 w-3 mr-1" />
                     Dashboard
                   </Button>
                 </Link>
               )}
-              
+
               {!loading && !userProfile && (
                 <Link to="/builder-signin">
-                  <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white font-semibold text-xs px-3 py-1.5">
+                  <Button size="sm" className="h-8 bg-green-600 hover:bg-green-700 text-white font-semibold text-[11px] px-2.5">
                     <Lock className="h-3 w-3 mr-1" />
                     Sign In
                   </Button>
@@ -288,55 +285,73 @@ const Builders = () => {
               )}
             </div>
 
-            {/* Stats - Inline */}
-            <div className="flex flex-wrap justify-center gap-4 text-xs">
-              <span className="text-white/70"><strong className="text-blue-400">150+</strong> Builders</span>
-              <span className="text-white/70"><strong className="text-gray-300">500+</strong> Projects</span>
-              <span className="text-white/70"><strong className="text-orange-400">47</strong> Counties</span>
-              <span className="text-white/70"><strong className="text-blue-300">24/7</strong> Support</span>
+            <div className="flex flex-wrap justify-center gap-x-3 gap-y-0.5 text-[11px]">
+              <span className="text-white/70">
+                <strong className="text-blue-400">150+</strong> Builders
+              </span>
+              <span className="text-white/50 hidden sm:inline" aria-hidden>
+                ·
+              </span>
+              <span className="text-white/70">
+                <strong className="text-gray-300">500+</strong> Projects
+              </span>
+              <span className="text-white/50 hidden sm:inline" aria-hidden>
+                ·
+              </span>
+              <span className="text-white/70">
+                <strong className="text-orange-400">47</strong> Counties
+              </span>
+              <span className="text-white/50 hidden sm:inline" aria-hidden>
+                ·
+              </span>
+              <span className="text-white/70">
+                <strong className="text-blue-300">24/7</strong> Support
+              </span>
             </div>
           </div>
         </div>
       </section>
 
-      {/* Builder Portal Section - Compact */}
-      <section className="py-6 bg-gradient-to-r from-slate-50 to-blue-50">
+      {/* Builder portals — single tight band */}
+      <section className="py-2.5 sm:py-3 bg-gradient-to-r from-slate-50 to-blue-50 border-b border-slate-200/80">
         <div className="container mx-auto px-4">
-          <div className="text-center mb-4">
-            <h2 className="text-lg font-bold text-gray-900">Choose Your Builder Portal</h2>
-          </div>
-          
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-2xl mx-auto">
-            {/* Private Builder */}
-            <Card className="hover:shadow-lg transition-all duration-300 border border-emerald-200 bg-white">
-              <CardContent className="p-4 flex items-center gap-4">
-                <div className="w-12 h-12 bg-emerald-100 rounded-xl flex items-center justify-center flex-shrink-0">
-                  <ShoppingCart className="h-6 w-6 text-emerald-600" />
+          <h2 className="text-center text-sm font-semibold text-gray-800 mb-2 tracking-tight">
+            Choose Your Builder Portal
+          </h2>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3 max-w-xl mx-auto">
+            <Card className="shadow-sm border border-emerald-200/90 bg-white py-0">
+              <CardContent className="p-2.5 sm:p-3 flex items-center gap-2.5">
+                <div className="w-9 h-9 bg-emerald-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                  <ShoppingCart className="h-4 w-4 text-emerald-600" />
                 </div>
-                <div className="flex-1 min-w-0">
-                  <h3 className="text-base font-bold text-gray-900">Private Builder</h3>
-                  <p className="text-xs text-gray-500">Home projects & purchases</p>
+                <div className="flex-1 min-w-0 text-left">
+                  <h3 className="text-sm font-bold text-gray-900 leading-none">Private Builder</h3>
+                  <p className="text-[10px] sm:text-[11px] text-gray-500 mt-0.5 leading-tight">
+                    Home projects & purchases
+                  </p>
                 </div>
-                <Link to="/private-client-auth">
-                  <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold">
+                <Link to="/private-client-auth" className="flex-shrink-0">
+                  <Button size="sm" className="h-7 px-2.5 text-[11px] bg-emerald-600 hover:bg-emerald-700 text-white font-semibold">
                     Explore
                   </Button>
                 </Link>
               </CardContent>
             </Card>
 
-            {/* Professional Builder */}
-            <Card className="hover:shadow-lg transition-all duration-300 border border-blue-200 bg-white">
-              <CardContent className="p-4 flex items-center gap-4">
-                <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center flex-shrink-0">
-                  <Building2 className="h-6 w-6 text-blue-600" />
+            <Card className="shadow-sm border border-blue-200/90 bg-white py-0">
+              <CardContent className="p-2.5 sm:p-3 flex items-center gap-2.5">
+                <div className="w-9 h-9 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                  <Building2 className="h-4 w-4 text-blue-600" />
                 </div>
-                <div className="flex-1 min-w-0">
-                  <h3 className="text-base font-bold text-gray-900">Professional Builder</h3>
-                  <p className="text-xs text-gray-500">Contractors & companies</p>
+                <div className="flex-1 min-w-0 text-left">
+                  <h3 className="text-sm font-bold text-gray-900 leading-none">Professional Builder</h3>
+                  <p className="text-[10px] sm:text-[11px] text-gray-500 mt-0.5 leading-tight">
+                    Contractors & companies
+                  </p>
                 </div>
-                <Link to="/professional-builder-auth">
-                  <Button size="sm" className="bg-blue-600 hover:bg-blue-700 text-white font-semibold">
+                <Link to="/professional-builder-auth" className="flex-shrink-0">
+                  <Button size="sm" className="h-7 px-2.5 text-[11px] bg-blue-600 hover:bg-blue-700 text-white font-semibold">
                     Explore
                   </Button>
                 </Link>
