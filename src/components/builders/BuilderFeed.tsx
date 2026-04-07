@@ -1199,7 +1199,7 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
   });
 
   return (
-    <div className="w-full max-w-2xl mx-auto space-y-3 sm:space-y-4 px-2 sm:px-0">
+    <div className="w-full max-w-2xl mx-auto space-y-2 sm:space-y-3 px-1 sm:px-0">
       {/* Stories Section */}
       <BuilderStories
         currentUserName={effectiveUserName}

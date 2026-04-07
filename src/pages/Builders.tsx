@@ -381,7 +381,7 @@ const Builders = () => {
         </section>
       </Collapsible>
 
-      <main className="py-20 relative overflow-hidden">
+      <main className="py-10 sm:py-12 lg:py-14 relative overflow-hidden">
         {/* Kenyan Construction Development Background */}
         <div 
           className="absolute inset-0"
@@ -660,7 +660,7 @@ const Builders = () => {
           )
         ) : (
           /* Public Directory with Facebook-Style Combined Layout */
-          <div className="space-y-6">
+          <div className="space-y-3">
             {/* Show notice to suppliers/delivery providers that this is a builders directory */}
             {userProfile && userRoleState && userRoleState !== 'professional_builder' && userRoleState !== 'private_client' && userRoleState !== 'admin' && (
               <div className="bg-amber-50 border-2 border-amber-200 rounded-2xl p-4 text-center max-w-2xl mx-auto">
