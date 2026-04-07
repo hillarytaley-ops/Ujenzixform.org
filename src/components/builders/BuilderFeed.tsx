@@ -1203,6 +1203,7 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
 
   const feedBody = (
     <>
+      <div id="builder-feed-composer-anchor" className="scroll-mt-24">
       {canPost ? (
         <div className="border-b border-slate-100 dark:border-slate-800 px-3 py-3 sm:px-4">
           <div className="space-y-3">
@@ -1499,6 +1500,7 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
             </div>
         </div>
       )}
+      </div>
 
       <BuilderStories
         embedded

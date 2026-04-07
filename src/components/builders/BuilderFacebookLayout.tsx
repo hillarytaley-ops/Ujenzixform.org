@@ -31,6 +31,7 @@ import { BuilderVideoGallery } from './BuilderVideoGallery';
 import { MobileBottomNav, MobileHeader } from './MobileBottomNav';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { SUPABASE_ANON_KEY, SUPABASE_URL, supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
 
 // Builder type for registered builders
 interface RegisteredBuilder {
@@ -86,11 +87,26 @@ export const BuilderFacebookLayout: React.FC<BuilderFacebookLayoutProps> = ({
 
   const [feedShowcaseTab, setFeedShowcaseTab] = useState<'feed' | 'portfolio'>('feed');
   const feedShowcaseTabsRef = useRef<HTMLDivElement>(null);
+  const { toast } = useToast();
 
-  const goBackToSocialFeed = () => {
+  const focusSocialFeedTabs = () => {
     setFeedShowcaseTab('feed');
     requestAnimationFrame(() => {
       feedShowcaseTabsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  };
+
+  const goBackToSocialFeed = () => focusSocialFeedTabs();
+
+  const openSiteMobileMenu = () => {
+    const toggle = document.getElementById('site-mobile-nav-toggle');
+    if (toggle && toggle instanceof HTMLButtonElement) {
+      toggle.click();
+      return;
+    }
+    toast({
+      title: 'Menu',
+      description: 'Use the menu (☰) in the top bar to browse the site.',
     });
   };
 
@@ -328,7 +344,7 @@ export const BuilderFacebookLayout: React.FC<BuilderFacebookLayoutProps> = ({
       )}
 
       {/* Single frame: builders list + social feed / project showcase (+ featured on xl) */}
-      <div className="w-full max-w-[1280px] mx-auto pb-12 lg:pb-6 px-2 sm:px-3">
+      <div className="w-full max-w-[1280px] mx-auto pb-28 lg:pb-6 px-2 sm:px-3">
         <Card className="overflow-hidden rounded-xl border border-slate-200/90 dark:border-slate-800 bg-white dark:bg-gray-900 shadow-sm flex flex-col lg:flex-row items-stretch">
         <aside className="hidden lg:block w-56 xl:w-60 shrink-0 border-b lg:border-b-0 lg:border-r border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-900/30">
           <div className="lg:sticky lg:top-20 p-3 space-y-3 max-h-[calc(100vh-5rem)] overflow-y-auto">
@@ -691,8 +707,25 @@ export const BuilderFacebookLayout: React.FC<BuilderFacebookLayoutProps> = ({
         activeTab={mobileTab}
         onTabChange={(tab) => {
           setMobileTab(tab);
-          if (tab === 'builders') {
+          if (tab === 'feed') {
+            focusSocialFeedTabs();
+          } else if (tab === 'builders') {
             setShowMobileSearch(true);
+          } else if (tab === 'create') {
+            focusSocialFeedTabs();
+            window.setTimeout(() => {
+              document.getElementById('builder-feed-composer-anchor')?.scrollIntoView({
+                behavior: 'smooth',
+                block: 'center',
+              });
+            }, 280);
+          } else if (tab === 'notifications') {
+            toast({
+              title: 'Alerts',
+              description: 'You have no critical alerts. Check back later for updates.',
+            });
+          } else if (tab === 'menu') {
+            openSiteMobileMenu();
           }
         }}
         notificationCount={5}

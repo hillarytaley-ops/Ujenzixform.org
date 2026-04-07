@@ -1,10 +1,9 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { 
   Home, 
   Users, 
-  Video, 
   Bell, 
   Menu,
   Plus,
@@ -25,6 +24,11 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
   notificationCount = 0,
   messageCount = 0
 }) => {
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   const tabs = [
     { id: 'feed' as const, icon: Home, label: 'Feed' },
     { id: 'builders' as const, icon: Users, label: 'Builders' },
@@ -33,21 +37,26 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
     { id: 'menu' as const, icon: Menu, label: 'Menu' },
   ];
 
-  return (
-    <div className="fixed bottom-0 left-0 right-0 z-50 lg:hidden">
-      {/* Safe area padding for iOS */}
-      <div className="bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-800 shadow-lg">
-        <div className="flex items-center justify-around py-2 px-2 pb-safe">
+  const bar = (
+    <div
+      className="fixed bottom-0 left-0 right-0 z-[10060] lg:hidden pointer-events-auto"
+      style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
+      role="navigation"
+      aria-label="Builders mobile navigation"
+    >
+      <div className="bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-800 shadow-[0_-4px_20px_rgba(0,0,0,0.08)] dark:shadow-[0_-4px_20px_rgba(0,0,0,0.35)]">
+        <div className="flex items-end justify-around pt-1 px-1 sm:px-2">
           {tabs.map((tab) => (
             <button
               key={tab.id}
+              type="button"
               onClick={() => onTabChange(tab.id)}
-              className={`relative flex flex-col items-center justify-center py-2 px-4 rounded-xl transition-all duration-200 ${
+              className={`relative flex flex-col items-center justify-center touch-manipulation select-none active:opacity-80 rounded-xl transition-all duration-200 ${
                 tab.isSpecial
-                  ? 'bg-blue-600 text-white -mt-6 shadow-lg shadow-blue-500/30 rounded-full w-14 h-14'
-                  : activeTab === tab.id
-                  ? 'text-blue-600'
-                  : 'text-gray-500 hover:text-gray-700'
+                  ? 'bg-blue-600 text-white -mt-5 mb-0.5 shadow-lg shadow-blue-500/30 rounded-full w-14 h-14 shrink-0'
+                  : `py-2 px-2 sm:px-3 min-w-0 flex-1 max-w-[4.5rem] ${
+                      activeTab === tab.id ? 'text-blue-600' : 'text-gray-500'
+                    }`
               }`}
             >
               <div className="relative">
@@ -69,6 +78,12 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
       </div>
     </div>
   );
+
+  if (!mounted || typeof document === 'undefined') {
+    return null;
+  }
+
+  return createPortal(bar, document.body);
 };
 
 // Mobile Header Component
