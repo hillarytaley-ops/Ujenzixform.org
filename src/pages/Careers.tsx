@@ -1,23 +1,7 @@
-/**
- * ╔══════════════════════════════════════════════════════════════════════════════════════╗
- * ║                                                                                      ║
- * ║   💼 CAREERS PAGE - Professional Career Opportunities at UjenziXform                  ║
- * ║                                                                                      ║
- * ║   Created: December 27, 2025                                                         ║
- * ║   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ ║
- * ║                                                                                      ║
- * ║   FEATURES:                                                                          ║
- * ║   ┌─────────────────────────────────────────────────────────────────────────────┐   ║
- * ║   │  ✅ Professional hero section with career seeker background                 │   ║
- * ║   │  ✅ Dynamic job positions from database                                      │   ║
- * ║   │  ✅ Application form with validation                                         │   ║
- * ║   │  ✅ Company values and benefits showcase                                     │   ║
- * ║   └─────────────────────────────────────────────────────────────────────────────┘   ║
- * ║                                                                                      ║
- * ╚══════════════════════════════════════════════════════════════════════════════════════╝
- */
+/** Careers: live job list from `job_positions`; applications to `job_applications`. */
 
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import Navigation from '@/components/Navigation';
 import Footer from '@/components/Footer';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -28,6 +12,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
+import { useHomePagePublicStats, formatHomeStatCount } from '@/hooks/useHomePagePublicStats';
 import { supabase, SUPABASE_URL, SUPABASE_ANON_KEY } from '@/integrations/supabase/client';
 import {
   Briefcase,
@@ -110,14 +95,54 @@ const COMPANY_VALUES = [
 ];
 
 const PERKS = [
-  { icon: <HeartHandshake className="h-6 w-6" />, title: 'Health Insurance', description: 'Comprehensive coverage for you and your family', color: 'bg-red-100 text-red-600' },
-  { icon: <GraduationCap className="h-6 w-6" />, title: 'Learning Budget', description: 'KES 100,000/year for courses and conferences', color: 'bg-blue-100 text-blue-600' },
-  { icon: <Laptop className="h-6 w-6" />, title: 'Remote Friendly', description: 'Hybrid work with remote-friendly policies', color: 'bg-purple-100 text-purple-600' },
-  { icon: <TrendingUp className="h-6 w-6" />, title: 'Equity Options', description: 'Own a piece of what you\'re building', color: 'bg-green-100 text-green-600' },
-  { icon: <Plane className="h-6 w-6" />, title: 'Generous PTO', description: '25 days annual leave + public holidays', color: 'bg-cyan-100 text-cyan-600' },
-  { icon: <Coffee className="h-6 w-6" />, title: 'Team Events', description: 'Monthly team lunches and quarterly offsites', color: 'bg-orange-100 text-orange-600' },
-  { icon: <Award className="h-6 w-6" />, title: 'Equipment', description: 'MacBook Pro + monitor + ergonomic setup', color: 'bg-indigo-100 text-indigo-600' },
-  { icon: <Target className="h-6 w-6" />, title: 'Career Growth', description: 'Clear paths for advancement and mentorship', color: 'bg-pink-100 text-pink-600' }
+  {
+    icon: <HeartHandshake className="h-6 w-6" />,
+    title: 'Health insurance',
+    description: 'Medical cover for employees where we offer it for the role and location.',
+    color: 'bg-red-100 text-red-600',
+  },
+  {
+    icon: <GraduationCap className="h-6 w-6" />,
+    title: 'Learning & development',
+    description: 'Budget or support for training may be available depending on role and tenure.',
+    color: 'bg-blue-100 text-blue-600',
+  },
+  {
+    icon: <Laptop className="h-6 w-6" />,
+    title: 'Flexible work',
+    description: 'Hybrid or remote-friendly arrangements where the job allows.',
+    color: 'bg-purple-100 text-purple-600',
+  },
+  {
+    icon: <TrendingUp className="h-6 w-6" />,
+    title: 'Equity / upside',
+    description: 'Some roles may include equity or performance incentives — offer details vary.',
+    color: 'bg-green-100 text-green-600',
+  },
+  {
+    icon: <Plane className="h-6 w-6" />,
+    title: 'Time off',
+    description: 'Annual leave and public holidays per Kenya law and your contract.',
+    color: 'bg-cyan-100 text-cyan-600',
+  },
+  {
+    icon: <Coffee className="h-6 w-6" />,
+    title: 'Team culture',
+    description: 'Team meetups and events when practical — not guaranteed on a fixed schedule.',
+    color: 'bg-orange-100 text-orange-600',
+  },
+  {
+    icon: <Award className="h-6 w-6" />,
+    title: 'Equipment',
+    description: 'Laptop and tools suitable for the role; exact kit depends on position.',
+    color: 'bg-indigo-100 text-indigo-600',
+  },
+  {
+    icon: <Target className="h-6 w-6" />,
+    title: 'Career growth',
+    description: 'We want people to grow; paths depend on team needs and performance.',
+    color: 'bg-pink-100 text-pink-600',
+  },
 ];
 
 const getIconComponent = (iconName: string, className: string = "h-6 w-6") => {
@@ -135,61 +160,12 @@ const getIconComponent = (iconName: string, className: string = "h-6 w-6") => {
   return icons[iconName] || <Briefcase className={className} />;
 };
 
-// Default positions to show while loading from database
-const DEFAULT_POSITIONS: JobPosition[] = [
-  {
-    id: 'default-1',
-    title: 'Senior Software Engineer',
-    department: 'Engineering',
-    location: 'Nairobi, Kenya',
-    job_type: 'Full-time',
-    experience_level: '5+ years',
-    salary_range: 'KES 250,000 - 400,000',
-    description: 'Join our core engineering team to build the next generation of construction technology.',
-    requirements: ['Strong experience with React, TypeScript', 'Experience with PostgreSQL and Supabase'],
-    benefits: ['Competitive salary with equity options', 'Health insurance for you and family'],
-    responsibilities: ['Design and implement new features', 'Write clean, maintainable code'],
-    icon_name: 'Code',
-    is_featured: true,
-    created_at: new Date().toISOString()
-  },
-  {
-    id: 'default-2',
-    title: 'Product Manager',
-    department: 'Product',
-    location: 'Nairobi, Kenya',
-    job_type: 'Full-time',
-    experience_level: '3+ years',
-    salary_range: 'KES 200,000 - 350,000',
-    description: 'Lead product strategy for our marketplace platform.',
-    requirements: ['Experience in product management', 'Strong analytical mindset'],
-    benefits: ['Competitive salary with equity options', 'Health insurance'],
-    responsibilities: ['Define product roadmap', 'Conduct user research'],
-    icon_name: 'BarChart3',
-    is_featured: true,
-    created_at: new Date().toISOString()
-  },
-  {
-    id: 'default-3',
-    title: 'Operations Manager - Delivery',
-    department: 'Operations',
-    location: 'Nairobi, Kenya',
-    job_type: 'Full-time',
-    experience_level: '4+ years',
-    salary_range: 'KES 180,000 - 280,000',
-    description: 'Manage and optimize our delivery network across Kenya.',
-    requirements: ['Experience in logistics management', 'Strong network in transport industry'],
-    benefits: ['Competitive salary with bonuses', 'Company vehicle allowance'],
-    responsibilities: ['Manage delivery provider relationships', 'Optimize delivery routes'],
-    icon_name: 'Truck',
-    is_featured: false,
-    created_at: new Date().toISOString()
-  }
-];
+const CAREERS_EMAIL = 'info@ujenzixform.org';
 
 const Careers = () => {
-  const [positions, setPositions] = useState<JobPosition[]>(DEFAULT_POSITIONS);
-  const [loading, setLoading] = useState(false); // Start with false - show default content immediately
+  const publicStats = useHomePagePublicStats();
+  const [positions, setPositions] = useState<JobPosition[]>([]);
+  const [loading, setLoading] = useState(true);
   const [selectedJob, setSelectedJob] = useState<JobPosition | null>(null);
   const [isApplying, setIsApplying] = useState(false);
   const [applicationForm, setApplicationForm] = useState({
@@ -224,6 +200,7 @@ const Careers = () => {
   }, []);
 
   const loadPositions = async () => {
+    setLoading(true);
     try {
       const { data, error } = await supabase
         .from('job_positions')
@@ -233,13 +210,12 @@ const Careers = () => {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      if (data && data.length > 0) {
-        setPositions(data as any);
-      }
-      // If no data, keep showing default positions
+      setPositions((data ?? []) as JobPosition[]);
     } catch (error) {
       console.error('Error loading positions:', error);
-      // Keep showing default positions on error
+      setPositions([]);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -420,100 +396,89 @@ const Careers = () => {
         console.log('⚠️ Could not get session token, using anon key:', e);
       }
       
-      console.log('📤 Starting database insert fetch...');
+      let insertSucceeded = false;
       const controller = new AbortController();
       const insertTimeout = setTimeout(() => {
-        console.warn('⏱️ Database insert timeout after 10 seconds - aborting');
         controller.abort();
-      }, 10000); // 10 second timeout
-      
+      }, 10000);
+
       try {
-        console.log('🌐 Fetching:', `${SUPABASE_URL}/rest/v1/job_applications`);
-        const response = await fetch(
-          `${SUPABASE_URL}/rest/v1/job_applications`,
-          {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'apikey': SUPABASE_ANON_KEY,
-              'Authorization': `Bearer ${accessToken}`,
-              'Prefer': 'return=representation'
-            },
-            body: JSON.stringify(applicationData),
-            signal: controller.signal
-          }
-        );
-        
+        const response = await fetch(`${SUPABASE_URL}/rest/v1/job_applications`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            apikey: SUPABASE_ANON_KEY,
+            Authorization: `Bearer ${accessToken}`,
+            Prefer: 'return=representation',
+          },
+          body: JSON.stringify(applicationData),
+          signal: controller.signal,
+        });
+
         clearTimeout(insertTimeout);
-        console.log('📥 Got response:', response.status, response.statusText);
-        
+
         if (!response.ok) {
           const errorData = await response.json().catch(() => ({}));
-          console.error('❌ Database insert error:', response.status, errorData);
-          throw new Error(errorData.message || `Insert failed: ${response.status}`);
+          console.error('Database insert error:', response.status, errorData);
+          throw new Error(
+            (errorData as { message?: string }).message || `Insert failed: ${response.status}`
+          );
         }
-        
-        const insertedData = await response.json();
-        console.log('✅ General application submitted successfully to database:', insertedData?.[0]?.id || 'unknown');
-        
-        // Clear upload timeout if it's still pending (prevent late timeout message)
+
+        await response.json();
+        insertSucceeded = true;
         if (uploadTimeoutId) {
           clearTimeout(uploadTimeoutId);
           uploadTimeoutId = null;
         }
-      } catch (fetchError: any) {
+      } catch (fetchError: unknown) {
         clearTimeout(insertTimeout);
-        // Clear upload timeout on error too
         if (uploadTimeoutId) {
           clearTimeout(uploadTimeoutId);
           uploadTimeoutId = null;
         }
-        console.error('❌ Fetch error:', fetchError.name, fetchError.message);
-        if (fetchError.name === 'AbortError') {
-          console.warn('⚠️ Database insert timed out, but application may have been saved');
+        const err = fetchError as { name?: string; message?: string };
+        if (err.name === 'AbortError') {
           toast({
-            title: '⚠️ Submission Timeout',
-            description: 'Your application may have been submitted. Please check your email for confirmation or try again.',
+            title: 'Could not confirm submission',
+            description: `The request timed out. Please try again or email ${CAREERS_EMAIL}.`,
           });
-          // Don't throw - allow submission to complete
         } else {
-          console.error('❌ Database insert error:', fetchError);
           throw fetchError;
         }
       }
-      setApplicationSuccess(true);
-      toast({
-        title: '🎉 Application Submitted!',
-        description: 'Thank you for your interest! Our team will review your application and contact you soon.',
-      });
 
-      // Reset form
-      setGeneralApplication({
-        name: '',
-        email: '',
-        phone: '',
-        position: '',
-        linkedin: '',
-        coverLetter: ''
-      });
-      setResumeFile(null);
-      setCoverLetterFile(null);
-
-    } catch (error: any) {
-      console.error('❌ Application error:', error);
+      if (insertSucceeded) {
+        setApplicationSuccess(true);
+        toast({
+          title: 'Application submitted',
+          description: 'Thank you. We aim to follow up within about two weeks if there is a fit.',
+        });
+        setGeneralApplication({
+          name: '',
+          email: '',
+          phone: '',
+          position: '',
+          linkedin: '',
+          coverLetter: '',
+        });
+        setResumeFile(null);
+        setCoverLetterFile(null);
+      }
+    } catch (error: unknown) {
+      console.error('Application error:', error);
+      const err = error as { code?: string; message?: string };
       toast({
-        variant: error?.code === '23505' ? "default" : "destructive",
-        title: error?.code === '23505' ? 'Application Already Submitted' : 'Application Error',
-        description: error?.code === '23505' 
-          ? 'You have already submitted an application.'
-          : (error?.message || 'Failed to submit application. Please try again or contact support.'),
+        variant: err?.code === '23505' ? 'default' : 'destructive',
+        title: err?.code === '23505' ? 'Already submitted' : 'Application error',
+        description:
+          err?.code === '23505'
+            ? 'We already have an application from you on file.'
+            : err?.message || 'Failed to submit. Please try again or email us.',
       });
-      // Still show success state so user knows we received their attempt
-      setApplicationSuccess(true);
     } finally {
       clearTimeout(submissionTimeout);
       setIsSubmittingGeneral(false);
-      console.log('✅ General application submission process completed');
     }
   };
 
@@ -657,97 +622,87 @@ const Careers = () => {
         console.log('⚠️ Could not get session token, using anon key:', e);
       }
       
-      console.log('📤 Starting database insert fetch...');
+      let insertSucceeded = false;
       const controller = new AbortController();
-      const insertTimeout = setTimeout(() => {
-        console.warn('⏱️ Database insert timeout after 10 seconds - aborting');
-        controller.abort();
-      }, 10000); // 10 second timeout
-      
+      const insertTimeout = setTimeout(() => controller.abort(), 10000);
+
       try {
-        console.log('🌐 Fetching:', `${SUPABASE_URL}/rest/v1/job_applications`);
-        const response = await fetch(
-          `${SUPABASE_URL}/rest/v1/job_applications`,
-          {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'apikey': SUPABASE_ANON_KEY,
-              'Authorization': `Bearer ${accessToken}`,
-              'Prefer': 'return=representation'
-            },
-            body: JSON.stringify(applicationData),
-            signal: controller.signal
-          }
-        );
-        
+        const response = await fetch(`${SUPABASE_URL}/rest/v1/job_applications`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            apikey: SUPABASE_ANON_KEY,
+            Authorization: `Bearer ${accessToken}`,
+            Prefer: 'return=representation',
+          },
+          body: JSON.stringify(applicationData),
+          signal: controller.signal,
+        });
+
         clearTimeout(insertTimeout);
-        console.log('📥 Got response:', response.status, response.statusText);
-        
+
         if (!response.ok) {
           const errorData = await response.json().catch(() => ({}));
-          console.error('❌ Database insert error:', response.status, errorData);
-          throw new Error(errorData.message || `Insert failed: ${response.status}`);
+          console.error('Database insert error:', response.status, errorData);
+          throw new Error(
+            (errorData as { message?: string }).message || `Insert failed: ${response.status}`
+          );
         }
-        
-        const insertedData = await response.json();
-        console.log('✅ Application submitted successfully to database:', insertedData?.[0]?.id || 'unknown');
-        
-        // Clear upload timeout if it's still pending (prevent late timeout message)
+
+        await response.json();
+        insertSucceeded = true;
         if (uploadTimeoutId) {
           clearTimeout(uploadTimeoutId);
           uploadTimeoutId = null;
         }
-      } catch (fetchError: any) {
+      } catch (fetchError: unknown) {
         clearTimeout(insertTimeout);
-        // Clear upload timeout on error too
         if (uploadTimeoutId) {
           clearTimeout(uploadTimeoutId);
           uploadTimeoutId = null;
         }
-        console.error('❌ Fetch error:', fetchError.name, fetchError.message);
-        if (fetchError.name === 'AbortError') {
-          console.warn('⚠️ Database insert timed out, but application may have been saved');
+        const err = fetchError as { name?: string };
+        if (err.name === 'AbortError') {
           toast({
-            title: '⚠️ Submission Timeout',
-            description: 'Your application may have been submitted. Please check your email for confirmation or try again.',
+            title: 'Could not confirm submission',
+            description: `The request timed out. Please try again or email ${CAREERS_EMAIL}.`,
           });
-          // Don't throw - allow submission to complete
         } else {
-          console.error('❌ Database insert error:', fetchError);
           throw fetchError;
         }
       }
-      toast({
-        title: '🎉 Application Submitted!',
-        description: `Thank you for applying for ${selectedJob.title}. We'll review your application and get back to you within 5 business days.`,
-      });
 
-      setSelectedJob(null);
-      setApplicationForm({
-        name: '',
-        email: '',
-        phone: '',
-        linkedin: '',
-        portfolio: '',
-        coverLetter: ''
-      });
-      setJobResumeFile(null);
-      setJobCoverLetterFile(null);
-    } catch (error: any) {
-      console.error('❌ Application error:', error);
+      if (insertSucceeded) {
+        toast({
+          title: 'Application submitted',
+          description: `Thanks for applying for ${selectedJob.title}. We aim to follow up within about two weeks if there is a fit.`,
+        });
+        setSelectedJob(null);
+        setApplicationForm({
+          name: '',
+          email: '',
+          phone: '',
+          linkedin: '',
+          portfolio: '',
+          coverLetter: '',
+        });
+        setJobResumeFile(null);
+        setJobCoverLetterFile(null);
+      }
+    } catch (error: unknown) {
+      console.error('Application error:', error);
+      const err = error as { code?: string; message?: string };
       toast({
-        variant: error?.code === '23505' ? "default" : "destructive",
-        title: error?.code === '23505' ? 'Application Already Submitted' : 'Application Error',
-        description: error?.code === '23505' 
-          ? 'You have already submitted an application for this position.'
-          : (error?.message || 'Failed to submit application. Please try again or contact support.'),
+        variant: err?.code === '23505' ? 'default' : 'destructive',
+        title: err?.code === '23505' ? 'Already submitted' : 'Application error',
+        description:
+          err?.code === '23505'
+            ? 'We already have an application from you for this role.'
+            : err?.message || 'Failed to submit. Please try again or email us.',
       });
-      // Don't close modal on error so user can retry
     } finally {
       clearTimeout(submissionTimeout);
       setIsApplying(false);
-      console.log('✅ Application submission process completed');
     }
   };
 
@@ -762,9 +717,9 @@ const Careers = () => {
           <div className="absolute inset-0 bg-gradient-to-br from-slate-900 via-blue-900 to-slate-800" />
           
           {/* Background Image (loads in background) */}
-          <img 
+          <img
             src="https://images.unsplash.com/photo-1521737711867-e3b97375f902?ixlib=rb-4.0.3&auto=format&fit=crop&w=1920&q=80"
-            alt=""
+            alt="Team collaboration"
             loading="eager"
             className="absolute inset-0 w-full h-full object-cover"
             onLoad={(e) => (e.target as HTMLImageElement).style.opacity = '1'}
@@ -784,61 +739,85 @@ const Careers = () => {
           {/* Content */}
           <div className="container mx-auto px-4 relative z-10 py-20">
             <div className="max-w-4xl mx-auto text-center">
-              <div className="flex items-center justify-center gap-3 mb-6">
+              <div className="flex flex-wrap items-center justify-center gap-3 mb-6">
                 <Badge className="bg-primary/20 text-primary border-primary/30 backdrop-blur-sm px-4 py-1.5 text-sm">
                   <Sparkles className="h-4 w-4 mr-2" />
-                  We're Hiring!
+                  Careers at UjenziXform
                 </Badge>
                 <Badge variant="outline" className="border-white/30 text-white/80 backdrop-blur-sm">
-                  {positions.length} Open Positions
+                  {loading
+                    ? 'Loading roles…'
+                    : positions.length > 0
+                      ? `${positions.length} open role${positions.length === 1 ? '' : 's'}`
+                      : 'General applications welcome'}
                 </Badge>
               </div>
-              
+
               <h1 className="text-5xl md:text-6xl lg:text-7xl font-bold text-white mb-6 leading-tight">
                 Build the Future of
                 <span className="block bg-gradient-to-r from-primary via-orange-400 to-yellow-400 bg-clip-text text-transparent">
                   Construction in Kenya
                 </span>
               </h1>
-              
+
               <p className="text-xl text-white/80 mb-8 leading-relaxed max-w-2xl mx-auto">
-                Join UjenziXform and help transform how builders, suppliers, and delivery providers 
-                connect across all 47 counties. We're looking for passionate people who want to 
-                make a real impact on Africa's largest industry.
+                Help improve how builders, suppliers, and delivery partners coordinate materials and logistics. We are
+                strongest in major hubs and growing with the network — bring curiosity and craft.
               </p>
-              
+
               <div className="flex flex-wrap justify-center gap-4">
-                <Button 
-                  size="lg" 
+                <Button
+                  size="lg"
                   className="bg-primary hover:bg-primary/90 text-white gap-2 text-lg px-8 py-6 shadow-lg shadow-primary/25"
-                  onClick={() => document.getElementById('positions')?.scrollIntoView({ behavior: 'smooth' })}
+                  onClick={() =>
+                    document
+                      .getElementById(positions.length > 0 ? 'positions' : 'apply')
+                      ?.scrollIntoView({ behavior: 'smooth' })
+                  }
                 >
-                  View Open Positions
+                  {positions.length > 0 ? 'View open roles' : 'Apply (general)'}
                   <ArrowRight className="h-5 w-5" />
                 </Button>
-                <Button 
-                  size="lg" 
-                  variant="outline" 
+                <Button
+                  size="lg"
+                  variant="outline"
                   className="border-white/30 text-white hover:bg-white/10 backdrop-blur-sm text-lg px-8 py-6"
+                  asChild
                 >
-                  <Globe className="h-5 w-5 mr-2" />
-                  Learn About Us
+                  <Link to="/about">
+                    <Globe className="h-5 w-5 mr-2" />
+                    Learn about us
+                  </Link>
                 </Button>
               </div>
-              
-              {/* Stats */}
-              <div className="grid grid-cols-3 gap-8 mt-12 pt-8 border-t border-white/10 max-w-xl mx-auto">
+
+              <p className="text-xs text-white/50 mt-8 max-w-lg mx-auto">
+                Live platform totals (not headcount). Your offer letter defines any benefits.
+              </p>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mt-4 pt-8 border-t border-white/10 max-w-3xl mx-auto">
                 <div className="text-center">
-                  <p className="text-4xl font-bold text-white">47</p>
-                  <p className="text-white/60 text-sm">Counties Covered</p>
+                  <p className="text-3xl font-bold text-white tabular-nums">
+                    {formatHomeStatCount(publicStats.registeredNetwork, publicStats.loading)}
+                  </p>
+                  <p className="text-white/60 text-sm">Network accounts</p>
                 </div>
                 <div className="text-center">
-                  <p className="text-4xl font-bold text-white">10K+</p>
-                  <p className="text-white/60 text-sm">Active Users</p>
+                  <p className="text-3xl font-bold text-white tabular-nums">
+                    {formatHomeStatCount(publicStats.builderProjects, publicStats.loading)}
+                  </p>
+                  <p className="text-white/60 text-sm">Builder projects</p>
                 </div>
                 <div className="text-center">
-                  <p className="text-4xl font-bold text-white">25</p>
-                  <p className="text-white/60 text-sm">Team Members</p>
+                  <p className="text-3xl font-bold text-white tabular-nums">
+                    {formatHomeStatCount(publicStats.supplierCompanies, publicStats.loading)}
+                  </p>
+                  <p className="text-white/60 text-sm">Supplier companies</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-3xl font-bold text-white tabular-nums">
+                    {formatHomeStatCount(publicStats.professionalBuilders, publicStats.loading)}
+                  </p>
+                  <p className="text-white/60 text-sm">Pro builders</p>
                 </div>
               </div>
             </div>
@@ -882,7 +861,8 @@ const Careers = () => {
               <Badge className="mb-4">Benefits</Badge>
               <h2 className="text-4xl font-bold mb-4">Perks of Working Here</h2>
               <p className="text-muted-foreground max-w-2xl mx-auto text-lg">
-                We take care of our team so they can take care of our customers
+                Examples only — eligibility depends on your role, location, and employment agreement. Confirm details
+                with HR before you accept an offer.
               </p>
             </div>
             
@@ -1229,13 +1209,12 @@ const Careers = () => {
               <div className="text-center py-12">
                 <Briefcase className="h-16 w-16 mx-auto mb-4 text-muted-foreground/50" />
                 <h3 className="text-xl font-semibold mb-2">No Open Positions</h3>
-                <p className="text-muted-foreground mb-6">
-                  We don't have any open positions right now, but we're always looking for talented people.
+                <p className="text-muted-foreground mb-6 max-w-md mx-auto">
+                  There are no active listings in our careers database right now. You can still apply through the general
+                  application below, or email us with your CV.
                 </p>
                 <Button asChild>
-                  <a href="mailto:careers@UjenziXform.com">
-                    Send Your Resume
-                  </a>
+                  <a href={`mailto:${CAREERS_EMAIL}?subject=Careers%20inquiry`}>Email {CAREERS_EMAIL}</a>
                 </Button>
               </div>
             )}
@@ -1249,7 +1228,8 @@ const Careers = () => {
               <Badge className="mb-4 bg-blue-100 text-blue-700">Apply Now</Badge>
               <h2 className="text-4xl font-bold mb-4">Submit Your Application</h2>
               <p className="text-muted-foreground max-w-2xl mx-auto text-lg">
-                Ready to join our team? Upload your resume and cover letter, and we'll get back to you within 5 business days.
+                Ready to join our team? Upload your resume and optional cover letter. We aim to follow up within about
+                two weeks if there is a fit.
               </p>
             </div>
 
@@ -1274,7 +1254,8 @@ const Careers = () => {
                       </div>
                       <h3 className="text-2xl font-bold text-green-700 mb-3">Application Submitted!</h3>
                       <p className="text-muted-foreground mb-6">
-                        Thank you for your interest in joining UjenziXform. Our HR team will review your application and contact you within 5 business days.
+                        Thank you for your interest in joining UjenziXform. If your profile matches a need, we will
+                        contact you — typically within about two weeks.
                       </p>
                       <Button onClick={() => setApplicationSuccess(false)} variant="outline">
                         Submit Another Application
@@ -1481,7 +1462,11 @@ const Careers = () => {
                       </Button>
 
                       <p className="text-xs text-center text-muted-foreground">
-                        By submitting this application, you agree to our privacy policy and consent to us contacting you about job opportunities.
+                        By submitting, you consent to us processing your details to evaluate your application. See our{' '}
+                        <Link to="/privacy-policy" className="text-primary underline underline-offset-2">
+                          privacy policy
+                        </Link>
+                        .
                       </p>
                     </form>
                   )}
@@ -1499,19 +1484,18 @@ const Careers = () => {
           <div className="container mx-auto px-4 relative z-10 text-center">
             <h2 className="text-4xl font-bold text-white mb-4">Have Questions?</h2>
             <p className="text-white/80 mb-8 max-w-2xl mx-auto text-lg">
-              Want to learn more about life at UjenziXform? Reach out to our HR team or connect with us on social media.
+              Questions about roles or the application process? Email us — we read every message, though response time
+              varies.
             </p>
             <div className="flex flex-wrap justify-center gap-4">
               <Button size="lg" variant="secondary" className="text-lg px-8" asChild>
-                <a href="mailto:careers@UjenziXform.com">
-                  Contact HR Team
+                <a href={`mailto:${CAREERS_EMAIL}?subject=Careers%20question`}>
+                  Email careers contact
                   <ArrowRight className="h-5 w-5 ml-2" />
                 </a>
               </Button>
               <Button size="lg" variant="outline" className="text-white border-white/30 hover:bg-white/10 text-lg px-8" asChild>
-                <a href="/about">
-                  Learn About UjenziXform
-                </a>
+                <Link to="/about">Learn about UjenziXform</Link>
               </Button>
             </div>
           </div>
