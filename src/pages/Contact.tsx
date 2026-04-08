@@ -1,33 +1,33 @@
-
 import { useState } from "react";
-import { useForm, Controller } from "react-hook-form";
+import { useForm, Controller, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
+import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { MapPin, Phone, Mail, Clock, Shield, AlertTriangle, CheckCircle } from "lucide-react";
+import { MapPin, Phone, Mail, Clock, CheckCircle } from "lucide-react";
 import Navigation from "@/components/Navigation";
 import Footer from "@/components/Footer";
 import { useToast } from "@/hooks/use-toast";
 import AnimatedSection from "@/components/AnimatedSection";
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from "@/integrations/supabase/client";
-// import { useContactFormSecurity } from "@/hooks/useContactFormSecurity";
-// import { RecaptchaWrapper } from "@/components/ui/RecaptchaWrapper";
+
+function nameSchema(label: string) {
+  return z
+    .string()
+    .min(1, `${label} is required`)
+    .max(50, `${label} is too long`)
+    .refine((s) => !/[<>]/.test(s), `${label} cannot contain < or >`)
+    .refine((s) => s.trim().length > 0, `${label} cannot be only spaces`);
+}
 
 const contactSchema = z.object({
-  firstName: z.string()
-    .min(1, "First name is required")
-    .max(50, "First name too long")
-    .regex(/^[a-zA-Z\s\-']+$/, "First name contains invalid characters"),
-  lastName: z.string()
-    .min(1, "Last name is required")
-    .max(50, "Last name too long")
-    .regex(/^[a-zA-Z\s\-']+$/, "Last name contains invalid characters"),
+  firstName: nameSchema("First name"),
+  lastName: nameSchema("Last name"),
   email: z.string()
     .email("Please enter a valid email")
     .max(100, "Email address too long")
@@ -52,33 +52,23 @@ type ContactForm = z.infer<typeof contactSchema>;
 
 const Contact = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [securityScore, setSecurityScore] = useState(100);
-  const [formInteractions, setFormInteractions] = useState(0);
   const { toast } = useToast();
-  
-  // Track form interactions for security
-  const trackInteraction = (type: string) => {
-    setFormInteractions(prev => prev + 1);
-    console.log('Form interaction:', type);
-  };
 
   const {
     register,
     handleSubmit,
     formState: { errors },
     reset,
-    watch,
-    control
+    control,
   } = useForm<ContactForm>({
     resolver: zodResolver(contactSchema),
     defaultValues: {
       gdprConsent: false,
-      honeypot: '' // Honeypot field should be empty
-    }
+      honeypot: "",
+    },
   });
 
-  // Watch form values for security validation
-  const formValues = watch();
+  const messageLen = useWatch({ control, name: "message", defaultValue: "" })?.length ?? 0;
 
   // Enhanced form submission with basic security
   const onSubmit = async (data: ContactForm) => {
@@ -133,13 +123,12 @@ const Contact = () => {
       
       toast({
         title: "Message sent successfully!",
-        description: "Thank you for contacting us. We'll get back to you within 24 hours.",
+        description:
+          "Thank you for contacting us. We aim to respond within one business day during the week (often faster).",
         variant: "default",
       });
-      
+
       reset();
-      setSecurityScore(100);
-      setFormInteractions(0);
       
     } catch (error) {
       console.error("Error sending message:", error);
@@ -171,29 +160,30 @@ const Contact = () => {
           <div className="max-w-4xl mx-auto">
             <div className="mb-6 flex justify-center">
               <div className="bg-gradient-to-r from-green-600 to-red-600 text-white px-6 py-2 rounded-full text-lg font-semibold border border-white/30">
-                🇰🇪 Connect with Kenya's Construction Leaders
+                🇰🇪 Kenya-based team · UjenziXform
               </div>
             </div>
             <h1 id="contact-hero-heading" className="text-6xl md:text-7xl font-bold mb-6 text-white drop-shadow-2xl">
               Get In Touch
             </h1>
             <p className="text-2xl md:text-3xl mb-8 text-white/90 font-medium drop-shadow-lg leading-relaxed">
-              We're here to help you connect, build, and succeed across Kenya's construction industry
+              We help builders, suppliers, and delivery partners get unstuck — questions, partnerships, and platform
+              support.
             </p>
-            
-            {/* Contact Highlights */}
+
+            {/* Contact Highlights — aligned with business hours below */}
             <div className="flex flex-wrap justify-center gap-4 text-white/90">
               <div className="flex items-center gap-2 bg-white/10 px-4 py-2 rounded-full backdrop-blur-sm">
-                <Phone className="h-5 w-5" />
-                <span className="font-medium">24/7 Support</span>
+                <Phone className="h-5 w-5 shrink-0" />
+                <span className="font-medium">Phone support in business hours</span>
               </div>
               <div className="flex items-center gap-2 bg-white/10 px-4 py-2 rounded-full backdrop-blur-sm">
-                <Mail className="h-5 w-5" />
-                <span className="font-medium">Quick Response</span>
+                <Mail className="h-5 w-5 shrink-0" />
+                <span className="font-medium">Email &amp; form anytime</span>
               </div>
               <div className="flex items-center gap-2 bg-white/10 px-4 py-2 rounded-full backdrop-blur-sm">
-                <MapPin className="h-5 w-5" />
-                <span className="font-medium">Nairobi Office</span>
+                <MapPin className="h-5 w-5 shrink-0" />
+                <span className="font-medium">Nairobi HQ</span>
               </div>
             </div>
           </div>
@@ -208,9 +198,10 @@ const Contact = () => {
         
         <div className="container mx-auto px-4 relative z-10">
           <div className="text-center mb-12">
-            <h2 className="text-4xl font-bold mb-4 text-gray-900">Contact Kenya's Construction Experts</h2>
+            <h2 className="text-4xl font-bold mb-4 text-gray-900">Contact the UjenziXform team</h2>
             <p className="text-xl text-gray-700 max-w-3xl mx-auto">
-              From Nairobi to Mombasa, from Kisumu to Eldoret - we're here to support your construction projects
+              Use the form or reach us by phone or email. We focus on major construction hubs and work with teams across
+              Kenya.
             </p>
           </div>
           
@@ -225,24 +216,11 @@ const Contact = () => {
                   Send us a Message
                 </CardTitle>
                 <CardDescription className="text-lg text-gray-700">
-                  Connect with Kenya's leading construction platform. We'll respond within 24 hours.
+                  We aim to reply within one business day on weekdays (often faster). For urgent issues, call during
+                  business hours.
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                {/* Security Status */}
-                {process.env.NODE_ENV === 'development' && (
-                  <Alert className="mb-6 border-blue-200 bg-blue-50">
-                    <Shield className="h-4 w-4" />
-                    <AlertDescription>
-                      <div className="flex items-center justify-between">
-                        <span>Security Score: {securityScore}/100</span>
-                        <span>Interactions: {formInteractions}</span>
-                        <span>Protected: ✅</span>
-                      </div>
-                    </AlertDescription>
-                  </Alert>
-                )}
-
                 <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
                   {/* Honeypot field (hidden from users) */}
                   <input
@@ -256,15 +234,10 @@ const Contact = () => {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label htmlFor="firstName">First Name *</Label>
-                      <Input 
-                        id="firstName" 
+                      <Input
+                        id="firstName"
                         placeholder="Enter your first name"
                         {...register("firstName")}
-                        onFocus={() => trackInteraction('focus')}
-                        onChange={(e) => {
-                          trackInteraction('typing');
-                          register("firstName").onChange(e);
-                        }}
                         maxLength={50}
                       />
                       {errors.firstName && (
@@ -273,15 +246,10 @@ const Contact = () => {
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="lastName">Last Name *</Label>
-                      <Input 
-                        id="lastName" 
+                      <Input
+                        id="lastName"
                         placeholder="Enter your last name"
                         {...register("lastName")}
-                        onFocus={() => trackInteraction('focus')}
-                        onChange={(e) => {
-                          trackInteraction('typing');
-                          register("lastName").onChange(e);
-                        }}
                         maxLength={50}
                       />
                       {errors.lastName && (
@@ -292,16 +260,11 @@ const Contact = () => {
                   
                   <div className="space-y-2">
                     <Label htmlFor="email">Email Address *</Label>
-                    <Input 
-                      id="email" 
-                      type="email" 
+                    <Input
+                      id="email"
+                      type="email"
                       placeholder="Enter your email address"
                       {...register("email")}
-                      onFocus={() => trackInteraction('focus')}
-                      onChange={(e) => {
-                        trackInteraction('typing');
-                        register("email").onChange(e);
-                      }}
                       maxLength={100}
                       autoComplete="email"
                     />
@@ -312,16 +275,11 @@ const Contact = () => {
                   
                   <div className="space-y-2">
                     <Label htmlFor="phone">Phone Number *</Label>
-                    <Input 
-                      id="phone" 
-                      type="tel" 
+                    <Input
+                      id="phone"
+                      type="tel"
                       placeholder="Enter your phone number (e.g., +254 712 345 678)"
                       {...register("phone")}
-                      onFocus={() => trackInteraction('focus')}
-                      onChange={(e) => {
-                        trackInteraction('typing');
-                        register("phone").onChange(e);
-                      }}
                       maxLength={20}
                       autoComplete="tel"
                     />
@@ -332,15 +290,10 @@ const Contact = () => {
                   
                   <div className="space-y-2">
                     <Label htmlFor="subject">Subject *</Label>
-                    <Input 
-                      id="subject" 
+                    <Input
+                      id="subject"
                       placeholder="What is this regarding?"
                       {...register("subject")}
-                      onFocus={() => trackInteraction('focus')}
-                      onChange={(e) => {
-                        trackInteraction('typing');
-                        register("subject").onChange(e);
-                      }}
                       maxLength={200}
                       autoComplete="off"
                     />
@@ -351,23 +304,18 @@ const Contact = () => {
                   
                   <div className="space-y-2">
                     <Label htmlFor="message">Message *</Label>
-                    <Textarea 
-                      id="message" 
-                      placeholder="Tell us more about how we can help you..." 
+                    <Textarea
+                      id="message"
+                      placeholder="Tell us more about how we can help you..."
                       rows={6}
                       {...register("message")}
-                      onFocus={() => trackInteraction('focus')}
-                      onChange={(e) => {
-                        trackInteraction('typing');
-                        register("message").onChange(e);
-                      }}
                       maxLength={2000}
                     />
                     {errors.message && (
                       <p className="text-sm text-destructive">{errors.message.message}</p>
                     )}
                     <div className="text-xs text-muted-foreground text-right">
-                      {formValues.message?.length || 0}/2000 characters
+                      {messageLen}/2000 characters
                     </div>
                   </div>
 
@@ -378,22 +326,29 @@ const Contact = () => {
                         name="gdprConsent"
                         control={control}
                         render={({ field }) => (
-                          <Checkbox 
+                          <Checkbox
                             id="gdprConsent"
                             checked={field.value}
                             onCheckedChange={(checked) => {
                               field.onChange(checked);
-                              trackInteraction('checkbox');
                             }}
                           />
                         )}
                       />
                       <div className="grid gap-1.5 leading-none">
-                        <Label 
+                        <Label
                           htmlFor="gdprConsent"
                           className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
                         >
-                          I agree to the privacy policy and terms of service *
+                          I agree to the{" "}
+                          <Link to="/privacy-policy" className="text-primary underline underline-offset-2">
+                            privacy policy
+                          </Link>{" "}
+                          and{" "}
+                          <Link to="/terms-of-service" className="text-primary underline underline-offset-2">
+                            terms of service
+                          </Link>{" "}
+                          *
                         </Label>
                         <p className="text-xs text-muted-foreground">
                           By checking this box, you consent to us processing your personal data to respond to your inquiry. 
@@ -405,24 +360,7 @@ const Contact = () => {
                       <p className="text-sm text-destructive">{errors.gdprConsent.message}</p>
                     )}
                   </div>
-                  
-
-                  {/* Security Score Display */}
-                  {securityScore < 80 && (
-                    <Alert variant="destructive" className="mb-4">
-                      <AlertTriangle className="h-4 w-4" />
-                      <AlertDescription>
-                        Security validation failed. Please review your input and ensure all fields are properly filled.
-                      </AlertDescription>
-                    </Alert>
-                  )}
-
-                  <Button 
-                    type="submit" 
-                    disabled={isSubmitting || securityScore < 50}
-                    className="w-full" 
-                    size="lg"
-                  >
+                  <Button type="submit" disabled={isSubmitting} className="w-full" size="lg">
                     {isSubmitting ? (
                       <>
                         <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
@@ -430,29 +368,28 @@ const Contact = () => {
                       </>
                     ) : (
                       <>
-                        <Shield className="h-4 w-4 mr-2" />
-                        Send Secure Message
+                        <Mail className="h-4 w-4 mr-2" />
+                        Send message
                       </>
                     )}
                   </Button>
 
-                  {/* Form Security Info */}
                   <div className="text-xs text-center text-muted-foreground space-y-1">
-                    <div className="flex items-center justify-center gap-4">
+                    <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1">
                       <span className="flex items-center gap-1">
-                        <CheckCircle className="h-3 w-3 text-green-500" />
-                        SSL Encrypted
+                        <CheckCircle className="h-3 w-3 text-green-500 shrink-0" />
+                        Sent over HTTPS
                       </span>
                       <span className="flex items-center gap-1">
-                        <CheckCircle className="h-3 w-3 text-green-500" />
-                        Spam Protected
+                        <CheckCircle className="h-3 w-3 text-green-500 shrink-0" />
+                        Honeypot field to reduce bots
                       </span>
                       <span className="flex items-center gap-1">
-                        <CheckCircle className="h-3 w-3 text-green-500" />
-                        GDPR Compliant
+                        <CheckCircle className="h-3 w-3 text-green-500 shrink-0" />
+                        Consent recorded with your message
                       </span>
                     </div>
-                    <p>Protected by advanced security measures and rate limiting</p>
+                    <p>We may add CAPTCHA or stricter checks if spam increases.</p>
                   </div>
                 </form>
               </CardContent>
@@ -489,7 +426,7 @@ const Contact = () => {
                           Nairobi, Kenya
                         </p>
                         <p className="text-sm text-green-600 font-medium mt-2">
-                          🇰🇪 Serving all 47 counties from our Nairobi headquarters
+                          🇰🇪 Nairobi HQ — we work with teams across Kenya (major hubs first, growing nationwide).
                         </p>
                       </div>
                     </div>
@@ -532,7 +469,7 @@ const Contact = () => {
                           <a href="mailto:info@ujenzixform.org" className="hover:text-primary transition-colors">info@ujenzixform.org</a>
                         </p>
                         <p className="text-sm text-red-600 font-medium mt-2">
-                          ✉️ 24-hour response guarantee for all inquiries
+                          ✉️ We aim to reply within one business day on weekdays.
                         </p>
                       </div>
                     </div>
@@ -581,7 +518,7 @@ const Contact = () => {
           <div className="text-center mb-16">
             <h2 id="faq-heading" className="text-5xl font-bold mb-6 text-white drop-shadow-2xl">Frequently Asked Questions</h2>
             <p className="text-2xl text-white/90 max-w-3xl mx-auto drop-shadow-lg">
-              Quick answers to help you get started with Kenya's leading construction platform
+              Quick answers to help you get started with UjenziXform
             </p>
           </div>
           
@@ -593,22 +530,27 @@ const Contact = () => {
               </CardHeader>
               <CardContent className="p-8">
                 <p className="text-lg text-gray-700 leading-relaxed">
-                  Click on "Get Started" and select whether you're a builder or supplier. 
-                  Fill out the registration form with your business details and we'll verify your account within 24 hours. 
-                  Our verification process ensures quality and trust across Kenya's construction network.
+                  Use the registration links for{" "}
+                  <Link to="/builder-registration" className="text-primary font-medium underline underline-offset-2">
+                    builders
+                  </Link>{" "}
+                  or{" "}
+                  <Link to="/supplier-registration" className="text-primary font-medium underline underline-offset-2">
+                    suppliers
+                  </Link>
+                  . We review submissions as quickly as we can and may request documents depending on your role.
                 </p>
               </CardContent>
             </Card>
             
             <Card className="bg-white/95 backdrop-blur-sm border-2 border-white/50 shadow-2xl hover:shadow-3xl transition-all duration-300">
               <CardHeader className="bg-gradient-to-r from-blue-50 to-red-50 border-b border-gray-200">
-                <CardTitle className="text-2xl font-bold text-gray-900">Is there a fee to use UjenziPro?</CardTitle>
+                <CardTitle className="text-2xl font-bold text-gray-900">Is there a fee to use UjenziXform?</CardTitle>
               </CardHeader>
               <CardContent className="p-8">
                 <p className="text-lg text-gray-700 leading-relaxed">
-                  Basic registration and browsing is completely free. We charge a small commission only when successful 
-                  transactions are completed through our platform. This ensures we're aligned with your success and 
-                  only earn when you do business through UjenziPro.
+                  Basic registration and browsing is free. Fees depend on how you use the marketplace and services —
+                  see current terms and product pages, or ask us for the latest structure.
                 </p>
               </CardContent>
               </Card>
@@ -621,9 +563,9 @@ const Contact = () => {
               </CardHeader>
               <CardContent className="p-8">
                 <p className="text-lg text-gray-700 leading-relaxed">
-                  We verify business registration documents, check references, and conduct thorough background checks. 
-                  All verified members receive a trust badge on their profile. Our verification process includes 
-                  site visits for major suppliers and builders to ensure quality standards.
+                  We use document checks, references, and onboarding steps appropriate to each role. What we require
+                  can vary; trust indicators in the app reflect what we have been able to confirm — not every member
+                  has the same depth of review.
                 </p>
               </CardContent>
               </Card>
@@ -637,9 +579,9 @@ const Contact = () => {
               </CardHeader>
               <CardContent className="p-8">
                 <p className="text-lg text-gray-700 leading-relaxed">
-                  Yes! UjenziPro proudly serves all 47 counties of Kenya. From major cities like Nairobi, Mombasa, 
-                  and Kisumu to remote rural areas, we connect builders with local suppliers and coordinate 
-                  deliveries nationwide through our extensive network.
+                  Anyone in Kenya can sign up. Delivery and on-the-ground coverage depend on suppliers and drivers in
+                  each area — we are strongest in major construction hubs and are expanding over time, consistent with
+                  how we describe coverage on our About page.
                 </p>
               </CardContent>
               </Card>
