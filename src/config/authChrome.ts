@@ -27,5 +27,7 @@ export function shouldHideFloatingChrome(pathname: string): boolean {
   if (pathname.includes('-signin')) return true;
   // e.g. /private-client-auth, /supplier-auth, /delivery-auth
   if (pathname.endsWith('-auth')) return true;
+  // Field workflows: floating share/chat competes with scan/map/deliver tasks
+  if (pathname === '/delivery-dashboard') return true;
   return false;
 }

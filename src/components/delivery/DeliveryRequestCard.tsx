@@ -16,7 +16,7 @@ import {
   Truck, Package, MapPin, Clock, DollarSign, Users, Phone,
   CheckCircle, XCircle, AlertCircle, Navigation as NavigationIcon,
   Timer, Route, Camera, MessageSquare, ThumbsUp, ThumbsDown,
-  Loader2, AlertTriangle, Calendar
+  Loader2, AlertTriangle, Calendar, Mail,
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
@@ -47,6 +47,8 @@ interface DeliveryRequest {
   quantity: string;
   customer_name: string;
   customer_phone: string;
+  customer_email?: string;
+  supplier_phone?: string;
   status: string;
   estimated_time: string;
   price: number;
@@ -398,13 +400,28 @@ export const DeliveryRequestCard: React.FC<DeliveryRequestCardProps> = ({
                       {delivery.customer_name?.trim() || 'Builder'}
                     </span>
                   </div>
-                  <div className="flex items-center gap-1">
-                    <Phone className="h-3 w-3 text-gray-400 flex-shrink-0" />
-                    <span
-                      className={`text-[11px] sm:text-xs truncate ${delivery.customer_phone?.trim() ? (isDarkMode ? 'text-gray-300' : 'text-gray-700') : `italic ${isDarkMode ? 'text-gray-500' : 'text-gray-500'}`}`}
-                    >
-                      {delivery.customer_phone?.trim() || 'Phone not on file'}
-                    </span>
+                  {delivery.customer_email?.trim() && (
+                    <div className="flex items-center gap-1">
+                      <Mail className="h-3 w-3 text-gray-400 flex-shrink-0" />
+                      <span className={`text-[11px] sm:text-xs truncate ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                        {delivery.customer_email.trim()}
+                      </span>
+                    </div>
+                  )}
+                  <div className="flex flex-col gap-0.5">
+                    <div className="flex items-center gap-1">
+                      <Phone className="h-3 w-3 text-gray-400 flex-shrink-0" />
+                      <span
+                        className={`text-[11px] sm:text-xs truncate ${delivery.customer_phone?.trim() ? (isDarkMode ? 'text-gray-300' : 'text-gray-700') : `italic ${isDarkMode ? 'text-gray-500' : 'text-gray-500'}`}`}
+                      >
+                        {delivery.customer_phone?.trim() || 'Phone not on file'}
+                      </span>
+                    </div>
+                    {!delivery.customer_phone?.trim() && (
+                      <p className={`text-[10px] leading-snug pl-4 ${isDarkMode ? 'text-gray-500' : 'text-gray-500'}`}>
+                        Use <strong>Email</strong> if shown on the card, <strong>Call pickup</strong> for supplier, or coordinate at the pickup site.
+                      </p>
+                    )}
                   </div>
                 </div>
               </div>
@@ -524,11 +541,41 @@ export const DeliveryRequestCard: React.FC<DeliveryRequestCardProps> = ({
                         variant="outline"
                         className="h-7 px-2 text-[0.6875rem] sm:text-xs flex-1 sm:flex-initial min-w-[4.5rem]"
                         disabled={!delivery.customer_phone?.trim()}
+                        title={
+                          delivery.customer_phone?.trim()
+                            ? 'Call builder'
+                            : 'No builder phone on file — use Email or Call pickup'
+                        }
                         onClick={() => onCall?.(delivery.customer_phone?.trim() || '')}
                       >
                         <Phone className="h-3 w-3 mr-0.5 shrink-0" />
                         Call
                       </Button>
+                      {delivery.customer_email?.trim() && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-7 px-2 text-[0.6875rem] sm:text-xs flex-1 sm:flex-initial min-w-[4.5rem]"
+                          asChild
+                        >
+                          <a href={`mailto:${delivery.customer_email!.trim()}`}>
+                            <Mail className="h-3 w-3 mr-0.5 shrink-0" />
+                            Email
+                          </a>
+                        </Button>
+                      )}
+                      {delivery.supplier_phone?.trim() && (
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          className="h-7 px-2 text-[0.6875rem] sm:text-xs flex-1 sm:flex-initial min-w-[4.5rem]"
+                          title="Call supplier / pickup contact"
+                          onClick={() => onCall?.(delivery.supplier_phone!.trim())}
+                        >
+                          <Phone className="h-3 w-3 mr-0.5 shrink-0" />
+                          Pickup
+                        </Button>
+                      )}
                       <Button 
                         size="sm" 
                         variant="outline"

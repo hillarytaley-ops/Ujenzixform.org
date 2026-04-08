@@ -16,12 +16,19 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { DashboardLoader } from "@/components/ui/DashboardLoader";
 import { DashboardMobileActionSheet } from "@/components/dashboard/DashboardMobileActionSheet";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { DeliveryDashboardNavCards } from "@/components/delivery/DeliveryDashboardNavCards";
 import { 
   Truck, 
   Package, 
   MapPin,
   Clock,
-  DollarSign,
+  Wallet,
   Users,
   Star,
   CheckCircle,
@@ -47,7 +54,8 @@ import {
   Headphones,
   LogOut,
   X,
-  ChevronRight
+  ChevronRight,
+  MoreHorizontal,
 } from "lucide-react";
 import { DeliveryRequestCard } from "@/components/delivery/DeliveryRequestCard";
 import { useLanguage } from "@/contexts/LanguageContext";
@@ -103,7 +111,7 @@ function notifyNewDeliveryRequest() {
 import { useToast } from "@/hooks/use-toast";
 import { useDeliveryProviderData, logDataAccessAttempt } from "@/hooks/useDataIsolation";
 import { useDeliveriesUnified, type UnifiedDeliveryRow } from "@/hooks/useDeliveriesUnified";
-import { MessageSquare, User, QrCode, Scan, RefreshCw, Link2, DollarSign } from "lucide-react";
+import { MessageSquare, User, QrCode, Scan, RefreshCw, Link2 } from "lucide-react";
 import { ProfileEditDialog } from "@/components/profile/ProfileEditDialog";
 import { ProfileViewDialog } from "@/components/profile/ProfileViewDialog";
 
@@ -171,6 +179,10 @@ interface ActiveDelivery {
   quantity: string;
   customer_name: string;
   customer_phone: string;
+  /** Builder email when phone missing — mailto fallback for drivers */
+  customer_email?: string;
+  /** Supplier / pickup contact when present on API row */
+  supplier_phone?: string;
   status: string;
   estimated_time: string;
   price: number;
@@ -219,6 +231,11 @@ function mapIsolatedRowToActiveDeliveryQuick(d: any): ActiveDelivery {
       (typeof d.builder_email === 'string' ? d.builder_email.split('@')[0]?.trim() : '') ||
       'Builder',
     customer_phone: (d.builder_phone && String(d.builder_phone).trim()) || '',
+    customer_email: (d.builder_email && String(d.builder_email).trim()) || '',
+    supplier_phone:
+      (d.supplier_phone && String(d.supplier_phone).trim()) ||
+      (d.supplier_contact_phone && String(d.supplier_contact_phone).trim()) ||
+      '',
     status: d.status || 'pending',
     estimated_time: d.estimated_time || '30 mins',
     price: Number(d.price || d.delivery_fee || d.estimated_cost || 0),
@@ -536,6 +553,9 @@ const DeliveryDashboard = () => {
               d.project_name?.trim() ||
               'Builder',
             customer_phone: d.builder_phone?.trim() || '',
+            customer_email: d.builder_email?.trim() || '',
+            supplier_phone:
+              d.supplier_phone?.trim() || d.supplier_contact_phone?.trim() || '',
             status: d.status || d.display_status || 'pending',
             estimated_time: d.estimated_time || '30 mins',
             price: d.price || d.delivery_fee || d.estimated_cost || 0,
@@ -1016,6 +1036,8 @@ const DeliveryDashboard = () => {
     quantity: String(row._items_count ?? 0),
     customer_name: row.builder_name?.trim() || row.builder_email?.split('@')[0]?.trim() || 'Builder',
     customer_phone: row.builder_phone?.trim() || '',
+    customer_email: row.builder_email?.trim() || '',
+    supplier_phone: '',
     status: row.status,
     estimated_time: '',
     price: 0,
@@ -1050,6 +1072,8 @@ const DeliveryDashboard = () => {
         pickup_location: e.pickup_location || h.pickup_location,
         customer_name: e.customer_name || h.customer_name,
         customer_phone: e.customer_phone || h.customer_phone,
+        customer_email: e.customer_email || h.customer_email,
+        supplier_phone: e.supplier_phone || h.supplier_phone,
         material_type: e.material_type || h.material_type,
         status: e.status || h.status,
         order_number: e.order_number || h.order_number,
@@ -2536,16 +2560,18 @@ const DeliveryDashboard = () => {
                 <Button
                   variant="outline"
                   className="w-full justify-start border-teal-200 bg-teal-50 text-teal-900 hover:bg-teal-100"
+                  onClick={() => setActiveTab("notifications")}
                 >
                   <Bell className="mr-2 h-4 w-4" />
-                  Notifications
+                  Alerts & requests
                 </Button>
                 <Button
                   variant="outline"
                   className="w-full justify-start border-teal-200 bg-teal-50 text-teal-900 hover:bg-teal-100"
+                  onClick={() => setActiveTab("support")}
                 >
                   <Settings className="mr-2 h-4 w-4" />
-                  Settings
+                  Help & settings
                 </Button>
                 <Button
                   variant="outline"
@@ -2598,22 +2624,28 @@ const DeliveryDashboard = () => {
                   {isOnline ? 'Go Offline' : 'Go Online'}
                 </Button>
               </div>
-              <Button
-                variant="outline"
-                className="border-white/30 bg-white/10 text-white hover:bg-white/20"
-                onClick={() => setShowProfileView(true)}
-              >
-                <User className="mr-2 h-4 w-4" />
-                Profile
-              </Button>
-              <Button variant="outline" className="border-white/30 bg-white/10 text-white hover:bg-white/20">
-                <Bell className="mr-2 h-4 w-4" />
-                Notifications
-              </Button>
-              <Button variant="outline" className="border-white/30 bg-white/10 text-white hover:bg-white/20">
-                <Settings className="mr-2 h-4 w-4" />
-                Settings
-              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" className="border-white/30 bg-white/10 text-white hover:bg-white/20">
+                    <MoreHorizontal className="mr-2 h-4 w-4" />
+                    Menu
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56">
+                  <DropdownMenuItem onClick={() => setShowProfileView(true)}>
+                    <User className="mr-2 h-4 w-4" />
+                    Profile
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setActiveTab("notifications")}>
+                    <Bell className="mr-2 h-4 w-4" />
+                    Alerts & requests
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setActiveTab("support")}>
+                    <Settings className="mr-2 h-4 w-4" />
+                    Help & settings
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
               <Button
                 variant="outline"
                 className="border-white/30 bg-white/10 text-white hover:bg-white/20"
@@ -2683,13 +2715,18 @@ const DeliveryDashboard = () => {
           <Card className={`${isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white'} shadow-lg hover:shadow-xl transition-shadow`}>
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
-                <div>
+                <div className="min-w-0 pr-2">
                   <p className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>Earnings</p>
-                  <p className={`text-xl font-bold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>{formatCurrency(stats.totalEarnings)}</p>
+                  <p className={`text-xl font-bold tabular-nums ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>{formatCurrency(stats.totalEarnings)}</p>
                   <p className={`text-xs ${isDarkMode ? 'text-gray-500' : 'text-gray-400'}`}>Mileage pay</p>
+                  {stats.totalEarnings <= 0 && (
+                    <p className={`mt-1 text-[11px] leading-snug ${isDarkMode ? 'text-gray-500' : 'text-gray-500'}`}>
+                      Totals update when completed jobs are paid out — zero is normal if you have not finished paid deliveries yet.
+                    </p>
+                  )}
                 </div>
-                <div className="p-3 bg-emerald-100 rounded-full">
-                  <DollarSign className="h-6 w-6 text-emerald-600" />
+                <div className="p-3 bg-emerald-100 rounded-full shrink-0">
+                  <Wallet className="h-6 w-6 text-emerald-600" />
                 </div>
               </div>
             </CardContent>
@@ -2698,11 +2735,19 @@ const DeliveryDashboard = () => {
           <Card className={`${isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white'} shadow-lg hover:shadow-xl transition-shadow`}>
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
-                <div>
+                <div className="min-w-0 pr-2">
                   <p className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>Rating</p>
-                  <p className={`text-2xl font-bold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>{stats.averageRating}</p>
+                  <p className={`text-2xl font-bold tabular-nums ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                    {stats.averageRating > 0 ? stats.averageRating.toFixed(1) : "—"}
+                  </p>
+                  <p className={`text-xs ${isDarkMode ? 'text-gray-500' : 'text-gray-400'}`}>Out of 5</p>
+                  {stats.averageRating <= 0 && (
+                    <p className={`mt-1 text-[11px] leading-snug ${isDarkMode ? 'text-gray-500' : 'text-gray-500'}`}>
+                      Appears after builders rate completed deliveries — not broken.
+                    </p>
+                  )}
                 </div>
-                <div className="p-3 bg-amber-100 rounded-full">
+                <div className="p-3 bg-amber-100 rounded-full shrink-0">
                   <Star className="h-6 w-6 text-amber-600" />
                 </div>
               </div>
@@ -2712,11 +2757,16 @@ const DeliveryDashboard = () => {
           <Card className={`${isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white'} shadow-lg hover:shadow-xl transition-shadow`}>
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
-                <div>
+                <div className="min-w-0 pr-2">
                   <p className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>Distance</p>
-                  <p className={`text-2xl font-bold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>{stats.totalDistance} km</p>
+                  <p className={`text-2xl font-bold tabular-nums ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>{stats.totalDistance} km</p>
+                  {stats.totalDistance <= 0 && (
+                    <p className={`mt-1 text-[11px] leading-snug ${isDarkMode ? 'text-gray-500' : 'text-gray-500'}`}>
+                      Route distance fills in from completed trips — 0 km until then.
+                    </p>
+                  )}
                 </div>
-                <div className="p-3 bg-blue-100 rounded-full">
+                <div className="p-3 bg-blue-100 rounded-full shrink-0">
                   <Route className="h-6 w-6 text-blue-600" />
                 </div>
               </div>
@@ -2724,149 +2774,19 @@ const DeliveryDashboard = () => {
           </Card>
         </div>
 
-        {/* Card-Style Navigation - Reorganized with Deliveries button */}
-        <div className="grid grid-cols-4 md:grid-cols-7 gap-2 mb-8">
-          <Button 
-            variant="ghost"
-            className={`h-auto py-3 px-2 flex flex-col items-center gap-1 transition-all ${
-              activeTab === 'deliveries' 
-                ? 'bg-gradient-to-r from-teal-500 to-cyan-500 text-white shadow-lg ring-2 ring-teal-300' 
-                : isDarkMode 
-                  ? 'bg-gray-800 text-gray-300 hover:bg-gray-700 border border-gray-700' 
-                  : 'bg-white text-gray-700 hover:bg-teal-50 border border-gray-200 shadow-sm'
-            }`}
-            onClick={() => {
-              setActiveTab('deliveries');
-              setDeliveriesSubTab('scheduled'); // Default to scheduled when opening Deliveries
-            }}
-          >
-            <Truck className="h-5 w-5" />
-            <span className="text-xs font-medium">Deliveries</span>
-            {deliveriesBadgeCount > 0 && (
-              <Badge className="text-[10px] px-1 py-0 bg-yellow-500 text-white">
-                {deliveriesBadgeCount}
-              </Badge>
-            )}
-          </Button>
-          <Button 
-            variant="ghost"
-            className={`h-auto py-3 px-2 flex flex-col items-center gap-1 transition-all relative ${
-              activeTab === 'history' 
-                ? 'bg-gradient-to-r from-teal-500 to-cyan-500 text-white shadow-lg ring-2 ring-teal-300' 
-                : isDarkMode 
-                  ? 'bg-gray-800 text-gray-300 hover:bg-gray-700 border border-gray-700' 
-                  : 'bg-white text-gray-700 hover:bg-teal-50 border border-gray-200 shadow-sm'
-            }`}
-            onClick={() => setActiveTab('history')}
-          >
-            <CheckCircle className="h-5 w-5" />
-            <span className="text-xs font-medium">History</span>
-            {deliveryHistory.length > 0 && (
-              <Badge className="absolute -top-1 -right-1 text-[10px] px-1 py-0 bg-green-500 text-white">
-                {deliveryHistory.length}
-              </Badge>
-            )}
-          </Button>
-          <Button 
-            variant="ghost"
-            className={`h-auto py-3 px-2 flex flex-col items-center gap-1 transition-all ${
-              activeTab === 'map' 
-                ? 'bg-gradient-to-r from-teal-500 to-cyan-500 text-white shadow-lg ring-2 ring-teal-300' 
-                : isDarkMode 
-                  ? 'bg-gray-800 text-gray-300 hover:bg-gray-700 border border-gray-700' 
-                  : 'bg-white text-gray-700 hover:bg-teal-50 border border-gray-200 shadow-sm'
-            }`}
-            onClick={() => setActiveTab('map')}
-          >
-            <Map className="h-5 w-5" />
-            <span className="text-xs font-medium">Map</span>
-          </Button>
-          <Button 
-            variant="ghost"
-            className={`h-auto py-3 px-2 flex flex-col items-center gap-1 transition-all ${
-              activeTab === 'scanning' 
-                ? 'bg-gradient-to-r from-teal-500 to-cyan-500 text-white shadow-lg ring-2 ring-teal-300' 
-                : isDarkMode 
-                  ? 'bg-gray-800 text-gray-300 hover:bg-gray-700 border border-gray-700' 
-                  : 'bg-white text-gray-700 hover:bg-teal-50 border border-gray-200 shadow-sm'
-            }`}
-            onClick={() => setActiveTab('scanning')}
-          >
-            <Scan className="h-5 w-5" />
-            <span className="text-xs font-medium">Scan QR</span>
-          </Button>
-          <Button 
-            variant="ghost"
-            className={`h-auto py-3 px-2 flex flex-col items-center gap-1 transition-all ${
-              activeTab === 'pay' 
-                ? 'bg-gradient-to-r from-teal-500 to-cyan-500 text-white shadow-lg ring-2 ring-teal-300' 
-                : isDarkMode 
-                  ? 'bg-gray-800 text-gray-300 hover:bg-gray-700 border border-gray-700' 
-                  : 'bg-white text-gray-700 hover:bg-teal-50 border border-gray-200 shadow-sm'
-            }`}
-            onClick={() => setActiveTab('pay')}
-          >
-            <span className="relative inline-flex">
-              <DollarSign className="h-5 w-5" />
-              {builderInvoicePayPrompts.length > 0 && (
-                <Badge className="absolute -top-2 -right-2 min-w-[18px] h-[18px] flex items-center justify-center text-[10px] font-bold px-1 py-0 bg-red-600 text-white ring-2 ring-white shadow-md rounded-full">
-                  {builderInvoicePayPrompts.length > 9 ? '9+' : builderInvoicePayPrompts.length}
-                </Badge>
-              )}
-            </span>
-            <span className="text-xs font-medium">Pay</span>
-          </Button>
-          <Button 
-            variant="ghost"
-            className={`h-auto py-3 px-2 flex flex-col items-center gap-1 transition-all ${
-              activeTab === 'analytics' 
-                ? 'bg-gradient-to-r from-teal-500 to-cyan-500 text-white shadow-lg ring-2 ring-teal-300' 
-                : isDarkMode 
-                  ? 'bg-gray-800 text-gray-300 hover:bg-gray-700 border border-gray-700' 
-                  : 'bg-white text-gray-700 hover:bg-teal-50 border border-gray-200 shadow-sm'
-            }`}
-            onClick={() => setActiveTab('analytics')}
-          >
-            <BarChart3 className="h-5 w-5" />
-            <span className="text-xs font-medium">Analytics</span>
-          </Button>
-          <Button 
-            variant="ghost"
-            title={pendingNotificationCount > 0 ? `${pendingNotificationCount} new delivery request${pendingNotificationCount !== 1 ? 's' : ''} — click to view` : 'Alerts'}
-            className={`h-auto py-3 px-2 flex flex-col items-center gap-1 transition-all relative overflow-visible ${
-              activeTab === 'notifications' 
-                ? 'bg-gradient-to-r from-teal-500 to-cyan-500 text-white shadow-lg ring-2 ring-teal-300' 
-                : isDarkMode 
-                  ? 'bg-gray-800 text-gray-300 hover:bg-gray-700 border border-gray-700' 
-                  : 'bg-white text-gray-700 hover:bg-teal-50 border border-gray-200 shadow-sm'
-            }`}
-            onClick={() => setActiveTab('notifications')}
-          >
-            <span className="relative inline-flex">
-              <Bell className="h-5 w-5" />
-              {pendingNotificationCount > 0 && (
-                <Badge className="absolute -top-2 -right-2 min-w-[18px] h-[18px] flex items-center justify-center text-[10px] font-bold px-1.5 py-0 bg-red-500 text-white animate-pulse ring-2 ring-white shadow-md rounded-full">
-                  {pendingNotificationCount > 99 ? '99+' : pendingNotificationCount}
-                </Badge>
-              )}
-            </span>
-            <span className="text-xs font-medium">Alerts</span>
-          </Button>
-          <Button 
-            variant="ghost"
-            className={`h-auto py-3 px-2 flex flex-col items-center gap-1 transition-all ${
-              activeTab === 'support' 
-                ? 'bg-gradient-to-r from-teal-500 to-cyan-500 text-white shadow-lg ring-2 ring-teal-300' 
-                : isDarkMode 
-                  ? 'bg-gray-800 text-gray-300 hover:bg-gray-700 border border-gray-700' 
-                  : 'bg-white text-gray-700 hover:bg-teal-50 border border-gray-200 shadow-sm'
-            }`}
-            onClick={() => setActiveTab('support')}
-          >
-            <Headphones className="h-5 w-5" />
-            <span className="text-xs font-medium">Support</span>
-          </Button>
-        </div>
+        <DeliveryDashboardNavCards
+          activeTab={activeTab}
+          setActiveTab={setActiveTab}
+          isDarkMode={isDarkMode}
+          deliveriesBadgeCount={deliveriesBadgeCount}
+          deliveryHistoryCount={deliveryHistory.length}
+          builderPayPromptCount={builderInvoicePayPrompts.length}
+          pendingNotificationCount={pendingNotificationCount}
+          onOpenDeliveries={() => {
+            setActiveTab("deliveries");
+            setDeliveriesSubTab("scheduled");
+          }}
+        />
 
         {builderInvoicePayPrompts.length > 0 && (
           <Alert
