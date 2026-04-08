@@ -1,6 +1,10 @@
 import { Building2 } from "lucide-react";
 import { Link } from "react-router-dom";
-import { SOCIAL_INSTAGRAM_URL, SOCIAL_TIKTOK_URL } from "@/config/appIdentity";
+import {
+  SOCIAL_INSTAGRAM_URL,
+  SOCIAL_TIKTOK_URL,
+  SUPPORT_PHONE_PRIMARY,
+} from "@/config/appIdentity";
 import {
   FacebookIcon,
   TwitterIcon,
@@ -109,12 +113,18 @@ const Footer = () => {
             <span>info@ujenzixform.org</span>
           </a>
           <a
-            href="tel:+254700000000"
+            href={`tel:${SUPPORT_PHONE_PRIMARY.tel}`}
             className="flex items-center gap-2 hover:text-white transition-colors"
           >
             <PhoneIcon size={16} />
-            <span>+254 700 000 000</span>
+            <span>{SUPPORT_PHONE_PRIMARY.display}</span>
           </a>
+          <Link
+            to="/contact"
+            className="text-gray-500 hover:text-white transition-colors underline-offset-2 hover:underline"
+          >
+            All numbers & hours
+          </Link>
         </div>
 
         {/* Bottom bar: copyright + single social row (outline icons, all breakpoints) */}

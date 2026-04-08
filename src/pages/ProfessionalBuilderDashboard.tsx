@@ -51,7 +51,7 @@ import {
 import { BuilderProfileEdit } from "@/components/builders/BuilderProfileEdit";
 import { BuilderOrdersTracker } from "@/components/builders/BuilderOrdersTracker";
 import { ReviewPrompt } from "@/components/reviews/ReviewSystem";
-import { BarChart3, Star } from "lucide-react";
+import { Star } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
@@ -97,6 +97,14 @@ import {
   fetchMyMonitoringServiceRequests,
   monitoringRestOpts,
 } from "@/utils/myMonitoringServiceRequests";
+import { ProfessionalBuilderDashboardNavCards } from "@/components/builders/ProfessionalBuilderDashboardNavCards";
+
+const devLog = (...args: unknown[]) => {
+  if (import.meta.env.DEV) devLog(...args);
+};
+const devWarn = (...args: unknown[]) => {
+  if (import.meta.env.DEV) devWarn(...args);
+};
 
 const BuilderDashboardTabFallback = () => (
   <div
@@ -241,7 +249,7 @@ async function fetchBuilderProjectPurchaseStatsRpc(): Promise<
   try {
     const { data, error } = await supabase.rpc("builder_project_purchase_stats");
     if (error) {
-      console.warn("📁 builder_project_purchase_stats RPC:", error.message);
+      devWarn("📁 builder_project_purchase_stats RPC:", error.message);
       return map;
     }
     for (const row of data ?? []) {
@@ -258,7 +266,7 @@ async function fetchBuilderProjectPurchaseStatsRpc(): Promise<
       });
     }
   } catch (e) {
-    console.warn("📁 RPC stats error:", e);
+    devWarn("📁 RPC stats error:", e);
   }
   return map;
 }
@@ -410,7 +418,7 @@ async function mergeProjectRowsWithPurchaseOrders(
         .in("buyer_id", buyerIds);
       if (!clientErr && Array.isArray(clientRows) && clientRows.length > 0) {
         list = clientRows as PurchaseOrderProjectRow[];
-        console.log(
+        devLog(
           "📁 PO merge: Supabase client",
           list.length,
           "rows (buyer_id in",
@@ -418,7 +426,7 @@ async function mergeProjectRowsWithPurchaseOrders(
           "ids)"
         );
       } else if (clientErr) {
-        console.warn("📁 PO merge: Supabase client error:", clientErr.message);
+        devWarn("📁 PO merge: Supabase client error:", clientErr.message);
       }
 
       if (list.length === 0) {
@@ -459,7 +467,7 @@ async function mergeProjectRowsWithPurchaseOrders(
         if (ordersRes.ok) {
           const orderRows = (await ordersRes.json()) as PurchaseOrderProjectRow[];
           list = Array.isArray(orderRows) ? orderRows : [];
-          console.log(
+          devLog(
             "📁 PO merge: REST loaded",
             list.length,
             "rows for buyer_id in",
@@ -467,7 +475,7 @@ async function mergeProjectRowsWithPurchaseOrders(
             "ids"
           );
         } else {
-          console.warn("📁 purchase_orders merge HTTP:", ordersRes.status);
+          devWarn("📁 purchase_orders merge HTTP:", ordersRes.status);
         }
       }
     }
@@ -484,7 +492,7 @@ async function mergeProjectRowsWithPurchaseOrders(
       stats,
       previousMergedCards
     );
-    console.log(
+    devLog(
       "📁 PO merge: sample card",
       merged[0]?.name,
       "orders",
@@ -494,7 +502,7 @@ async function mergeProjectRowsWithPurchaseOrders(
     );
     return merged;
   } catch (e) {
-    console.warn("📁 purchase_orders merge error:", e);
+    devWarn("📁 purchase_orders merge error:", e);
     return projectRows;
   }
 }
@@ -636,18 +644,18 @@ const ProfessionalBuilderDashboardPage = () => {
       const { data: { session }, error } = await supabase.auth.getSession();
       
       if (error) {
-        console.log('🔑 Supabase getSession error:', error.message);
+        devLog('🔑 Supabase getSession error:', error.message);
       }
       
       if (session?.access_token) {
-        console.log('🔑 Got fresh token from Supabase client (length:', session.access_token.length, ')');
+        devLog('🔑 Got fresh token from Supabase client (length:', session.access_token.length, ')');
         return session.access_token;
       }
       
-      console.log('🔑 No session from Supabase client, user may need to log in again');
+      devLog('🔑 No session from Supabase client, user may need to log in again');
       return '';
     } catch (e) {
-      console.log('🔑 Error getting session:', e);
+      devLog('🔑 Error getting session:', e);
       return '';
     }
   };
@@ -704,7 +712,7 @@ const ProfessionalBuilderDashboardPage = () => {
       }
       const count = seen.size;
       setSupplierResponseCount(count);
-      console.log('📊 Supplier response count:', count);
+      devLog('📊 Supplier response count:', count);
     } catch (error) {
       console.error('Error fetching supplier response count:', error);
       setSupplierResponseCount(0);
@@ -727,14 +735,14 @@ const ProfessionalBuilderDashboardPage = () => {
         .select('id', { count: 'exact', head: true })
         .in('builder_id', builders)
         .in('status', ['pending_signature', 'inspection_pending']);
-      if (dnErr) console.warn('Invoice hub badge (DN):', dnErr.message);
+      if (dnErr) devWarn('Invoice hub badge (DN):', dnErr.message);
 
       const { count: grnCount, error: grnErr } = await supabase
         .from('goods_received_notes')
         .select('id', { count: 'exact', head: true })
         .in('builder_id', builders)
         .eq('status', 'generated');
-      if (grnErr) console.warn('Invoice hub badge (GRN):', grnErr.message);
+      if (grnErr) devWarn('Invoice hub badge (GRN):', grnErr.message);
 
       const { data: invByBuilder, error: ibErr } = await supabase
         .from('invoices')
@@ -742,13 +750,13 @@ const ProfessionalBuilderDashboardPage = () => {
         .in('builder_id', builders)
         .in('status', ['sent', 'draft'])
         .is('acknowledged_at', null);
-      if (ibErr) console.warn('Invoice hub badge (inv builder_id):', ibErr.message);
+      if (ibErr) devWarn('Invoice hub badge (inv builder_id):', ibErr.message);
 
       const { data: poRows, error: poErr } = await supabase
         .from('purchase_orders')
         .select('id')
         .in('buyer_id', builders);
-      if (poErr) console.warn('Invoice hub badge (PO):', poErr.message);
+      if (poErr) devWarn('Invoice hub badge (PO):', poErr.message);
 
       const poIds = (poRows || []).map((p) => p.id).filter(Boolean);
       let invByPo: { id: string }[] = [];
@@ -759,7 +767,7 @@ const ProfessionalBuilderDashboardPage = () => {
           .in('purchase_order_id', poIds)
           .in('status', ['sent', 'draft'])
           .is('acknowledged_at', null);
-        if (ipErr) console.warn('Invoice hub badge (inv PO):', ipErr.message);
+        if (ipErr) devWarn('Invoice hub badge (inv PO):', ipErr.message);
         invByPo = data || [];
       }
 
@@ -776,7 +784,7 @@ const ProfessionalBuilderDashboardPage = () => {
       setInvoiceSubBadgeInv(invN);
       setInvoiceHubBadgeCount(Math.min(99, dnN + invN));
     } catch (e) {
-      console.warn('fetchInvoiceHubBadgeCount:', e);
+      devWarn('fetchInvoiceHubBadgeCount:', e);
       setInvoiceHubBadgeCount(0);
       setInvoiceSubBadgeDn(0);
       setInvoiceSubBadgeGrn(0);
@@ -793,7 +801,7 @@ const ProfessionalBuilderDashboardPage = () => {
         return parsed.user?.id || '';
       }
     } catch (e) {
-      console.warn('Could not get user ID from localStorage');
+      devWarn('Could not get user ID from localStorage');
     }
     return '';
   };
@@ -807,11 +815,11 @@ const ProfessionalBuilderDashboardPage = () => {
     // indefinitely on some devices; projects use localStorage token (fast path) for the same reason.
     const userId = authUser?.id || getUserId();
     if (!userId) {
-      console.warn("📹 Monitoring: skip refresh (no user id yet)");
+      devWarn("📹 Monitoring: skip refresh (no user id yet)");
       return;
     }
 
-    console.log("📹 Monitoring: fetching for user", userId.slice(0, 8) + "…");
+    devLog("📹 Monitoring: fetching for user", userId.slice(0, 8) + "…");
     // Token from localStorage via monitoringRestOpts only (avoids getSession hang).
     const { rows: raw, usedRpc } = await fetchMyMonitoringServiceRequests(
       supabase,
@@ -823,7 +831,7 @@ const ProfessionalBuilderDashboardPage = () => {
         new Date(String(a.created_at || 0)).getTime()
     );
     setMonitoringRequests(rows);
-    console.log(
+    devLog(
       "📹 Monitoring requests loaded:",
       rows.length,
       usedRpc ? "(direct)" : "(table)"
@@ -833,7 +841,7 @@ const ProfessionalBuilderDashboardPage = () => {
   // Set user from AuthContext when available
   useEffect(() => {
     if (authUser) {
-      console.log('📋 ProfessionalBuilderDashboard: Got user from AuthContext:', authUser.email);
+      devLog('📋 ProfessionalBuilderDashboard: Got user from AuthContext:', authUser.email);
       setUser(authUser);
     }
   }, [authUser]);
@@ -955,25 +963,25 @@ const ProfessionalBuilderDashboardPage = () => {
       const userId = getUserId();
       
       if (!userId) {
-        console.log('📋 ProfessionalBuilderDashboard: No user ID available yet');
+        devLog('📋 ProfessionalBuilderDashboard: No user ID available yet');
         // Don't redirect - RoleProtectedRoute handles this
         return;
       }
 
-      console.log('📋 ProfessionalBuilderDashboard: Loading profile for user:', userId);
+      devLog('📋 ProfessionalBuilderDashboard: Loading profile for user:', userId);
       
       // Set user object immediately
       const userObj = authUser || { id: userId, email: authUser?.email || 'user' };
       setUser(userObj);
 
       // IMMEDIATELY start loading deliveries and stats in background (don't wait for profile)
-      console.log('📋 Starting background data loads for:', userId);
+      devLog('📋 Starting background data loads for:', userId);
       loadRealStats(userId).catch(err => console.error('Stats load error:', err));
       loadDeliveries(userId, true).catch(err => console.error('Deliveries load error:', err));
 
       // Get profile using Supabase client (handles auth automatically)
       let profileData = null;
-      console.log('📋 Fetching profile using Supabase client...');
+      devLog('📋 Fetching profile using Supabase client...');
       
       try {
         const { data: profiles, error: profileError } = await supabase
@@ -983,18 +991,18 @@ const ProfessionalBuilderDashboardPage = () => {
           .maybeSingle();
         
         if (profileError) {
-          console.warn('📋 Profile fetch error:', profileError.message);
+          devWarn('📋 Profile fetch error:', profileError.message);
         } else if (profiles) {
           profileData = profiles;
-          console.log('📋 Profile loaded:', profileData.full_name || profileData.email);
+          devLog('📋 Profile loaded:', profileData.full_name || profileData.email);
         }
       } catch (profileError: any) {
-        console.warn('Profile fetch warning:', profileError.message);
+        devWarn('Profile fetch warning:', profileError.message);
       }
 
       if (!profileData) {
         // Create a basic profile from auth data if profiles table fails
-        console.log('📋 Using fallback profile');
+        devLog('📋 Using fallback profile');
         setProfile({
           id: userId,
           user_id: userId,
@@ -1009,7 +1017,7 @@ const ProfessionalBuilderDashboardPage = () => {
       }
 
       // Role already verified by RoleProtectedRoute, skip redundant check
-      console.log('📋 Profile setup complete, data loading in background');
+      devLog('📋 Profile setup complete, data loading in background');
 
       void refreshMonitoringRequests();
 
@@ -1031,15 +1039,15 @@ const ProfessionalBuilderDashboardPage = () => {
 
   // Load real stats using Supabase client (handles auth automatically)
   const loadRealStats = async (userId: string) => {
-    console.log('📊 loadRealStats called for:', userId);
+    devLog('📊 loadRealStats called for:', userId);
     
     if (!userId) {
-      console.log('📊 No userId provided, skipping stats load');
+      devLog('📊 No userId provided, skipping stats load');
       return;
     }
 
     try {
-      console.log('📊 Loading real stats for builder:', userId);
+      devLog('📊 Loading real stats for builder:', userId);
 
       const { data: statsSession } = await supabase.auth.getSession();
       const poBuyerIds = await fetchPurchaseBuyerIdsForBuilder(
@@ -1061,9 +1069,9 @@ const ProfessionalBuilderDashboardPage = () => {
       
       const orders = ordersResult.data;
       if (ordersResult.error) {
-        console.log('📊 Orders fetch error:', ordersResult.error.message);
+        devLog('📊 Orders fetch error:', ordersResult.error.message);
       } else {
-        console.log('📊 Stats: Orders loaded:', orders?.length || 0);
+        devLog('📊 Stats: Orders loaded:', orders?.length || 0);
       }
 
       // Fetch builder projects using Supabase client with timeout (increased to 10s)
@@ -1075,9 +1083,9 @@ const ProfessionalBuilderDashboardPage = () => {
       
       const projectsData = projectsResult.data;
       if (projectsResult.error) {
-        console.log('📊 Projects fetch error:', projectsResult.error.message);
+        devLog('📊 Projects fetch error:', projectsResult.error.message);
       } else {
-        console.log('📊 Stats: Projects loaded:', projectsData?.length || 0);
+        devLog('📊 Stats: Projects loaded:', projectsData?.length || 0);
         // Projects list + per-project order counts come from fetchProjects() (REST + purchase_orders merge)
       }
 
@@ -1108,7 +1116,7 @@ const ProfessionalBuilderDashboardPage = () => {
         totalSpent
       });
 
-      console.log('📊 Stats calculated:', { activeProjects, pendingOrders, completedOrders, totalSpent });
+      devLog('📊 Stats calculated:', { activeProjects, pendingOrders, completedOrders, totalSpent });
 
     } catch (error) {
       console.error('Error loading stats:', error);
@@ -1126,12 +1134,12 @@ const ProfessionalBuilderDashboardPage = () => {
   const loadDeliveries = async (userId: string, forceRefresh: boolean = false) => {
     // Skip if already loaded and not forcing refresh (prevents flicker)
     if (deliveriesLoaded && !forceRefresh && deliveries.length > 0) {
-      console.log('🚚 Deliveries already loaded, skipping fetch');
+      devLog('🚚 Deliveries already loaded, skipping fetch');
       return;
     }
     
     if (!userId) {
-      console.log('🚚 No userId provided, skipping delivery load');
+      devLog('🚚 No userId provided, skipping delivery load');
       return;
     }
     
@@ -1139,13 +1147,13 @@ const ProfessionalBuilderDashboardPage = () => {
     
     // Safety timeout - finish loading after 15 seconds max
     const safetyTimeout = setTimeout(() => {
-      console.log('🚚 Safety timeout reached, finishing delivery load');
+      devLog('🚚 Safety timeout reached, finishing delivery load');
       setLoadingDeliveries(false);
       setDeliveriesLoaded(true);
     }, 15000);
 
     try {
-      console.log('🚚 Loading deliveries for builder:', userId);
+      devLog('🚚 Loading deliveries for builder:', userId);
       
       // First, get the profile ID (delivery_requests uses profile.id as builder_id)
       let profileId = userId;
@@ -1157,7 +1165,7 @@ const ProfessionalBuilderDashboardPage = () => {
       
       if (profileResult.data?.id) {
         profileId = profileResult.data.id;
-        console.log('🚚 Found profile ID:', profileId);
+        devLog('🚚 Found profile ID:', profileId);
       }
 
       // Fetch delivery requests using Supabase client with timeout (increased to 10s)
@@ -1171,10 +1179,10 @@ const ProfessionalBuilderDashboardPage = () => {
       );
       
       if (reqResult1.error) {
-        console.log('🚚 Delivery requests (by profile_id) error:', reqResult1.error.message);
+        devLog('🚚 Delivery requests (by profile_id) error:', reqResult1.error.message);
       } else if (reqResult1.data) {
         deliveryRequests = [...deliveryRequests, ...reqResult1.data];
-        console.log('🚚 Delivery requests (by profile_id):', reqResult1.data.length);
+        devLog('🚚 Delivery requests (by profile_id):', reqResult1.data.length);
       }
 
       // Also try with user_id if different
@@ -1189,7 +1197,7 @@ const ProfessionalBuilderDashboardPage = () => {
           const existingIds = new Set(deliveryRequests.map(d => d.id));
           const newData = reqResult2.data.filter((d: any) => !existingIds.has(d.id));
           deliveryRequests = [...deliveryRequests, ...newData];
-          console.log('🚚 Delivery requests (by user_id):', reqResult2.data.length);
+          devLog('🚚 Delivery requests (by user_id):', reqResult2.data.length);
         }
       }
 
@@ -1204,7 +1212,7 @@ const ProfessionalBuilderDashboardPage = () => {
       
       if (delResult1.data) {
         deliveriesData = [...deliveriesData, ...delResult1.data];
-        console.log('🚚 Deliveries (by profile_id):', delResult1.data.length);
+        devLog('🚚 Deliveries (by profile_id):', delResult1.data.length);
       }
 
       if (profileId !== userId) {
@@ -1218,7 +1226,7 @@ const ProfessionalBuilderDashboardPage = () => {
           const existingIds = new Set(deliveriesData.map(d => d.id));
           const newData = delResult2.data.filter((d: any) => !existingIds.has(d.id));
           deliveriesData = [...deliveriesData, ...newData];
-          console.log('🚚 Deliveries (by user_id):', delResult2.data.length);
+          devLog('🚚 Deliveries (by user_id):', delResult2.data.length);
         }
       }
 
@@ -1260,7 +1268,7 @@ const ProfessionalBuilderDashboardPage = () => {
             tracking_number: o.po_number,
             estimated_delivery: o.delivery_date
           }));
-        console.log('🚚 Order deliveries:', orderDeliveries.length);
+        devLog('🚚 Order deliveries:', orderDeliveries.length);
       }
 
       // Combine all - delivery requests, actual deliveries, and order deliveries
@@ -1285,7 +1293,7 @@ const ProfessionalBuilderDashboardPage = () => {
 
       setDeliveries(uniqueDeliveries);
       setDeliveriesLoaded(true);
-      console.log('🚚 Total unique deliveries:', uniqueDeliveries.length);
+      devLog('🚚 Total unique deliveries:', uniqueDeliveries.length);
 
     } catch (error) {
       console.error('Error loading deliveries:', error);
@@ -1301,28 +1309,28 @@ const ProfessionalBuilderDashboardPage = () => {
   const fetchProjects = async () => {
     const userId = getUserId();
     if (!userId) {
-      console.log('📁 No userId for projects fetch');
+      devLog('📁 No userId for projects fetch');
       setLoadingProjects(false);
       return;
     }
     
-    console.log('📁 Fetching projects for:', userId);
+    devLog('📁 Fetching projects for:', userId);
     setLoadingProjects(true);
     
     // Safety: never block UI forever if network/auth stalls (was 10s — too aggressive for slow links)
     const safetyTimeout = setTimeout(() => {
-      console.log('📁 Projects fetch safety timeout');
+      devLog('📁 Projects fetch safety timeout');
       setLoadingProjects(false);
     }, 45000);
     
     try {
       // Use REST API directly with fetch to bypass Supabase client issues
-      console.log('📁 Fetching projects via REST API for userId:', userId);
+      devLog('📁 Fetching projects via REST API for userId:', userId);
       
       // CRITICAL: read persisted session first. await supabase.auth.getSession() can hang on some
       // browsers/networks and never resolve — that left projects stuck empty after safety timeout.
       let accessToken: string | null = readAccessTokenSyncBestEffort() || null;
-      if (accessToken) console.log("📁 Got token from persisted session (fast path)");
+      if (accessToken) devLog("📁 Got token from persisted session (fast path)");
       if (!accessToken) {
         try {
           const sessPromise = supabase.auth.getSession();
@@ -1335,17 +1343,17 @@ const ProfessionalBuilderDashboardPage = () => {
             timeoutPromise,
           ]);
           accessToken = raced;
-          if (accessToken) console.log("📁 Got token from getSession (raced)");
-          else console.warn("📁 No JWT yet from getSession within", timeoutMs, "ms");
+          if (accessToken) devLog("📁 Got token from getSession (raced)");
+          else devWarn("📁 No JWT yet from getSession within", timeoutMs, "ms");
         } catch (e) {
-          console.warn("📁 getSession failed:", e);
+          devWarn("📁 getSession failed:", e);
         }
       }
       
       const controller = new AbortController();
       const fetchTimeout = setTimeout(() => controller.abort(), 25000);
       
-      console.log('📁 Making REST API request...');
+      devLog('📁 Making REST API request...');
       const projectSelect =
         'id,name,location,status,budget,spent,progress,created_at,start_date,end_date,expected_end_date,description,total_orders';
       let response = await fetch(
@@ -1384,7 +1392,7 @@ const ProfessionalBuilderDashboardPage = () => {
         clearTimeout(fetchTimeout);
       }
       
-      console.log('📁 Response status:', response.status);
+      devLog('📁 Response status:', response.status);
       
       if (!response.ok) {
         const errorText = await response.text();
@@ -1395,13 +1403,13 @@ const ProfessionalBuilderDashboardPage = () => {
       
       const rawData = await response.json();
       const data = Array.isArray(rawData) ? dedupeProjectsById(rawData) : rawData;
-      console.log('📁 Query completed successfully');
-      console.log('📁 Raw data received:', data);
+      devLog('📁 Query completed successfully');
+      devLog('📁 Raw data received:', data);
       
       if (data && Array.isArray(data)) {
         const projectRows = data as any[];
         setProjects(projectRows);
-        console.log('📁 Loaded', projectRows.length, 'projects (order stats merge in background)');
+        devLog('📁 Loaded', projectRows.length, 'projects (order stats merge in background)');
         const purchaseExtraSeeds = [profile?.id].filter(
           (id): id is string => typeof id === "string" && id.length > 0
         );
@@ -1414,13 +1422,13 @@ const ProfessionalBuilderDashboardPage = () => {
         )
           .then((merged) => {
             setProjects(merged);
-            console.log('📁 Merged per-project order counts from purchase_orders');
+            devLog('📁 Merged per-project order counts from purchase_orders');
           })
           .catch((err) =>
-            console.warn('📁 Per-project order merge failed (non-fatal):', err)
+            devWarn('📁 Per-project order merge failed (non-fatal):', err)
           );
       } else {
-        console.log('📁 No projects data returned (data is null or not array)');
+        devLog('📁 No projects data returned (data is null or not array)');
         setProjects([]);
       }
     } catch (error: any) {
@@ -1428,7 +1436,7 @@ const ProfessionalBuilderDashboardPage = () => {
       if (error?.name !== 'AbortError') {
         setProjects([]);
       } else {
-        console.warn('📁 Projects fetch aborted (timeout) — keeping prior list if any');
+        devWarn('📁 Projects fetch aborted (timeout) — keeping prior list if any');
       }
     } finally {
       clearTimeout(safetyTimeout);
@@ -1438,7 +1446,7 @@ const ProfessionalBuilderDashboardPage = () => {
 
   // Debug: Log when projects state changes
   useEffect(() => {
-    console.log('📁 Projects state changed:', projects.length, 'projects', projects);
+    devLog('📁 Projects state changed:', projects.length, 'projects', projects);
   }, [projects]);
 
   // Restore header project selector from cart (e.g. after refresh) when it matches a loaded project
@@ -1454,7 +1462,7 @@ const ProfessionalBuilderDashboardPage = () => {
   
   // Debug: Log when selectedProject changes
   useEffect(() => {
-    console.log('📁 selectedProject state changed:', selectedProject ? `${selectedProject.id} - ${selectedProject.name}` : 'null');
+    devLog('📁 selectedProject state changed:', selectedProject ? `${selectedProject.id} - ${selectedProject.name}` : 'null');
   }, [selectedProject]);
 
   // Load projects on mount - with delay to ensure auth is ready
@@ -1495,7 +1503,7 @@ const ProfessionalBuilderDashboardPage = () => {
       });
 
       const { latitude, longitude } = position.coords;
-      console.log('📍 Got project coordinates:', latitude, longitude);
+      devLog('📍 Got project coordinates:', latitude, longitude);
 
       // Update project with coordinates
       setNewProject(prev => ({
@@ -1530,7 +1538,7 @@ const ProfessionalBuilderDashboardPage = () => {
           });
         }
       } catch (geoError) {
-        console.log('📍 Reverse geocoding failed, using coordinates only');
+        devLog('📍 Reverse geocoding failed, using coordinates only');
         toast({
           title: '📍 Coordinates Saved',
           description: `Lat: ${latitude.toFixed(6)}, Lng: ${longitude.toFixed(6)}`
@@ -1588,7 +1596,7 @@ const ProfessionalBuilderDashboardPage = () => {
     
     // Safety timeout: Always clear loading state after 15 seconds max
     const safetyTimeout = setTimeout(() => {
-      console.warn('⚠️ Project creation safety timeout - clearing loading state');
+      devWarn('⚠️ Project creation safety timeout - clearing loading state');
       setCreatingProject(false);
     }, 15000);
     
@@ -1607,29 +1615,29 @@ const ProfessionalBuilderDashboardPage = () => {
     // Get access token with timeout to prevent hanging
     let accessToken: string | null = null;
     try {
-      console.log('📁 Getting access token...');
+      devLog('📁 Getting access token...');
       const tokenPromise = getAccessToken();
       const tokenTimeout = new Promise<never>((_, reject) => 
         setTimeout(() => reject(new Error('Token fetch timeout')), 5000)
       );
       accessToken = await Promise.race([tokenPromise, tokenTimeout]);
-      console.log('📁 Access token obtained');
+      devLog('📁 Access token obtained');
     } catch (tokenError: any) {
-      console.warn('⚠️ Failed to get access token, trying localStorage fallback:', tokenError);
+      devWarn('⚠️ Failed to get access token, trying localStorage fallback:', tokenError);
       // Try to get token from localStorage as fallback
       try {
         const storedSession = localStorage.getItem('sb-' + SUPABASE_URL.split('//')[1].split('.')[0] + '-auth-token');
         if (storedSession) {
           const parsed = JSON.parse(storedSession);
           accessToken = parsed.access_token || SUPABASE_ANON_KEY;
-          console.log('📁 Using token from localStorage');
+          devLog('📁 Using token from localStorage');
         } else {
           accessToken = SUPABASE_ANON_KEY;
-          console.log('📁 Using anon key as fallback');
+          devLog('📁 Using anon key as fallback');
         }
       } catch {
         accessToken = SUPABASE_ANON_KEY;
-        console.log('📁 Using anon key as final fallback');
+        devLog('📁 Using anon key as final fallback');
       }
     }
     
@@ -1663,9 +1671,9 @@ const ProfessionalBuilderDashboardPage = () => {
         projectData.address = newProject.address.trim();
       }
 
-      console.log('📁 Creating project:', projectData);
-      console.log('📁 User ID:', userId);
-      console.log('📁 Access Token:', accessToken ? 'Present' : 'Missing');
+      devLog('📁 Creating project:', projectData);
+      devLog('📁 User ID:', userId);
+      devLog('📁 Access Token:', accessToken ? 'Present' : 'Missing');
 
       // Add timeout to prevent hanging
       const controller = new AbortController();
@@ -1693,7 +1701,7 @@ const ProfessionalBuilderDashboardPage = () => {
         throw fetchError;
       }
 
-      console.log('📁 Response status:', response.status);
+      devLog('📁 Response status:', response.status);
 
       if (!response.ok) {
         let errorText = await response.text();
@@ -1744,7 +1752,7 @@ const ProfessionalBuilderDashboardPage = () => {
       }
 
       const data = await response.json();
-      console.log('✅ Project created:', data);
+      devLog('✅ Project created:', data);
       
       // Ensure we have the created project data
       const createdProject = Array.isArray(data) ? data[0] : data;
@@ -1759,13 +1767,13 @@ const ProfessionalBuilderDashboardPage = () => {
         // Check if project already exists (avoid duplicates)
         const exists = prev.some(p => p.id === createdProject.id);
         if (exists) {
-          console.log('📁 Project already in state, skipping duplicate');
+          devLog('📁 Project already in state, skipping duplicate');
           return prev;
         }
         // Add new project at the beginning of the list
-        console.log('📁 Adding project to state:', createdProject.id, createdProject.name);
+        devLog('📁 Adding project to state:', createdProject.id, createdProject.name);
         const newProjects = [createdProject, ...prev];
-        console.log('📁 Projects state updated, total projects:', newProjects.length);
+        devLog('📁 Projects state updated, total projects:', newProjects.length);
         return newProjects;
       });
 
@@ -1801,7 +1809,7 @@ const ProfessionalBuilderDashboardPage = () => {
       // Refresh projects list in background (non-blocking, with timeout)
       // This will update the list with any server-side changes, but the project is already visible
       fetchProjects().catch((err) => {
-        console.warn('⚠️ Failed to refresh projects list (non-critical):', err);
+        devWarn('⚠️ Failed to refresh projects list (non-critical):', err);
         // Don't show error toast - project was created successfully and is already visible
       });
     } catch (error: any) {
@@ -1813,7 +1821,7 @@ const ProfessionalBuilderDashboardPage = () => {
       });
     } finally {
       clearTimeout(safetyTimeout);
-      console.log('🔄 Clearing creatingProject state');
+      devLog('🔄 Clearing creatingProject state');
       setCreatingProject(false);
     }
   };
@@ -1830,10 +1838,10 @@ const ProfessionalBuilderDashboardPage = () => {
     if (!userId) return;
 
     const profileBuyerId = profile?.id;
-    console.log('🔔 Setting up real-time subscriptions for builder:', userId, profileBuyerId || '');
+    devLog('🔔 Setting up real-time subscriptions for builder:', userId, profileBuyerId || '');
 
     const onPurchaseOrderChange = (payload: unknown) => {
-      console.log('🛒 Order change detected:', payload);
+      devLog('🛒 Order change detected:', payload);
       loadRealStats(userId);
       void fetchProjects();
       fetchSupplierResponseCount(userId, profileBuyerId);
@@ -1864,14 +1872,14 @@ const ProfessionalBuilderDashboardPage = () => {
       .on('postgres_changes',
         { event: '*', schema: 'public', table: 'builder_projects', filter: `builder_id=eq.${userId}` },
         (payload) => {
-          console.log('📁 Project change detected:', payload);
+          devLog('📁 Project change detected:', payload);
           loadRealStats(userId);
         }
       )
       .on('postgres_changes',
         { event: '*', schema: 'public', table: 'delivery_requests', filter: `builder_id=eq.${userId}` },
         (payload) => {
-          console.log('🚚 Delivery request change detected:', payload);
+          devLog('🚚 Delivery request change detected:', payload);
           loadDeliveries(userId, true); // Force refresh on real-time update
           toast({
             title: "Delivery Update",
@@ -1882,7 +1890,7 @@ const ProfessionalBuilderDashboardPage = () => {
       .on('postgres_changes',
         { event: '*', schema: 'public', table: 'deliveries', filter: `builder_id=eq.${userId}` },
         (payload) => {
-          console.log('🚚 Delivery change detected:', payload);
+          devLog('🚚 Delivery change detected:', payload);
           loadDeliveries(userId, true); // Force refresh on real-time update
         }
       )
@@ -2029,7 +2037,7 @@ const ProfessionalBuilderDashboardPage = () => {
     }
 
     setSubmittingRequest(true);
-    console.log('📹 Submitting monitoring request...');
+    devLog('📹 Submitting monitoring request...');
 
     const { data: { session: submitSession } } = await supabase.auth.getSession();
     const submitUserId = submitSession?.user?.id || getUserId();
@@ -2056,7 +2064,7 @@ const ProfessionalBuilderDashboardPage = () => {
     
     // Safety timeout
     const safetyTimeout = setTimeout(() => {
-      console.log('⚠️ Monitoring request safety timeout');
+      devLog('⚠️ Monitoring request safety timeout');
       setSubmittingRequest(false);
       toast({
         title: "Timeout",
@@ -2110,7 +2118,7 @@ const ProfessionalBuilderDashboardPage = () => {
         throw new Error(errorData.message || `Request failed: ${response.status}`);
       }
 
-      console.log('✅ Monitoring request submitted successfully');
+      devLog('✅ Monitoring request submitted successfully');
       clearTimeout(safetyTimeout);
 
       toast({
@@ -2149,12 +2157,12 @@ const ProfessionalBuilderDashboardPage = () => {
 
   // Exit dashboard — public /home with ?browse=1 so Index does not auto-redirect back to dashboard
   const handleExitDashboard = () => {
-    console.log('🚪 Exit Dashboard: Redirecting to public home...');
+    devLog('🚪 Exit Dashboard: Redirecting to public home...');
     navigate('/home?browse=1');
   };
 
   const handleLogoutProfessional = () => {
-    console.log('🚪 Logout: Starting sign out process...');
+    devLog('🚪 Logout: Starting sign out process...');
     localStorage.removeItem('user_role');
     localStorage.removeItem('user_role_id');
     localStorage.removeItem('user_role_verified');
@@ -2394,139 +2402,15 @@ const ProfessionalBuilderDashboardPage = () => {
             </div>
           </div>
         )}
-        {/* Navigation Cards - Single Row */}
-        <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-7 lg:grid-cols-14 gap-2 mb-6">
-          <Button 
-            className={`h-auto py-3 px-2 transition-all flex flex-col items-center gap-1 ${activeTab === 'projects' 
-              ? 'bg-gradient-to-r from-blue-500 to-blue-600 ring-2 ring-blue-300 shadow-lg text-white' 
-              : 'bg-white hover:bg-blue-50 text-gray-700 border shadow-sm'}`}
-            onClick={() => setActiveTab('projects')}
-          >
-            <Building2 className="h-5 w-5" />
-            <span className="text-[10px] sm:text-xs">Projects</span>
-          </Button>
-          <Button 
-            className={`h-auto py-3 px-2 transition-all flex flex-col items-center gap-1 relative ${activeTab === 'quotes' 
-              ? 'bg-gradient-to-r from-green-500 to-green-600 ring-2 ring-green-300 shadow-lg text-white' 
-              : 'bg-white hover:bg-green-50 text-gray-700 border shadow-sm'}`}
-            onClick={() => setActiveTab('quotes')}
-          >
-            <CreditCard className="h-5 w-5" />
-            <span className="text-[10px] sm:text-xs">Quotes</span>
-            {supplierResponseCount > 0 && (
-              <Badge 
-                className="absolute -top-1 -right-1 h-5 w-5 rounded-full p-0 flex items-center justify-center text-xs bg-red-500 text-white border-2 border-white"
-              >
-                {supplierResponseCount > 9 ? '9+' : supplierResponseCount}
-              </Badge>
-            )}
-          </Button>
-          <Button 
-            className={`h-auto py-3 px-2 transition-all flex flex-col items-center gap-1 relative ${activeTab === 'orders' 
-              ? 'bg-gradient-to-r from-blue-500 to-indigo-600 ring-2 ring-blue-300 shadow-lg text-white' 
-              : 'bg-white hover:bg-blue-50 text-gray-700 border shadow-sm'}`}
-            onClick={() => setActiveTab('orders')}
-          >
-            <Package className="h-5 w-5" />
-            <span className="text-[10px] sm:text-xs">Orders</span>
-            {stats.pendingOrders > 0 && (
-              <Badge
-                className="absolute -top-1 -right-1 h-5 min-w-5 px-1 rounded-full p-0 flex items-center justify-center text-[10px] bg-red-500 text-white border-2 border-white"
-              >
-                {stats.pendingOrders > 9 ? '9+' : stats.pendingOrders}
-              </Badge>
-            )}
-          </Button>
-          <Button 
-            className={`h-auto py-3 px-2 transition-all flex flex-col items-center gap-1 relative ${activeTab === 'deliveries' 
-              ? 'bg-gradient-to-r from-amber-500 to-orange-500 ring-2 ring-amber-300 shadow-lg text-white' 
-              : 'bg-white hover:bg-amber-50 text-gray-700 border shadow-sm'}`}
-            onClick={() => setActiveTab('deliveries')}
-          >
-            <Truck className="h-5 w-5" />
-            <span className="text-[10px] sm:text-xs">Deliveries</span>
-            {deliveriesNavBadgeCount > 0 && (
-              <Badge
-                className="absolute -top-1 -right-1 h-5 min-w-5 px-1 rounded-full p-0 flex items-center justify-center text-[10px] bg-red-500 text-white border-2 border-white"
-              >
-                {deliveriesNavBadgeCount > 9 ? '9+' : deliveriesNavBadgeCount}
-              </Badge>
-            )}
-          </Button>
-          <Button 
-            className={`h-auto py-3 px-2 transition-all flex flex-col items-center gap-1 ${activeTab === 'tracking' 
-              ? 'bg-gradient-to-r from-teal-500 to-cyan-500 ring-2 ring-teal-300 shadow-lg text-white' 
-              : 'bg-white hover:bg-teal-50 text-gray-700 border shadow-sm'}`}
-            onClick={() => setActiveTab('tracking')}
-          >
-            <NavigationIcon className="h-5 w-5" />
-            <span className="text-[10px] sm:text-xs">Tracking</span>
-          </Button>
-          <Button 
-            className={`h-auto py-3 px-2 transition-all flex flex-col items-center gap-1 relative ${activeTab === 'invoices' 
-              ? 'bg-gradient-to-r from-slate-500 to-slate-600 ring-2 ring-slate-300 shadow-lg text-white' 
-              : 'bg-white hover:bg-slate-50 text-gray-700 border shadow-sm'}`}
-            onClick={() => setActiveTab('invoices')}
-          >
-            <FileText className="h-5 w-5" />
-            <span className="text-[10px] sm:text-xs">Invoices</span>
-            {invoiceHubBadgeCount > 0 && (
-              <Badge
-                className="absolute -top-1 -right-1 h-5 min-w-5 px-1 rounded-full p-0 flex items-center justify-center text-[10px] bg-red-500 text-white border-2 border-white"
-              >
-                {invoiceHubBadgeCount > 9 ? '9+' : invoiceHubBadgeCount}
-              </Badge>
-            )}
-          </Button>
-          <Button 
-            className={`h-auto py-3 px-2 transition-all flex flex-col items-center gap-1 ${activeTab === 'extras' 
-              ? 'bg-gradient-to-r from-violet-500 to-purple-600 ring-2 ring-violet-300 shadow-lg text-white' 
-              : 'bg-white hover:bg-violet-50 text-gray-700 border shadow-sm'}`}
-            onClick={() => {
-              setActiveTab('extras');
-              setExtrasSubTab('team'); // Default to team when opening Extras
-            }}
-          >
-            <Settings className="h-5 w-5" />
-            <span className="text-[10px] sm:text-xs">Extras</span>
-          </Button>
-          <Button 
-            className={`h-auto py-3 px-2 transition-all flex flex-col items-center gap-1 ${activeTab === 'monitoring' 
-              ? 'bg-gradient-to-r from-cyan-500 to-sky-500 ring-2 ring-cyan-300 shadow-lg text-white' 
-              : 'bg-white hover:bg-cyan-50 text-gray-700 border shadow-sm'}`}
-            onClick={() => setActiveTab('monitoring')}
-          >
-            <Camera className="h-5 w-5" />
-            <span className="text-[10px] sm:text-xs">Monitor</span>
-          </Button>
-          <Button 
-            className={`h-auto py-3 px-2 transition-all flex flex-col items-center gap-1 ${activeTab === 'portfolio' 
-              ? 'bg-gradient-to-r from-purple-500 to-pink-500 ring-2 ring-purple-300 shadow-lg text-white' 
-              : 'bg-white hover:bg-purple-50 text-gray-700 border shadow-sm'}`}
-            onClick={() => setActiveTab('portfolio')}
-          >
-            <Video className="h-5 w-5" />
-            <span className="text-[10px] sm:text-xs">Portfolio</span>
-          </Button>
-          <Button 
-            className={`h-auto py-3 px-2 transition-all flex flex-col items-center gap-1 ${activeTab === 'order-history' 
-              ? 'bg-gradient-to-r from-indigo-500 to-violet-600 ring-2 ring-indigo-300 shadow-lg text-white' 
-              : 'bg-white hover:bg-indigo-50 text-gray-700 border shadow-sm'}`}
-            onClick={() => setActiveTab('order-history')}
-          >
-            <FileText className="h-5 w-5" />
-            <span className="text-[10px] sm:text-xs">History</span>
-          </Button>
-          <Button 
-            className={`h-auto py-3 px-2 transition-all flex flex-col items-center gap-1 ${activeTab === 'my-analytics' 
-              ? 'bg-gradient-to-r from-pink-500 to-rose-500 ring-2 ring-pink-300 shadow-lg text-white' 
-              : 'bg-white hover:bg-pink-50 text-gray-700 border shadow-sm'}`}
-            onClick={() => setActiveTab('my-analytics')}
-          >
-            <BarChart3 className="h-5 w-5" />
-            <span className="text-[10px] sm:text-xs">Analytics</span>
-          </Button>
-        </div>
+        <ProfessionalBuilderDashboardNavCards
+          activeTab={activeTab}
+          setActiveTab={setActiveTab}
+          setExtrasSubTab={setExtrasSubTab}
+          supplierResponseCount={supplierResponseCount}
+          stats={stats}
+          deliveriesNavBadgeCount={deliveriesNavBadgeCount}
+          invoiceHubBadgeCount={invoiceHubBadgeCount}
+        />
 
         {/* Tab Content - Hidden TabsList, content controlled by cards above */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
@@ -2549,13 +2433,9 @@ const ProfessionalBuilderDashboardPage = () => {
           <TabsContent value="projects" className="mt-4" data-tab-content="projects">
             {selectedProject ? (
               <div className="animate-in fade-in slide-in-from-bottom-4 duration-300">
-                {console.log('📁 Rendering ProjectDetails for:', selectedProject.id, selectedProject.name)}
                 <ProjectDetails 
                   project={selectedProject}
-                  onBack={() => {
-                    console.log('📁 Back button clicked, clearing selectedProject');
-                    setSelectedProject(null);
-                  }}
+                  onBack={() => setSelectedProject(null)}
                   onUpdate={handleProjectUpdate}
                   userId={getUserId()}
                   profileIdForOrders={profile?.id}
@@ -2823,10 +2703,6 @@ const ProfessionalBuilderDashboardPage = () => {
                   </Dialog>
                 </CardHeader>
                 <CardContent>
-                  {(() => {
-                    console.log('📁 RENDER CHECK - loadingProjects:', loadingProjects, 'projects.length:', projects.length, 'projects:', projects);
-                    return null;
-                  })()}
                   {loadingProjects ? (
                     <div className="text-center py-12">
                       <div className="animate-spin h-8 w-8 border-4 border-blue-500 border-t-transparent rounded-full mx-auto mb-4" />
@@ -2837,7 +2713,6 @@ const ProfessionalBuilderDashboardPage = () => {
                       <Building2 className="h-16 w-16 mx-auto mb-4 text-gray-300" />
                       <p className="text-lg font-medium">No active projects</p>
                       <p className="text-sm mb-4">Create your first project to get started</p>
-                      {console.log('📁 RENDERING EMPTY STATE - projects array:', projects)}
                       <div className="flex gap-2 justify-center">
                         <Button 
                           onClick={() => setShowCreateProject(true)}
@@ -2848,7 +2723,6 @@ const ProfessionalBuilderDashboardPage = () => {
                         </Button>
                         <Button 
                           onClick={() => {
-                            console.log('🔄 Manual refresh triggered');
                             setLoadingProjects(true);
                             fetchProjects();
                           }}
@@ -3016,20 +2890,14 @@ const ProfessionalBuilderDashboardPage = () => {
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     e.preventDefault();
-                                    console.log('📁 View Details clicked for project:', project.id, project.name);
-                                    console.log('📁 Current selectedProject before update:', selectedProject);
-                                    console.log('📁 Setting selectedProject to:', project);
                                     setSelectedProject(project);
-                                    // Ensure projects tab is active
                                     setActiveTab('projects');
-                                    // Scroll to top of projects section
                                     setTimeout(() => {
                                       const projectsSection = document.querySelector('[data-tab-content="projects"]');
                                       if (projectsSection) {
                                         projectsSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
                                       }
                                     }, 100);
-                                    console.log('📁 selectedProject state updated, component should re-render');
                                   }}
                                 >
                                   <Eye className="h-4 w-4 mr-2" />
@@ -4337,22 +4205,30 @@ const ProfessionalBuilderDashboardPage = () => {
           </TabsContent>
         </Tabs>
 
-        {/* Professional Features Banner */}
+        {/* Ordering context — benefits vary by supplier; avoid implying guaranteed perks */}
         <Card className="mt-8 bg-gradient-to-r from-blue-600 to-indigo-600 text-white">
           <CardContent className="p-6">
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-              <div>
-                <h3 className="text-xl font-bold mb-2">Professional Builder Benefits</h3>
+              <div className="space-y-3 min-w-0">
+                <h3 className="text-xl font-bold">Ordering as a professional builder</h3>
+                <p className="text-sm text-white/90 max-w-2xl leading-relaxed">
+                  Volume pricing, payment terms, delivery speed, and support levels depend on each supplier and your
+                  relationship with them — not something we guarantee site-wide. Ask when you quote or order, or see{" "}
+                  <Link to="/contact" className="font-medium underline underline-offset-2 hover:text-white">
+                    Contact
+                  </Link>{" "}
+                  for how we can help.
+                </p>
                 <div className="flex flex-wrap gap-2">
-                  <Badge className="bg-white/20 text-white">Bulk Discounts</Badge>
-                  <Badge className="bg-white/20 text-white">Credit Terms</Badge>
-                  <Badge className="bg-white/20 text-white">Priority Delivery</Badge>
-                  <Badge className="bg-white/20 text-white">Dedicated Support</Badge>
+                  <Badge className="bg-white/20 text-white border-0">Volume pricing (where offered)</Badge>
+                  <Badge className="bg-white/20 text-white border-0">Payment terms (by agreement)</Badge>
+                  <Badge className="bg-white/20 text-white border-0">Delivery options (per supplier)</Badge>
+                  <Badge className="bg-white/20 text-white border-0">Support via Contact & in-app</Badge>
                 </div>
               </div>
-              <Link to="/suppliers?from=dashboard">
-                <Button className="bg-white text-blue-700 hover:bg-blue-50">
-                  Start Ordering
+              <Link to="/suppliers?from=dashboard" className="shrink-0">
+                <Button className="bg-white text-blue-700 hover:bg-blue-50 w-full md:w-auto">
+                  Browse suppliers
                 </Button>
               </Link>
             </div>

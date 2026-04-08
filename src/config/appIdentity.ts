@@ -15,6 +15,25 @@ export const TERMS_OF_SERVICE_URL = `${DEFAULT_SITE_URL}/terms`;
 export const SUPPORT_EMAIL =
   (import.meta.env.VITE_SUPPORT_EMAIL as string | undefined) || 'support@ujenzixform.org';
 
+/** Public footer & Contact — override via VITE_SUPPORT_PHONE_* if numbers change. */
+export const SUPPORT_PHONE_PRIMARY = {
+  tel: (
+    (import.meta.env.VITE_SUPPORT_PHONE_PRIMARY_TEL as string | undefined) || '+254726749849'
+  ).replace(/\s/g, ''),
+  display:
+    (import.meta.env.VITE_SUPPORT_PHONE_PRIMARY_DISPLAY as string | undefined)?.trim() ||
+    '+254 726 749 849',
+} as const;
+
+export const SUPPORT_PHONE_SECONDARY = {
+  tel: (
+    (import.meta.env.VITE_SUPPORT_PHONE_SECONDARY_TEL as string | undefined) || '+254733987654'
+  ).replace(/\s/g, ''),
+  display:
+    (import.meta.env.VITE_SUPPORT_PHONE_SECONDARY_DISPLAY as string | undefined)?.trim() ||
+    '+254 733 987 654',
+} as const;
+
 export const SOCIAL_INSTAGRAM_URL =
   (import.meta.env.VITE_SOCIAL_INSTAGRAM_URL as string | undefined) ||
   'https://instagram.com/ujenzixform';
