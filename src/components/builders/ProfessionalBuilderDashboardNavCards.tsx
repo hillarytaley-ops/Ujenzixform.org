@@ -17,9 +17,9 @@ import {
 type NavStats = { pendingOrders: number };
 
 const navBtnBase =
-  "relative h-auto min-h-12 min-w-0 flex flex-col items-center justify-center gap-1.5 px-2 py-3.5 transition-all sm:flex-row sm:gap-2 sm:px-3";
+  "relative h-auto min-h-12 min-w-0 flex flex-col items-center justify-center gap-1.5 px-2 py-3.5 transition-all sm:px-3";
 
-const navLabelClass = "text-xs font-medium leading-tight sm:text-sm text-center sm:text-left";
+const navLabelClass = "text-xs font-medium leading-tight sm:text-sm text-center";
 
 type Props = {
   activeTab: string;
