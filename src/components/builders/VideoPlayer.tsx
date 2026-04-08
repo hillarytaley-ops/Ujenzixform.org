@@ -28,6 +28,7 @@ import {
   Building,
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
+import { SUPPORT_PHONE_PRIMARY } from "@/config/appIdentity";
 interface BuilderVideo {
   id: string;
   builder_id: string;
@@ -531,8 +532,8 @@ export const VideoPlayer = ({ video, isOpen, onClose, onVideoUpdate }: VideoPlay
                 <div className="space-y-1 text-sm">
                   <div className="flex items-center text-gray-600">
                     <Phone className="h-3 w-3 mr-2 text-green-600" />
-                    <a href={`tel:${video.builder_profile?.phone || '+254700000000'}`} className="hover:text-green-600">
-                      {video.builder_profile?.phone || '+254 700 000 000'}
+                    <a href={`tel:${(video.builder_profile?.phone || SUPPORT_PHONE_PRIMARY.tel).replace(/\s/g, '')}`} className="hover:text-green-600">
+                      {video.builder_profile?.phone || SUPPORT_PHONE_PRIMARY.display}
                     </a>
                   </div>
                   <div className="flex items-center text-gray-600">

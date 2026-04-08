@@ -45,6 +45,7 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
+import { SUPPORT_PHONE_PRIMARY, SUPPORT_EMAIL } from '@/config/appIdentity';
 
 // Types
 interface Message {
@@ -254,11 +255,11 @@ const UJENZIXFORM_KB = {
   // Locations
   locations: ['Nairobi', 'Mombasa', 'Kisumu', 'Nakuru', 'Eldoret', 'Thika', 'Kiambu', 'Machakos', 'Kajiado', 'Naivasha', 'Nyeri', 'Meru'],
   
-  // Contact information
+  // Contact information (aligned with Footer / Contact page; override via env on appIdentity)
   contact: {
-    phone: '+254 700 000 000',
-    whatsapp: '+254 700 000 000',
-    email: 'support@ujenzixform.co.ke',
+    phone: SUPPORT_PHONE_PRIMARY.display,
+    whatsapp: SUPPORT_PHONE_PRIMARY.tel,
+    email: SUPPORT_EMAIL,
     hours: 'Monday - Saturday: 8:00 AM - 6:00 PM',
     address: 'Nairobi, Kenya'
   },

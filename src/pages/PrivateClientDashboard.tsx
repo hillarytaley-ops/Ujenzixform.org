@@ -1,4 +1,4 @@
-import React, { useState, useEffect, lazy, Suspense } from "react";
+import React, { useState, useEffect, useMemo, lazy, Suspense } from "react";
 import { useUrlTabSync } from "@/hooks/useUrlTabSync";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -26,7 +26,7 @@ import {
   ShoppingBag, 
   Package, 
   Truck, 
-  CreditCard, 
+  Receipt,
   Home,
   LogOut,
   User,
@@ -62,9 +62,11 @@ import {
 } from "@/components/ui/dialog";
 import { ProfileEditDialog } from "@/components/profile/ProfileEditDialog";
 import { ProfileViewDialog } from "@/components/profile/ProfileViewDialog";
-import { Navigation as NavigationIcon, QrCode, Settings } from "lucide-react";
+import { Navigation as NavigationIcon, QrCode } from "lucide-react";
 import { DashboardMobileActionSheet } from "@/components/dashboard/DashboardMobileActionSheet";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { PrivateClientDashboardNavCards } from "@/components/builders/PrivateClientDashboardNavCards";
+import { SUPPORT_PHONE_PRIMARY, SUPPORT_EMAIL } from "@/config/appIdentity";
 
 const PrivateClientTabFallback = () => (
   <div
@@ -167,6 +169,9 @@ const PrivateClientDashboard = () => {
   const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [orders, setOrders] = useState<Order[]>([]);
+  const [orderSearchQuery, setOrderSearchQuery] = useState("");
+  const [ordersPage, setOrdersPage] = useState(1);
+  const ORDERS_PAGE_SIZE = 10;
   const [deliveries, setDeliveries] = useState<DeliveryRequest[]>([]);
   const [showProfileEdit, setShowProfileEdit] = useState(false);
   const [showProfileView, setShowProfileView] = useState(false);
@@ -202,6 +207,34 @@ const PrivateClientDashboard = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [deliveryAddressNeededNotifications, setDeliveryAddressNeededNotifications] = useState<{ id: string; title: string; message: string; action_url?: string }[]>([]);
+
+  const filteredOrders = useMemo(() => {
+    const q = orderSearchQuery.trim().toLowerCase();
+    if (!q) return orders;
+    return orders.filter((o) => {
+      const po = String(o.po_number ?? "").toLowerCase();
+      const pn = (o.project_name ?? "").toLowerCase();
+      const st = (o.status ?? "").toLowerCase();
+      const addr = (o.delivery_address ?? "").toLowerCase();
+      return po.includes(q) || pn.includes(q) || st.includes(q) || addr.includes(q);
+    });
+  }, [orders, orderSearchQuery]);
+
+  const ordersTotalPages = Math.max(1, Math.ceil(filteredOrders.length / ORDERS_PAGE_SIZE) || 1);
+  const ordersListPage = Math.min(ordersPage, ordersTotalPages);
+
+  const pagedOrders = useMemo(() => {
+    const start = (ordersListPage - 1) * ORDERS_PAGE_SIZE;
+    return filteredOrders.slice(start, start + ORDERS_PAGE_SIZE);
+  }, [filteredOrders, ordersListPage]);
+
+  useEffect(() => {
+    setOrdersPage(1);
+  }, [orderSearchQuery]);
+
+  useEffect(() => {
+    setOrdersPage((p) => Math.min(p, ordersTotalPages));
+  }, [ordersTotalPages]);
 
   useEffect(() => {
     const timeout = setTimeout(() => {
@@ -806,6 +839,18 @@ const PrivateClientDashboard = () => {
                   Welcome, {profile?.full_name || 'Builder'}!
                 </h1>
                 <p className="text-green-100">Private Builder Dashboard</p>
+                {user?.last_sign_in_at && (
+                  <p className="mt-1 text-sm text-green-100/90">
+                    Last signed in{" "}
+                    <time dateTime={user.last_sign_in_at}>
+                      {new Date(user.last_sign_in_at).toLocaleString(undefined, {
+                        dateStyle: "medium",
+                        timeStyle: "short",
+                      })}
+                    </time>{" "}
+                    (your account — not live session clock)
+                  </p>
+                )}
               </div>
             </div>
             <div className="hidden w-full flex-none flex-wrap gap-2 md:flex md:w-auto md:justify-end">
@@ -939,90 +984,7 @@ const PrivateClientDashboard = () => {
             </div>
           </div>
         )}
-        {/* Navigation Cards - Single Row */}
-        <div className="grid grid-cols-3 sm:grid-cols-5 md:grid-cols-9 gap-2 mb-6">
-          <Button 
-            className={`h-auto py-3 px-2 transition-all flex flex-col items-center gap-1 ${activeTab === 'orders' 
-              ? 'bg-gradient-to-r from-green-500 to-emerald-600 ring-2 ring-green-300 shadow-lg text-white' 
-              : 'bg-white hover:bg-green-50 text-gray-700 border shadow-sm'}`}
-            onClick={() => setActiveTab('orders')}
-          >
-            <Package className="h-5 w-5" />
-            <span className="text-[10px] sm:text-xs">Orders</span>
-          </Button>
-          <Button 
-            className={`h-auto py-3 px-2 transition-all flex flex-col items-center gap-1 ${activeTab === 'order-tracking' 
-              ? 'bg-gradient-to-r from-cyan-500 to-sky-600 ring-2 ring-cyan-300 shadow-lg text-white' 
-              : 'bg-white hover:bg-cyan-50 text-gray-700 border shadow-sm'}`}
-            onClick={() => setActiveTab('order-tracking')}
-          >
-            <QrCode className="h-5 w-5" />
-            <span className="text-[10px] sm:text-xs">QR Status</span>
-          </Button>
-          <Button 
-            className={`h-auto py-3 px-2 transition-all flex flex-col items-center gap-1 ${activeTab === 'deliveries' 
-              ? 'bg-gradient-to-r from-amber-500 to-orange-500 ring-2 ring-amber-300 shadow-lg text-white' 
-              : 'bg-white hover:bg-amber-50 text-gray-700 border shadow-sm'}`}
-            onClick={() => setActiveTab('deliveries')}
-          >
-            <Truck className="h-5 w-5" />
-            <span className="text-[10px] sm:text-xs">Deliveries</span>
-          </Button>
-          <Button 
-            className={`h-auto py-3 px-2 transition-all flex flex-col items-center gap-1 ${activeTab === 'tracking' 
-              ? 'bg-gradient-to-r from-blue-500 to-indigo-600 ring-2 ring-blue-300 shadow-lg text-white' 
-              : 'bg-white hover:bg-blue-50 text-gray-700 border shadow-sm'}`}
-            onClick={() => setActiveTab('tracking')}
-          >
-            <NavigationIcon className="h-5 w-5" />
-            <span className="text-[10px] sm:text-xs">Tracking</span>
-          </Button>
-          <Button 
-            className={`h-auto py-3 px-2 transition-all flex flex-col items-center gap-1 ${activeTab === 'request-delivery' 
-              ? 'bg-gradient-to-r from-teal-500 to-emerald-500 ring-2 ring-teal-300 shadow-lg text-white' 
-              : 'bg-white hover:bg-teal-50 text-gray-700 border shadow-sm'}`}
-            onClick={() => setActiveTab('request-delivery')}
-          >
-            <Plus className="h-5 w-5" />
-            <span className="text-[10px] sm:text-xs">Request</span>
-          </Button>
-          <Button 
-            className={`h-auto py-3 px-2 transition-all flex flex-col items-center gap-1 ${activeTab === 'payments' 
-              ? 'bg-gradient-to-r from-green-600 to-emerald-700 ring-2 ring-green-300 shadow-lg text-white' 
-              : 'bg-white hover:bg-green-50 text-gray-700 border shadow-sm'}`}
-            onClick={() => setActiveTab('payments')}
-          >
-            <CreditCard className="h-5 w-5" />
-            <span className="text-[10px] sm:text-xs">Payments</span>
-          </Button>
-          <Button 
-            className={`h-auto py-3 px-2 transition-all flex flex-col items-center gap-1 ${activeTab === 'wishlist' 
-              ? 'bg-gradient-to-r from-pink-500 to-rose-500 ring-2 ring-pink-300 shadow-lg text-white' 
-              : 'bg-white hover:bg-pink-50 text-gray-700 border shadow-sm'}`}
-            onClick={() => setActiveTab('wishlist')}
-          >
-            <Heart className="h-5 w-5" />
-            <span className="text-[10px] sm:text-xs">Wishlist</span>
-          </Button>
-          <Button 
-            className={`h-auto py-3 px-2 transition-all flex flex-col items-center gap-1 ${activeTab === 'monitoring' 
-              ? 'bg-gradient-to-r from-cyan-500 to-sky-500 ring-2 ring-cyan-300 shadow-lg text-white' 
-              : 'bg-white hover:bg-cyan-50 text-gray-700 border shadow-sm'}`}
-            onClick={() => setActiveTab('monitoring')}
-          >
-            <Video className="h-5 w-5" />
-            <span className="text-[10px] sm:text-xs">Monitor</span>
-          </Button>
-          <Button 
-            className={`h-auto py-3 px-2 transition-all flex flex-col items-center gap-1 ${activeTab === 'support' 
-              ? 'bg-gradient-to-r from-purple-500 to-violet-600 ring-2 ring-purple-300 shadow-lg text-white' 
-              : 'bg-white hover:bg-purple-50 text-gray-700 border shadow-sm'}`}
-            onClick={() => setActiveTab('support')}
-          >
-            <Headphones className="h-5 w-5" />
-            <span className="text-[10px] sm:text-xs">Support</span>
-          </Button>
-        </div>
+        <PrivateClientDashboardNavCards activeTab={activeTab} setActiveTab={setActiveTab} />
 
         {/* Tab Content - Hidden TabsList, content controlled by cards above */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
@@ -1062,7 +1024,60 @@ const PrivateClientDashboard = () => {
                   </div>
                 ) : (
                   <div className="space-y-4">
-                    <p className="text-sm text-gray-500 mb-2">Showing {orders.length} orders</p>
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                      <Label htmlFor="private-orders-search" className="sr-only">
+                        Search orders
+                      </Label>
+                      <Input
+                        id="private-orders-search"
+                        type="search"
+                        placeholder="Search by order #, project, status, or address…"
+                        value={orderSearchQuery}
+                        onChange={(e) => setOrderSearchQuery(e.target.value)}
+                        className="max-w-md"
+                        autoComplete="off"
+                      />
+                      <p className="text-sm text-gray-500 shrink-0">
+                        {filteredOrders.length === 0 ? (
+                          <>No matches</>
+                        ) : (
+                          <>
+                            {filteredOrders.length === orders.length ? (
+                              <>Showing {(ordersListPage - 1) * ORDERS_PAGE_SIZE + 1}–
+                              {Math.min(ordersListPage * ORDERS_PAGE_SIZE, filteredOrders.length)} of{" "}
+                              {filteredOrders.length} orders</>
+                            ) : (
+                              <>
+                                {filteredOrders.length} match{filteredOrders.length === 1 ? "" : "es"} · page{" "}
+                                {ordersListPage} of {ordersTotalPages}
+                              </>
+                            )}
+                          </>
+                        )}
+                      </p>
+                    </div>
+                    {filteredOrders.length > ORDERS_PAGE_SIZE && (
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          disabled={ordersListPage <= 1}
+                          onClick={() => setOrdersPage((p) => Math.max(1, p - 1))}
+                        >
+                          Previous
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          disabled={ordersListPage >= ordersTotalPages}
+                          onClick={() => setOrdersPage((p) => Math.min(ordersTotalPages, p + 1))}
+                        >
+                          Next
+                        </Button>
+                      </div>
+                    )}
                     {orders.some(
                       (o) =>
                         o.status === "awaiting_delivery_request" &&
@@ -1093,7 +1108,12 @@ const PrivateClientDashboard = () => {
                         </AlertDescription>
                       </Alert>
                     )}
-                    {orders.map((order) => (
+                    {filteredOrders.length === 0 && orderSearchQuery.trim() ? (
+                      <p className="text-center text-sm text-muted-foreground py-8">
+                        No orders match your search. Clear the search box to see all orders.
+                      </p>
+                    ) : null}
+                    {pagedOrders.map((order) => (
                       <div key={order.id} className="border rounded-lg p-4 hover:shadow-md transition-shadow">
                         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                           <div className="flex-1">
@@ -1490,14 +1510,14 @@ const PrivateClientDashboard = () => {
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <CreditCard className="h-5 w-5 text-green-600" />
+                  <Receipt className="h-5 w-5 text-green-600" />
                   Payment History
                 </CardTitle>
                 <CardDescription>View your payment transactions</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="text-center py-12 text-gray-500">
-                  <CreditCard className="h-16 w-16 mx-auto mb-4 text-gray-300" />
+                  <Receipt className="h-16 w-16 mx-auto mb-4 text-gray-300" />
                   <p className="text-lg font-medium">No payments yet</p>
                   <p className="text-sm">Your payment history will appear here</p>
                 </div>
@@ -2040,9 +2060,22 @@ const PrivateClientDashboard = () => {
                         <AlertCircle className="h-4 w-4 text-blue-600" />
                         Emergency Contact
                       </h4>
-                      <p className="text-sm text-muted-foreground">
-                        Call: +254 700 000 000<br />
-                        Email: support@UjenziXform.co.ke
+                      <p className="text-sm text-muted-foreground space-y-1">
+                        <a
+                          href={`tel:${SUPPORT_PHONE_PRIMARY.tel}`}
+                          className="block text-blue-700 hover:underline dark:text-blue-300"
+                        >
+                          Call: {SUPPORT_PHONE_PRIMARY.display}
+                        </a>
+                        <a
+                          href={`mailto:${SUPPORT_EMAIL}`}
+                          className="block text-blue-700 hover:underline dark:text-blue-300"
+                        >
+                          Email: {SUPPORT_EMAIL}
+                        </a>
+                        <Link to="/contact" className="block text-blue-700 hover:underline dark:text-blue-300">
+                          Full contact details & hours
+                        </Link>
                       </p>
                     </CardContent>
                   </Card>

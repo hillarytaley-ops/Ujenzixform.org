@@ -25,6 +25,7 @@ import {
 } from "lucide-react";
 import { VideoPlayer } from "./VideoPlayer";
 import { formatDistanceToNow } from "date-fns";
+import { SUPPORT_PHONE_PRIMARY } from "@/config/appIdentity";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -126,7 +127,7 @@ export const BuilderVideoGallery = ({
     const defaultProfile = (title: string) => ({
       full_name: title || 'UjenziXform Builder',
       company_name: 'UjenziXform Professional',
-      phone: '+254 700 000 000',
+      phone: SUPPORT_PHONE_PRIMARY.display,
       email: 'info@ujenzixform.org',
       location: 'Kenya',
     });

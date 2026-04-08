@@ -5,6 +5,7 @@ import { useUrlTabSync } from "@/hooks/useUrlTabSync";
 import { supabase, SUPABASE_URL, SUPABASE_ANON_KEY } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import Footer from "@/components/Footer";
+import { SUPPORT_PHONE_PRIMARY, SUPPORT_EMAIL } from "@/config/appIdentity";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -3538,9 +3539,16 @@ const DeliveryDashboard = () => {
                       <Phone className="h-4 w-4 text-purple-500" />
                       Driver Hotline
                     </h4>
-                    <p className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-                      Call: +254 700 000 000<br />
-                      Email: drivers@UjenziXform.co.ke
+                    <p className={`text-sm space-y-1 ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                      <a href={`tel:${SUPPORT_PHONE_PRIMARY.tel}`} className="block hover:underline">
+                        Call: {SUPPORT_PHONE_PRIMARY.display}
+                      </a>
+                      <a href={`mailto:${SUPPORT_EMAIL}`} className="block hover:underline">
+                        Email: {SUPPORT_EMAIL}
+                      </a>
+                      <Link to="/contact" className="block hover:underline">
+                        Contact page
+                      </Link>
                     </p>
                   </CardContent>
                 </Card>
