@@ -19,7 +19,6 @@ import { Badge } from "@/components/ui/badge";
 import { 
   ShoppingCart, 
   FileText, 
-  Building, 
   Building2,
   Shield,
   Store,
@@ -35,9 +34,8 @@ import { MaterialsGrid } from "@/components/suppliers/MaterialsGrid";
 import { CartSidebar } from "@/components/cart/CartSidebar";
 import { FloatingCartButton } from "@/components/cart/FloatingCartButton";
 import { supabase, SUPABASE_URL, SUPABASE_ANON_KEY } from "@/integrations/supabase/client";
-import { useToast } from "@/hooks/use-toast";
-import { DashboardLoader } from "@/components/ui/DashboardLoader";
 import { setCartProjectContext, clearCartProjectContext } from "@/utils/builderCartProject";
+import { useHomePagePublicStats, formatHomeStatCount } from "@/hooks/useHomePagePublicStats";
 
 const Suppliers = () => {
   const [user, setUser] = useState<any>(null);
@@ -46,8 +44,8 @@ const Suppliers = () => {
   const [isMobile, setIsMobile] = useState(false);
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { toast } = useToast();
-  
+  const publicStats = useHomePagePublicStats();
+
   // Check if user is coming from a dashboard (hide hero section)
   const isFromDashboard = searchParams.get('from') === 'dashboard';
   
@@ -291,7 +289,7 @@ const Suppliers = () => {
           {/* Badge */}
           <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-sm border border-white/20 rounded-full px-4 py-2 mb-6 md:mb-8">
             <span className="text-xl md:text-2xl">🇰🇪</span>
-            <span className="text-white font-medium text-sm md:text-base">Kenya's #1 Construction Marketplace</span>
+            <span className="text-white font-medium text-sm md:text-base">Kenya · materials & supplier marketplace</span>
           </div>
           
           {/* Title - Responsive sizing */}
@@ -302,24 +300,32 @@ const Suppliers = () => {
           
           {/* Description */}
           <p className="text-sm sm:text-base md:text-lg lg:text-xl mb-6 max-w-2xl mx-auto text-white/80 px-3 sm:px-4 leading-relaxed text-balance">
-            Connect with 500+ verified suppliers. Quality construction materials delivered across all 47 counties.
+            Browse approved listings, compare options, and check out with M-Pesa where enabled. Delivery depends on your area and
+            active partners.
           </p>
 
-          {/* Stats Row - Responsive */}
+          {/* Stats Row — live counts from public stats RPC */}
           <div className="flex flex-wrap justify-center gap-6 md:gap-12 mb-8 md:mb-10">
             <div className="text-center">
-              <div className="text-2xl md:text-4xl font-bold text-white">500+</div>
-              <div className="text-xs md:text-sm text-white/60">Suppliers</div>
+              <div className="text-2xl md:text-4xl font-bold text-white">
+                {formatHomeStatCount(publicStats.supplierCompanies, publicStats.loading)}
+              </div>
+              <div className="text-xs md:text-sm text-white/60">Supplier listings</div>
             </div>
             <div className="text-center">
-              <div className="text-2xl md:text-4xl font-bold text-emerald-400">10K+</div>
-              <div className="text-xs md:text-sm text-white/60">Products</div>
+              <div className="text-2xl md:text-4xl font-bold text-emerald-400">
+                {formatHomeStatCount(publicStats.approvedMaterials, publicStats.loading)}
+              </div>
+              <div className="text-xs md:text-sm text-white/60">Approved materials</div>
             </div>
             <div className="text-center">
               <div className="text-2xl md:text-4xl font-bold text-teal-400">47</div>
-              <div className="text-xs md:text-sm text-white/60">Counties</div>
+              <div className="text-xs md:text-sm text-white/60">Counties (Kenya)</div>
             </div>
           </div>
+          <p className="text-[11px] md:text-xs text-white/45 max-w-md mx-auto mb-6 md:mb-8 px-2">
+            Figures update from directory data; materials count matches approved rows in the catalog.
+          </p>
 
           {/* Main CTA */}
           <Button 
@@ -432,19 +438,19 @@ const Suppliers = () => {
           <div className="flex flex-wrap justify-center items-center gap-4 md:gap-8 text-gray-600">
             <div className="flex items-center gap-2">
               <Shield className="h-5 w-5 text-emerald-600" />
-              <span className="text-sm md:text-base">Verified Suppliers</span>
+              <span className="text-sm md:text-base">Supplier accounts on platform</span>
             </div>
             <div className="flex items-center gap-2">
               <Package className="h-5 w-5 text-emerald-600" />
-              <span className="text-sm md:text-base">Quality Guaranteed</span>
+              <span className="text-sm md:text-base">Listings moderated (approved catalog)</span>
             </div>
             <div className="flex items-center gap-2">
               <Truck className="h-5 w-5 text-emerald-600" />
-              <span className="text-sm md:text-base">Nationwide Delivery</span>
+              <span className="text-sm md:text-base">Delivery by region &amp; availability</span>
             </div>
             <div className="flex items-center gap-2">
               <Star className="h-5 w-5 text-emerald-600" />
-              <span className="text-sm md:text-base">4.8★ Rating</span>
+              <span className="text-sm md:text-base">Compare prices before you buy</span>
             </div>
           </div>
         </div>
@@ -460,7 +466,7 @@ const Suppliers = () => {
                 Browse construction materials
               </h2>
               <p className="text-gray-600 text-sm sm:text-base leading-relaxed text-balance">
-                Quality materials from verified suppliers across Kenya
+                Approved materials and catalog items—verify specs and pricing on each order.
               </p>
             </div>
           )}
@@ -472,6 +478,14 @@ const Suppliers = () => {
       <Footer />
     </div>
   );
+};
+
+/** Explicit Tailwind classes so borders are not purged (dynamic `border-${x}` fails with JIT). */
+const PORTAL_CARD_BORDER: Record<string, string> = {
+  emerald: "border-emerald-500/30 hover:border-emerald-400/80",
+  blue: "border-blue-500/30 hover:border-blue-400/80",
+  amber: "border-amber-500/30 hover:border-amber-400/80",
+  purple: "border-purple-500/30 hover:border-purple-400/80",
 };
 
 // Reusable Portal Card Component - Single Explore button
@@ -496,8 +510,12 @@ const PortalCard: React.FC<PortalCardProps> = ({
 }) => {
   const navigate = useNavigate();
   
+  const borderRing = PORTAL_CARD_BORDER[borderColor] ?? "border-white/20 hover:border-white/40";
+
   return (
-    <div className={`group bg-gradient-to-br ${gradient} rounded-xl md:rounded-2xl p-4 md:p-6 border border-${borderColor}-500/30 hover:border-${borderColor}-400 transition-all duration-300 hover:scale-[1.02] hover:shadow-xl flex flex-col`}>
+    <div
+      className={`group bg-gradient-to-br ${gradient} rounded-xl md:rounded-2xl p-4 md:p-6 border ${borderRing} transition-all duration-300 hover:scale-[1.02] hover:shadow-xl flex flex-col`}
+    >
       <div className="w-12 h-12 md:w-14 md:h-14 bg-white/20 rounded-xl md:rounded-2xl flex items-center justify-center mb-3 md:mb-4 mx-auto group-hover:scale-110 transition-transform">
         {icon}
       </div>

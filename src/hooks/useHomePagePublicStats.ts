@@ -7,6 +7,8 @@ export type HomePagePublicStats = {
   builderProjects: number;
   deliveryProviders: number;
   registeredNetwork: number;
+  /** Rows in materials approved for marketplace (matches grid filter). */
+  approvedMaterials: number;
   loading: boolean;
   error: boolean;
 };
@@ -17,6 +19,7 @@ const ZERO: Omit<HomePagePublicStats, 'loading' | 'error'> = {
   builderProjects: 0,
   deliveryProviders: 0,
   registeredNetwork: 0,
+  approvedMaterials: 0,
 };
 
 /**
@@ -46,6 +49,7 @@ export function useHomePagePublicStats(): HomePagePublicStats {
             builderProjects: Number(row.builder_projects) || 0,
             deliveryProviders: Number(row.delivery_providers) || 0,
             registeredNetwork: Number(row.registered_network) || 0,
+            approvedMaterials: Number(row.approved_materials) || 0,
             loading: false,
             error: false,
           });
