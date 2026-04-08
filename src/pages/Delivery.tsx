@@ -4,21 +4,20 @@ import Navigation from "@/components/Navigation";
 import Footer from "@/components/Footer";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
-import { useToast } from "@/hooks/use-toast";
+import { useHomePagePublicStats, formatHomeStatCount } from "@/hooks/useHomePagePublicStats";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import AnimatedSection from "@/components/AnimatedSection";
 import { prefetchRoutes } from "@/utils/routePrefetch";
-import { 
-  Package, 
-  Truck, 
-  MapPin, 
-  Clock, 
-  Phone, 
-  User, 
+import {
+  Package,
+  Truck,
+  MapPin,
+  Clock,
+  Phone,
+  User,
   CheckCircle,
   Navigation as NavigationIcon,
   FileText,
@@ -26,8 +25,15 @@ import {
   Users,
   Zap,
   Shield,
-  ShoppingCart
+  ShoppingCart,
+  AlertCircle,
 } from "lucide-react";
+import {
+  mapDeliveryRequestRow,
+  isActivePipelineStatus,
+  isCompletedDeliveryStatus,
+  type DeliveryCard,
+} from "@/pages/deliveryPageUtils";
 // Lazy load these components to prevent errors from breaking the page
 // Load only when needed for better performance
 const EnhancedDeliveryAnalytics = React.lazy(() => 
@@ -57,29 +63,14 @@ const DeliveryRequestForm = React.lazy(() =>
 
 const Delivery = () => {
   const navigate = useNavigate();
-  const { toast } = useToast();
   const { userRole: authUserRole, user: authUser } = useAuth();
+  const publicStats = useHomePagePublicStats();
   const [activeTab, setActiveTab] = useState("request");
   const [userRole, setUserRole] = useState<string | null>(authUserRole);
-  const [user, setUser] = useState<any>(authUser);
-  const [loading, setLoading] = useState(false); // Start with false - show content immediately
-  const [isMobile, setIsMobile] = useState(typeof window !== 'undefined' && window.innerWidth < 768);
+  const [deliveries, setDeliveries] = useState<DeliveryCard[]>([]);
+  const [deliveriesLoading, setDeliveriesLoading] = useState(false);
+  const [deliveriesError, setDeliveriesError] = useState<string | null>(null);
 
-  // Handler for Request Quote and Buy Now buttons
-  // Builders go to supplier marketplace, others go to builder registration
-  const handlePurchaseAction = (action: 'quote' | 'buy') => {
-    if (authUserRole === 'builder' || authUserRole === 'admin') {
-      // Builders and admins go to supplier marketplace
-      navigate('/supplier-marketplace');
-    } else if (authUser) {
-      // Logged in but not a builder - redirect to builder registration
-      navigate('/builder-registration');
-    } else {
-      // Not logged in - redirect to builder registration (will need to sign up first)
-      navigate('/builder-registration');
-    }
-  };
-  
   // Prefetch likely next pages for instant navigation - especially critical on mobile
   useEffect(() => {
     // Prefetch Feedback immediately on mobile (within 1 second), desktop after 2 seconds
@@ -87,113 +78,140 @@ const Delivery = () => {
     const prefetchDelay = isMobileDevice ? 1000 : 2000;
     
     // Prefetch Feedback and Tracking pages
-    prefetchRoutes(['/feedback', '/tracking'], prefetchDelay, 500);
-  }, []);
-  
-  const [deliveries, setDeliveries] = useState([
-    {
-      id: "DEL-001",
-      materialType: "Cement",
-      quantity: "50 bags",
-      status: "in_transit",
-      pickupLocation: "Bamburi Cement Factory",
-      deliveryLocation: "Westlands Construction Site",
-      driver: "John Mwangi",
-      driverPhone: "+254 712 345 678",
-      estimatedArrival: "2:30 PM",
-      progress: 75
-    },
-    {
-      id: "DEL-002", 
-      materialType: "Steel Bars",
-      quantity: "2 tons",
-      status: "delivered",
-      pickupLocation: "Devki Steel Mills",
-      deliveryLocation: "Karen Residential Project",
-      driver: "Mary Wanjiku",
-      driverPhone: "+254 723 456 789",
-      estimatedArrival: "Delivered",
-      progress: 100
-    }
-  ]);
-  
-  useEffect(() => {
-    const checkMobile = () => {
-      setIsMobile(window.innerWidth < 768);
-    };
-    
-    checkMobile();
-    window.addEventListener('resize', checkMobile);
-    return () => window.removeEventListener('resize', checkMobile);
+    prefetchRoutes(["/feedback", "/tracking"], prefetchDelay, 500);
   }, []);
 
-  // Use auth context values first, then check database in background
   useEffect(() => {
-    // If we already have role from context, use it
     if (authUserRole) {
       setUserRole(authUserRole);
-      setUser(authUser);
       return;
     }
-    
-    // Check localStorage for cached role
-    const cachedRole = localStorage.getItem('user_role');
-    if (cachedRole) {
-      setUserRole(cachedRole);
-    }
-    
-    // Background check for database role (non-blocking)
-    checkUserRole();
-  }, [authUserRole, authUser]);
+    const cachedRole = localStorage.getItem("user_role");
+    if (cachedRole) setUserRole(cachedRole);
 
-  const checkUserRole = async () => {
-    try {
-      const { data: { user }, error: authError } = await supabase.auth.getUser();
-      
-      // Handle no user gracefully (public access allowed)
-      if (authError || !user) {
-        return; // Don't update state, keep showing public view
+    const checkUserRole = async () => {
+      try {
+        const {
+          data: { user },
+          error: authError,
+        } = await supabase.auth.getUser();
+        if (authError || !user) return;
+        const { data: roleData } = await supabase
+          .from("user_roles")
+          .select("role")
+          .eq("user_id", user.id)
+          .limit(1)
+          .maybeSingle();
+        if (roleData?.role) setUserRole(String(roleData.role));
+      } catch (e) {
+        console.error("Error checking user role:", e);
       }
+    };
+    void checkUserRole();
+  }, [authUserRole]);
 
-      setUser(user);
-      const { data: roleData } = await supabase
-        .from('user_roles')
-        .select('role')
-        .eq('user_id', user.id)
-        .limit(1)
-        .maybeSingle();
-      
-      if (roleData?.role) {
-        setUserRole(roleData.role as any);
-      }
-    } catch (error) {
-      console.error('Error checking user role:', error);
-      // Don't crash, keep current state
+  const isAdmin = userRole === "admin";
+  const isBuilder = ["builder", "professional_builder", "private_client"].includes(userRole || "");
+
+  useEffect(() => {
+    if (!authUser?.id || (!isAdmin && !isBuilder)) {
+      setDeliveries([]);
+      return;
     }
-  };
-
-  const isAdmin = userRole === 'admin';
-  const isBuilder = ['builder', 'professional_builder', 'private_client'].includes(userRole || '');
+    let cancelled = false;
+    (async () => {
+      setDeliveriesLoading(true);
+      setDeliveriesError(null);
+      try {
+        if (isAdmin) {
+          const { data, error } = await supabase
+            .from("delivery_requests")
+            .select("*")
+            .order("created_at", { ascending: false })
+            .limit(100);
+          if (error) throw error;
+          if (!cancelled) setDeliveries((data ?? []).map((r) => mapDeliveryRequestRow(r as Record<string, unknown>)));
+        } else {
+          const { data: prof, error: pErr } = await supabase
+            .from("profiles")
+            .select("id")
+            .eq("user_id", authUser.id)
+            .maybeSingle();
+          if (pErr) throw pErr;
+          if (!prof?.id) {
+            if (!cancelled) setDeliveries([]);
+            return;
+          }
+          const { data, error } = await supabase
+            .from("delivery_requests")
+            .select("*")
+            .eq("builder_id", prof.id)
+            .order("created_at", { ascending: false })
+            .limit(50);
+          if (error) throw error;
+          if (!cancelled) setDeliveries((data ?? []).map((r) => mapDeliveryRequestRow(r as Record<string, unknown>)));
+        }
+      } catch {
+        if (!cancelled) {
+          setDeliveriesError("Could not load delivery requests.");
+          setDeliveries([]);
+        }
+      } finally {
+        if (!cancelled) setDeliveriesLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [authUser?.id, isAdmin, isBuilder]);
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case "delivered": return "bg-green-100 text-green-800 border-green-200";
-      case "in_transit": return "bg-blue-100 text-blue-800 border-blue-200";
-      case "pending": return "bg-yellow-100 text-yellow-800 border-yellow-200";
-      case "cancelled": return "bg-red-100 text-red-800 border-red-200";
-      default: return "bg-gray-100 text-gray-800 border-gray-200";
+      case "delivered":
+      case "completed":
+        return "bg-green-100 text-green-800 border-green-200";
+      case "in_transit":
+      case "out_for_delivery":
+      case "picked_up":
+        return "bg-blue-100 text-blue-800 border-blue-200";
+      case "pending":
+      case "requested":
+        return "bg-yellow-100 text-yellow-800 border-yellow-200";
+      case "cancelled":
+      case "rejected":
+        return "bg-red-100 text-red-800 border-red-200";
+      default:
+        return "bg-gray-100 text-gray-800 border-gray-200";
     }
   };
 
   const getStatusIcon = (status: string) => {
     switch (status) {
-      case "delivered": return <CheckCircle className="h-4 w-4" />;
-      case "in_transit": return <Truck className="h-4 w-4" />;
-      case "pending": return <Clock className="h-4 w-4" />;
-      case "cancelled": return <AlertCircle className="h-4 w-4" />;
-      default: return <Package className="h-4 w-4" />;
+      case "delivered":
+      case "completed":
+        return <CheckCircle className="h-4 w-4" />;
+      case "in_transit":
+      case "out_for_delivery":
+        return <Truck className="h-4 w-4" />;
+      case "pending":
+      case "requested":
+        return <Clock className="h-4 w-4" />;
+      case "cancelled":
+      case "rejected":
+        return <AlertCircle className="h-4 w-4" />;
+      default:
+        return <Package className="h-4 w-4" />;
     }
   };
+
+  const formatStatusLabel = (status: string) =>
+    status.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+
+  const activeDeliveries = deliveries.filter((d) => isActivePipelineStatus(d.status));
+  const completedDeliveries = deliveries.filter((d) => isCompletedDeliveryStatus(d.status));
+
+  const showDeliveryActions = (status: string) =>
+    ["in_transit", "out_for_delivery", "picked_up", "accepted", "assigned"].includes(status);
 
   return (
     <div className="min-h-screen bg-gradient-construction">
@@ -228,7 +246,7 @@ const Delivery = () => {
           {/* Badge */}
           <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-sm border border-white/20 rounded-full px-4 py-2 mb-6">
             <span className="text-2xl">🇰🇪</span>
-            <span className="text-white/90 font-medium">Trusted Delivery Network</span>
+            <span className="text-white/90 font-medium">Kenya · delivery coordination on UjenziXform</span>
           </div>
           
           {/* Title */}
@@ -239,28 +257,38 @@ const Delivery = () => {
           
           {/* Subtitle */}
           <p className="text-lg md:text-xl mb-8 max-w-2xl mx-auto text-white/80 leading-relaxed">
-            Real-time GPS tracking, verified transporters, and seamless coordination for your construction materials across all 47 counties.
+            Request transport, match with providers where available, and follow status in your dashboard. GPS depends on the provider and
+            device permissions.
           </p>
 
-          {/* Stats Row */}
+          {/* Stats Row — live aggregates from public stats RPC */}
           <div className="flex flex-wrap justify-center gap-6 md:gap-10 mb-10">
             <div className="text-center">
-              <div className="text-3xl md:text-4xl font-bold text-white">1000+</div>
-              <div className="text-sm text-white/60">Monthly Deliveries</div>
+              <div className="text-3xl md:text-4xl font-bold text-white">
+                {formatHomeStatCount(publicStats.deliveryRequestsTotal, publicStats.loading)}
+              </div>
+              <div className="text-sm text-white/60">Requests (platform)</div>
             </div>
             <div className="text-center">
-              <div className="text-3xl md:text-4xl font-bold text-blue-400">98%</div>
-              <div className="text-sm text-white/60">On-Time Rate</div>
+              <div className="text-3xl md:text-4xl font-bold text-blue-400">
+                {formatHomeStatCount(publicStats.deliveryRequestsActive, publicStats.loading)}
+              </div>
+              <div className="text-sm text-white/60">Not yet completed</div>
             </div>
             <div className="text-center">
-              <div className="text-3xl md:text-4xl font-bold text-cyan-400">24/7</div>
-              <div className="text-sm text-white/60">Live Tracking</div>
+              <div className="text-3xl md:text-4xl font-bold text-cyan-400">
+                {formatHomeStatCount(publicStats.deliveryProviders, publicStats.loading)}
+              </div>
+              <div className="text-sm text-white/60">Delivery partner accounts</div>
             </div>
             <div className="text-center">
               <div className="text-3xl md:text-4xl font-bold text-white">47</div>
-              <div className="text-sm text-white/60">Counties</div>
+              <div className="text-sm text-white/60">Counties (Kenya)</div>
             </div>
           </div>
+          <p className="text-[11px] md:text-xs text-white/45 max-w-lg mx-auto mb-8 px-2">
+            Figures update from platform data. “Not yet completed” excludes delivered, cancelled, and rejected statuses.
+          </p>
 
           {/* Main CTA Buttons */}
           <div className="flex flex-col sm:flex-row gap-4 justify-center mb-10">
@@ -294,8 +322,8 @@ const Delivery = () => {
                   onClick={() => {
                     if (isBuilder) {
                       navigate('/professional-builder-dashboard');
-                    } else if (user) {
-                      navigate('/suppliers');
+                    } else if (authUser) {
+                      navigate("/suppliers");
                     } else {
                       navigate('/builder-signin');
                     }
@@ -361,75 +389,6 @@ const Delivery = () => {
       </section>
 
       <main className="container mx-auto px-4 py-8">
-        {/* Header */}
-        <div className="text-center mb-8">
-        </div>
-
-        {/* Delivery Provider Portal Cards */}
-        <div className="grid md:grid-cols-2 gap-6 max-w-4xl mx-auto mb-8">
-          {/* Sign In Portal / Dashboard Access */}
-          <Card className="border-teal-200 bg-gradient-to-br from-teal-50 to-white">
-            <CardContent className="p-6">
-              <div className="flex items-center gap-4">
-                <div className="w-14 h-14 bg-teal-100 rounded-full flex items-center justify-center">
-                  <User className="h-7 w-7 text-teal-600" />
-                </div>
-                <div className="flex-1">
-                  <h3 className="text-xl font-semibold mb-1 text-teal-800">
-                    {userRole === 'delivery' || userRole === 'delivery_provider' 
-                      ? 'Your Delivery Dashboard' 
-                      : 'Delivery Provider Portal'}
-                  </h3>
-                  <p className="text-sm text-muted-foreground mb-3">
-                    {userRole === 'delivery' || userRole === 'delivery_provider'
-                      ? 'Manage deliveries, track earnings, and view assignments'
-                      : 'Already a provider? Sign in to access your dashboard'}
-                  </p>
-                  <Button 
-                    onClick={() => {
-                      if (userRole === 'delivery' || userRole === 'delivery_provider') {
-                        navigate('/delivery-dashboard');
-                      } else {
-                        navigate('/delivery-signin');
-                      }
-                    }}
-                    className="bg-teal-600 hover:bg-teal-700 text-white"
-                  >
-                    <Truck className="h-4 w-4 mr-2" />
-                    {userRole === 'delivery' || userRole === 'delivery_provider' 
-                      ? 'Go to Dashboard' 
-                      : 'Sign In to Dashboard'}
-                  </Button>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Become a Provider */}
-          <Card className="border-blue-200 bg-gradient-to-br from-blue-50 to-white">
-            <CardContent className="p-6">
-              <div className="flex items-center gap-4">
-                <div className="w-14 h-14 bg-blue-100 rounded-full flex items-center justify-center">
-                  <Truck className="h-7 w-7 text-blue-600" />
-                </div>
-                <div className="flex-1">
-                  <h3 className="text-xl font-semibold mb-1 text-blue-800">Become a Delivery Provider</h3>
-                  <p className="text-sm text-muted-foreground mb-3">
-                    Join our network of trusted delivery partners
-                  </p>
-                  <Button 
-                    onClick={() => navigate('/delivery/apply')}
-                    className="bg-blue-600 hover:bg-blue-700 text-white"
-                  >
-                    <Users className="h-4 w-4 mr-2" />
-                    Apply Now
-                  </Button>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
         {/* Main Content */}
         {isAdmin ? (
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
@@ -479,125 +438,158 @@ const Delivery = () => {
             {/* Tracking Tab */}
             <TabsContent value="tracking" className="space-y-6">
               <div className="max-w-6xl mx-auto">
-                <h2 className="text-2xl font-bold mb-6">Active Deliveries</h2>
-                <div className="grid gap-6">
-                  {deliveries.map((delivery) => (
-                    <Card key={delivery.id}>
-                      <CardHeader>
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-3">
-                            <div className="bg-primary/10 p-2 rounded-lg">
-                              {getStatusIcon(delivery.status)}
-                            </div>
-                            <div>
-                              <CardTitle className="text-lg">Delivery #{delivery.id}</CardTitle>
-                              <CardDescription>{delivery.materialType} - {delivery.quantity}</CardDescription>
-                            </div>
-                          </div>
-                          <Badge className={getStatusColor(delivery.status)}>
-                            {delivery.status.replace('_', ' ').toUpperCase()}
-                          </Badge>
-                        </div>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                          <div className="space-y-3">
-                            <h4 className="font-semibold flex items-center gap-2">
-                              <MapPin className="h-4 w-4" />
-                              Route
-                            </h4>
-                            <div className="space-y-2 text-sm">
+                <h2 className="text-2xl font-bold mb-6">Active deliveries</h2>
+                {deliveriesError && (
+                  <p className="text-sm text-destructive mb-4">{deliveriesError}</p>
+                )}
+                {deliveriesLoading ? (
+                  <Card>
+                    <CardContent className="py-12 text-center text-muted-foreground">Loading delivery requests…</CardContent>
+                  </Card>
+                ) : (
+                  <div className="grid gap-6">
+                    {activeDeliveries.map((delivery) => (
+                      <Card key={delivery.rawId}>
+                        <CardHeader>
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                              <div className="bg-primary/10 p-2 rounded-lg">{getStatusIcon(delivery.status)}</div>
                               <div>
-                                <span className="text-muted-foreground">From:</span>
-                                <p className="font-medium">{delivery.pickupLocation}</p>
-                              </div>
-                              <div>
-                                <span className="text-muted-foreground">To:</span>
-                                <p className="font-medium">{delivery.deliveryLocation}</p>
+                                <CardTitle className="text-lg">Delivery #{delivery.id}</CardTitle>
+                                <CardDescription>
+                                  {delivery.materialType} — {delivery.quantity}
+                                </CardDescription>
                               </div>
                             </div>
+                            <Badge className={getStatusColor(delivery.status)}>{formatStatusLabel(delivery.status)}</Badge>
                           </div>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                            <div className="space-y-3">
+                              <h4 className="font-semibold flex items-center gap-2">
+                                <MapPin className="h-4 w-4" />
+                                Route
+                              </h4>
+                              <div className="space-y-2 text-sm">
+                                <div>
+                                  <span className="text-muted-foreground">From:</span>
+                                  <p className="font-medium">{delivery.pickupLocation}</p>
+                                </div>
+                                <div>
+                                  <span className="text-muted-foreground">To:</span>
+                                  <p className="font-medium">{delivery.deliveryLocation}</p>
+                                </div>
+                              </div>
+                            </div>
 
-                          <div className="space-y-3">
-                            <h4 className="font-semibold flex items-center gap-2">
-                              <User className="h-4 w-4" />
-                              Driver
-                            </h4>
-                            <div className="space-y-2 text-sm">
-                              <div>
-                                <span className="text-muted-foreground">Name:</span>
-                                <p className="font-medium">{delivery.driver}</p>
-                              </div>
-                              <div>
-                                <span className="text-muted-foreground">Phone:</span>
-                                <p className="font-medium">{delivery.driverPhone}</p>
+                            <div className="space-y-3">
+                              <h4 className="font-semibold flex items-center gap-2">
+                                <User className="h-4 w-4" />
+                                Driver
+                              </h4>
+                              <div className="space-y-2 text-sm">
+                                <div>
+                                  <span className="text-muted-foreground">Name:</span>
+                                  <p className="font-medium">{delivery.driver ?? "—"}</p>
+                                </div>
+                                <div>
+                                  <span className="text-muted-foreground">Phone:</span>
+                                  <p className="font-medium">{delivery.driverPhone ?? "—"}</p>
+                                </div>
                               </div>
                             </div>
-                          </div>
 
-                          <div className="space-y-3">
-                            <h4 className="font-semibold flex items-center gap-2">
-                              <Clock className="h-4 w-4" />
-                              Status
-                            </h4>
-                            <div className="space-y-2 text-sm">
-                              <div>
-                                <span className="text-muted-foreground">ETA:</span>
-                                <p className="font-medium">{delivery.estimatedArrival}</p>
-                              </div>
-                              <div>
-                                <span className="text-muted-foreground">Progress:</span>
-                                <div className="flex items-center gap-2 mt-1">
-                                  <div className="flex-1 bg-gray-200 rounded-full h-2">
-                                    <div 
-                                      className="bg-primary h-2 rounded-full transition-all duration-300"
-                                      style={{ width: `${delivery.progress}%` }}
-                                    ></div>
+                            <div className="space-y-3">
+                              <h4 className="font-semibold flex items-center gap-2">
+                                <Clock className="h-4 w-4" />
+                                Status
+                              </h4>
+                              <div className="space-y-2 text-sm">
+                                <div>
+                                  <span className="text-muted-foreground">Schedule / ETA:</span>
+                                  <p className="font-medium">{delivery.estimatedArrival}</p>
+                                </div>
+                                <div>
+                                  <span className="text-muted-foreground">Progress:</span>
+                                  <div className="flex items-center gap-2 mt-1">
+                                    <div className="flex-1 bg-gray-200 rounded-full h-2">
+                                      <div
+                                        className="bg-primary h-2 rounded-full transition-all duration-300"
+                                        style={{ width: `${delivery.progress}%` }}
+                                      />
+                                    </div>
+                                    <span className="text-xs font-medium">{delivery.progress}%</span>
                                   </div>
-                                  <span className="text-xs font-medium">{delivery.progress}%</span>
                                 </div>
                               </div>
                             </div>
                           </div>
-                        </div>
 
-                        {delivery.status === 'in_transit' && (
-                          <div className="flex gap-2 mt-4">
-                            <Button variant="outline" size="sm">
-                              <Phone className="h-4 w-4 mr-2" />
-                              Call Driver
-                            </Button>
-                            <Button variant="outline" size="sm">
-                              <MapPin className="h-4 w-4 mr-2" />
-                              Track Location
-                            </Button>
-                          </div>
-                        )}
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
+                          {showDeliveryActions(delivery.status) && (
+                            <div className="flex flex-wrap gap-2 mt-4">
+                              {delivery.driverPhone ? (
+                                <Button variant="outline" size="sm" asChild>
+                                  <a href={`tel:${delivery.driverPhone.replace(/\s/g, "")}`}>
+                                    <Phone className="h-4 w-4 mr-2" />
+                                    Call
+                                  </a>
+                                </Button>
+                              ) : null}
+                              {delivery.lat != null && delivery.lng != null ? (
+                                <Button variant="outline" size="sm" asChild>
+                                  <a
+                                    href={`https://www.google.com/maps?q=${delivery.lat},${delivery.lng}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                  >
+                                    <MapPin className="h-4 w-4 mr-2" />
+                                    Drop-off map
+                                  </a>
+                                </Button>
+                              ) : (
+                                <Button variant="outline" size="sm" asChild>
+                                  <Link to="/tracking">
+                                    <NavigationIcon className="h-4 w-4 mr-2" />
+                                    Tracking hub
+                                  </Link>
+                                </Button>
+                              )}
+                            </div>
+                          )}
+                        </CardContent>
+                      </Card>
+                    ))}
+                    {activeDeliveries.length === 0 && !deliveriesLoading && (
+                      <Card>
+                        <CardContent className="text-center py-12 text-muted-foreground">
+                          No active delivery requests in this view.
+                        </CardContent>
+                      </Card>
+                    )}
+                  </div>
+                )}
               </div>
             </TabsContent>
 
             {/* Bulk Operations Tab */}
             <TabsContent value="bulk" className="space-y-6">
               <React.Suspense fallback={<div className="text-center p-8">Loading...</div>}>
-                <BulkDeliveryManager userRole={userRole} userId={user?.id} />
+                <BulkDeliveryManager userRole={userRole} userId={authUser?.id} />
               </React.Suspense>
             </TabsContent>
 
             {/* Enhanced Analytics Tab */}
             <TabsContent value="analytics" className="space-y-6">
               <React.Suspense fallback={<div className="text-center p-8">Loading analytics...</div>}>
-                <EnhancedDeliveryAnalytics userRole={userRole} userId={user?.id} />
+                <EnhancedDeliveryAnalytics userRole={userRole} userId={authUser?.id} />
               </React.Suspense>
             </TabsContent>
 
             {/* Security Dashboard Tab */}
             <TabsContent value="security" className="space-y-6">
               <React.Suspense fallback={<div className="text-center p-8">Loading security dashboard...</div>}>
-                <DeliverySecurityDashboard userRole={userRole} userId={user?.id} />
+                <DeliverySecurityDashboard userRole={userRole} userId={authUser?.id} />
               </React.Suspense>
             </TabsContent>
 
@@ -615,25 +607,30 @@ const Delivery = () => {
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
-                    {deliveries.filter(d => d.status === 'delivered').map((delivery) => (
-                      <div key={delivery.id} className="flex items-center justify-between p-4 border rounded-lg">
-                        <div className="flex items-center gap-3">
-                          <CheckCircle className="h-5 w-5 text-green-500" />
-                          <div>
-                            <p className="font-medium">#{delivery.id} - {delivery.materialType}</p>
-                            <p className="text-sm text-muted-foreground">{delivery.quantity} delivered to {delivery.deliveryLocation}</p>
+                    {deliveriesLoading ? (
+                      <p className="text-center py-8 text-muted-foreground">Loading…</p>
+                    ) : (
+                      <>
+                        {completedDeliveries.map((delivery) => (
+                          <div key={delivery.rawId} className="flex items-center justify-between p-4 border rounded-lg">
+                            <div className="flex items-center gap-3">
+                              <CheckCircle className="h-5 w-5 text-green-500" />
+                              <div>
+                                <p className="font-medium">
+                                  #{delivery.id} — {delivery.materialType}
+                                </p>
+                                <p className="text-sm text-muted-foreground">
+                                  {delivery.quantity} to {delivery.deliveryLocation}
+                                </p>
+                              </div>
+                            </div>
+                            <Badge className={getStatusColor(delivery.status)}>{formatStatusLabel(delivery.status)}</Badge>
                           </div>
-                        </div>
-                        <Badge className={getStatusColor(delivery.status)}>
-                          Delivered
-                        </Badge>
-                      </div>
-                    ))}
-                    
-                    {deliveries.filter(d => d.status === 'delivered').length === 0 && (
-                      <div className="text-center py-8 text-muted-foreground">
-                        No completed deliveries yet
-                      </div>
+                        ))}
+                        {completedDeliveries.length === 0 && (
+                          <div className="text-center py-8 text-muted-foreground">No completed deliveries in this view yet.</div>
+                        )}
+                      </>
                     )}
                   </div>
                 </CardContent>
@@ -695,79 +692,120 @@ const Delivery = () => {
             {/* Tracking Tab for Builders */}
             <TabsContent value="tracking" className="space-y-6">
               <div className="max-w-6xl mx-auto">
-                <h2 className="text-2xl font-bold mb-6">Your Active Deliveries</h2>
-                <div className="grid gap-6">
-                  {deliveries.filter(d => d.status !== 'delivered').map((delivery) => (
-                    <Card key={delivery.id}>
-                      <CardHeader>
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-3">
-                            <div className="bg-primary/10 p-2 rounded-lg">
-                              {getStatusIcon(delivery.status)}
+                <h2 className="text-2xl font-bold mb-6">Your active deliveries</h2>
+                {deliveriesError && <p className="text-sm text-destructive mb-4">{deliveriesError}</p>}
+                {deliveriesLoading ? (
+                  <Card>
+                    <CardContent className="py-12 text-center text-muted-foreground">Loading your delivery requests…</CardContent>
+                  </Card>
+                ) : (
+                  <div className="grid gap-6">
+                    {activeDeliveries.map((delivery) => (
+                      <Card key={delivery.rawId}>
+                        <CardHeader>
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                              <div className="bg-primary/10 p-2 rounded-lg">{getStatusIcon(delivery.status)}</div>
+                              <div>
+                                <CardTitle className="text-lg">Delivery #{delivery.id}</CardTitle>
+                                <CardDescription>
+                                  {delivery.materialType} — {delivery.quantity}
+                                </CardDescription>
+                              </div>
                             </div>
-                            <div>
-                              <CardTitle className="text-lg">Delivery #{delivery.id}</CardTitle>
-                              <CardDescription>{delivery.materialType} - {delivery.quantity}</CardDescription>
+                            <Badge className={getStatusColor(delivery.status)}>{formatStatusLabel(delivery.status)}</Badge>
+                          </div>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                            <div className="space-y-3">
+                              <h4 className="font-semibold flex items-center gap-2">
+                                <MapPin className="h-4 w-4" />
+                                Route
+                              </h4>
+                              <div className="text-sm space-y-1">
+                                <p>
+                                  <span className="text-muted-foreground">From:</span> {delivery.pickupLocation}
+                                </p>
+                                <p>
+                                  <span className="text-muted-foreground">To:</span> {delivery.deliveryLocation}
+                                </p>
+                              </div>
+                            </div>
+                            <div className="space-y-3">
+                              <h4 className="font-semibold flex items-center gap-2">
+                                <User className="h-4 w-4" />
+                                Driver
+                              </h4>
+                              <div className="text-sm space-y-1">
+                                <p>{delivery.driver ?? "—"}</p>
+                                {delivery.driverPhone ? (
+                                  <p className="flex items-center gap-1">
+                                    <Phone className="h-3 w-3" />
+                                    {delivery.driverPhone}
+                                  </p>
+                                ) : null}
+                              </div>
+                            </div>
+                            <div className="space-y-3">
+                              <h4 className="font-semibold flex items-center gap-2">
+                                <Clock className="h-4 w-4" />
+                                Schedule
+                              </h4>
+                              <p className="text-lg font-medium">{delivery.estimatedArrival}</p>
+                              <div className="w-full bg-gray-200 rounded-full h-2">
+                                <div
+                                  className="bg-primary h-2 rounded-full transition-all"
+                                  style={{ width: `${delivery.progress}%` }}
+                                />
+                              </div>
                             </div>
                           </div>
-                          <Badge className={getStatusColor(delivery.status)}>
-                            {delivery.status.replace('_', ' ').toUpperCase()}
-                          </Badge>
-                        </div>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                          <div className="space-y-3">
-                            <h4 className="font-semibold flex items-center gap-2">
-                              <MapPin className="h-4 w-4" />
-                              Route
-                            </h4>
-                            <div className="text-sm space-y-1">
-                              <p><span className="text-muted-foreground">From:</span> {delivery.pickupLocation}</p>
-                              <p><span className="text-muted-foreground">To:</span> {delivery.deliveryLocation}</p>
+                          {showDeliveryActions(delivery.status) && (
+                            <div className="flex flex-wrap gap-2 mt-4">
+                              {delivery.driverPhone ? (
+                                <Button variant="outline" size="sm" asChild>
+                                  <a href={`tel:${delivery.driverPhone.replace(/\s/g, "")}`}>
+                                    <Phone className="h-4 w-4 mr-2" />
+                                    Call
+                                  </a>
+                                </Button>
+                              ) : null}
+                              {delivery.lat != null && delivery.lng != null ? (
+                                <Button variant="outline" size="sm" asChild>
+                                  <a
+                                    href={`https://www.google.com/maps?q=${delivery.lat},${delivery.lng}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                  >
+                                    <MapPin className="h-4 w-4 mr-2" />
+                                    Drop-off map
+                                  </a>
+                                </Button>
+                              ) : (
+                                <Button variant="outline" size="sm" asChild>
+                                  <Link to="/tracking">
+                                    <NavigationIcon className="h-4 w-4 mr-2" />
+                                    Tracking hub
+                                  </Link>
+                                </Button>
+                              )}
                             </div>
-                          </div>
-                          <div className="space-y-3">
-                            <h4 className="font-semibold flex items-center gap-2">
-                              <User className="h-4 w-4" />
-                              Driver
-                            </h4>
-                            <div className="text-sm space-y-1">
-                              <p>{delivery.driver}</p>
-                              <p className="flex items-center gap-1">
-                                <Phone className="h-3 w-3" />
-                                {delivery.driverPhone}
-                              </p>
-                            </div>
-                          </div>
-                          <div className="space-y-3">
-                            <h4 className="font-semibold flex items-center gap-2">
-                              <Clock className="h-4 w-4" />
-                              ETA
-                            </h4>
-                            <p className="text-lg font-medium">{delivery.estimatedArrival}</p>
-                            <div className="w-full bg-gray-200 rounded-full h-2">
-                              <div 
-                                className="bg-primary h-2 rounded-full transition-all" 
-                                style={{ width: `${delivery.progress}%` }}
-                              />
-                            </div>
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
-                  
-                  {deliveries.filter(d => d.status !== 'delivered').length === 0 && (
-                    <Card>
-                      <CardContent className="text-center py-12">
-                        <Truck className="h-16 w-16 mx-auto mb-4 text-gray-300" />
-                        <p className="text-lg font-medium text-gray-500">No active deliveries</p>
-                        <p className="text-sm text-muted-foreground">Your deliveries will appear here once requested</p>
-                      </CardContent>
-                    </Card>
-                  )}
-                </div>
+                          )}
+                        </CardContent>
+                      </Card>
+                    ))}
+                    {activeDeliveries.length === 0 && (
+                      <Card>
+                        <CardContent className="text-center py-12">
+                          <Truck className="h-16 w-16 mx-auto mb-4 text-gray-300" />
+                          <p className="text-lg font-medium text-gray-500">No active deliveries</p>
+                          <p className="text-sm text-muted-foreground">Submit a request above; accepted jobs will show here.</p>
+                        </CardContent>
+                      </Card>
+                    )}
+                  </div>
+                )}
               </div>
             </TabsContent>
 
@@ -785,31 +823,66 @@ const Delivery = () => {
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
-                    {deliveries.filter(d => d.status === 'delivered').map((delivery) => (
-                      <div key={delivery.id} className="flex items-center justify-between p-4 border rounded-lg">
-                        <div className="flex items-center gap-3">
-                          <CheckCircle className="h-5 w-5 text-green-500" />
-                          <div>
-                            <p className="font-medium">#{delivery.id} - {delivery.materialType}</p>
-                            <p className="text-sm text-muted-foreground">{delivery.quantity} delivered to {delivery.deliveryLocation}</p>
+                    {deliveriesLoading ? (
+                      <p className="text-center py-8 text-muted-foreground">Loading…</p>
+                    ) : (
+                      <>
+                        {completedDeliveries.map((delivery) => (
+                          <div key={delivery.rawId} className="flex items-center justify-between p-4 border rounded-lg">
+                            <div className="flex items-center gap-3">
+                              <CheckCircle className="h-5 w-5 text-green-500" />
+                              <div>
+                                <p className="font-medium">
+                                  #{delivery.id} — {delivery.materialType}
+                                </p>
+                                <p className="text-sm text-muted-foreground">
+                                  {delivery.quantity} to {delivery.deliveryLocation}
+                                </p>
+                              </div>
+                            </div>
+                            <Badge className={getStatusColor(delivery.status)}>{formatStatusLabel(delivery.status)}</Badge>
                           </div>
-                        </div>
-                        <Badge className={getStatusColor(delivery.status)}>
-                          Delivered
-                        </Badge>
-                      </div>
-                    ))}
-                    
-                    {deliveries.filter(d => d.status === 'delivered').length === 0 && (
-                      <div className="text-center py-8 text-muted-foreground">
-                        No completed deliveries yet
-                      </div>
+                        ))}
+                        {completedDeliveries.length === 0 && (
+                          <div className="text-center py-8 text-muted-foreground">No completed deliveries yet.</div>
+                        )}
+                      </>
                     )}
                   </div>
                 </CardContent>
               </Card>
             </TabsContent>
           </Tabs>
+        ) : userRole === "delivery" || userRole === "delivery_provider" ? (
+          <div className="max-w-xl mx-auto">
+            <Card>
+              <CardHeader>
+                <CardTitle>Delivery partner</CardTitle>
+                <CardDescription>Assignments, GPS updates, and payouts are managed in your dashboard.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Button className="w-full sm:w-auto" onClick={() => navigate("/delivery-dashboard")}>
+                  <Truck className="h-4 w-4 mr-2" />
+                  Open delivery dashboard
+                </Button>
+              </CardContent>
+            </Card>
+          </div>
+        ) : userRole === "supplier" ? (
+          <div className="max-w-xl mx-auto">
+            <Card>
+              <CardHeader>
+                <CardTitle>Suppliers &amp; dispatch</CardTitle>
+                <CardDescription>Delivery for orders is coordinated from your supplier dashboard and dispatch tools.</CardDescription>
+              </CardHeader>
+              <CardContent className="flex flex-col sm:flex-row gap-3">
+                <Button onClick={() => navigate("/supplier-dashboard")}>Supplier dashboard</Button>
+                <Button variant="outline" onClick={() => navigate("/suppliers")}>
+                  Browse marketplace
+                </Button>
+              </CardContent>
+            </Card>
+          </div>
         ) : (
           /* Public Access - Prompt to Sign In */
           <div className="max-w-4xl mx-auto">
@@ -820,7 +893,7 @@ const Delivery = () => {
                 </div>
                 <CardTitle className="text-2xl">Request Delivery Service</CardTitle>
                 <CardDescription className="text-base">
-                  Get your construction materials delivered to your site by verified delivery providers
+                  Request transport for your site; providers on the platform can accept jobs when available in your area.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
@@ -829,22 +902,28 @@ const Delivery = () => {
                   <div className="flex items-start gap-3 p-4 bg-white rounded-lg border">
                     <CheckCircle className="h-5 w-5 text-green-500 mt-0.5" />
                     <div>
-                      <h4 className="font-medium">Verified Providers</h4>
-                      <p className="text-sm text-muted-foreground">All delivery providers are vetted and verified</p>
+                      <h4 className="font-medium">Registered partners</h4>
+                      <p className="text-sm text-muted-foreground">
+                        Providers join through enrollment; confirm assignment and contact details on each job.
+                      </p>
                     </div>
                   </div>
                   <div className="flex items-start gap-3 p-4 bg-white rounded-lg border">
                     <NavigationIcon className="h-5 w-5 text-blue-500 mt-0.5" />
                     <div>
-                      <h4 className="font-medium">Real-time Tracking</h4>
-                      <p className="text-sm text-muted-foreground">Track your delivery in real-time with GPS</p>
+                      <h4 className="font-medium">GPS when enabled</h4>
+                      <p className="text-sm text-muted-foreground">
+                        Live location depends on the provider sharing updates and device permissions.
+                      </p>
                     </div>
                   </div>
                   <div className="flex items-start gap-3 p-4 bg-white rounded-lg border">
                     <Shield className="h-5 w-5 text-purple-500 mt-0.5" />
                     <div>
-                      <h4 className="font-medium">Secure & Insured</h4>
-                      <p className="text-sm text-muted-foreground">Your materials are protected during transit</p>
+                      <h4 className="font-medium">Status &amp; handoffs</h4>
+                      <p className="text-sm text-muted-foreground">
+                        Track request status, notes, and delivery records from your builder account.
+                      </p>
                     </div>
                   </div>
                 </div>
@@ -875,9 +954,8 @@ const Delivery = () => {
                 <Alert className="border-blue-200 bg-blue-50">
                   <Truck className="h-4 w-4" />
                   <AlertDescription>
-                    <strong>How it works:</strong> Sign in as a builder, fill out the delivery request form, 
-                    and our verified delivery providers will compete to deliver your materials. 
-                    First provider to accept gets the job!
+                    <strong>How it works:</strong> Sign in as a builder, submit a delivery request with pickup and drop-off details,
+                    and an available delivery partner can accept based on coverage and capacity.
                   </AlertDescription>
                 </Alert>
               </CardContent>
