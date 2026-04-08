@@ -2,58 +2,73 @@ import React, { useEffect, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { 
-  Users, 
-  Target, 
-  Award, 
-  Globe, 
-  Shield, 
-  ExternalLink, 
+import {
+  Users,
+  Target,
+  Award,
+  Globe,
+  Shield,
   SkipForward,
   Building2,
   Truck,
   MapPin,
   CheckCircle2,
-  Star,
-  TrendingUp,
-  Heart,
-  Lightbulb,
-  Handshake,
   ArrowRight,
-  Play,
-  Quote
+  Quote,
+  Package,
+  ScanLine,
+  QrCode,
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import Navigation from "@/components/Navigation";
 import Footer from "@/components/Footer";
 import AnimatedSection from "@/components/AnimatedSection";
-import AnimatedCounter from "@/components/AnimatedCounter";
+import { useHomePagePublicStats, formatHomeStatCount } from "@/hooks/useHomePagePublicStats";
+
+function TeamAvatar({ src, alt }: { src: string; alt: string }) {
+  const [failed, setFailed] = useState(false);
+  if (!src?.trim() || failed) {
+    return <Users className="h-16 w-16 text-primary/40" aria-hidden />;
+  }
+  return (
+    <img
+      src={src}
+      alt={alt}
+      className="w-full h-full object-cover"
+      loading="lazy"
+      onError={() => setFailed(true)}
+    />
+  );
+}
 
 const About: React.FC = () => {
+  const publicStats = useHomePagePublicStats();
   const [pageViews, setPageViews] = useState(0);
   const [performanceMetrics, setPerformanceMetrics] = useState({
     loadTime: 0,
-    renderTime: 0
+    renderTime: 0,
   });
 
   useEffect(() => {
+    if (!import.meta.env.DEV) return;
+
     const startTime = performance.now();
-    
+
     const handleLoad = () => {
       const loadTime = performance.now() - startTime;
-      setPerformanceMetrics(prev => ({ ...prev, loadTime }));
+      setPerformanceMetrics((prev) => ({ ...prev, loadTime }));
     };
-    
-    window.addEventListener('load', handleLoad);
-    const renderTime = performance.now() - startTime;
-    setPerformanceMetrics(prev => ({ ...prev, renderTime }));
 
-    const views = parseInt(localStorage.getItem('about-page-views') || '0') + 1;
+    window.addEventListener("load", handleLoad);
+    const renderTime = performance.now() - startTime;
+    setPerformanceMetrics((prev) => ({ ...prev, renderTime }));
+
+    const views = parseInt(localStorage.getItem("about-page-views") || "0", 10) + 1;
     setPageViews(views);
-    localStorage.setItem('about-page-views', views.toString());
+    localStorage.setItem("about-page-views", String(views));
 
     return () => {
-      window.removeEventListener('load', handleLoad);
+      window.removeEventListener("load", handleLoad);
     };
   }, []);
 
@@ -73,13 +88,15 @@ const About: React.FC = () => {
     {
       icon: Award,
       title: "Quality Assurance",
-      description: "Every supplier and builder on our platform is verified to ensure the highest standards of quality and reliability.",
+      description:
+        "We verify supplier storefronts and onboard builders through structured checks, and we keep improving trust and safety as the network grows.",
       color: "from-orange-500 to-amber-500"
     },
     {
       icon: Globe,
       title: "National Reach",
-      description: "Connecting construction professionals across all 47 counties of Kenya, from Nairobi to remote rural areas.",
+      description:
+        "Kenya has 47 counties — we focus on major construction hubs today and aim to deepen coverage everywhere builders and suppliers need us.",
       color: "from-purple-500 to-pink-500"
     }
   ];
@@ -106,10 +123,10 @@ const About: React.FC = () => {
   ];
 
   const milestones = [
-    { year: "2023", title: "Founded", description: "UjenziXform was born in Nairobi" },
-    { year: "2023", title: "100+ Users", description: "First hundred builders joined" },
-    { year: "2024", title: "47 Counties", description: "Nationwide coverage achieved" },
-    { year: "2024", title: "1000+ Projects", description: "Milestone projects completed" },
+    { year: "2023", title: "Founded", description: "UjenziXform started in Nairobi to link construction supply and demand." },
+    { year: "2024", title: "Marketplace momentum", description: "Materials discovery, builder projects, and supplier storefronts on one platform." },
+    { year: "2025", title: "Operations depth", description: "Delivery coordination, QR traceability, and site monitoring workflows." },
+    { year: "2026", title: "Growing together", description: "Scaling with Kenya’s builders, suppliers, and delivery partners." },
   ];
 
   return (
@@ -178,9 +195,9 @@ const About: React.FC = () => {
               {/* Subtitle */}
               <AnimatedSection animation="fadeInUp" delay={200}>
                 <p className="text-xl md:text-2xl text-gray-300 mb-8 max-w-3xl mx-auto leading-relaxed">
-                  Transforming Kenya's construction industry through technology, 
-                  connecting <span className="text-cyan-400 font-semibold">builders</span> with trusted{" "}
-                  <span className="text-green-400 font-semibold">suppliers</span> across all 47 counties
+                  Transforming Kenya&apos;s construction industry through technology, connecting{" "}
+                  <span className="text-cyan-400 font-semibold">builders</span> with trusted{" "}
+                  <span className="text-green-400 font-semibold">suppliers</span> and delivery partners nationwide.
                 </p>
               </AnimatedSection>
 
@@ -211,24 +228,35 @@ const About: React.FC = () => {
                 </div>
               </AnimatedSection>
 
-              {/* Hero Stats */}
+              {/* Hero stats — live aggregates (same RPC as home / monitoring hero) */}
               <AnimatedSection animation="fadeInUp" delay={400}>
+                <p className="text-xs text-gray-500 mb-4 max-w-xl mx-auto">
+                  Live platform totals from our database (rounded; updates as people join and projects grow).
+                </p>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6 max-w-4xl mx-auto">
                   <div className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl p-4 md:p-6">
-                    <div className="text-3xl md:text-4xl font-bold text-white mb-1">47</div>
-                    <div className="text-sm text-gray-400">Counties Covered</div>
+                    <div className="text-3xl md:text-4xl font-bold text-white mb-1 tabular-nums">
+                      {formatHomeStatCount(publicStats.registeredNetwork, publicStats.loading)}
+                    </div>
+                    <div className="text-sm text-gray-400">Network accounts</div>
                   </div>
                   <div className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl p-4 md:p-6">
-                    <div className="text-3xl md:text-4xl font-bold text-green-400 mb-1">1000+</div>
-                    <div className="text-sm text-gray-400">Active Builders</div>
+                    <div className="text-3xl md:text-4xl font-bold text-green-400 mb-1 tabular-nums">
+                      {formatHomeStatCount(publicStats.builderProjects, publicStats.loading)}
+                    </div>
+                    <div className="text-sm text-gray-400">Builder projects</div>
                   </div>
                   <div className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl p-4 md:p-6">
-                    <div className="text-3xl md:text-4xl font-bold text-blue-400 mb-1">500+</div>
-                    <div className="text-sm text-gray-400">Verified Suppliers</div>
+                    <div className="text-3xl md:text-4xl font-bold text-blue-400 mb-1 tabular-nums">
+                      {formatHomeStatCount(publicStats.professionalBuilders, publicStats.loading)}
+                    </div>
+                    <div className="text-sm text-gray-400">Professional builders</div>
                   </div>
                   <div className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl p-4 md:p-6">
-                    <div className="text-3xl md:text-4xl font-bold text-yellow-400 mb-1">KSh 2B+</div>
-                    <div className="text-sm text-gray-400">Transactions</div>
+                    <div className="text-3xl md:text-4xl font-bold text-yellow-400 mb-1 tabular-nums">
+                      {formatHomeStatCount(publicStats.supplierCompanies, publicStats.loading)}
+                    </div>
+                    <div className="text-sm text-gray-400">Supplier companies</div>
                   </div>
                 </div>
               </AnimatedSection>
@@ -261,12 +289,13 @@ const About: React.FC = () => {
                         not just better connections, but complete project visibility.
                       </p>
                       <p>
-                        Founded in 2023 by a team of construction industry veterans and technology experts, 
-                        we've quickly grown to become Kenya's leading platform for construction professionals.
+                        Founded in 2023 by a team of construction industry veterans and technology experts, we
+                        have grown into a dedicated digital platform for construction professionals in Kenya.
                       </p>
                       <p>
-                        Today, we're proud to serve thousands of builders and suppliers across all 47 counties, 
-                        facilitating millions of shillings in transactions and helping build the Kenya of tomorrow.
+                        Today we support a growing network of builders, suppliers, and delivery partners. The live
+                        figures on this page reflect real sign-ups and activity in our system — not a revenue or bank
+                        total.
                       </p>
                     </div>
                     <div className="mt-8 flex flex-wrap gap-4">
@@ -383,18 +412,10 @@ const About: React.FC = () => {
                     <CardHeader className="pb-4">
                       <div className="relative mx-auto mb-4">
                         <div className="w-32 h-32 bg-gradient-to-br from-primary/20 to-primary/5 rounded-full flex items-center justify-center overflow-hidden ring-4 ring-background shadow-xl group-hover:ring-primary/20 transition-all">
-                          {member.image && member.image !== '/placeholder.svg' ? (
-                            <img
-                              src={member.image}
-                              alt={`${member.name} - ${member.role}`}
-                              className="w-full h-full object-cover"
-                              loading="lazy"
-                              onError={(e) => {
-                                e.currentTarget.style.display = 'none';
-                              }}
-                            />
-                          ) : null}
-                          <Users className="h-16 w-16 text-primary/40" />
+                          <TeamAvatar
+                            src={member.image && member.image !== "/placeholder.svg" ? member.image : ""}
+                            alt={`${member.name} - ${member.role}`}
+                          />
                         </div>
                       </div>
                       <CardTitle className="text-xl">{member.name}</CardTitle>
@@ -432,48 +453,53 @@ const About: React.FC = () => {
               <Badge className="mb-4 bg-white/10 text-white border-white/20">Our Impact</Badge>
               <h2 className="text-4xl md:text-5xl font-bold text-white mb-4">Impact Across Kenya</h2>
               <p className="text-xl text-gray-300 max-w-2xl mx-auto">
-                From Mombasa to Kisumu, from Nairobi to Eldoret - we're building Kenya's future together
+                From Mombasa to Kisumu, Nairobi to Eldoret — these activity metrics are live counts from the same
+                public stats we use on the home page (materials, logistics, and QR).
               </p>
             </div>
-            
+
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 max-w-5xl mx-auto">
               <AnimatedSection animation="fadeInUp" delay={0}>
                 <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-8 border border-white/20 text-center hover:bg-white/15 transition-all">
-                  <div className="text-5xl font-bold text-green-400 mb-2">
-                    <AnimatedCounter end={1000} suffix="+" />
+                  <Package className="h-8 w-8 text-green-400 mx-auto mb-3" aria-hidden />
+                  <div className="text-5xl font-bold text-green-400 mb-2 tabular-nums">
+                    {formatHomeStatCount(publicStats.approvedMaterials, publicStats.loading)}
                   </div>
-                  <div className="text-xl font-semibold text-white mb-1">Active Builders</div>
-                  <div className="text-sm text-gray-400">Across all 47 counties</div>
+                  <div className="text-xl font-semibold text-white mb-1">Approved materials</div>
+                  <div className="text-sm text-gray-400">Marketplace rows (approved)</div>
                 </div>
               </AnimatedSection>
-              
+
               <AnimatedSection animation="fadeInUp" delay={100}>
                 <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-8 border border-white/20 text-center hover:bg-white/15 transition-all">
-                  <div className="text-5xl font-bold text-blue-400 mb-2">
-                    <AnimatedCounter end={500} suffix="+" />
+                  <Truck className="h-8 w-8 text-blue-400 mx-auto mb-3" aria-hidden />
+                  <div className="text-5xl font-bold text-blue-400 mb-2 tabular-nums">
+                    {formatHomeStatCount(publicStats.deliveryRequestsActive, publicStats.loading)}
                   </div>
-                  <div className="text-xl font-semibold text-white mb-1">Verified Suppliers</div>
-                  <div className="text-sm text-gray-400">Quality-assured partners</div>
+                  <div className="text-xl font-semibold text-white mb-1">Active deliveries</div>
+                  <div className="text-sm text-gray-400">In-flight delivery requests</div>
                 </div>
               </AnimatedSection>
-              
+
               <AnimatedSection animation="fadeInUp" delay={200}>
                 <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-8 border border-white/20 text-center hover:bg-white/15 transition-all">
-                  <div className="text-5xl font-bold text-yellow-400 mb-2">
-                    <AnimatedCounter end={10000} suffix="+" />
+                  <ScanLine className="h-8 w-8 text-yellow-400 mx-auto mb-3" aria-hidden />
+                  <div className="text-5xl font-bold text-yellow-400 mb-2 tabular-nums">
+                    {formatHomeStatCount(publicStats.qrScanEventsTotal, publicStats.loading)}
                   </div>
-                  <div className="text-xl font-semibold text-white mb-1">Successful Projects</div>
-                  <div className="text-sm text-gray-400">Completed nationwide</div>
+                  <div className="text-xl font-semibold text-white mb-1">QR scan events</div>
+                  <div className="text-sm text-gray-400">Recorded scans on the platform</div>
                 </div>
               </AnimatedSection>
-              
+
               <AnimatedSection animation="fadeInUp" delay={300}>
                 <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-8 border border-white/20 text-center hover:bg-white/15 transition-all">
-                  <div className="text-5xl font-bold text-red-400 mb-2">
-                    KSh <AnimatedCounter end={2} suffix="B+" />
+                  <QrCode className="h-8 w-8 text-red-400 mx-auto mb-3" aria-hidden />
+                  <div className="text-5xl font-bold text-red-400 mb-2 tabular-nums">
+                    {formatHomeStatCount(publicStats.materialItemsWithQr, publicStats.loading)}
                   </div>
-                  <div className="text-xl font-semibold text-white mb-1">Total Transactions</div>
-                  <div className="text-sm text-gray-400">Economic impact</div>
+                  <div className="text-xl font-semibold text-white mb-1">Materials with QR</div>
+                  <div className="text-sm text-gray-400">Items carrying QR in catalog</div>
                 </div>
               </AnimatedSection>
             </div>
@@ -499,7 +525,7 @@ const About: React.FC = () => {
             <AnimatedSection animation="fadeInUp">
               <h2 className="text-3xl md:text-4xl font-bold mb-4">Ready to Build Something Great?</h2>
               <p className="text-lg text-white/90 mb-8 max-w-2xl mx-auto">
-                Join thousands of builders and suppliers transforming Kenya's construction industry
+                Join builders and suppliers who use UjenziXform to coordinate materials, delivery, and site visibility.
               </p>
               <div className="flex flex-col sm:flex-row gap-4 justify-center">
                 <Button 
@@ -530,7 +556,7 @@ const About: React.FC = () => {
         </section>
 
         {/* Dev Performance Metrics */}
-        {process.env.NODE_ENV === 'development' && (
+        {import.meta.env.DEV && (
           <section className="py-4 bg-muted border-t">
             <div className="container mx-auto px-4">
               <div className="flex justify-center items-center gap-6 text-xs text-muted-foreground">
