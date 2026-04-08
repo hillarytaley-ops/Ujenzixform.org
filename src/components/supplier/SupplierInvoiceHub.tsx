@@ -17,6 +17,7 @@ import { InvoiceManagement } from '@/components/invoices/InvoiceManagement';
 import { useToast } from '@/hooks/use-toast';
 import { openDeliveryNotePdfWindow } from '@/utils/deliveryNoteDocument';
 import { MobileHorizontalScroll } from '@/components/ui/mobile-horizontal-scroll';
+import { sortSupplyChainDocsNewestFirst } from '@/utils/sortSupplyChainDocs';
 
 interface SupplierInvoiceHubProps {
   userId: string;
@@ -145,7 +146,7 @@ export const SupplierInvoiceHub: React.FC<SupplierInvoiceHubProps> = ({
         if (error) throw error;
         list = rows || [];
       }
-      setDeliveryNotes(list);
+      setDeliveryNotes(sortSupplyChainDocsNewestFirst(list as Record<string, unknown>[]) as any[]);
 
       const builderKeys = [...new Set(list.map((r: any) => r.builder_id).filter(Boolean))];
       let labelMap: Record<string, string> = {};
@@ -350,7 +351,7 @@ export const SupplierInvoiceHub: React.FC<SupplierInvoiceHubProps> = ({
         if (error) throw error;
         rows = data || [];
       }
-      setGrns(rows);
+      setGrns(sortSupplyChainDocsNewestFirst(rows as Record<string, unknown>[]) as any[]);
     } catch (e: any) {
       console.error('Supplier GRN fetch:', e);
       toast({
@@ -388,6 +389,9 @@ export const SupplierInvoiceHub: React.FC<SupplierInvoiceHubProps> = ({
       const g = getDeliveryNoteGroup(dn as Record<string, unknown>, signatureFallbackByDnId);
       buckets[g].push(dn);
     }
+    (Object.keys(buckets) as DeliveryNoteGroup[]).forEach((k) => {
+      buckets[k] = sortSupplyChainDocsNewestFirst(buckets[k] as Record<string, unknown>[]) as any[];
+    });
     return buckets;
   }, [deliveryNotes, signatureFallbackByDnId]);
 

@@ -26,6 +26,7 @@ import {
   AlertTriangle,
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { sortSupplyChainDocsNewestFirst } from '@/utils/sortSupplyChainDocs';
 
 interface Invoice {
   id: string;
@@ -115,7 +116,9 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
             .select(invoiceSelect)
             .order('created_at', { ascending: false });
           if (error) throw error;
-          setInvoices((data || []) as Invoice[]);
+          setInvoices(
+            sortSupplyChainDocsNewestFirst((data || []) as unknown as Record<string, unknown>[]) as Invoice[]
+          );
           return;
         }
 
@@ -142,7 +145,9 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
             ? { company_name: supById[inv.supplier_id].company_name }
             : undefined,
         })) as Invoice[];
-        setInvoices(enriched);
+        setInvoices(
+          sortSupplyChainDocsNewestFirst(enriched as unknown as Record<string, unknown>[]) as Invoice[]
+        );
         return;
       }
 
@@ -174,11 +179,9 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
         for (const inv of [...(byBuilderId || []), ...byPo] as Invoice[]) {
           merged.set(inv.id, inv);
         }
-        const list = Array.from(merged.values()).sort((a, b) => {
-          const ta = new Date(a.created_at || a.invoice_date || 0).getTime();
-          const tb = new Date(b.created_at || b.invoice_date || 0).getTime();
-          return tb - ta;
-        });
+        const list = sortSupplyChainDocsNewestFirst(
+          Array.from(merged.values()) as unknown as Record<string, unknown>[]
+        ) as Invoice[];
         setInvoices(list);
         return;
       }
@@ -189,7 +192,9 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setInvoices(data || []);
+      setInvoices(
+        sortSupplyChainDocsNewestFirst((data || []) as unknown as Record<string, unknown>[]) as Invoice[]
+      );
     } catch (error: any) {
       console.error('Error fetching invoices:', error);
       toast({

@@ -11,6 +11,7 @@ import {
   resolveGrnLineLabel,
   resolveGrnLineQty,
 } from '@/utils/grnDocument';
+import { sortSupplyChainDocsNewestFirst } from '@/utils/sortSupplyChainDocs';
 
 interface GRN {
   id: string;
@@ -66,7 +67,9 @@ export const GRNView: React.FC<GRNViewProps> = ({ userId, userRole }) => {
 
       const { data, error } = await query;
       if (error) throw error;
-      setGRNs(data || []);
+      setGRNs(
+        sortSupplyChainDocsNewestFirst((data || []) as unknown as Record<string, unknown>[]) as GRN[]
+      );
     } catch (error: any) {
       console.error('Error fetching GRNs:', error);
       toast({

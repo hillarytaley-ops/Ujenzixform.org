@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import SignatureCanvas from 'react-signature-canvas';
 import { ResponsiveSignatureCanvas } from '@/components/ui/ResponsiveSignatureCanvas';
+import { sortSupplyChainDocsNewestFirst } from '@/utils/sortSupplyChainDocs';
 
 interface DeliveryNote {
   id: string;
@@ -179,7 +180,9 @@ export const DeliveryNoteWorkflow: React.FC<DeliveryNoteWorkflowProps> = ({
         };
       });
 
-      setDeliveryNotes(enriched);
+      setDeliveryNotes(
+        sortSupplyChainDocsNewestFirst(enriched as unknown as Record<string, unknown>[]) as DeliveryNote[]
+      );
     } catch (error: any) {
       console.error('Error fetching delivery notes:', error);
       toast({
