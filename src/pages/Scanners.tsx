@@ -1,14 +1,28 @@
 import { readPersistedAuthRawStringSync } from '@/utils/supabaseAccessToken';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ErrorBoundary } from "@/components/ui/error-boundary";
-import { DispatchScanner } from '@/components/qr/DispatchScanner';
-import { ReceivingScanner } from '@/components/qr/ReceivingScanner';
 import Navigation from "@/components/Navigation";
 import Footer from "@/components/Footer";
 import { useAuth } from "@/contexts/AuthContext";
+import { useHomePagePublicStats, formatHomeStatCount } from "@/hooks/useHomePagePublicStats";
+import type { User } from "@supabase/supabase-js";
+
+const DispatchScanner = React.lazy(() =>
+  import("@/components/qr/DispatchScanner").then((m) => ({ default: m.DispatchScanner }))
+);
+const ReceivingScanner = React.lazy(() =>
+  import("@/components/qr/ReceivingScanner").then((m) => ({ default: m.ReceivingScanner }))
+);
+
+const scannerSuspenseFallback = (
+  <div className="flex flex-col items-center justify-center py-16 gap-3 text-muted-foreground">
+    <div className="animate-spin rounded-full h-10 w-10 border-2 border-primary border-t-transparent" />
+    <p className="text-sm">Loading scanner…</p>
+  </div>
+);
 import { useNavigate } from 'react-router-dom';
 import { supabase } from "@/integrations/supabase/client";
 import { 
@@ -35,7 +49,7 @@ const ScannersAccessGuard = ({ children }: { children: React.ReactNode }) => {
   const navigate = useNavigate();
   const [checking, setChecking] = useState(true);
   const [dbRole, setDbRole] = useState<string | null>(null);
-  const [user, setUser] = useState<any>(null);
+  const [user, setUser] = useState<User | null>(null);
   const [dbVerified, setDbVerified] = useState(false); // Track if DB check is complete
   
   // Helper to get user from localStorage
@@ -62,12 +76,10 @@ const ScannersAccessGuard = ({ children }: { children: React.ReactNode }) => {
   
   useEffect(() => {
     const checkAccess = async () => {
-      console.log('🔐 Scanners - Checking access...');
       setDbVerified(false);
       
       // Safety timeout - show UI after 3 seconds max
       const safetyTimeout = setTimeout(() => {
-        console.log('🔐 Scanners - Safety timeout, using localStorage');
         const storedRole = localStorage.getItem('user_role');
         const storedUser = getUserFromStorage();
         if (storedUser && storedRole) {
@@ -84,15 +96,11 @@ const ScannersAccessGuard = ({ children }: { children: React.ReactNode }) => {
         try {
           const { data } = await withTimeout(supabase.auth.getUser(), 2000);
           authUser = data?.user || null;
-          console.log('🔐 Scanners - Got user from auth:', authUser?.id);
         } catch {
-          console.log('🔐 Scanners - Auth timeout, trying localStorage...');
           authUser = getUserFromStorage();
-          console.log('🔐 Scanners - Got user from localStorage:', authUser?.id);
         }
         
         if (!authUser) {
-          console.log('🔐 Scanners - No user logged in');
           clearTimeout(safetyTimeout);
           setUser(null);
           setDbRole(null);
@@ -120,9 +128,8 @@ const ScannersAccessGuard = ({ children }: { children: React.ReactNode }) => {
             localStorage.setItem('user_role', role);
             localStorage.setItem('user_role_id', authUser.id);
           }
-          console.log('🔐 Scanners - DB role:', role);
         } catch {
-          console.log('🔐 Scanners - Role lookup timeout, using localStorage:', role);
+          /* use localStorage role */
         }
         
         setDbRole(role);
@@ -280,40 +287,38 @@ const ScannersAccessGuard = ({ children }: { children: React.ReactNode }) => {
   return <>{children}</>;
 };
 
-const ScannersContent = () => {
-  const [activeScanner, setActiveScanner] = useState<'dispatch' | 'receiving' | null>(null);
-  const { userRole, user, loading } = useAuth();
-  const navigate = useNavigate();
-  
-  // Determine effective role
-  const localRole = localStorage.getItem('user_role');
-  const effectiveRole = userRole || localRole;
-  const isBuilder = effectiveRole === 'builder';
+const scrollToScannerStations = () => {
+  document.getElementById("scanner-stations")?.scrollIntoView({ behavior: "smooth", block: "start" });
+};
 
-  // Role-based redirection for logged-in users to their specific scanners
+const ScannersContent = () => {
+  const [activeScanner, setActiveScanner] = useState<"dispatch" | "receiving" | null>(null);
+  const { userRole, loading } = useAuth();
+  const navigate = useNavigate();
+  const publicStats = useHomePagePublicStats();
+
+  const localRole = localStorage.getItem("user_role");
+  const effectiveRole = userRole || localRole;
+
   useEffect(() => {
     if (loading) return;
-    
-    const localRole = localStorage.getItem('user_role');
-    const effectiveRole = userRole || localRole;
-    
-    // BLOCK builders, private_client, professional_builder - redirect to tracking page
-    const restrictedRoles = ['builder', 'private_client', 'professional_builder'];
-    if (restrictedRoles.includes(effectiveRole || '')) {
-      navigate('/tracking', { replace: true });
+
+    const lr = localStorage.getItem("user_role");
+    const role = userRole || lr;
+
+    const restrictedRoles = ["builder", "private_client", "professional_builder"];
+    if (restrictedRoles.includes(role || "")) {
+      navigate("/tracking", { replace: true });
       return;
     }
-    // Redirect suppliers to their specific scanner page
-    if (effectiveRole === 'supplier') {
-      navigate('/supplier-dispatch-scanner', { replace: true });
+    if (role === "supplier") {
+      navigate("/supplier-dispatch-scanner", { replace: true });
       return;
     }
-    // Redirect delivery providers to their specific scanner page
-    if (effectiveRole === 'delivery') {
-      navigate('/delivery-receiving-scanner', { replace: true });
+    if (role === "delivery" || role === "delivery_provider") {
+      navigate("/delivery-receiving-scanner", { replace: true });
       return;
     }
-    // Admin and unauthenticated users can see the general page
   }, [userRole, loading, navigate]);
 
   return (
@@ -348,7 +353,7 @@ const ScannersContent = () => {
             {/* Badge */}
             <Badge className="mb-6 bg-cyan-500/20 text-cyan-300 border-cyan-500/30 px-4 py-2 text-sm font-medium">
               <QrCode className="h-4 w-4 mr-2" />
-              Smart Material Verification System
+              QR dispatch &amp; receiving
             </Badge>
 
             {/* Main Heading */}
@@ -364,25 +369,30 @@ const ScannersContent = () => {
 
             {/* Description */}
             <p className="text-lg md:text-xl text-gray-300 mb-8 max-w-3xl mx-auto leading-relaxed">
-              Instantly verify construction materials with our advanced QR scanning technology. 
-              Track deliveries, confirm authenticity, and maintain complete supply chain transparency 
-              across all 47 Kenyan counties.
+              Scan material QR codes at dispatch and receiving; the platform validates codes against your orders and line items.
+              Coverage and GPS depend on how your team uses delivery tracking.
             </p>
 
             {/* CTA Buttons */}
             <div className="flex flex-col sm:flex-row gap-4 justify-center mb-12">
-              <Button 
+              <Button
                 size="lg"
-                onClick={() => setActiveScanner('dispatch')}
+                onClick={() => {
+                  setActiveScanner("dispatch");
+                  requestAnimationFrame(() => scrollToScannerStations());
+                }}
                 className="bg-cyan-500 hover:bg-cyan-600 text-white font-semibold px-8 py-6 text-lg shadow-lg shadow-cyan-500/25"
               >
                 <Scan className="h-5 w-5 mr-2" />
                 Dispatch Scanner
               </Button>
-              <Button 
+              <Button
                 size="lg"
                 variant="outline"
-                onClick={() => setActiveScanner('receiving')}
+                onClick={() => {
+                  setActiveScanner("receiving");
+                  requestAnimationFrame(() => scrollToScannerStations());
+                }}
                 className="border-white/30 text-white hover:bg-white/10 font-semibold px-8 py-6 text-lg"
               >
                 <Package className="h-5 w-5 mr-2" />
@@ -390,25 +400,34 @@ const ScannersContent = () => {
               </Button>
             </div>
 
-            {/* Stats Row */}
+            {/* Stats Row — live aggregates */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
               <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-xl p-4">
-                <div className="text-2xl md:text-3xl font-bold text-cyan-400">50K+</div>
-                <div className="text-sm text-gray-400">Materials Scanned</div>
+                <div className="text-2xl md:text-3xl font-bold text-cyan-400">
+                  {formatHomeStatCount(publicStats.qrScanEventsTotal, publicStats.loading)}
+                </div>
+                <div className="text-sm text-gray-400">Scans logged (platform)</div>
               </div>
               <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-xl p-4">
-                <div className="text-2xl md:text-3xl font-bold text-green-400">99.9%</div>
-                <div className="text-sm text-gray-400">Scan Accuracy</div>
+                <div className="text-2xl md:text-3xl font-bold text-green-400">
+                  {formatHomeStatCount(publicStats.materialItemsWithQr, publicStats.loading)}
+                </div>
+                <div className="text-sm text-gray-400">Line items with QR</div>
               </div>
               <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-xl p-4">
-                <div className="text-2xl md:text-3xl font-bold text-blue-400">&lt;2s</div>
-                <div className="text-sm text-gray-400">Scan Speed</div>
+                <div className="text-2xl md:text-3xl font-bold text-blue-400">
+                  {formatHomeStatCount(publicStats.supplierCompanies, publicStats.loading)}
+                </div>
+                <div className="text-sm text-gray-400">Supplier listings</div>
               </div>
               <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-xl p-4">
                 <div className="text-2xl md:text-3xl font-bold text-purple-400">47</div>
-                <div className="text-sm text-gray-400">Counties Covered</div>
+                <div className="text-sm text-gray-400">Counties (Kenya)</div>
               </div>
             </div>
+            <p className="text-[11px] md:text-xs text-white/45 max-w-lg mx-auto mt-4 px-2">
+              Scan and QR counts come from live database totals. Open a scanner below when you are ready—camera loads on demand.
+            </p>
           </div>
         </div>
 
@@ -427,7 +446,7 @@ const ScannersContent = () => {
             <Badge variant="outline" className="mb-4">How It Works</Badge>
             <h2 className="text-3xl md:text-4xl font-bold mb-4">Simple & Secure Scanning Process</h2>
             <p className="text-muted-foreground max-w-2xl mx-auto">
-              Our QR scanning system ensures complete traceability of construction materials from supplier to site.
+              Tie physical materials to purchase orders: scan at handoff points so dispatch and receipt stay aligned with your data.
             </p>
           </div>
 
@@ -439,7 +458,7 @@ const ScannersContent = () => {
                 </div>
                 <div className="text-sm font-medium text-cyan-600 dark:text-cyan-400 mb-2">Step 1</div>
                 <h3 className="font-semibold mb-2">Generate QR Code</h3>
-                <p className="text-sm text-muted-foreground">Unique QR codes are generated for each material batch</p>
+                <p className="text-sm text-muted-foreground">QR codes are linked to material line items on each order</p>
               </CardContent>
             </Card>
 
@@ -461,7 +480,9 @@ const ScannersContent = () => {
                 </div>
                 <div className="text-sm font-medium text-green-600 dark:text-green-400 mb-2">Step 3</div>
                 <h3 className="font-semibold mb-2">Track in Transit</h3>
-                <p className="text-sm text-muted-foreground">Real-time GPS tracking throughout delivery</p>
+                <p className="text-sm text-muted-foreground">
+                  Status moves forward as scans and delivery workflows complete—GPS when providers share location
+                </p>
               </CardContent>
             </Card>
 
@@ -480,7 +501,7 @@ const ScannersContent = () => {
       </section>
 
       {/* Scanner Section */}
-      <section className="py-12 bg-muted/30">
+      <section id="scanner-stations" className="py-12 bg-muted/30 scroll-mt-24">
         <div className="container mx-auto px-4">
           <div className="text-center mb-8">
             <h2 className="text-2xl md:text-3xl font-bold mb-2">Material Scanning Stations</h2>
@@ -545,7 +566,34 @@ const ScannersContent = () => {
                   </div>
                 </CardHeader>
                 <CardContent className="p-6">
-                  <DispatchScanner />
+                  {activeScanner === "dispatch" ? (
+                    <>
+                      <div className="flex justify-end mb-2">
+                        <Button variant="ghost" size="sm" onClick={() => setActiveScanner(null)}>
+                          Collapse
+                        </Button>
+                      </div>
+                      <Suspense fallback={scannerSuspenseFallback}>
+                        <DispatchScanner />
+                      </Suspense>
+                    </>
+                  ) : (
+                    <div className="text-center py-10 px-4 space-y-4">
+                      <p className="text-sm text-muted-foreground max-w-sm mx-auto">
+                        Open the dispatch scanner when you are at the supplier yard. The camera and scanner bundle load only after you
+                        open it.
+                      </p>
+                      <Button
+                        onClick={() => {
+                          setActiveScanner("dispatch");
+                          requestAnimationFrame(() => scrollToScannerStations());
+                        }}
+                      >
+                        <Scan className="h-4 w-4 mr-2" />
+                        Open dispatch scanner
+                      </Button>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
 
@@ -570,7 +618,33 @@ const ScannersContent = () => {
                   </div>
                 </CardHeader>
                 <CardContent className="p-6">
-                  <ReceivingScanner />
+                  {activeScanner === "receiving" ? (
+                    <>
+                      <div className="flex justify-end mb-2">
+                        <Button variant="ghost" size="sm" onClick={() => setActiveScanner(null)}>
+                          Collapse
+                        </Button>
+                      </div>
+                      <Suspense fallback={scannerSuspenseFallback}>
+                        <ReceivingScanner />
+                      </Suspense>
+                    </>
+                  ) : (
+                    <div className="text-center py-10 px-4 space-y-4">
+                      <p className="text-sm text-muted-foreground max-w-sm mx-auto">
+                        Open the receiving scanner when you are accepting a delivery. The camera loads on demand to save bandwidth.
+                      </p>
+                      <Button
+                        onClick={() => {
+                          setActiveScanner("receiving");
+                          requestAnimationFrame(() => scrollToScannerStations());
+                        }}
+                      >
+                        <Package className="h-4 w-4 mr-2" />
+                        Open receiving scanner
+                      </Button>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             </div>
@@ -593,9 +667,9 @@ const ScannersContent = () => {
             <Card className="hover:shadow-lg transition-shadow">
               <CardContent className="pt-6">
                 <Shield className="h-10 w-10 text-cyan-500 mb-4" />
-                <h3 className="font-semibold text-lg mb-2">Fraud Prevention</h3>
+                <h3 className="font-semibold text-lg mb-2">Stronger handoffs</h3>
                 <p className="text-sm text-muted-foreground">
-                  Prevent material theft and substitution with verified QR codes that can't be duplicated.
+                  Server-side checks tie each scan to known line items—reducing casual mix-ups; operational controls still matter on site.
                 </p>
               </CardContent>
             </Card>
@@ -603,9 +677,9 @@ const ScannersContent = () => {
             <Card className="hover:shadow-lg transition-shadow">
               <CardContent className="pt-6">
                 <Clock className="h-10 w-10 text-blue-500 mb-4" />
-                <h3 className="font-semibold text-lg mb-2">Real-Time Updates</h3>
+                <h3 className="font-semibold text-lg mb-2">Workflow updates</h3>
                 <p className="text-sm text-muted-foreground">
-                  Instant notifications when materials are dispatched, in transit, and received.
+                  Order and delivery status update as scans succeed, subject to your notification settings and connectivity.
                 </p>
               </CardContent>
             </Card>
@@ -613,9 +687,9 @@ const ScannersContent = () => {
             <Card className="hover:shadow-lg transition-shadow">
               <CardContent className="pt-6">
                 <MapPin className="h-10 w-10 text-green-500 mb-4" />
-                <h3 className="font-semibold text-lg mb-2">GPS Integration</h3>
+                <h3 className="font-semibold text-lg mb-2">Location when provided</h3>
                 <p className="text-sm text-muted-foreground">
-                  Automatic location tagging when scanning to verify delivery points.
+                  Scans can include location metadata when the device and flow capture it—not every scan includes GPS.
                 </p>
               </CardContent>
             </Card>
@@ -623,9 +697,9 @@ const ScannersContent = () => {
             <Card className="hover:shadow-lg transition-shadow">
               <CardContent className="pt-6">
                 <Smartphone className="h-10 w-10 text-purple-500 mb-4" />
-                <h3 className="font-semibold text-lg mb-2">Works Offline</h3>
+                <h3 className="font-semibold text-lg mb-2">Spotty connections</h3>
                 <p className="text-sm text-muted-foreground">
-                  Scan materials even without internet. Data syncs when connection is restored.
+                  The experience is tuned for mobile field use; full offline queueing depends on your build and browser—retry when back online if a scan fails.
                 </p>
               </CardContent>
             </Card>
@@ -633,9 +707,9 @@ const ScannersContent = () => {
             <Card className="hover:shadow-lg transition-shadow">
               <CardContent className="pt-6">
                 <BarChart3 className="h-10 w-10 text-orange-500 mb-4" />
-                <h3 className="font-semibold text-lg mb-2">Analytics Dashboard</h3>
+                <h3 className="font-semibold text-lg mb-2">Dashboards &amp; history</h3>
                 <p className="text-sm text-muted-foreground">
-                  Track all your material movements with detailed reports and insights.
+                  Supplier and delivery dashboards summarize movement; depth varies by role and what your team records.
                 </p>
               </CardContent>
             </Card>
@@ -643,9 +717,9 @@ const ScannersContent = () => {
             <Card className="hover:shadow-lg transition-shadow">
               <CardContent className="pt-6">
                 <FileCheck className="h-10 w-10 text-red-500 mb-4" />
-                <h3 className="font-semibold text-lg mb-2">KEBS Compliance</h3>
+                <h3 className="font-semibold text-lg mb-2">Specs on the order</h3>
                 <p className="text-sm text-muted-foreground">
-                  Ensure all materials meet Kenya Bureau of Standards requirements.
+                  QR flows confirm which catalog line item moved; KEBS and certifications still depend on what suppliers document on products and quotes.
                 </p>
               </CardContent>
             </Card>
@@ -658,17 +732,17 @@ const ScannersContent = () => {
         <div className="container mx-auto px-4 text-center">
           <h2 className="text-3xl md:text-4xl font-bold mb-4">Ready to Start Scanning?</h2>
           <p className="text-lg text-white/90 mb-8 max-w-2xl mx-auto">
-            Join thousands of builders and suppliers using our QR system for secure material tracking.
+            Open the scanner when you are at the yard or site—camera and heavy scripts load only after you choose dispatch or receiving.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Button 
-              size="lg" 
+            <Button
+              size="lg"
               variant="secondary"
               className="font-semibold px-8"
-              onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+              onClick={() => scrollToScannerStations()}
             >
               <Scan className="h-5 w-5 mr-2" />
-              Start Scanning Now
+              Choose a scanner
             </Button>
             <Button 
               size="lg" 

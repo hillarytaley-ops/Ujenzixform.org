@@ -11,6 +11,8 @@ export type HomePagePublicStats = {
   approvedMaterials: number;
   deliveryRequestsTotal: number;
   deliveryRequestsActive: number;
+  qrScanEventsTotal: number;
+  materialItemsWithQr: number;
   loading: boolean;
   error: boolean;
 };
@@ -24,6 +26,8 @@ const ZERO: Omit<HomePagePublicStats, 'loading' | 'error'> = {
   approvedMaterials: 0,
   deliveryRequestsTotal: 0,
   deliveryRequestsActive: 0,
+  qrScanEventsTotal: 0,
+  materialItemsWithQr: 0,
 };
 
 /**
@@ -56,6 +60,8 @@ export function useHomePagePublicStats(): HomePagePublicStats {
             approvedMaterials: Number(row.approved_materials) || 0,
             deliveryRequestsTotal: Number(row.delivery_requests_total) || 0,
             deliveryRequestsActive: Number(row.delivery_requests_active) || 0,
+            qrScanEventsTotal: Number(row.qr_scan_events_total) || 0,
+            materialItemsWithQr: Number(row.material_items_with_qr) || 0,
             loading: false,
             error: false,
           });
