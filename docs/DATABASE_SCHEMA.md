@@ -5,6 +5,7 @@
 
 ## Table of Contents
 - [Overview](#overview)
+- [Migrations](#migrations)
 - [Core Tables](#core-tables)
 - [Entity Relationship Diagram](#entity-relationship-diagram)
 - [Table Details](#table-details)
@@ -19,6 +20,10 @@ UjenziXform is a Kenyan construction marketplace platform. The database supports
 - **Orders & Quotes**: Purchase orders, quotation requests
 - **Delivery**: Delivery providers, tracking, QR codes
 - **Communication**: Chat, notifications, feedback
+
+### Migrations
+
+Workflow, diagnostics vs migration files, and security linting for SQL are documented in [MIGRATIONS.md](./MIGRATIONS.md).
 
 ---
 

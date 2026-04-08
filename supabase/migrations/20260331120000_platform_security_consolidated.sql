@@ -96,17 +96,8 @@ BEGIN
   END IF;
 END $$;
 
-DO $$
-BEGIN
-  IF EXISTS (
-    SELECT 1 FROM information_schema.columns
-    WHERE table_schema = 'public' AND table_name = 'admin_staff' AND column_name = 'staff_code'
-  ) THEN
-    UPDATE public.admin_staff
-    SET staff_code = COALESCE(NULLIF(TRIM(staff_code), ''), 'UJPRO-2024-0001')
-    WHERE LOWER(email) = 'hillarytaley@gmail.com';
-  END IF;
-END $$;
+-- admin_staff.staff_code bootstrap: set per environment via Dashboard, seed.sql, or a
+-- dedicated non-production seed script — avoid targeting individual emails in migrations.
 
 DROP POLICY IF EXISTS "Allow public read for login verification" ON public.admin_staff;
 

@@ -123,6 +123,28 @@ async function analyzeMigrations() {
   if (duplicates > 0) {
     console.log(`  ⚠️  Found ${duplicates} potential duplicate migrations`);
   }
+
+  // Same 14-digit timestamp prefix (different suffixes): distinct Supabase versions, but confusing when skimming
+  const by14 = {};
+  for (const file of files) {
+    const m14 = file.match(/^(\d{14})_/);
+    if (!m14) continue;
+    const p = m14[1];
+    if (!by14[p]) by14[p] = [];
+    by14[p].push(file);
+  }
+  const prefixDupes = Object.entries(by14).filter(([, arr]) => arr.length > 1);
+  if (prefixDupes.length > 0) {
+    console.log(`\n⚠️  Migrations sharing the same 14-digit prefix (${prefixDupes.length} prefixes):`);
+    for (const [prefix, arr] of prefixDupes.slice(0, 15)) {
+      console.log(`  ${prefix}: ${arr.length} files`);
+      for (const n of arr) console.log(`    - ${n}`);
+    }
+    if (prefixDupes.length > 15) {
+      console.log(`  ... and ${prefixDupes.length - 15} more prefixes`);
+    }
+    console.log('  (Each file is still a unique version; avoid reusing the same full basename.)');
+  }
   
   // Find empty migrations
   const emptyMigrations = files.filter(f => {
