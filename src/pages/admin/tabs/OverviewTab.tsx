@@ -94,10 +94,11 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
               <Activity className="h-5 w-5 text-blue-500" />
               Recent Activity
             </CardTitle>
-            <p className="text-sm text-gray-500">
-              Suppliers and builders: use <span className="text-gray-400">Open</span> for User Registrations (full forms
-              and documents). Delivery rows open <span className="text-gray-400">Delivery applications</span> (approve /
-              reject pipeline).
+            <p className="text-base text-gray-400 leading-relaxed max-w-3xl">
+              <span className="font-medium text-gray-300">How to open rows:</span> For suppliers and builders, use{" "}
+              <span className="text-white">Open</span> to go to <strong className="text-gray-200">User Registrations</strong>{" "}
+              (full forms and documents). Delivery rows open{" "}
+              <strong className="text-gray-200">Delivery applications</strong> (approve / reject pipeline).
             </p>
           </CardHeader>
           <CardContent>
@@ -248,7 +249,7 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
                       : 'text-blue-400'
                   }`}
                 />
-                <p className="text-xs text-white font-medium truncate">{page.name}</p>
+                <p className="text-sm text-white font-medium leading-tight line-clamp-2">{page.name}</p>
                 <div
                   className={`w-1.5 h-1.5 rounded-full mx-auto mt-2 ${
                     page.status === 'active' ? 'bg-green-500' : 'bg-yellow-500'

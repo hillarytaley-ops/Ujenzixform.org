@@ -84,7 +84,12 @@ import {
   Scan,
   ShoppingBag,
   ClipboardList,
-  Video
+  Video,
+  UserRoundPlus,
+  LogIn,
+  ClipboardPenLine,
+  HardHat,
+  Factory,
 } from "lucide-react";
 import { AdminScanDashboard } from "@/components/qr/AdminScanDashboard";
 import { EnhancedQRCodeManager } from "@/components/qr/EnhancedQRCodeManager";
@@ -491,15 +496,15 @@ const AdminDashboard = () => {
   const appPages: AppPage[] = [
     { name: 'Home', path: '/', icon: Home, status: 'active', visits: 0, description: 'Main landing & auth page', category: 'public' },
     { name: 'Auth / Sign In', path: '/auth', icon: Lock, status: 'active', visits: 0, description: 'User authentication', category: 'public' },
-    { name: 'Builder Registration', path: '/builder-registration', icon: Building2, status: 'active', visits: 0, description: 'Builder signup form', category: 'public' },
-    { name: 'Supplier Registration', path: '/supplier-registration', icon: Store, status: 'active', visits: 0, description: 'Supplier signup form', category: 'public' },
-    { name: 'Delivery Registration', path: '/delivery-registration', icon: Truck, status: 'active', visits: 0, description: 'Delivery provider signup', category: 'public' },
-    { name: 'Builder Sign In', path: '/builder-signin', icon: Building2, status: 'active', visits: 0, description: 'Builder portal login', category: 'public' },
-    { name: 'Supplier Sign In', path: '/supplier-signin', icon: Store, status: 'active', visits: 0, description: 'Supplier portal login', category: 'public' },
-    { name: 'Delivery Sign In', path: '/delivery-signin', icon: Truck, status: 'active', visits: 0, description: 'Delivery portal login', category: 'public' },
-    { name: 'Builder Dashboard', path: '/professional-builder-dashboard', icon: LayoutDashboard, status: 'active', visits: 0, description: 'Builder management panel', category: 'protected' },
-    { name: 'Supplier Dashboard', path: '/supplier-dashboard', icon: LayoutDashboard, status: 'active', visits: 0, description: 'Supplier management panel', category: 'protected' },
-    { name: 'Delivery Dashboard', path: '/delivery-dashboard', icon: LayoutDashboard, status: 'active', visits: 0, description: 'Delivery management panel', category: 'protected' },
+    { name: 'Builder Registration', path: '/builder-registration', icon: UserRoundPlus, status: 'active', visits: 0, description: 'Builder signup form', category: 'public' },
+    { name: 'Supplier Registration', path: '/supplier-registration', icon: Factory, status: 'active', visits: 0, description: 'Supplier signup form', category: 'public' },
+    { name: 'Delivery Registration', path: '/delivery-registration', icon: ClipboardPenLine, status: 'active', visits: 0, description: 'Delivery provider signup', category: 'public' },
+    { name: 'Builder Sign In', path: '/builder-signin', icon: LogIn, status: 'active', visits: 0, description: 'Builder portal login', category: 'public' },
+    { name: 'Supplier Sign In', path: '/supplier-signin', icon: LogIn, status: 'active', visits: 0, description: 'Supplier portal login', category: 'public' },
+    { name: 'Delivery Sign In', path: '/delivery-signin', icon: LogIn, status: 'active', visits: 0, description: 'Delivery portal login', category: 'public' },
+    { name: 'Builder Dashboard', path: '/professional-builder-dashboard', icon: HardHat, status: 'active', visits: 0, description: 'Builder management panel', category: 'protected' },
+    { name: 'Supplier Dashboard', path: '/supplier-dashboard', icon: Store, status: 'active', visits: 0, description: 'Supplier management panel', category: 'protected' },
+    { name: 'Delivery Dashboard', path: '/delivery-dashboard', icon: Truck, status: 'active', visits: 0, description: 'Delivery management panel', category: 'protected' },
     { name: 'Supplier Marketplace', path: '/supplier-marketplace', icon: ShoppingCart, status: 'active', visits: 0, description: 'Material marketplace for builders', category: 'protected' },
     { name: 'Suppliers Page', path: '/suppliers', icon: Store, status: 'active', visits: 0, description: 'Browse all suppliers', category: 'protected' },
     { name: 'Builders Page', path: '/builders', icon: Building2, status: 'active', visits: 0, description: 'Browse all builders', category: 'protected' },
@@ -2300,11 +2305,16 @@ const AdminDashboard = () => {
           <Card className="bg-slate-900/50 border-slate-800">
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
-                <div>
+                <div className="min-w-0 pr-2">
                   <p className="text-xs text-gray-400">Active Today</p>
-                  <p className="text-2xl font-bold text-green-400">{stats.activeToday}</p>
+                  <p className="text-2xl font-bold text-green-400 tabular-nums">{stats.activeToday}</p>
+                  {stats.activeToday <= 0 && (
+                    <p className="mt-1 text-[11px] leading-snug text-gray-500">
+                      No staff-tracked sessions yet today — normal for quiet periods; not a system error.
+                    </p>
+                  )}
                 </div>
-                <Activity className="h-8 w-8 text-green-500 opacity-50" />
+                <Activity className="h-8 w-8 text-green-500 opacity-50 shrink-0" />
               </div>
             </CardContent>
           </Card>
@@ -5019,7 +5029,7 @@ const AdminDashboard = () => {
       <footer className="border-t border-slate-800 py-6 mt-12">
         <div className="container mx-auto px-4">
           <div className="flex flex-col sm:flex-row items-center justify-between gap-2 text-sm text-gray-500">
-            <p>© 2024 UjenziXform Admin Portal. All rights reserved.</p>
+            <p>© {new Date().getFullYear()} UjenziXform Admin Portal. All rights reserved.</p>
             <div className="flex items-center gap-2">
               <div className="w-2 h-2 bg-green-500 rounded-full"></div>
               <span>System Status: Operational</span>

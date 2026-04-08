@@ -29,5 +29,7 @@ export function shouldHideFloatingChrome(pathname: string): boolean {
   if (pathname.endsWith('-auth')) return true;
   // Field workflows: floating share/chat competes with scan/map/deliver tasks
   if (pathname === '/delivery-dashboard') return true;
+  // Staff console: dense controls + tables; floaters obscure content
+  if (pathname === '/admin-dashboard') return true;
   return false;
 }
