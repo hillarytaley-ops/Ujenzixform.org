@@ -2174,6 +2174,8 @@ const AdminDashboard = () => {
                 activeTab={activeTab} 
                 setActiveTab={setActiveTab} 
                 pendingCount={stats.pendingRegistrations}
+                showCommunications={shouldShowTab('communications')}
+                communicationsBadge={Math.max(chatStats.unreadChats, chatStats.pendingFeedback)}
               />
               <div className="flex items-center gap-2">
                 <div className="p-1.5 sm:p-2 bg-blue-600 rounded-lg">
@@ -2188,6 +2190,28 @@ const AdminDashboard = () => {
 
             <div className="flex items-center gap-2 sm:gap-4">
               <ThemeToggle variant="compact" />
+
+              {shouldShowTab('communications') && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="relative text-gray-400 hover:text-white"
+                  title="Open Communications (live chat, voice, feedback)"
+                  onClick={() => {
+                    setActiveTab('communications');
+                    requestAnimationFrame(() => {
+                      document.getElementById('admin-main-tabs')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    });
+                  }}
+                >
+                  <MessageCircle className="h-5 w-5" />
+                  {Math.max(chatStats.unreadChats, chatStats.pendingFeedback) > 0 && (
+                    <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-teal-600 px-1 text-[10px] font-semibold text-white ring-2 ring-slate-900">
+                      {Math.min(99, Math.max(chatStats.unreadChats, chatStats.pendingFeedback))}
+                    </span>
+                  )}
+                </Button>
+              )}
               
               <Button variant="ghost" size="icon" className="text-gray-400 hover:text-white">
                 <Bell className="h-5 w-5" />
@@ -2321,7 +2345,7 @@ const AdminDashboard = () => {
         </div>
 
         {/* Tabs */}
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6" id="admin-main-tabs">
           {/* Grouped Tab Navigation - Cleaner dropdown-based navigation */}
           <GroupedTabNav
             activeTab={activeTab}

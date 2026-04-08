@@ -4,13 +4,17 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/co
 import { Badge } from '@/components/ui/badge';
 import { 
   Menu, BarChart3, Users, FileText, Settings, Shield, 
-  Activity, MessageSquare, Globe, DollarSign, QrCode, X, ClipboardList
+  Activity, MessageSquare, MessageCircle, Globe, DollarSign, QrCode, ClipboardList
 } from 'lucide-react';
 
 interface MobileNavProps {
   activeTab: string;
   setActiveTab: (tab: string) => void;
   pendingCount: number;
+  /** When true, show Communications (live chat & queues) in the sheet. */
+  showCommunications?: boolean;
+  /** Unread / pending count for Communications (max of chat + feedback queue). */
+  communicationsBadge?: number;
 }
 
 const navItems = [
@@ -19,14 +23,21 @@ const navItems = [
   { id: 'registrations', label: 'Registrations', icon: Users, color: 'text-green-400', badge: true },
   { id: 'pages', label: 'Pages', icon: Globe, color: 'text-purple-400' },
   { id: 'feedback', label: 'Feedback', icon: MessageSquare, color: 'text-yellow-400' },
+  { id: 'communications', label: 'Communications', icon: MessageCircle, color: 'text-teal-400' },
   { id: 'documents', label: 'Documents', icon: FileText, color: 'text-orange-400' },
   { id: 'financial', label: 'Financial', icon: DollarSign, color: 'text-emerald-400' },
   { id: 'supply-chain-docs', label: 'DN · GRN · Invoices', icon: ClipboardList, color: 'text-emerald-400' },
-  { id: 'qr-scanning', label: 'QR Scanning', icon: QrCode, color: 'text-cyan-400' },
+  { id: 'scanning', label: 'QR Scanning', icon: QrCode, color: 'text-cyan-400' },
   { id: 'settings', label: 'Settings', icon: Settings, color: 'text-gray-400' },
 ];
 
-export const MobileNav: React.FC<MobileNavProps> = ({ activeTab, setActiveTab, pendingCount }) => {
+export const MobileNav: React.FC<MobileNavProps> = ({
+  activeTab,
+  setActiveTab,
+  pendingCount,
+  showCommunications = false,
+  communicationsBadge = 0,
+}) => {
   const [isOpen, setIsOpen] = useState(false);
 
   const handleNavClick = (tabId: string) => {
@@ -54,7 +65,9 @@ export const MobileNav: React.FC<MobileNavProps> = ({ activeTab, setActiveTab, p
           </SheetHeader>
           
           <nav className="p-2">
-            {navItems.map((item) => (
+            {navItems
+              .filter((item) => item.id !== 'communications' || showCommunications)
+              .map((item) => (
               <button
                 key={item.id}
                 onClick={() => handleNavClick(item.id)}
@@ -69,6 +82,11 @@ export const MobileNav: React.FC<MobileNavProps> = ({ activeTab, setActiveTab, p
                 {item.badge && pendingCount > 0 && (
                   <Badge className="bg-yellow-600 text-white text-xs">
                     {pendingCount}
+                  </Badge>
+                )}
+                {item.id === 'communications' && communicationsBadge > 0 && (
+                  <Badge className="bg-teal-600 text-white text-xs">
+                    {Math.min(99, communicationsBadge)}
                   </Badge>
                 )}
               </button>
