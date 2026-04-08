@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
-import { useForm } from "react-hook-form";
+import { Link } from "react-router-dom";
+import { useForm, Controller, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { Button } from "@/components/ui/button";
@@ -8,15 +9,17 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Star, MessageSquare, Shield, AlertTriangle, CheckCircle } from "lucide-react";
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 
 const feedbackSchema = z.object({
-  name: z.string()
+  name: z
+    .string()
     .optional()
-    .refine(name => !name || (name.length <= 50 && /^[a-zA-Z\s\-']*$/.test(name)), "Name contains invalid characters"),
+    .refine((n) => !n || n.length <= 50, "Name is too long")
+    .refine((n) => !n || !/[<>]/.test(n), "Name cannot contain < or >")
+    .refine((n) => !n || n.trim().length > 0, "Name cannot be only spaces"),
   email: z.string()
     .email("Please enter a valid email")
     .max(100, "Email address too long")
@@ -27,12 +30,15 @@ const feedbackSchema = z.object({
     .max(200, "Subject too long")
     .refine(subject => !/<.*>/.test(subject), "Subject contains invalid characters")
     .refine(subject => !/script|javascript|vbscript/i.test(subject), "Subject contains suspicious content"),
-  message: z.string()
+  message: z
+    .string()
     .min(10, "Message must be at least 10 characters")
     .max(2000, "Message too long")
-    .refine(message => !/<script.*>/.test(message), "Message contains invalid content")
-    .refine(message => !/javascript:|vbscript:|data:|file:/i.test(message), "Message contains suspicious content")
-    .refine(message => !/(viagra|casino|loan|bitcoin|crypto|investment|forex)/i.test(message), "Message contains spam content"),
+    .refine((message) => !/<script.*>/.test(message), "Message contains invalid content")
+    .refine(
+      (message) => !/javascript:|vbscript:|data:|file:/i.test(message),
+      "Message contains suspicious content"
+    ),
   rating: z.number().min(1, "Please select a rating").max(5, "Invalid rating"),
   gdprConsent: z.boolean().refine(val => val === true, "You must agree to the privacy policy"),
   honeypot: z.string().max(0, "Bot detected") // Should be empty
@@ -49,16 +55,12 @@ export function FeedbackForm({ onSuccess }: FeedbackFormProps) {
   const [rating, setRating] = useState(0);
   const [hoveredRating, setHoveredRating] = useState(0);
   const [securityScore, setSecurityScore] = useState(100);
-  const [formInteractions, setFormInteractions] = useState(0);
   const [submissionStartTime] = useState(Date.now());
-  const [rateLimitStatus, setRateLimitStatus] = useState({ canSubmit: true, resetTime: null });
+  const [rateLimitStatus, setRateLimitStatus] = useState<{
+    canSubmit: boolean;
+    resetTime: string | null;
+  }>({ canSubmit: true, resetTime: null });
   const { toast } = useToast();
-
-  // Track form interactions for security
-  const trackInteraction = (type: string) => {
-    setFormInteractions(prev => prev + 1);
-    console.log('Feedback form interaction:', type);
-  };
 
   // Check rate limits
   useEffect(() => {
@@ -108,10 +110,8 @@ export function FeedbackForm({ onSuccess }: FeedbackFormProps) {
     // Remove potentially dangerous characters
     sanitized = sanitized.replace(/[<>\"'&]/g, '');
     
-    // Field-specific sanitization
     switch (fieldType) {
       case 'name':
-        sanitized = sanitized.replace(/[^a-zA-Z\s\-']/g, '');
         break;
       case 'email':
         sanitized = sanitized.replace(/[^a-zA-Z0-9@.\-_]/g, '');
@@ -134,17 +134,16 @@ export function FeedbackForm({ onSuccess }: FeedbackFormProps) {
     formState: { errors },
     reset,
     setValue,
-    watch
+    control,
   } = useForm<FeedbackForm>({
     resolver: zodResolver(feedbackSchema),
     defaultValues: {
       gdprConsent: false,
-      honeypot: ''
-    }
+      honeypot: '',
+    },
   });
 
-  // Watch form values for security validation
-  const formValues = watch();
+  const messageLen = useWatch({ control, name: 'message', defaultValue: '' })?.length ?? 0;
 
   // Security validation - relaxed for better UX
   const validateFormSecurity = (formData: FeedbackForm) => {
@@ -233,15 +232,13 @@ export function FeedbackForm({ onSuccess }: FeedbackFormProps) {
         rating: data.rating
       };
 
-      // Submit feedback without user_id to avoid foreign key constraint issues
-      console.log('Submitting feedback...');
-      
       const response = await fetch(`${SUPABASE_URL}/rest/v1/feedback`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'apikey': SUPABASE_ANON_KEY,
-          'Prefer': 'return=minimal'
+          apikey: SUPABASE_ANON_KEY,
+          Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+          Prefer: 'return=minimal',
         },
         body: JSON.stringify({
           // Send all fields separately for proper admin dashboard display
@@ -254,8 +251,6 @@ export function FeedbackForm({ onSuccess }: FeedbackFormProps) {
         })
       });
       
-      console.log('Feedback response status:', response.status);
-
       if (!response.ok) {
         const errorText = await response.text();
         console.error('Feedback submission error:', errorText);
@@ -278,7 +273,6 @@ export function FeedbackForm({ onSuccess }: FeedbackFormProps) {
       reset();
       setRating(0);
       setSecurityScore(100);
-      setFormInteractions(0);
       onSuccess?.();
     } catch (error) {
       console.error("Error submitting feedback:", error);
@@ -300,15 +294,12 @@ export function FeedbackForm({ onSuccess }: FeedbackFormProps) {
   return (
     <div className="w-full">
       {/* Security Status */}
-      {process.env.NODE_ENV === 'development' && (
+      {import.meta.env.DEV && (
         <Alert className="mb-6 border-blue-200 bg-blue-50">
           <Shield className="h-4 w-4" />
-          <AlertDescription>
-            <div className="flex items-center justify-between">
-              <span>Security Score: {securityScore}/100</span>
-              <span>Interactions: {formInteractions}</span>
-              <span>Rate Limit: {rateLimitStatus.canSubmit ? '✅' : '❌'}</span>
-            </div>
+          <AlertDescription className="flex flex-wrap items-center justify-between gap-2 text-xs">
+            <span>Security score: {securityScore}/100</span>
+            <span>Rate limit OK: {rateLimitStatus.canSubmit ? 'yes' : 'no'}</span>
           </AlertDescription>
         </Alert>
       )}
@@ -341,11 +332,6 @@ export function FeedbackForm({ onSuccess }: FeedbackFormProps) {
               {...register("name")}
               placeholder="Your name"
               className="h-12 text-lg"
-              onFocus={() => trackInteraction('focus')}
-              onChange={(e) => {
-                trackInteraction('typing');
-                register("name").onChange(e);
-              }}
               maxLength={50}
             />
             {errors.name && (
@@ -361,11 +347,6 @@ export function FeedbackForm({ onSuccess }: FeedbackFormProps) {
               {...register("email")}
               placeholder="your.email@example.com"
               className="h-12 text-lg"
-              onFocus={() => trackInteraction('focus')}
-              onChange={(e) => {
-                trackInteraction('typing');
-                register("email").onChange(e);
-              }}
               maxLength={100}
               autoComplete="email"
             />
@@ -382,11 +363,6 @@ export function FeedbackForm({ onSuccess }: FeedbackFormProps) {
             {...register("subject")}
             placeholder="Brief summary of your feedback"
             className="h-12 text-lg"
-            onFocus={() => trackInteraction('focus')}
-            onChange={(e) => {
-              trackInteraction('typing');
-              register("subject").onChange(e);
-            }}
             maxLength={200}
             autoComplete="off"
           />
@@ -402,10 +378,7 @@ export function FeedbackForm({ onSuccess }: FeedbackFormProps) {
               <button
                 key={star}
                 type="button"
-                onClick={() => {
-                  handleRatingClick(star);
-                  trackInteraction('rating');
-                }}
+                onClick={() => handleRatingClick(star)}
                 onMouseEnter={() => setHoveredRating(star)}
                 onMouseLeave={() => setHoveredRating(0)}
                 className="p-2 hover:scale-125 transition-all duration-200 rounded-full hover:bg-yellow-100"
@@ -441,43 +414,41 @@ export function FeedbackForm({ onSuccess }: FeedbackFormProps) {
             placeholder="Tell us about your experience with UjenziXform. What did you like? What could we improve? Any suggestions for better serving Kenya's construction industry?"
             rows={6}
             className="text-lg resize-none"
-            onFocus={() => trackInteraction('focus')}
-            onChange={(e) => {
-              trackInteraction('typing');
-              register("message").onChange(e);
-            }}
             maxLength={2000}
           />
           {errors.message && (
             <p className="text-sm text-destructive mt-1">{errors.message.message}</p>
           )}
           <div className="text-xs text-muted-foreground text-right">
-            {formValues.message?.length || 0}/2000 characters
+            {messageLen}/2000 characters
           </div>
         </div>
 
         {/* GDPR Compliance */}
         <div className="space-y-4">
           <div className="flex items-start space-x-3">
-            <Checkbox 
-              id="gdprConsent"
-              checked={watch("gdprConsent")}
-              onCheckedChange={(checked) => {
-                setValue("gdprConsent", checked === true);
-                trackInteraction('checkbox');
-              }}
+            <Controller
+              name="gdprConsent"
+              control={control}
+              render={({ field }) => (
+                <Checkbox
+                  id="gdprConsent"
+                  checked={field.value}
+                  onCheckedChange={(checked) => field.onChange(checked === true)}
+                />
+              )}
             />
             <div className="grid gap-1.5 leading-none">
-              <Label 
-                htmlFor="gdprConsent"
-                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
-                onClick={() => {
-                  const currentValue = watch("gdprConsent");
-                  setValue("gdprConsent", !currentValue);
-                  trackInteraction('checkbox');
-                }}
-              >
-                I agree to the privacy policy and terms of service *
+              <Label htmlFor="gdprConsent" className="text-sm font-medium leading-none cursor-pointer">
+                I agree to the{' '}
+                <Link to="/privacy-policy" className="text-primary underline underline-offset-2">
+                  privacy policy
+                </Link>{' '}
+                and{' '}
+                <Link to="/terms-of-service" className="text-primary underline underline-offset-2">
+                  terms of service
+                </Link>{' '}
+                *
               </Label>
               <p className="text-xs text-muted-foreground">
                 By checking this box, you consent to us processing your feedback and contact information 
@@ -491,11 +462,11 @@ export function FeedbackForm({ onSuccess }: FeedbackFormProps) {
         </div>
 
         {/* Security Notice */}
-        <Alert className="border-green-200 bg-green-50">
+        <Alert className="border-green-200 bg-green-50 dark:border-green-900 dark:bg-green-950/30">
           <Shield className="h-4 w-4" />
           <AlertDescription>
-            <strong>Security Protected:</strong> This form includes advanced security measures including 
-            bot protection, spam filtering, rate limiting, and secure data transmission.
+            <strong>How we protect this form:</strong> HTTPS, a hidden honeypot field, basic spam checks, and a
+            per-browser rate limit (a few submissions per hour). We may add stricter checks if abuse increases.
           </AlertDescription>
         </Alert>
 
@@ -523,8 +494,8 @@ export function FeedbackForm({ onSuccess }: FeedbackFormProps) {
               </>
             ) : (
               <>
-                <Shield className="h-5 w-5 mr-3" />
-                Submit Secure Feedback
+                <MessageSquare className="h-5 w-5 mr-3" />
+                Submit feedback
               </>
             )}
           </Button>
@@ -532,21 +503,21 @@ export function FeedbackForm({ onSuccess }: FeedbackFormProps) {
 
         {/* Form Security Info */}
         <div className="text-xs text-center text-muted-foreground space-y-1">
-          <div className="flex items-center justify-center gap-4">
+          <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1">
             <span className="flex items-center gap-1">
-              <CheckCircle className="h-3 w-3 text-green-500" />
-              SSL Encrypted
+              <CheckCircle className="h-3 w-3 text-green-500 shrink-0" />
+              Sent over HTTPS
             </span>
             <span className="flex items-center gap-1">
-              <CheckCircle className="h-3 w-3 text-green-500" />
-              Spam Protected
+              <CheckCircle className="h-3 w-3 text-green-500 shrink-0" />
+              Honeypot + client rate limit
             </span>
             <span className="flex items-center gap-1">
-              <CheckCircle className="h-3 w-3 text-green-500" />
-              GDPR Compliant
+              <CheckCircle className="h-3 w-3 text-green-500 shrink-0" />
+              Consent recorded with your message
             </span>
           </div>
-          <p>🇰🇪 Thank you for helping us build a better construction platform for Kenya</p>
+          <p>Thank you for helping improve UjenziXform for Kenya&apos;s construction sector.</p>
         </div>
       </form>
     </div>

@@ -1,4 +1,5 @@
 import React, { Suspense } from "react";
+import { useHomePagePublicStats, formatHomeStatCount } from "@/hooks/useHomePagePublicStats";
 import Navigation from "@/components/Navigation";
 import Footer from "@/components/Footer";
 import { Badge } from "@/components/ui/badge";
@@ -62,14 +63,9 @@ const feedbackTypes = [
   }
 ];
 
-const impactStats = [
-  { value: "500+", label: "Feedback Received", sublabel: "From our community", color: "text-green-600" },
-  { value: "95%", label: "Issues Resolved", sublabel: "Within 48 hours", color: "text-blue-600" },
-  { value: "4.8", label: "Average Rating", sublabel: "Customer satisfaction", color: "text-yellow-600", icon: Star },
-  { value: "47", label: "Counties Served", sublabel: "Across Kenya", color: "text-red-600" }
-];
-
 export default function Feedback() {
+  const publicStats = useHomePagePublicStats();
+
   return (
     <div className="min-h-screen bg-background">
       <Navigation />
@@ -178,7 +174,7 @@ export default function Feedback() {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 max-w-6xl mx-auto">
             
             {/* Feedback Form */}
-            <div>
+            <div id="feedback-form-section">
               <Card className="shadow-2xl border-0">
                 <CardHeader className="bg-gradient-to-r from-purple-500/5 to-pink-500/5 border-b">
                   <div className="flex items-center gap-3">
@@ -187,7 +183,9 @@ export default function Feedback() {
                     </div>
                     <div>
                       <CardTitle className="text-2xl">Share Your Feedback</CardTitle>
-                      <p className="text-muted-foreground text-sm mt-1">We read every submission</p>
+                      <p className="text-muted-foreground text-sm mt-1">
+                        We review all submissions; we cannot reply to every note, but they inform our roadmap.
+                      </p>
                     </div>
                   </div>
                 </CardHeader>
@@ -245,26 +243,28 @@ export default function Feedback() {
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2 text-xl">
                     <Sparkles className="h-5 w-5 text-pink-600" />
-                    Recent Improvements
+                    Product areas we care about
                   </CardTitle>
-                  <p className="text-sm text-muted-foreground">Based on your feedback</p>
+                  <p className="text-sm text-muted-foreground">
+                    Illustrative themes — not a release log. Priorities shift based on feedback, operations, and safety.
+                  </p>
                 </CardHeader>
                 <CardContent className="space-y-3">
                   <div className="flex items-center gap-2 text-sm">
                     <CheckCircle2 className="h-4 w-4 text-green-500 flex-shrink-0" />
-                    <span>Enhanced GPS tracking accuracy</span>
+                    <span>Reliable delivery and GPS handoff for drivers and builders</span>
                   </div>
                   <div className="flex items-center gap-2 text-sm">
                     <CheckCircle2 className="h-4 w-4 text-green-500 flex-shrink-0" />
-                    <span>Faster supplier search results</span>
+                    <span>Supplier discovery, materials data, and checkout flows</span>
                   </div>
                   <div className="flex items-center gap-2 text-sm">
                     <CheckCircle2 className="h-4 w-4 text-green-500 flex-shrink-0" />
-                    <span>Mobile app performance boost</span>
+                    <span>Performance and accessibility on phones and low bandwidth</span>
                   </div>
                   <div className="flex items-center gap-2 text-sm">
                     <CheckCircle2 className="h-4 w-4 text-green-500 flex-shrink-0" />
-                    <span>New delivery notifications</span>
+                    <span>Notifications, QR workflows, and site monitoring integrations</span>
                   </div>
                 </CardContent>
               </Card>
@@ -273,9 +273,9 @@ export default function Feedback() {
               <Card className="shadow-xl border-0">
                 <CardContent className="p-6 text-center">
                   <Users className="h-10 w-10 text-primary mx-auto mb-3" />
-                  <h3 className="font-semibold text-lg mb-2">Prefer to Talk?</h3>
+                  <h3 className="font-semibold text-lg mb-2">Prefer to talk?</h3>
                   <p className="text-sm text-muted-foreground mb-4">
-                    Our support team is available Monday to Saturday
+                    Use Contact for phone numbers and business hours (Mon–Fri, half day Sat; closed Sun).
                   </p>
                   <Button asChild variant="outline" className="w-full">
                     <Link to="/contact">
@@ -299,110 +299,72 @@ export default function Feedback() {
               Your Impact
             </Badge>
             <h2 className="text-3xl md:text-4xl font-bold mb-4">
-              Community Feedback in Numbers
+              Platform scale (live totals)
             </h2>
             <p className="text-lg text-gray-300 max-w-2xl mx-auto">
-              See how feedback from users like you is making a difference
+              The same public aggregates we show elsewhere — not feedback volume or satisfaction scores.
             </p>
           </div>
 
           <div className="grid grid-cols-2 md:grid-cols-4 gap-6 max-w-4xl mx-auto">
-            {impactStats.map((stat, index) => (
-              <Card key={index} className="bg-white/5 backdrop-blur-sm border-white/10 text-center">
-                <CardContent className="p-6">
-                  <div className={`text-4xl md:text-5xl font-bold ${stat.color} mb-2 flex items-center justify-center gap-1`}>
-                    {stat.value}
-                    {stat.icon && <stat.icon className="h-6 w-6 fill-current" />}
-                  </div>
-                  <p className="text-white font-medium">{stat.label}</p>
-                  <p className="text-sm text-gray-400">{stat.sublabel}</p>
-                </CardContent>
-              </Card>
-            ))}
+            <Card className="bg-white/5 backdrop-blur-sm border-white/10 text-center">
+              <CardContent className="p-6">
+                <div className="text-4xl md:text-5xl font-bold text-green-400 mb-2 tabular-nums">
+                  {formatHomeStatCount(publicStats.registeredNetwork, publicStats.loading)}
+                </div>
+                <p className="text-white font-medium">Network accounts</p>
+                <p className="text-sm text-gray-400">Onboarded roles (excl. admin)</p>
+              </CardContent>
+            </Card>
+            <Card className="bg-white/5 backdrop-blur-sm border-white/10 text-center">
+              <CardContent className="p-6">
+                <div className="text-4xl md:text-5xl font-bold text-blue-400 mb-2 tabular-nums">
+                  {formatHomeStatCount(publicStats.builderProjects, publicStats.loading)}
+                </div>
+                <p className="text-white font-medium">Builder projects</p>
+                <p className="text-sm text-gray-400">In our database</p>
+              </CardContent>
+            </Card>
+            <Card className="bg-white/5 backdrop-blur-sm border-white/10 text-center">
+              <CardContent className="p-6">
+                <div className="text-4xl md:text-5xl font-bold text-yellow-400 mb-2 tabular-nums">
+                  {formatHomeStatCount(publicStats.qrScanEventsTotal, publicStats.loading)}
+                </div>
+                <p className="text-white font-medium">QR scan events</p>
+                <p className="text-sm text-gray-400">Recorded on platform</p>
+              </CardContent>
+            </Card>
+            <Card className="bg-white/5 backdrop-blur-sm border-white/10 text-center">
+              <CardContent className="p-6">
+                <div className="text-4xl md:text-5xl font-bold text-red-400 mb-2 tabular-nums">
+                  {formatHomeStatCount(publicStats.deliveryRequestsActive, publicStats.loading)}
+                </div>
+                <p className="text-white font-medium">Active deliveries</p>
+                <p className="text-sm text-gray-400">In-flight requests</p>
+              </CardContent>
+            </Card>
           </div>
         </div>
       </section>
 
-      {/* Testimonials / Success Stories */}
+      {/* Honest community note (no fabricated quotes) */}
       <section className="py-16 bg-background">
-        <div className="container mx-auto px-4">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl font-bold mb-4">What Our Community Says</h2>
-            <p className="text-muted-foreground max-w-2xl mx-auto">
-              Real feedback from builders and suppliers across Kenya
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-5xl mx-auto">
-            <Card className="shadow-lg border-0">
-              <CardContent className="p-6">
-                <div className="flex items-center gap-1 mb-4">
-                  {[1,2,3,4,5].map(i => (
-                    <Star key={i} className="h-5 w-5 text-yellow-500 fill-yellow-500" />
-                  ))}
-                </div>
-                <p className="text-muted-foreground mb-4 italic">
-                  "UjenziXform has transformed how I source materials. The tracking feature 
-                  is a game-changer for my construction projects in Nairobi."
-                </p>
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-cyan-600 rounded-full flex items-center justify-center text-white font-bold">
-                    JM
-                  </div>
-                  <div>
-                    <p className="font-medium text-sm">James Mwangi</p>
-                    <p className="text-xs text-muted-foreground">Builder, Nairobi</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="shadow-lg border-0">
-              <CardContent className="p-6">
-                <div className="flex items-center gap-1 mb-4">
-                  {[1,2,3,4,5].map(i => (
-                    <Star key={i} className="h-5 w-5 text-yellow-500 fill-yellow-500" />
-                  ))}
-                </div>
-                <p className="text-muted-foreground mb-4 italic">
-                  "I suggested the QR scanning feature months ago and they actually implemented it! 
-                  Great to see a company that listens."
-                </p>
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-gradient-to-br from-green-500 to-emerald-600 rounded-full flex items-center justify-center text-white font-bold">
-                    AO
-                  </div>
-                  <div>
-                    <p className="font-medium text-sm">Amina Ochieng</p>
-                    <p className="text-xs text-muted-foreground">Supplier, Mombasa</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="shadow-lg border-0">
-              <CardContent className="p-6">
-                <div className="flex items-center gap-1 mb-4">
-                  {[1,2,3,4,5].map(i => (
-                    <Star key={i} className="h-5 w-5 text-yellow-500 fill-yellow-500" />
-                  ))}
-                </div>
-                <p className="text-muted-foreground mb-4 italic">
-                  "The support team responded to my feedback within hours. 
-                  Best customer service I've experienced in the industry."
-                </p>
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-pink-600 rounded-full flex items-center justify-center text-white font-bold">
-                    PK
-                  </div>
-                  <div>
-                    <p className="font-medium text-sm">Peter Kamau</p>
-                    <p className="text-xs text-muted-foreground">Builder, Kisumu</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
+        <div className="container mx-auto px-4 max-w-2xl text-center">
+          <h2 className="text-3xl font-bold mb-4">Your story matters</h2>
+          <p className="text-muted-foreground mb-6">
+            We do not display named testimonials here unless we have explicit permission. If you are open to being
+            featured (first name + role + county only), say so in your feedback and we may follow up.
+          </p>
+          <Button
+            variant="outline"
+            size="lg"
+            onClick={() =>
+              document.getElementById('feedback-form-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+            }
+          >
+            <MessageSquare className="h-5 w-5 mr-2" />
+            Open feedback form
+          </Button>
         </div>
       </section>
 
@@ -416,10 +378,12 @@ export default function Feedback() {
             Your feedback helps us build a better platform for Kenya's construction industry
           </p>
           <div className="flex flex-wrap justify-center gap-4">
-            <Button 
-              size="lg" 
+            <Button
+              size="lg"
               className="bg-white text-purple-600 hover:bg-white/90"
-              onClick={() => window.scrollTo({ top: 500, behavior: 'smooth' })}
+              onClick={() =>
+                document.getElementById('feedback-form-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+              }
             >
               <MessageSquare className="h-5 w-5 mr-2" />
               Submit Feedback
