@@ -20,6 +20,7 @@
     "db:consolidate": "node scripts/consolidate-migrations.mjs --generate",
     "db:archive": "node scripts/consolidate-migrations.mjs --archive",
     "db:lint-migrations": "node scripts/check-migration-security.mjs",
+    "db:combine-migrations": "node scripts/combine-migrations.mjs",
     "security:audit": "npm audit --audit-level moderate",
     "security:test": "npm run lint && npm run check:auth-keys && npm run db:lint-migrations && npm run security:audit",
     "security:headers": "node scripts/test-security-headers.js",

@@ -21,6 +21,16 @@ This repository has a long chain of incremental migrations. That is normal for a
 
 Optional consolidation for **brand-new** databases only is a separate, manual process (export schema from Supabase, review, single baseline). The script `npm run db:consolidate` prints guidance only.
 
+### One file for manual execution (advanced)
+
+To produce a single SQL file containing **every** migration in order (for empty DBs / `psql` only):
+
+```bash
+npm run db:combine-migrations
+```
+
+Output: `supabase/combined_migrations_manual_run.sql` (large, gitignored). Prefer the Supabase CLI on real projects so migration history stays accurate.
+
 ## Diagnostics vs migrations
 
 Ad hoc `SELECT` batches, one-off backfills, and account-specific troubleshooting must **not** live in `supabase/migrations/`. Use `supabase/scripts/diagnostics/` and run them manually in the SQL Editor when needed.

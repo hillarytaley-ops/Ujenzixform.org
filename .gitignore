@@ -57,6 +57,9 @@ bun.lockb
 *.tmp
 *.temp
 
+# Local rollup of every migration (large); regenerate with npm run db:combine-migrations
+supabase/combined_migrations_manual_run.sql
+
 # OS files
 Thumbs.db
 desktop.ini
