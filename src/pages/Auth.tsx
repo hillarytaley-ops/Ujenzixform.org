@@ -136,6 +136,8 @@ function rejectAfter(ms: number, message: string): Promise<never> {
   return new Promise((_, rej) => setTimeout(() => rej(new Error(message)), ms));
 }
 
+const EMAIL_LIKE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 const Auth = () => {
   const navigate = useNavigate();
   const [formLoading, setFormLoading] = useState(false);
@@ -145,6 +147,8 @@ const Auth = () => {
   const [signInPassword, setSignInPassword] = useState("");
   const [signUpEmail, setSignUpEmail] = useState("");
   const [signUpPassword, setSignUpPassword] = useState("");
+  /** Shown only when the email typed on the active tab matches an active admin_staff row (via RPC). */
+  const [staffPortalEligible, setStaffPortalEligible] = useState(false);
   const isSubmitting = useRef(false);
   const passwordSignInFlowRef = useRef(false);
   const { toast } = useToast();
@@ -203,6 +207,32 @@ const Auth = () => {
 
     return () => subscription.unsubscribe();
   }, [toast, completeSignInNavigation]);
+
+  useEffect(() => {
+    const raw = (authTab === "signin" ? signInEmail : signUpEmail).trim();
+    if (!EMAIL_LIKE.test(raw)) {
+      setStaffPortalEligible(false);
+      return;
+    }
+    let cancelled = false;
+    const t = window.setTimeout(() => {
+      void (async () => {
+        const { data, error } = await supabase.rpc("is_admin_staff_portal_email", {
+          p_email: raw,
+        });
+        if (cancelled) return;
+        if (error) {
+          setStaffPortalEligible(false);
+          return;
+        }
+        setStaffPortalEligible(data === true);
+      })();
+    }, 450);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(t);
+    };
+  }, [authTab, signInEmail, signUpEmail]);
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -477,14 +507,16 @@ const Auth = () => {
               </a>
             </div>
 
-            <div className="mt-4 pt-4 border-t">
-              <Link to="/admin-login">
-                <Button variant="outline" className="w-full bg-slate-800 text-white hover:bg-slate-700 border-slate-700">
-                  <Shield className="mr-2 h-4 w-4" />
-                  Staff Access
-                </Button>
-              </Link>
-            </div>
+            {staffPortalEligible ? (
+              <div className="mt-4 pt-4 border-t">
+                <Link to="/admin-login">
+                  <Button variant="outline" className="w-full bg-slate-800 text-white hover:bg-slate-700 border-slate-700">
+                    <Shield className="mr-2 h-4 w-4" />
+                    Staff Access
+                  </Button>
+                </Link>
+              </div>
+            ) : null}
           </CardContent>
         </Card>
       </AnimatedSection>
