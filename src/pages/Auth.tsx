@@ -55,14 +55,19 @@ function rejectAfter(ms: number, message: string): Promise<never> {
   return new Promise((_, rej) => setTimeout(() => rej(new Error(message)), ms));
 }
 
+const EMAIL_LIKE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 const Auth = () => {
   const navigate = useNavigate();
   const [formLoading, setFormLoading] = useState(false);
   const [showResetDialog, setShowResetDialog] = useState(false);
+  const [authTab, setAuthTab] = useState("signin");
   const [signInEmail, setSignInEmail] = useState("");
   const [signInPassword, setSignInPassword] = useState("");
   const [signUpEmail, setSignUpEmail] = useState("");
   const [signUpPassword, setSignUpPassword] = useState("");
+  /** True only when Sign In email matches an active row in admin_staff (via RPC). */
+  const [staffPortalEligible, setStaffPortalEligible] = useState(false);
   const isSubmitting = useRef(false);
   const passwordSignInFlowRef = useRef(false);
   const { toast } = useToast();
@@ -121,6 +126,32 @@ const Auth = () => {
 
     return () => subscription.unsubscribe();
   }, [toast, completeSignInNavigation]);
+
+  useEffect(() => {
+    const raw = signInEmail.trim();
+    if (!EMAIL_LIKE.test(raw)) {
+      setStaffPortalEligible(false);
+      return;
+    }
+    let cancelled = false;
+    const t = window.setTimeout(() => {
+      void (async () => {
+        const { data, error } = await supabase.rpc("is_admin_staff_portal_email", {
+          p_email: raw,
+        });
+        if (cancelled) return;
+        if (error) {
+          setStaffPortalEligible(false);
+          return;
+        }
+        setStaffPortalEligible(data === true);
+      })();
+    }, 450);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(t);
+    };
+  }, [signInEmail]);
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -283,7 +314,7 @@ const Auth = () => {
             <CardDescription>Kenya's Premier Construction Platform</CardDescription>
           </CardHeader>
           <CardContent>
-            <Tabs defaultValue="signin" className="w-full">
+            <Tabs value={authTab} onValueChange={setAuthTab} className="w-full">
               <TabsList className="grid w-full grid-cols-2">
                 <TabsTrigger value="signin">Sign In</TabsTrigger>
                 <TabsTrigger value="signup">Sign Up</TabsTrigger>
@@ -445,14 +476,16 @@ const Auth = () => {
               </a>
             </div>
 
-            <div className="mt-4 pt-4 border-t">
-              <Link to="/admin-login">
-                <Button variant="outline" className="w-full bg-slate-800 text-white hover:bg-slate-700 border-slate-700">
-                  <Shield className="mr-2 h-4 w-4" />
-                  Staff Access
-                </Button>
-              </Link>
-            </div>
+            {staffPortalEligible ? (
+              <div className="mt-4 pt-4 border-t">
+                <Link to="/admin-login">
+                  <Button variant="outline" className="w-full bg-slate-800 text-white hover:bg-slate-700 border-slate-700">
+                    <Shield className="mr-2 h-4 w-4" />
+                    Staff Access
+                  </Button>
+                </Link>
+              </div>
+            ) : null}
           </CardContent>
         </Card>
       </AnimatedSection>
