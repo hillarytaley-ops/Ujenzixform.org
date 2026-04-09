@@ -14,7 +14,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
 import AnimatedSection from "@/components/AnimatedSection";
 import { Separator } from "@/components/ui/separator";
-import { Github, Mail, KeyRound, CheckCircle, Loader2, Shield } from "lucide-react";
+import { Mail, KeyRound, CheckCircle, Loader2, Shield } from "lucide-react";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { SimplePasswordReset } from "@/components/SimplePasswordReset";
 
@@ -259,7 +259,7 @@ const Auth = () => {
     }
   };
 
-  const signInWithProvider = async (provider: 'google' | 'github' | 'apple') => {
+  const signInWithProvider = async (provider: "google" | "apple") => {
     if (formLoading) return;
     setFormLoading(true);
     try {
@@ -273,7 +273,7 @@ const Auth = () => {
       if (error) {
         toast({
           variant: 'destructive',
-          title: `${provider === 'apple' ? 'Apple' : provider === 'google' ? 'Google' : 'GitHub'} sign-in failed`,
+          title: `${provider === "apple" ? "Apple" : "Google"} sign-in failed`,
           description: error.message,
         });
         setFormLoading(false);
@@ -322,12 +322,9 @@ const Auth = () => {
               
               <TabsContent value="signin">
                 <div className="space-y-4">
-                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                     <Button variant="outline" onClick={() => signInWithProvider('google')} disabled={formLoading}>
                       <Mail className="mr-2 h-4 w-4" /> Google
-                    </Button>
-                    <Button variant="outline" onClick={() => signInWithProvider('github')} disabled={formLoading}>
-                      <Github className="mr-2 h-4 w-4" /> GitHub
                     </Button>
                     <Button variant="outline" onClick={() => signInWithProvider('apple')} disabled={formLoading}>
                       <svg className="mr-2 h-4 w-4" viewBox="0 0 24 24" aria-hidden>
@@ -395,12 +392,9 @@ const Auth = () => {
               
               <TabsContent value="signup">
                 <div className="space-y-4">
-                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                     <Button variant="outline" onClick={() => signInWithProvider('google')} disabled={formLoading}>
                       <Mail className="mr-2 h-4 w-4" /> Google
-                    </Button>
-                    <Button variant="outline" onClick={() => signInWithProvider('github')} disabled={formLoading}>
-                      <Github className="mr-2 h-4 w-4" /> GitHub
                     </Button>
                     <Button variant="outline" onClick={() => signInWithProvider('apple')} disabled={formLoading}>
                       <svg className="mr-2 h-4 w-4" viewBox="0 0 24 24" aria-hidden>
