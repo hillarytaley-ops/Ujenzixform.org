@@ -9,7 +9,8 @@ export interface HlsVideoPlayerProps {
 }
 
 /**
- * Plays HLS (.m3u8) in the browser: Safari uses native HLS; Chrome/Firefox/Edge use hls.js.
+ * Plays HLS (.m3u8) in the browser: Safari uses native HLS; Chrome/Firefox/Edge use **hls.js**
+ * from the npm package (same role as a CDN script — bundled by Vite, no extra &lt;script&gt; tag).
  * The playlist host must send CORS headers allowing your site origin, or the player will fail.
  */
 export function HlsVideoPlayer({ src, className, onFatalError }: HlsVideoPlayerProps) {
@@ -35,10 +36,13 @@ export function HlsVideoPlayer({ src, className, onFatalError }: HlsVideoPlayerP
     if (native) {
       video.src = src;
       const onErr = () => fail();
+      const onLoaded = () => void video.play().catch(() => {});
       video.addEventListener('error', onErr);
+      video.addEventListener('loadedmetadata', onLoaded);
       return () => {
         destroyed = true;
         video.removeEventListener('error', onErr);
+        video.removeEventListener('loadedmetadata', onLoaded);
         video.removeAttribute('src');
         video.load();
       };
@@ -52,12 +56,16 @@ export function HlsVideoPlayer({ src, className, onFatalError }: HlsVideoPlayerP
       }
       hls = new Hls({
         enableWorker: true,
-        lowLatencyMode: true,
+        // Standard HLS (e.g. MediaMTX `hlsVariant: mpegts`) — LL-HLS needs lowLatencyMode + LL parts.
+        lowLatencyMode: false,
         maxBufferLength: 45,
         maxMaxBufferLength: 120,
       });
       hls.loadSource(src);
       hls.attachMedia(video);
+      hls.on(Hls.Events.MANIFEST_PARSED, () => {
+        void video.play().catch(() => {});
+      });
       hls.on(Hls.Events.ERROR, (_event, data) => {
         if (!data.fatal) return;
         hls?.destroy();
