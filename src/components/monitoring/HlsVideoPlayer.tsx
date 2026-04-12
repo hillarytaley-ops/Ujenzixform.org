@@ -54,12 +54,25 @@ export function HlsVideoPlayer({ src, className, onFatalError }: HlsVideoPlayerP
         fail();
         return;
       }
+      const srcLower = src.trim().toLowerCase();
+      const ngrokTunnel =
+        srcLower.includes('ngrok-free.') ||
+        srcLower.includes('ngrok.app') ||
+        srcLower.includes('ngrok.io');
       hls = new Hls({
         enableWorker: true,
         // Standard HLS (e.g. MediaMTX `hlsVariant: mpegts`) — LL-HLS needs lowLatencyMode + LL parts.
         lowLatencyMode: false,
         maxBufferLength: 45,
         maxMaxBufferLength: 120,
+        // ngrok free tier returns an interstitial HTML page unless this header is set — breaks hls.js fetches.
+        ...(ngrokTunnel
+          ? {
+              xhrSetup: (xhr: XMLHttpRequest) => {
+                xhr.setRequestHeader('ngrok-skip-browser-warning', 'true');
+              },
+            }
+          : {}),
       });
       hls.loadSource(src);
       hls.attachMedia(video);

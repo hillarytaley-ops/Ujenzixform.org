@@ -291,8 +291,10 @@ function StreamPlaybackHelp({
         <p className="text-slate-400 text-xs leading-relaxed text-left">
           Check that the <strong>.m3u8</strong> URL is reachable from <em>your</em> browser (not only the server), uses{' '}
           <strong>HTTPS</strong> when the app is on HTTPS, and that the media server sends{' '}
-          <strong>CORS</strong> headers so hls.js can fetch segments. For hiding the origin or proxying segments, see the
-          relay section in the infra doc.
+          <strong>CORS</strong> headers so hls.js can fetch segments. If the URL is on <strong>ngrok</strong>, the app
+          sends <code className="text-[11px] bg-slate-800 px-1 rounded">ngrok-skip-browser-warning</code> on segment
+          requests; if you test outside the app, add that header or open the playlist in Safari/VLC. For relaying or
+          proxying segments, see the infra doc.
         </p>
         <div className="flex flex-wrap gap-2 justify-center">
           <Button variant="outline" size="sm" asChild className="text-slate-200 border-slate-600">
@@ -925,8 +927,7 @@ const Monitoring = () => {
       const isBuilderRole = ['builder', 'professional_builder', 'private_client'].includes(dbRole);
       
       if (isBuilderRole) {
-        // Approved subscription does NOT unlock live cameras — user must enter access code (or ?access_code=).
-        console.log('🔐 Monitoring - Builder context (code required for camera access):', authUser.id);
+        console.log('🔐 Monitoring - Builder context:', authUser.id);
 
         const { rows: allMonitoring } = await fetchMyMonitoringServiceRequests(
           supabase,
@@ -947,14 +948,30 @@ const Monitoring = () => {
               new Date(String(a.created_at || 0)).getTime()
           );
         const monitoringData = approved.slice(0, 1);
+        const latestMr = monitoringData.length > 0 ? monitoringData[0] : null;
+        setMonitoringRequest(latestMr);
 
-        setMonitoringRequest(monitoringData.length > 0 ? monitoringData[0] : null);
-
-        console.log(
-          monitoringData.length > 0
-            ? '🔐 Monitoring - Approved service on file; enter access code to open cameras'
-            : '⚠️ Monitoring - No approved monitoring requests'
-        );
+        // Auto-load assigned cameras when the approved row already has an access code (private/pro builders
+        // often skip pasting the code on every visit). URL ?access_code= still takes precedence via separate effect.
+        if (
+          latestMr &&
+          !accessCodeFromUrl &&
+          typeof latestMr.access_code === 'string' &&
+          latestMr.access_code.trim() &&
+          Array.isArray(latestMr.assigned_cameras) &&
+          latestMr.assigned_cameras.length > 0
+        ) {
+          queueMicrotask(() => {
+            void loadCamerasFromAccessCode(latestMr.access_code.trim());
+          });
+          console.log('🔐 Monitoring - Auto-loading cameras from saved access code on monitoring request');
+        } else {
+          console.log(
+            monitoringData.length > 0
+              ? '🔐 Monitoring - Approved service on file; add ?access_code=CODE or use the access code field if cameras did not auto-load'
+              : '⚠️ Monitoring - No approved monitoring requests'
+          );
+        }
       } else if (dbRole === 'admin') {
         // Admins always have access
         setHasMonitoringAccess(true);
