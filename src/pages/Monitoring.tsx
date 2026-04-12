@@ -199,7 +199,7 @@ function StreamPlaybackHelp({
               Run the <strong>MediaMTX</strong> Docker example from this repo on a mini PC / NVR (same LAN as the camera).
             </li>
             <li>
-              Put the resulting <code className="text-[11px]">…/site/index.m3u8</code> URL into{' '}
+              Put the resulting <code className="text-[11px]">…/cam1/index.m3u8</code> URL into{' '}
               <strong>cameras.stream_url</strong>. Remote viewers need HTTPS, VPN, or tunnel — see infra doc.
             </li>
           </ol>

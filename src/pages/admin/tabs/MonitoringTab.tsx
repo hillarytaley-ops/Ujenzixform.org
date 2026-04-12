@@ -1016,7 +1016,7 @@ const CameraModal: React.FC<CameraModalProps> = ({
                     formData.connection_type === 'mobile'
                       ? 'http://192.168.1.100:8080/video'
                       : formData.connection_type === 'vendor_cellular'
-                        ? 'https://your-relay.example.com/hls/site/index.m3u8'
+                        ? 'https://your-relay.example.com/cam1/index.m3u8'
                         : 'https://camera.example.com/stream'
                   }
                   className="bg-slate-800 border-slate-700 text-white mt-1"

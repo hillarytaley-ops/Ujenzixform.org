@@ -56,7 +56,7 @@ Browsers will **never** play `rtsp://` directly. You must expose **HLS** (or MP4
 Pick a machine on the **same LAN** as the camera (mini PC, NVR sidecar, office PC, or small Linux VM).
 
 1. Copy the repo folder **`docs/examples/mediamtx-rtsp-to-hls/`** to that machine.
-2. Edit **`mediamtx.yml`**: set `paths.site.source` to your real RTSP URL (URL-encode special characters in the password if needed).
+2. Edit **`mediamtx.yml`**: set **`paths.<name>.source`** (example uses **`cam1`**) to your real RTSP URL (URL-encode special characters in the password if needed). The URL path **`/cam1/`** must match that key. Prefer **`hlsVariant: mpegts`** for hls.js compatibility (see `docs/examples/mediamtx-rtsp-to-hls/mediamtx.yml`).
 3. Install **Docker** on the host.
 4. In that folder run:
 
@@ -64,8 +64,8 @@ Pick a machine on the **same LAN** as the camera (mini PC, NVR sidecar, office P
    docker compose up -d
    ```
 
-5. Default HLS URL shape:  
-   `http://<HOST_LAN_IP>:8888/site/index.m3u8`  
+5. Default HLS URL shape (if your path key is `cam1`):  
+   `http://<HOST_LAN_IP>:8888/cam1/index.m3u8`  
    Test in VLC (Open Network Stream) or Safari.
 
 **Other converters (same role: on LAN, RTSP in → HLS/HTTPS out):** Any stack that can **pull** your `rtsp://…` URL and **serve** an **HTTPS** playlist the app can store in `cameras.stream_url` is valid. Common choices besides MediaMTX: **FFmpeg** writing HLS to disk behind **nginx/Caddy** (DIY); **[go2rtc](https://github.com/AlexxIT/go2rtc)** (lightweight, multiple outputs including HLS/WebRTC); **[OvenMediaEngine](https://github.com/AirenSoft/OvenMediaEngine)** or **[ZLMediaKit](https://github.com/ZLMediaKit/ZLMediaKit)** (full media servers); or an **NVR/VMS** that restreams HLS/RTMP if the vendor documents a stable URL. You still need **TLS**, **CORS**, and (for most sites) **no mixed content** — same as A3–A4 below.
