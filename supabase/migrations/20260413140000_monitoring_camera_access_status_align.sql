@@ -1,9 +1,3 @@
-/*
-  Align monitoring request statuses with Monitoring.tsx / builder UX:
-  - auth_can_access_camera: include in_progress (was missing vs UI filter)
-  - resolve_monitoring_access_code: allow active + in_progress so access codes work before "completed"
-*/
-
 CREATE OR REPLACE FUNCTION public.auth_can_access_camera(p_camera_id uuid)
 RETURNS boolean
 LANGUAGE plpgsql
