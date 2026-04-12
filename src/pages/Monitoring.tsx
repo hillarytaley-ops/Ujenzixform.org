@@ -56,6 +56,8 @@ import { CameraAccessRequest } from '@/components/builders/CameraAccessRequest';
 import { MonitoringServiceRequest } from '@/components/builders/MonitoringServiceRequest';
 import { CameraRemoteCapabilitiesPanel } from '@/components/monitoring/CameraRemoteCapabilitiesPanel';
 import { HlsVideoPlayer } from '@/components/monitoring/HlsVideoPlayer';
+import { MultiCameraWall } from '@/components/monitoring/MultiCameraWall';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { cn } from '@/lib/utils';
 import {
   isHlsPlaylistUrl,
@@ -356,9 +358,12 @@ function StreamPlaybackHelp({
 function MonitoringLiveMedia({
   feed,
   variant,
+  streamLatency = 'standard',
 }: {
   feed: CameraFeed;
   variant: 'fullscreen' | 'default';
+  /** Low = LL-HLS-style hls.js tuning; needs short parts from the media server. */
+  streamLatency?: 'standard' | 'low';
 }) {
   const [videoFailed, setVideoFailed] = useState(false);
   const [hlsFailed, setHlsFailed] = useState(false);
@@ -420,7 +425,12 @@ function MonitoringLiveMedia({
     }
     return (
       <div className={cn(shell, 'items-center justify-center')}>
-        <HlsVideoPlayer src={rawUrl} onFatalError={() => setHlsFailed(true)} />
+        <HlsVideoPlayer
+          src={rawUrl}
+          latencyMode={streamLatency}
+          autoReconnect
+          onFatalError={() => setHlsFailed(true)}
+        />
       </div>
     );
   }
@@ -497,6 +507,30 @@ const Monitoring = () => {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [cameraViewSize, setCameraViewSize] = useState<'normal' | 'large' | 'fullscreen'>('normal');
+  const [cameraLayout, setCameraLayout] = useState<'single' | 'wall'>(() => {
+    if (typeof window === 'undefined') return 'single';
+    return localStorage.getItem('monitoring_camera_layout') === 'wall' ? 'wall' : 'single';
+  });
+  const [streamLatency, setStreamLatency] = useState<'standard' | 'low'>(() => {
+    if (typeof window === 'undefined') return 'standard';
+    return localStorage.getItem('monitoring_stream_latency') === 'low' ? 'low' : 'standard';
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('monitoring_camera_layout', cameraLayout);
+    } catch {
+      /* ignore */
+    }
+  }, [cameraLayout]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('monitoring_stream_latency', streamLatency);
+    } catch {
+      /* ignore */
+    }
+  }, [streamLatency]);
 
   // Handle body scroll lock when fullscreen
   useEffect(() => {
@@ -618,6 +652,17 @@ const Monitoring = () => {
         ? null
         : activeCameraList.find((c) => c.id === selectedCamera) ?? null,
     [activeCameraList, selectedCamera]
+  );
+
+  const wallCameras = useMemo(
+    () =>
+      activeCameraList.map((c) => ({
+        id: c.id,
+        name: c.name,
+        stream_url: c.stream_url,
+        embed_code: c.embed_code,
+      })),
+    [activeCameraList]
   );
 
   const [projects] = useState<ProjectMonitoring[]>([
@@ -1875,16 +1920,52 @@ const Monitoring = () => {
                   </Alert>
                 )}
                 
-                <div className="flex items-center justify-between mb-6">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between mb-6">
                   <div>
                     <h2 className="text-2xl font-bold">Live Camera Feeds</h2>
                     <p className="text-muted-foreground">
                       {isAdmin ? "Monitor all construction site cameras" : "View cameras from your construction projects"}
                     </p>
                   </div>
-                  <Badge variant="outline" className="bg-green-50">
-                    {activeCameraList.filter(cameraFeedLooksLive).length} Online
-                  </Badge>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge variant="outline" className="bg-green-50">
+                      {activeCameraList.filter(cameraFeedLooksLive).length} Online
+                    </Badge>
+                    <ToggleGroup
+                      type="single"
+                      value={cameraLayout}
+                      onValueChange={(v) => {
+                        if (v === 'single' || v === 'wall') setCameraLayout(v);
+                      }}
+                      variant="outline"
+                      size="sm"
+                      className="justify-start"
+                    >
+                      <ToggleGroupItem value="single" aria-label="Single camera view">
+                        Single
+                      </ToggleGroupItem>
+                      <ToggleGroupItem value="wall" aria-label="Multi-camera wall">
+                        Wall
+                      </ToggleGroupItem>
+                    </ToggleGroup>
+                    <ToggleGroup
+                      type="single"
+                      value={streamLatency}
+                      onValueChange={(v) => {
+                        if (v === 'standard' || v === 'low') setStreamLatency(v);
+                      }}
+                      variant="outline"
+                      size="sm"
+                      className="justify-start"
+                    >
+                      <ToggleGroupItem value="standard" aria-label="Standard HLS latency">
+                        Standard
+                      </ToggleGroupItem>
+                      <ToggleGroupItem value="low" aria-label="Low latency HLS (LL-HLS)">
+                        Low latency
+                      </ToggleGroupItem>
+                    </ToggleGroup>
+                  </div>
                 </div>
 
                 {/* Reorganized Layout - Camera List on Top for Mobile, Side for Desktop */}
@@ -1961,7 +2042,11 @@ const Monitoring = () => {
                       <div className="absolute inset-0 flex items-center justify-center p-4">
                         {selectedCamera ? (
                           selectedFeed && cameraHasStreamMedia(selectedFeed) ? (
-                            <MonitoringLiveMedia feed={selectedFeed} variant="fullscreen" />
+                            <MonitoringLiveMedia
+                              feed={selectedFeed}
+                              variant="fullscreen"
+                              streamLatency={streamLatency}
+                            />
                           ) : (
                             <div className="text-center">
                               {selectedCamera.startsWith('drone-') ? (
@@ -2183,10 +2268,28 @@ const Monitoring = () => {
                           )}
                           
                           {/* Center Content */}
-                          <div className="absolute inset-0 flex items-center justify-center p-4">
-                            {selectedCamera ? (
+                          <div
+                            className={cn(
+                              'absolute inset-0 p-4',
+                              cameraLayout === 'wall'
+                                ? 'overflow-auto'
+                                : 'flex items-center justify-center'
+                            )}
+                          >
+                            {cameraLayout === 'wall' ? (
+                              <MultiCameraWall
+                                cameras={wallCameras}
+                                selectedId={selectedCamera}
+                                onSelectCamera={setSelectedCamera}
+                                latencyMode={streamLatency}
+                              />
+                            ) : selectedCamera ? (
                               selectedFeed && cameraHasStreamMedia(selectedFeed) ? (
-                                <MonitoringLiveMedia feed={selectedFeed} variant="default" />
+                                <MonitoringLiveMedia
+                                  feed={selectedFeed}
+                                  variant="default"
+                                  streamLatency={streamLatency}
+                                />
                               ) : (
                                 <div className="text-center">
                                   {selectedCamera.startsWith('drone-') ? (
@@ -2449,6 +2552,35 @@ const Monitoring = () => {
                       </CardContent>
                     </Card>
                   </div>
+                </div>
+
+                <div className="grid gap-4 md:grid-cols-2 max-w-6xl mx-auto mt-6">
+                  <Card className="border-slate-200 dark:border-slate-700 bg-card/80">
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-base">Recording playback</CardTitle>
+                      <CardDescription>
+                        Archived segments from your recorder (for example MediaMTX record paths or NVR exports) will
+                        plug in here. Configure the media server first, then add playback URLs per camera.
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <Button variant="outline" size="sm" asChild>
+                        <a href={DOCS_MONITORING_STREAMING_STEPS} target="_blank" rel="noopener noreferrer">
+                          Streaming setup steps
+                        </a>
+                      </Button>
+                    </CardContent>
+                  </Card>
+                  <Card className="border-slate-200 dark:border-slate-700 bg-card/80">
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-base">Secure streams</CardTitle>
+                      <CardDescription>
+                        RTSP credentials stay on your converter or edge device. Viewers use your signed-in session and
+                        database checks (for example get_camera_stream_secure); the browser only receives HTTPS HLS or
+                        embeds you allow—no per-camera passwords stored in this app.
+                      </CardDescription>
+                    </CardHeader>
+                  </Card>
                 </div>
                 
                 {/* Custom Scrollbar Styles */}
