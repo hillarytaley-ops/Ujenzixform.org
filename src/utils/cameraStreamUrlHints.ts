@@ -21,6 +21,26 @@ export function isHlsPlaylistUrl(url: string): boolean {
   }
 }
 
+/**
+ * When the SPA is served over HTTPS, browsers block fetching `http://` playlists and segments
+ * (mixed content). hls.js and native HLS both fail silently or with a generic security error.
+ * Localhost HTTP is still allowed by browsers for dev.
+ */
+export function isHttpStreamBlockedByMixedContent(url: string): boolean {
+  if (typeof window === 'undefined') return false;
+  if (window.location.protocol !== 'https:') return false;
+  const trimmed = url.trim();
+  if (!trimmed.toLowerCase().startsWith('http://')) return false;
+  try {
+    const u = new URL(trimmed);
+    const h = u.hostname.toLowerCase();
+    if (h === 'localhost' || h === '127.0.0.1' || h === '[::1]') return false;
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export function shouldUseSharePageHintInsteadOfVideoTag(url: string): boolean {
   const trimmed = url.trim();
   if (!trimmed) return true;

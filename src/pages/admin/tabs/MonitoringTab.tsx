@@ -1029,6 +1029,27 @@ const CameraModal: React.FC<CameraModalProps> = ({
                   {formData.connection_type === 'vendor_cellular' &&
                     'Use an HLS (.m3u8) or direct HTTPS video URL — not rtsp:// (browsers cannot play RTSP). For vendor iframe viewers, switch to Embed code.'}
                 </p>
+                {requiredFields.includes('stream_url') &&
+                  formData.stream_url.trim().toLowerCase().startsWith('http://') && (
+                    <Alert className="mt-3 border-amber-500/50 bg-slate-900/80 text-slate-200 [&>svg]:text-amber-400">
+                      <AlertTriangle className="h-4 w-4" />
+                      <AlertTitle className="text-amber-100 text-sm">Use HTTPS for production Web Link streams</AlertTitle>
+                      <AlertDescription className="text-xs text-slate-400 leading-relaxed space-y-2">
+                        <p>
+                          On <strong>https://</strong> (e.g. Vercel), the browser blocks <code className="text-[11px] bg-slate-800 px-1 rounded">http://</code>{' '}
+                          HLS playlists — you will see mixed-content or connection errors, not live video.
+                        </p>
+                        <p>
+                          Put TLS in front of MediaMTX, or run a tunnel on the PC that hosts port <strong>8888</strong> (install{' '}
+                          <a href="https://ngrok.com/download" target="_blank" rel="noopener noreferrer" className="text-amber-300 underline">
+                            ngrok
+                          </a>
+                          , then <code className="text-[11px] bg-slate-800 px-1 rounded">ngrok http 8888</code>) and paste the{' '}
+                          <strong>https://…</strong> <code className="text-[11px] bg-slate-800 px-1">.m3u8</code> URL here.
+                        </p>
+                      </AlertDescription>
+                    </Alert>
+                  )}
                 {formData.connection_type === 'vendor_cellular' && (
                   <Alert className="mt-3 border-cyan-500/40 bg-slate-900/80 text-slate-200 [&>svg]:text-cyan-400">
                     <Sun className="h-4 w-4" />

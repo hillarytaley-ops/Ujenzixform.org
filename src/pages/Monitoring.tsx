@@ -59,6 +59,7 @@ import { HlsVideoPlayer } from '@/components/monitoring/HlsVideoPlayer';
 import { cn } from '@/lib/utils';
 import {
   isHlsPlaylistUrl,
+  isHttpStreamBlockedByMixedContent,
   isRtspStreamUrl,
   shouldUseSharePageHintInsteadOfVideoTag,
 } from '@/utils/cameraStreamUrlHints';
@@ -169,7 +170,7 @@ function youtubeOrVimeoEmbedUrl(pageUrl: string): string | null {
   return null;
 }
 
-type StreamPlaybackHelpHint = 'rtsp' | 'hls-failed' | 'generic';
+type StreamPlaybackHelpHint = 'rtsp' | 'hls-failed' | 'mixed-content' | 'generic';
 
 function StreamPlaybackHelp({
   rawUrl,
@@ -227,6 +228,55 @@ function StreamPlaybackHelp({
           <Button variant="ghost" size="sm" asChild className="text-slate-500">
             <a href={rawUrl} target="_blank" rel="noopener noreferrer">
               Copy / test in VLC
+            </a>
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  if (mode === 'mixed-content') {
+    return (
+      <div className="max-w-xl mx-auto text-center p-6 rounded-lg bg-slate-900/95 border border-red-500/40 space-y-3">
+        <p className="text-red-100 text-sm font-semibold">HTTP stream blocked on this site (mixed content)</p>
+        <p className="text-slate-400 text-xs leading-relaxed text-left">
+          UjenziXform is loaded over <strong>HTTPS</strong>. Browsers refuse to load an <code className="text-[11px] bg-slate-800 px-1 rounded">http://</code>{' '}
+          <strong>.m3u8</strong> playlist or its segments from another host — that is a security rule, not a bug in the app.
+        </p>
+        <div className="text-left text-xs text-slate-300 space-y-2 border border-slate-700/80 rounded-md p-3 bg-slate-950/50">
+          <p className="font-medium text-slate-200">What to do</p>
+          <ol className="list-decimal list-inside space-y-1.5">
+            <li>
+              Put <strong>HTTPS</strong> in front of MediaMTX (Caddy / nginx + Let&apos;s Encrypt), or use an <strong>HTTPS tunnel</strong>{' '}
+              from the PC that runs MediaMTX (same machine as port 8888).
+            </li>
+            <li>
+              <strong>ngrok:</strong> install from{' '}
+              <a href="https://ngrok.com/download" target="_blank" rel="noopener noreferrer" className="text-cyan-400 underline">
+                ngrok.com/download
+              </a>
+              , then run <code className="text-[11px] bg-slate-800 px-1 rounded">ngrok http 8888</code> and paste the{' '}
+              <strong>https://….ngrok-free.app/…/index.m3u8</strong> URL into the camera Web Link field.
+            </li>
+            <li>
+              Alternative: <strong>Cloudflare Tunnel</strong> (<code className="text-[11px] bg-slate-800 px-1">cloudflared tunnel --url http://127.0.0.1:8888</code>) or{' '}
+              <strong>Tailscale</strong> so viewers reach your LAN over VPN (then you may still want HTTPS on the stream host).
+            </li>
+          </ol>
+          <p className="text-slate-500 pt-1">
+            <strong>ERR_CONNECTION_REFUSED</strong> on a raw public IP usually means nothing is listening there from your network, or MediaMTX
+            is not running — a tunnel forwards to the machine where <code className="text-[11px] bg-slate-800 px-1">localhost:8888</code> actually works.
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2 justify-center pt-1">
+          <Button variant="outline" size="sm" asChild className="text-slate-200 border-slate-600">
+            <a href={DOCS_MONITORING_STREAMING_STEPS} target="_blank" rel="noopener noreferrer">
+              Streaming checklist (Part A3–A4)
+            </a>
+          </Button>
+          <Button variant="ghost" size="sm" asChild className="text-slate-500">
+            <a href={rawUrl} target="_blank" rel="noopener noreferrer">
+              Try opening playlist (may still be blocked in-page)
             </a>
           </Button>
         </div>
@@ -360,6 +410,9 @@ function MonitoringLiveMedia({
   }
 
   if (isHlsPlaylistUrl(rawUrl)) {
+    if (isHttpStreamBlockedByMixedContent(rawUrl)) {
+      return <StreamPlaybackHelp rawUrl={rawUrl} hint="mixed-content" />;
+    }
     if (hlsFailed) {
       return <StreamPlaybackHelp rawUrl={rawUrl} hint="hls-failed" />;
     }
