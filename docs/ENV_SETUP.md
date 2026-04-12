@@ -41,14 +41,21 @@ Use reCAPTCHA v2 "I'm not a robot" Checkbox type.
 VITE_RECAPTCHA_SITE_KEY=6Le...your-site-key
 ```
 
-### Payments - Stripe
+### Payments - Paystack (primary)
 
-Get from: [Stripe Dashboard](https://dashboard.stripe.com/apikeys)
+Checkout uses **Paystack’s hosted page** (cards, M-Pesa, and other channels you enable in Paystack). The app never collects raw card numbers.
 
-⚠️ Use the **PUBLISHABLE** key (starts with `pk_`), NOT the secret key!
+1. Create a Paystack account and get your **secret key** (`sk_test_…` or `sk_live_…`).
+2. In **Supabase Dashboard → Project Settings → Edge Functions → Secrets**, add:
+   - `PAYSTACK_SECRET_KEY` — your Paystack secret key (never put this in `VITE_*` or commit it).
+3. Deploy Edge Functions `paystack-initialize`, `paystack-verify`, and `paystack-webhook` (see `supabase/config.toml` entries).
+4. In **Paystack Dashboard → Settings → API & Webhooks**, set the webhook URL to  
+   `https://<your-project-ref>.supabase.co/functions/v1/paystack-webhook`.
+
+Optional legacy Stripe env (unused by the Paystack UI path):
 
 ```env
-VITE_STRIPE_PUBLIC_KEY=pk_test_...or...pk_live_...
+# VITE_STRIPE_PUBLIC_KEY=pk_test_...or...pk_live_...
 ```
 
 ### Maps & Location - Google Maps

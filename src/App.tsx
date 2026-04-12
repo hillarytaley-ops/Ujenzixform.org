@@ -70,6 +70,7 @@ const DeliveryAuth = lazyImport(() => import("./pages/DeliveryAuth"));
 // Legal pages - lazy loaded
 const PrivacyPolicy = lazyImport(() => import("./pages/PrivacyPolicy"));
 const TermsOfService = lazyImport(() => import("./pages/TermsOfService"));
+const PaystackPaymentCallback = lazyImport(() => import("./pages/PaystackPaymentCallback"));
 
 // Auth Guard
 import { AuthRequired } from "@/components/security/AuthRequired";
@@ -273,6 +274,7 @@ const App = () => {
                     
                     {/* All pages accessible after sign in - no repeated auth required */}
                     <Route path="/home" element={<Index />} />
+                    <Route path="/payment/paystack-callback" element={<SuspenseWrapper><PaystackPaymentCallback /></SuspenseWrapper>} />
                     {SUPPLIERS_PAGE_PATHS.map((p) => (
                       <Route key={p} path={p} element={<SuspenseWrapper><Suppliers /></SuspenseWrapper>} />
                     ))}

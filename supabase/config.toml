@@ -26,3 +26,14 @@ verify_jwt = false
 
 [functions.rate-limit]
 verify_jwt = false
+
+# Paystack: JWT checked inside handler (invoke sends user Bearer token).
+[functions.paystack-initialize]
+verify_jwt = false
+
+[functions.paystack-verify]
+verify_jwt = false
+
+# Paystack servers only (HMAC x-paystack-signature).
+[functions.paystack-webhook]
+verify_jwt = false
