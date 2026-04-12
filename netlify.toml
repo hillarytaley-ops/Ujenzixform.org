@@ -1,3 +1,6 @@
+# Legacy / unused for the primary deployment — production uses Vercel (`vercel.json` for CSP and headers).
+# Kept in-repo only for forks or experiments; safe to ignore if you deploy on Vercel.
+
 [build]
   # Build command
   command = "npm run build"

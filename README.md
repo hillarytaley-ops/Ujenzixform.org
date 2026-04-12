@@ -60,7 +60,7 @@ Security is **defense in depth**: client practices, Supabase **Row Level Securit
 
 ### **Security & monitoring**
 - **Auth**: Supabase JWT; optional OAuth providers when enabled in the project
-- **CSP / headers**: Helpers and scripts exist to test headers locally — confirm the same policies on your production host (e.g. Vercel)
+- **CSP / headers**: Production **Vercel** config lives in [`vercel.json`](vercel.json) (CSP, HSTS, frame protections). Local scripts can validate header behavior; `netlify.toml` is legacy and not used for the main deploy.
 - **Error reporting**: Optional Sentry integration when configured
 
 ## 🚀 **Getting Started**
@@ -119,6 +119,10 @@ npm run security:headers  # Test security headers
 npm run security:full     # Complete security test suite
 ```
 
+### **Deployment (Vercel)**
+
+The app is built and served on **Vercel**. After `git push`, the project build uses `vercel.json` (framework `vite`, `dist` output, SPA rewrites, cache headers, and **Content-Security-Policy**). Change Paystack, Supabase, analytics, or map domains there if your stack differs.
+
 ## 🏗️ **Project Structure**
 
 ```
@@ -139,6 +143,7 @@ UjenziXform/
 │   └── functions/          # Edge functions
 ├── docs/                   # Documentation
 │   └── security/           # Security documentation
+├── vercel.json             # Vercel: build, rewrites, CSP / security headers
 └── scripts/                # Build and deployment scripts
 ```
 
