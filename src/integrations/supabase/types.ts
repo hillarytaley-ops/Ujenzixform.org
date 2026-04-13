@@ -203,6 +203,8 @@ export type Database = {
         Row: {
           created_at: string
           id: string
+          ingest_rtmp_url: string | null
+          ingest_srt_url: string | null
           is_active: boolean | null
           location: string | null
           name: string
@@ -215,6 +217,8 @@ export type Database = {
         Insert: {
           created_at?: string
           id?: string
+          ingest_rtmp_url?: string | null
+          ingest_srt_url?: string | null
           is_active?: boolean | null
           location?: string | null
           name: string
@@ -227,6 +231,8 @@ export type Database = {
         Update: {
           created_at?: string
           id?: string
+          ingest_rtmp_url?: string | null
+          ingest_srt_url?: string | null
           is_active?: boolean | null
           location?: string | null
           name?: string

@@ -246,6 +246,10 @@ export interface CameraRecord {
   project_id: string | null;
   project_name?: string;
   stream_url: string | null;
+  /** RTMP publish URL for camera → MediaMTX (ops); not for browser playback. */
+  ingest_rtmp_url?: string | null;
+  /** SRT publish URL when camera supports SRT push. */
+  ingest_srt_url?: string | null;
   is_active: boolean;
   camera_type: string;
   connection_type: CameraConnectionType;
@@ -269,6 +273,8 @@ export interface CameraFormData {
   name: string;
   location: string;
   stream_url: string;
+  ingest_rtmp_url?: string;
+  ingest_srt_url?: string;
   camera_type: string;
   connection_type: CameraConnectionType;
   ip_address?: string;

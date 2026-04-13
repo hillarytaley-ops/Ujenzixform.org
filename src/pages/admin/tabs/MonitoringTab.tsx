@@ -49,12 +49,18 @@ import {
   HelpCircle,
   Mic,
   Sun,
+  Copy,
 } from 'lucide-react';
 import { CameraRecord, CameraFormData, CameraConnectionType } from '../types';
 import { StatsCard, StatsGrid } from '../components/StatsCard';
 import { CameraPermissionGuide, CameraSetupBanner } from '@/components/camera/CameraPermissionGuide';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { DOCS_CAMERAS_HIKVISION, DOCS_MONITORING_STREAMING_STEPS } from '@/config/docsLinks';
+import {
+  DOCS_CAMERAS_HIKVISION,
+  DOCS_MEDIAMTX_RTSP_TO_HLS,
+  DOCS_MONITORING_STREAMING_STEPS,
+} from '@/config/docsLinks';
+import { useToast } from '@/hooks/use-toast';
 import { CameraGridSkeleton } from '@/components/ui/loading-skeleton';
 import { FriendlyError } from '@/components/ui/friendly-error';
 import { DataTable, StatusBadge, Column, RowAction } from '../components/DataTable';
@@ -111,7 +117,8 @@ const connectionTypes: {
     value: 'vendor_cellular',
     label: 'Solar / 4G IP',
     icon: Sun,
-    description: 'Cellular or solar IP camera (e.g. Hikvision): HLS/HTTPS URL or vendor embed',
+    description:
+      'Cellular or solar IP camera (e.g. Hikvision): HLS URL for the dashboard; optional RTMP/SRT ingest for the camera to push to MediaMTX.',
     fields: ['stream_url'],
   },
 ];
@@ -131,6 +138,8 @@ export const MonitoringTab: React.FC<MonitoringTabProps> = ({
     name: '',
     location: '',
     stream_url: '',
+    ingest_rtmp_url: '',
+    ingest_srt_url: '',
     camera_type: 'ip',
     connection_type: 'url',
     recording_enabled: false,
@@ -179,6 +188,8 @@ export const MonitoringTab: React.FC<MonitoringTabProps> = ({
       name: camera.name,
       location: camera.location || '',
       stream_url: camera.stream_url || '',
+      ingest_rtmp_url: camera.ingest_rtmp_url || '',
+      ingest_srt_url: camera.ingest_srt_url || '',
       camera_type: camera.camera_type || 'ip',
       connection_type: camera.connection_type || 'url',
       ip_address: camera.ip_address || '',
@@ -200,6 +211,8 @@ export const MonitoringTab: React.FC<MonitoringTabProps> = ({
       name: '',
       location: '',
       stream_url: '',
+      ingest_rtmp_url: '',
+      ingest_srt_url: '',
       camera_type: 'ip',
       connection_type: 'url',
       recording_enabled: false,
@@ -236,6 +249,18 @@ export const MonitoringTab: React.FC<MonitoringTabProps> = ({
       ),
     },
     { key: 'location', label: 'Location', sortable: true },
+    {
+      key: 'ingest_rtmp_url',
+      label: 'Camera push',
+      render: (_, row) =>
+        row.ingest_rtmp_url || row.ingest_srt_url ? (
+          <Badge variant="outline" className="border-cyan-600/50 text-cyan-300 text-[10px] uppercase tracking-wide">
+            RTMP / SRT
+          </Badge>
+        ) : (
+          <span className="text-gray-600 text-xs">—</span>
+        ),
+    },
     {
       key: 'connection_type',
       label: 'Connection',
@@ -856,6 +881,109 @@ const CameraCard: React.FC<CameraCardProps> = ({
   );
 };
 
+/** RTMP/SRT publish targets for Case 2 (camera → MediaMTX). Dashboard still uses Stream URL (HLS) above. */
+function StreamIngestFields({
+  formData,
+  setFormData,
+}: {
+  formData: CameraFormData;
+  setFormData: React.Dispatch<React.SetStateAction<CameraFormData>>;
+}) {
+  const { toast } = useToast();
+
+  const copy = async (label: string, text: string) => {
+    const t = text.trim();
+    if (!t) {
+      toast({ title: 'Nothing to copy', description: `Enter a ${label} URL first.`, variant: 'destructive' });
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(t);
+      toast({ title: 'Copied', description: `${label} URL copied to clipboard.` });
+    } catch {
+      toast({
+        title: 'Copy failed',
+        description: 'Clipboard is not available in this context.',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  return (
+    <div className="space-y-4 rounded-lg border border-slate-700/80 bg-slate-900/60 p-4">
+      <div className="flex items-start gap-2">
+        <Server className="h-4 w-4 text-amber-400 shrink-0 mt-0.5" />
+        <div>
+          <p className="text-sm font-medium text-slate-200">Camera push → MediaMTX (optional)</p>
+          <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+            Paste these into the camera or NVR as the <strong>publish / server</strong> addresses. The monitoring player
+            does not use RTMP or SRT — it uses the <strong>HLS Stream URL</strong> you set above (output from MediaMTX,
+            often <code className="text-[11px] bg-slate-800 px-1 rounded">…/index.m3u8</code>).
+          </p>
+          <p className="text-xs text-slate-500 mt-2">
+            <a
+              href={DOCS_MEDIAMTX_RTSP_TO_HLS}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-amber-400 hover:underline inline-flex items-center gap-1"
+            >
+              <ExternalLink className="h-3 w-3" />
+              MediaMTX example (README)
+            </a>
+          </p>
+        </div>
+      </div>
+
+      <div>
+        <div className="flex items-center justify-between gap-2">
+          <Label className="text-gray-300">RTMP ingest URL</Label>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="h-7 text-xs text-slate-400 hover:text-white"
+            onClick={() => void copy('RTMP ingest', formData.ingest_rtmp_url || '')}
+          >
+            <Copy className="h-3.5 w-3.5 mr-1" />
+            Copy
+          </Button>
+        </div>
+        <Input
+          placeholder="rtmp://your-vps-public-ip:1935/your_path"
+          className="bg-slate-800 border-slate-700 text-white mt-1 font-mono text-xs"
+          value={formData.ingest_rtmp_url || ''}
+          onChange={(e) => setFormData((prev) => ({ ...prev, ingest_rtmp_url: e.target.value }))}
+        />
+      </div>
+
+      <div>
+        <div className="flex items-center justify-between gap-2">
+          <Label className="text-gray-300">SRT ingest URL</Label>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="h-7 text-xs text-slate-400 hover:text-white"
+            onClick={() => void copy('SRT ingest', formData.ingest_srt_url || '')}
+          >
+            <Copy className="h-3.5 w-3.5 mr-1" />
+            Copy
+          </Button>
+        </div>
+        <Input
+          placeholder="srt://your-vps-public-ip:8890?streamid=publish:path:user:pass"
+          className="bg-slate-800 border-slate-700 text-white mt-1 font-mono text-xs"
+          value={formData.ingest_srt_url || ''}
+          onChange={(e) => setFormData((prev) => ({ ...prev, ingest_srt_url: e.target.value }))}
+        />
+        <p className="text-[11px] text-slate-500 mt-1">
+          UDP <strong>8890</strong> must be open on the VPS for SRT. Match streamid format to your MediaMTX version.
+        </p>
+      </div>
+    </div>
+  );
+}
+
 // Enhanced Camera Modal Component
 interface CameraModalProps {
   isEditing: boolean;
@@ -1163,6 +1291,10 @@ const CameraModal: React.FC<CameraModalProps> = ({
                   .
                 </p>
               </div>
+            )}
+
+            {requiredFields.includes('stream_url') && (
+              <StreamIngestFields formData={formData} setFormData={setFormData} />
             )}
           </div>
 

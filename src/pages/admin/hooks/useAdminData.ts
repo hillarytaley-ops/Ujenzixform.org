@@ -436,6 +436,8 @@ export const useCameras = () => {
           location,
           project_id,
           stream_url,
+          ingest_rtmp_url,
+          ingest_srt_url,
           is_active,
           connection_type,
           embed_code,
@@ -469,6 +471,8 @@ export const useCameras = () => {
           project_id: cam.project_id as string | null,
           project_name: (cam.projects as { name: string } | null)?.name || undefined,
           stream_url: cam.stream_url as string | null,
+          ingest_rtmp_url: (cam.ingest_rtmp_url as string | null) ?? null,
+          ingest_srt_url: (cam.ingest_srt_url as string | null) ?? null,
           is_active: (cam.is_active as boolean) ?? true,
           camera_type: (cam.camera_type as string) || 'ip',
           connection_type: (cam.connection_type as CameraRecord['connection_type']) || 'url',
@@ -508,10 +512,14 @@ export const useCameras = () => {
 
       const streamUrl = cameraData.stream_url?.trim() ? cameraData.stream_url.trim() : null;
       const embedCode = cameraData.embed_code?.trim() ? cameraData.embed_code.trim() : null;
+      const ingestRtmp = cameraData.ingest_rtmp_url?.trim() ? cameraData.ingest_rtmp_url.trim() : null;
+      const ingestSrt = cameraData.ingest_srt_url?.trim() ? cameraData.ingest_srt_url.trim() : null;
       const insertPayload: Record<string, unknown> = {
         name: cameraData.name,
         location: cameraData.location || null,
         stream_url: streamUrl,
+        ingest_rtmp_url: ingestRtmp,
+        ingest_srt_url: ingestSrt,
         is_active: cameraData.is_active ?? true,
         supports_ptz: cameraData.supports_ptz ?? false,
         supports_two_way_audio: cameraData.supports_two_way_audio ?? false,
@@ -561,6 +569,16 @@ export const useCameras = () => {
       if (cameraData.location !== undefined) updateData.location = cameraData.location || null;
       if (cameraData.stream_url !== undefined) {
         updateData.stream_url = cameraData.stream_url?.trim() ? cameraData.stream_url.trim() : null;
+      }
+      if (cameraData.ingest_rtmp_url !== undefined) {
+        updateData.ingest_rtmp_url = cameraData.ingest_rtmp_url?.trim()
+          ? cameraData.ingest_rtmp_url.trim()
+          : null;
+      }
+      if (cameraData.ingest_srt_url !== undefined) {
+        updateData.ingest_srt_url = cameraData.ingest_srt_url?.trim()
+          ? cameraData.ingest_srt_url.trim()
+          : null;
       }
       if (cameraData.is_active !== undefined) updateData.is_active = cameraData.is_active;
       if (cameraData.supports_ptz !== undefined) updateData.supports_ptz = cameraData.supports_ptz;
