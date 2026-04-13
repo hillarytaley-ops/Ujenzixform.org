@@ -24,21 +24,22 @@ function credentialsPayloadFromForm(d: Partial<CameraFormData>): Record<string, 
   return Object.keys(o).length > 0 ? o : undefined;
 }
 
-const CAMERAS_WEBRTC_HOSTS_COL = 'mediamtx_webrtc_additional_hosts';
-
-/** PostgREST returns 400 if select/insert references a column not in the DB (migration not applied yet). */
-function isMissingCamerasWebrtcColumnError(error: unknown): boolean {
-  const msg =
-    error && typeof error === 'object' && 'message' in error
-      ? String((error as { message?: string }).message)
-      : '';
-  if (!msg.includes(CAMERAS_WEBRTC_HOSTS_COL)) return false;
-  return (
-    msg.includes('does not exist') ||
-    msg.includes('schema cache') ||
-    msg.includes('Could not find') ||
-    msg.includes('column')
-  );
+/**
+ * PostgREST returns 400 when PATCH/INSERT JSON includes a column absent from the schema cache
+ * (migrations not applied on the linked project). Message shape varies slightly by version.
+ */
+function getPostgrestMissingCamerasColumnName(error: unknown): string | null {
+  const e = error && typeof error === 'object' ? (error as Record<string, unknown>) : null;
+  if (!e) return null;
+  const text = [e.message, e.details, e.hint].filter(Boolean).join(' ');
+  if (!text) return null;
+  const ofTable = text.match(/Could not find the '([^']+)' column of 'cameras'/i);
+  if (ofTable) return ofTable[1];
+  const inCache = text.match(/Could not find the '([^']+)' column in the schema cache/i);
+  if (inCache) return inCache[1];
+  const pgQuoted = text.match(/column "([^"]+)" does not exist/i);
+  if (pgQuoted && /cameras/i.test(text)) return pgQuoted[1];
+  return null;
 }
 
 // Hook for fetching dashboard statistics
@@ -539,25 +540,28 @@ export const useCameras = () => {
       const creds = credentialsPayloadFromForm(cameraData);
       if (creds) insertPayload.credentials = creds;
 
-      let insertResult = await client.from('cameras').insert(insertPayload);
-      let webrtcHostsSkippedOnInsert = false;
-      if (
-        insertResult.error &&
-        isMissingCamerasWebrtcColumnError(insertResult.error) &&
-        CAMERAS_WEBRTC_HOSTS_COL in insertPayload
-      ) {
-        const { [CAMERAS_WEBRTC_HOSTS_COL]: _webrtc, ...rest } = insertPayload;
-        insertResult = await client.from('cameras').insert(rest);
-        webrtcHostsSkippedOnInsert = !insertResult.error && !!webrtcHosts;
+      let insertPayloadMut: Record<string, unknown> = { ...insertPayload };
+      const strippedInsertCols: string[] = [];
+      let insertResult = await client.from('cameras').insert(insertPayloadMut);
+      for (let i = 0; i < 12 && insertResult.error; i++) {
+        const missingCol = getPostgrestMissingCamerasColumnName(insertResult.error);
+        if (!missingCol || !(missingCol in insertPayloadMut)) break;
+        strippedInsertCols.push(missingCol);
+        const { [missingCol]: _removed, ...rest } = insertPayloadMut;
+        insertPayloadMut = rest;
+        if (Object.keys(insertPayloadMut).length === 0) break;
+        insertResult = await client.from('cameras').insert(insertPayloadMut);
       }
 
       if (insertResult.error) throw insertResult.error;
 
+      const insertPartial =
+        strippedInsertCols.length > 0
+          ? ` Some fields were not saved (no matching DB column yet): ${strippedInsertCols.join(', ')}. Run pending Supabase migrations for cameras.`
+          : '';
       toast({
         title: 'Camera Added',
-        description: webrtcHostsSkippedOnInsert
-          ? `Camera "${cameraData.name}" was added. WebRTC host list was not saved until the mediamtx migration is applied on Supabase.`
-          : `Camera "${cameraData.name}" has been added successfully.`,
+        description: `Camera "${cameraData.name}" has been added successfully.${insertPartial}`,
       });
 
       fetchCameras();
@@ -617,26 +621,28 @@ export const useCameras = () => {
       if (cameraData.ip_address !== undefined) updateData.ip_address = cameraData.ip_address?.trim() || null;
       // Do not PATCH credentials here: the form often omits password on edit, which would wipe stored JSONB.
 
-      let updateResult = await client.from('cameras').update(updateData).eq('id', id);
-      let webrtcHostsSkippedOnUpdate = false;
-      if (
-        updateResult.error &&
-        isMissingCamerasWebrtcColumnError(updateResult.error) &&
-        CAMERAS_WEBRTC_HOSTS_COL in updateData
-      ) {
-        const { [CAMERAS_WEBRTC_HOSTS_COL]: _webrtc, ...rest } = updateData;
-        updateResult = await client.from('cameras').update(rest).eq('id', id);
-        webrtcHostsSkippedOnUpdate =
-          !updateResult.error && cameraData.mediamtx_webrtc_additional_hosts !== undefined;
+      let updatePayloadMut: Record<string, unknown> = { ...updateData };
+      const strippedUpdateCols: string[] = [];
+      let updateResult = await client.from('cameras').update(updatePayloadMut).eq('id', id);
+      for (let i = 0; i < 12 && updateResult.error; i++) {
+        const missingCol = getPostgrestMissingCamerasColumnName(updateResult.error);
+        if (!missingCol || !(missingCol in updatePayloadMut)) break;
+        strippedUpdateCols.push(missingCol);
+        const { [missingCol]: _removed, ...rest } = updatePayloadMut;
+        updatePayloadMut = rest;
+        if (Object.keys(updatePayloadMut).length === 0) break;
+        updateResult = await client.from('cameras').update(updatePayloadMut).eq('id', id);
       }
 
       if (updateResult.error) throw updateResult.error;
 
+      const updatePartial =
+        strippedUpdateCols.length > 0
+          ? ` Some fields were not saved (no matching DB column yet): ${strippedUpdateCols.join(', ')}. Run pending Supabase migrations for cameras.`
+          : '';
       toast({
         title: 'Camera Updated',
-        description: webrtcHostsSkippedOnUpdate
-          ? 'Other settings were saved. WebRTC host list was not saved until the mediamtx migration is applied on Supabase.'
-          : 'Camera settings have been updated successfully.',
+        description: `Camera settings have been updated successfully.${updatePartial}`,
       });
 
       fetchCameras();
