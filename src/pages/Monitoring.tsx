@@ -172,15 +172,44 @@ function youtubeOrVimeoEmbedUrl(pageUrl: string): string | null {
   return null;
 }
 
+/** Prefer auto-selecting a feed the in-app player can use without admin troubleshooting overlays. */
+function cameraStreamLikelyPlayableInApp(feed: CameraFeed): boolean {
+  if (String(feed.embed_code ?? '').trim()) return true;
+  const rawUrl = String(feed.stream_url ?? '').trim();
+  if (!rawUrl) return false;
+  if (youtubeOrVimeoEmbedUrl(rawUrl)) return true;
+  if (isHlsPlaylistUrl(rawUrl)) return true;
+  if (/\.(mp4|webm)(\?|#|$)/i.test(rawUrl)) return true;
+  if (isRtspStreamUrl(rawUrl)) return false;
+  if (shouldUseSharePageHintInsteadOfVideoTag(rawUrl)) return false;
+  return true;
+}
+
 type StreamPlaybackHelpHint = 'rtsp' | 'hls-failed' | 'mixed-content' | 'generic';
 
 function StreamPlaybackHelp({
   rawUrl,
   hint,
+  viewerMode = 'admin',
 }: {
   rawUrl: string;
   hint?: StreamPlaybackHelpHint;
+  /** Builders / access-code viewers: no doc links or technical setup UI. */
+  viewerMode?: 'admin' | 'client';
 }) {
+  if (viewerMode === 'client') {
+    return (
+      <div className="max-w-md mx-auto text-center p-8 rounded-lg bg-slate-900/95 border border-slate-700/80 space-y-4">
+        <Camera className="h-14 w-14 mx-auto text-cyan-500/70" />
+        <p className="text-slate-100 text-sm font-semibold">Waiting for live stream</p>
+        <p className="text-slate-400 text-xs leading-relaxed">
+          Please wait while your site administrator starts the stream. You can leave this page open or check back in a
+          few minutes.
+        </p>
+      </div>
+    );
+  }
+
   const mode: StreamPlaybackHelpHint =
     hint ?? (isRtspStreamUrl(rawUrl) ? 'rtsp' : 'generic');
 
@@ -367,11 +396,13 @@ function MonitoringLiveMedia({
   feed,
   variant,
   streamLatency = 'standard',
+  viewerMode = 'admin',
 }: {
   feed: CameraFeed;
   variant: 'fullscreen' | 'default';
   /** Low = LL-HLS-style hls.js tuning; needs short parts from the media server. */
   streamLatency?: 'standard' | 'low';
+  viewerMode?: 'admin' | 'client';
 }) {
   const [videoFailed, setVideoFailed] = useState(false);
   const [hlsFailed, setHlsFailed] = useState(false);
@@ -421,15 +452,15 @@ function MonitoringLiveMedia({
     shouldUseSharePageHintInsteadOfVideoTag(rawUrl) &&
     !youtubeOrVimeoEmbedUrl(rawUrl)
   ) {
-    return <StreamPlaybackHelp rawUrl={rawUrl} />;
+    return <StreamPlaybackHelp rawUrl={rawUrl} viewerMode={viewerMode} />;
   }
 
   if (isHlsPlaylistUrl(rawUrl)) {
     if (isHttpStreamBlockedByMixedContent(rawUrl)) {
-      return <StreamPlaybackHelp rawUrl={rawUrl} hint="mixed-content" />;
+      return <StreamPlaybackHelp rawUrl={rawUrl} hint="mixed-content" viewerMode={viewerMode} />;
     }
     if (hlsFailed) {
-      return <StreamPlaybackHelp rawUrl={rawUrl} hint="hls-failed" />;
+      return <StreamPlaybackHelp rawUrl={rawUrl} hint="hls-failed" viewerMode={viewerMode} />;
     }
     return (
       <div className={cn(shell, 'items-center justify-center')}>
@@ -444,7 +475,7 @@ function MonitoringLiveMedia({
   }
 
   if (videoFailed) {
-    return <StreamPlaybackHelp rawUrl={rawUrl} />;
+    return <StreamPlaybackHelp rawUrl={rawUrl} viewerMode={viewerMode} />;
   }
 
   return (
@@ -719,15 +750,6 @@ const Monitoring = () => {
       loadCamerasFromAccessCode(accessCodeFromUrl);
     }
   }, [accessCodeFromUrl]);
-
-  // After access-code cameras load, select first camera so the main player is not stuck on "no selection"
-  useEffect(() => {
-    if (assignedCameras.length === 0) return;
-    setSelectedCamera((prev) => {
-      if (prev && assignedCameras.some((c) => c.id === prev)) return prev;
-      return assignedCameras[0].id;
-    });
-  }, [assignedCameras]);
 
   useEffect(() => {
     // Set default tab based on role
@@ -1055,6 +1077,19 @@ const Monitoring = () => {
   const isDeliveryProvider = effectiveRoleEarly === 'delivery_provider' || effectiveRoleEarly === 'delivery';
   // Builders can view cameras if they have the role (monitoring access check is done separately)
   const canViewCameras = isAdmin || isBuilder;
+
+  // After assigned cameras load, pick a sensible default (clients: first in-app-playable stream when possible).
+  useEffect(() => {
+    if (assignedCameras.length === 0) return;
+    setSelectedCamera((prev) => {
+      if (prev && assignedCameras.some((c) => c.id === prev)) return prev;
+      if (!isAdmin) {
+        const playable = assignedCameras.find((c) => cameraStreamLikelyPlayableInApp(c));
+        if (playable) return playable.id;
+      }
+      return assignedCameras[0].id;
+    });
+  }, [assignedCameras, isAdmin]);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -2054,6 +2089,7 @@ const Monitoring = () => {
                               feed={selectedFeed}
                               variant="fullscreen"
                               streamLatency={streamLatency}
+                              viewerMode={isAdmin ? 'admin' : 'client'}
                             />
                           ) : (
                             <div className="text-center">
@@ -2080,7 +2116,9 @@ const Monitoring = () => {
                                     Live Camera Feed
                                   </p>
                                   <p className="text-xl font-mono text-cyan-300/70">
-                                    {selectedFeed?.quality} • Streaming (add stream URL or embed in admin)
+                                    {isAdmin
+                                      ? `${selectedFeed?.quality} • Streaming (add stream URL or embed in admin)`
+                                      : `${selectedFeed?.quality} • Waiting for administrator to start the stream`}
                                   </p>
                                 </>
                               )}
@@ -2290,6 +2328,7 @@ const Monitoring = () => {
                                 selectedId={selectedCamera}
                                 onSelectCamera={setSelectedCamera}
                                 latencyMode={streamLatency}
+                                viewerMode={isAdmin ? 'admin' : 'client'}
                               />
                             ) : selectedCamera ? (
                               selectedFeed && cameraHasStreamMedia(selectedFeed) ? (
@@ -2297,6 +2336,7 @@ const Monitoring = () => {
                                   feed={selectedFeed}
                                   variant="default"
                                   streamLatency={streamLatency}
+                                  viewerMode={isAdmin ? 'admin' : 'client'}
                                 />
                               ) : (
                                 <div className="text-center">
@@ -2333,7 +2373,9 @@ const Monitoring = () => {
                                         Live Camera Feed
                                       </p>
                                       <p className="text-lg font-mono text-cyan-300/70">
-                                        {selectedFeed?.quality} • Streaming (add stream URL or embed in admin)
+                                        {isAdmin
+                                          ? `${selectedFeed?.quality} • Streaming (add stream URL or embed in admin)`
+                                          : `${selectedFeed?.quality} • Waiting for administrator to start the stream`}
                                       </p>
                                       <div className="mt-4 flex items-center justify-center gap-3">
                                         <Badge className="bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 px-4 py-2">

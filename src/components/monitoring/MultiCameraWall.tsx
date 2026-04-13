@@ -16,18 +16,23 @@ export type WallCamera = {
 
 type Latency = 'standard' | 'low';
 
+export type WallViewerMode = 'admin' | 'client';
+
 export function MultiCameraWall({
   cameras,
   selectedId,
   onSelectCamera,
   latencyMode,
   className,
+  viewerMode = 'admin',
 }: {
   cameras: WallCamera[];
   selectedId: string | null;
   onSelectCamera: (id: string) => void;
   latencyMode: Latency;
   className?: string;
+  /** Client viewers: no external “open stream” links; show a neutral wait state instead. */
+  viewerMode?: WallViewerMode;
 }) {
   const withMedia = cameras.filter(
     (c) =>
@@ -37,7 +42,9 @@ export function MultiCameraWall({
   if (withMedia.length === 0) {
     return (
       <div className={cn('rounded-lg border border-slate-700/60 bg-slate-900/50 p-6 text-center text-slate-400 text-sm', className)}>
-        No cameras with a stream URL or embed code. Add streams in Admin → Monitoring.
+        {viewerMode === 'client'
+          ? 'No live streams are available for this project yet. Please check back later.'
+          : 'No cameras with a stream URL or embed code. Add streams in Admin → Monitoring.'}
       </div>
     );
   }
@@ -79,7 +86,9 @@ export function MultiCameraWall({
               ) : isHlsPlaylistUrl(rawUrl) ? (
                 isHttpStreamBlockedByMixedContent(rawUrl) ? (
                   <div className="absolute inset-0 flex items-center justify-center p-2 text-[11px] text-amber-200 text-center">
-                    HTTPS required for wall view
+                    {viewerMode === 'client'
+                      ? 'Waiting for live stream'
+                      : 'HTTPS required for wall view'}
                   </div>
                 ) : (
                   <div className="absolute inset-0">
@@ -93,19 +102,25 @@ export function MultiCameraWall({
                   </div>
                 )
               ) : rawUrl ? (
-                <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 p-2">
-                  <span className="text-[11px] text-slate-500 text-center">Open in player / new tab</span>
-                  <a
-                    href={rawUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1 text-xs text-cyan-400 hover:underline"
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    <ExternalLink className="h-3 w-3" />
-                    Open
-                  </a>
-                </div>
+                viewerMode === 'client' ? (
+                  <div className="absolute inset-0 flex items-center justify-center p-3 text-center text-[11px] text-slate-400">
+                    Waiting for live stream
+                  </div>
+                ) : (
+                  <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 p-2">
+                    <span className="text-[11px] text-slate-500 text-center">Open in player / new tab</span>
+                    <a
+                      href={rawUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 text-xs text-cyan-400 hover:underline"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <ExternalLink className="h-3 w-3" />
+                      Open
+                    </a>
+                  </div>
+                )
               ) : (
                 <div className="absolute inset-0 flex items-center justify-center text-[11px] text-slate-500">
                   No stream
