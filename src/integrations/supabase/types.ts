@@ -205,6 +205,7 @@ export type Database = {
           id: string
           ingest_rtmp_url: string | null
           ingest_srt_url: string | null
+          mediamtx_webrtc_additional_hosts: string | null
           is_active: boolean | null
           location: string | null
           name: string
@@ -219,6 +220,7 @@ export type Database = {
           id?: string
           ingest_rtmp_url?: string | null
           ingest_srt_url?: string | null
+          mediamtx_webrtc_additional_hosts?: string | null
           is_active?: boolean | null
           location?: string | null
           name: string
@@ -233,6 +235,7 @@ export type Database = {
           id?: string
           ingest_rtmp_url?: string | null
           ingest_srt_url?: string | null
+          mediamtx_webrtc_additional_hosts?: string | null
           is_active?: boolean | null
           location?: string | null
           name?: string

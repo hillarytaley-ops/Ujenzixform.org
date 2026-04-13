@@ -140,6 +140,7 @@ export const MonitoringTab: React.FC<MonitoringTabProps> = ({
     stream_url: '',
     ingest_rtmp_url: '',
     ingest_srt_url: '',
+    mediamtx_webrtc_additional_hosts: '',
     camera_type: 'ip',
     connection_type: 'url',
     recording_enabled: false,
@@ -190,6 +191,7 @@ export const MonitoringTab: React.FC<MonitoringTabProps> = ({
       stream_url: camera.stream_url || '',
       ingest_rtmp_url: camera.ingest_rtmp_url || '',
       ingest_srt_url: camera.ingest_srt_url || '',
+      mediamtx_webrtc_additional_hosts: camera.mediamtx_webrtc_additional_hosts || '',
       camera_type: camera.camera_type || 'ip',
       connection_type: camera.connection_type || 'url',
       ip_address: camera.ip_address || '',
@@ -213,6 +215,7 @@ export const MonitoringTab: React.FC<MonitoringTabProps> = ({
       stream_url: '',
       ingest_rtmp_url: '',
       ingest_srt_url: '',
+      mediamtx_webrtc_additional_hosts: '',
       camera_type: 'ip',
       connection_type: 'url',
       recording_enabled: false,
@@ -253,9 +256,9 @@ export const MonitoringTab: React.FC<MonitoringTabProps> = ({
       key: 'ingest_rtmp_url',
       label: 'Camera push',
       render: (_, row) =>
-        row.ingest_rtmp_url || row.ingest_srt_url ? (
+        row.ingest_rtmp_url || row.ingest_srt_url || row.mediamtx_webrtc_additional_hosts ? (
           <Badge variant="outline" className="border-cyan-600/50 text-cyan-300 text-[10px] uppercase tracking-wide">
-            RTMP / SRT
+            {row.mediamtx_webrtc_additional_hosts ? 'RTMP / SRT / WebRTC' : 'RTMP / SRT'}
           </Badge>
         ) : (
           <span className="text-gray-600 text-xs">—</span>
@@ -894,12 +897,12 @@ function StreamIngestFields({
   const copy = async (label: string, text: string) => {
     const t = text.trim();
     if (!t) {
-      toast({ title: 'Nothing to copy', description: `Enter a ${label} URL first.`, variant: 'destructive' });
+      toast({ title: 'Nothing to copy', description: `Enter ${label} first.`, variant: 'destructive' });
       return;
     }
     try {
       await navigator.clipboard.writeText(t);
-      toast({ title: 'Copied', description: `${label} URL copied to clipboard.` });
+      toast({ title: 'Copied', description: `${label} copied to clipboard.` });
     } catch {
       toast({
         title: 'Copy failed',
@@ -942,7 +945,7 @@ function StreamIngestFields({
             variant="ghost"
             size="sm"
             className="h-7 text-xs text-slate-400 hover:text-white"
-            onClick={() => void copy('RTMP ingest', formData.ingest_rtmp_url || '')}
+            onClick={() => void copy('RTMP ingest URL', formData.ingest_rtmp_url || '')}
           >
             <Copy className="h-3.5 w-3.5 mr-1" />
             Copy
@@ -964,7 +967,7 @@ function StreamIngestFields({
             variant="ghost"
             size="sm"
             className="h-7 text-xs text-slate-400 hover:text-white"
-            onClick={() => void copy('SRT ingest', formData.ingest_srt_url || '')}
+            onClick={() => void copy('SRT ingest URL', formData.ingest_srt_url || '')}
           >
             <Copy className="h-3.5 w-3.5 mr-1" />
             Copy
@@ -979,6 +982,68 @@ function StreamIngestFields({
         <p className="text-[11px] text-slate-500 mt-1">
           UDP <strong>8890</strong> must be open on the VPS for SRT. Match streamid format to your MediaMTX version.
         </p>
+      </div>
+
+      <div className="pt-2 border-t border-slate-700/80 space-y-2">
+        <div className="flex items-start gap-2">
+          <Radio className="h-4 w-4 text-violet-400 shrink-0 mt-0.5" />
+          <div>
+            <p className="text-sm font-medium text-slate-200">WebRTC additional hosts (MediaMTX)</p>
+            <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+              Only if you use MediaMTX&apos;s <strong>WebRTC</strong> viewer (e.g. port <strong>8889</strong>), set Docker env{' '}
+              <code className="text-[11px] bg-slate-800 px-1 rounded">MTX_WEBRTCADDITIONALHOSTS</code> to reachable IPs
+              (often your VPS public IP and/or LAN IP). <strong>Not used</strong> for HLS-only playback in UjenziXform —
+              leave blank if you only serve <code className="text-[11px] bg-slate-800 px-1 rounded">.m3u8</code>.
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center justify-between gap-2">
+          <Label className="text-gray-300">Comma-separated hosts</Label>
+          <div className="flex gap-1 shrink-0">
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-7 text-xs text-slate-400 hover:text-white px-2"
+              onClick={() => void copy('WebRTC hosts', formData.mediamtx_webrtc_additional_hosts || '')}
+            >
+              <Copy className="h-3.5 w-3.5 mr-1" />
+              Copy
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-7 text-xs text-slate-400 hover:text-white px-2"
+              onClick={() => {
+                const h = (formData.mediamtx_webrtc_additional_hosts || '').trim();
+                if (!h) {
+                  toast({
+                    title: 'Nothing to copy',
+                    description: 'Enter comma-separated hosts first.',
+                    variant: 'destructive',
+                  });
+                  return;
+                }
+                void copy(
+                  'Docker -e MTX_WEBRTCADDITIONALHOSTS',
+                  `-e MTX_WEBRTCADDITIONALHOSTS=${h}`
+                );
+              }}
+            >
+              <Copy className="h-3.5 w-3.5 mr-1" />
+              Copy -e
+            </Button>
+          </div>
+        </div>
+        <Input
+          placeholder="203.0.113.10,192.168.20.14"
+          className="bg-slate-800 border-slate-700 text-white mt-1 font-mono text-xs"
+          value={formData.mediamtx_webrtc_additional_hosts || ''}
+          onChange={(e) =>
+            setFormData((prev) => ({ ...prev, mediamtx_webrtc_additional_hosts: e.target.value }))
+          }
+        />
       </div>
     </div>
   );

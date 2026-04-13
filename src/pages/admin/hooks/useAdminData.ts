@@ -438,6 +438,7 @@ export const useCameras = () => {
           stream_url,
           ingest_rtmp_url,
           ingest_srt_url,
+          mediamtx_webrtc_additional_hosts,
           is_active,
           connection_type,
           embed_code,
@@ -473,6 +474,7 @@ export const useCameras = () => {
           stream_url: cam.stream_url as string | null,
           ingest_rtmp_url: (cam.ingest_rtmp_url as string | null) ?? null,
           ingest_srt_url: (cam.ingest_srt_url as string | null) ?? null,
+          mediamtx_webrtc_additional_hosts: (cam.mediamtx_webrtc_additional_hosts as string | null) ?? null,
           is_active: (cam.is_active as boolean) ?? true,
           camera_type: (cam.camera_type as string) || 'ip',
           connection_type: (cam.connection_type as CameraRecord['connection_type']) || 'url',
@@ -514,12 +516,16 @@ export const useCameras = () => {
       const embedCode = cameraData.embed_code?.trim() ? cameraData.embed_code.trim() : null;
       const ingestRtmp = cameraData.ingest_rtmp_url?.trim() ? cameraData.ingest_rtmp_url.trim() : null;
       const ingestSrt = cameraData.ingest_srt_url?.trim() ? cameraData.ingest_srt_url.trim() : null;
+      const webrtcHosts = cameraData.mediamtx_webrtc_additional_hosts?.trim()
+        ? cameraData.mediamtx_webrtc_additional_hosts.trim()
+        : null;
       const insertPayload: Record<string, unknown> = {
         name: cameraData.name,
         location: cameraData.location || null,
         stream_url: streamUrl,
         ingest_rtmp_url: ingestRtmp,
         ingest_srt_url: ingestSrt,
+        mediamtx_webrtc_additional_hosts: webrtcHosts,
         is_active: cameraData.is_active ?? true,
         supports_ptz: cameraData.supports_ptz ?? false,
         supports_two_way_audio: cameraData.supports_two_way_audio ?? false,
@@ -578,6 +584,11 @@ export const useCameras = () => {
       if (cameraData.ingest_srt_url !== undefined) {
         updateData.ingest_srt_url = cameraData.ingest_srt_url?.trim()
           ? cameraData.ingest_srt_url.trim()
+          : null;
+      }
+      if (cameraData.mediamtx_webrtc_additional_hosts !== undefined) {
+        updateData.mediamtx_webrtc_additional_hosts = cameraData.mediamtx_webrtc_additional_hosts?.trim()
+          ? cameraData.mediamtx_webrtc_additional_hosts.trim()
           : null;
       }
       if (cameraData.is_active !== undefined) updateData.is_active = cameraData.is_active;
