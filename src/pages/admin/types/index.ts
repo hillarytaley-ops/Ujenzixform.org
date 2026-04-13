@@ -230,7 +230,7 @@ export type CameraConnectionType =
   | 'embedded'          // Embedded iframe viewer
   | 'usb'               // Local USB camera
   | 'mobile'            // Mobile device camera (phone/tablet)
-  | 'vendor_cellular';  // Solar / 4G IP kits (Hikvision-style): HLS/HTTPS or embed, not rtsp:// in browser
+  | 'vendor_cellular';  // Solar / 4G IP (e.g. Hikvision): prefer RTMP/SRT → MediaMTX VPS → HLS in stream_url; RTSP only if LAN pull
 
 export interface CameraCredentials {
   username?: string;

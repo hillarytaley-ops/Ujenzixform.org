@@ -1,16 +1,41 @@
-# Example: RTSP camera → HLS for UjenziXform Monitoring
+# MediaMTX → HLS for UjenziXform Monitoring
 
-The Monitoring page can play **HLS** (`.m3u8`). Most IP cameras expose **RTSP**. [MediaMTX](https://github.com/bluenviron/mediamtx) can pull RTSP and serve HLS on HTTP.
+The Monitoring page plays **HLS** (`.m3u8`) over **HTTPS**. For **4G / cellular cameras** (e.g. Hikvision **DS-2XS2T41G1-ID/4G**), the **recommended** setup is **not** browser‑visible RTSP: it is **camera → RTMP or SRT → MediaMTX on a VPS → HLS → UjenziXform**.
 
-**This folder is not started automatically** — copy it to a **mini PC, NVR sidecar, or VPS** that can reach the camera (usually same LAN).
+**RTSP** remains a **good option on LAN** (same Wi‑Fi or wired network as the camera): MediaMTX can **pull** `rtsp://…` and still output HLS.
 
-## Prerequisites
+**This folder is not started automatically** — copy it to a host that can receive the camera (VPS on the internet for **push**, or mini PC / NVR **on the same LAN** for **RTSP pull**).
+
+---
+
+## Preferred path: 4G / cellular — RTMP or SRT **push** to MediaMTX on a **VPS**
+
+**Why this is primary for 4G:** The SIM is usually behind **carrier NAT**. The internet cannot reliably **open a connection into** the camera. **Outbound** **RTMP** or **SRT** from the camera (or a small box on site) to **your** server works like a phone **calling** your VPS — no inbound hole through the operator to the camera needed.
+
+1. Run **MediaMTX** on a **VPS** (public IP), e.g. with Docker (open **1935/TCP** for RTMP, **8890/UDP** for SRT if you use SRT, **8888/TCP** for HLS, plus **8889** / UDP **8189** only if you use WebRTC in the browser on MediaMTX’s own page).
+2. In **MediaMTX**, define a **path** the camera may **publish** to (often with **user/password**). Example ingest URL shape:  
+   `rtmp://YOUR_VPS_IP:1935/your_path`
+3. In the **Hikvision** (or NVR) web UI, if **custom RTMP** (or **SRT**) server is available, paste that address (and credentials if required).
+4. HLS playlist (example path `your_path`):  
+   `http://YOUR_VPS_IP:8888/your_path/index.m3u8`  
+   Put **HTTPS** in front (Caddy / nginx / **ngrok**) and store **`https://…/your_path/index.m3u8`** in Supabase **`cameras.stream_url`** for UjenziXform.
+5. In **Admin → Monitoring**, optionally save the same RTMP/SRT ingest string in **ingest** fields and WebRTC host hints for **Docker** — they are for installers; the player still uses **`stream_url`**.
+
+If the camera **does not** offer RTMP/SRT push, you still need **one** device on site that can **see** the camera (often **RTSP on LAN**) and **upload** to the VPS (FFmpeg, NVR, or MediaMTX elsewhere). The **app** side is unchanged: still **HLS** in **`stream_url`**.
+
+---
+
+## Alternative path: **RTSP pull** (same LAN as the camera)
+
+Most IP cameras expose **RTSP**. [MediaMTX](https://github.com/bluenviron/mediamtx) can **pull** RTSP and serve HLS on HTTP. Use this when the camera and MediaMTX are on the **same network** (not the typical 4G‑only “camera alone” case).
+
+### Prerequisites
 
 - Docker (or Docker Desktop on Windows)
 - Camera **RTSP URL** (test in VLC first)
 - Understanding of **who can open** the HLS URL: same Wi‑Fi / VPN only vs public internet (TLS + firewall)
 
-## Steps
+### Steps
 
 1. Copy this directory to the host (e.g. `C:\mediamtx-site` or `/opt/mediamtx-site`).
 2. Edit **`mediamtx.yml`**:
@@ -53,8 +78,8 @@ If builders use the app **from the internet**, a **private LAN** HLS URL will **
 
 ## Security
 
-- Do not commit real RTSP credentials to git.
-- Restrict port `8888` with firewall rules; prefer reverse proxy + TLS for anything exposed beyond LAN.
+- Do not commit real RTSP or publish credentials to git.
+- Restrict port **8888** (and RTMP/SRT ports) with firewall rules; prefer reverse proxy + TLS for anything exposed beyond LAN.
 
 ### Optional: HTTPS directly from MediaMTX
 

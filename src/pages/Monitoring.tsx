@@ -195,14 +195,22 @@ function StreamPlaybackHelp({
           <strong>.webm</strong> link, or paste vendor <strong>iframe</strong> embed HTML in admin.
         </p>
         <div className="text-left text-xs text-slate-400 space-y-2 border border-slate-700/80 rounded-md p-3 bg-slate-950/50">
-          <p className="font-medium text-slate-300">Fastest path: RTSP → HLS on site</p>
+          <p className="font-medium text-slate-300">Recommended for 4G (e.g. Hikvision cellular): RTMP or SRT → MediaMTX on a VPS → HLS</p>
           <ol className="list-decimal list-inside space-y-1">
             <li>
-              Run the <strong>MediaMTX</strong> Docker example from this repo on a mini PC / NVR (same LAN as the camera).
+              If the camera can <strong>push RTMP/SRT</strong>, point it at <strong>MediaMTX</strong> on a <strong>VPS</strong> (outbound from the SIM works through carrier NAT).
             </li>
             <li>
-              Put the resulting <code className="text-[11px]">…/cam1/index.m3u8</code> URL into{' '}
-              <strong>cameras.stream_url</strong>. Remote viewers need HTTPS, VPN, or tunnel — see infra doc.
+              Put the resulting <strong>HTTPS</strong> <code className="text-[11px]">…/index.m3u8</code> URL into <strong>cameras.stream_url</strong>. Use Admin → Monitoring ingest fields to store the publish URL for installers.
+            </li>
+          </ol>
+          <p className="font-medium text-slate-300 pt-2 border-t border-slate-700/60 mt-2">LAN alternative: RTSP → MediaMTX → HLS</p>
+          <ol className="list-decimal list-inside space-y-1">
+            <li>
+              Same-LAN mini PC / NVR runs MediaMTX and <strong>pulls</strong> this <code className="text-[11px]">rtsp://…</code> URL.
+            </li>
+            <li>
+              Put the <code className="text-[11px]">…/index.m3u8</code> URL into <strong>cameras.stream_url</strong> (HTTPS / tunnel for remote viewers).
             </li>
           </ol>
         </div>
@@ -214,7 +222,7 @@ function StreamPlaybackHelp({
           </Button>
           <Button variant="outline" size="sm" asChild className="text-slate-200 border-slate-600">
             <a href={DOCS_MEDIAMTX_RTSP_TO_HLS} target="_blank" rel="noopener noreferrer">
-              MediaMTX example (README)
+              MediaMTX: 4G RTMP / LAN RTSP → HLS
             </a>
           </Button>
           <Button variant="outline" size="sm" asChild className="text-slate-200 border-slate-600">
@@ -323,7 +331,7 @@ function StreamPlaybackHelp({
         Many camera “share” pages (GoPro, vendor portals, etc.) are <strong>websites</strong>, not video files. Use a
         direct <strong>.mp4</strong> / <strong>.webm</strong> URL, an <strong>HLS (.m3u8)</strong> playlist, a{' '}
         <strong>YouTube or Vimeo</strong> page link, or paste your vendor’s <strong>iframe embed</strong> HTML in the admin
-        embed field. <strong>RTSP</strong> → convert with MediaMTX (see link below). Product status:{' '}
+        embed field. For <strong>4G</strong> kits, prefer <strong>RTMP or SRT</strong> into MediaMTX on a VPS, then HLS; use <strong>RTSP pull</strong> on LAN when push is not available. Product status:{' '}
         <a
           href={DOCS_MONITORING_VISION_STATUS}
           target="_blank"
@@ -337,7 +345,7 @@ function StreamPlaybackHelp({
       <div className="flex flex-wrap gap-2 justify-center mb-3">
         <Button variant="outline" size="sm" asChild className="text-slate-200 border-slate-600">
           <a href={DOCS_MEDIAMTX_RTSP_TO_HLS} target="_blank" rel="noopener noreferrer">
-            RTSP → HLS (MediaMTX)
+            MediaMTX (RTMP / RTSP → HLS)
           </a>
         </Button>
         <Button variant="outline" size="sm" asChild className="text-slate-200 border-slate-600">
@@ -2575,9 +2583,9 @@ const Monitoring = () => {
                     <CardHeader className="pb-2">
                       <CardTitle className="text-base">Secure streams</CardTitle>
                       <CardDescription>
-                        RTSP credentials stay on your converter or edge device. Viewers use your signed-in session and
-                        database checks (for example get_camera_stream_secure); the browser only receives HTTPS HLS or
-                        embeds you allow—no per-camera passwords stored in this app.
+                        RTMP / SRT publish credentials and RTSP pull credentials stay on MediaMTX, your VPS, or an edge
+                        converter—not in the browser. Viewers use your signed-in session and database checks (for example
+                        get_camera_stream_secure); the browser only receives HTTPS HLS or embeds you allow.
                       </CardDescription>
                     </CardHeader>
                   </Card>

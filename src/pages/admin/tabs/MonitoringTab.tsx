@@ -931,7 +931,7 @@ function StreamIngestFields({
               className="text-amber-400 hover:underline inline-flex items-center gap-1"
             >
               <ExternalLink className="h-3 w-3" />
-              MediaMTX example (README)
+              MediaMTX: 4G RTMP / LAN RTSP → HLS
             </a>
           </p>
         </div>
@@ -1220,7 +1220,7 @@ const CameraModal: React.FC<CameraModalProps> = ({
                   {formData.connection_type === 'mobile' && 'Get this URL from your IP Webcam app'}
                   {formData.connection_type === 'url' && 'Paste the link to your camera viewer or stream'}
                   {formData.connection_type === 'vendor_cellular' &&
-                    'Use an HLS (.m3u8) or direct HTTPS video URL — not rtsp:// (browsers cannot play RTSP). For vendor iframe viewers, switch to Embed code.'}
+                    'Use HTTPS HLS (.m3u8) from your MediaMTX VPS (camera should push RTMP/SRT there on 4G). Not rtsp:// in the browser. Vendor iframe only: use Embed code.'}
                 </p>
                 {requiredFields.includes('stream_url') &&
                   formData.stream_url.trim().toLowerCase().startsWith('http://') && (
@@ -1249,8 +1249,10 @@ const CameraModal: React.FC<CameraModalProps> = ({
                     <AlertTitle className="text-cyan-100 text-sm">Hikvision-style solar / 4G kits</AlertTitle>
                     <AlertDescription className="text-xs text-slate-400 leading-relaxed space-y-2">
                       <p>
-                        UjenziXform Monitoring matches what works in a normal browser: HLS, HTTPS video, YouTube/Vimeo, or
-                        pasted iframe embed. Raw camera RTSP belongs behind MediaMTX or your vendor relay.
+                        For <strong>4G Hikvision-style</strong> kits, the usual path is <strong>camera → RTMP or SRT →
+                        MediaMTX on your VPS → HTTPS HLS</strong> in this field. RTSP is for <strong>LAN pull</strong> into
+                        MediaMTX when the device cannot push. The browser still only plays HLS / HTTPS / embed — not{' '}
+                        <code className="text-[11px] bg-slate-800 px-1 rounded">rtsp://</code>.
                       </p>
                       <div className="flex flex-wrap gap-2 pt-1">
                         <a

@@ -1,6 +1,9 @@
 /**
  * Heuristics for camera stream URLs shown on Monitoring / admin.
  * Browsers only play a subset of URLs in <video src>; share pages and RTSP are common pitfalls.
+ *
+ * Deployment note: for 4G / cellular cameras, prefer camera → RTMP or SRT → MediaMTX on a VPS → HLS
+ * in stream_url. RTSP is mainly for LAN pull into MediaMTX when push is not available.
  */
 
 /** Browsers cannot open rtsp:// or rtsps:// in &lt;video&gt; or hls.js — convert to HLS/WebRTC first. */
