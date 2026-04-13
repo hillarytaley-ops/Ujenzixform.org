@@ -24,6 +24,23 @@ function credentialsPayloadFromForm(d: Partial<CameraFormData>): Record<string, 
   return Object.keys(o).length > 0 ? o : undefined;
 }
 
+const CAMERAS_WEBRTC_HOSTS_COL = 'mediamtx_webrtc_additional_hosts';
+
+/** PostgREST returns 400 if select/insert references a column not in the DB (migration not applied yet). */
+function isMissingCamerasWebrtcColumnError(error: unknown): boolean {
+  const msg =
+    error && typeof error === 'object' && 'message' in error
+      ? String((error as { message?: string }).message)
+      : '';
+  if (!msg.includes(CAMERAS_WEBRTC_HOSTS_COL)) return false;
+  return (
+    msg.includes('does not exist') ||
+    msg.includes('schema cache') ||
+    msg.includes('Could not find') ||
+    msg.includes('column')
+  );
+}
+
 // Hook for fetching dashboard statistics
 export const useAdminStats = () => {
   const [stats, setStats] = useState<DashboardStats>({
@@ -428,33 +445,15 @@ export const useCameras = () => {
       setLoading(true);
       const client = supabase;
 
+      // Use * so environments without mediamtx_webrtc_additional_hosts (migration pending) still load.
       const { data, error } = await client
         .from('cameras')
-        .select(`
-          id,
-          name,
-          location,
-          project_id,
-          stream_url,
-          ingest_rtmp_url,
-          ingest_srt_url,
-          mediamtx_webrtc_additional_hosts,
-          is_active,
-          connection_type,
-          embed_code,
-          camera_type,
-          ip_address,
-          credentials,
-          resolution,
-          recording_enabled,
-          motion_detection,
-          supports_ptz,
-          supports_two_way_audio,
-          last_connected,
-          created_at,
-          updated_at,
+        .select(
+          `
+          *,
           projects:project_id (name)
-        `)
+        `,
+        )
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -540,13 +539,25 @@ export const useCameras = () => {
       const creds = credentialsPayloadFromForm(cameraData);
       if (creds) insertPayload.credentials = creds;
 
-      const { error } = await client.from('cameras').insert(insertPayload);
+      let insertResult = await client.from('cameras').insert(insertPayload);
+      let webrtcHostsSkippedOnInsert = false;
+      if (
+        insertResult.error &&
+        isMissingCamerasWebrtcColumnError(insertResult.error) &&
+        CAMERAS_WEBRTC_HOSTS_COL in insertPayload
+      ) {
+        const { [CAMERAS_WEBRTC_HOSTS_COL]: _webrtc, ...rest } = insertPayload;
+        insertResult = await client.from('cameras').insert(rest);
+        webrtcHostsSkippedOnInsert = !insertResult.error && !!webrtcHosts;
+      }
 
-      if (error) throw error;
+      if (insertResult.error) throw insertResult.error;
 
       toast({
         title: 'Camera Added',
-        description: `Camera "${cameraData.name}" has been added successfully.`,
+        description: webrtcHostsSkippedOnInsert
+          ? `Camera "${cameraData.name}" was added. WebRTC host list was not saved until the mediamtx migration is applied on Supabase.`
+          : `Camera "${cameraData.name}" has been added successfully.`,
       });
 
       fetchCameras();
@@ -606,16 +617,26 @@ export const useCameras = () => {
       if (cameraData.ip_address !== undefined) updateData.ip_address = cameraData.ip_address?.trim() || null;
       // Do not PATCH credentials here: the form often omits password on edit, which would wipe stored JSONB.
 
-      const { error } = await client
-        .from('cameras')
-        .update(updateData)
-        .eq('id', id);
+      let updateResult = await client.from('cameras').update(updateData).eq('id', id);
+      let webrtcHostsSkippedOnUpdate = false;
+      if (
+        updateResult.error &&
+        isMissingCamerasWebrtcColumnError(updateResult.error) &&
+        CAMERAS_WEBRTC_HOSTS_COL in updateData
+      ) {
+        const { [CAMERAS_WEBRTC_HOSTS_COL]: _webrtc, ...rest } = updateData;
+        updateResult = await client.from('cameras').update(rest).eq('id', id);
+        webrtcHostsSkippedOnUpdate =
+          !updateResult.error && cameraData.mediamtx_webrtc_additional_hosts !== undefined;
+      }
 
-      if (error) throw error;
+      if (updateResult.error) throw updateResult.error;
 
       toast({
         title: 'Camera Updated',
-        description: 'Camera settings have been updated successfully.',
+        description: webrtcHostsSkippedOnUpdate
+          ? 'Other settings were saved. WebRTC host list was not saved until the mediamtx migration is applied on Supabase.'
+          : 'Camera settings have been updated successfully.',
       });
 
       fetchCameras();
