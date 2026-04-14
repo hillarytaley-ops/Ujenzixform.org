@@ -22,10 +22,10 @@
     Header always set Referrer-Policy "strict-origin-when-cross-origin"
     
     # Permissions Policy
-    Header always set Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=(), usb=(), bluetooth=(), accelerometer=(), gyroscope=(), magnetometer=()"
+    Header always set Permissions-Policy "camera=(self), microphone=(), geolocation=(), payment=(), usb=(), bluetooth=(), accelerometer=(), gyroscope=(), magnetometer=()"
     
     # Feature Policy (fallback for older browsers)
-    Header always set Feature-Policy "camera 'none'; microphone 'none'; geolocation 'none'; payment 'none'"
+    Header always set Feature-Policy "camera 'self'; microphone 'none'; geolocation 'none'; payment 'none'"
     
     # Cross-Origin Policies
     Header always set Cross-Origin-Embedder-Policy "require-corp"

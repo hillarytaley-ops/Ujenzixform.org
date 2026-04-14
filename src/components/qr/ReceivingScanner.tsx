@@ -665,16 +665,13 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
       console.log('🎥 Creating Html5Qrcode instance for container:', scannerContainerId);
       scannerRef.current = new Html5Qrcode(scannerContainerId, { verbose: false });
 
-      let cameraConfig: any;
+      // html5-qrcode: device id string or single-key { facingMode } only (not width/height siblings).
+      let cameraConfig: string | { facingMode: string };
       if (selectedCameraId) {
         cameraConfig = selectedCameraId;
         console.log('📷 Using selected camera ID:', selectedCameraId);
       } else {
-        cameraConfig = {
-          facingMode: facing,
-          width: { ideal: 1280, min: 640 },
-          height: { ideal: 720, min: 480 },
-        };
+        cameraConfig = { facingMode: facing };
         console.log('📷 Using facing mode:', facing);
       }
 

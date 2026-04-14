@@ -1104,16 +1104,13 @@ export const DispatchScanner: React.FC<DispatchScannerProps> = ({
       // Set verbose to false to reduce noise from internal library errors
       scannerRef.current = new Html5Qrcode(scannerContainerId, { verbose: false });
       
-      let cameraConfig: any;
+      // html5-qrcode requires cameraIdOrConfig as a device id string, or a single-key object
+      // (e.g. { facingMode: 'environment' }); width/height at the top level triggers "found 3 keys".
+      let cameraConfig: string | { facingMode: string };
       if (selectedCameraId) {
         cameraConfig = selectedCameraId;
       } else {
-        // Request better video quality for better QR code detection
-        cameraConfig = { 
-          facingMode: facing,
-          width: { ideal: 1280, min: 640 },
-          height: { ideal: 720, min: 480 }
-        };
+        cameraConfig = { facingMode: facing };
       }
 
       const scannerConfig = {
