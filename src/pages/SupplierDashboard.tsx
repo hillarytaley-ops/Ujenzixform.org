@@ -789,8 +789,8 @@ const SupplierDashboard = () => {
     if (user) {
       setLoading(false);
     }
-    // Safety timeout - show UI after 2 seconds max
-    const timeout = setTimeout(() => setLoading(false), 2000);
+    // Safety timeout — show shell quickly if auth user is slow to hydrate
+    const timeout = setTimeout(() => setLoading(false), 600);
     return () => clearTimeout(timeout);
   }, [user]);
 
@@ -799,7 +799,15 @@ const SupplierDashboard = () => {
     if (isolatedProfile) {
       setSupplierProfile(isolatedProfile);
     }
-    if (isolatedStats) {
+    // Do not replace dashboard KPIs with hook stats when they are all zeros: useSupplierData often returns
+    // empty orders under RLS while fetchDashboardData (same session) resolves supplier_id and loads 77+ rows.
+    if (
+      isolatedStats &&
+      (isolatedStats.totalOrders > 0 ||
+        isolatedStats.totalProducts > 0 ||
+        isolatedStats.totalRevenue > 0 ||
+        (supplierOrders?.length ?? 0) > 0)
+    ) {
       setStats(isolatedStats);
     }
     // Transform orders to match local format and feed Orders sub-tab immediately so it's not lazy-loading

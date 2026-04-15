@@ -1,5 +1,5 @@
 import { clearSupabasePersistedSessionSync, readPersistedAuthRawStringSync } from '@/utils/supabaseAccessToken';
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useLayoutEffect, useCallback, useRef } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useUrlTabSync } from "@/hooks/useUrlTabSync";
 import { supabase, SUPABASE_URL, SUPABASE_ANON_KEY } from "@/integrations/supabase/client";
@@ -574,11 +574,11 @@ const AdminDashboard = () => {
       setLoading(false);
     }
     
-    // Safety timeout - show UI after 1 second max (only if authenticated)
+    // Safety timeout — keep short so authenticated users are not stuck behind a spinner if a branch forgets setLoading(false).
     const safetyTimeout = setTimeout(() => {
       console.log('⏱️ Admin Dashboard safety timeout - forcing loading false');
       setLoading(false);
-    }, 1000);
+    }, 400);
     
     // Run checkAdminAccess in background - it will update state if needed
     checkAdminAccess().finally(() => {
@@ -951,10 +951,10 @@ const AdminDashboard = () => {
     }
   };
   
-  // Load data when tab changes
-  useEffect(() => {
+  // Load tab data as soon as the shell is ready — useLayoutEffect reduces one paint of empty overview widgets.
+  useLayoutEffect(() => {
     if (!loading && activeTab) {
-      loadTabData(activeTab);
+      void loadTabData(activeTab);
     }
   }, [activeTab, loading]);
 
@@ -982,68 +982,70 @@ const AdminDashboard = () => {
         headers['Authorization'] = `Bearer ${accessToken}`;
       }
 
-      // Get user counts by role - using REST API
-      try {
-        const rolesResponse = await fetch(`${SUPABASE_URL}/rest/v1/user_roles?select=role`, { headers });
-        if (rolesResponse.ok) {
-          const rolesData = await rolesResponse.json();
-          console.log('📊 User roles loaded:', rolesData?.length);
-          
-          if (rolesData && Array.isArray(rolesData)) {
-            // Anon / no JWT: RLS returns [] — do not replace visible stats with zeros
-            if (rolesData.length === 0 && skipAnonAggregates) {
-              console.log('📊 Skipping role counts: empty user_roles without JWT (staff limited mode).');
+      await Promise.all([
+        (async () => {
+          try {
+            const rolesResponse = await fetch(`${SUPABASE_URL}/rest/v1/user_roles?select=role`, { headers });
+            if (rolesResponse.ok) {
+              const rolesData = await rolesResponse.json();
+              console.log('📊 User roles loaded:', rolesData?.length);
+              
+              if (rolesData && Array.isArray(rolesData)) {
+                if (rolesData.length === 0 && skipAnonAggregates) {
+                  console.log('📊 Skipping role counts: empty user_roles without JWT (staff limited mode).');
+                } else {
+                  const builderCount = rolesData.filter((r: any) => r.role === 'builder' || r.role === 'professional_builder' || r.role === 'private_client').length;
+                  const supplierCount = rolesData.filter((r: any) => r.role === 'supplier').length;
+                  const deliveryCount = rolesData.filter((r: any) => r.role === 'delivery_provider' || r.role === 'delivery').length;
+
+                  setStats(prev => ({
+                    ...prev,
+                    totalUsers: rolesData.length,
+                    totalBuilders: builderCount,
+                    totalSuppliers: supplierCount,
+                    totalDelivery: deliveryCount
+                  }));
+                  console.log('📊 Role counts:', { total: rolesData.length, builders: builderCount, suppliers: supplierCount, delivery: deliveryCount });
+                }
+              }
             } else {
-            const builderCount = rolesData.filter((r: any) => r.role === 'builder' || r.role === 'professional_builder' || r.role === 'private_client').length;
-            const supplierCount = rolesData.filter((r: any) => r.role === 'supplier').length;
-            const deliveryCount = rolesData.filter((r: any) => r.role === 'delivery_provider' || r.role === 'delivery').length;
-
-            setStats(prev => ({
-              ...prev,
-              totalUsers: rolesData.length,
-              totalBuilders: builderCount,
-              totalSuppliers: supplierCount,
-              totalDelivery: deliveryCount
-            }));
-            console.log('📊 Role counts:', { total: rolesData.length, builders: builderCount, suppliers: supplierCount, delivery: deliveryCount });
+              console.warn('📊 Failed to load user roles:', rolesResponse.status);
             }
+          } catch (e: any) {
+            console.warn('📊 Error loading user roles:', e.message);
           }
-        } else {
-          console.warn('📊 Failed to load user roles:', rolesResponse.status);
-        }
-      } catch (e: any) {
-        console.warn('📊 Error loading user roles:', e.message);
-      }
+        })(),
+        (async () => {
+          try {
+            const [supplierRegsResponse, deliveryRegsResponse] = await Promise.all([
+              fetch(`${SUPABASE_URL}/rest/v1/supplier_applications?status=eq.pending&select=id`, { headers }),
+              fetch(`${SUPABASE_URL}/rest/v1/delivery_providers?is_verified=eq.false&select=id`, { headers })
+            ]);
 
-      // Get pending registrations count - using REST API
-      try {
-        const [supplierRegsResponse, deliveryRegsResponse] = await Promise.all([
-          fetch(`${SUPABASE_URL}/rest/v1/supplier_applications?status=eq.pending&select=id`, { headers }),
-          fetch(`${SUPABASE_URL}/rest/v1/delivery_providers?is_verified=eq.false&select=id`, { headers })
-        ]);
+            let pendingCount = 0;
+            if (supplierRegsResponse.ok) {
+              const data = await supplierRegsResponse.json();
+              pendingCount += Array.isArray(data) ? data.length : 0;
+            }
+            if (deliveryRegsResponse.ok) {
+              const data = await deliveryRegsResponse.json();
+              pendingCount += Array.isArray(data) ? data.length : 0;
+            }
 
-        let pendingCount = 0;
-        if (supplierRegsResponse.ok) {
-          const data = await supplierRegsResponse.json();
-          pendingCount += Array.isArray(data) ? data.length : 0;
-        }
-        if (deliveryRegsResponse.ok) {
-          const data = await deliveryRegsResponse.json();
-          pendingCount += Array.isArray(data) ? data.length : 0;
-        }
-
-        if (!skipAnonAggregates) {
-          setStats(prev => ({
-            ...prev,
-            pendingRegistrations: pendingCount
-          }));
-          console.log('📊 Pending registrations:', pendingCount);
-        } else {
-          console.log('📊 Skipping pending registration count (staff limited mode without JWT).');
-        }
-      } catch (regError: any) {
-        console.warn('📊 Error loading pending registrations:', regError.message);
-      }
+            if (!skipAnonAggregates) {
+              setStats(prev => ({
+                ...prev,
+                pendingRegistrations: pendingCount
+              }));
+              console.log('📊 Pending registrations:', pendingCount);
+            } else {
+              console.log('📊 Skipping pending registration count (staff limited mode without JWT).');
+            }
+          } catch (regError: any) {
+            console.warn('📊 Error loading pending registrations:', regError.message);
+          }
+        })(),
+      ]);
 
     } catch (error: any) {
       console.error('Error loading dashboard data:', error);
