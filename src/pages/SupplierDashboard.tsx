@@ -74,6 +74,10 @@ import {
   readPersistedAuthUserSync,
 } from "@/utils/supabaseAccessToken";
 import {
+  readSupplierOverviewStatsFromSession,
+  writeSupplierOverviewStatsToSession,
+} from "@/utils/dashboardStatsCache";
+import {
   buildOrderStatusChartData,
   countOrdersInStatusBucket,
 } from "@/lib/purchaseOrderMetrics";
@@ -154,6 +158,15 @@ interface DashboardStats {
   totalCustomers: number;
   averageRating: number;
 }
+
+const SUPPLIER_STATS_INITIAL: DashboardStats = {
+  totalProducts: 0,
+  totalOrders: 0,
+  pendingOrders: 0,
+  totalRevenue: 0,
+  totalCustomers: 0,
+  averageRating: 0,
+};
 
 interface RecentOrder {
   id: string;
@@ -716,13 +729,13 @@ const SupplierDashboard = () => {
   const [supplierRecordId, setSupplierRecordId] = useState<string | null>(null); // Actual supplier table ID
   /** Same ID list used for dashboard stats queries (user id + supplier row id, etc.) — keeps Analytics tab in sync */
   const [resolvedSupplierIds, setResolvedSupplierIds] = useState<string[]>([]);
-  const [stats, setStats] = useState<DashboardStats>({
-    totalProducts: 0,
-    totalOrders: 0,
-    pendingOrders: 0,
-    totalRevenue: 0,
-    totalCustomers: 0,
-    averageRating: 0
+  const [stats, setStats] = useState<DashboardStats>(() => {
+    const uid =
+      typeof window !== 'undefined'
+        ? localStorage.getItem('user_id') || localStorage.getItem('user_role_id')
+        : null;
+    const cached = uid ? readSupplierOverviewStatsFromSession(uid) : null;
+    return cached ? { ...SUPPLIER_STATS_INITIAL, ...cached } : { ...SUPPLIER_STATS_INITIAL };
   });
   const [recentOrders, setRecentOrders] = useState<RecentOrder[]>([]);
   const [ordersForOrdersTab, setOrdersForOrdersTab] = useState<any[]>([]); // Full orders for OrderManagement (so Orders tab shows immediately)
@@ -809,6 +822,9 @@ const SupplierDashboard = () => {
         (supplierOrders?.length ?? 0) > 0)
     ) {
       setStats(isolatedStats);
+      if (user?.id) {
+        writeSupplierOverviewStatsToSession(user.id, { ...SUPPLIER_STATS_INITIAL, ...isolatedStats });
+      }
     }
     // Transform orders to match local format and feed Orders sub-tab immediately so it's not lazy-loading
     if (supplierOrders && supplierOrders.length > 0) {
@@ -824,7 +840,7 @@ const SupplierDashboard = () => {
       }));
       setRecentOrders(formattedOrders);
     }
-  }, [isolatedProfile, isolatedStats, supplierOrders]);
+  }, [isolatedProfile, isolatedStats, supplierOrders, user?.id]);
 
   // Log data access for security audit
   useEffect(() => {
@@ -1823,13 +1839,17 @@ const SupplierDashboard = () => {
               
               console.log('📊 Dashboard stats: Orders:', ordersData.length, 'Pending:', pendingCount, 'Confirmed:', confirmedCount, 'Revenue:', totalRevenue);
               
-              setStats(prev => ({
-                ...prev,
-                totalOrders: ordersData.length,
-                pendingOrders: pendingCount,
-                totalRevenue,
-                totalCustomers: uniqueCustomers
-              }));
+              setStats((prev) => {
+                const next: DashboardStats = {
+                  ...prev,
+                  totalOrders: ordersData.length,
+                  pendingOrders: pendingCount,
+                  totalRevenue,
+                  totalCustomers: uniqueCustomers,
+                };
+                if (user?.id) writeSupplierOverviewStatsToSession(user.id, next);
+                return next;
+              });
             }
           }
         } catch (e) {
@@ -1851,10 +1871,11 @@ const SupplierDashboard = () => {
           if (productsResponse.ok) {
             const productsData = await productsResponse.json();
             console.log('📦 Dashboard: Products count:', productsData?.length || 0);
-            setStats(prev => ({
-              ...prev,
-              totalProducts: productsData?.length || 0
-            }));
+            setStats((prev) => {
+              const next: DashboardStats = { ...prev, totalProducts: productsData?.length || 0 };
+              if (user?.id) writeSupplierOverviewStatsToSession(user.id, next);
+              return next;
+            });
           }
         } catch (e) {
           console.log('Products count fetch timeout');

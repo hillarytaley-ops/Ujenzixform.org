@@ -1,4 +1,9 @@
 import { clearSupabasePersistedSessionSync, readPersistedAuthRawStringSync } from '@/utils/supabaseAccessToken';
+import {
+  readAdminOverviewStatsFromSession,
+  writeAdminOverviewStatsToSession,
+  type AdminOverviewStatsCache,
+} from '@/utils/dashboardStatsCache';
 import { useState, useEffect, useLayoutEffect, useCallback, useRef } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useUrlTabSync } from "@/hooks/useUrlTabSync";
@@ -169,17 +174,7 @@ import {
   useCameras 
 } from "@/pages/admin/hooks/useAdminData";
 
-interface DashboardStats {
-  totalUsers: number;
-  totalBuilders: number;
-  totalSuppliers: number;
-  totalDelivery: number;
-  pendingRegistrations: number;
-  activeToday: number;
-  totalFeedback: number;
-  positiveFeedback: number;
-  negativeFeedback: number;
-}
+interface DashboardStats extends AdminOverviewStatsCache {}
 
 interface FeedbackRecord {
   id: string;
@@ -371,26 +366,29 @@ interface CameraRecord {
   updated_at: string;
 }
 
+const ADMIN_STATS_INITIAL: DashboardStats = {
+  totalUsers: 0,
+  totalBuilders: 0,
+  totalSuppliers: 0,
+  totalDelivery: 0,
+  pendingRegistrations: 0,
+  activeToday: 0,
+  totalFeedback: 0,
+  positiveFeedback: 0,
+  negativeFeedback: 0,
+  totalOrders: 0,
+  pendingOrders: 0,
+  confirmedOrders: 0,
+  totalDeliveryRequests: 0,
+  pendingDeliveryRequests: 0,
+};
+
 const AdminDashboard = () => {
   const [loading, setLoading] = useState(true);
   const [adminEmail, setAdminEmail] = useState("");
-  const [stats, setStats] = useState<DashboardStats>({
-    totalUsers: 0,
-    totalBuilders: 0,
-    totalSuppliers: 0,
-    totalDelivery: 0,
-    pendingRegistrations: 0,
-    activeToday: 0,
-    totalFeedback: 0,
-    positiveFeedback: 0,
-    negativeFeedback: 0,
-    // Order stats
-    totalOrders: 0,
-    pendingOrders: 0,
-    confirmedOrders: 0,
-    // Delivery request stats
-    totalDeliveryRequests: 0,
-    pendingDeliveryRequests: 0
+  const [stats, setStats] = useState<DashboardStats>(() => {
+    const cached = readAdminOverviewStatsFromSession();
+    return cached ? { ...ADMIN_STATS_INITIAL, ...cached } : { ...ADMIN_STATS_INITIAL };
   });
   const [users, setUsers] = useState<UserRecord[]>([]);
   const [registrations, setRegistrations] = useState<RegistrationRecord[]>([]);
@@ -844,17 +842,21 @@ const AdminDashboard = () => {
       
       console.log('📊 Stats loaded:', { usersCount, pendingSuppliers, pendingDelivery, feedbackCount, totalOrders, pendingOrders, confirmedOrders, totalDeliveryRequests, pendingDeliveryRequests });
 
-      setStats(prev => ({
-        ...prev,
-        totalUsers: usersCount,
-        pendingRegistrations: pendingSuppliers + pendingDelivery,
-        totalFeedback: feedbackCount,
-        totalOrders,
-        pendingOrders,
-        confirmedOrders,
-        totalDeliveryRequests,
-        pendingDeliveryRequests
-      }));
+      setStats((prev) => {
+        const next: DashboardStats = {
+          ...prev,
+          totalUsers: usersCount,
+          pendingRegistrations: pendingSuppliers + pendingDelivery,
+          totalFeedback: feedbackCount,
+          totalOrders,
+          pendingOrders,
+          confirmedOrders,
+          totalDeliveryRequests,
+          pendingDeliveryRequests,
+        };
+        writeAdminOverviewStatsToSession(next);
+        return next;
+      });
     } catch (error: any) {
       console.error('Error loading stats:', error);
       // Keep prior stats on failure — zeroing everything looks like data "disappeared"
@@ -998,13 +1000,17 @@ const AdminDashboard = () => {
                   const supplierCount = rolesData.filter((r: any) => r.role === 'supplier').length;
                   const deliveryCount = rolesData.filter((r: any) => r.role === 'delivery_provider' || r.role === 'delivery').length;
 
-                  setStats(prev => ({
-                    ...prev,
-                    totalUsers: rolesData.length,
-                    totalBuilders: builderCount,
-                    totalSuppliers: supplierCount,
-                    totalDelivery: deliveryCount
-                  }));
+                  setStats((prev) => {
+                    const next: DashboardStats = {
+                      ...prev,
+                      totalUsers: rolesData.length,
+                      totalBuilders: builderCount,
+                      totalSuppliers: supplierCount,
+                      totalDelivery: deliveryCount,
+                    };
+                    writeAdminOverviewStatsToSession(next);
+                    return next;
+                  });
                   console.log('📊 Role counts:', { total: rolesData.length, builders: builderCount, suppliers: supplierCount, delivery: deliveryCount });
                 }
               }
@@ -1033,10 +1039,11 @@ const AdminDashboard = () => {
             }
 
             if (!skipAnonAggregates) {
-              setStats(prev => ({
-                ...prev,
-                pendingRegistrations: pendingCount
-              }));
+              setStats((prev) => {
+                const next: DashboardStats = { ...prev, pendingRegistrations: pendingCount };
+                writeAdminOverviewStatsToSession(next);
+                return next;
+              });
               console.log('📊 Pending registrations:', pendingCount);
             } else {
               console.log('📊 Skipping pending registration count (staff limited mode without JWT).');
@@ -1609,12 +1616,16 @@ const AdminDashboard = () => {
         const positive = formattedFeedback.filter(f => f.rating >= 4).length;
         const negative = formattedFeedback.filter(f => f.rating <= 2 && f.rating > 0).length;
         
-        setStats(prev => ({
-          ...prev,
-          totalFeedback: formattedFeedback.length,
-          positiveFeedback: positive,
-          negativeFeedback: negative
-        }));
+        setStats((prev) => {
+          const next: DashboardStats = {
+            ...prev,
+            totalFeedback: formattedFeedback.length,
+            positiveFeedback: positive,
+            negativeFeedback: negative,
+          };
+          writeAdminOverviewStatsToSession(next);
+          return next;
+        });
       }
     } catch (error) {
       console.log('Feedback table may not exist yet:', error);
