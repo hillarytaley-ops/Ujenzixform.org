@@ -813,13 +813,14 @@ const SupplierDashboard = () => {
       setSupplierProfile(isolatedProfile);
     }
     // Do not replace dashboard KPIs with hook stats when they are all zeros: useSupplierData often returns
-    // empty orders under RLS while fetchDashboardData (same session) resolves supplier_id and loads 77+ rows.
+    // empty orders under RLS while fetchDashboardData resolves supplier_id and loads rows.
+    // Never use "supplierOrders.length > 0" alone: the hook can have rows while isolatedStats is still
+    // all zeros (e.g. stats vs orders timing), which would wipe correct totals from fetchDashboardData.
     if (
       isolatedStats &&
       (isolatedStats.totalOrders > 0 ||
         isolatedStats.totalProducts > 0 ||
-        isolatedStats.totalRevenue > 0 ||
-        (supplierOrders?.length ?? 0) > 0)
+        isolatedStats.totalRevenue > 0)
     ) {
       setStats(isolatedStats);
       if (user?.id) {
