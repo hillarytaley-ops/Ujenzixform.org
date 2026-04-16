@@ -3,11 +3,15 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Lock, Shield, Loader2 } from "lucide-react";
+import { Lock, Shield, Loader2, FlaskConical } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 
 const PAYSTACK_NAV_KEY = "ujenzi_paystack_after";
+
+/** Set `VITE_PAYSTACK_TEST_MODE=true` in Netlify / `.env.local` while using `sk_test_…` in Supabase so all roles see a clear sandbox banner. */
+export const isPaystackTestModeBanner = (): boolean =>
+  import.meta.env.VITE_PAYSTACK_TEST_MODE === "true" || import.meta.env.VITE_PAYSTACK_TEST_MODE === "1";
 
 export type PaystackCheckoutProps = {
   amount: number;
@@ -116,8 +120,36 @@ export function PaystackCheckout({
     }
   };
 
+  const showTestBanner = isPaystackTestModeBanner();
+
   return (
     <div className={className}>
+      {showTestBanner && (
+        <Alert className="mb-4 border-amber-300 bg-amber-50 dark:bg-amber-950/30 dark:border-amber-700">
+          <FlaskConical className="h-4 w-4 text-amber-800 dark:text-amber-200" />
+          <AlertTitle className="text-amber-900 dark:text-amber-100">Paystack test mode</AlertTitle>
+          <AlertDescription className="text-amber-900/90 dark:text-amber-100/90 text-sm space-y-2">
+            <p>
+              No real money is charged. Use this for you, suppliers, and delivery partners to rehearse checkout. Your
+              Supabase secret should be <code className="rounded bg-amber-100/80 dark:bg-amber-900/50 px-1">sk_test_…</code>
+              , and the Paystack dashboard should be in <strong>Test</strong> mode for webhooks.
+            </p>
+            <p>
+              Test cards and channels are documented in{" "}
+              <a
+                href="https://paystack.com/docs/payments/test-payments/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-medium underline underline-offset-2"
+              >
+                Paystack test payments
+              </a>
+              .
+            </p>
+          </AlertDescription>
+        </Alert>
+      )}
+
       <Alert className="mb-4 border-emerald-200 bg-emerald-50/80">
         <Shield className="h-4 w-4 text-emerald-700" />
         <AlertTitle>Pay with Paystack</AlertTitle>
