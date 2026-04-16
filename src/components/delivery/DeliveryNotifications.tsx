@@ -12,7 +12,7 @@ import {
   Bell, BellOff, Volume2, VolumeX, Vibrate, 
   Package, Truck, AlertTriangle, CheckCircle, X,
   Clock, MapPin, DollarSign, Star, RefreshCw,
-  Check, XCircle, Loader2, Copy, Navigation, ExternalLink
+  Check, XCircle, Loader2, Copy, Navigation, ExternalLink, EyeOff
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { SUPABASE_ANON_KEY, SUPABASE_URL, supabase } from '@/integrations/supabase/client';
@@ -21,6 +21,14 @@ import { trackingNumberService } from '@/services/TrackingNumberService';
 import { cleanupDuplicateDeliveryRequests, cleanupDuplicatePurchaseOrders, checkForDuplicateDeliveryRequests, deleteDeliveryRequestsWithoutAddress, deleteDuplicateDeliveryRequestsByCompositeKey } from '@/utils/cleanupDuplicateDeliveryRequests';
 import { checkDeliveryAddress } from '@/utils/checkDeliveryAddress';
 import { haversineKm, resolveJobCoordinates } from '@/utils/deliveryProximity';
+
+/** DB sometimes stores placeholder 0; treat as empty for card copy */
+function materialTypeForDisplay(raw: unknown): string {
+  if (raw == null) return '';
+  const s = String(raw).trim();
+  if (!s || s === '0') return '';
+  return s;
+}
 
 interface Notification {
   id: string;
@@ -75,6 +83,7 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [acceptingId, setAcceptingId] = useState<string | null>(null);
   const [rejectingId, setRejectingId] = useState<string | null>(null);
+  const [dismissingId, setDismissingId] = useState<string | null>(null);
   const acceptingRef = useRef<string | null>(null);
   const [settings, setSettings] = useState<NotificationSettings>({
     pushEnabled: false,
@@ -892,11 +901,12 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
           nearby = d <= NEARBY_RADIUS_KM;
         }
 
+        const matLabel = materialTypeForDisplay(dr.material_type);
         finalNotifications.push({
           id: `dr-${dr.id}`, // Use delivery_request id as notification id
           type: 'new_delivery',
           title: dr.status === 'pending' ? '🚚 New Delivery Request!' : `Delivery ${dr.status}`,
-          message: `${dr.material_type || 'Materials'} delivery to ${deliveryAddr}`,
+          message: `${matLabel || 'Materials'} delivery to ${deliveryAddr}`,
           timestamp: new Date(dr.created_at),
           read: dr.status !== 'pending', // Only pending deliveries are unread
           priority: dr.status === 'pending' ? 'high' : 'medium',
@@ -904,7 +914,7 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
           status: dr.status,
           pickupAddress: dr.pickup_address || dr.pickup_location || '',
           deliveryAddress: deliveryAddr,
-          materialType: dr.material_type || '',
+          materialType: matLabel,
           quantity: dr.quantity || '',
           estimatedCost: dr.estimated_cost || dr.budget_range || 0,
           purchase_order_id: dr.purchase_order_id ?? (poId === dr.id ? undefined : poId), // Use real PO id; for null-po requests key is dr.id so pass undefined
@@ -1259,69 +1269,109 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
     }
   }, [userId]);
 
-  // Reject delivery handler
+  const patchDeliveryRequestRejected = async (
+    requestId: string,
+    rejectionReason: string
+  ): Promise<{ ok: boolean; errorMessage?: string }> => {
+    const { url, headers } = await getAuthHeaders();
+    const response = await fetch(`${url}/rest/v1/delivery_requests?id=eq.${requestId}`, {
+      method: 'PATCH',
+      headers: {
+        ...headers,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        status: 'rejected',
+        rejection_reason: rejectionReason.trim(),
+        rejected_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      }),
+    });
+    if (response.ok) return { ok: true };
+    const errorData = await response.json().catch(() => ({}));
+    return {
+      ok: false,
+      errorMessage: (errorData as { message?: string }).message || 'Failed to update delivery request',
+    };
+  };
+
+  // Reject delivery handler (builder-visible reason)
   const handleRejectDelivery = async (requestId: string) => {
     if (!requestId) {
       console.error('❌ No delivery request ID provided for rejection');
       return;
     }
-    
-    // Ask for rejection reason
+
     const rejectReason = window.prompt('Please provide a reason for rejecting this delivery request:');
     if (!rejectReason || rejectReason.trim() === '') {
       toast({
-        title: "Reason Required",
-        description: "Please provide a reason for rejecting this delivery.",
-        variant: "destructive"
+        title: 'Reason Required',
+        description: 'Please provide a reason for rejecting this delivery.',
+        variant: 'destructive',
       });
       return;
     }
-    
-    setRejectingId(requestId);
-    
-    try {
-      const { url, headers } = await getAuthHeaders();
 
-      // Update delivery_request status to rejected
-      const response = await fetch(
-        `${url}/rest/v1/delivery_requests?id=eq.${requestId}`,
-        {
-          method: 'PATCH',
-          headers: {
-            ...headers,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            status: 'rejected',
-            rejection_reason: rejectReason.trim(),
-            rejected_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
-          })
-        }
-      );
-      
-      if (response.ok) {
+    setRejectingId(requestId);
+    try {
+      const { ok, errorMessage } = await patchDeliveryRequestRejected(requestId, rejectReason);
+      if (ok) {
         toast({
-          title: "✅ Delivery Rejected",
-          description: "The delivery request has been rejected. The builder will be notified.",
+          title: '✅ Delivery Rejected',
+          description: 'The delivery request has been rejected. The builder will be notified.',
         });
         loadNotifications();
-        if (onRejectDelivery) {
-          onRejectDelivery(requestId);
-        }
+        onRejectDelivery?.(requestId);
       } else {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.message || 'Failed to reject delivery');
+        throw new Error(errorMessage);
       }
     } catch (error: any) {
       console.error('❌ Error rejecting delivery:', error);
       toast({
         title: 'Error',
         description: error.message || 'Failed to reject delivery. Please try again.',
-        variant: 'destructive'
+        variant: 'destructive',
       });
     } finally {
       setRejectingId(null);
+    }
+  };
+
+  /** One-click hide: same DB outcome as reject but without prompting (card leaves Alerts list). */
+  const handleRemoveFromAlerts = async (requestId: string) => {
+    if (!requestId) return;
+    if (
+      !window.confirm(
+        'Remove this job from your alerts? It will no longer appear here; the request is marked as declined by you.'
+      )
+    ) {
+      return;
+    }
+    setDismissingId(requestId);
+    try {
+      const { ok, errorMessage } = await patchDeliveryRequestRejected(
+        requestId,
+        'Removed from provider alerts (not taking this job)'
+      );
+      if (ok) {
+        toast({
+          title: 'Removed from alerts',
+          description: 'This delivery request no longer appears in your list.',
+        });
+        loadNotifications();
+        onRejectDelivery?.(requestId);
+      } else {
+        throw new Error(errorMessage);
+      }
+    } catch (error: any) {
+      console.error('❌ Error removing from alerts:', error);
+      toast({
+        title: 'Could not remove',
+        description: error.message || 'Try again or use Reject with a reason.',
+        variant: 'destructive',
+      });
+    } finally {
+      setDismissingId(null);
     }
   };
 
@@ -2538,11 +2588,16 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
                           </p>
                         </div>
                       ) : (
-                        <div className="flex gap-2">
+                        <div className="flex flex-col gap-2">
+                          <div className="flex gap-2">
                             <Button
                               size="sm"
                               onClick={() => handleAcceptDelivery(notification.delivery_request_id!)}
-                              disabled={acceptingId === notification.delivery_request_id || rejectingId === notification.delivery_request_id}
+                              disabled={
+                                acceptingId === notification.delivery_request_id ||
+                                rejectingId === notification.delivery_request_id ||
+                                dismissingId === notification.delivery_request_id
+                              }
                               className="flex-1 h-8 text-xs bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white font-semibold"
                             >
                               {acceptingId === notification.delivery_request_id ? (
@@ -2561,7 +2616,11 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
                               size="sm"
                               variant="destructive"
                               onClick={() => handleRejectDelivery(notification.delivery_request_id!)}
-                              disabled={acceptingId === notification.delivery_request_id || rejectingId === notification.delivery_request_id}
+                              disabled={
+                                acceptingId === notification.delivery_request_id ||
+                                rejectingId === notification.delivery_request_id ||
+                                dismissingId === notification.delivery_request_id
+                              }
                               className="flex-1 h-8 text-xs font-semibold"
                             >
                               {rejectingId === notification.delivery_request_id ? (
@@ -2576,6 +2635,30 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
                                 </>
                               )}
                             </Button>
+                          </div>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-8 text-xs w-full border-slate-300 text-slate-700"
+                            onClick={() => handleRemoveFromAlerts(notification.delivery_request_id!)}
+                            disabled={
+                              acceptingId === notification.delivery_request_id ||
+                              rejectingId === notification.delivery_request_id ||
+                              dismissingId === notification.delivery_request_id
+                            }
+                          >
+                            {dismissingId === notification.delivery_request_id ? (
+                              <>
+                                <Loader2 className="h-3 w-3 mr-1.5 animate-spin" />
+                                Removing...
+                              </>
+                            ) : (
+                              <>
+                                <EyeOff className="h-3 w-3 mr-1.5" />
+                                Remove from my alerts
+                              </>
+                            )}
+                          </Button>
                         </div>
                       )}
                     </>
