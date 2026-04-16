@@ -10,8 +10,12 @@ import { supabase } from "@/integrations/supabase/client";
 const PAYSTACK_NAV_KEY = "ujenzi_paystack_after";
 
 /** Set `VITE_PAYSTACK_TEST_MODE=true` in Netlify / `.env.local` while using `sk_test_…` in Supabase so all roles see a clear sandbox banner. */
-export const isPaystackTestModeBanner = (): boolean =>
-  import.meta.env.VITE_PAYSTACK_TEST_MODE === "true" || import.meta.env.VITE_PAYSTACK_TEST_MODE === "1";
+export const isPaystackTestModeBanner = (): boolean => {
+  const raw = import.meta.env.VITE_PAYSTACK_TEST_MODE;
+  if (raw === undefined || raw === null || String(raw).trim() === "") return false;
+  const v = String(raw).trim().toLowerCase();
+  return v === "true" || v === "1" || v === "yes";
+};
 
 export type PaystackCheckoutProps = {
   amount: number;

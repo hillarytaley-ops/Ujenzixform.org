@@ -41,6 +41,7 @@ import { QuoteCart, QuoteCartButton, QuoteCartItem } from './QuoteCart';
 import { MobileBookView } from './MobileBookView';
 import { FileText, BookOpen } from 'lucide-react';
 import { ProductModal, materialToProduct, Product } from '@/components/products';
+import { PaymentGateway } from '@/components/payment/PaymentGateway';
 import { useAuth } from '@/contexts/AuthContext';
 import {
   getCartProjectId,
@@ -437,6 +438,13 @@ export const MaterialsGrid: React.FC<MaterialsGridProps> = ({ embeddedInDashboar
   const [showBookView, setShowBookView] = useState(false);
   const [bookViewStartIndex, setBookViewStartIndex] = useState(0);
   const [isMobile, setIsMobile] = useState(false);
+
+  /** Paystack after direct grid “Buy Now” (same intent as cart checkout). */
+  const [paystackAfterBuyOpen, setPaystackAfterBuyOpen] = useState(false);
+  const [paystackAfterBuyOrderId, setPaystackAfterBuyOrderId] = useState<string | null>(null);
+  const [paystackAfterBuyAmount, setPaystackAfterBuyAmount] = useState(0);
+  const [paystackAfterBuyPo, setPaystackAfterBuyPo] = useState('');
+  const [paystackAfterBuyPath, setPaystackAfterBuyPath] = useState('/home');
   
   // Detect mobile device
   useEffect(() => {
@@ -1557,10 +1565,29 @@ export const MaterialsGrid: React.FC<MaterialsGridProps> = ({ embeddedInDashboar
         console.error('Purchase order error:', orderError);
         throw orderError;
       }
-      
+
+      const total = material.unit_price * qty;
+      const successPath =
+        userRole === 'private_client'
+          ? '/private-client-dashboard'
+          : userRole === 'professional_builder'
+            ? '/professional-builder-dashboard'
+            : '/home';
+
+      if (orderData?.id && total >= 1) {
+        setPaystackAfterBuyOrderId(orderData.id);
+        setPaystackAfterBuyAmount(total);
+        setPaystackAfterBuyPo(poNumber);
+        setPaystackAfterBuyPath(successPath);
+        setPaystackAfterBuyOpen(true);
+      }
+
       toast({
-        title: '🛒 Order Placed!',
-        description: `Order for ${qty}x ${material.name} has been placed. PO#: ${poNumber}`,
+        title: '🛒 Order placed',
+        description:
+          orderData?.id && total >= 1
+            ? `PO# ${poNumber} — complete payment in the window that opened (or close it to pay later).`
+            : `Order for ${qty}x ${material.name} has been placed. PO#: ${poNumber}`,
       });
     } catch (e) {
       console.error('Failed to create order:', e);
@@ -2863,6 +2890,28 @@ export const MaterialsGrid: React.FC<MaterialsGridProps> = ({ embeddedInDashboar
         isOpen={!!selectedProductDetail}
         onClose={() => setSelectedProductDetail(null)}
       />
+
+      <Dialog open={paystackAfterBuyOpen} onOpenChange={(open) => !open && setPaystackAfterBuyOpen(false)}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Pay for your order</DialogTitle>
+            <DialogDescription>
+              Pay securely with Paystack. Close this window if you want to pay later; the order is already created.
+            </DialogDescription>
+          </DialogHeader>
+          {paystackAfterBuyOrderId && paystackAfterBuyAmount >= 1 ? (
+            <PaymentGateway
+              amount={paystackAfterBuyAmount}
+              currency="KES"
+              description={`Order ${paystackAfterBuyPo} — grid Buy Now`}
+              orderId={paystackAfterBuyOrderId}
+              successNavigateTo={paystackAfterBuyPath}
+              onSuccess={() => {}}
+              onCancel={() => setPaystackAfterBuyOpen(false)}
+            />
+          ) : null}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
