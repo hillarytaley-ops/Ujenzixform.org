@@ -9,7 +9,7 @@ import { supabase } from "@/integrations/supabase/client";
 
 const PAYSTACK_NAV_KEY = "ujenzi_paystack_after";
 
-/** Set `VITE_PAYSTACK_TEST_MODE=true` in Netlify / `.env.local` while using `sk_test_…` in Supabase so all roles see a clear sandbox banner. */
+/** Set `VITE_PAYSTACK_TEST_MODE=true` in Vercel (or `.env.local`) while using `sk_test_…` in Supabase so all roles see a clear sandbox banner. */
 export const isPaystackTestModeBanner = (): boolean => {
   const raw = import.meta.env.VITE_PAYSTACK_TEST_MODE;
   if (raw === undefined || raw === null || String(raw).trim() === "") return false;
