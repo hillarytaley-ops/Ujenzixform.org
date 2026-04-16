@@ -41,7 +41,7 @@ import { QuoteCart, QuoteCartButton, QuoteCartItem } from './QuoteCart';
 import { MobileBookView } from './MobileBookView';
 import { FileText, BookOpen } from 'lucide-react';
 import { ProductModal, materialToProduct, Product } from '@/components/products';
-import { PaymentGateway } from '@/components/payment/PaymentGateway';
+import { PostOrderPaystackModal } from '@/components/payment/PostOrderPaystackModal';
 import { useAuth } from '@/contexts/AuthContext';
 import {
   getCartProjectId,
@@ -2891,27 +2891,14 @@ export const MaterialsGrid: React.FC<MaterialsGridProps> = ({ embeddedInDashboar
         onClose={() => setSelectedProductDetail(null)}
       />
 
-      <Dialog open={paystackAfterBuyOpen} onOpenChange={(open) => !open && setPaystackAfterBuyOpen(false)}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Pay for your order</DialogTitle>
-            <DialogDescription>
-              Pay securely with Paystack. Close this window if you want to pay later; the order is already created.
-            </DialogDescription>
-          </DialogHeader>
-          {paystackAfterBuyOrderId && paystackAfterBuyAmount >= 1 ? (
-            <PaymentGateway
-              amount={paystackAfterBuyAmount}
-              currency="KES"
-              description={`Order ${paystackAfterBuyPo} — grid Buy Now`}
-              orderId={paystackAfterBuyOrderId}
-              successNavigateTo={paystackAfterBuyPath}
-              onSuccess={() => {}}
-              onCancel={() => setPaystackAfterBuyOpen(false)}
-            />
-          ) : null}
-        </DialogContent>
-      </Dialog>
+      <PostOrderPaystackModal
+        open={paystackAfterBuyOpen && !!paystackAfterBuyOrderId && paystackAfterBuyAmount >= 1}
+        onClose={() => setPaystackAfterBuyOpen(false)}
+        amount={paystackAfterBuyAmount}
+        orderId={paystackAfterBuyOrderId ?? ''}
+        description={`Order ${paystackAfterBuyPo} — grid Buy Now`}
+        successNavigateTo={paystackAfterBuyPath}
+      />
     </div>
   );
 };

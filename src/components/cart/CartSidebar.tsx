@@ -33,14 +33,7 @@ import { CartPriceComparisonAll } from './CartPriceComparisonAll';
 import { MultiSupplierQuoteDialog } from './MultiSupplierQuoteDialog';
 import { DeliveryPromptDialog } from '@/components/builders/DeliveryPromptDialog';
 import { MonitoringServicePrompt } from '@/components/builders/MonitoringServicePrompt';
-import { PaymentGateway } from '@/components/payment/PaymentGateway';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
+import { PostOrderPaystackModal } from '@/components/payment/PostOrderPaystackModal';
 import { setCartProjectContext, clearCartProjectContext } from '@/utils/builderCartProject';
 import { catalogMaterialIdFromCartLineId } from '@/utils/cartLineId';
 
@@ -686,8 +679,9 @@ export const CartSidebar: React.FC = () => {
       setPaystackSuccessPath(payAfterPath);
 
       // Offer Paystack when amount meets hosted-checkout minimum (1 KES); otherwise go straight to delivery prompt.
+      // Defer until after the cart Sheet finishes closing so its overlay does not compete with the payment layer.
       if (orderTotal >= 1) {
-        setShowPaystackAfterOrder(true);
+        window.setTimeout(() => setShowPaystackAfterOrder(true), 200);
       } else if (userRole === 'private_client' || userRole === 'professional_builder' || !userRole) {
         setTimeout(() => setShowDeliveryPrompt(true), 500);
       }
@@ -1181,44 +1175,19 @@ export const CartSidebar: React.FC = () => {
       }}
     />
 
-        {/* Paystack after Buy Now (order already created; payment is optional from buyer perspective until you enforce it) */}
-    <Dialog
-      open={showPaystackAfterOrder}
-      onOpenChange={(open) => {
-        if (!open) {
-          setShowPaystackAfterOrder(false);
-          if (userRole === 'private_client' || userRole === 'professional_builder' || !userRole) {
-            setTimeout(() => setShowDeliveryPrompt(true), 300);
-          }
+        <PostOrderPaystackModal
+      open={showPaystackAfterOrder && !!lastOrderId && lastOrderTotal >= 1}
+      onClose={() => {
+        setShowPaystackAfterOrder(false);
+        if (userRole === 'private_client' || userRole === 'professional_builder' || !userRole) {
+          setTimeout(() => setShowDeliveryPrompt(true), 300);
         }
       }}
-    >
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>Pay for your order</DialogTitle>
-          <DialogDescription>
-            Pay securely with Paystack (card, M-Pesa, etc.). You can close this window to skip payment for now; your order
-            is already recorded.
-          </DialogDescription>
-        </DialogHeader>
-        {lastOrderId && lastOrderTotal >= 1 ? (
-          <PaymentGateway
-            amount={lastOrderTotal}
-            currency="KES"
-            description={`Order ${lastOrderPoNumber || lastOrderId.slice(0, 8)} — ${lastOrderItems.length} line(s)`}
-            orderId={lastOrderId}
-            successNavigateTo={paystackSuccessPath}
-            onSuccess={() => {}}
-            onCancel={() => {
-              setShowPaystackAfterOrder(false);
-              if (userRole === 'private_client' || userRole === 'professional_builder' || !userRole) {
-                setTimeout(() => setShowDeliveryPrompt(true), 300);
-              }
-            }}
-          />
-        ) : null}
-      </DialogContent>
-    </Dialog>
+      amount={lastOrderTotal}
+      orderId={lastOrderId ?? ''}
+      description={`Order ${lastOrderPoNumber || (lastOrderId ? lastOrderId.slice(0, 8) : '')} — ${lastOrderItems.length} line(s)`}
+      successNavigateTo={paystackSuccessPath}
+    />
 
     </>
   );
