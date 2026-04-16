@@ -33,6 +33,14 @@ import { CartPriceComparisonAll } from './CartPriceComparisonAll';
 import { MultiSupplierQuoteDialog } from './MultiSupplierQuoteDialog';
 import { DeliveryPromptDialog } from '@/components/builders/DeliveryPromptDialog';
 import { MonitoringServicePrompt } from '@/components/builders/MonitoringServicePrompt';
+import { PaymentGateway } from '@/components/payment/PaymentGateway';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { setCartProjectContext, clearCartProjectContext } from '@/utils/builderCartProject';
 import { catalogMaterialIdFromCartLineId } from '@/utils/cartLineId';
 
@@ -106,7 +114,11 @@ export const CartSidebar: React.FC = () => {
   const [lastOrderItems, setLastOrderItems] = useState<Array<{ material_name?: string; name?: string; quantity: number; unit?: string; unit_price?: number }>>([]);
   const [lastOrderStatus, setLastOrderStatus] = useState<string | null>(null);
   const [lastOrderFulfillmentChoice, setLastOrderFulfillmentChoice] = useState<string | null>(null);
+  const [lastOrderPoNumber, setLastOrderPoNumber] = useState<string>('');
   const [lastDeliveryAddress, setLastDeliveryAddress] = useState<string>('');
+  /** After Buy Now, offer Paystack before the delivery prompt (buyer total only; fee logic stays server-side later). */
+  const [showPaystackAfterOrder, setShowPaystackAfterOrder] = useState(false);
+  const [paystackSuccessPath, setPaystackSuccessPath] = useState<string>('/home');
   
   // Project selection for linking orders to projects
   const [projects, setProjects] = useState<BuilderProject[]>([]);
@@ -651,27 +663,33 @@ export const CartSidebar: React.FC = () => {
       setLastOrderItems(orderItemsSnapshot);
       setLastOrderStatus(orderData.status ?? 'confirmed');
       setLastOrderFulfillmentChoice(orderData.builder_fulfillment_choice ?? 'pending');
+      setLastOrderPoNumber(poNumber);
 
       clearCart();
       setIsCartOpen(false);
       
       toast({
-        title: '🎉 Order Placed Successfully!',
-        description: `Your order #${poNumber} for ${orderItemCount} items (KES ${orderTotal.toLocaleString()}) has been confirmed.`,
-        duration: 4000,
+        title: '🎉 Order placed',
+        description:
+          orderTotal >= 1
+            ? `Order #${poNumber} (${orderItemCount} items, KES ${orderTotal.toLocaleString()}). Complete payment in the next step, or skip and arrange delivery.`
+            : `Your order #${poNumber} for ${orderItemCount} items (KES ${orderTotal.toLocaleString()}) has been confirmed.`,
+        duration: 5000,
       });
 
-      // Debug logging
-      console.log('🚚 Checking delivery prompt - User role:', userRole);
-      console.log('🚚 Last order ID:', orderData.id);
+      const payAfterPath =
+        userRole === 'private_client'
+          ? '/private-client-dashboard'
+          : userRole === 'professional_builder'
+            ? '/professional-builder-dashboard'
+            : '/home';
+      setPaystackSuccessPath(payAfterPath);
 
-      // Show delivery prompt for private clients AND professional builders
-      if (userRole === 'private_client' || userRole === 'professional_builder' || !userRole) {
-        console.log('🚚 Setting showDeliveryPrompt to true in 500ms...');
-        setTimeout(() => {
-          console.log('🚚 NOW setting showDeliveryPrompt = true');
-          setShowDeliveryPrompt(true);
-        }, 500);
+      // Offer Paystack when amount meets hosted-checkout minimum (1 KES); otherwise go straight to delivery prompt.
+      if (orderTotal >= 1) {
+        setShowPaystackAfterOrder(true);
+      } else if (userRole === 'private_client' || userRole === 'professional_builder' || !userRole) {
+        setTimeout(() => setShowDeliveryPrompt(true), 500);
       }
 
     } catch (error: any) {
@@ -1091,7 +1109,7 @@ export const CartSidebar: React.FC = () => {
         }}
         purchaseOrder={{
           id: lastOrderId,
-          po_number: `PO-${lastOrderId.slice(0, 8)}`,
+          po_number: lastOrderPoNumber || `PO-${lastOrderId.slice(0, 8)}`,
           supplier_id: '',
           total_amount: lastOrderTotal,
           delivery_address: 'To be provided',
@@ -1130,12 +1148,13 @@ export const CartSidebar: React.FC = () => {
           setLastOrderItems([]);
           setLastOrderStatus(null);
           setLastOrderFulfillmentChoice(null);
+          setLastOrderPoNumber('');
           setLastDeliveryAddress('');
         }
       }}
       purchaseOrder={lastOrderId ? {
         id: lastOrderId,
-        po_number: `PO-${lastOrderId.slice(0, 8)}`,
+        po_number: lastOrderPoNumber || `PO-${lastOrderId.slice(0, 8)}`,
         total_amount: lastOrderTotal,
         project_name: 'Direct Purchase',
         delivery_address: lastDeliveryAddress || undefined
@@ -1147,6 +1166,7 @@ export const CartSidebar: React.FC = () => {
         setLastOrderItems([]);
         setLastOrderStatus(null);
         setLastOrderFulfillmentChoice(null);
+        setLastOrderPoNumber('');
         setLastDeliveryAddress('');
       }}
       onDeclined={() => {
@@ -1156,11 +1176,51 @@ export const CartSidebar: React.FC = () => {
         setLastOrderItems([]);
         setLastOrderStatus(null);
         setLastOrderFulfillmentChoice(null);
+        setLastOrderPoNumber('');
         setLastDeliveryAddress('');
       }}
     />
 
-        </>
+        {/* Paystack after Buy Now (order already created; payment is optional from buyer perspective until you enforce it) */}
+    <Dialog
+      open={showPaystackAfterOrder}
+      onOpenChange={(open) => {
+        if (!open) {
+          setShowPaystackAfterOrder(false);
+          if (userRole === 'private_client' || userRole === 'professional_builder' || !userRole) {
+            setTimeout(() => setShowDeliveryPrompt(true), 300);
+          }
+        }
+      }}
+    >
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Pay for your order</DialogTitle>
+          <DialogDescription>
+            Pay securely with Paystack (card, M-Pesa, etc.). You can close this window to skip payment for now; your order
+            is already recorded.
+          </DialogDescription>
+        </DialogHeader>
+        {lastOrderId && lastOrderTotal >= 1 ? (
+          <PaymentGateway
+            amount={lastOrderTotal}
+            currency="KES"
+            description={`Order ${lastOrderPoNumber || lastOrderId.slice(0, 8)} — ${lastOrderItems.length} line(s)`}
+            orderId={lastOrderId}
+            successNavigateTo={paystackSuccessPath}
+            onSuccess={() => {}}
+            onCancel={() => {
+              setShowPaystackAfterOrder(false);
+              if (userRole === 'private_client' || userRole === 'professional_builder' || !userRole) {
+                setTimeout(() => setShowDeliveryPrompt(true), 300);
+              }
+            }}
+          />
+        ) : null}
+      </DialogContent>
+    </Dialog>
+
+    </>
   );
 };
 
