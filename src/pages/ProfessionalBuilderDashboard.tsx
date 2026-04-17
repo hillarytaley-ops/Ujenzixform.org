@@ -535,6 +535,15 @@ const ProfessionalBuilderDashboardPage = () => {
   const [deliveriesSubTab, setDeliveriesSubTab] = useState('request'); // Sub-tab for Deliveries (request, schedule, history)
   /** Sub-tabs on Invoices: delivery notes → GRN → supplier invoices (horizontal row). */
   const [invoiceDocsSubTab, setInvoiceDocsSubTab] = useState('delivery-notes');
+  /** After first open (or hover prefetch), keep DN/GRN/Invoice subtree mounted so sub-tabs stay instant. */
+  const [invoicesHubWarm, setInvoicesHubWarm] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    try {
+      return new URLSearchParams(window.location.search).get('tab') === 'invoices';
+    } catch {
+      return false;
+    }
+  });
   const [supplierResponseCount, setSupplierResponseCount] = useState(0); // Count of supplier responses for notification badge
   const [invoiceHubBadgeCount, setInvoiceHubBadgeCount] = useState(0); // DN + invoices needing builder action (Invoices tab)
   const [invoiceSubBadgeDn, setInvoiceSubBadgeDn] = useState(0);
@@ -1974,6 +1983,11 @@ const ProfessionalBuilderDashboardPage = () => {
     }
   }, [searchParams, activeTab]);
 
+  /** Keep DN / GRN / Invoice subtree mounted after first visit so sub-tab switches stay instant. */
+  useEffect(() => {
+    if (activeTab === 'invoices') setInvoicesHubWarm(true);
+  }, [activeTab]);
+
   // Invoices tab badge: delivery notes + unacknowledged invoices (+ sub-tab counts + realtime)
   useEffect(() => {
     const userId = getUserId();
@@ -2411,6 +2425,7 @@ const ProfessionalBuilderDashboardPage = () => {
           stats={stats}
           deliveriesNavBadgeCount={deliveriesNavBadgeCount}
           invoiceHubBadgeCount={invoiceHubBadgeCount}
+          onInvoicesWarm={() => setInvoicesHubWarm(true)}
         />
 
         {/* Tab Content - Hidden TabsList, content controlled by cards above */}
@@ -3429,7 +3444,8 @@ const ProfessionalBuilderDashboardPage = () => {
             </Card>
           </TabsContent>
 
-          <TabsContent value="invoices" className="space-y-6">
+          <TabsContent value="invoices" forceMount className="space-y-6">
+            {invoicesHubWarm ? (
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -3562,6 +3578,7 @@ const ProfessionalBuilderDashboardPage = () => {
                 </Tabs>
               </CardContent>
             </Card>
+            ) : null}
           </TabsContent>
 
           {/* Legacy Invoices Tab - Keeping for backward compatibility */}

@@ -29,6 +29,8 @@ type Props = {
   stats: NavStats;
   deliveriesNavBadgeCount: number;
   invoiceHubBadgeCount: number;
+  /** Prefetch Invoices hub (DN/GRN/Invoice) while hovering so sub-tabs feel instant after click. */
+  onInvoicesWarm?: () => void;
 };
 
 export function ProfessionalBuilderDashboardNavCards({
@@ -39,6 +41,7 @@ export function ProfessionalBuilderDashboardNavCards({
   stats,
   deliveriesNavBadgeCount,
   invoiceHubBadgeCount,
+  onInvoicesWarm,
 }: Props) {
   return (
     <div
@@ -140,6 +143,8 @@ export function ProfessionalBuilderDashboardNavCards({
             ? "bg-gradient-to-r from-slate-500 to-slate-600 ring-2 ring-slate-300 shadow-lg text-white"
             : "bg-white hover:bg-slate-50 text-gray-700 border shadow-sm"
         }`}
+        onPointerEnter={() => onInvoicesWarm?.()}
+        onFocus={() => onInvoicesWarm?.()}
         onClick={() => setActiveTab("invoices")}
       >
         <FileText className="h-5 w-5 shrink-0" aria-hidden />
