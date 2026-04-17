@@ -98,6 +98,9 @@ import {
   monitoringRestOpts,
 } from "@/utils/myMonitoringServiceRequests";
 import { ProfessionalBuilderDashboardNavCards } from "@/components/builders/ProfessionalBuilderDashboardNavCards";
+import { InvoiceManagement } from "@/components/invoices/InvoiceManagement";
+import { DeliveryNoteWorkflow } from "@/components/delivery/DeliveryNoteWorkflow";
+import { GRNView } from "@/components/delivery/GRNView";
 import { SUPPORT_PHONE_PRIMARY, SUPPORT_EMAIL } from "@/config/appIdentity";
 
 const devLog = (...args: unknown[]) => {
@@ -126,19 +129,6 @@ function BuilderDashboardTabSuspense({ children }: { children: React.ReactNode }
 const LazyDeliveryRequest = React.lazy(() => import("@/components/DeliveryRequest"));
 const LazyTrackingTab = React.lazy(() =>
   import("@/components/tracking/TrackingTab").then((m) => ({ default: m.TrackingTab }))
-);
-const LazyDeliveryNoteWorkflow = React.lazy(() =>
-  import("@/components/delivery/DeliveryNoteWorkflow").then((m) => ({
-    default: m.DeliveryNoteWorkflow,
-  }))
-);
-const LazyGRNView = React.lazy(() =>
-  import("@/components/delivery/GRNView").then((m) => ({ default: m.GRNView }))
-);
-const LazyInvoiceManagement = React.lazy(() =>
-  import("@/components/invoices/InvoiceManagement").then((m) => ({
-    default: m.InvoiceManagement,
-  }))
 );
 const LazyInAppCommunication = React.lazy(() =>
   import("@/components/communication/InAppCommunication").then((m) => ({
@@ -3452,11 +3442,7 @@ const ProfessionalBuilderDashboardPage = () => {
                 )}
               </CardHeader>
               <CardContent>
-                {user?.id ? (
-                  <BuilderDashboardTabSuspense>
-                    <LazyInvoiceManagement userId={user.id} userRole="builder" />
-                  </BuilderDashboardTabSuspense>
-                ) : null}
+                {user?.id ? <InvoiceManagement userId={user.id} userRole="builder" /> : null}
               </CardContent>
             </Card>
 
@@ -3464,7 +3450,7 @@ const ProfessionalBuilderDashboardPage = () => {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Receipt className="h-5 w-5 text-orange-500" />
-                  Delivery notes &amp; GRN
+                  Delivery notes and GRN
                 </CardTitle>
                 <CardDescription className="space-y-3">
                   <p>Sign delivery notes and view GRNs for materials received — separate from paying the supplier invoice above.</p>
@@ -3514,15 +3500,13 @@ const ProfessionalBuilderDashboardPage = () => {
                       Sign delivery notes and verify materials received.
                     </p>
                     {user?.id && (
-                      <BuilderDashboardTabSuspense>
-                        <LazyDeliveryNoteWorkflow
-                          builderAuthUserId={user.id}
-                          builderProfileId={profile?.id ?? null}
-                          onComplete={() => {
-                            void fetchInvoiceHubBadgeCount(profile?.id ?? null, user.id);
-                          }}
-                        />
-                      </BuilderDashboardTabSuspense>
+                      <DeliveryNoteWorkflow
+                        builderAuthUserId={user.id}
+                        builderProfileId={profile?.id ?? null}
+                        onComplete={() => {
+                          void fetchInvoiceHubBadgeCount(profile?.id ?? null, user.id);
+                        }}
+                      />
                     )}
                   </TabsContent>
 
@@ -3530,11 +3514,7 @@ const ProfessionalBuilderDashboardPage = () => {
                     <p className="text-sm text-muted-foreground">
                       View all GRNs for accepted deliveries.
                     </p>
-                    {user?.id && (
-                      <BuilderDashboardTabSuspense>
-                        <LazyGRNView userId={user.id} userRole="builder" />
-                      </BuilderDashboardTabSuspense>
-                    )}
+                    {user?.id && <GRNView userId={user.id} userRole="builder" />}
                   </TabsContent>
                 </Tabs>
               </CardContent>

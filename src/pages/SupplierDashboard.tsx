@@ -82,6 +82,7 @@ import {
   countOrdersInStatusBucket,
 } from "@/lib/purchaseOrderMetrics";
 import { Navigation as NavigationIcon, Receipt } from "lucide-react";
+import { SupplierInvoiceHub } from "@/components/supplier/SupplierInvoiceHub";
 
 const SupplierTabFallback = () => (
   <div
@@ -133,10 +134,6 @@ const LazyInAppCommunication = lazy(() =>
     default: m.InAppCommunication,
   }))
 );
-const LazySupplierInvoiceHub = lazy(() =>
-  import("@/components/supplier/SupplierInvoiceHub").then((m) => ({ default: m.SupplierInvoiceHub }))
-);
-
 const LazySupplierReviewsSection = lazy(async () => {
   const m = await import("@/components/reviews/ReviewSystem");
   function SupplierReviewsSection({ supplierId }: { supplierId: string }) {
@@ -2855,16 +2852,14 @@ const SupplierDashboard = () => {
           {/* ═══════════════════════════════════════════════════════════════════════════════════ */}
           <TabsContent value="invoice">
             {user?.id && (
-              <SupplierTabSuspense>
-                <LazySupplierInvoiceHub
-                  userId={user.id}
-                  supplierRecordId={supplierRecordId}
-                  isDarkMode={isDarkMode}
-                  textColor={textColor}
-                  mutedText={mutedText}
-                  cardBg={cardBg}
-                />
-              </SupplierTabSuspense>
+              <SupplierInvoiceHub
+                userId={user.id}
+                supplierRecordId={supplierRecordId}
+                isDarkMode={isDarkMode}
+                textColor={textColor}
+                mutedText={mutedText}
+                cardBg={cardBg}
+              />
             )}
           </TabsContent>
 
