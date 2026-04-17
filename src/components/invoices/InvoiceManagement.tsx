@@ -553,7 +553,16 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
                 </p>
                 {userRole === 'builder' && invoice.payment_status !== 'paid' && (
                   <p className="mt-2 text-sm font-medium text-amber-800 dark:text-amber-200">
-                    Tap <strong>Pay now</strong> to pay with Paystack or record a transfer you already made.
+                    {String(invoice.status || '').toLowerCase() === 'draft' ? (
+                      <>
+                        This invoice is still a <strong>draft</strong> on the supplier side.{" "}
+                        <strong>Pay now</strong> unlocks when they send it to you.
+                      </>
+                    ) : (
+                      <>
+                        Tap <strong>Pay now</strong> to pay with Paystack or record a transfer you already made.
+                      </>
+                    )}
                   </p>
                 )}
               </div>
@@ -594,12 +603,20 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
                 
                 {userRole === 'builder' &&
                   (invoice.payment_status || 'pending') !== 'paid' &&
-                  !['draft', 'cancelled'].includes(String(invoice.status || '').toLowerCase()) && (
+                  String(invoice.status || '').toLowerCase() !== 'cancelled' && (
                     <Button
                       type="button"
-                      className="flex-1 min-w-[160px] bg-emerald-600 px-4 py-6 text-base font-bold text-white shadow-md hover:bg-emerald-700 sm:py-5"
+                      className="min-w-[140px] flex-1 bg-emerald-600 px-4 py-6 text-base font-bold text-white shadow-md hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-emerald-300 disabled:text-emerald-950/70 disabled:hover:bg-emerald-300 sm:min-w-[160px] sm:py-5"
                       onClick={() => void handlePayNowClick(invoice)}
-                      disabled={acknowledging && payNowBusyId === invoice.id}
+                      disabled={
+                        ['draft'].includes(String(invoice.status || '').toLowerCase()) ||
+                        (acknowledging && payNowBusyId === invoice.id)
+                      }
+                      title={
+                        String(invoice.status || '').toLowerCase() === 'draft'
+                          ? 'Supplier must send this invoice before you can pay.'
+                          : undefined
+                      }
                     >
                       {acknowledging && payNowBusyId === invoice.id ? (
                         <>
@@ -615,7 +632,7 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
                     </Button>
                   )}
 
-                <Button variant="outline" type="button">
+                <Button variant="outline" type="button" className="min-w-[120px] shrink-0">
                   <Download className="h-4 w-4 mr-2" />
                   Download
                 </Button>
