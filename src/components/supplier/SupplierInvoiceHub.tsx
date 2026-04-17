@@ -503,7 +503,7 @@ export const SupplierInvoiceHub: React.FC<SupplierInvoiceHubProps> = ({
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="invoices" className="mt-0 space-y-4">
+          <TabsContent value="invoices" forceMount className="mt-0 space-y-4">
             <p className={`text-sm ${mutedText}`}>
               Invoices tied to your supplier account: edit and send when marked editable.
             </p>
@@ -514,7 +514,7 @@ export const SupplierInvoiceHub: React.FC<SupplierInvoiceHubProps> = ({
             />
           </TabsContent>
 
-          <TabsContent value="delivery-notes" className="mt-0">
+          <TabsContent value="delivery-notes" forceMount className="mt-0">
             <div className="mb-3 flex items-center justify-between gap-2">
               <p className={`text-sm ${mutedText}`}>
                 Grouped by builder progress: pending signature vs accepted. Professional builder names come from their
@@ -652,7 +652,7 @@ export const SupplierInvoiceHub: React.FC<SupplierInvoiceHubProps> = ({
             )}
           </TabsContent>
 
-          <TabsContent value="grn" className="mt-0">
+          <TabsContent value="grn" forceMount className="mt-0">
             <div className="mb-3 flex items-center justify-between gap-2">
               <p className={`text-sm ${mutedText}`}>
                 Goods received notes after a builder accepts delivery. Mark as viewed to continue the invoice workflow.
