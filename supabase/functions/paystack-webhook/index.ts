@@ -3,8 +3,11 @@
  * URL: https://<project-ref>.supabase.co/functions/v1/paystack-webhook
  */
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.8";
 
 const PAYSTACK_SECRET_KEY = Deno.env.get("PAYSTACK_SECRET_KEY") ?? "";
+const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
+const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 
 async function hmacSha512Hex(secret: string, message: string): Promise<string> {
   const enc = new TextEncoder();
@@ -56,11 +59,52 @@ serve(async (req) => {
   }
 
   const ev = event.event ?? "";
-  console.log("[paystack-webhook]", ev, (event.data as { reference?: string })?.reference);
+  const data = event.data as Record<string, unknown> | undefined;
+  const reference = typeof data?.reference === "string" ? data.reference : "";
+  console.log("[paystack-webhook]", ev, reference);
 
-  // Extend here: upsert orders/invoices when charge succeeds (idempotent by reference).
-  if (ev === "charge.success") {
-    // no-op until order tables are wired; verification on return URL remains primary for UX
+  if (ev === "charge.success" && SERVICE_ROLE_KEY && SUPABASE_URL) {
+    const meta = data?.metadata as Record<string, unknown> | undefined;
+    const orderId = typeof meta?.order_id === "string" ? meta.order_id.trim() : "";
+    const metaUser = typeof meta?.user_id === "string" ? meta.user_id.trim() : "";
+
+    if (orderId.startsWith("inv_") && metaUser) {
+      const invoiceId = orderId.slice(4);
+      const admin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
+        auth: { persistSession: false, autoRefreshToken: false },
+      });
+
+      const { data: inv, error: invErr } = await admin
+        .from("invoices")
+        .select("id, builder_id, payment_status, notes")
+        .eq("id", invoiceId)
+        .maybeSingle();
+
+      if (invErr) {
+        console.error("[paystack-webhook] invoice lookup:", invErr.message);
+      } else if (inv && inv.builder_id === metaUser && inv.payment_status !== "paid") {
+        const stamp = new Date().toISOString();
+        const line = reference
+          ? `\n[${stamp}] Paystack charge.success — ref: ${reference}`
+          : `\n[${stamp}] Paystack charge.success`;
+        const prevNotes = typeof inv.notes === "string" ? inv.notes : "";
+        const { error: upErr } = await admin
+          .from("invoices")
+          .update({
+            payment_status: "paid",
+            updated_at: stamp,
+            notes: `${prevNotes}${line}`.trim(),
+          })
+          .eq("id", invoiceId);
+        if (upErr) {
+          console.error("[paystack-webhook] invoice update:", upErr.message);
+        } else {
+          console.log("[paystack-webhook] marked invoice paid:", invoiceId);
+        }
+      } else if (inv && inv.builder_id !== metaUser) {
+        console.warn("[paystack-webhook] metadata user_id does not match invoice.builder_id; skip", invoiceId);
+      }
+    }
   }
 
   return new Response(JSON.stringify({ ok: true }), {

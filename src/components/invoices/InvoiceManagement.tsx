@@ -27,6 +27,8 @@ import {
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { sortSupplyChainDocsNewestFirst } from '@/utils/sortSupplyChainDocs';
+import { PaystackCheckout } from '@/components/payment/PaystackCheckout';
+import { Separator } from '@/components/ui/separator';
 
 interface Invoice {
   id: string;
@@ -589,16 +591,16 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
           }
         }}
       >
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Pay supplier immediately</DialogTitle>
+            <DialogTitle>Settle this invoice</DialogTitle>
             <DialogDescription>
-              Complete payment outside the app (M-Pesa, bank transfer, cheque, etc.) as agreed with your
-              supplier, then record it here so your records stay accurate.
+              Pay with Paystack (card, M-Pesa, bank, etc. — whatever your Paystack business has enabled), or record a
+              payment you already made directly to the supplier.
             </DialogDescription>
           </DialogHeader>
           {payInvoice && (
-            <div className="space-y-3 py-2">
+            <div className="space-y-4 py-2">
               <div className="rounded-md border bg-muted/50 px-3 py-2 text-sm">
                 <p className="font-medium">{payInvoice.invoice_number}</p>
                 <p className="text-muted-foreground">
@@ -608,6 +610,22 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
                   </span>
                 </p>
               </div>
+
+              <PaystackCheckout
+                amount={Number(payInvoice.total_amount)}
+                currency="KES"
+                description={`Invoice ${payInvoice.invoice_number} — ${payInvoice.supplier?.company_name || 'Supplier'}`}
+                orderId={`inv_${payInvoice.id}`}
+                successNavigateTo="/professional-builder-dashboard?tab=invoices"
+                onCancel={() => {
+                  setPayInvoice(null);
+                  setPaymentReference('');
+                }}
+              />
+
+              <Separator className="my-2" />
+              <p className="text-center text-xs text-muted-foreground">Paid directly to the supplier?</p>
+
               <div className="space-y-2">
                 <Label htmlFor="pay-ref">Payment reference (optional)</Label>
                 <Input
