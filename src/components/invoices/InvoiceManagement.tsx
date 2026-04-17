@@ -368,7 +368,7 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
 
       let next = { ...invoice };
 
-      if (invoice.status === 'sent' && !invoice.acknowledged_at) {
+      if (String(invoice.status || '').toLowerCase() === 'sent' && !invoice.acknowledged_at) {
         const ackAt = new Date().toISOString();
         const { error } = await supabase
           .from('invoices')
@@ -630,12 +630,9 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
                   String(invoice.status || '').toLowerCase() !== 'cancelled' && (
                     <Button
                       type="button"
-                      className="min-w-[130px] shrink-0 bg-emerald-600 px-3 py-5 text-sm font-bold text-white shadow-md hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-emerald-300 disabled:text-emerald-950/70 disabled:hover:bg-emerald-300 sm:min-w-[160px] sm:px-4 sm:py-5 sm:text-base"
+                      className="relative z-10 min-w-[130px] shrink-0 bg-emerald-600 px-3 py-5 text-sm font-bold text-white shadow-md hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-emerald-300 disabled:text-emerald-950/70 disabled:hover:bg-emerald-300 sm:min-w-[160px] sm:px-4 sm:py-5 sm:text-base"
                       onClick={() => void handlePayNowClick(invoice)}
-                      disabled={
-                        ['draft'].includes(String(invoice.status || '').toLowerCase()) ||
-                        (acknowledging && payNowBusyId === invoice.id)
-                      }
+                      disabled={acknowledging && payNowBusyId === invoice.id}
                       title={
                         String(invoice.status || '').toLowerCase() === 'draft'
                           ? 'Supplier must send this invoice before you can pay.'
