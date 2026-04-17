@@ -469,7 +469,7 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h3 className="text-lg font-semibold">Invoices</h3>
+        <h3 className="text-lg font-semibold">Supplier invoices (pay here)</h3>
         <Button variant="outline" size="sm" onClick={fetchInvoices}>
           Refresh
         </Button>

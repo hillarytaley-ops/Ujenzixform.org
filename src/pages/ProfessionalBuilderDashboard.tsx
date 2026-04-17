@@ -542,8 +542,8 @@ const ProfessionalBuilderDashboardPage = () => {
   const [activeTab, setActiveTab] = useUrlTabSync(BUILDER_TABS, 'projects');
   const [extrasSubTab, setExtrasSubTab] = useState('team'); // Sub-tab for Extras (team or support)
   const [deliveriesSubTab, setDeliveriesSubTab] = useState('request'); // Sub-tab for Deliveries (request, schedule, history)
-  // Default to supplier invoices so Pay / Paystack is visible (DN & GRN are the other sub-tabs).
-  const [invoiceDocsSubTab, setInvoiceDocsSubTab] = useState('invoice-list');
+  // Delivery notes vs GRN only (supplier invoices are shown above, not hidden in a sub-tab).
+  const [invoiceDocsSubTab, setInvoiceDocsSubTab] = useState('delivery-notes');
   const [supplierResponseCount, setSupplierResponseCount] = useState(0); // Count of supplier responses for notification badge
   const [invoiceHubBadgeCount, setInvoiceHubBadgeCount] = useState(0); // DN + invoices needing builder action (Invoices tab)
   const [invoiceSubBadgeDn, setInvoiceSubBadgeDn] = useState(0);
@@ -3015,23 +3015,46 @@ const ProfessionalBuilderDashboardPage = () => {
           </TabsContent>
 
           <TabsContent value="orders">
-            {(() => {
-              // Prefer profile id (purchase_orders.buyer_id often stores profiles.id); fall back to auth uid
-              let builderId = profile?.id || user?.id || '';
-              if (!builderId) {
-                try {
-                  const stored = readPersistedAuthRawStringSync();
-                  if (stored) {
-                    const parsed = JSON.parse(stored);
-                    builderId = parsed.user?.id || '';
-                  }
-                } catch (e) {}
+            <div className="mb-4 space-y-4">
+              <Card className="border-emerald-200 bg-emerald-50/60 dark:border-emerald-800 dark:bg-emerald-950/30">
+                <CardContent className="flex flex-col gap-3 py-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="min-w-0">
+                    <p className="font-semibold text-emerald-950 dark:text-emerald-50">
+                      Supplier invoice for materials you bought?
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      Pay suppliers on the <strong>Invoices</strong> tab — each unpaid invoice has a green{" "}
+                      <strong>Pay now</strong> button (Paystack or record a transfer you already made).
+                    </p>
+                  </div>
+                  <Button
+                    type="button"
+                    className="shrink-0 bg-emerald-600 hover:bg-emerald-700"
+                    onClick={() => setActiveTab("invoices")}
+                  >
+                    <CreditCard className="mr-2 h-4 w-4" />
+                    Open invoices — Pay now
+                  </Button>
+                </CardContent>
+              </Card>
+              {(() => {
+                // Prefer profile id (purchase_orders.buyer_id often stores profiles.id); fall back to auth uid
+                let builderId = profile?.id || user?.id || '';
                 if (!builderId) {
-                  builderId = localStorage.getItem('user_id') || '';
+                  try {
+                    const stored = readPersistedAuthRawStringSync();
+                    if (stored) {
+                      const parsed = JSON.parse(stored);
+                      builderId = parsed.user?.id || '';
+                    }
+                  } catch (e) {}
+                  if (!builderId) {
+                    builderId = localStorage.getItem('user_id') || '';
+                  }
                 }
-              }
-              return <BuilderOrdersTracker builderId={builderId} />;
-            })()}
+                return <BuilderOrdersTracker builderId={builderId} />;
+              })()}
+            </div>
           </TabsContent>
 
           {/* Deliveries Tab - Contains Request Delivery, Delivery Schedule, and Delivery History as sub-tabs */}
@@ -3408,18 +3431,43 @@ const ProfessionalBuilderDashboardPage = () => {
           </TabsContent>
 
           <TabsContent value="invoices" className="space-y-6">
+            {/* Supplier payment first — builders were missing Pay now hidden behind a third sub-tab. */}
+            <Card className="border-2 border-emerald-200 shadow-md dark:border-emerald-800">
+              <CardHeader className="pb-2">
+                <CardTitle className="flex flex-wrap items-center gap-2 text-lg text-emerald-950 dark:text-emerald-50 sm:text-xl">
+                  <CreditCard className="h-6 w-6 shrink-0 text-emerald-600" aria-hidden />
+                  Pay suppliers for materials you ordered
+                </CardTitle>
+                <CardDescription className="text-base text-muted-foreground">
+                  When your supplier sends an invoice for a purchase order, it appears below. Each unpaid row has a
+                  green <strong className="text-emerald-800 dark:text-emerald-200">Pay now</strong> button (Paystack
+                  card / M-Pesa / bank, depending on your Paystack setup) or you can record a payment you already made
+                  to the supplier.
+                </CardDescription>
+                {invoiceSubBadgeInv > 0 && (
+                  <p className="pt-1 text-sm font-medium text-amber-800 dark:text-amber-200">
+                    You have {invoiceSubBadgeInv} supplier invoice{invoiceSubBadgeInv === 1 ? "" : "s"} needing
+                    payment or acknowledgement — scroll to the green Pay now buttons.
+                  </p>
+                )}
+              </CardHeader>
+              <CardContent>
+                {user?.id ? (
+                  <BuilderDashboardTabSuspense>
+                    <LazyInvoiceManagement userId={user.id} userRole="builder" />
+                  </BuilderDashboardTabSuspense>
+                ) : null}
+              </CardContent>
+            </Card>
+
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Receipt className="h-5 w-5 text-orange-500" />
-                  Receipts & documents
+                  Delivery notes &amp; GRN
                 </CardTitle>
                 <CardDescription className="space-y-3">
-                  <p>
-                    Use the <strong>Invoices</strong> column for supplier invoices (acknowledge, then{" "}
-                    <strong>Pay now</strong> / Paystack). Switch to <strong>Delivery notes</strong> or{" "}
-                    <strong>GRN</strong> for signing and receipts.
-                  </p>
+                  <p>Sign delivery notes and view GRNs for materials received — separate from paying the supplier invoice above.</p>
                   <div className="flex flex-wrap items-center gap-2 rounded-md border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
                     <Volume2 className="h-3.5 w-3.5 shrink-0" aria-hidden />
                     <Label htmlFor="builder-doc-sound" className="cursor-pointer font-normal">
@@ -3440,7 +3488,7 @@ const ProfessionalBuilderDashboardPage = () => {
               </CardHeader>
               <CardContent>
                 <Tabs value={invoiceDocsSubTab} onValueChange={setInvoiceDocsSubTab} className="space-y-4">
-                  <TabsList className="grid h-auto w-full grid-cols-1 gap-2 p-1 sm:grid-cols-3 bg-muted">
+                  <TabsList className="grid h-auto w-full grid-cols-1 gap-2 p-1 sm:grid-cols-2 bg-muted">
                     <TabsTrigger value="delivery-notes" className="relative gap-2 pr-7 sm:pr-8">
                       <FileSignature className="h-4 w-4 shrink-0" />
                       Delivery notes
@@ -3456,15 +3504,6 @@ const ProfessionalBuilderDashboardPage = () => {
                       {invoiceSubBadgeGrn > 0 && (
                         <Badge className="absolute right-1 top-1/2 h-5 min-w-5 -translate-y-1/2 border-2 border-background bg-red-500 px-1 text-[10px] text-white hover:bg-red-500">
                           {invoiceSubBadgeGrn > 9 ? '9+' : invoiceSubBadgeGrn}
-                        </Badge>
-                      )}
-                    </TabsTrigger>
-                    <TabsTrigger value="invoice-list" className="relative gap-2 pr-7 sm:pr-8">
-                      <Receipt className="h-4 w-4 shrink-0" />
-                      Invoices
-                      {invoiceSubBadgeInv > 0 && (
-                        <Badge className="absolute right-1 top-1/2 h-5 min-w-5 -translate-y-1/2 border-2 border-background bg-red-500 px-1 text-[10px] text-white hover:bg-red-500">
-                          {invoiceSubBadgeInv > 9 ? '9+' : invoiceSubBadgeInv}
                         </Badge>
                       )}
                     </TabsTrigger>
@@ -3494,18 +3533,6 @@ const ProfessionalBuilderDashboardPage = () => {
                     {user?.id && (
                       <BuilderDashboardTabSuspense>
                         <LazyGRNView userId={user.id} userRole="builder" />
-                      </BuilderDashboardTabSuspense>
-                    )}
-                  </TabsContent>
-
-                  <TabsContent value="invoice-list" className="mt-0 space-y-2">
-                    <p className="text-sm text-muted-foreground">
-                      When a supplier forwards an invoice, acknowledge it and use <strong>Pay now</strong> to
-                      settle and record payment without delay.
-                    </p>
-                    {user?.id && (
-                      <BuilderDashboardTabSuspense>
-                        <LazyInvoiceManagement userId={user.id} userRole="builder" />
                       </BuilderDashboardTabSuspense>
                     )}
                   </TabsContent>
