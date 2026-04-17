@@ -17,6 +17,9 @@ import SignatureCanvas from 'react-signature-canvas';
 import { ResponsiveSignatureCanvas } from '@/components/ui/ResponsiveSignatureCanvas';
 import { sortSupplyChainDocsNewestFirst } from '@/utils/sortSupplyChainDocs';
 
+/** Cap rows returned — avoids huge payloads and keeps queries within DB statement limits. */
+const DN_WORKFLOW_LIST_LIMIT = 500;
+
 interface DeliveryNote {
   id: string;
   dn_number: string;
@@ -145,7 +148,8 @@ export const DeliveryNoteWorkflow: React.FC<DeliveryNoteWorkflowProps> = ({
         .select('*')
         .in('builder_id', builderIds)
         .in('status', ['pending_signature', 'signed', 'forwarded_to_supplier', 'inspection_pending'])
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false })
+        .limit(DN_WORKFLOW_LIST_LIMIT);
 
       if (error) throw error;
       const list = rows || [];
@@ -189,10 +193,15 @@ export const DeliveryNoteWorkflow: React.FC<DeliveryNoteWorkflowProps> = ({
       );
     } catch (error: any) {
       console.error('Error fetching delivery notes:', error);
+      const code = error?.code as string | undefined;
+      const msg = String(error?.message || '');
+      const timedOut = code === '57014' || /timeout/i.test(msg);
       toast({
-        title: "Error",
-        description: "Failed to load delivery notes",
-        variant: "destructive",
+        title: timedOut ? 'Delivery notes timed out' : 'Error',
+        description: timedOut
+          ? 'The list took too long to load. Try Refresh, or ask your admin to run the latest Supabase migration (delivery_notes index).'
+          : 'Failed to load delivery notes',
+        variant: 'destructive',
       });
     } finally {
       if (!silent) setLoading(false);
