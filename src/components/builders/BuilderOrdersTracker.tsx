@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { Link } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -30,7 +31,8 @@ import {
   Edit,
   XCircle,
   FileText,
-  Phone
+  Phone,
+  CreditCard,
 } from 'lucide-react';
 import { SUPABASE_ANON_KEY, SUPABASE_URL, supabase } from '@/integrations/supabase/client';
 import {
@@ -151,6 +153,8 @@ interface ScanEvent {
 
 interface BuilderOrdersTrackerProps {
   builderId: string;
+  /** When false, hide supplier-invoice Pay now (e.g. private client QR tab reuses this component). Default true. */
+  showSupplierPayLinks?: boolean;
 }
 
 /** Real provider name for UI — strips placeholders; keeps "Assigned driver" and falls back when only id is set */
@@ -313,7 +317,10 @@ const QRCodeDialog: React.FC<{
 // Filter types for order status
 type OrderFilter = 'all' | 'pending' | 'dispatched' | 'in_transit' | 'received';
 
-export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ builderId }) => {
+export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({
+  builderId,
+  showSupplierPayLinks = true,
+}) => {
   const [orders, setOrders] = useState<PurchaseOrder[]>([]);
   const [scanEvents, setScanEvents] = useState<ScanEvent[]>([]);
   const [loading, setLoading] = useState(true);
@@ -326,7 +333,37 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
   >([]);
   const [showDeliveryPrompt, setShowDeliveryPrompt] = useState(false);
   const [selectedOrderForDelivery, setSelectedOrderForDelivery] = useState<PurchaseOrder | null>(null);
+  /** purchase_order_id → invoice.id for unpaid supplier invoices (builder pays on Invoices tab). */
+  const [payInvoiceByPoId, setPayInvoiceByPoId] = useState<Record<string, string>>({});
   const { toast } = useToast();
+
+  useEffect(() => {
+    if (!showSupplierPayLinks || !builderId?.trim() || orders.length === 0) {
+      setPayInvoiceByPoId({});
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      const poIds = orders.map((o) => o.id).filter(Boolean);
+      const { data, error } = await supabase
+        .from('invoices')
+        .select('id, purchase_order_id, payment_status, status')
+        .in('purchase_order_id', poIds);
+      if (cancelled || error) return;
+      const next: Record<string, string> = {};
+      for (const row of data || []) {
+        const paid = String(row.payment_status || '').toLowerCase() === 'paid';
+        const st = String(row.status || '').toLowerCase();
+        if (paid || st === 'draft' || st === 'cancelled') continue;
+        const po = row.purchase_order_id as string | undefined;
+        if (po) next[po] = row.id as string;
+      }
+      setPayInvoiceByPoId(next);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [orders, builderId, showSupplierPayLinks]);
 
   const fetchOrders = async () => {
     /** Not cleared by useEffect — avoids stuck spinner if builderId churn cancels outer timeouts. */
@@ -1551,6 +1588,23 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
             >
               <Truck className="h-3.5 w-3.5 sm:mr-1" />
               <span className="hidden sm:inline text-xs font-semibold">Re-request</span>
+            </Button>
+          ) : null}
+          {showSupplierPayLinks && payInvoiceByPoId[order.id] ? (
+            <Button
+              type="button"
+              size="sm"
+              className="h-8 shrink-0 border-0 bg-emerald-600 px-2 text-xs font-semibold text-white hover:bg-emerald-700 sm:px-3"
+              asChild
+            >
+              <Link
+                to={`/professional-builder-dashboard?tab=invoices&payInvoice=${payInvoiceByPoId[order.id]}`}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <CreditCard className="h-3.5 w-3.5 sm:mr-1" />
+                <span className="hidden sm:inline">Pay now</span>
+                <span className="sm:hidden">Pay</span>
+              </Link>
             </Button>
           ) : null}
           <button

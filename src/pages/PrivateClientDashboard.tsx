@@ -1316,6 +1316,7 @@ const PrivateClientDashboard = () => {
                       <LazyBuilderOrdersTracker
                         key={`${builderId}-${profile?.id ?? ""}`}
                         builderId={builderId}
+                        showSupplierPayLinks={false}
                       />
                     </PrivateClientTabSuspense>
                   ) : (

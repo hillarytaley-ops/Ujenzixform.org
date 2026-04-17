@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -81,6 +82,9 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
   const [paymentReference, setPaymentReference] = useState('');
   const [recordingPayment, setRecordingPayment] = useState(false);
   const { toast } = useToast();
+  const [searchParams, setSearchParams] = useSearchParams();
+  /** Prevents double-launch when `payInvoice` stays in URL across re-renders. */
+  const payInvoiceUrlHandledRef = useRef<string | null>(null);
 
   // Form state for editing
   const [editedItems, setEditedItems] = useState<any[]>([]);
@@ -390,6 +394,31 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
       setPayNowBusyId(null);
     }
   };
+
+  /** Deep link: ?tab=invoices&payInvoice=<uuid> (e.g. from Orders row). */
+  useEffect(() => {
+    if (userRole !== 'builder' || loading) return;
+    const invId = searchParams.get('payInvoice');
+    if (!invId) {
+      payInvoiceUrlHandledRef.current = null;
+      return;
+    }
+    if (payInvoiceUrlHandledRef.current === invId) return;
+    const match = invoices.find((i) => i.id === invId);
+    if (!match) return;
+
+    payInvoiceUrlHandledRef.current = invId;
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        next.delete('payInvoice');
+        return next;
+      },
+      { replace: true }
+    );
+    void handlePayNowClick(match);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- one-shot deep link; handler identity changes each render
+  }, [userRole, loading, invoices, searchParams, setSearchParams]);
 
   const handleRecordPayment = async () => {
     if (!payInvoice) return;
