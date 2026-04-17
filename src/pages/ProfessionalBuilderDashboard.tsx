@@ -101,10 +101,10 @@ import { ProfessionalBuilderDashboardNavCards } from "@/components/builders/Prof
 import { SUPPORT_PHONE_PRIMARY, SUPPORT_EMAIL } from "@/config/appIdentity";
 
 const devLog = (...args: unknown[]) => {
-  if (import.meta.env.DEV) devLog(...args);
+  if (import.meta.env.DEV) console.log(...args);
 };
 const devWarn = (...args: unknown[]) => {
-  if (import.meta.env.DEV) devWarn(...args);
+  if (import.meta.env.DEV) console.warn(...args);
 };
 
 const BuilderDashboardTabFallback = () => (
@@ -542,7 +542,8 @@ const ProfessionalBuilderDashboardPage = () => {
   const [activeTab, setActiveTab] = useUrlTabSync(BUILDER_TABS, 'projects');
   const [extrasSubTab, setExtrasSubTab] = useState('team'); // Sub-tab for Extras (team or support)
   const [deliveriesSubTab, setDeliveriesSubTab] = useState('request'); // Sub-tab for Deliveries (request, schedule, history)
-  const [invoiceDocsSubTab, setInvoiceDocsSubTab] = useState('delivery-notes'); // Invoices tab: DN / GRN / invoices list
+  // Default to supplier invoices so Pay / Paystack is visible (DN & GRN are the other sub-tabs).
+  const [invoiceDocsSubTab, setInvoiceDocsSubTab] = useState('invoice-list');
   const [supplierResponseCount, setSupplierResponseCount] = useState(0); // Count of supplier responses for notification badge
   const [invoiceHubBadgeCount, setInvoiceHubBadgeCount] = useState(0); // DN + invoices needing builder action (Invoices tab)
   const [invoiceSubBadgeDn, setInvoiceSubBadgeDn] = useState(0);
@@ -3415,7 +3416,9 @@ const ProfessionalBuilderDashboardPage = () => {
                 </CardTitle>
                 <CardDescription className="space-y-3">
                   <p>
-                    Switch between delivery notes to sign, goods received notes (GRN), and invoices — no long scroll.
+                    Use the <strong>Invoices</strong> column for supplier invoices (acknowledge, then{" "}
+                    <strong>Pay now</strong> / Paystack). Switch to <strong>Delivery notes</strong> or{" "}
+                    <strong>GRN</strong> for signing and receipts.
                   </p>
                   <div className="flex flex-wrap items-center gap-2 rounded-md border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
                     <Volume2 className="h-3.5 w-3.5 shrink-0" aria-hidden />

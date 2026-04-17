@@ -349,12 +349,20 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
 
       if (error) throw error;
 
+      const ackAt = new Date().toISOString();
+      setPayInvoice({
+        ...invoice,
+        acknowledged_at: ackAt,
+        status: 'acknowledged',
+      });
+      setPaymentReference('');
+
       toast({
         title: "Invoice acknowledged",
-        description: "Pay your supplier immediately — use Pay now on this invoice.",
+        description: "Choose Paystack or record an offline payment in the window that opened.",
       });
 
-      fetchInvoices();
+      void fetchInvoices();
     } catch (error: any) {
       console.error('Error acknowledging invoice:', error);
       toast({
@@ -409,16 +417,26 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
   };
 
   const getStatusBadge = (status: string, paymentStatus: string) => {
-    if (paymentStatus === 'paid') {
+    const paid = (paymentStatus || '') === 'paid';
+    if (paid) {
       return <Badge variant="default" className="bg-green-500">Paid</Badge>;
     }
-    if (status === 'acknowledged') {
-      return <Badge variant="default" className="bg-blue-500">Acknowledged</Badge>;
-    }
-    if (status === 'sent') {
-      return <Badge variant="secondary">Sent</Badge>;
-    }
-    return <Badge variant="outline">{status}</Badge>;
+    const workflow =
+      status === 'acknowledged' ? (
+        <Badge variant="default" className="bg-blue-500">Acknowledged</Badge>
+      ) : status === 'sent' ? (
+        <Badge variant="secondary">Sent</Badge>
+      ) : (
+        <Badge variant="outline">{status}</Badge>
+      );
+    return (
+      <div className="flex flex-col items-end gap-1 shrink-0">
+        <Badge variant="destructive" className="font-semibold">
+          Unpaid
+        </Badge>
+        {workflow}
+      </div>
+    );
   };
 
   if (loading) {
@@ -454,16 +472,16 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
                 <p>
                   <strong>{builderPayPrompt.needAcknowledge.length}</strong> invoice
                   {builderPayPrompt.needAcknowledge.length === 1 ? ' was' : 's were'} forwarded by your
-                  supplier{builderPayPrompt.needAcknowledge.length === 1 ? '' : 's'}. Acknowledge each one,
-                  then <strong>pay immediately</strong> using <strong>Pay now</strong>.
+                  supplier{builderPayPrompt.needAcknowledge.length === 1 ? '' : 's'}. Tap{" "}
+                  <strong>Acknowledge (then pay)</strong> — the payment window opens next (Paystack or offline).
                 </p>
               )}
               {builderPayPrompt.needPayment.length > 0 && (
                 <p>
                   <strong>{builderPayPrompt.needPayment.length}</strong> invoice
                   {builderPayPrompt.needPayment.length === 1 ? ' is' : 's are'} ready for payment — complete
-                  transfer (M-Pesa, bank, etc.) per your agreement, then tap <strong>Pay now</strong> to record
-                  it.
+                  transfer (M-Pesa, bank, etc.) per your agreement, then tap <strong>Pay now</strong> for Paystack or
+                  to record it.
                 </p>
               )}
             </AlertDescription>
@@ -494,7 +512,7 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
                   </p>
                 )}
                 {userRole === 'builder' &&
-                  (invoice.status === 'acknowledged' || invoice.acknowledged_at) &&
+                  (!!invoice.acknowledged_at || invoice.status === 'acknowledged') &&
                   invoice.payment_status !== 'paid' && (
                     <p className="mt-2 text-sm font-semibold text-red-700 dark:text-red-300">
                       Payment due now — pay {invoice.supplier?.company_name || 'the supplier'} as soon as
@@ -558,7 +576,7 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
                 )}
 
                 {userRole === 'builder' &&
-                  (invoice.status === 'acknowledged' || !!invoice.acknowledged_at) &&
+                  (!!invoice.acknowledged_at || invoice.status === 'acknowledged') &&
                   invoice.payment_status !== 'paid' && (
                     <Button
                       className="flex-1 min-w-[140px] bg-red-600 hover:bg-red-700"
@@ -568,7 +586,7 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
                       }}
                     >
                       <CreditCard className="h-4 w-4 mr-2" />
-                      Pay now
+                      Pay now (Paystack or record)
                     </Button>
                   )}
 
