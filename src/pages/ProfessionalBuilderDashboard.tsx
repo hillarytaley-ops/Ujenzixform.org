@@ -3549,7 +3549,13 @@ const ProfessionalBuilderDashboardPage = () => {
                         )}
                       </CardHeader>
                       <CardContent>
-                        {user?.id ? <InvoiceManagement userId={user.id} userRole="builder" /> : null}
+                        {user?.id ? (
+                          <InvoiceManagement
+                            userId={user.id}
+                            userRole="builder"
+                            builderProfileId={profile?.id ?? null}
+                          />
+                        ) : null}
                       </CardContent>
                     </Card>
                   </TabsContent>

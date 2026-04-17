@@ -29,6 +29,7 @@ import { useToast } from '@/hooks/use-toast';
 import { sortSupplyChainDocsNewestFirst } from '@/utils/sortSupplyChainDocs';
 import { PaystackCheckout } from '@/components/payment/PaystackCheckout';
 import { Separator } from '@/components/ui/separator';
+import { Skeleton } from '@/components/ui/skeleton';
 
 interface Invoice {
   id: string;
@@ -63,12 +64,15 @@ interface InvoiceManagementProps {
   userRole: 'builder' | 'supplier' | 'admin';
   /** public.suppliers.id — passed to list_invoices_for_supplier RPC */
   supplierRecordId?: string | null;
+  /** profiles.id — match invoices / PO buyer_id when stored as profile row id (same as delivery notes) */
+  builderProfileId?: string | null;
 }
 
 export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
   userId,
   userRole,
   supplierRecordId,
+  builderProfileId,
 }) => {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);
@@ -85,6 +89,8 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
   const [searchParams, setSearchParams] = useSearchParams();
   /** Prevents double-launch when `payInvoice` stays in URL across re-renders. */
   const payInvoiceUrlHandledRef = useRef<string | null>(null);
+  /** First fetch per user shows skeleton; later fetches (e.g. profile id resolved) refresh without blanking. */
+  const invoiceFetchGenerationRef = useRef(0);
 
   // Form state for editing
   const [editedItems, setEditedItems] = useState<any[]>([]);
@@ -160,16 +166,13 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
       }
 
       if (userRole === 'builder') {
-        const { data: byBuilderId, error: e1 } = await supabase
-          .from('invoices')
-          .select(invoiceSelect)
-          .eq('builder_id', userId);
-        if (e1) throw e1;
+        const builderKeys = [...new Set([userId, builderProfileId].filter(Boolean))] as string[];
 
-        const { data: myOrders, error: e2 } = await supabase
-          .from('purchase_orders')
-          .select('id')
-          .eq('buyer_id', userId);
+        const [{ data: byBuilderId, error: e1 }, { data: myOrders, error: e2 }] = await Promise.all([
+          supabase.from('invoices').select(invoiceSelect).in('builder_id', builderKeys),
+          supabase.from('purchase_orders').select('id').in('buyer_id', builderKeys),
+        ]);
+        if (e1) throw e1;
         if (e2) throw e2;
 
         const poIds = (myOrders || []).map((p) => p.id).filter(Boolean);
@@ -216,10 +219,15 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
   };
 
   useEffect(() => {
-    if (userId) {
-      fetchInvoices();
-    }
-  }, [userId, userRole, supplierRecordId]);
+    invoiceFetchGenerationRef.current = 0;
+  }, [userId]);
+
+  useEffect(() => {
+    if (!userId) return;
+    const silent = invoiceFetchGenerationRef.current > 0;
+    invoiceFetchGenerationRef.current += 1;
+    void fetchInvoices({ silent });
+  }, [userId, userRole, supplierRecordId, builderProfileId]);
 
   const builderPayPrompt = useMemo(() => {
     if (userRole !== 'builder') {
@@ -485,64 +493,79 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
     );
   };
 
-  if (loading) {
-    return (
-      <Card>
-        <CardContent className="py-12 text-center">
-          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
-          <p>Loading invoices...</p>
-        </CardContent>
-      </Card>
-    );
-  }
+  const showInitialLoad = loading && invoices.length === 0;
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h3 className="text-lg font-semibold">Supplier invoices (pay here)</h3>
-        <Button variant="outline" size="sm" onClick={fetchInvoices}>
-          Refresh
+        <Button
+          variant="outline"
+          size="sm"
+          disabled={loading}
+          onClick={() => void fetchInvoices({ silent: true })}
+        >
+          {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Refresh'}
         </Button>
       </div>
 
-      {userRole === 'builder' &&
-        (builderPayPrompt.needAcknowledge.length > 0 ||
-          builderPayPrompt.needPayment.length > 0) && (
-          <Alert className="border-amber-500/60 bg-amber-50 text-amber-950 dark:border-amber-600 dark:bg-amber-950/40 dark:text-amber-50">
-            <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
-            <AlertTitle className="text-amber-950 dark:text-amber-50">
-              Pay suppliers without delay
-            </AlertTitle>
-            <AlertDescription className="space-y-2 text-amber-900/90 dark:text-amber-100/90">
-              {builderPayPrompt.needAcknowledge.length > 0 && (
-                <p>
-                  <strong>{builderPayPrompt.needAcknowledge.length}</strong> invoice
-                  {builderPayPrompt.needAcknowledge.length === 1 ? ' was' : 's were'} forwarded by your
-                  supplier{builderPayPrompt.needAcknowledge.length === 1 ? '' : 's'}. Tap the green{" "}
-                  <strong>Pay now</strong> button on each row (we acknowledge for you if needed, then you pay).
-                </p>
-              )}
-              {builderPayPrompt.needPayment.length > 0 && (
-                <p>
-                  <strong>{builderPayPrompt.needPayment.length}</strong> invoice
-                  {builderPayPrompt.needPayment.length === 1 ? ' is' : 's are'} ready for payment — complete
-                  transfer (M-Pesa, bank, etc.) per your agreement, then tap <strong>Pay now</strong> for Paystack or
-                  to record it.
-                </p>
-              )}
-            </AlertDescription>
-          </Alert>
-        )}
+      {showInitialLoad && (
+        <div className="space-y-3" aria-busy="true" aria-label="Loading invoices">
+          {[0, 1, 2].map((i) => (
+            <Card key={i}>
+              <CardContent className="space-y-3 py-6">
+                <Skeleton className="h-6 w-48" />
+                <Skeleton className="h-4 w-full max-w-md" />
+                <div className="flex gap-2 pt-2">
+                  <Skeleton className="h-10 w-28" />
+                  <Skeleton className="h-10 w-24" />
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
 
-      {invoices.length === 0 ? (
-        <Card>
-          <CardContent className="py-10 text-center text-muted-foreground text-sm">
-            No invoices yet.
-          </CardContent>
-        </Card>
-      ) : null}
+      {!showInitialLoad && (
+        <>
+          {userRole === 'builder' &&
+            (builderPayPrompt.needAcknowledge.length > 0 ||
+              builderPayPrompt.needPayment.length > 0) && (
+              <Alert className="border-amber-500/60 bg-amber-50 text-amber-950 dark:border-amber-600 dark:bg-amber-950/40 dark:text-amber-50">
+                <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                <AlertTitle className="text-amber-950 dark:text-amber-50">
+                  Pay suppliers without delay
+                </AlertTitle>
+                <AlertDescription className="space-y-2 text-amber-900/90 dark:text-amber-100/90">
+                  {builderPayPrompt.needAcknowledge.length > 0 && (
+                    <p>
+                      <strong>{builderPayPrompt.needAcknowledge.length}</strong> invoice
+                      {builderPayPrompt.needAcknowledge.length === 1 ? ' was' : 's were'} forwarded by your
+                      supplier{builderPayPrompt.needAcknowledge.length === 1 ? '' : 's'}. Tap the green{" "}
+                      <strong>Pay now</strong> button on each row (we acknowledge for you if needed, then you pay).
+                    </p>
+                  )}
+                  {builderPayPrompt.needPayment.length > 0 && (
+                    <p>
+                      <strong>{builderPayPrompt.needPayment.length}</strong> invoice
+                      {builderPayPrompt.needPayment.length === 1 ? ' is' : 's are'} ready for payment — complete
+                      transfer (M-Pesa, bank, etc.) per your agreement, then tap <strong>Pay now</strong> for Paystack or
+                      to record it.
+                    </p>
+                  )}
+                </AlertDescription>
+              </Alert>
+            )}
 
-      {invoices.map((invoice) => (
+          {invoices.length === 0 ? (
+            <Card>
+              <CardContent className="py-10 text-center text-muted-foreground text-sm">
+                No invoices yet.
+              </CardContent>
+            </Card>
+          ) : null}
+
+          {invoices.map((invoice) => (
         <Card key={invoice.id}>
           <CardHeader>
             <div className="flex items-center justify-between">
@@ -641,7 +664,9 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
             </div>
           </CardContent>
         </Card>
-      ))}
+          ))}
+        </>
+      )}
 
       <Dialog
         open={!!payInvoice}
