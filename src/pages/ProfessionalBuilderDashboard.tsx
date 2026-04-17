@@ -3474,19 +3474,29 @@ const ProfessionalBuilderDashboardPage = () => {
               </CardHeader>
               <CardContent>
                 <Tabs value={invoiceDocsSubTab} onValueChange={setInvoiceDocsSubTab} className="space-y-4">
-                  <TabsList className="grid h-auto w-full grid-cols-1 gap-2 p-1 sm:grid-cols-2 bg-muted">
-                    <TabsTrigger value="delivery-notes" className="relative gap-2 pr-7 sm:pr-8">
-                      <FileSignature className="h-4 w-4 shrink-0" />
-                      Delivery notes
+                  <TabsList className="grid h-auto w-full grid-cols-2 gap-1 p-1 sm:gap-2 bg-muted">
+                    <TabsTrigger value="delivery-notes" className="relative min-w-0 gap-1 px-2 py-2 pr-7 text-xs sm:gap-2 sm:pr-8 sm:px-3 sm:text-sm">
+                      <FileSignature className="h-3.5 w-3.5 shrink-0 sm:h-4 sm:w-4" />
+                      <span className="truncate">
+                        <span className="sm:hidden">DN</span>
+                        <span className="hidden sm:inline">Delivery notes</span>
+                      </span>
                       {invoiceSubBadgeDn > 0 && (
                         <Badge className="absolute right-1 top-1/2 h-5 min-w-5 -translate-y-1/2 border-2 border-background bg-red-500 px-1 text-[10px] text-white hover:bg-red-500">
                           {invoiceSubBadgeDn > 9 ? '9+' : invoiceSubBadgeDn}
                         </Badge>
                       )}
                     </TabsTrigger>
-                    <TabsTrigger value="grn" className="relative gap-2 pr-7 sm:pr-8">
-                      <Package className="h-4 w-4 shrink-0" />
-                      GRN
+                    <TabsTrigger
+                      value="grn"
+                      title="Goods received note (GRN)"
+                      className="relative min-w-0 gap-1 px-2 py-2 pr-7 text-xs sm:gap-2 sm:pr-8 sm:px-3 sm:text-sm"
+                    >
+                      <Package className="h-3.5 w-3.5 shrink-0 sm:h-4 sm:w-4" />
+                      <span className="truncate">
+                        <span className="sm:hidden">RN</span>
+                        <span className="hidden sm:inline">GRN</span>
+                      </span>
                       {invoiceSubBadgeGrn > 0 && (
                         <Badge className="absolute right-1 top-1/2 h-5 min-w-5 -translate-y-1/2 border-2 border-background bg-red-500 px-1 text-[10px] text-white hover:bg-red-500">
                           {invoiceSubBadgeGrn > 9 ? '9+' : invoiceSubBadgeGrn}

@@ -472,21 +472,34 @@ export const SupplierInvoiceHub: React.FC<SupplierInvoiceHubProps> = ({
       <CardContent>
         <Tabs value={subTab} onValueChange={setSubTab} className="space-y-4">
           <TabsList
-            className={`grid h-auto w-full grid-cols-1 gap-2 p-1 sm:grid-cols-3 ${
+            className={`grid h-auto w-full grid-cols-3 gap-1 p-1 sm:gap-2 ${
               isDarkMode ? 'bg-slate-900' : 'bg-muted'
             }`}
           >
-            <TabsTrigger value="invoices" className="gap-2">
-              <Receipt className="h-4 w-4 shrink-0" />
-              Invoices
+            <TabsTrigger value="invoices" className="min-w-0 gap-1 px-2 py-2 text-xs sm:gap-2 sm:px-3 sm:text-sm">
+              <Receipt className="h-3.5 w-3.5 shrink-0 sm:h-4 sm:w-4" />
+              <span className="truncate sm:max-w-none">
+                <span className="sm:hidden">Inv.</span>
+                <span className="hidden sm:inline">Invoices</span>
+              </span>
             </TabsTrigger>
-            <TabsTrigger value="delivery-notes" className="gap-2">
-              <FileText className="h-4 w-4 shrink-0" />
-              Delivery notes
+            <TabsTrigger value="delivery-notes" className="min-w-0 gap-1 px-2 py-2 text-xs sm:gap-2 sm:px-3 sm:text-sm">
+              <FileText className="h-3.5 w-3.5 shrink-0 sm:h-4 sm:w-4" />
+              <span className="truncate sm:max-w-none">
+                <span className="sm:hidden">DN</span>
+                <span className="hidden sm:inline">Delivery notes</span>
+              </span>
             </TabsTrigger>
-            <TabsTrigger value="grn" className="gap-2">
-              <Package className="h-4 w-4 shrink-0" />
-              GRN
+            <TabsTrigger
+              value="grn"
+              title="Goods received note (GRN)"
+              className="min-w-0 gap-1 px-2 py-2 text-xs sm:gap-2 sm:px-3 sm:text-sm"
+            >
+              <Package className="h-3.5 w-3.5 shrink-0 sm:h-4 sm:w-4" />
+              <span className="truncate sm:max-w-none">
+                <span className="sm:hidden">RN</span>
+                <span className="hidden sm:inline">GRN</span>
+              </span>
             </TabsTrigger>
           </TabsList>
 
@@ -585,16 +598,16 @@ export const SupplierInvoiceHub: React.FC<SupplierInvoiceHubProps> = ({
                                       : '—'}
                                   </TableCell>
                                   <TableCell className="text-right">
-                                    <div className="flex flex-col items-end gap-1">
+                                    <div className="flex flex-col items-end gap-1 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end sm:gap-2">
                                       {fileLabel ? (
                                         <span
-                                          className={`max-w-[180px] truncate text-left text-xs ${mutedText}`}
+                                          className={`max-w-[180px] truncate text-left text-xs sm:max-w-[220px] ${mutedText}`}
                                           title={fileLabel}
                                         >
                                           {fileLabel}
                                         </span>
                                       ) : null}
-                                      <div className="flex flex-wrap items-center justify-end gap-1">
+                                      <div className="flex flex-row flex-wrap items-center justify-end gap-1">
                                         <Button
                                           type="button"
                                           variant="outline"

@@ -476,7 +476,7 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
         <Badge variant="outline">{status}</Badge>
       );
     return (
-      <div className="flex flex-col items-end gap-1 shrink-0">
+      <div className="flex flex-row flex-wrap items-center justify-end gap-1 shrink-0">
         <Badge variant="destructive" className="font-semibold">
           Unpaid
         </Badge>
@@ -591,7 +591,7 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
                 </div>
               </div>
 
-              <div className="flex flex-wrap gap-2 pt-4 border-t">
+              <div className="flex flex-row flex-wrap items-center gap-2 overflow-x-auto pt-4 border-t sm:flex-nowrap sm:overflow-visible">
                 {userRole === 'supplier' && invoice.is_editable && (
                   <Button
                     variant="outline"
@@ -607,7 +607,7 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
                   String(invoice.status || '').toLowerCase() !== 'cancelled' && (
                     <Button
                       type="button"
-                      className="min-w-[140px] flex-1 bg-emerald-600 px-4 py-6 text-base font-bold text-white shadow-md hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-emerald-300 disabled:text-emerald-950/70 disabled:hover:bg-emerald-300 sm:min-w-[160px] sm:py-5"
+                      className="min-w-[130px] shrink-0 bg-emerald-600 px-3 py-5 text-sm font-bold text-white shadow-md hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-emerald-300 disabled:text-emerald-950/70 disabled:hover:bg-emerald-300 sm:min-w-[160px] sm:px-4 sm:py-5 sm:text-base"
                       onClick={() => void handlePayNowClick(invoice)}
                       disabled={
                         ['draft'].includes(String(invoice.status || '').toLowerCase()) ||
