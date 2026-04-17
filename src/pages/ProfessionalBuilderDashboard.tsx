@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useNavigate, Link } from "react-router-dom";
+import { useNavigate, Link, useSearchParams } from "react-router-dom";
 import { useUrlTabSync } from "@/hooks/useUrlTabSync";
 import { supabase, SUPABASE_URL, SUPABASE_ANON_KEY } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -525,6 +525,7 @@ const ProfessionalBuilderDashboardPage = () => {
   const [submittingRequest, setSubmittingRequest] = useState(false);
   const [monitoringRequests, setMonitoringRequests] = useState<any[]>([]);
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { toast } = useToast();
 
   // Active tab state - syncs with URL so refresh keeps current tab
@@ -532,7 +533,7 @@ const ProfessionalBuilderDashboardPage = () => {
   const [activeTab, setActiveTab] = useUrlTabSync(BUILDER_TABS, 'projects');
   const [extrasSubTab, setExtrasSubTab] = useState('team'); // Sub-tab for Extras (team or support)
   const [deliveriesSubTab, setDeliveriesSubTab] = useState('request'); // Sub-tab for Deliveries (request, schedule, history)
-  // Delivery notes vs GRN only (supplier invoices are shown above, not hidden in a sub-tab).
+  /** Sub-tabs on Invoices: delivery notes → GRN → supplier invoices (horizontal row). */
   const [invoiceDocsSubTab, setInvoiceDocsSubTab] = useState('delivery-notes');
   const [supplierResponseCount, setSupplierResponseCount] = useState(0); // Count of supplier responses for notification badge
   const [invoiceHubBadgeCount, setInvoiceHubBadgeCount] = useState(0); // DN + invoices needing builder action (Invoices tab)
@@ -1964,6 +1965,14 @@ const ProfessionalBuilderDashboardPage = () => {
     if (!docAlertSoundOn || !increased) return;
     playBuilderDocAlertBeep();
   }, [invoiceSubBadgeDn, invoiceSubBadgeGrn, invoiceSubBadgeInv, docAlertSoundOn]);
+
+  /** Orders “Pay now” deep link: ?tab=invoices&payInvoice=… — open supplier invoices sub-tab so InvoiceManagement mounts. */
+  useEffect(() => {
+    const inv = searchParams.get('payInvoice');
+    if (inv && activeTab === 'invoices') {
+      setInvoiceDocsSubTab('supplier-invoices');
+    }
+  }, [searchParams, activeTab]);
 
   // Invoices tab badge: delivery notes + unacknowledged invoices (+ sub-tab counts + realtime)
   useEffect(() => {
@@ -3421,39 +3430,18 @@ const ProfessionalBuilderDashboardPage = () => {
           </TabsContent>
 
           <TabsContent value="invoices" className="space-y-6">
-            {/* Supplier payment first — builders were missing Pay now hidden behind a third sub-tab. */}
-            <Card className="border-2 border-emerald-200 shadow-md dark:border-emerald-800">
-              <CardHeader className="pb-2">
-                <CardTitle className="flex flex-wrap items-center gap-2 text-lg text-emerald-950 dark:text-emerald-50 sm:text-xl">
-                  <CreditCard className="h-6 w-6 shrink-0 text-emerald-600" aria-hidden />
-                  Pay suppliers for materials you ordered
-                </CardTitle>
-                <CardDescription className="text-base text-muted-foreground">
-                  When your supplier sends an invoice for a purchase order, it appears below. Each unpaid row has a
-                  green <strong className="text-emerald-800 dark:text-emerald-200">Pay now</strong> button (Paystack
-                  card / M-Pesa / bank, depending on your Paystack setup) or you can record a payment you already made
-                  to the supplier.
-                </CardDescription>
-                {invoiceSubBadgeInv > 0 && (
-                  <p className="pt-1 text-sm font-medium text-amber-800 dark:text-amber-200">
-                    You have {invoiceSubBadgeInv} supplier invoice{invoiceSubBadgeInv === 1 ? "" : "s"} needing
-                    payment or acknowledgement — scroll to the green Pay now buttons.
-                  </p>
-                )}
-              </CardHeader>
-              <CardContent>
-                {user?.id ? <InvoiceManagement userId={user.id} userRole="builder" /> : null}
-              </CardContent>
-            </Card>
-
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Receipt className="h-5 w-5 text-orange-500" />
-                  Delivery notes and GRN
+                  Delivery notes, GRN & supplier invoices
                 </CardTitle>
                 <CardDescription className="space-y-3">
-                  <p>Sign delivery notes and view GRNs for materials received — separate from paying the supplier invoice above.</p>
+                  <p>
+                    Use the row below in order: <strong className="font-medium">DN</strong> (delivery notes), then{' '}
+                    <strong className="font-medium">GRN</strong>, then <strong className="font-medium">Invoice</strong>{' '}
+                    (pay the supplier). Everything stays on one horizontal tab bar.
+                  </p>
                   <div className="flex flex-wrap items-center gap-2 rounded-md border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
                     <Volume2 className="h-3.5 w-3.5 shrink-0" aria-hidden />
                     <Label htmlFor="builder-doc-sound" className="cursor-pointer font-normal">
@@ -3474,7 +3462,7 @@ const ProfessionalBuilderDashboardPage = () => {
               </CardHeader>
               <CardContent>
                 <Tabs value={invoiceDocsSubTab} onValueChange={setInvoiceDocsSubTab} className="space-y-4">
-                  <TabsList className="grid h-auto w-full grid-cols-2 gap-1 p-1 sm:gap-2 bg-muted">
+                  <TabsList className="grid h-auto w-full grid-cols-3 gap-1 p-1 sm:gap-2 bg-muted">
                     <TabsTrigger value="delivery-notes" className="relative min-w-0 gap-1 px-2 py-2 pr-7 text-xs sm:gap-2 sm:pr-8 sm:px-3 sm:text-sm">
                       <FileSignature className="h-3.5 w-3.5 shrink-0 sm:h-4 sm:w-4" />
                       <span className="truncate">
@@ -3493,13 +3481,26 @@ const ProfessionalBuilderDashboardPage = () => {
                       className="relative min-w-0 gap-1 px-2 py-2 pr-7 text-xs sm:gap-2 sm:pr-8 sm:px-3 sm:text-sm"
                     >
                       <Package className="h-3.5 w-3.5 shrink-0 sm:h-4 sm:w-4" />
-                      <span className="truncate">
-                        <span className="sm:hidden">RN</span>
-                        <span className="hidden sm:inline">GRN</span>
-                      </span>
+                      <span className="truncate">GRN</span>
                       {invoiceSubBadgeGrn > 0 && (
                         <Badge className="absolute right-1 top-1/2 h-5 min-w-5 -translate-y-1/2 border-2 border-background bg-red-500 px-1 text-[10px] text-white hover:bg-red-500">
                           {invoiceSubBadgeGrn > 9 ? '9+' : invoiceSubBadgeGrn}
+                        </Badge>
+                      )}
+                    </TabsTrigger>
+                    <TabsTrigger
+                      value="supplier-invoices"
+                      title="Supplier invoices — Pay now"
+                      className="relative min-w-0 gap-1 px-2 py-2 pr-7 text-xs sm:gap-2 sm:pr-8 sm:px-3 sm:text-sm"
+                    >
+                      <CreditCard className="h-3.5 w-3.5 shrink-0 text-emerald-600 sm:h-4 sm:w-4" aria-hidden />
+                      <span className="truncate">
+                        <span className="sm:hidden">Inv.</span>
+                        <span className="hidden sm:inline">Invoice</span>
+                      </span>
+                      {invoiceSubBadgeInv > 0 && (
+                        <Badge className="absolute right-1 top-1/2 h-5 min-w-5 -translate-y-1/2 border-2 border-background bg-red-500 px-1 text-[10px] text-white hover:bg-red-500">
+                          {invoiceSubBadgeInv > 9 ? '9+' : invoiceSubBadgeInv}
                         </Badge>
                       )}
                     </TabsTrigger>
@@ -3525,6 +3526,32 @@ const ProfessionalBuilderDashboardPage = () => {
                       View all GRNs for accepted deliveries.
                     </p>
                     {user?.id && <GRNView userId={user.id} userRole="builder" />}
+                  </TabsContent>
+
+                  <TabsContent value="supplier-invoices" className="mt-0 space-y-4">
+                    <Card className="border-2 border-emerald-200 shadow-md dark:border-emerald-800">
+                      <CardHeader className="pb-2">
+                        <CardTitle className="flex flex-wrap items-center gap-2 text-lg text-emerald-950 dark:text-emerald-50 sm:text-xl">
+                          <CreditCard className="h-6 w-6 shrink-0 text-emerald-600" aria-hidden />
+                          Pay suppliers for materials you ordered
+                        </CardTitle>
+                        <CardDescription className="text-base text-muted-foreground">
+                          When your supplier sends an invoice for a purchase order, it appears below. Each unpaid row has
+                          a green <strong className="text-emerald-800 dark:text-emerald-200">Pay now</strong> button
+                          (Paystack card / M-Pesa / bank, depending on your Paystack setup) or you can record a payment
+                          you already made to the supplier.
+                        </CardDescription>
+                        {invoiceSubBadgeInv > 0 && (
+                          <p className="pt-1 text-sm font-medium text-amber-800 dark:text-amber-200">
+                            You have {invoiceSubBadgeInv} supplier invoice{invoiceSubBadgeInv === 1 ? '' : 's'} needing
+                            payment or acknowledgement — scroll to the green Pay now buttons.
+                          </p>
+                        )}
+                      </CardHeader>
+                      <CardContent>
+                        {user?.id ? <InvoiceManagement userId={user.id} userRole="builder" /> : null}
+                      </CardContent>
+                    </Card>
                   </TabsContent>
                 </Tabs>
               </CardContent>
