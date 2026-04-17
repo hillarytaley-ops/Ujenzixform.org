@@ -18,7 +18,6 @@ import { supabase } from '@/integrations/supabase/client';
 import {
   Receipt,
   Edit,
-  CheckCircle2,
   CreditCard,
   Loader2,
   Send,
@@ -76,6 +75,8 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [saving, setSaving] = useState(false);
   const [acknowledging, setAcknowledging] = useState(false);
+  /** Which invoice row is running the async “acknowledge then open pay” flow */
+  const [payNowBusyId, setPayNowBusyId] = useState<string | null>(null);
   const [payInvoice, setPayInvoice] = useState<Invoice | null>(null);
   const [paymentReference, setPaymentReference] = useState('');
   const [recordingPayment, setRecordingPayment] = useState(false);
@@ -333,45 +334,60 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
     }
   };
 
-  const handleAcknowledgeInvoice = async (invoice: Invoice) => {
+  /** Builder: one obvious “Pay now” — acknowledges supplier invoice if needed, then opens Paystack / record dialog */
+  const handlePayNowClick = async (invoice: Invoice) => {
+    if (userRole !== 'builder') return;
+    if ((invoice.payment_status || 'pending') === 'paid') return;
+
+    const st = String(invoice.status || '').toLowerCase();
+    if (st === 'draft' || st === 'cancelled') {
+      toast({
+        title: 'Not payable yet',
+        description: 'This invoice is still a draft or was cancelled.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     try {
       setAcknowledging(true);
+      setPayNowBusyId(invoice.id);
 
-      const { error } = await supabase
-        .from('invoices')
-        .update({
-          acknowledged_at: new Date().toISOString(),
-          acknowledged_by: userId,
-          status: 'acknowledged',
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', invoice.id);
+      let next = { ...invoice };
 
-      if (error) throw error;
+      if (invoice.status === 'sent' && !invoice.acknowledged_at) {
+        const ackAt = new Date().toISOString();
+        const { error } = await supabase
+          .from('invoices')
+          .update({
+            acknowledged_at: ackAt,
+            acknowledged_by: userId,
+            status: 'acknowledged',
+            updated_at: ackAt,
+          })
+          .eq('id', invoice.id);
 
-      const ackAt = new Date().toISOString();
-      setPayInvoice({
-        ...invoice,
-        acknowledged_at: ackAt,
-        status: 'acknowledged',
-      });
+        if (error) throw error;
+        next = { ...invoice, acknowledged_at: ackAt, status: 'acknowledged' };
+      }
+
       setPaymentReference('');
-
-      toast({
-        title: "Invoice acknowledged",
-        description: "Choose Paystack or record an offline payment in the window that opened.",
-      });
-
+      setPayInvoice(next);
       void fetchInvoices();
-    } catch (error: any) {
-      console.error('Error acknowledging invoice:', error);
       toast({
-        title: "Error",
-        description: "Failed to acknowledge invoice",
-        variant: "destructive",
+        title: 'Pay now',
+        description: 'Use Paystack below or record a payment you already sent to the supplier.',
+      });
+    } catch (error: unknown) {
+      console.error('Pay now / acknowledge:', error);
+      toast({
+        title: 'Could not start payment',
+        description: error instanceof Error ? error.message : 'Try again or contact support.',
+        variant: 'destructive',
       });
     } finally {
       setAcknowledging(false);
+      setPayNowBusyId(null);
     }
   };
 
@@ -472,8 +488,8 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
                 <p>
                   <strong>{builderPayPrompt.needAcknowledge.length}</strong> invoice
                   {builderPayPrompt.needAcknowledge.length === 1 ? ' was' : 's were'} forwarded by your
-                  supplier{builderPayPrompt.needAcknowledge.length === 1 ? '' : 's'}. Tap{" "}
-                  <strong>Acknowledge (then pay)</strong> — the payment window opens next (Paystack or offline).
+                  supplier{builderPayPrompt.needAcknowledge.length === 1 ? '' : 's'}. Tap the green{" "}
+                  <strong>Pay now</strong> button on each row (we acknowledge for you if needed, then you pay).
                 </p>
               )}
               {builderPayPrompt.needPayment.length > 0 && (
@@ -506,19 +522,11 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
                   PO: {invoice.purchase_order?.po_number || 'N/A'} •{' '}
                   {invoice.supplier?.company_name || 'Supplier'}
                 </p>
-                {userRole === 'builder' && invoice.status === 'sent' && !invoice.acknowledged_at && (
+                {userRole === 'builder' && invoice.payment_status !== 'paid' && (
                   <p className="mt-2 text-sm font-medium text-amber-800 dark:text-amber-200">
-                    Forwarded by your supplier — acknowledge, then pay immediately.
+                    Tap <strong>Pay now</strong> to pay with Paystack or record a transfer you already made.
                   </p>
                 )}
-                {userRole === 'builder' &&
-                  (!!invoice.acknowledged_at || invoice.status === 'acknowledged') &&
-                  invoice.payment_status !== 'paid' && (
-                    <p className="mt-2 text-sm font-semibold text-red-700 dark:text-red-300">
-                      Payment due now — pay {invoice.supplier?.company_name || 'the supplier'} as soon as
-                      possible.
-                    </p>
-                  )}
               </div>
               {getStatusBadge(invoice.status, invoice.payment_status)}
             </div>
@@ -555,38 +563,26 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
                   </Button>
                 )}
                 
-                {userRole === 'builder' && invoice.status === 'sent' && !invoice.acknowledged_at && (
-                  <Button
-                    onClick={() => handleAcknowledgeInvoice(invoice)}
-                    disabled={acknowledging}
-                    className="flex-1 min-w-[140px] bg-amber-600 hover:bg-amber-700"
-                  >
-                    {acknowledging ? (
-                      <>
-                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                        Acknowledging...
-                      </>
-                    ) : (
-                      <>
-                        <CheckCircle2 className="h-4 w-4 mr-2" />
-                        Acknowledge (then pay)
-                      </>
-                    )}
-                  </Button>
-                )}
-
                 {userRole === 'builder' &&
-                  (!!invoice.acknowledged_at || invoice.status === 'acknowledged') &&
-                  invoice.payment_status !== 'paid' && (
+                  (invoice.payment_status || 'pending') !== 'paid' &&
+                  !['draft', 'cancelled'].includes(String(invoice.status || '').toLowerCase()) && (
                     <Button
-                      className="flex-1 min-w-[140px] bg-red-600 hover:bg-red-700"
-                      onClick={() => {
-                        setPaymentReference('');
-                        setPayInvoice(invoice);
-                      }}
+                      type="button"
+                      className="flex-1 min-w-[160px] bg-emerald-600 px-4 py-6 text-base font-bold text-white shadow-md hover:bg-emerald-700 sm:py-5"
+                      onClick={() => void handlePayNowClick(invoice)}
+                      disabled={acknowledging && payNowBusyId === invoice.id}
                     >
-                      <CreditCard className="h-4 w-4 mr-2" />
-                      Pay now (Paystack or record)
+                      {acknowledging && payNowBusyId === invoice.id ? (
+                        <>
+                          <Loader2 className="h-5 w-5 mr-2 animate-spin" />
+                          Opening…
+                        </>
+                      ) : (
+                        <>
+                          <CreditCard className="h-5 w-5 mr-2" />
+                          Pay now
+                        </>
+                      )}
                     </Button>
                   )}
 
