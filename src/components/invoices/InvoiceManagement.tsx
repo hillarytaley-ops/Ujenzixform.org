@@ -27,7 +27,7 @@ import {
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { sortSupplyChainDocsNewestFirst } from '@/utils/sortSupplyChainDocs';
-import { PaystackCheckout } from '@/components/payment/PaystackCheckout';
+import { PaystackCheckout, isPaystackTestModeBanner } from '@/components/payment/PaystackCheckout';
 import { Separator } from '@/components/ui/separator';
 import { Skeleton } from '@/components/ui/skeleton';
 
@@ -87,6 +87,8 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
   const [recordingPayment, setRecordingPayment] = useState(false);
   const { toast } = useToast();
   const [searchParams, setSearchParams] = useSearchParams();
+  /** When true (VITE_PAYSTACK_TEST_MODE), builders can open Paystack on draft rows for sandbox testing. */
+  const paystackSandbox = useMemo(() => isPaystackTestModeBanner(), []);
   /** Prevents double-launch when `payInvoice` stays in URL across re-renders. */
   const payInvoiceUrlHandledRef = useRef<string | null>(null);
   /** First fetch per user shows skeleton; later fetches (e.g. profile id resolved) refresh without blanking. */
@@ -354,10 +356,19 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
     if ((invoice.payment_status || 'pending') === 'paid') return;
 
     const st = String(invoice.status || '').toLowerCase();
-    if (st === 'draft' || st === 'cancelled') {
+    if (st === 'cancelled') {
       toast({
         title: 'Not payable yet',
-        description: 'This invoice is still a draft or was cancelled.',
+        description: 'This invoice was cancelled.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    if (st === 'draft' && !paystackSandbox) {
+      toast({
+        title: 'Not payable yet',
+        description:
+          'This invoice is still a draft on the supplier side. Ask them to send it, or set VITE_PAYSTACK_TEST_MODE=true to test Paystack on drafts.',
         variant: 'destructive',
       });
       return;
@@ -390,7 +401,9 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
       void fetchInvoices({ silent: true });
       toast({
         title: 'Pay now',
-        description: 'Use Paystack below or record a payment you already sent to the supplier.',
+        description: paystackSandbox && String(invoice.status || '').toLowerCase() === 'draft'
+          ? 'Paystack test mode: paying a draft is for sandbox only. Use Paystack below or record a payment.'
+          : 'Use Paystack below or record a payment you already sent to the supplier.',
       });
     } catch (error: unknown) {
       console.error('Pay now / acknowledge:', error);
@@ -573,7 +586,7 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
               userRole === 'builder' &&
               (invoice.payment_status || 'pending') !== 'paid' &&
               rowStatus !== 'cancelled' &&
-              rowStatus !== 'draft';
+              (rowStatus !== 'draft' || paystackSandbox);
 
             return (
               <Card key={invoice.id}>
@@ -588,10 +601,17 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
                       {userRole === 'builder' && invoice.payment_status !== 'paid' && (
                         <p className="mt-2 text-sm font-medium text-amber-800 dark:text-amber-200">
                           {rowStatus === 'draft' ? (
-                            <>
-                              This invoice is still a <strong>draft</strong> on the supplier side. Payment unlocks
-                              when they send it to you.
-                            </>
+                            paystackSandbox ? (
+                              <>
+                                <strong>Paystack test mode:</strong> you can use <strong>Pay now</strong> on this draft
+                                to run Paystack sandbox only. In production, the supplier must send the invoice first.
+                              </>
+                            ) : (
+                              <>
+                                This invoice is still a <strong>draft</strong> on the supplier side. Payment unlocks
+                                when they send it to you.
+                              </>
+                            )
                           ) : (
                             <>
                               Tap <strong>Pay now</strong> to pay with Paystack or record a transfer you already made.

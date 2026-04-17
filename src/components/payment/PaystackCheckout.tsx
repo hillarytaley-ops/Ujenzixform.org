@@ -9,7 +9,7 @@ import { supabase } from "@/integrations/supabase/client";
 
 const PAYSTACK_NAV_KEY = "ujenzi_paystack_after";
 
-/** Set `VITE_PAYSTACK_TEST_MODE=true` in Vercel (or `.env.local`) while using `sk_test_…` in Supabase so all roles see a clear sandbox banner. */
+/** Set `VITE_PAYSTACK_TEST_MODE=true` in Vercel (or `.env.local`) while using `sk_test_…` in Supabase so all roles see a clear sandbox banner. Builder invoices: also allows **Pay now** on draft rows for Paystack sandbox testing (do not enable on production). */
 export const isPaystackTestModeBanner = (): boolean => {
   const raw = import.meta.env.VITE_PAYSTACK_TEST_MODE;
   if (raw === undefined || raw === null || String(raw).trim() === "") return false;
