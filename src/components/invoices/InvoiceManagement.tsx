@@ -234,13 +234,14 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
       return { needAcknowledge: [] as Invoice[], needPayment: [] as Invoice[] };
     }
     const unpaid = (i: Invoice) => (i.payment_status || 'pending') !== 'paid';
-    const needAcknowledge = invoices.filter(
-      (i) => i.status === 'sent' && !i.acknowledged_at && unpaid(i)
-    );
-    const needPayment = invoices.filter(
-      (i) =>
-        unpaid(i) && (i.status === 'acknowledged' || !!i.acknowledged_at)
-    );
+    const needAcknowledge = invoices.filter((i) => {
+      const st = String(i.status || '').toLowerCase();
+      return st === 'sent' && !i.acknowledged_at && unpaid(i);
+    });
+    const needPayment = invoices.filter((i) => {
+      const st = String(i.status || '').toLowerCase();
+      return unpaid(i) && (st === 'acknowledged' || !!i.acknowledged_at);
+    });
     return { needAcknowledge, needPayment };
   }, [invoices, userRole]);
 
@@ -475,13 +476,14 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
     if (paid) {
       return <Badge variant="default" className="bg-green-500">Paid</Badge>;
     }
+    const st = String(status || '').toLowerCase();
     const workflow =
-      status === 'acknowledged' ? (
+      st === 'acknowledged' ? (
         <Badge variant="default" className="bg-blue-500">Acknowledged</Badge>
-      ) : status === 'sent' ? (
+      ) : st === 'sent' ? (
         <Badge variant="secondary">Sent</Badge>
       ) : (
-        <Badge variant="outline">{status}</Badge>
+        <Badge variant="outline">{status || '—'}</Badge>
       );
     return (
       <div className="flex flex-row flex-wrap items-center justify-end gap-1 shrink-0">
@@ -565,103 +567,102 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
             </Card>
           ) : null}
 
-          {invoices.map((invoice) => (
-        <Card key={invoice.id}>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle>{invoice.invoice_number}</CardTitle>
-                <p className="text-sm text-gray-500">
-                  PO: {invoice.purchase_order?.po_number || 'N/A'} •{' '}
-                  {invoice.supplier?.company_name || 'Supplier'}
-                </p>
-                {userRole === 'builder' && invoice.payment_status !== 'paid' && (
-                  <p className="mt-2 text-sm font-medium text-amber-800 dark:text-amber-200">
-                    {String(invoice.status || '').toLowerCase() === 'draft' ? (
-                      <>
-                        This invoice is still a <strong>draft</strong> on the supplier side.{" "}
-                        <strong>Pay now</strong> unlocks when they send it to you.
-                      </>
-                    ) : (
-                      <>
-                        Tap <strong>Pay now</strong> to pay with Paystack or record a transfer you already made.
-                      </>
-                    )}
-                  </p>
-                )}
-              </div>
-              {getStatusBadge(invoice.status, invoice.payment_status)}
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4 text-sm">
-                <div>
-                  <p className="text-gray-500">Invoice Date</p>
-                  <p className="font-medium">{new Date(invoice.invoice_date).toLocaleDateString()}</p>
-                </div>
-                <div>
-                  <p className="text-gray-500">Due Date</p>
-                  <p className="font-medium">{new Date(invoice.due_date).toLocaleDateString()}</p>
-                </div>
-                <div>
-                  <p className="text-gray-500">Subtotal</p>
-                  <p className="font-medium">KES {Number(invoice.subtotal).toLocaleString()}</p>
-                </div>
-                <div>
-                  <p className="text-gray-500">Total Amount</p>
-                  <p className="font-medium text-lg">KES {Number(invoice.total_amount).toLocaleString()}</p>
-                </div>
-              </div>
+          {invoices.map((invoice) => {
+            const rowStatus = String(invoice.status || '').toLowerCase();
+            const showBuilderPayNow =
+              userRole === 'builder' &&
+              (invoice.payment_status || 'pending') !== 'paid' &&
+              rowStatus !== 'cancelled' &&
+              rowStatus !== 'draft';
 
-              <div className="flex flex-row flex-wrap items-center gap-2 overflow-x-auto pt-4 border-t sm:flex-nowrap sm:overflow-visible">
-                {userRole === 'supplier' && invoice.is_editable && (
-                  <Button
-                    variant="outline"
-                    onClick={() => handleEditInvoice(invoice)}
-                  >
-                    <Edit className="h-4 w-4 mr-2" />
-                    Edit Invoice
-                  </Button>
-                )}
-                
-                {userRole === 'builder' &&
-                  (invoice.payment_status || 'pending') !== 'paid' &&
-                  String(invoice.status || '').toLowerCase() !== 'cancelled' && (
-                    <Button
-                      type="button"
-                      className="relative z-10 min-w-[130px] shrink-0 bg-emerald-600 px-3 py-5 text-sm font-bold text-white shadow-md hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-emerald-300 disabled:text-emerald-950/70 disabled:hover:bg-emerald-300 sm:min-w-[160px] sm:px-4 sm:py-5 sm:text-base"
-                      onClick={() => void handlePayNowClick(invoice)}
-                      disabled={acknowledging && payNowBusyId === invoice.id}
-                      title={
-                        String(invoice.status || '').toLowerCase() === 'draft'
-                          ? 'Supplier must send this invoice before you can pay.'
-                          : undefined
-                      }
-                    >
-                      {acknowledging && payNowBusyId === invoice.id ? (
-                        <>
-                          <Loader2 className="h-5 w-5 mr-2 animate-spin" />
-                          Opening…
-                        </>
-                      ) : (
-                        <>
-                          <CreditCard className="h-5 w-5 mr-2" />
-                          Pay now
-                        </>
+            return (
+              <Card key={invoice.id}>
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <CardTitle>{invoice.invoice_number}</CardTitle>
+                      <p className="text-sm text-gray-500">
+                        PO: {invoice.purchase_order?.po_number || 'N/A'} •{' '}
+                        {invoice.supplier?.company_name || 'Supplier'}
+                      </p>
+                      {userRole === 'builder' && invoice.payment_status !== 'paid' && (
+                        <p className="mt-2 text-sm font-medium text-amber-800 dark:text-amber-200">
+                          {rowStatus === 'draft' ? (
+                            <>
+                              This invoice is still a <strong>draft</strong> on the supplier side. Payment unlocks
+                              when they send it to you.
+                            </>
+                          ) : (
+                            <>
+                              Tap <strong>Pay now</strong> to pay with Paystack or record a transfer you already made.
+                            </>
+                          )}
+                        </p>
                       )}
-                    </Button>
-                  )}
+                    </div>
+                    {getStatusBadge(invoice.status, invoice.payment_status)}
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-2 gap-4 text-sm">
+                      <div>
+                        <p className="text-gray-500">Invoice Date</p>
+                        <p className="font-medium">{new Date(invoice.invoice_date).toLocaleDateString()}</p>
+                      </div>
+                      <div>
+                        <p className="text-gray-500">Due Date</p>
+                        <p className="font-medium">{new Date(invoice.due_date).toLocaleDateString()}</p>
+                      </div>
+                      <div>
+                        <p className="text-gray-500">Subtotal</p>
+                        <p className="font-medium">KES {Number(invoice.subtotal).toLocaleString()}</p>
+                      </div>
+                      <div>
+                        <p className="text-gray-500">Total Amount</p>
+                        <p className="font-medium text-lg">KES {Number(invoice.total_amount).toLocaleString()}</p>
+                      </div>
+                    </div>
 
-                <Button variant="outline" type="button" className="min-w-[120px] shrink-0">
-                  <Download className="h-4 w-4 mr-2" />
-                  Download
-                </Button>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-          ))}
+                    <div className="flex flex-row flex-wrap items-center gap-2 overflow-x-auto pt-4 border-t sm:flex-nowrap sm:overflow-visible">
+                      {userRole === 'supplier' && invoice.is_editable && (
+                        <Button variant="outline" onClick={() => handleEditInvoice(invoice)}>
+                          <Edit className="h-4 w-4 mr-2" />
+                          Edit Invoice
+                        </Button>
+                      )}
+
+                      {showBuilderPayNow && (
+                        <Button
+                          type="button"
+                          className="relative z-10 min-w-[130px] shrink-0 bg-emerald-600 px-3 py-5 text-sm font-bold text-white shadow-md hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-emerald-300 disabled:text-emerald-950/70 disabled:hover:bg-emerald-300 sm:min-w-[160px] sm:px-4 sm:py-5 sm:text-base"
+                          onClick={() => void handlePayNowClick(invoice)}
+                          disabled={acknowledging && payNowBusyId === invoice.id}
+                        >
+                          {acknowledging && payNowBusyId === invoice.id ? (
+                            <>
+                              <Loader2 className="h-5 w-5 mr-2 animate-spin" />
+                              Opening…
+                            </>
+                          ) : (
+                            <>
+                              <CreditCard className="h-5 w-5 mr-2" />
+                              Pay now
+                            </>
+                          )}
+                        </Button>
+                      )}
+
+                      <Button variant="outline" type="button" className="min-w-[120px] shrink-0">
+                        <Download className="h-4 w-4 mr-2" />
+                        Download
+                      </Button>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })}
         </>
       )}
 
