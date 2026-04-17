@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
@@ -38,9 +39,10 @@ export const GRNView: React.FC<GRNViewProps> = ({ userId, userRole }) => {
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
 
-  const fetchGRNs = async () => {
+  const fetchGRNs = async (opts?: { silent?: boolean }) => {
+    const silent = opts?.silent === true;
     try {
-      setLoading(true);
+      if (!silent) setLoading(true);
       let query = supabase
         .from('goods_received_notes')
         .select(`
@@ -78,13 +80,13 @@ export const GRNView: React.FC<GRNViewProps> = ({ userId, userRole }) => {
         variant: "destructive",
       });
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   };
 
   useEffect(() => {
     if (userId) {
-      fetchGRNs();
+      void fetchGRNs();
       
       // Mark as viewed by supplier when they view it
       if (userRole === 'supplier') {
@@ -125,38 +127,48 @@ export const GRNView: React.FC<GRNViewProps> = ({ userId, userRole }) => {
     }
   };
 
-  if (loading) {
-    return (
-      <Card>
-        <CardContent className="py-12 text-center">
-          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
-          <p>Loading GRNs...</p>
-        </CardContent>
-      </Card>
-    );
-  }
-
-  if (grns.length === 0) {
-    return (
-      <Card>
-        <CardContent className="py-12 text-center">
-          <Package className="h-12 w-12 mx-auto mb-4 text-gray-400" />
-          <p className="text-gray-500">No GRNs available</p>
-        </CardContent>
-      </Card>
-    );
-  }
+  const showInitialLoad = loading && grns.length === 0;
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h3 className="text-lg font-semibold">Goods Received Notes (GRN)</h3>
-        <Button variant="outline" size="sm" onClick={fetchGRNs}>
-          Refresh
+        <Button
+          variant="outline"
+          size="sm"
+          disabled={loading}
+          onClick={() => void fetchGRNs({ silent: true })}
+        >
+          {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Refresh'}
         </Button>
       </div>
 
-      {grns.map((grn) => (
+      {showInitialLoad && (
+        <div className="space-y-3" aria-busy="true" aria-label="Loading GRNs">
+          {[0, 1, 2].map((i) => (
+            <Card key={i}>
+              <CardContent className="space-y-3 py-6">
+                <Skeleton className="h-6 w-40" />
+                <Skeleton className="h-4 w-full max-w-sm" />
+                <Skeleton className="h-10 w-36" />
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
+
+      {!showInitialLoad && grns.length === 0 && (
+        <Card>
+          <CardContent className="py-12 text-center">
+            <Package className="h-12 w-12 mx-auto mb-4 text-gray-400" />
+            <p className="text-gray-500">No GRNs available</p>
+          </CardContent>
+        </Card>
+      )}
+
+      {!showInitialLoad &&
+        grns.length > 0 &&
+        grns.map((grn) => (
         <Card key={grn.id}>
           <CardHeader>
             <div className="flex items-center justify-between">

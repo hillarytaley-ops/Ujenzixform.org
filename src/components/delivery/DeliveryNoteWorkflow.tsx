@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
@@ -125,11 +126,14 @@ export const DeliveryNoteWorkflow: React.FC<DeliveryNoteWorkflowProps> = ({
   const [inspectionNotes, setInspectionNotes] = useState('');
   const [rejectionReason, setRejectionReason] = useState('');
   const { toast } = useToast();
+  /** First fetch shows skeleton; later runs (e.g. profile id resolved) refresh without blanking the panel. */
+  const dnFetchGenerationRef = useRef(0);
 
   // Fetch pending delivery notes (no nested embeds — avoids PostgREST 400 when FK hints are missing from schema cache)
-  const fetchDeliveryNotes = async () => {
+  const fetchDeliveryNotes = async (opts?: { silent?: boolean }) => {
+    const silent = opts?.silent === true;
     try {
-      setLoading(true);
+      if (!silent) setLoading(true);
       const builderIds = uniqueBuilderIds(builderAuthUserId, builderProfileId);
       if (builderIds.length === 0) {
         setDeliveryNotes([]);
@@ -191,14 +195,23 @@ export const DeliveryNoteWorkflow: React.FC<DeliveryNoteWorkflowProps> = ({
         variant: "destructive",
       });
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   };
 
   useEffect(() => {
-    if (builderAuthUserId || builderProfileId) {
-      fetchDeliveryNotes();
+    dnFetchGenerationRef.current = 0;
+  }, [builderAuthUserId]);
+
+  useEffect(() => {
+    if (!(builderAuthUserId || builderProfileId)) {
+      setDeliveryNotes([]);
+      setLoading(false);
+      return;
     }
+    const silent = dnFetchGenerationRef.current > 0;
+    dnFetchGenerationRef.current += 1;
+    void fetchDeliveryNotes({ silent });
   }, [builderAuthUserId, builderProfileId]);
 
   // Sign delivery note
@@ -260,7 +273,7 @@ export const DeliveryNoteWorkflow: React.FC<DeliveryNoteWorkflowProps> = ({
         })
         .eq('id', selectedDN.id);
 
-      fetchDeliveryNotes();
+      void fetchDeliveryNotes({ silent: true });
     } catch (error: any) {
       console.error('Error signing DN:', error);
       toast({
@@ -326,8 +339,8 @@ export const DeliveryNoteWorkflow: React.FC<DeliveryNoteWorkflowProps> = ({
       setShowInspectionDialog(false);
       setInspectionNotes('');
       setRejectionReason('');
-      fetchDeliveryNotes();
-      
+      void fetchDeliveryNotes({ silent: true });
+
       if (onComplete) onComplete();
     } catch (error: any) {
       console.error('Error processing inspection:', error);
@@ -391,27 +404,7 @@ export const DeliveryNoteWorkflow: React.FC<DeliveryNoteWorkflowProps> = ({
     return <Badge variant={statusInfo.variant}>{statusInfo.label}</Badge>;
   };
 
-  if (loading) {
-    return (
-      <Card>
-        <CardContent className="py-12 text-center">
-          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
-          <p>Loading delivery notes...</p>
-        </CardContent>
-      </Card>
-    );
-  }
-
-  if (deliveryNotes.length === 0) {
-    return (
-      <Card>
-        <CardContent className="py-12 text-center">
-          <Package className="h-12 w-12 mx-auto mb-4 text-gray-400" />
-          <p className="text-gray-500">No delivery notes pending action</p>
-        </CardContent>
-      </Card>
-    );
-  }
+  const showInitialLoad = loading && deliveryNotes.length === 0;
 
   return (
     <div className="space-y-4">
@@ -420,12 +413,45 @@ export const DeliveryNoteWorkflow: React.FC<DeliveryNoteWorkflowProps> = ({
           <h3 className="text-lg font-semibold">Delivery Notes</h3>
           <p className="text-sm text-gray-500">Sign and verify your deliveries</p>
         </div>
-        <Button variant="outline" size="sm" onClick={fetchDeliveryNotes}>
-          Refresh
+        <Button
+          variant="outline"
+          size="sm"
+          disabled={loading}
+          onClick={() => void fetchDeliveryNotes({ silent: true })}
+        >
+          {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Refresh'}
         </Button>
       </div>
 
-      {deliveryNotes.map((dn) => (
+      {showInitialLoad && (
+        <div className="space-y-3" aria-busy="true" aria-label="Loading delivery notes">
+          {[0, 1, 2].map((i) => (
+            <Card key={i}>
+              <CardContent className="space-y-3 py-6">
+                <Skeleton className="h-6 w-48" />
+                <Skeleton className="h-4 w-full max-w-md" />
+                <div className="flex gap-2 pt-2">
+                  <Skeleton className="h-10 w-36" />
+                  <Skeleton className="h-10 w-32" />
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
+
+      {!showInitialLoad && deliveryNotes.length === 0 && (
+        <Card>
+          <CardContent className="py-12 text-center">
+            <Package className="h-12 w-12 mx-auto mb-4 text-gray-400" />
+            <p className="text-gray-500">No delivery notes pending action</p>
+          </CardContent>
+        </Card>
+      )}
+
+      {!showInitialLoad &&
+        deliveryNotes.length > 0 &&
+        deliveryNotes.map((dn) => (
         <Card key={dn.id}>
           <CardHeader>
             <div className="flex items-center justify-between">
