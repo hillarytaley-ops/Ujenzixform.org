@@ -94,9 +94,10 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
   const [editedTotal, setEditedTotal] = useState(0);
   const [editedNotes, setEditedNotes] = useState('');
 
-  const fetchInvoices = async () => {
+  const fetchInvoices = async (opts?: { silent?: boolean }) => {
+    const silent = opts?.silent === true;
     try {
-      setLoading(true);
+      if (!silent) setLoading(true);
 
       const invoiceSelect = `
           *,
@@ -210,7 +211,7 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
         variant: "destructive",
       });
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   };
 
@@ -325,7 +326,7 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
       });
 
       setShowEditDialog(false);
-      fetchInvoices();
+      void fetchInvoices({ silent: true });
     } catch (error: any) {
       console.error('Error saving invoice:', error);
       toast({
@@ -377,7 +378,7 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
 
       setPaymentReference('');
       setPayInvoice(next);
-      void fetchInvoices();
+      void fetchInvoices({ silent: true });
       toast({
         title: 'Pay now',
         description: 'Use Paystack below or record a payment you already sent to the supplier.',
@@ -448,7 +449,7 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
       });
       setPayInvoice(null);
       setPaymentReference('');
-      fetchInvoices();
+      void fetchInvoices({ silent: true });
     } catch (error: any) {
       console.error('Error recording payment:', error);
       toast({
