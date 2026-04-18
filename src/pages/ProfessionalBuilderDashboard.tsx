@@ -365,7 +365,7 @@ function isMonitoringApprovedStatus(s: string | null | undefined): boolean {
 
 function isMonitoringPendingOrQuotedStatus(s: string | null | undefined): boolean {
   const n = normMonitoringStatus(s);
-  return n === "pending" || n === "quoted" || n === "reviewing";
+  return n === "pending" || n === "pending_payment" || n === "quoted" || n === "reviewing";
 }
 
 /**

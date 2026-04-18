@@ -1,4 +1,3 @@
-import { readPersistedAuthRawStringSync } from '@/utils/supabaseAccessToken';
 import React, { useState } from 'react';
 import {
   Dialog,
@@ -17,24 +16,9 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { supabase, SUPABASE_URL, SUPABASE_ANON_KEY } from '@/integrations/supabase/client';
+import { PAYSTACK_NAV_KEY } from '@/components/payment/PaystackCheckout';
 import { MapLocationPicker } from '@/components/location/MapLocationPicker';
 
-// Helper for fetch with timeout
-const fetchWithTimeout = async (url: string, options: RequestInit, timeoutMs: number = 10000) => {
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
-  try {
-    const response = await fetch(url, { ...options, signal: controller.signal });
-    clearTimeout(timeoutId);
-    return response;
-  } catch (error: any) {
-    clearTimeout(timeoutId);
-    if (error.name === 'AbortError') {
-      throw new Error('Request timed out');
-    }
-    throw error;
-  }
-};
 import {
   Eye,
   Shield,
@@ -53,7 +37,8 @@ import {
   Zap,
   Navigation,
   Copy,
-  Map as MapIcon
+  Map as MapIcon,
+  CreditCard
 } from 'lucide-react';
 
 interface MonitoringServicePromptProps {
@@ -289,6 +274,11 @@ function getRealDeliveryAddress(addr: string | undefined): string {
   return addr.trim();
 }
 
+function isPhoneReasonable(phone: string): boolean {
+  const digits = phone.replace(/\D/g, '');
+  return digits.length >= 9 && digits.length <= 15;
+}
+
 export const MonitoringServicePrompt: React.FC<MonitoringServicePromptProps> = ({
   isOpen,
   onOpenChange,
@@ -438,122 +428,157 @@ export const MonitoringServicePrompt: React.FC<MonitoringServicePromptProps> = (
     }
   }, [step, purchaseOrder?.delivery_address]);
 
-  const handleRequestMonitoring = async () => {
-    if (!selectedPackage || !formData.siteAddress || !formData.contactPhone) {
+  const postPaystackDashboardPath = (): string => {
+    if (isProfessional) return '/professional-builder-dashboard';
+    return '/private-client-dashboard';
+  };
+
+  /** Creates a `pending_payment` row and redirects to Paystack; webhook/callback sets `approved` when paid. */
+  const startMonitoringCheckout = async (opts: { requireFullForm: boolean }) => {
+    if (!selectedPackage) {
       toast({
-        title: 'Missing Information',
-        description: 'Please fill in all required fields.',
-        variant: 'destructive'
+        title: 'Choose a package',
+        description: 'Select a monitoring package first.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    const selectedPkg = packages.find((p) => p.id === selectedPackage);
+    if (!selectedPkg) return;
+
+    if (!formData.contactPhone?.trim() || !isPhoneReasonable(formData.contactPhone)) {
+      toast({
+        title: 'Phone required',
+        description: 'Enter a valid contact phone number (used by our team and for Paystack receipts).',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    const siteFromPo = getRealDeliveryAddress(purchaseOrder?.delivery_address);
+    const siteLine = opts.requireFullForm
+      ? (formData.siteAddress?.trim() || '')
+      : (formData.siteAddress?.trim() || siteFromPo || 'To be confirmed with you').trim();
+
+    if (opts.requireFullForm && !siteLine) {
+      toast({
+        title: 'Site address required',
+        description: 'Enter the construction site address before paying.',
+        variant: 'destructive',
       });
       return;
     }
 
     setSubmitting(true);
-    console.log('📹 Starting monitoring service request...');
-
     try {
-      // Get user from localStorage (faster than Supabase call)
-      let userId: string | null = null;
-      let userEmail: string | null = null;
-      let accessToken: string | null = null;
-      
-      try {
-        const storedSession = readPersistedAuthRawStringSync();
-        if (storedSession) {
-          const parsed = JSON.parse(storedSession);
-          userId = parsed.user?.id;
-          userEmail = parsed.user?.email;
-          accessToken = parsed.access_token;
-        }
-      } catch (e) {
-        console.warn('Could not parse stored session');
-      }
-      
-      if (!userId || !accessToken) {
-        throw new Error('User not authenticated');
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      if (!session?.access_token || !session.user?.id) {
+        toast({
+          title: 'Sign in required',
+          description: 'Please sign in to pay with Paystack.',
+          variant: 'destructive',
+        });
+        return;
       }
 
-      console.log('📹 User ID:', userId);
+      const userId = session.user.id;
+      const userEmail = (session.user.email || '').trim();
+      if (!userEmail.includes('@')) {
+        toast({
+          title: 'Email required',
+          description: 'Your account needs an email address for Paystack checkout.',
+          variant: 'destructive',
+        });
+        return;
+      }
 
-      const selectedPkg = packages.find(p => p.id === selectedPackage);
+      const projectName =
+        formData.projectDescription?.trim() ||
+        purchaseOrder?.project_name?.trim() ||
+        `Monitoring — ${selectedPkg.name}`;
 
-      // Create monitoring service request
-      const monitoringRequest = {
+      const specParts = [formData.projectDescription?.trim(), formData.specialRequirements?.trim()].filter(
+        Boolean
+      ) as string[];
+      const specialRequirements = specParts.length > 0 ? specParts.join('\n\n') : null;
+
+      const insertPayload: Record<string, unknown> = {
         user_id: userId,
-        project_name: formData.projectDescription || purchaseOrder?.project_name || 'Monitoring Request',
-        project_location: formData.siteAddress,
+        project_name: projectName,
+        project_location: siteLine,
         project_type: selectedPackage,
-        project_duration: selectedPkg?.duration || null,
+        project_duration: selectedPkg.duration,
         start_date: formData.preferredStartDate || null,
-        contact_name: userEmail?.split('@')[0] || 'Customer',
-        contact_email: userEmail || '',
-        contact_phone: formData.contactPhone,
+        contact_name: userEmail.split('@')[0] || 'Customer',
+        contact_email: userEmail,
+        contact_phone: formData.contactPhone.trim(),
         selected_services: [selectedPackage],
         camera_count: 1,
-        special_requirements: formData.specialRequirements || null,
-        estimated_cost: selectedPkg?.priceMonthly ?? selectedPkg?.price ?? 0,
-        additional_notes: `Package: ${selectedPkg?.name || selectedPackage}. Duration: ${selectedPkg?.duration || 'N/A'}${formData.gpsCoordinates ? `. GPS: ${formData.gpsCoordinates}` : ''}`,
-        status: 'pending',
-        urgency: 'normal'
+        special_requirements: specialRequirements,
+        estimated_cost: selectedPkg.priceMonthly,
+        additional_notes: `Paystack monitoring package: ${selectedPkg.name} (${selectedPkg.duration}). Builder tier: ${isProfessional ? 'professional' : 'private'}.${formData.gpsCoordinates ? ` GPS: ${formData.gpsCoordinates}` : ''}`,
+        status: 'pending_payment',
       };
 
-      console.log('📹 Creating monitoring request:', monitoringRequest);
+      const { data: row, error: insErr } = await supabase
+        .from('monitoring_service_requests')
+        .insert(insertPayload as never)
+        .select('id')
+        .single();
 
-      // Use native fetch with timeout
-      try {
-        const response = await fetchWithTimeout(
-          `${SUPABASE_URL}/rest/v1/monitoring_service_requests`,
-          {
-            method: 'POST',
-            headers: {
-              'apikey': SUPABASE_ANON_KEY,
-              'Authorization': `Bearer ${accessToken}`,
-              'Content-Type': 'application/json',
-              'Prefer': 'return=minimal'
-            },
-            body: JSON.stringify(monitoringRequest)
-          },
-          10000
-        );
-
-        if (response.ok) {
-          console.log('✅ Monitoring request created successfully');
-        } else {
-          const errorText = await response.text();
-          console.warn('⚠️ Monitoring request failed:', errorText);
-        }
-      } catch (insertError: any) {
-        console.warn('⚠️ Insert error (non-critical):', insertError.message);
+      if (insErr || !row || !(row as { id?: string }).id) {
+        console.error('[monitoring pay] insert:', insErr);
+        throw new Error(insErr?.message || 'Could not start checkout. Try again or contact support.');
       }
 
-      setStep('success');
-      
-      toast({
-        title: '🎉 Monitoring Service Requested!',
-        description: 'Our team will contact you within 24 hours to set up your project monitoring.',
+      const msrId = (row as { id: string }).id;
+      const orderId = `msr_${msrId}`;
+      const origin = window.location.origin;
+      const callbackUrl = `${origin}/payment/paystack-callback`;
+      const amount = selectedPkg.priceMonthly;
+      const description = `Monitoring: ${selectedPkg.name} (${isProfessional ? 'Professional' : 'Private'} builder)`;
+
+      sessionStorage.setItem(
+        PAYSTACK_NAV_KEY,
+        JSON.stringify({
+          successNavigateTo: postPaystackDashboardPath(),
+          orderId,
+          amount,
+          currency: 'KES',
+          description,
+        })
+      );
+
+      const { data: payData, error: payErr } = await supabase.functions.invoke('paystack-initialize', {
+        body: {
+          amount,
+          currency: 'KES',
+          email: userEmail,
+          orderId,
+          description,
+          callbackUrl,
+        },
       });
 
-      if (onServiceRequested) {
-        setTimeout(() => {
-          onServiceRequested();
-          onOpenChange(false);
-          setStep('intro');
-        }, 3000);
+      if (payErr) {
+        throw new Error(payErr.message || 'Could not start Paystack checkout.');
+      }
+      if (payData?.error) {
+        throw new Error(typeof payData.error === 'string' ? payData.error : 'Could not start Paystack checkout.');
       }
 
-    } catch (error: any) {
-      console.error('❌ Error requesting monitoring service:', error);
-      toast({
-        title: 'Request Submitted',
-        description: 'Your monitoring request has been noted. Our team will contact you soon.',
-      });
-      
-      // Still show success even if DB insert fails
-      setStep('success');
-      setTimeout(() => {
-        onOpenChange(false);
-        setStep('intro');
-      }, 3000);
+      const url = payData?.authorization_url as string | undefined;
+      if (!url) {
+        throw new Error('Paystack did not return a checkout URL.');
+      }
+
+      window.location.assign(url);
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : 'Checkout failed';
+      toast({ title: 'Payment', description: msg, variant: 'destructive' });
     } finally {
       setSubmitting(false);
     }
@@ -768,15 +793,56 @@ export const MonitoringServicePrompt: React.FC<MonitoringServicePromptProps> = (
                   )}
                 </AlertDescription>
               </Alert>
+
+              {selectedPackage && (
+                <div className="space-y-2 p-3 rounded-lg border border-slate-200 bg-slate-50/80 dark:bg-slate-900/40 dark:border-slate-700">
+                  <Label htmlFor="packageContactPhone" className="flex items-center gap-1 text-sm">
+                    <Phone className="h-3 w-3" />
+                    Contact phone (required for Paystack){' '}
+                  </Label>
+                  <Input
+                    id="packageContactPhone"
+                    placeholder="+254 7XX XXX XXX"
+                    value={formData.contactPhone}
+                    onChange={(e) => setFormData((prev) => ({ ...prev, contactPhone: e.target.value }))}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    After payment, your monitoring request is approved automatically. You can add full site details on the
+                    next step if you prefer—Pay now is available there too.
+                  </p>
+                </div>
+              )}
             </div>
 
             <DialogFooter className="flex flex-col gap-2">
+              {selectedPackage && (
+                <Button
+                  type="button"
+                  onClick={() => void startMonitoringCheckout({ requireFullForm: false })}
+                  disabled={submitting || !isPhoneReasonable(formData.contactPhone)}
+                  className="w-full bg-emerald-600 hover:bg-emerald-700 text-white"
+                  size="lg"
+                >
+                  {submitting ? (
+                    <>
+                      <Loader2 className="h-5 w-5 mr-2 animate-spin" />
+                      Opening Paystack…
+                    </>
+                  ) : (
+                    <>
+                      <CreditCard className="h-5 w-5 mr-2" />
+                      Pay now —{' '}
+                      {formatCurrency(packages.find((p) => p.id === selectedPackage)?.priceMonthly || 0)} (Paystack)
+                    </>
+                  )}
+                </Button>
+              )}
               <Button 
                 onClick={() => setStep('details')}
                 disabled={!selectedPackage}
                 className="w-full bg-blue-600 hover:bg-blue-700"
               >
-                Continue
+                Continue to site details
               </Button>
               <Button 
                 variant="ghost" 
@@ -1015,19 +1081,21 @@ export const MonitoringServicePrompt: React.FC<MonitoringServicePromptProps> = (
 
             <DialogFooter className="flex flex-col gap-2">
               <Button 
-                onClick={handleRequestMonitoring}
-                disabled={submitting || !formData.siteAddress || !formData.contactPhone}
-                className="w-full bg-blue-600 hover:bg-blue-700"
+                type="button"
+                onClick={() => void startMonitoringCheckout({ requireFullForm: true })}
+                disabled={submitting || !formData.siteAddress || !formData.contactPhone || !isPhoneReasonable(formData.contactPhone)}
+                className="w-full bg-emerald-600 hover:bg-emerald-700"
               >
                 {submitting ? (
                   <>
                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Submitting...
+                    Opening Paystack…
                   </>
                 ) : (
                   <>
-                    <CheckCircle className="h-4 w-4 mr-2" />
-                    Request Monitoring Service
+                    <CreditCard className="h-4 w-4 mr-2" />
+                    Pay now with Paystack —{' '}
+                    {formatCurrency(packages.find((p) => p.id === selectedPackage)?.priceMonthly || 0)}
                   </>
                 )}
               </Button>

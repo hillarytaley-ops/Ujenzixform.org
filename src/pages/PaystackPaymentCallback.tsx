@@ -64,7 +64,34 @@ export default function PaystackPaymentCallback() {
 
         const meta = data?.metadata as Record<string, unknown> | undefined;
         const orderId = typeof meta?.order_id === "string" ? meta.order_id.trim() : "";
-        if (orderId.startsWith("drq_")) {
+        if (orderId.startsWith("msr_")) {
+          const msrId = orderId.slice(4);
+          const stamp = new Date().toISOString();
+          const ref = typeof data.reference === "string" ? data.reference.trim() : "";
+          const { data: prevMsr } = await supabase
+            .from("monitoring_service_requests")
+            .select("admin_notes")
+            .eq("id", msrId)
+            .maybeSingle();
+          const prevNotes = typeof prevMsr?.admin_notes === "string" ? prevMsr.admin_notes : "";
+          const line = ref
+            ? `\n[${stamp}] Paystack verify (callback) — ref: ${ref}`
+            : `\n[${stamp}] Paystack verify (callback)`;
+          const { error: msrErr } = await supabase
+            .from("monitoring_service_requests")
+            .update({
+              status: "approved",
+              paid_at: stamp,
+              paystack_reference: ref || null,
+              updated_at: stamp,
+              admin_notes: `${prevNotes}${line}`.trim(),
+            })
+            .eq("id", msrId)
+            .eq("status", "pending_payment");
+          if (msrErr) {
+            console.warn("[paystack-callback] monitoring request update:", msrErr.message);
+          }
+        } else if (orderId.startsWith("drq_")) {
           const drId = orderId.slice(4);
           const stamp = new Date().toISOString();
           const ref = typeof data.reference === "string" ? data.reference.trim() : "";

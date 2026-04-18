@@ -1589,7 +1589,7 @@ const PrivateClientDashboard = () => {
                     <div>
                       <p className="text-sm text-amber-700 font-medium">Pending Approval</p>
                       <p className="text-3xl font-bold text-amber-800">
-                        {monitoringRequests.filter(r => r.status === 'pending' || r.status === 'quoted').length}
+                        {monitoringRequests.filter(r => r.status === 'pending' || r.status === 'pending_payment' || r.status === 'quoted').length}
                       </p>
                     </div>
                     <div className="p-3 bg-amber-500 rounded-full">

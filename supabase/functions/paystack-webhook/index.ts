@@ -151,6 +151,61 @@ serve(async (req) => {
           }
         }
       }
+    } else if (orderId.startsWith("msr_") && metaUser) {
+      const msrId = orderId.slice(4);
+      const admin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
+        auth: { persistSession: false, autoRefreshToken: false },
+      });
+
+      const { data: msr, error: msrErr } = await admin
+        .from("monitoring_service_requests")
+        .select("id, user_id, status")
+        .eq("id", msrId)
+        .maybeSingle();
+
+      if (msrErr) {
+        console.error("[paystack-webhook] monitoring_service_requests lookup:", msrErr.message);
+      } else if (
+        msr &&
+        msr.user_id === metaUser &&
+        String(msr.status) === "pending_payment"
+      ) {
+        const stamp = new Date().toISOString();
+        const line = reference
+          ? `\n[${stamp}] Paystack charge.success — ref: ${reference}`
+          : `\n[${stamp}] Paystack charge.success`;
+        const { data: prevRow, error: prevErr } = await admin
+          .from("monitoring_service_requests")
+          .select("admin_notes")
+          .eq("id", msrId)
+          .maybeSingle();
+        if (prevErr) {
+          console.error("[paystack-webhook] monitoring admin_notes read:", prevErr.message);
+        }
+        const prevNotes = typeof prevRow?.admin_notes === "string" ? prevRow.admin_notes : "";
+        const { error: upMsr } = await admin
+          .from("monitoring_service_requests")
+          .update({
+            status: "approved",
+            paid_at: stamp,
+            paystack_reference: reference || null,
+            updated_at: stamp,
+            admin_notes: `${prevNotes}${line}`.trim(),
+          })
+          .eq("id", msrId)
+          .eq("status", "pending_payment");
+
+        if (upMsr) {
+          console.error("[paystack-webhook] monitoring_service_requests update:", upMsr.message);
+        } else {
+          console.log("[paystack-webhook] marked monitoring package paid / approved:", msrId);
+        }
+      } else if (msr && msr.user_id !== metaUser) {
+        console.warn(
+          "[paystack-webhook] metadata user_id does not match monitoring_service_requests.user_id; skip",
+          msrId,
+        );
+      }
     }
   }
 
