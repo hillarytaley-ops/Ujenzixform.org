@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
@@ -16,6 +16,13 @@ import {
 import SignatureCanvas from 'react-signature-canvas';
 import { ResponsiveSignatureCanvas } from '@/components/ui/ResponsiveSignatureCanvas';
 import { sortSupplyChainDocsNewestFirst } from '@/utils/sortSupplyChainDocs';
+import {
+  invalidateBuilderInvoicesHub,
+  patchHubDeliveryNotes,
+  peekHubDeliveryNotes,
+  subscribeBuilderHubCache,
+  warmBuilderInvoicesHub,
+} from '@/lib/builderInvoicesHubCache';
 
 /** Cap rows returned — avoids huge payloads and keeps queries within DB statement limits. */
 const DN_WORKFLOW_LIST_LIMIT = 500;
@@ -129,9 +136,14 @@ export const DeliveryNoteWorkflow: React.FC<DeliveryNoteWorkflowProps> = ({
   builderProfileId,
   onComplete
 }) => {
-  const [deliveryNotes, setDeliveryNotes] = useState<DeliveryNote[]>([]);
+  const [deliveryNotes, setDeliveryNotes] = useState<DeliveryNote[]>(() => {
+    const raw = peekHubDeliveryNotes(builderAuthUserId, builderProfileId ?? undefined);
+    return (raw as DeliveryNote[]) ?? [];
+  });
   const [selectedDN, setSelectedDN] = useState<DeliveryNote | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(
+    () => peekHubDeliveryNotes(builderAuthUserId, builderProfileId ?? undefined) === null
+  );
   const [signing, setSigning] = useState(false);
   const [inspecting, setInspecting] = useState(false);
   const [showSignatureDialog, setShowSignatureDialog] = useState(false);
@@ -151,6 +163,7 @@ export const DeliveryNoteWorkflow: React.FC<DeliveryNoteWorkflowProps> = ({
       const builderIds = uniqueBuilderIds(builderAuthUserId, builderProfileId);
       if (builderIds.length === 0) {
         setDeliveryNotes([]);
+        patchHubDeliveryNotes(builderAuthUserId, builderProfileId ?? undefined, []);
         return;
       }
 
@@ -196,6 +209,7 @@ export const DeliveryNoteWorkflow: React.FC<DeliveryNoteWorkflowProps> = ({
       }
       if (list.length === 0) {
         setDeliveryNotes([]);
+        patchHubDeliveryNotes(builderAuthUserId, builderProfileId ?? undefined, []);
         return;
       }
 
@@ -229,9 +243,11 @@ export const DeliveryNoteWorkflow: React.FC<DeliveryNoteWorkflowProps> = ({
         };
       });
 
-      setDeliveryNotes(
-        sortSupplyChainDocsNewestFirst(enriched as unknown as Record<string, unknown>[]) as DeliveryNote[]
-      );
+      const sorted = sortSupplyChainDocsNewestFirst(
+        enriched as unknown as Record<string, unknown>[]
+      ) as DeliveryNote[];
+      setDeliveryNotes(sorted);
+      patchHubDeliveryNotes(builderAuthUserId, builderProfileId ?? undefined, sorted);
     } catch (error: any) {
       console.error('Error fetching delivery notes:', error);
       const code = error?.code as string | undefined;
@@ -248,6 +264,21 @@ export const DeliveryNoteWorkflow: React.FC<DeliveryNoteWorkflowProps> = ({
       if (!silent) setLoading(false);
     }
   };
+
+  useLayoutEffect(() => {
+    if (builderAuthUserId || builderProfileId) {
+      warmBuilderInvoicesHub(builderAuthUserId, builderProfileId ?? undefined);
+    }
+  }, [builderAuthUserId, builderProfileId]);
+
+  useEffect(() => {
+    return subscribeBuilderHubCache(() => {
+      const raw = peekHubDeliveryNotes(builderAuthUserId, builderProfileId ?? undefined);
+      if (raw === null) return;
+      setDeliveryNotes((raw as DeliveryNote[]) ?? []);
+      setLoading(false);
+    });
+  }, [builderAuthUserId, builderProfileId]);
 
   useEffect(() => {
     dnFetchGenerationRef.current = 0;
@@ -323,6 +354,8 @@ export const DeliveryNoteWorkflow: React.FC<DeliveryNoteWorkflowProps> = ({
         })
         .eq('id', selectedDN.id);
 
+      invalidateBuilderInvoicesHub(builderAuthUserId, builderProfileId ?? undefined);
+      warmBuilderInvoicesHub(builderAuthUserId, builderProfileId ?? undefined);
       void fetchDeliveryNotes({ silent: true });
     } catch (error: any) {
       console.error('Error signing DN:', error);
@@ -389,6 +422,8 @@ export const DeliveryNoteWorkflow: React.FC<DeliveryNoteWorkflowProps> = ({
       setShowInspectionDialog(false);
       setInspectionNotes('');
       setRejectionReason('');
+      invalidateBuilderInvoicesHub(builderAuthUserId, builderProfileId ?? undefined);
+      warmBuilderInvoicesHub(builderAuthUserId, builderProfileId ?? undefined);
       void fetchDeliveryNotes({ silent: true });
 
       if (onComplete) onComplete();

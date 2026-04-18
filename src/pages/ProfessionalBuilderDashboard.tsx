@@ -11,6 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useNavigate, Link, useSearchParams } from "react-router-dom";
 import { useUrlTabSync } from "@/hooks/useUrlTabSync";
 import { supabase, SUPABASE_URL, SUPABASE_ANON_KEY } from "@/integrations/supabase/client";
+import { warmBuilderInvoicesHub } from "@/lib/builderInvoicesHubCache";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import Footer from "@/components/Footer";
@@ -1988,6 +1989,22 @@ const ProfessionalBuilderDashboardPage = () => {
     if (activeTab === 'invoices') setInvoicesHubWarm(true);
   }, [activeTab]);
 
+  /** Prefetch hub data in the background so DN/GRN/Invoice subtabs often paint without skeletons. */
+  useEffect(() => {
+    const uid = user?.id;
+    if (!uid) return;
+    const t = window.setTimeout(() => {
+      warmBuilderInvoicesHub(uid, profile?.id ?? undefined);
+    }, 1200);
+    return () => clearTimeout(t);
+  }, [user?.id, profile?.id]);
+
+  useLayoutEffect(() => {
+    if (activeTab === 'invoices' && user?.id) {
+      warmBuilderInvoicesHub(user.id, profile?.id ?? undefined);
+    }
+  }, [activeTab, user?.id, profile?.id]);
+
   // Invoices tab badge: delivery notes + unacknowledged invoices (+ sub-tab counts + realtime)
   useEffect(() => {
     const userId = getUserId();
@@ -2425,7 +2442,10 @@ const ProfessionalBuilderDashboardPage = () => {
           stats={stats}
           deliveriesNavBadgeCount={deliveriesNavBadgeCount}
           invoiceHubBadgeCount={invoiceHubBadgeCount}
-          onInvoicesWarm={() => setInvoicesHubWarm(true)}
+          onInvoicesWarm={() => {
+            setInvoicesHubWarm(true);
+            if (user?.id) warmBuilderInvoicesHub(user.id, profile?.id ?? undefined);
+          }}
         />
 
         {/* Tab Content - Hidden TabsList, content controlled by cards above */}
@@ -3541,7 +3561,13 @@ const ProfessionalBuilderDashboardPage = () => {
                     <p className="text-sm text-muted-foreground">
                       View all GRNs for accepted deliveries.
                     </p>
-                    {user?.id && <GRNView userId={user.id} userRole="builder" />}
+                    {user?.id && (
+                      <GRNView
+                        userId={user.id}
+                        userRole="builder"
+                        hubCacheProfileId={profile?.id ?? null}
+                      />
+                    )}
                   </TabsContent>
 
                   <TabsContent value="supplier-invoices" forceMount className="mt-0 space-y-4">

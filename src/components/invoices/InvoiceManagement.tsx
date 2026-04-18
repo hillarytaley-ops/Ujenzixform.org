@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -30,6 +30,12 @@ import { sortSupplyChainDocsNewestFirst } from '@/utils/sortSupplyChainDocs';
 import { PaystackCheckout, isPaystackTestModeBanner } from '@/components/payment/PaystackCheckout';
 import { Separator } from '@/components/ui/separator';
 import { Skeleton } from '@/components/ui/skeleton';
+import {
+  patchHubInvoices,
+  peekHubInvoices,
+  subscribeBuilderHubCache,
+  warmBuilderInvoicesHub,
+} from '@/lib/builderInvoicesHubCache';
 
 /** Builder invoice hub: cap rows and PO fan-out so `in(...)` never explodes (timeouts → endless skeleton). */
 const BUILDER_INVOICE_PAGE_LIMIT = 350;
@@ -79,8 +85,15 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
   supplierRecordId,
   builderProfileId,
 }) => {
-  const [invoices, setInvoices] = useState<Invoice[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [invoices, setInvoices] = useState<Invoice[]>(() => {
+    if (userRole !== 'builder') return [];
+    const raw = peekHubInvoices(userId, builderProfileId ?? undefined);
+    return (raw as Invoice[]) ?? [];
+  });
+  const [loading, setLoading] = useState(() => {
+    if (userRole !== 'builder') return true;
+    return peekHubInvoices(userId, builderProfileId ?? undefined) === null;
+  });
   const [editingInvoice, setEditingInvoice] = useState<Invoice | null>(null);
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -98,6 +111,22 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
   const payInvoiceUrlHandledRef = useRef<string | null>(null);
   /** First fetch per user shows skeleton; later fetches (e.g. profile id resolved) refresh without blanking. */
   const invoiceFetchGenerationRef = useRef(0);
+
+  useLayoutEffect(() => {
+    if (userRole === 'builder' && userId) {
+      warmBuilderInvoicesHub(userId, builderProfileId ?? undefined);
+    }
+  }, [userRole, userId, builderProfileId]);
+
+  useEffect(() => {
+    if (userRole !== 'builder') return;
+    return subscribeBuilderHubCache(() => {
+      const raw = peekHubInvoices(userId, builderProfileId ?? undefined);
+      if (raw === null) return;
+      setInvoices((raw as Invoice[]) ?? []);
+      setLoading(false);
+    });
+  }, [userRole, userId, builderProfileId]);
 
   // Form state for editing
   const [editedItems, setEditedItems] = useState<any[]>([]);
@@ -235,6 +264,7 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
           list = list.slice(0, BUILDER_INVOICE_PAGE_LIMIT);
         }
         setInvoices(list);
+        patchHubInvoices(userId, builderProfileId ?? undefined, list);
         return;
       }
 
