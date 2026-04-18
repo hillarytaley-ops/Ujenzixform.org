@@ -44,10 +44,33 @@ const DN_LIST_SELECT =
 
 const BUILDER_INVOICE_PAGE_LIMIT = 350;
 const BUILDER_RECENT_PO_CAP = 400;
-const INVOICE_PO_ID_CHUNK = 40;
+const INVOICE_PO_ID_CHUNK = 80;
 
-const INVOICE_SELECT = `
-    *,
+/** Hub list only — omit `items` JSONB (often huge); avoids statement timeouts / PostgREST stalls. */
+const INVOICE_HUB_LIST_SELECT = `
+    id,
+    invoice_number,
+    purchase_order_id,
+    grn_id,
+    supplier_id,
+    builder_id,
+    issuer_id,
+    subtotal,
+    tax_amount,
+    discount_amount,
+    total_amount,
+    invoice_date,
+    due_date,
+    status,
+    payment_status,
+    is_editable,
+    last_edited_at,
+    last_edited_by,
+    acknowledged_at,
+    acknowledged_by,
+    notes,
+    created_at,
+    updated_at,
     purchase_order:purchase_orders(po_number),
     supplier:suppliers(company_name)
   `;
@@ -325,7 +348,7 @@ export async function fetchBuilderHubInvoices(
   const invByKey = (bid: string) =>
     supabase
       .from('invoices')
-      .select(INVOICE_SELECT)
+      .select(INVOICE_HUB_LIST_SELECT)
       .eq('builder_id', bid)
       .order('created_at', { ascending: false })
       .limit(BUILDER_INVOICE_PAGE_LIMIT);
@@ -354,15 +377,23 @@ export async function fetchBuilderHubInvoices(
   const poIds = (myOrders || []).map((p) => p.id).filter(Boolean);
   const byPoMap = new Map<string, Record<string, unknown>>();
   if (poIds.length > 0) {
+    const slices: string[][] = [];
     for (let i = 0; i < poIds.length; i += INVOICE_PO_ID_CHUNK) {
-      const slice = poIds.slice(i, i + INVOICE_PO_ID_CHUNK);
-      const { data: invPo, error: e3 } = await supabase
-        .from('invoices')
-        .select(INVOICE_SELECT)
-        .in('purchase_order_id', slice)
-        .order('created_at', { ascending: false })
-        .limit(BUILDER_INVOICE_PAGE_LIMIT);
-      if (e3) throw e3;
+      slices.push(poIds.slice(i, i + INVOICE_PO_ID_CHUNK));
+    }
+    const poChunkResults = await Promise.all(
+      slices.map((slice) =>
+        supabase
+          .from('invoices')
+          .select(INVOICE_HUB_LIST_SELECT)
+          .in('purchase_order_id', slice)
+          .order('created_at', { ascending: false })
+          .limit(BUILDER_INVOICE_PAGE_LIMIT)
+      )
+    );
+    const poChunkErr = poChunkResults.find((r) => r.error)?.error;
+    if (poChunkErr) throw poChunkErr;
+    for (const { data: invPo } of poChunkResults) {
       for (const inv of (invPo || []) as Record<string, unknown>[]) {
         const id = inv.id as string;
         if (id) byPoMap.set(id, inv);
@@ -380,7 +411,11 @@ export async function fetchBuilderHubInvoices(
   if (list.length > BUILDER_INVOICE_PAGE_LIMIT) {
     list = list.slice(0, BUILDER_INVOICE_PAGE_LIMIT);
   }
-  return list;
+  // List select omits `items`; UI expects an array (e.g. supplier edit, guards).
+  return list.map((row) => ({
+    ...row,
+    items: Array.isArray((row as { items?: unknown }).items) ? (row as { items: unknown[] }).items : [],
+  }));
 }
 
 function finishInflight(key: string) {

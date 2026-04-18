@@ -3566,7 +3566,7 @@ const ProfessionalBuilderDashboardPage = () => {
                     </TabsTrigger>
                   </TabsList>
 
-                  <TabsContent value="delivery-notes" className="mt-0 space-y-2">
+                  <TabsContent value="delivery-notes" forceMount className="mt-0 space-y-2">
                     <p className="text-sm text-muted-foreground">
                       Sign delivery notes and verify materials received.
                     </p>
@@ -3581,7 +3581,7 @@ const ProfessionalBuilderDashboardPage = () => {
                     )}
                   </TabsContent>
 
-                  <TabsContent value="grn" className="mt-0 space-y-2">
+                  <TabsContent value="grn" forceMount className="mt-0 space-y-2">
                     <p className="text-sm text-muted-foreground">
                       View all GRNs for accepted deliveries.
                     </p>
@@ -3594,7 +3594,7 @@ const ProfessionalBuilderDashboardPage = () => {
                     )}
                   </TabsContent>
 
-                  <TabsContent value="supplier-invoices" className="mt-0 space-y-4">
+                  <TabsContent value="supplier-invoices" forceMount className="mt-0 space-y-4">
                     <Card className="border-2 border-emerald-200 shadow-md dark:border-emerald-800">
                       <CardHeader className="pb-2">
                         <CardTitle className="flex flex-wrap items-center gap-2 text-lg text-emerald-950 dark:text-emerald-50 sm:text-xl">
