@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useLayoutEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
@@ -14,10 +14,10 @@ import {
 } from '@/utils/grnDocument';
 import { sortSupplyChainDocsNewestFirst } from '@/utils/sortSupplyChainDocs';
 import {
+  fetchBuilderHubGrns,
   patchHubGrns,
   peekHubGrns,
   subscribeBuilderHubCache,
-  warmBuilderInvoicesHub,
 } from '@/lib/builderInvoicesHubCache';
 
 interface GRN {
@@ -57,7 +57,25 @@ export const GRNView: React.FC<GRNViewProps> = ({ userId, userRole, hubCacheProf
   const fetchGRNs = async (opts?: { silent?: boolean }) => {
     const silent = opts?.silent === true;
     try {
-      if (!silent) setLoading(true);
+      if (!silent) {
+        if (userRole === 'builder') {
+          const hit = peekHubGrns(userId, hubCacheProfileId ?? undefined);
+          if (hit !== null) {
+            setGRNs(hit as GRN[]);
+            setLoading(false);
+            return;
+          }
+        }
+        setLoading(true);
+      }
+
+      if (userRole === 'builder') {
+        const sorted = (await fetchBuilderHubGrns(userId)) as GRN[];
+        setGRNs(sorted);
+        patchHubGrns(userId, hubCacheProfileId ?? undefined, sorted);
+        return;
+      }
+
       let query = supabase
         .from('goods_received_notes')
         .select(`
@@ -67,9 +85,7 @@ export const GRNView: React.FC<GRNViewProps> = ({ userId, userRole, hubCacheProf
         .order('created_at', { ascending: false })
         .limit(400);
 
-      if (userRole === 'builder') {
-        query = query.eq('builder_id', userId);
-      } else if (userRole === 'supplier') {
+      if (userRole === 'supplier') {
         // Get supplier ID from user_id
         const { data: supplier } = await supabase
           .from('suppliers')
@@ -89,9 +105,6 @@ export const GRNView: React.FC<GRNViewProps> = ({ userId, userRole, hubCacheProf
         (data || []) as unknown as Record<string, unknown>[]
       ) as GRN[];
       setGRNs(sorted);
-      if (userRole === 'builder') {
-        patchHubGrns(userId, hubCacheProfileId ?? undefined, sorted);
-      }
     } catch (error: any) {
       console.error('Error fetching GRNs:', error);
       toast({
@@ -103,12 +116,6 @@ export const GRNView: React.FC<GRNViewProps> = ({ userId, userRole, hubCacheProf
       if (!silent) setLoading(false);
     }
   };
-
-  useLayoutEffect(() => {
-    if (userRole === 'builder' && userId) {
-      warmBuilderInvoicesHub(userId, hubCacheProfileId ?? undefined);
-    }
-  }, [userId, userRole, hubCacheProfileId]);
 
   useEffect(() => {
     if (userRole !== 'builder') return;

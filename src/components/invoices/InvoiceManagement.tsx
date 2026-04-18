@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useLayoutEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -31,16 +31,11 @@ import { PaystackCheckout, isPaystackTestModeBanner } from '@/components/payment
 import { Separator } from '@/components/ui/separator';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
+  fetchBuilderHubInvoices,
   patchHubInvoices,
   peekHubInvoices,
   subscribeBuilderHubCache,
-  warmBuilderInvoicesHub,
 } from '@/lib/builderInvoicesHubCache';
-
-/** Builder invoice hub: cap rows and PO fan-out so `in(...)` never explodes (timeouts → endless skeleton). */
-const BUILDER_INVOICE_PAGE_LIMIT = 350;
-const BUILDER_RECENT_PO_CAP = 400;
-const INVOICE_PO_ID_CHUNK = 40;
 
 interface Invoice {
   id: string;
@@ -112,12 +107,6 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
   /** First fetch per user shows skeleton; later fetches (e.g. profile id resolved) refresh without blanking. */
   const invoiceFetchGenerationRef = useRef(0);
 
-  useLayoutEffect(() => {
-    if (userRole === 'builder' && userId) {
-      warmBuilderInvoicesHub(userId, builderProfileId ?? undefined);
-    }
-  }, [userRole, userId, builderProfileId]);
-
   useEffect(() => {
     if (userRole !== 'builder') return;
     return subscribeBuilderHubCache(() => {
@@ -139,7 +128,17 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
   const fetchInvoices = async (opts?: { silent?: boolean }) => {
     const silent = opts?.silent === true;
     try {
-      if (!silent) setLoading(true);
+      if (!silent) {
+        if (userRole === 'builder') {
+          const hit = peekHubInvoices(userId, builderProfileId ?? undefined);
+          if (hit !== null) {
+            setInvoices(hit as Invoice[]);
+            setLoading(false);
+            return;
+          }
+        }
+        setLoading(true);
+      }
 
       const invoiceSelect = `
           *,
@@ -203,66 +202,7 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
       }
 
       if (userRole === 'builder') {
-        const builderKeys = [...new Set([userId, builderProfileId].filter(Boolean))] as string[];
-
-        const invByKey = (bid: string) =>
-          supabase
-            .from('invoices')
-            .select(invoiceSelect)
-            .eq('builder_id', bid)
-            .order('created_at', { ascending: false })
-            .limit(BUILDER_INVOICE_PAGE_LIMIT);
-
-        const byKeyRes =
-          builderKeys.length === 1
-            ? [await invByKey(builderKeys[0])]
-            : await Promise.all(builderKeys.map((k) => invByKey(k)));
-        const eInv = byKeyRes.find((r) => r.error)?.error;
-        if (eInv) throw eInv;
-
-        const byBuilderMap = new Map<string, Invoice>();
-        for (const r of byKeyRes) {
-          for (const inv of (r.data || []) as Invoice[]) {
-            if (inv?.id) byBuilderMap.set(inv.id, inv);
-          }
-        }
-
-        const { data: myOrders, error: e2 } = await supabase
-          .from('purchase_orders')
-          .select('id')
-          .in('buyer_id', builderKeys)
-          .order('created_at', { ascending: false })
-          .limit(BUILDER_RECENT_PO_CAP);
-        if (e2) throw e2;
-
-        const poIds = (myOrders || []).map((p) => p.id).filter(Boolean);
-        const byPoMap = new Map<string, Invoice>();
-        if (poIds.length > 0) {
-          for (let i = 0; i < poIds.length; i += INVOICE_PO_ID_CHUNK) {
-            const slice = poIds.slice(i, i + INVOICE_PO_ID_CHUNK);
-            const { data: invPo, error: e3 } = await supabase
-              .from('invoices')
-              .select(invoiceSelect)
-              .in('purchase_order_id', slice)
-              .order('created_at', { ascending: false })
-              .limit(BUILDER_INVOICE_PAGE_LIMIT);
-            if (e3) throw e3;
-            for (const inv of (invPo || []) as Invoice[]) {
-              if (inv?.id) byPoMap.set(inv.id, inv);
-            }
-          }
-        }
-
-        const merged = new Map<string, Invoice>();
-        for (const inv of byBuilderMap.values()) merged.set(inv.id, inv);
-        for (const inv of byPoMap.values()) merged.set(inv.id, inv);
-
-        let list = sortSupplyChainDocsNewestFirst(
-          Array.from(merged.values()) as unknown as Record<string, unknown>[]
-        ) as Invoice[];
-        if (list.length > BUILDER_INVOICE_PAGE_LIMIT) {
-          list = list.slice(0, BUILDER_INVOICE_PAGE_LIMIT);
-        }
+        const list = (await fetchBuilderHubInvoices(userId, builderProfileId ?? undefined)) as Invoice[];
         setInvoices(list);
         patchHubInvoices(userId, builderProfileId ?? undefined, list);
         return;

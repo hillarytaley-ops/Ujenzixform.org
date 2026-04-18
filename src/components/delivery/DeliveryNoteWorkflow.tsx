@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useLayoutEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
@@ -15,28 +15,14 @@ import {
 } from 'lucide-react';
 import SignatureCanvas from 'react-signature-canvas';
 import { ResponsiveSignatureCanvas } from '@/components/ui/ResponsiveSignatureCanvas';
-import { sortSupplyChainDocsNewestFirst } from '@/utils/sortSupplyChainDocs';
 import {
+  fetchBuilderHubDeliveryNotes,
   invalidateBuilderInvoicesHub,
   patchHubDeliveryNotes,
   peekHubDeliveryNotes,
   subscribeBuilderHubCache,
   warmBuilderInvoicesHub,
 } from '@/lib/builderInvoicesHubCache';
-
-/** Cap rows returned — avoids huge payloads and keeps queries within DB statement limits. */
-const DN_WORKFLOW_LIST_LIMIT = 500;
-
-const DN_ACTIVE_STATUSES = [
-  'pending_signature',
-  'signed',
-  'forwarded_to_supplier',
-  'inspection_pending',
-] as const;
-
-/** Omit `builder_signature` (often large) — list view does not render it; signing uses canvas + refetch. */
-const DN_LIST_SELECT =
-  'id,dn_number,purchase_order_id,builder_id,supplier_id,delivery_address,delivery_date,items,status,builder_signed_at,inspection_verified,builder_decision,rejection_reason,created_at,updated_at';
 
 interface DeliveryNote {
   id: string;
@@ -155,11 +141,19 @@ export const DeliveryNoteWorkflow: React.FC<DeliveryNoteWorkflowProps> = ({
   /** First fetch shows skeleton; later runs (e.g. profile id resolved) refresh without blanking the panel. */
   const dnFetchGenerationRef = useRef(0);
 
-  // Fetch pending delivery notes (no nested embeds — avoids PostgREST 400 when FK hints are missing from schema cache)
+  // Single network path shared with dashboard prefetch (see builderInvoicesHubCache).
   const fetchDeliveryNotes = async (opts?: { silent?: boolean }) => {
     const silent = opts?.silent === true;
     try {
-      if (!silent) setLoading(true);
+      if (!silent) {
+        const hit = peekHubDeliveryNotes(builderAuthUserId, builderProfileId ?? undefined);
+        if (hit !== null) {
+          setDeliveryNotes(hit as DeliveryNote[]);
+          setLoading(false);
+          return;
+        }
+        setLoading(true);
+      }
       const builderIds = uniqueBuilderIds(builderAuthUserId, builderProfileId);
       if (builderIds.length === 0) {
         setDeliveryNotes([]);
@@ -167,87 +161,12 @@ export const DeliveryNoteWorkflow: React.FC<DeliveryNoteWorkflowProps> = ({
         return;
       }
 
-      const statuses = [...DN_ACTIVE_STATUSES];
-      let list: Record<string, unknown>[] = [];
-
-      if (builderIds.length === 1) {
-        const { data: rows, error } = await supabase
-          .from('delivery_notes')
-          .select(DN_LIST_SELECT)
-          .eq('builder_id', builderIds[0])
-          .in('status', statuses)
-          .order('created_at', { ascending: false })
-          .limit(DN_WORKFLOW_LIST_LIMIT);
-        if (error) throw error;
-        list = (rows || []) as Record<string, unknown>[];
-      } else {
-        const perBuilder = Math.max(50, Math.ceil(DN_WORKFLOW_LIST_LIMIT / builderIds.length));
-        const parts = await Promise.all(
-          builderIds.map((bid) =>
-            supabase
-              .from('delivery_notes')
-              .select(DN_LIST_SELECT)
-              .eq('builder_id', bid)
-              .in('status', statuses)
-              .order('created_at', { ascending: false })
-              .limit(perBuilder)
-          )
-        );
-        const firstErr = parts.find((p) => p.error)?.error;
-        if (firstErr) throw firstErr;
-        const merged = new Map<string, Record<string, unknown>>();
-        for (const p of parts) {
-          for (const row of (p.data || []) as Record<string, unknown>[]) {
-            const id = row.id as string;
-            if (id) merged.set(id, row);
-          }
-        }
-        list = sortSupplyChainDocsNewestFirst([...merged.values()]) as Record<string, unknown>[];
-        if (list.length > DN_WORKFLOW_LIST_LIMIT) {
-          list = list.slice(0, DN_WORKFLOW_LIST_LIMIT);
-        }
-      }
-      if (list.length === 0) {
-        setDeliveryNotes([]);
-        patchHubDeliveryNotes(builderAuthUserId, builderProfileId ?? undefined, []);
-        return;
-      }
-
-      const poIds = [...new Set(list.map((r) => r.purchase_order_id).filter(Boolean))];
-      const supplierIds = [...new Set(list.map((r) => r.supplier_id).filter(Boolean))];
-
-      const [poRes, supRes] = await Promise.all([
-        poIds.length
-          ? supabase.from('purchase_orders').select('id, po_number, total_amount').in('id', poIds)
-          : Promise.resolve({ data: [] as { id: string; po_number?: string; total_amount?: number }[], error: null }),
-        supplierIds.length
-          ? supabase.from('suppliers').select('id, company_name').in('id', supplierIds)
-          : Promise.resolve({ data: [] as { id: string; company_name?: string }[], error: null }),
-      ]);
-
-      if (poRes.error) throw poRes.error;
-      if (supRes.error) throw supRes.error;
-
-      const poById = Object.fromEntries((poRes.data || []).map((p) => [p.id, p]));
-      const supById = Object.fromEntries((supRes.data || []).map((s) => [s.id, s]));
-
-      const enriched: DeliveryNote[] = (list as any[]).map((r: any) => {
-        const po = poById[r.purchase_order_id];
-        const sup = supById[r.supplier_id];
-        return {
-          ...r,
-          purchase_order: po
-            ? { po_number: po.po_number, total_amount: po.total_amount ?? undefined }
-            : undefined,
-          supplier: sup ? { company_name: sup.company_name ?? undefined } : undefined,
-        };
-      });
-
-      const sorted = sortSupplyChainDocsNewestFirst(
-        enriched as unknown as Record<string, unknown>[]
-      ) as DeliveryNote[];
-      setDeliveryNotes(sorted);
-      patchHubDeliveryNotes(builderAuthUserId, builderProfileId ?? undefined, sorted);
+      const enriched = (await fetchBuilderHubDeliveryNotes(
+        builderAuthUserId,
+        builderProfileId ?? undefined
+      )) as DeliveryNote[];
+      setDeliveryNotes(enriched);
+      patchHubDeliveryNotes(builderAuthUserId, builderProfileId ?? undefined, enriched);
     } catch (error: any) {
       console.error('Error fetching delivery notes:', error);
       const code = error?.code as string | undefined;
@@ -264,12 +183,6 @@ export const DeliveryNoteWorkflow: React.FC<DeliveryNoteWorkflowProps> = ({
       if (!silent) setLoading(false);
     }
   };
-
-  useLayoutEffect(() => {
-    if (builderAuthUserId || builderProfileId) {
-      warmBuilderInvoicesHub(builderAuthUserId, builderProfileId ?? undefined);
-    }
-  }, [builderAuthUserId, builderProfileId]);
 
   useEffect(() => {
     return subscribeBuilderHubCache(() => {
