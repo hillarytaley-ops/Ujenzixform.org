@@ -26,6 +26,13 @@ import {
 
 const SUPPLIER_HUB_IN_CHUNK = 80;
 const SUPPLIER_DN_LIST_FALLBACK_LIMIT = 500;
+/** Wall clock for RPC + DN list only (enrichment runs after UI unblocks). */
+const SUPPLIER_DN_LIST_PHASE_TIMEOUT_MS = 60_000;
+
+function isRlsPermissionDenied(err: unknown): boolean {
+  const o = err as { code?: string; message?: string };
+  return o?.code === '42501' || /permission denied/i.test(String(o?.message ?? ''));
+}
 
 interface SupplierInvoiceHubProps {
   userId: string;
@@ -112,7 +119,115 @@ export const SupplierInvoiceHub: React.FC<SupplierInvoiceHubProps> = ({
   const [supplierCompanyName, setSupplierCompanyName] = useState('');
   const [dnFileDownloadingId, setDnFileDownloadingId] = useState<string | null>(null);
 
-  /** RPC with p_supplier_id = dashboard suppliers.id; refetch when supplierRecordId resolves (was missing from deps before). */
+  /** Profiles, signatures, PO numbers — runs after the DN table is shown (faster perceived load). */
+  const enrichDeliveryNotesAfterList = useCallback(
+    async (list: any[]) => {
+      if (!supplierRecordId) return;
+      try {
+        const builderKeys = [...new Set(list.map((r: any) => r.builder_id).filter(Boolean))];
+        let labelMap: Record<string, string> = {};
+        if (builderKeys.length > 0) {
+          const add = (p: {
+            id?: string;
+            user_id?: string;
+            full_name?: string | null;
+            company_name?: string | null;
+          }) => {
+            const label = (p.company_name || p.full_name || '').trim() || 'Builder';
+            if (p.id) labelMap[p.id] = label;
+            if (p.user_id) labelMap[p.user_id] = label;
+          };
+          const profileChunks = chunkArray(builderKeys, SUPPLIER_HUB_IN_CHUNK);
+          const profileResults = await Promise.all(
+            profileChunks.map((chunk) =>
+              Promise.all([
+                supabase.from('profiles').select('id, user_id, full_name, company_name').in('id', chunk),
+                supabase.from('profiles').select('id, user_id, full_name, company_name').in('user_id', chunk),
+              ])
+            )
+          );
+          for (const [byId, byUser] of profileResults) {
+            if (byId.error) throw byId.error;
+            if (byUser.error) throw byUser.error;
+            (byId.data || []).forEach(add);
+            (byUser.data || []).forEach(add);
+          }
+        }
+        setBuilderLabelByKey(labelMap);
+
+        const dnIds = [...new Set(list.map((r: any) => r.id).filter(Boolean))];
+        let sigByDnId: Record<string, { signature: string; signedAt: string }> = {};
+        if (dnIds.length > 0) {
+          try {
+            const sigChunks = chunkArray(dnIds, SUPPLIER_HUB_IN_CHUNK);
+            const sigResults = await Promise.all(
+              sigChunks.map((chunk) =>
+                supabase
+                  .from('delivery_note_signatures')
+                  .select('delivery_note_id, signature_data, signed_at')
+                  .in('delivery_note_id', chunk)
+                  .order('signed_at', { ascending: false })
+              )
+            );
+            for (const { data: sigRows, error: sigErr } of sigResults) {
+              if (sigErr) {
+                if (isRlsPermissionDenied(sigErr)) {
+                  console.warn(
+                    '[Supplier DN] delivery_note_signatures not readable; apply migration 20260418140000_delivery_note_signatures_supplier_select_rls.sql'
+                  );
+                  sigByDnId = {};
+                  break;
+                }
+                throw sigErr;
+              }
+              if (sigRows) {
+                for (const r of sigRows) {
+                  const id = r.delivery_note_id as string;
+                  if (!id || sigByDnId[id]) continue;
+                  sigByDnId[id] = {
+                    signature: r.signature_data as string,
+                    signedAt: r.signed_at as string,
+                  };
+                }
+              }
+            }
+          } catch (sigBlock: unknown) {
+            if (isRlsPermissionDenied(sigBlock)) {
+              sigByDnId = {};
+            } else {
+              throw sigBlock;
+            }
+          }
+        }
+        setSignatureFallbackByDnId(sigByDnId);
+
+        const poIds = [...new Set(list.map((r) => r.purchase_order_id).filter(Boolean))];
+        if (poIds.length === 0) {
+          setPoById({});
+          setPoItemsById({});
+          return;
+        }
+        const poChunks = chunkArray(poIds, SUPPLIER_HUB_IN_CHUNK);
+        const poChunkResults = await Promise.all(
+          poChunks.map((chunk) =>
+            supabase.from('purchase_orders').select('id, po_number').in('id', chunk)
+          )
+        );
+        const poRows: { id: string; po_number?: string }[] = [];
+        for (const r of poChunkResults) {
+          if (r.error) throw r.error;
+          if (r.data?.length) poRows.push(...(r.data as typeof poRows));
+        }
+        setPoById(Object.fromEntries(poRows.map((p: any) => [p.id, p.po_number || '—'])));
+        setPoItemsById({});
+      } catch (enrichErr) {
+        console.warn('Supplier DN enrich (profiles / signatures / PO):', enrichErr);
+      }
+    },
+    [supplierRecordId]
+  );
+
+  /** RPC + list first; enrichment (profiles, signatures, PO#) does not block the loading spinner. */
   const loadDeliveryNotes = useCallback(async () => {
     if (!supplierRecordId) {
       setDeliveryNotes([]);
@@ -125,7 +240,7 @@ export const SupplierInvoiceHub: React.FC<SupplierInvoiceHubProps> = ({
     }
     setDnLoading(true);
     try {
-      await builderHubListFetchWithTimeout(
+      const list = await builderHubListFetchWithTimeout(
         (async () => {
           let rpc = await supabase.rpc('list_delivery_notes_for_supplier', {
             p_supplier_id: supplierRecordId,
@@ -136,9 +251,9 @@ export const SupplierInvoiceHub: React.FC<SupplierInvoiceHubProps> = ({
               p_supplier_id: supplierRecordId,
             });
           }
-          let list: any[] = [];
+          let rows: any[] = [];
           if (!rpc.error && Array.isArray(rpc.data)) {
-            list = rpc.data;
+            rows = rpc.data;
           } else {
             if (rpc.error) {
               const msg = rpc.error.message || '';
@@ -160,101 +275,25 @@ export const SupplierInvoiceHub: React.FC<SupplierInvoiceHubProps> = ({
                 );
               }
             }
-            const { data: rows, error } = await supabase
+            const { data: directRows, error } = await supabase
               .from('delivery_notes')
               .select('*')
               .eq('supplier_id', supplierRecordId)
               .order('created_at', { ascending: false })
               .limit(SUPPLIER_DN_LIST_FALLBACK_LIMIT);
             if (error) throw error;
-            list = rows || [];
+            rows = directRows || [];
           }
-          setDeliveryNotes(sortSupplyChainDocsNewestFirst(list as Record<string, unknown>[]) as any[]);
-
-          const builderKeys = [...new Set(list.map((r: any) => r.builder_id).filter(Boolean))];
-          let labelMap: Record<string, string> = {};
-          if (builderKeys.length > 0) {
-            const add = (p: {
-              id?: string;
-              user_id?: string;
-              full_name?: string | null;
-              company_name?: string | null;
-            }) => {
-              const label = (p.company_name || p.full_name || '').trim() || 'Builder';
-              if (p.id) labelMap[p.id] = label;
-              if (p.user_id) labelMap[p.user_id] = label;
-            };
-            const profileChunks = chunkArray(builderKeys, SUPPLIER_HUB_IN_CHUNK);
-            const profileResults = await Promise.all(
-              profileChunks.map((chunk) =>
-                Promise.all([
-                  supabase.from('profiles').select('id, user_id, full_name, company_name').in('id', chunk),
-                  supabase.from('profiles').select('id, user_id, full_name, company_name').in('user_id', chunk),
-                ])
-              )
-            );
-            for (const [byId, byUser] of profileResults) {
-              if (byId.error) throw byId.error;
-              if (byUser.error) throw byUser.error;
-              (byId.data || []).forEach(add);
-              (byUser.data || []).forEach(add);
-            }
-          }
-          setBuilderLabelByKey(labelMap);
-
-          const dnIds = [...new Set(list.map((r: any) => r.id).filter(Boolean))];
-          let sigByDnId: Record<string, { signature: string; signedAt: string }> = {};
-          if (dnIds.length > 0) {
-            const sigChunks = chunkArray(dnIds, SUPPLIER_HUB_IN_CHUNK);
-            const sigResults = await Promise.all(
-              sigChunks.map((chunk) =>
-                supabase
-                  .from('delivery_note_signatures')
-                  .select('delivery_note_id, signature_data, signed_at')
-                  .in('delivery_note_id', chunk)
-                  .order('signed_at', { ascending: false })
-              )
-            );
-            for (const { data: sigRows, error: sigErr } of sigResults) {
-              if (sigErr) throw sigErr;
-              if (sigRows) {
-                for (const r of sigRows) {
-                  const id = r.delivery_note_id as string;
-                  if (!id || sigByDnId[id]) continue;
-                  sigByDnId[id] = {
-                    signature: r.signature_data as string,
-                    signedAt: r.signed_at as string,
-                  };
-                }
-              }
-            }
-          }
-          setSignatureFallbackByDnId(sigByDnId);
-
-          const poIds = [...new Set(list.map((r) => r.purchase_order_id).filter(Boolean))];
-          if (poIds.length === 0) {
-            setPoById({});
-            setPoItemsById({});
-            return;
-          }
-          // Omit `items` here — large JSONB per PO often pushes multi-chunk loads past short wall timeouts; fetch on PDF open.
-          const poChunks = chunkArray(poIds, SUPPLIER_HUB_IN_CHUNK);
-          const poChunkResults = await Promise.all(
-            poChunks.map((chunk) =>
-              supabase.from('purchase_orders').select('id, po_number').in('id', chunk)
-            )
-          );
-          const poRows: { id: string; po_number?: string }[] = [];
-          for (const r of poChunkResults) {
-            if (r.error) throw r.error;
-            if (r.data?.length) poRows.push(...(r.data as typeof poRows));
-          }
-          setPoById(Object.fromEntries(poRows.map((p: any) => [p.id, p.po_number || '—'])));
-          setPoItemsById({});
+          return rows;
         })(),
         'supplier_dn_list_timeout',
-        SUPPLIER_DOC_LIST_FETCH_TIMEOUT_MS
+        SUPPLIER_DN_LIST_PHASE_TIMEOUT_MS
       );
+      const sorted = sortSupplyChainDocsNewestFirst(list as Record<string, unknown>[]) as any[];
+      setDeliveryNotes(sorted);
+      setDnLoading(false);
+
+      void enrichDeliveryNotesAfterList(sorted);
     } catch (e: any) {
       console.error('Supplier DN fetch:', e);
       const msg = String(e?.message || '');
@@ -280,7 +319,7 @@ export const SupplierInvoiceHub: React.FC<SupplierInvoiceHubProps> = ({
     } finally {
       setDnLoading(false);
     }
-  }, [toast, supplierRecordId]);
+  }, [toast, supplierRecordId, enrichDeliveryNotesAfterList]);
 
   useEffect(() => {
     if (!supplierRecordId) {
@@ -473,13 +512,6 @@ export const SupplierInvoiceHub: React.FC<SupplierInvoiceHubProps> = ({
     if (subTab === 'delivery-notes') void loadDeliveryNotes();
     if (subTab === 'grn') void loadGrns();
   }, [subTab, supplierRecordId, loadDeliveryNotes, loadGrns]);
-
-  // Preload when suppliers.id is known (async on parent dashboard — without this, fetch ran once with no id).
-  useEffect(() => {
-    if (!supplierRecordId) return;
-    void loadDeliveryNotes();
-    void loadGrns();
-  }, [supplierRecordId, loadDeliveryNotes, loadGrns]);
 
   const groupedDeliveryNotes = useMemo(() => {
     const buckets: Record<DeliveryNoteGroup, any[]> = {
