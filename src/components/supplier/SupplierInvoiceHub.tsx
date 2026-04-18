@@ -18,6 +18,14 @@ import { useToast } from '@/hooks/use-toast';
 import { openDeliveryNotePdfWindow } from '@/utils/deliveryNoteDocument';
 import { MobileHorizontalScroll } from '@/components/ui/mobile-horizontal-scroll';
 import { sortSupplyChainDocsNewestFirst } from '@/utils/sortSupplyChainDocs';
+import { chunkArray } from '@/utils/performance';
+import {
+  builderHubListFetchWithTimeout,
+  BUILDER_HUB_LIST_FETCH_TIMEOUT_MS,
+} from '@/lib/builderInvoicesHubCache';
+
+const SUPPLIER_HUB_IN_CHUNK = 80;
+const SUPPLIER_DN_LIST_FALLBACK_LIMIT = 500;
 
 interface SupplierInvoiceHubProps {
   userId: string;
@@ -117,100 +125,136 @@ export const SupplierInvoiceHub: React.FC<SupplierInvoiceHubProps> = ({
     }
     setDnLoading(true);
     try {
-      const rpc = await supabase.rpc('list_delivery_notes_for_supplier', {
-        p_supplier_id: supplierRecordId,
-      });
-      let list: any[] = [];
-      if (!rpc.error && Array.isArray(rpc.data)) {
-        list = rpc.data;
-      } else {
-        if (rpc.error) {
-          const msg = rpc.error.message || '';
-          const missingFn =
-            msg.includes('Could not find the function') ||
-            (msg.includes('function') && msg.includes('does not exist'));
-          if (missingFn) {
-            toast({
-              title: 'Database update required',
-              description:
-                'Run migration 20260329350000 in Supabase SQL (list_delivery_notes_for_supplier with p_supplier_id).',
-              variant: 'destructive',
-            });
+      await builderHubListFetchWithTimeout(
+        (async () => {
+          const rpc = await supabase.rpc('list_delivery_notes_for_supplier', {
+            p_supplier_id: supplierRecordId,
+          });
+          let list: any[] = [];
+          if (!rpc.error && Array.isArray(rpc.data)) {
+            list = rpc.data;
+          } else {
+            if (rpc.error) {
+              const msg = rpc.error.message || '';
+              const missingFn =
+                msg.includes('Could not find the function') ||
+                (msg.includes('function') && msg.includes('does not exist'));
+              if (missingFn) {
+                toast({
+                  title: 'Database update required',
+                  description:
+                    'Run migration 20260329350000 in Supabase SQL (list_delivery_notes_for_supplier with p_supplier_id).',
+                  variant: 'destructive',
+                });
+              }
+              console.warn(
+                'list_delivery_notes_for_supplier RPC unavailable, using direct select:',
+                rpc.error.message
+              );
+            }
+            const { data: rows, error } = await supabase
+              .from('delivery_notes')
+              .select('*')
+              .eq('supplier_id', supplierRecordId)
+              .order('created_at', { ascending: false })
+              .limit(SUPPLIER_DN_LIST_FALLBACK_LIMIT);
+            if (error) throw error;
+            list = rows || [];
           }
-          console.warn('list_delivery_notes_for_supplier RPC unavailable, using direct select:', rpc.error.message);
-        }
-        const { data: rows, error } = await supabase
-          .from('delivery_notes')
-          .select('*')
-          .order('created_at', { ascending: false });
-        if (error) throw error;
-        list = rows || [];
-      }
-      setDeliveryNotes(sortSupplyChainDocsNewestFirst(list as Record<string, unknown>[]) as any[]);
+          setDeliveryNotes(sortSupplyChainDocsNewestFirst(list as Record<string, unknown>[]) as any[]);
 
-      const builderKeys = [...new Set(list.map((r: any) => r.builder_id).filter(Boolean))];
-      let labelMap: Record<string, string> = {};
-      if (builderKeys.length > 0) {
-        const [byId, byUser] = await Promise.all([
-          supabase.from('profiles').select('id, user_id, full_name, company_name').in('id', builderKeys),
-          supabase.from('profiles').select('id, user_id, full_name, company_name').in('user_id', builderKeys),
-        ]);
-        const add = (p: { id?: string; user_id?: string; full_name?: string | null; company_name?: string | null }) => {
-          const label = (p.company_name || p.full_name || '').trim() || 'Builder';
-          if (p.id) labelMap[p.id] = label;
-          if (p.user_id) labelMap[p.user_id] = label;
-        };
-        (byId.data || []).forEach(add);
-        (byUser.data || []).forEach(add);
-      }
-      setBuilderLabelByKey(labelMap);
-
-      const dnIds = [...new Set(list.map((r: any) => r.id).filter(Boolean))];
-      let sigByDnId: Record<string, { signature: string; signedAt: string }> = {};
-      if (dnIds.length > 0) {
-        const { data: sigRows, error: sigErr } = await supabase
-          .from('delivery_note_signatures')
-          .select('delivery_note_id, signature_data, signed_at')
-          .in('delivery_note_id', dnIds)
-          .order('signed_at', { ascending: false });
-        if (!sigErr && sigRows) {
-          for (const r of sigRows) {
-            const id = r.delivery_note_id as string;
-            if (!id || sigByDnId[id]) continue;
-            sigByDnId[id] = {
-              signature: r.signature_data as string,
-              signedAt: r.signed_at as string,
+          const builderKeys = [...new Set(list.map((r: any) => r.builder_id).filter(Boolean))];
+          let labelMap: Record<string, string> = {};
+          if (builderKeys.length > 0) {
+            const add = (p: {
+              id?: string;
+              user_id?: string;
+              full_name?: string | null;
+              company_name?: string | null;
+            }) => {
+              const label = (p.company_name || p.full_name || '').trim() || 'Builder';
+              if (p.id) labelMap[p.id] = label;
+              if (p.user_id) labelMap[p.user_id] = label;
             };
+            for (const chunk of chunkArray(builderKeys, SUPPLIER_HUB_IN_CHUNK)) {
+              const [byId, byUser] = await Promise.all([
+                supabase.from('profiles').select('id, user_id, full_name, company_name').in('id', chunk),
+                supabase.from('profiles').select('id, user_id, full_name, company_name').in('user_id', chunk),
+              ]);
+              if (byId.error) throw byId.error;
+              if (byUser.error) throw byUser.error;
+              (byId.data || []).forEach(add);
+              (byUser.data || []).forEach(add);
+            }
           }
-        }
-      }
-      setSignatureFallbackByDnId(sigByDnId);
+          setBuilderLabelByKey(labelMap);
 
-      const poIds = [...new Set(list.map((r) => r.purchase_order_id).filter(Boolean))];
-      if (poIds.length === 0) {
-        setPoById({});
-        setPoItemsById({});
-        return;
-      }
-      const { data: pos, error: poErr } = await supabase
-        .from('purchase_orders')
-        .select('id, po_number, items')
-        .in('id', poIds);
-      if (poErr) throw poErr;
-      const poRows = pos || [];
-      setPoById(Object.fromEntries(poRows.map((p: any) => [p.id, p.po_number || '—'])));
-      setPoItemsById(
-        Object.fromEntries(
-          poRows.map((p: any) => [p.id, Array.isArray(p.items) ? p.items : []])
-        )
+          const dnIds = [...new Set(list.map((r: any) => r.id).filter(Boolean))];
+          let sigByDnId: Record<string, { signature: string; signedAt: string }> = {};
+          if (dnIds.length > 0) {
+            for (const chunk of chunkArray(dnIds, SUPPLIER_HUB_IN_CHUNK)) {
+              const { data: sigRows, error: sigErr } = await supabase
+                .from('delivery_note_signatures')
+                .select('delivery_note_id, signature_data, signed_at')
+                .in('delivery_note_id', chunk)
+                .order('signed_at', { ascending: false });
+              if (sigErr) throw sigErr;
+              if (sigRows) {
+                for (const r of sigRows) {
+                  const id = r.delivery_note_id as string;
+                  if (!id || sigByDnId[id]) continue;
+                  sigByDnId[id] = {
+                    signature: r.signature_data as string,
+                    signedAt: r.signed_at as string,
+                  };
+                }
+              }
+            }
+          }
+          setSignatureFallbackByDnId(sigByDnId);
+
+          const poIds = [...new Set(list.map((r) => r.purchase_order_id).filter(Boolean))];
+          if (poIds.length === 0) {
+            setPoById({});
+            setPoItemsById({});
+            return;
+          }
+          const poRows: { id: string; po_number?: string; items?: unknown }[] = [];
+          for (const chunk of chunkArray(poIds, SUPPLIER_HUB_IN_CHUNK)) {
+            const { data: pos, error: poErr } = await supabase
+              .from('purchase_orders')
+              .select('id, po_number, items')
+              .in('id', chunk);
+            if (poErr) throw poErr;
+            if (pos?.length) poRows.push(...(pos as typeof poRows));
+          }
+          setPoById(Object.fromEntries(poRows.map((p: any) => [p.id, p.po_number || '—'])));
+          setPoItemsById(
+            Object.fromEntries(
+              poRows.map((p: any) => [p.id, Array.isArray(p.items) ? p.items : []])
+            )
+          );
+        })(),
+        'supplier_dn_list_timeout',
+        BUILDER_HUB_LIST_FETCH_TIMEOUT_MS
       );
     } catch (e: any) {
       console.error('Supplier DN fetch:', e);
-      toast({
-        title: 'Could not load delivery notes',
-        description: e?.message || 'Try again later.',
-        variant: 'destructive',
-      });
+      const msg = String(e?.message || '');
+      if (msg.includes('supplier_dn_list_timeout')) {
+        toast({
+          title: 'Delivery notes are taking too long',
+          description:
+            'Try Refresh. If this keeps happening, ask your admin to check delivery_notes / purchase_orders performance on Supabase.',
+          variant: 'destructive',
+        });
+      } else {
+        toast({
+          title: 'Could not load delivery notes',
+          description: e?.message || 'Try again later.',
+          variant: 'destructive',
+        });
+      }
       setDeliveryNotes([]);
       setPoById({});
       setPoItemsById({});
@@ -322,43 +366,64 @@ export const SupplierInvoiceHub: React.FC<SupplierInvoiceHubProps> = ({
     }
     setGrnLoading(true);
     try {
-      const rpc = await supabase.rpc('list_goods_received_notes_for_supplier', {
-        p_supplier_id: supplierRecordId,
-      });
-      let rows: any[] = [];
-      if (!rpc.error && Array.isArray(rpc.data)) {
-        rows = rpc.data;
-      } else {
-        if (rpc.error) {
-          const msg = rpc.error.message || '';
-          if (
-            msg.includes('Could not find the function') ||
-            (msg.includes('function') && msg.includes('does not exist'))
-          ) {
-            toast({
-              title: 'Database update required',
-              description:
-                'Run migration 20260329350000 (list_goods_received_notes_for_supplier) in Supabase SQL.',
-              variant: 'destructive',
-            });
+      await builderHubListFetchWithTimeout(
+        (async () => {
+          const rpc = await supabase.rpc('list_goods_received_notes_for_supplier', {
+            p_supplier_id: supplierRecordId,
+          });
+          let rows: any[] = [];
+          if (!rpc.error && Array.isArray(rpc.data)) {
+            rows = rpc.data;
+          } else {
+            if (rpc.error) {
+              const msg = rpc.error.message || '';
+              if (
+                msg.includes('Could not find the function') ||
+                (msg.includes('function') && msg.includes('does not exist'))
+              ) {
+                toast({
+                  title: 'Database update required',
+                  description:
+                    'Run migration 20260329350000 (list_goods_received_notes_for_supplier) in Supabase SQL.',
+                  variant: 'destructive',
+                });
+              }
+              console.warn(
+                'list_goods_received_notes_for_supplier RPC unavailable, using direct select:',
+                rpc.error.message
+              );
+            }
+            const { data, error } = await supabase
+              .from('goods_received_notes')
+              .select('*')
+              .eq('supplier_id', supplierRecordId)
+              .order('created_at', { ascending: false })
+              .limit(SUPPLIER_DN_LIST_FALLBACK_LIMIT);
+            if (error) throw error;
+            rows = data || [];
           }
-          console.warn('list_goods_received_notes_for_supplier RPC unavailable, using direct select:', rpc.error.message);
-        }
-        const { data, error } = await supabase
-          .from('goods_received_notes')
-          .select('*')
-          .order('created_at', { ascending: false });
-        if (error) throw error;
-        rows = data || [];
-      }
-      setGrns(sortSupplyChainDocsNewestFirst(rows as Record<string, unknown>[]) as any[]);
+          setGrns(sortSupplyChainDocsNewestFirst(rows as Record<string, unknown>[]) as any[]);
+        })(),
+        'supplier_grn_list_timeout',
+        BUILDER_HUB_LIST_FETCH_TIMEOUT_MS
+      );
     } catch (e: any) {
       console.error('Supplier GRN fetch:', e);
-      toast({
-        title: 'Could not load GRNs',
-        description: e?.message || 'Try again later.',
-        variant: 'destructive',
-      });
+      const msg = String(e?.message || '');
+      if (msg.includes('supplier_grn_list_timeout')) {
+        toast({
+          title: 'GRNs are taking too long',
+          description:
+            'Try Refresh. If this keeps happening, ask your admin to check goods_received_notes performance on Supabase.',
+          variant: 'destructive',
+        });
+      } else {
+        toast({
+          title: 'Could not load GRNs',
+          description: e?.message || 'Try again later.',
+          variant: 'destructive',
+        });
+      }
       setGrns([]);
     } finally {
       setGrnLoading(false);

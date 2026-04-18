@@ -27,6 +27,7 @@ import {
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { sortSupplyChainDocsNewestFirst } from '@/utils/sortSupplyChainDocs';
+import { chunkArray } from '@/utils/performance';
 import { PaystackCheckout, isPaystackTestModeBanner } from '@/components/payment/PaystackCheckout';
 import { Separator } from '@/components/ui/separator';
 import {
@@ -158,55 +159,69 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
 
       // Supplier: prefer RPC with p_supplier_id when dashboard resolved suppliers.id.
       if (userRole === 'supplier') {
-        const rpcArgs =
-          supplierRecordId != null && supplierRecordId !== ''
-            ? { p_supplier_id: supplierRecordId }
-            : ({} as Record<string, string>);
-        const rpc = await supabase.rpc('list_invoices_for_supplier', rpcArgs);
-        let base: any[] = [];
-        if (!rpc.error && Array.isArray(rpc.data)) {
-          base = rpc.data;
-        } else {
-          if (rpc.error) {
-            console.warn('list_invoices_for_supplier RPC unavailable, using direct select:', rpc.error.message);
-          }
-          const { data, error } = await supabase
-            .from('invoices')
-            .select(invoiceSelect)
-            .order('created_at', { ascending: false })
-            .limit(500);
-          if (error) throw error;
-          setInvoices(
-            sortSupplyChainDocsNewestFirst((data || []) as unknown as Record<string, unknown>[]) as Invoice[]
-          );
-          return;
-        }
+        await builderHubListFetchWithTimeout(
+          (async () => {
+            const rpcArgs =
+              supplierRecordId != null && supplierRecordId !== ''
+                ? { p_supplier_id: supplierRecordId }
+                : ({} as Record<string, string>);
+            const rpc = await supabase.rpc('list_invoices_for_supplier', rpcArgs);
+            let base: any[] = [];
+            if (!rpc.error && Array.isArray(rpc.data)) {
+              base = rpc.data;
+            } else {
+              if (rpc.error) {
+                console.warn(
+                  'list_invoices_for_supplier RPC unavailable, using direct select:',
+                  rpc.error.message
+                );
+              }
+              let invQ = supabase
+                .from('invoices')
+                .select(invoiceSelect)
+                .order('created_at', { ascending: false })
+                .limit(500);
+              if (supplierRecordId) {
+                invQ = invQ.eq('supplier_id', supplierRecordId);
+              }
+              const { data, error } = await invQ;
+              if (error) throw error;
+              setInvoices(
+                sortSupplyChainDocsNewestFirst((data || []) as unknown as Record<string, unknown>[]) as Invoice[]
+              );
+              return;
+            }
 
-        const poIds = [...new Set(base.map((i) => i.purchase_order_id).filter(Boolean))];
-        const supIds = [...new Set(base.map((i) => i.supplier_id).filter(Boolean))];
-        const [poRes, supRes] = await Promise.all([
-          poIds.length
-            ? supabase.from('purchase_orders').select('id, po_number').in('id', poIds)
-            : Promise.resolve({ data: [] as { id: string; po_number?: string }[], error: null }),
-          supIds.length
-            ? supabase.from('suppliers').select('id, company_name').in('id', supIds)
-            : Promise.resolve({ data: [] as { id: string; company_name?: string }[], error: null }),
-        ]);
-        if (poRes.error) throw poRes.error;
-        if (supRes.error) throw supRes.error;
-        const poById = Object.fromEntries((poRes.data || []).map((p) => [p.id, p]));
-        const supById = Object.fromEntries((supRes.data || []).map((s) => [s.id, s]));
-        const enriched = base.map((inv) => ({
-          ...inv,
-          purchase_order: poById[inv.purchase_order_id]
-            ? { po_number: poById[inv.purchase_order_id].po_number }
-            : undefined,
-          supplier: supById[inv.supplier_id]
-            ? { company_name: supById[inv.supplier_id].company_name }
-            : undefined,
-        })) as Invoice[];
-        setInvoices(
-          sortSupplyChainDocsNewestFirst(enriched as unknown as Record<string, unknown>[]) as Invoice[]
+            const poIds = [...new Set(base.map((i) => i.purchase_order_id).filter(Boolean))];
+            const supIds = [...new Set(base.map((i) => i.supplier_id).filter(Boolean))];
+            const poMerged: { id: string; po_number?: string }[] = [];
+            for (const chunk of chunkArray(poIds, 80)) {
+              const poRes = await supabase.from('purchase_orders').select('id, po_number').in('id', chunk);
+              if (poRes.error) throw poRes.error;
+              if (poRes.data?.length) poMerged.push(...poRes.data);
+            }
+            const supMerged: { id: string; company_name?: string }[] = [];
+            for (const chunk of chunkArray(supIds, 80)) {
+              const supRes = await supabase.from('suppliers').select('id, company_name').in('id', chunk);
+              if (supRes.error) throw supRes.error;
+              if (supRes.data?.length) supMerged.push(...supRes.data);
+            }
+            const poById = Object.fromEntries(poMerged.map((p) => [p.id, p]));
+            const supById = Object.fromEntries(supMerged.map((s) => [s.id, s]));
+            const enriched = base.map((inv) => ({
+              ...inv,
+              purchase_order: poById[inv.purchase_order_id]
+                ? { po_number: poById[inv.purchase_order_id].po_number }
+                : undefined,
+              supplier: supById[inv.supplier_id]
+                ? { company_name: supById[inv.supplier_id].company_name }
+                : undefined,
+            })) as Invoice[];
+            setInvoices(
+              sortSupplyChainDocsNewestFirst(enriched as unknown as Record<string, unknown>[]) as Invoice[]
+            );
+          })(),
+          'supplier_invoice_list_timeout'
         );
         return;
       }
@@ -236,7 +251,7 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
         return;
       }
       const msg = String(error?.message || '');
-      if (msg.includes('invoice_fetch_timeout')) {
+      if (msg.includes('invoice_fetch_timeout') || msg.includes('supplier_invoice_list_timeout')) {
         toast({
           title: 'Invoices are taking too long',
           description: 'Try Refresh. If this keeps happening, ask your admin to check invoices / purchase_orders performance on Supabase.',
