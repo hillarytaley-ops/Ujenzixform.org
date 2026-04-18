@@ -12,6 +12,10 @@ import { useNavigate, Link, useSearchParams } from "react-router-dom";
 import { useUrlTabSync } from "@/hooks/useUrlTabSync";
 import { supabase, SUPABASE_URL, SUPABASE_ANON_KEY } from "@/integrations/supabase/client";
 import { warmBuilderInvoicesHub } from "@/lib/builderInvoicesHubCache";
+import {
+  getCachedData,
+  UJENZI_BUILDER_PREFETCH_PROFILE_EVENT,
+} from "@/services/dataPrefetch";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import Footer from "@/components/Footer";
@@ -951,6 +955,23 @@ const ProfessionalBuilderDashboardPage = () => {
   }, [activeTab, refreshMonitoringRequests]);
 
   useEffect(() => {
+    const onPrefetchProfile = () => {
+      const uid = authUser?.id || getUserId();
+      if (!uid) return;
+      const seeded = getCachedData(`builder_profile_${uid}`) as { id?: string; user_id?: string } | null;
+      if (!seeded?.id || String(seeded.id) === String(uid)) return;
+      setProfile((prev) => {
+        if (prev?.id && String(prev.id) === String(seeded.id)) return prev;
+        if (!prev?.id) return seeded;
+        if (String(prev.id) === String(uid)) return { ...prev, ...seeded, user_id: seeded.user_id ?? uid };
+        return prev;
+      });
+    };
+    window.addEventListener(UJENZI_BUILDER_PREFETCH_PROFILE_EVENT, onPrefetchProfile);
+    return () => window.removeEventListener(UJENZI_BUILDER_PREFETCH_PROFILE_EVENT, onPrefetchProfile);
+  }, [authUser?.id]);
+
+  useEffect(() => {
     // Safety timeout - show UI after 2 seconds max
     const timeout = setTimeout(() => setLoading(false), 2000);
     checkAuth().finally(() => {
@@ -976,6 +997,11 @@ const ProfessionalBuilderDashboardPage = () => {
       // Set user object immediately
       const userObj = authUser || { id: userId, email: authUser?.email || 'user' };
       setUser(userObj);
+
+      const prefetchedProfile = getCachedData(`builder_profile_${userId}`) as { id?: string; user_id?: string } | null;
+      if (prefetchedProfile?.id && String(prefetchedProfile.id) !== String(userId)) {
+        setProfile(prefetchedProfile);
+      }
 
       // IMMEDIATELY start loading deliveries and stats in background (don't wait for profile)
       devLog('📋 Starting background data loads for:', userId);
@@ -1004,17 +1030,23 @@ const ProfessionalBuilderDashboardPage = () => {
       }
 
       if (!profileData) {
-        // Create a basic profile from auth data if profiles table fails
-        devLog('📋 Using fallback profile');
-        setProfile({
-          id: userId,
-          user_id: userId,
-          email: userObj.email,
-          full_name: userObj.user_metadata?.full_name || userObj.email?.split('@')[0] || 'Builder',
-          phone: userObj.user_metadata?.phone || '',
-          company_name: userObj.user_metadata?.company_name || '',
-          county: userObj.user_metadata?.county || '',
-        });
+        const cached = getCachedData(`builder_profile_${userId}`) as { id?: string; user_id?: string } | null;
+        const cachedId = cached?.id != null ? String(cached.id) : '';
+        if (cachedId && cachedId !== String(userId)) {
+          devLog('📋 Using prefetched profile row (DB profile query empty or failed)');
+          setProfile({ ...cached, user_id: cached.user_id ?? userId });
+        } else {
+          devLog('📋 Using fallback profile');
+          setProfile({
+            id: userId,
+            user_id: userId,
+            email: userObj.email,
+            full_name: userObj.user_metadata?.full_name || userObj.email?.split('@')[0] || 'Builder',
+            phone: userObj.user_metadata?.phone || '',
+            company_name: userObj.user_metadata?.company_name || '',
+            county: userObj.user_metadata?.county || '',
+          });
+        }
       } else {
         setProfile(profileData);
       }

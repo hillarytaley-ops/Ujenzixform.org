@@ -1,4 +1,9 @@
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from '@/integrations/supabase/client';
+import { warmBuilderInvoicesHub } from '@/lib/builderInvoicesHubCache';
+import { logger } from '@/utils/logger';
+
+/** Dashboard listens so `profile.id` matches hub cache key before slow `profiles` query finishes. */
+export const UJENZI_BUILDER_PREFETCH_PROFILE_EVENT = 'ujenzi-builder-prefetch-profile';
 /**
  * ╔══════════════════════════════════════════════════════════════════════════════════════╗
  * ║                                                                                      ║
@@ -31,7 +36,7 @@ export const getCachedData = (key: string): any | null => {
   // Check memory cache first (fastest)
   const memCached = memoryCache[key];
   if (memCached && Date.now() - memCached.timestamp < CACHE_EXPIRY_MS) {
-    console.log(`📦 Prefetch: Memory cache hit for ${key}`);
+    logger.debug(`Memory cache hit for ${key}`, undefined, 'Prefetch');
     return memCached.data;
   }
 
@@ -41,14 +46,14 @@ export const getCachedData = (key: string): any | null => {
     if (cached) {
       const parsed = JSON.parse(cached);
       if (Date.now() - parsed.timestamp < CACHE_EXPIRY_MS) {
-        console.log(`📦 Prefetch: localStorage cache hit for ${key}`);
+        logger.debug(`localStorage cache hit for ${key}`, undefined, 'Prefetch');
         // Also store in memory for faster subsequent access
         memoryCache[key] = { data: parsed.data, timestamp: parsed.timestamp };
         return parsed.data;
       }
     }
   } catch (e) {
-    console.warn('Prefetch cache read error:', e);
+    logger.warn('Prefetch cache read error', e, 'Prefetch');
   }
 
   return null;
@@ -71,7 +76,7 @@ const setCachedData = (key: string, data: any): void => {
       localStorage.setItem(`prefetch_${key}`, payload);
     }
   } catch (e) {
-    console.warn('Prefetch cache write error:', e);
+    logger.warn('Prefetch cache write error', e, 'Prefetch');
   }
 };
 
@@ -92,7 +97,7 @@ export const clearPrefetchCache = (): void => {
   }
   keysToRemove.forEach(key => localStorage.removeItem(key));
   
-  console.log('📦 Prefetch: Cache cleared');
+  logger.debug('Cache cleared', undefined, 'Prefetch');
 };
 
 /**
@@ -127,7 +132,7 @@ const fastFetch = async (url: string, accessToken: string, timeoutMs: number = 5
  * Prefetch supplier-specific data
  */
 const prefetchSupplierData = async (userId: string, accessToken: string): Promise<PrefetchResult> => {
-  console.log('📦 Prefetch: Starting supplier data prefetch...');
+  logger.debug('Starting supplier data prefetch…', undefined, 'Prefetch');
   const result: PrefetchResult = {};
   
   // First, get the supplier ID
@@ -144,7 +149,7 @@ const prefetchSupplierData = async (userId: string, accessToken: string): Promis
     if (suppliers && suppliers.length > 0) {
       supplierId = suppliers[0].id as string;
       localStorage.setItem('supplier_id', supplierId);
-      console.log('📦 Prefetch: Found supplier ID:', supplierId);
+      logger.debug(`Found supplier ID: ${supplierId}`, undefined, 'Prefetch');
     } else {
       // Try via profile
       const profiles = await fastFetch(
@@ -208,19 +213,19 @@ const prefetchSupplierData = async (userId: string, accessToken: string): Promis
   if (orders) {
     result.orders = orders;
     setCachedData(`supplier_orders_${supplierId}`, orders);
-    console.log('📦 Prefetch: Cached', orders.length, 'orders');
+    logger.debug(`Cached ${orders.length} orders`, undefined, 'Prefetch');
   }
   
   if (quotes) {
     result.quotes = quotes;
     setCachedData(`supplier_quotes_${supplierId}`, quotes);
-    console.log('📦 Prefetch: Cached', quotes.length, 'quotes');
+    logger.debug(`Cached ${quotes.length} quotes`, undefined, 'Prefetch');
   }
   
   if (products) {
     result.products = products;
     setCachedData(`supplier_products_${supplierId}`, products);
-    console.log('📦 Prefetch: Cached', products.length, 'products');
+    logger.debug(`Cached ${products.length} products`, undefined, 'Prefetch');
   }
   
   if (materialItems) {
@@ -264,8 +269,14 @@ const prefetchBuilderData = async (userId: string, accessToken: string): Promise
   if (profiles?.[0]) {
     result.profile = profiles[0];
     setCachedData(`builder_profile_${userId}`, profiles[0]);
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent(UJENZI_BUILDER_PREFETCH_PROFILE_EVENT, { detail: { userId } }));
+    }
   }
-  
+
+  // Same hub as Invoices DN/GRN/Invoice — warms during login prefetch so subtabs are not stuck on skeletons.
+  warmBuilderInvoicesHub(userId, profiles?.[0]?.id ?? undefined);
+
   // Prefetch data in parallel
   const [orders, projects, trackingNumbers] = await Promise.all([
     // Fetch orders
