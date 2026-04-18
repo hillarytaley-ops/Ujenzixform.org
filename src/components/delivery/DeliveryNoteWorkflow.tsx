@@ -189,7 +189,6 @@ export const DeliveryNoteWorkflow: React.FC<DeliveryNoteWorkflowProps> = ({
       }
       console.error('Error fetching delivery notes:', error);
       const code = error?.code as string | undefined;
-      const msg = String(error?.message || '');
       const timedOut = code === '57014' || /timeout/i.test(msg);
       toast({
         title: timedOut ? 'Delivery notes timed out' : 'Error',

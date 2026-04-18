@@ -247,7 +247,6 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
       }
       console.error('Error fetching invoices:', error);
       const code = error?.code as string | undefined;
-      const msg = String(error?.message || '');
       const timedOut = code === '57014' || /timeout/i.test(msg);
       toast({
         title: timedOut ? 'Invoices timed out' : 'Error',
