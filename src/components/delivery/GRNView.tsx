@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useLayoutEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -47,28 +47,30 @@ export const GRNView: React.FC<GRNViewProps> = ({ userId, userRole, hubCacheProf
     const raw = peekHubGrns(userId, hubCacheProfileId ?? undefined);
     return (raw as GRN[]) ?? [];
   });
-  const [loading, setLoading] = useState(() => {
-    if (userRole !== 'builder') return true;
-    return peekHubGrns(userId, hubCacheProfileId ?? undefined) === null;
+  const [listReady, setListReady] = useState(() => {
+    if (userRole !== 'builder') return false;
+    return peekHubGrns(userId, hubCacheProfileId ?? undefined) !== null;
   });
+  const [supplierLoading, setSupplierLoading] = useState(() => userRole !== 'builder');
+  const [refreshing, setRefreshing] = useState(false);
   const { toast } = useToast();
 
   const fetchGRNs = async (opts?: { silent?: boolean }) => {
     const silent = opts?.silent === true;
+    const isBuilder = userRole === 'builder';
     try {
-      if (!silent) {
-        if (userRole === 'builder') {
-          const hit = peekHubGrns(userId, hubCacheProfileId ?? undefined);
-          if (hit !== null) {
-            setGRNs(hit as GRN[]);
-            setLoading(false);
-            return;
-          }
+      if (isBuilder && silent) setRefreshing(true);
+      if (!silent && isBuilder) {
+        const hit = peekHubGrns(userId, hubCacheProfileId ?? undefined);
+        if (hit !== null) {
+          setGRNs(hit as GRN[]);
+          setListReady(true);
+          return;
         }
-        setLoading(true);
       }
+      if (!silent && !isBuilder) setSupplierLoading(true);
 
-      if (userRole === 'builder') {
+      if (isBuilder) {
         const sorted = (await fetchBuilderHubGrns(userId)) as GRN[];
         setGRNs(sorted);
         patchHubGrns(userId, hubCacheProfileId ?? undefined, sorted);
@@ -112,9 +114,24 @@ export const GRNView: React.FC<GRNViewProps> = ({ userId, userRole, hubCacheProf
         variant: "destructive",
       });
     } finally {
-      if (!silent) setLoading(false);
+      if (isBuilder) {
+        if (silent) setRefreshing(false);
+        setListReady(true);
+      } else {
+        setSupplierLoading(false);
+        setListReady(true);
+      }
     }
   };
+
+  useLayoutEffect(() => {
+    if (userRole !== 'builder') return;
+    const hit = peekHubGrns(userId, hubCacheProfileId ?? undefined);
+    if (hit !== null) {
+      setGRNs(hit as GRN[]);
+      setListReady(true);
+    }
+  }, [userId, userRole, hubCacheProfileId]);
 
   useEffect(() => {
     if (userRole !== 'builder') return;
@@ -122,7 +139,7 @@ export const GRNView: React.FC<GRNViewProps> = ({ userId, userRole, hubCacheProf
       const raw = peekHubGrns(userId, hubCacheProfileId ?? undefined);
       if (raw === null) return;
       setGRNs((raw as GRN[]) ?? []);
-      setLoading(false);
+      setListReady(true);
     });
   }, [userId, userRole, hubCacheProfileId]);
 
@@ -169,7 +186,7 @@ export const GRNView: React.FC<GRNViewProps> = ({ userId, userRole, hubCacheProf
     }
   };
 
-  const showInitialLoad = loading && grns.length === 0;
+  const supplierBlocking = userRole !== 'builder' && supplierLoading && grns.length === 0;
 
   return (
     <div className="space-y-4">
@@ -178,14 +195,26 @@ export const GRNView: React.FC<GRNViewProps> = ({ userId, userRole, hubCacheProf
         <Button
           variant="outline"
           size="sm"
-          disabled={loading}
+          disabled={
+            userRole === 'builder' ? refreshing && grns.length > 0 : supplierLoading
+          }
           onClick={() => void fetchGRNs({ silent: true })}
         >
-          {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Refresh'}
+          {userRole === 'builder' ? (
+            refreshing && grns.length > 0 ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              'Refresh'
+            )
+          ) : supplierLoading ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            'Refresh'
+          )}
         </Button>
       </div>
 
-      {showInitialLoad && (
+      {supplierBlocking && (
         <div
           className="flex items-center gap-2 rounded-md border border-dashed bg-muted/30 px-3 py-4 text-sm text-muted-foreground"
           aria-busy="true"
@@ -196,7 +225,7 @@ export const GRNView: React.FC<GRNViewProps> = ({ userId, userRole, hubCacheProf
         </div>
       )}
 
-      {!showInitialLoad && grns.length === 0 && (
+      {listReady && grns.length === 0 && (
         <Card>
           <CardContent className="py-12 text-center">
             <Package className="h-12 w-12 mx-auto mb-4 text-gray-400" />
@@ -205,8 +234,7 @@ export const GRNView: React.FC<GRNViewProps> = ({ userId, userRole, hubCacheProf
         </Card>
       )}
 
-      {!showInitialLoad &&
-        grns.length > 0 &&
+      {grns.length > 0 &&
         grns.map((grn) => (
         <Card key={grn.id}>
           <CardHeader>

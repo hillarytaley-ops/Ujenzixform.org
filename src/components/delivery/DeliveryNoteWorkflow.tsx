@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -127,9 +127,12 @@ export const DeliveryNoteWorkflow: React.FC<DeliveryNoteWorkflowProps> = ({
     return (raw as DeliveryNote[]) ?? [];
   });
   const [selectedDN, setSelectedDN] = useState<DeliveryNote | null>(null);
-  const [loading, setLoading] = useState(
-    () => peekHubDeliveryNotes(builderAuthUserId, builderProfileId ?? undefined) === null
+  /** True after hub cache hit or first fetch finished — avoids "No items" flash before data arrives. */
+  const [listReady, setListReady] = useState(
+    () => peekHubDeliveryNotes(builderAuthUserId, builderProfileId ?? undefined) !== null
   );
+  /** Only while user tapped Refresh (never blocks first paint). */
+  const [refreshing, setRefreshing] = useState(false);
   const [signing, setSigning] = useState(false);
   const [inspecting, setInspecting] = useState(false);
   const [showSignatureDialog, setShowSignatureDialog] = useState(false);
@@ -138,21 +141,20 @@ export const DeliveryNoteWorkflow: React.FC<DeliveryNoteWorkflowProps> = ({
   const [inspectionNotes, setInspectionNotes] = useState('');
   const [rejectionReason, setRejectionReason] = useState('');
   const { toast } = useToast();
-  /** First fetch shows skeleton; later runs (e.g. profile id resolved) refresh without blanking the panel. */
   const dnFetchGenerationRef = useRef(0);
 
   // Single network path shared with dashboard prefetch (see builderInvoicesHubCache).
   const fetchDeliveryNotes = async (opts?: { silent?: boolean }) => {
     const silent = opts?.silent === true;
     try {
+      if (silent) setRefreshing(true);
       if (!silent) {
         const hit = peekHubDeliveryNotes(builderAuthUserId, builderProfileId ?? undefined);
         if (hit !== null) {
           setDeliveryNotes(hit as DeliveryNote[]);
-          setLoading(false);
+          setListReady(true);
           return;
         }
-        setLoading(true);
       }
       const builderIds = uniqueBuilderIds(
         builderAuthUserId,
@@ -183,16 +185,26 @@ export const DeliveryNoteWorkflow: React.FC<DeliveryNoteWorkflowProps> = ({
         variant: 'destructive',
       });
     } finally {
-      if (!silent) setLoading(false);
+      if (silent) setRefreshing(false);
+      setListReady(true);
     }
   };
+
+  useLayoutEffect(() => {
+    if (!(builderAuthUserId || builderProfileId)) return;
+    const hit = peekHubDeliveryNotes(builderAuthUserId, builderProfileId ?? undefined);
+    if (hit !== null) {
+      setDeliveryNotes(hit as DeliveryNote[]);
+      setListReady(true);
+    }
+  }, [builderAuthUserId, builderProfileId]);
 
   useEffect(() => {
     return subscribeBuilderHubCache(() => {
       const raw = peekHubDeliveryNotes(builderAuthUserId, builderProfileId ?? undefined);
       if (raw === null) return;
       setDeliveryNotes((raw as DeliveryNote[]) ?? []);
-      setLoading(false);
+      setListReady(true);
     });
   }, [builderAuthUserId, builderProfileId]);
 
@@ -203,7 +215,7 @@ export const DeliveryNoteWorkflow: React.FC<DeliveryNoteWorkflowProps> = ({
   useEffect(() => {
     if (!(builderAuthUserId || builderProfileId)) {
       setDeliveryNotes([]);
-      setLoading(false);
+      setListReady(true);
       return;
     }
     const silent = dnFetchGenerationRef.current > 0;
@@ -405,8 +417,6 @@ export const DeliveryNoteWorkflow: React.FC<DeliveryNoteWorkflowProps> = ({
     return <Badge variant={statusInfo.variant}>{statusInfo.label}</Badge>;
   };
 
-  const showInitialLoad = loading && deliveryNotes.length === 0;
-
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -417,10 +427,10 @@ export const DeliveryNoteWorkflow: React.FC<DeliveryNoteWorkflowProps> = ({
         <Button
           variant="outline"
           size="sm"
-          disabled={loading && deliveryNotes.length > 0}
+          disabled={refreshing && deliveryNotes.length > 0}
           onClick={() => void fetchDeliveryNotes({ silent: true })}
         >
-          {loading && deliveryNotes.length > 0 ? (
+          {refreshing && deliveryNotes.length > 0 ? (
             <Loader2 className="h-4 w-4 animate-spin" />
           ) : (
             'Refresh'
@@ -428,18 +438,7 @@ export const DeliveryNoteWorkflow: React.FC<DeliveryNoteWorkflowProps> = ({
         </Button>
       </div>
 
-      {showInitialLoad && (
-        <div
-          className="flex items-center gap-2 rounded-md border border-dashed bg-muted/30 px-3 py-4 text-sm text-muted-foreground"
-          aria-busy="true"
-          aria-label="Loading delivery notes"
-        >
-          <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
-          <span>Loading delivery notes…</span>
-        </div>
-      )}
-
-      {!showInitialLoad && deliveryNotes.length === 0 && (
+      {listReady && deliveryNotes.length === 0 && (
         <Card>
           <CardContent className="py-12 text-center">
             <Package className="h-12 w-12 mx-auto mb-4 text-gray-400" />
@@ -448,8 +447,7 @@ export const DeliveryNoteWorkflow: React.FC<DeliveryNoteWorkflowProps> = ({
         </Card>
       )}
 
-      {!showInitialLoad &&
-        deliveryNotes.length > 0 &&
+      {deliveryNotes.length > 0 &&
         deliveryNotes.map((dn) => (
         <Card key={dn.id}>
           <CardHeader>

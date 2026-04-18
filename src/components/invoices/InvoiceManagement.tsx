@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -84,10 +84,12 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
     const raw = peekHubInvoices(userId, builderProfileId ?? undefined);
     return (raw as Invoice[]) ?? [];
   });
-  const [loading, setLoading] = useState(() => {
-    if (userRole !== 'builder') return true;
-    return peekHubInvoices(userId, builderProfileId ?? undefined) === null;
+  const [listReady, setListReady] = useState(() => {
+    if (userRole !== 'builder') return false;
+    return peekHubInvoices(userId, builderProfileId ?? undefined) !== null;
   });
+  const [loading, setLoading] = useState(() => userRole !== 'builder');
+  const [refreshing, setRefreshing] = useState(false);
   const [editingInvoice, setEditingInvoice] = useState<Invoice | null>(null);
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -106,13 +108,22 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
   /** First fetch per user shows skeleton; later fetches (e.g. profile id resolved) refresh without blanking. */
   const invoiceFetchGenerationRef = useRef(0);
 
+  useLayoutEffect(() => {
+    if (userRole !== 'builder') return;
+    const hit = peekHubInvoices(userId, builderProfileId ?? undefined);
+    if (hit !== null) {
+      setInvoices(hit as Invoice[]);
+      setListReady(true);
+    }
+  }, [userRole, userId, builderProfileId]);
+
   useEffect(() => {
     if (userRole !== 'builder') return;
     return subscribeBuilderHubCache(() => {
       const raw = peekHubInvoices(userId, builderProfileId ?? undefined);
       if (raw === null) return;
       setInvoices((raw as Invoice[]) ?? []);
-      setLoading(false);
+      setListReady(true);
     });
   }, [userRole, userId, builderProfileId]);
 
@@ -127,17 +138,16 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
   const fetchInvoices = async (opts?: { silent?: boolean }) => {
     const silent = opts?.silent === true;
     try {
-      if (!silent) {
-        if (userRole === 'builder') {
-          const hit = peekHubInvoices(userId, builderProfileId ?? undefined);
-          if (hit !== null) {
-            setInvoices(hit as Invoice[]);
-            setLoading(false);
-            return;
-          }
+      if (userRole === 'builder' && silent) setRefreshing(true);
+      if (!silent && userRole === 'builder') {
+        const hit = peekHubInvoices(userId, builderProfileId ?? undefined);
+        if (hit !== null) {
+          setInvoices(hit as Invoice[]);
+          setListReady(true);
+          return;
         }
-        setLoading(true);
       }
+      if (!silent && userRole !== 'builder') setLoading(true);
 
       const invoiceSelect = `
           *,
@@ -230,7 +240,13 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
         variant: 'destructive',
       });
     } finally {
-      if (!silent) setLoading(false);
+      if (userRole === 'builder') {
+        if (silent) setRefreshing(false);
+        setListReady(true);
+      } else {
+        setLoading(false);
+        setListReady(true);
+      }
     }
   };
 
@@ -434,7 +450,7 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
 
   /** Deep link: ?tab=invoices&payInvoice=<uuid> (e.g. from Orders row). */
   useEffect(() => {
-    if (userRole !== 'builder' || loading) return;
+    if (userRole !== 'builder' || !listReady) return;
     const invId = searchParams.get('payInvoice');
     if (!invId) {
       payInvoiceUrlHandledRef.current = null;
@@ -455,7 +471,7 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
     );
     void handlePayNowClick(match);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- one-shot deep link; handler identity changes each render
-  }, [userRole, loading, invoices, searchParams, setSearchParams]);
+  }, [userRole, listReady, invoices, searchParams, setSearchParams]);
 
   const handleRecordPayment = async () => {
     if (!payInvoice) return;
@@ -522,7 +538,7 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
     );
   };
 
-  const showInitialLoad = loading && invoices.length === 0;
+  const supplierBlockingLoad = userRole !== 'builder' && loading && invoices.length === 0;
 
   return (
     <div className="space-y-4">
@@ -531,14 +547,26 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
         <Button
           variant="outline"
           size="sm"
-          disabled={loading && invoices.length > 0}
+          disabled={
+            userRole === 'builder' ? refreshing && invoices.length > 0 : loading && invoices.length > 0
+          }
           onClick={() => void fetchInvoices({ silent: true })}
         >
-          {loading && invoices.length > 0 ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Refresh'}
+          {userRole === 'builder' ? (
+            refreshing && invoices.length > 0 ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              'Refresh'
+            )
+          ) : loading && invoices.length > 0 ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            'Refresh'
+          )}
         </Button>
       </div>
 
-      {showInitialLoad && (
+      {supplierBlockingLoad && (
         <div
           className="flex items-center gap-2 rounded-md border border-dashed bg-muted/30 px-3 py-4 text-sm text-muted-foreground"
           aria-busy="true"
@@ -549,7 +577,7 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
         </div>
       )}
 
-      {!showInitialLoad && (
+      {(userRole === 'builder' || !supplierBlockingLoad) && (
         <>
           {userRole === 'builder' &&
             (builderPayPrompt.needAcknowledge.length > 0 ||
@@ -580,7 +608,7 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
               </Alert>
             )}
 
-          {invoices.length === 0 ? (
+          {listReady && invoices.length === 0 ? (
             <Card>
               <CardContent className="py-10 text-center text-muted-foreground text-sm">
                 No invoices yet.
