@@ -20,6 +20,17 @@ import { sortSupplyChainDocsNewestFirst } from '@/utils/sortSupplyChainDocs';
 /** Cap rows returned — avoids huge payloads and keeps queries within DB statement limits. */
 const DN_WORKFLOW_LIST_LIMIT = 500;
 
+const DN_ACTIVE_STATUSES = [
+  'pending_signature',
+  'signed',
+  'forwarded_to_supplier',
+  'inspection_pending',
+] as const;
+
+/** Omit `builder_signature` (often large) — list view does not render it; signing uses canvas + refetch. */
+const DN_LIST_SELECT =
+  'id,dn_number,purchase_order_id,builder_id,supplier_id,delivery_address,delivery_date,items,status,builder_signed_at,inspection_verified,builder_decision,rejection_reason,created_at,updated_at';
+
 interface DeliveryNote {
   id: string;
   dn_number: string;
@@ -143,16 +154,46 @@ export const DeliveryNoteWorkflow: React.FC<DeliveryNoteWorkflowProps> = ({
         return;
       }
 
-      const { data: rows, error } = await supabase
-        .from('delivery_notes')
-        .select('*')
-        .in('builder_id', builderIds)
-        .in('status', ['pending_signature', 'signed', 'forwarded_to_supplier', 'inspection_pending'])
-        .order('created_at', { ascending: false })
-        .limit(DN_WORKFLOW_LIST_LIMIT);
+      const statuses = [...DN_ACTIVE_STATUSES];
+      let list: Record<string, unknown>[] = [];
 
-      if (error) throw error;
-      const list = rows || [];
+      if (builderIds.length === 1) {
+        const { data: rows, error } = await supabase
+          .from('delivery_notes')
+          .select(DN_LIST_SELECT)
+          .eq('builder_id', builderIds[0])
+          .in('status', statuses)
+          .order('created_at', { ascending: false })
+          .limit(DN_WORKFLOW_LIST_LIMIT);
+        if (error) throw error;
+        list = (rows || []) as Record<string, unknown>[];
+      } else {
+        const perBuilder = Math.max(50, Math.ceil(DN_WORKFLOW_LIST_LIMIT / builderIds.length));
+        const parts = await Promise.all(
+          builderIds.map((bid) =>
+            supabase
+              .from('delivery_notes')
+              .select(DN_LIST_SELECT)
+              .eq('builder_id', bid)
+              .in('status', statuses)
+              .order('created_at', { ascending: false })
+              .limit(perBuilder)
+          )
+        );
+        const firstErr = parts.find((p) => p.error)?.error;
+        if (firstErr) throw firstErr;
+        const merged = new Map<string, Record<string, unknown>>();
+        for (const p of parts) {
+          for (const row of (p.data || []) as Record<string, unknown>[]) {
+            const id = row.id as string;
+            if (id) merged.set(id, row);
+          }
+        }
+        list = sortSupplyChainDocsNewestFirst([...merged.values()]) as Record<string, unknown>[];
+        if (list.length > DN_WORKFLOW_LIST_LIMIT) {
+          list = list.slice(0, DN_WORKFLOW_LIST_LIMIT);
+        }
+      }
       if (list.length === 0) {
         setDeliveryNotes([]);
         return;
@@ -176,7 +217,7 @@ export const DeliveryNoteWorkflow: React.FC<DeliveryNoteWorkflowProps> = ({
       const poById = Object.fromEntries((poRes.data || []).map((p) => [p.id, p]));
       const supById = Object.fromEntries((supRes.data || []).map((s) => [s.id, s]));
 
-      const enriched: DeliveryNote[] = list.map((r: any) => {
+      const enriched: DeliveryNote[] = (list as any[]).map((r: any) => {
         const po = poById[r.purchase_order_id];
         const sup = supById[r.supplier_id];
         return {
@@ -425,10 +466,14 @@ export const DeliveryNoteWorkflow: React.FC<DeliveryNoteWorkflowProps> = ({
         <Button
           variant="outline"
           size="sm"
-          disabled={loading}
+          disabled={loading && deliveryNotes.length > 0}
           onClick={() => void fetchDeliveryNotes({ silent: true })}
         >
-          {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Refresh'}
+          {loading && deliveryNotes.length > 0 ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            'Refresh'
+          )}
         </Button>
       </div>
 

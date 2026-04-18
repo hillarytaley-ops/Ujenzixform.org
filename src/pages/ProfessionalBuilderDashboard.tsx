@@ -3,7 +3,7 @@ import {
   readAccessTokenSyncBestEffort,
   readPersistedAuthRawStringSync,
 } from '@/utils/supabaseAccessToken';
-import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import React, { useState, useEffect, useLayoutEffect, useCallback, useMemo, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -1984,7 +1984,7 @@ const ProfessionalBuilderDashboardPage = () => {
   }, [searchParams, activeTab]);
 
   /** Keep DN / GRN / Invoice subtree mounted after first visit so sub-tab switches stay instant. */
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (activeTab === 'invoices') setInvoicesHubWarm(true);
   }, [activeTab]);
 

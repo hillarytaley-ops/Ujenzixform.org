@@ -145,7 +145,10 @@ export function ProfessionalBuilderDashboardNavCards({
         }`}
         onPointerEnter={() => onInvoicesWarm?.()}
         onFocus={() => onInvoicesWarm?.()}
-        onClick={() => setActiveTab("invoices")}
+        onClick={() => {
+          onInvoicesWarm?.();
+          setActiveTab("invoices");
+        }}
       >
         <FileText className="h-5 w-5 shrink-0" aria-hidden />
         <span className={navLabelClass}>Invoices</span>
