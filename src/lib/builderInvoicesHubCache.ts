@@ -12,6 +12,9 @@ const TTL_MS = 90_000;
 /** Client-side cap so DN / GRN / invoice hub subtabs never spin forever if PostgREST hangs. */
 export const BUILDER_HUB_LIST_FETCH_TIMEOUT_MS = 45_000;
 
+/** Supplier hub runs RPC + profiles + signatures + PO chunks — needs a higher wall clock than builder single-flight. */
+export const SUPPLIER_DOC_LIST_FETCH_TIMEOUT_MS = 120_000;
+
 export function builderHubListFetchWithTimeout<T>(
   promise: Promise<T>,
   timeoutToken: string,

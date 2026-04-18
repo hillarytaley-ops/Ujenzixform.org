@@ -21,7 +21,7 @@ import { sortSupplyChainDocsNewestFirst } from '@/utils/sortSupplyChainDocs';
 import { chunkArray } from '@/utils/performance';
 import {
   builderHubListFetchWithTimeout,
-  BUILDER_HUB_LIST_FETCH_TIMEOUT_MS,
+  SUPPLIER_DOC_LIST_FETCH_TIMEOUT_MS,
 } from '@/lib/builderInvoicesHubCache';
 
 const SUPPLIER_HUB_IN_CHUNK = 80;
@@ -184,11 +184,16 @@ export const SupplierInvoiceHub: React.FC<SupplierInvoiceHubProps> = ({
               if (p.id) labelMap[p.id] = label;
               if (p.user_id) labelMap[p.user_id] = label;
             };
-            for (const chunk of chunkArray(builderKeys, SUPPLIER_HUB_IN_CHUNK)) {
-              const [byId, byUser] = await Promise.all([
-                supabase.from('profiles').select('id, user_id, full_name, company_name').in('id', chunk),
-                supabase.from('profiles').select('id, user_id, full_name, company_name').in('user_id', chunk),
-              ]);
+            const profileChunks = chunkArray(builderKeys, SUPPLIER_HUB_IN_CHUNK);
+            const profileResults = await Promise.all(
+              profileChunks.map((chunk) =>
+                Promise.all([
+                  supabase.from('profiles').select('id, user_id, full_name, company_name').in('id', chunk),
+                  supabase.from('profiles').select('id, user_id, full_name, company_name').in('user_id', chunk),
+                ])
+              )
+            );
+            for (const [byId, byUser] of profileResults) {
               if (byId.error) throw byId.error;
               if (byUser.error) throw byUser.error;
               (byId.data || []).forEach(add);
@@ -200,12 +205,17 @@ export const SupplierInvoiceHub: React.FC<SupplierInvoiceHubProps> = ({
           const dnIds = [...new Set(list.map((r: any) => r.id).filter(Boolean))];
           let sigByDnId: Record<string, { signature: string; signedAt: string }> = {};
           if (dnIds.length > 0) {
-            for (const chunk of chunkArray(dnIds, SUPPLIER_HUB_IN_CHUNK)) {
-              const { data: sigRows, error: sigErr } = await supabase
-                .from('delivery_note_signatures')
-                .select('delivery_note_id, signature_data, signed_at')
-                .in('delivery_note_id', chunk)
-                .order('signed_at', { ascending: false });
+            const sigChunks = chunkArray(dnIds, SUPPLIER_HUB_IN_CHUNK);
+            const sigResults = await Promise.all(
+              sigChunks.map((chunk) =>
+                supabase
+                  .from('delivery_note_signatures')
+                  .select('delivery_note_id, signature_data, signed_at')
+                  .in('delivery_note_id', chunk)
+                  .order('signed_at', { ascending: false })
+              )
+            );
+            for (const { data: sigRows, error: sigErr } of sigResults) {
               if (sigErr) throw sigErr;
               if (sigRows) {
                 for (const r of sigRows) {
@@ -227,24 +237,23 @@ export const SupplierInvoiceHub: React.FC<SupplierInvoiceHubProps> = ({
             setPoItemsById({});
             return;
           }
-          const poRows: { id: string; po_number?: string; items?: unknown }[] = [];
-          for (const chunk of chunkArray(poIds, SUPPLIER_HUB_IN_CHUNK)) {
-            const { data: pos, error: poErr } = await supabase
-              .from('purchase_orders')
-              .select('id, po_number, items')
-              .in('id', chunk);
-            if (poErr) throw poErr;
-            if (pos?.length) poRows.push(...(pos as typeof poRows));
-          }
-          setPoById(Object.fromEntries(poRows.map((p: any) => [p.id, p.po_number || '—'])));
-          setPoItemsById(
-            Object.fromEntries(
-              poRows.map((p: any) => [p.id, Array.isArray(p.items) ? p.items : []])
+          // Omit `items` here — large JSONB per PO often pushes multi-chunk loads past short wall timeouts; fetch on PDF open.
+          const poChunks = chunkArray(poIds, SUPPLIER_HUB_IN_CHUNK);
+          const poChunkResults = await Promise.all(
+            poChunks.map((chunk) =>
+              supabase.from('purchase_orders').select('id, po_number').in('id', chunk)
             )
           );
+          const poRows: { id: string; po_number?: string }[] = [];
+          for (const r of poChunkResults) {
+            if (r.error) throw r.error;
+            if (r.data?.length) poRows.push(...(r.data as typeof poRows));
+          }
+          setPoById(Object.fromEntries(poRows.map((p: any) => [p.id, p.po_number || '—'])));
+          setPoItemsById({});
         })(),
         'supplier_dn_list_timeout',
-        BUILDER_HUB_LIST_FETCH_TIMEOUT_MS
+        SUPPLIER_DOC_LIST_FETCH_TIMEOUT_MS
       );
     } catch (e: any) {
       console.error('Supplier DN fetch:', e);
@@ -289,10 +298,23 @@ export const SupplierInvoiceHub: React.FC<SupplierInvoiceHubProps> = ({
       });
   }, [supplierRecordId]);
 
-  const printDeliveryNotePdf = (dn: Record<string, unknown>) => {
+  const printDeliveryNotePdf = async (dn: Record<string, unknown>) => {
     const poId = String(dn.purchase_order_id || '');
     const builderKey = dn.builder_id != null ? String(dn.builder_id) : '';
     const dnId = String(dn.id || '');
+    let lineItems: unknown[] | undefined =
+      poId && Array.isArray(poItemsById[poId]) ? (poItemsById[poId] as unknown[]) : undefined;
+    if (poId && lineItems === undefined) {
+      const { data, error } = await supabase
+        .from('purchase_orders')
+        .select('items')
+        .eq('id', poId)
+        .maybeSingle();
+      if (!error && data && Array.isArray((data as { items?: unknown }).items)) {
+        lineItems = (data as { items: unknown[] }).items;
+        setPoItemsById((prev) => ({ ...prev, [poId]: lineItems! }));
+      }
+    }
     const altSig = dnId ? signatureFallbackByDnId[dnId] : undefined;
     const hasColSig =
       typeof dn.builder_signature === 'string' && dn.builder_signature.trim().length > 0;
@@ -307,7 +329,7 @@ export const SupplierInvoiceHub: React.FC<SupplierInvoiceHubProps> = ({
         poNumber: poById[poId] || undefined,
         supplierName: supplierCompanyName || undefined,
         builderDisplayName: builderKey ? builderLabelByKey[builderKey] : undefined,
-        purchaseOrderItems: poId ? poItemsById[poId] : undefined,
+        purchaseOrderItems: lineItems,
       },
       {
         onPopUpBlocked: () =>
@@ -421,7 +443,7 @@ export const SupplierInvoiceHub: React.FC<SupplierInvoiceHubProps> = ({
           setGrns(sortSupplyChainDocsNewestFirst(rows as Record<string, unknown>[]) as any[]);
         })(),
         'supplier_grn_list_timeout',
-        BUILDER_HUB_LIST_FETCH_TIMEOUT_MS
+        SUPPLIER_DOC_LIST_FETCH_TIMEOUT_MS
       );
     } catch (e: any) {
       console.error('Supplier GRN fetch:', e);
@@ -694,7 +716,7 @@ export const SupplierInvoiceHub: React.FC<SupplierInvoiceHubProps> = ({
                                           variant="outline"
                                           size="sm"
                                           className="h-8"
-                                          onClick={() => printDeliveryNotePdf(dn as Record<string, unknown>)}
+                                          onClick={() => void printDeliveryNotePdf(dn as Record<string, unknown>)}
                                         >
                                           <FileText className="mr-1 h-3.5 w-3.5" />
                                           PDF

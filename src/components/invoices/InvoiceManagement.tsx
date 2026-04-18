@@ -36,6 +36,7 @@ import {
   patchHubInvoices,
   peekHubInvoices,
   subscribeBuilderHubCache,
+  SUPPLIER_DOC_LIST_FETCH_TIMEOUT_MS,
 } from '@/lib/builderInvoicesHubCache';
 
 interface Invoice {
@@ -198,15 +199,25 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
 
             const poIds = [...new Set(base.map((i) => i.purchase_order_id).filter(Boolean))];
             const supIds = [...new Set(base.map((i) => i.supplier_id).filter(Boolean))];
+            const [poChunkRows, supChunkRows] = await Promise.all([
+              Promise.all(
+                chunkArray(poIds, 80).map((chunk) =>
+                  supabase.from('purchase_orders').select('id, po_number').in('id', chunk)
+                )
+              ),
+              Promise.all(
+                chunkArray(supIds, 80).map((chunk) =>
+                  supabase.from('suppliers').select('id, company_name').in('id', chunk)
+                )
+              ),
+            ]);
             const poMerged: { id: string; po_number?: string }[] = [];
-            for (const chunk of chunkArray(poIds, 80)) {
-              const poRes = await supabase.from('purchase_orders').select('id, po_number').in('id', chunk);
+            for (const poRes of poChunkRows) {
               if (poRes.error) throw poRes.error;
               if (poRes.data?.length) poMerged.push(...poRes.data);
             }
             const supMerged: { id: string; company_name?: string }[] = [];
-            for (const chunk of chunkArray(supIds, 80)) {
-              const supRes = await supabase.from('suppliers').select('id, company_name').in('id', chunk);
+            for (const supRes of supChunkRows) {
               if (supRes.error) throw supRes.error;
               if (supRes.data?.length) supMerged.push(...supRes.data);
             }
@@ -225,7 +236,8 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
               sortSupplyChainDocsNewestFirst(enriched as unknown as Record<string, unknown>[]) as Invoice[]
             );
           })(),
-          'supplier_invoice_list_timeout'
+          'supplier_invoice_list_timeout',
+          SUPPLIER_DOC_LIST_FETCH_TIMEOUT_MS
         );
         return;
       }
