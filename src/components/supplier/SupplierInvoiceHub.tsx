@@ -12,7 +12,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { FileText, Package, Receipt, Loader2, Eye, Download } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase, isAbortLikeSupabaseError } from '@/integrations/supabase/client';
 import { InvoiceManagement } from '@/components/invoices/InvoiceManagement';
 import { useToast } from '@/hooks/use-toast';
 import { openDeliveryNotePdfWindow } from '@/utils/deliveryNoteDocument';
@@ -127,9 +127,15 @@ export const SupplierInvoiceHub: React.FC<SupplierInvoiceHubProps> = ({
     try {
       await builderHubListFetchWithTimeout(
         (async () => {
-          const rpc = await supabase.rpc('list_delivery_notes_for_supplier', {
+          let rpc = await supabase.rpc('list_delivery_notes_for_supplier', {
             p_supplier_id: supplierRecordId,
           });
+          if (rpc.error && isAbortLikeSupabaseError(rpc.error)) {
+            await new Promise((r) => setTimeout(r, 200));
+            rpc = await supabase.rpc('list_delivery_notes_for_supplier', {
+              p_supplier_id: supplierRecordId,
+            });
+          }
           let list: any[] = [];
           if (!rpc.error && Array.isArray(rpc.data)) {
             list = rpc.data;
@@ -147,10 +153,12 @@ export const SupplierInvoiceHub: React.FC<SupplierInvoiceHubProps> = ({
                   variant: 'destructive',
                 });
               }
-              console.warn(
-                'list_delivery_notes_for_supplier RPC unavailable, using direct select:',
-                rpc.error.message
-              );
+              if (!isAbortLikeSupabaseError(rpc.error)) {
+                console.warn(
+                  'list_delivery_notes_for_supplier RPC unavailable, using direct select:',
+                  rpc.error.message
+                );
+              }
             }
             const { data: rows, error } = await supabase
               .from('delivery_notes')
@@ -368,9 +376,15 @@ export const SupplierInvoiceHub: React.FC<SupplierInvoiceHubProps> = ({
     try {
       await builderHubListFetchWithTimeout(
         (async () => {
-          const rpc = await supabase.rpc('list_goods_received_notes_for_supplier', {
+          let rpc = await supabase.rpc('list_goods_received_notes_for_supplier', {
             p_supplier_id: supplierRecordId,
           });
+          if (rpc.error && isAbortLikeSupabaseError(rpc.error)) {
+            await new Promise((r) => setTimeout(r, 200));
+            rpc = await supabase.rpc('list_goods_received_notes_for_supplier', {
+              p_supplier_id: supplierRecordId,
+            });
+          }
           let rows: any[] = [];
           if (!rpc.error && Array.isArray(rpc.data)) {
             rows = rpc.data;
@@ -388,10 +402,12 @@ export const SupplierInvoiceHub: React.FC<SupplierInvoiceHubProps> = ({
                   variant: 'destructive',
                 });
               }
-              console.warn(
-                'list_goods_received_notes_for_supplier RPC unavailable, using direct select:',
-                rpc.error.message
-              );
+              if (!isAbortLikeSupabaseError(rpc.error)) {
+                console.warn(
+                  'list_goods_received_notes_for_supplier RPC unavailable, using direct select:',
+                  rpc.error.message
+                );
+              }
             }
             const { data, error } = await supabase
               .from('goods_received_notes')

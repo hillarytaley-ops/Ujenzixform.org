@@ -77,6 +77,23 @@ function resolveAuthStorage(): Storage {
 
 const authStorage = resolveAuthStorage();
 
+/** True when PostgREST / Supabase-js returned an abort (global fetch timeout, navigation, or auth churn). */
+export function isAbortLikeSupabaseError(err: unknown): boolean {
+  if (err == null || typeof err !== 'object') return false;
+  const e = err as { name?: string; message?: string };
+  return e.name === 'AbortError' || /aborted|signal is aborted/i.test(String(e.message || ''));
+}
+
+/** Upper bound for PostgREST / RPC calls (RLS-heavy lists can exceed 15s). Override with VITE_SUPABASE_FETCH_TIMEOUT_MS. */
+function resolveSupabaseGlobalFetchTimeoutMs(): number {
+  const raw = (import.meta.env.VITE_SUPABASE_FETCH_TIMEOUT_MS as string | undefined)?.trim();
+  if (raw) {
+    const n = parseInt(raw, 10);
+    if (Number.isFinite(n) && n >= 5_000) return Math.min(n, 300_000);
+  }
+  return 90_000;
+}
+
 // Import the supabase client like this:
 // import { supabase } from "@/integrations/supabase/client";
 
@@ -88,18 +105,38 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
     detectSessionInUrl: true,
     flowType: 'pkce'
   },
-  // Add global fetch options to prevent hanging
+  // Bounded fetch time + honor Supabase's own AbortSignal (session refresh / dedup) instead of replacing it.
   global: {
-    fetch: (url, options) => {
-      // Add timeout to all fetch requests
+    fetch: (url, options?: RequestInit) => {
+      const timeoutMs = resolveSupabaseGlobalFetchTimeoutMs();
+      const parentSignal = options?.signal;
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
-      
+      const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+      const onParentAbort = () => {
+        clearTimeout(timeoutId);
+        controller.abort();
+      };
+
+      if (parentSignal) {
+        if (parentSignal.aborted) {
+          clearTimeout(timeoutId);
+          const reason = parentSignal.reason;
+          return Promise.reject(
+            reason instanceof Error ? reason : new DOMException('The operation was aborted', 'AbortError')
+          );
+        }
+        parentSignal.addEventListener('abort', onParentAbort, { once: true });
+      }
+
       return fetch(url, {
         ...options,
-        signal: controller.signal
-      }).finally(() => clearTimeout(timeoutId));
-    }
+        signal: controller.signal,
+      }).finally(() => {
+        clearTimeout(timeoutId);
+        if (parentSignal) parentSignal.removeEventListener('abort', onParentAbort);
+      });
+    },
   },
   // Disable realtime to reduce connections
   realtime: {

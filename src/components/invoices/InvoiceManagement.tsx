@@ -15,7 +15,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase, isAbortLikeSupabaseError } from '@/integrations/supabase/client';
 import {
   Receipt,
   Edit,
@@ -165,12 +165,16 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
               supplierRecordId != null && supplierRecordId !== ''
                 ? { p_supplier_id: supplierRecordId }
                 : ({} as Record<string, string>);
-            const rpc = await supabase.rpc('list_invoices_for_supplier', rpcArgs);
+            let rpc = await supabase.rpc('list_invoices_for_supplier', rpcArgs);
+            if (rpc.error && isAbortLikeSupabaseError(rpc.error)) {
+              await new Promise((r) => setTimeout(r, 200));
+              rpc = await supabase.rpc('list_invoices_for_supplier', rpcArgs);
+            }
             let base: any[] = [];
             if (!rpc.error && Array.isArray(rpc.data)) {
               base = rpc.data;
             } else {
-              if (rpc.error) {
+              if (rpc.error && !isAbortLikeSupabaseError(rpc.error)) {
                 console.warn(
                   'list_invoices_for_supplier RPC unavailable, using direct select:',
                   rpc.error.message
