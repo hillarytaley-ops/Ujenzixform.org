@@ -312,6 +312,39 @@ interface DeliveryApplication {
   _source?: string;
 }
 
+/** Format PO `items` JSONB for admin delivery cards (one line per SKU). */
+function summarizePurchaseOrderItems(items: unknown): string {
+  if (!Array.isArray(items) || items.length === 0) return '';
+  return items
+    .map((it: Record<string, unknown>) => {
+      const name = String(
+        it.material_name ?? it.name ?? it.item_name ?? it.title ?? it.description ?? 'Item'
+      ).trim();
+      const qty = it.quantity ?? it.qty;
+      const unit = String(it.unit ?? '').trim();
+      let line = name || 'Item';
+      if (qty != null && qty !== '') {
+        line += ` × ${qty}`;
+        if (unit) line += ` ${unit}`;
+      }
+      return line;
+    })
+    .join('\n');
+}
+
+function buildSupplierPickupDisplay(
+  supplier: { company_name?: string | null; address?: string | null } | undefined,
+  rawPickup: string
+): string {
+  const name = supplier?.company_name?.trim();
+  if (name) {
+    const addr = supplier?.address?.trim();
+    return addr ? `${name} — ${addr}` : name;
+  }
+  const t = (rawPickup || '').trim();
+  return t || '—';
+}
+
 // Builder Delivery Requests (materials delivery)
 // Matches actual database schema
 interface BuilderDeliveryRequest {
@@ -319,6 +352,13 @@ interface BuilderDeliveryRequest {
   builder_id: string;
   builder_email?: string;
   builder_name?: string;
+  purchase_order_id?: string | null;
+  po_number?: string | null;
+  supplier_name?: string;
+  supplier_address?: string | null;
+  supplier_phone?: string | null;
+  /** Multi-line list from purchase_orders.items */
+  po_items_summary?: string;
   pickup_location?: string;
   pickup_address?: string;
   dropoff_location?: string;
@@ -1069,8 +1109,7 @@ const AdminDashboard = () => {
   
   const loadBuilderDeliveryRequests = async () => {
     console.log('📦 Loading builder delivery requests with REST API...');
-    
-    // Get auth token from localStorage
+
     let accessToken: string | null = null;
     try {
       const storedSession = readPersistedAuthRawStringSync();
@@ -1079,83 +1118,165 @@ const AdminDashboard = () => {
         accessToken = parsed.access_token;
       }
     } catch (e) {}
-    
+
     const headers: Record<string, string> = {
-      'apikey': SUPABASE_ANON_KEY,
-      'Content-Type': 'application/json'
+      apikey: SUPABASE_ANON_KEY,
+      'Content-Type': 'application/json',
     };
     if (accessToken) {
-      headers['Authorization'] = `Bearer ${accessToken}`;
+      headers.Authorization = `Bearer ${accessToken}`;
     }
 
+    const restInChunks = async <T,>(
+      table: string,
+      ids: string[],
+      select: string,
+      chunkSize: number
+    ): Promise<T[]> => {
+      const uniq = [...new Set(ids.filter(Boolean))];
+      const out: T[] = [];
+      for (let i = 0; i < uniq.length; i += chunkSize) {
+        const chunk = uniq.slice(i, i + chunkSize);
+        if (chunk.length === 0) continue;
+        const r = await fetch(
+          `${SUPABASE_URL}/rest/v1/${table}?id=in.(${chunk.join(',')})&select=${select}`,
+          { headers }
+        );
+        if (!r.ok) continue;
+        const rows = (await r.json()) as T[];
+        if (Array.isArray(rows)) out.push(...rows);
+      }
+      return out;
+    };
+
     try {
-      // Fetch delivery requests using REST API
       const response = await fetch(
         `${SUPABASE_URL}/rest/v1/delivery_requests?order=created_at.desc&limit=100`,
         { headers }
       );
-      
+
       if (!response.ok) {
         console.log('📦 Failed to load delivery requests:', response.status);
-        // Don't clear existing data on error
         return;
       }
-      
-      const data = await response.json();
+
+      const data = (await response.json()) as any[];
       console.log('📦 Delivery requests loaded:', data?.length);
 
-      if (data && data.length > 0) {
-        // Get builder names for the requests
-        const builderIds = [...new Set(data.map((req: any) => req.builder_id).filter(Boolean))];
-        let profileMap = new Map();
-        
-        if (builderIds.length > 0) {
-          try {
-            const profilesResponse = await fetch(
-              `${SUPABASE_URL}/rest/v1/profiles?id=in.(${builderIds.join(',')})&select=id,full_name,company_name`,
-              { headers }
-            );
-            if (profilesResponse.ok) {
-              const profiles = await profilesResponse.json();
-              profileMap = new Map(
-                profiles?.map((p: any) => {
-                  const label =
-                    [p.full_name, p.company_name].find(
-                      (x: string | null | undefined) => x && String(x).trim().length > 0
-                    ) || null;
-                  return [p.id, label];
-                }) || []
-              );
-            }
-          } catch (e) {
-            console.log('Could not fetch builder profiles');
-          }
-        }
+      if (!data || data.length === 0) {
+        console.log('📦 No delivery requests found');
+        setBuilderDeliveryRequests([]);
+        return;
+      }
 
-        const formattedRequests: BuilderDeliveryRequest[] = data.map((req: any) => ({
+      const builderKeys = [...new Set(data.map((req) => req.builder_id).filter(Boolean))] as string[];
+      const profileLabelByKey = new Map<string, string>();
+
+      if (builderKeys.length > 0) {
+        const inList = builderKeys.join(',');
+        try {
+          const [byIdRes, byUserRes] = await Promise.all([
+            fetch(
+              `${SUPABASE_URL}/rest/v1/profiles?id=in.(${inList})&select=id,user_id,full_name,company_name`,
+              { headers }
+            ),
+            fetch(
+              `${SUPABASE_URL}/rest/v1/profiles?user_id=in.(${inList})&select=id,user_id,full_name,company_name`,
+              { headers }
+            ),
+          ]);
+          const addProfile = (p: {
+            id?: string;
+            user_id?: string;
+            full_name?: string | null;
+            company_name?: string | null;
+          }) => {
+            const label =
+              [p.full_name, p.company_name].find(
+                (x: string | null | undefined) => x && String(x).trim().length > 0
+              ) || null;
+            if (!label) return;
+            if (p.id) profileLabelByKey.set(p.id, label);
+            if (p.user_id) profileLabelByKey.set(p.user_id, label);
+          };
+          if (byIdRes.ok) {
+            const profiles = (await byIdRes.json()) as any[];
+            profiles.forEach(addProfile);
+          }
+          if (byUserRes.ok) {
+            const profiles = (await byUserRes.json()) as any[];
+            profiles.forEach(addProfile);
+          }
+        } catch (e) {
+          console.log('Could not fetch builder profiles', e);
+        }
+      }
+
+      const poIds = [...new Set(data.map((req) => req.purchase_order_id).filter(Boolean))] as string[];
+      const poRows = await restInChunks<{
+        id: string;
+        po_number?: string;
+        items?: unknown;
+        supplier_id?: string;
+      }>(`purchase_orders`, poIds, 'id,po_number,items,supplier_id', 40);
+      const poById = Object.fromEntries(poRows.map((p) => [p.id, p]));
+
+      const supIds = [...new Set(poRows.map((p) => p.supplier_id).filter(Boolean))] as string[];
+      const supRows = await restInChunks<{
+        id: string;
+        company_name?: string;
+        address?: string | null;
+        phone?: string | null;
+        email?: string | null;
+      }>(`suppliers`, supIds, 'id,company_name,address,phone,email', 40);
+      const supById = Object.fromEntries(supRows.map((s) => [s.id, s]));
+
+      const formattedRequests: BuilderDeliveryRequest[] = data.map((req: any) => {
+        const po = req.purchase_order_id ? poById[req.purchase_order_id as string] : undefined;
+        const sup = po?.supplier_id ? supById[po.supplier_id as string] : undefined;
+        const poItemsSummary = summarizePurchaseOrderItems(po?.items);
+        const rawPickup = req.pickup_location || req.pickup_address || '';
+        const supplierPickupLine = buildSupplierPickupDisplay(sup, rawPickup);
+        const materialFallback = [req.material_type, req.quantity != null ? `× ${req.quantity}` : '']
+          .filter((x: string) => x && String(x).trim())
+          .join(' ')
+          .trim();
+        const itemLine =
+          poItemsSummary ||
+          (materialFallback ? materialFallback : '') ||
+          req.item_description ||
+          (req.material_type ? String(req.material_type) : '') ||
+          'N/A';
+
+        return {
           id: req.id || '',
           builder_id: req.builder_id || '',
           builder_email: req.builder_email || '',
           builder_name:
-            profileMap.get(req.builder_id) ||
+            profileLabelByKey.get(req.builder_id) ||
             req.builder_email?.split('@')[0] ||
             'Unknown Builder',
-          pickup_latitude:
-            typeof req.pickup_latitude === 'number' ? req.pickup_latitude : null,
-          pickup_longitude:
-            typeof req.pickup_longitude === 'number' ? req.pickup_longitude : null,
-          delivery_latitude:
-            typeof req.delivery_latitude === 'number' ? req.delivery_latitude : null,
-          delivery_longitude:
-            typeof req.delivery_longitude === 'number' ? req.delivery_longitude : null,
-          // Support both old column names (pickup_location) and new column names (pickup_address)
-          pickup_location: req.pickup_location || req.pickup_address || '',
-          pickup_address: req.pickup_address || req.pickup_location || '',
+          purchase_order_id: req.purchase_order_id ?? null,
+          po_number: po?.po_number ?? null,
+          supplier_name: sup?.company_name || undefined,
+          supplier_address: sup?.address ?? null,
+          supplier_phone: sup?.phone ?? null,
+          po_items_summary: poItemsSummary || undefined,
+          pickup_latitude: typeof req.pickup_latitude === 'number' ? req.pickup_latitude : null,
+          pickup_longitude: typeof req.pickup_longitude === 'number' ? req.pickup_longitude : null,
+          delivery_latitude: typeof req.delivery_latitude === 'number' ? req.delivery_latitude : null,
+          delivery_longitude: typeof req.delivery_longitude === 'number' ? req.delivery_longitude : null,
+          pickup_location: supplierPickupLine,
+          pickup_address: req.pickup_address || req.pickup_location || supplierPickupLine,
           dropoff_location: req.dropoff_location || req.delivery_address || '',
           dropoff_address: req.dropoff_address || req.delivery_address || '',
-          // Support both item_description and material_type
-          item_description: req.item_description || req.material_type || 'N/A',
-          estimated_weight: req.estimated_weight || req.weight_kg || '',
+          item_description: itemLine,
+          estimated_weight:
+            req.estimated_weight != null && req.estimated_weight !== ''
+              ? String(req.estimated_weight)
+              : req.weight_kg != null
+                ? String(req.weight_kg)
+                : '',
           preferred_date: req.preferred_date || req.pickup_date || '',
           preferred_time: req.preferred_time || '',
           urgency: req.urgency || 'normal',
@@ -1179,17 +1300,13 @@ const AdminDashboard = () => {
           current_location: req.current_location,
           tracking_updates: req.tracking_updates,
           created_at: req.created_at,
-          updated_at: req.updated_at
-        }));
-        setBuilderDeliveryRequests(formattedRequests);
-        console.log('📦 Formatted delivery requests:', formattedRequests.length);
-      } else {
-        console.log('📦 No delivery requests found');
-        setBuilderDeliveryRequests([]);
-      }
+          updated_at: req.updated_at,
+        };
+      });
+      setBuilderDeliveryRequests(formattedRequests);
+      console.log('📦 Formatted delivery requests:', formattedRequests.length);
     } catch (error) {
       console.log('📦 Error loading builder delivery requests:', error);
-      // Don't clear existing data on error
     }
   };
 
@@ -3413,18 +3530,39 @@ const AdminDashboard = () => {
                               </div>
                             </div>
 
-                            <div className="grid md:grid-cols-4 gap-3">
-                              <div className="p-2 bg-slate-800/30 rounded">
-                                <p className="text-gray-500 text-xs">Item</p>
-                                <p className="text-white text-sm capitalize">{request.item_description || 'N/A'}</p>
+                            {(request.supplier_name || request.po_number) && (
+                              <div className="p-3 bg-slate-800/40 rounded-lg border border-slate-700/80 space-y-1">
+                                <p className="text-gray-500 text-xs uppercase tracking-wide">Supplier</p>
+                                {request.supplier_name ? (
+                                  <p className="text-white text-sm font-semibold">{request.supplier_name}</p>
+                                ) : (
+                                  <p className="text-gray-500 text-sm">—</p>
+                                )}
+                                <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-gray-400">
+                                  {request.po_number ? (
+                                    <span className="font-mono">PO {request.po_number}</span>
+                                  ) : null}
+                                  {request.supplier_phone ? <span>{request.supplier_phone}</span> : null}
+                                </div>
                               </div>
-                              <div className="p-2 bg-slate-800/30 rounded">
-                                <p className="text-gray-500 text-xs">Weight</p>
-                                <p className="text-white text-sm">{request.estimated_weight || 'N/A'}</p>
-                              </div>
-                              <div className="p-2 bg-slate-800/30 rounded">
-                                <p className="text-gray-500 text-xs">Urgency</p>
-                                <p className="text-white text-sm capitalize">{request.urgency || 'normal'}</p>
+                            )}
+
+                            <div className="space-y-3">
+                              <div className="grid md:grid-cols-4 gap-3">
+                                <div className="p-2 bg-slate-800/30 rounded md:col-span-2">
+                                  <p className="text-gray-500 text-xs">Materials to deliver</p>
+                                  <p className="text-white text-sm whitespace-pre-wrap leading-snug">
+                                    {request.po_items_summary || request.item_description || 'N/A'}
+                                  </p>
+                                </div>
+                                <div className="p-2 bg-slate-800/30 rounded">
+                                  <p className="text-gray-500 text-xs">Weight</p>
+                                  <p className="text-white text-sm">{request.estimated_weight || 'N/A'}</p>
+                                </div>
+                                <div className="p-2 bg-slate-800/30 rounded">
+                                  <p className="text-gray-500 text-xs">Urgency</p>
+                                  <p className="text-white text-sm capitalize">{request.urgency || 'normal'}</p>
+                                </div>
                               </div>
                               <div className="p-2 bg-slate-800/30 rounded">
                                 <p className="text-gray-500 text-xs">Requested By</p>
