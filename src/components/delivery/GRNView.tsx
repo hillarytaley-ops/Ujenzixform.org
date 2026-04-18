@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
@@ -187,16 +186,13 @@ export const GRNView: React.FC<GRNViewProps> = ({ userId, userRole, hubCacheProf
       </div>
 
       {showInitialLoad && (
-        <div className="space-y-3" aria-busy="true" aria-label="Loading GRNs">
-          {[0, 1, 2].map((i) => (
-            <Card key={i}>
-              <CardContent className="space-y-3 py-6">
-                <Skeleton className="h-6 w-40" />
-                <Skeleton className="h-4 w-full max-w-sm" />
-                <Skeleton className="h-10 w-36" />
-              </CardContent>
-            </Card>
-          ))}
+        <div
+          className="flex items-center gap-2 rounded-md border border-dashed bg-muted/30 px-3 py-4 text-sm text-muted-foreground"
+          aria-busy="true"
+          aria-label="Loading GRNs"
+        >
+          <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
+          <span>Loading GRNs…</span>
         </div>
       )}
 

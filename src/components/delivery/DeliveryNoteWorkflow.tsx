@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
@@ -20,6 +19,7 @@ import {
   invalidateBuilderInvoicesHub,
   patchHubDeliveryNotes,
   peekHubDeliveryNotes,
+  resolveBuilderHubProfileId,
   subscribeBuilderHubCache,
   warmBuilderInvoicesHub,
 } from '@/lib/builderInvoicesHubCache';
@@ -154,7 +154,10 @@ export const DeliveryNoteWorkflow: React.FC<DeliveryNoteWorkflowProps> = ({
         }
         setLoading(true);
       }
-      const builderIds = uniqueBuilderIds(builderAuthUserId, builderProfileId);
+      const builderIds = uniqueBuilderIds(
+        builderAuthUserId,
+        resolveBuilderHubProfileId(builderAuthUserId, builderProfileId) ?? builderProfileId
+      );
       if (builderIds.length === 0) {
         setDeliveryNotes([]);
         patchHubDeliveryNotes(builderAuthUserId, builderProfileId ?? undefined, []);
@@ -426,19 +429,13 @@ export const DeliveryNoteWorkflow: React.FC<DeliveryNoteWorkflowProps> = ({
       </div>
 
       {showInitialLoad && (
-        <div className="space-y-3" aria-busy="true" aria-label="Loading delivery notes">
-          {[0, 1, 2].map((i) => (
-            <Card key={i}>
-              <CardContent className="space-y-3 py-6">
-                <Skeleton className="h-6 w-48" />
-                <Skeleton className="h-4 w-full max-w-md" />
-                <div className="flex gap-2 pt-2">
-                  <Skeleton className="h-10 w-36" />
-                  <Skeleton className="h-10 w-32" />
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+        <div
+          className="flex items-center gap-2 rounded-md border border-dashed bg-muted/30 px-3 py-4 text-sm text-muted-foreground"
+          aria-busy="true"
+          aria-label="Loading delivery notes"
+        >
+          <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
+          <span>Loading delivery notes…</span>
         </div>
       )}
 

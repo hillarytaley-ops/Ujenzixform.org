@@ -3,7 +3,7 @@ import {
   readAccessTokenSyncBestEffort,
   readPersistedAuthRawStringSync,
 } from '@/utils/supabaseAccessToken';
-import React, { useState, useEffect, useLayoutEffect, useCallback, useMemo, useRef } from "react";
+import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -540,15 +540,6 @@ const ProfessionalBuilderDashboardPage = () => {
   const [deliveriesSubTab, setDeliveriesSubTab] = useState('request'); // Sub-tab for Deliveries (request, schedule, history)
   /** Sub-tabs on Invoices: delivery notes → GRN → supplier invoices (horizontal row). */
   const [invoiceDocsSubTab, setInvoiceDocsSubTab] = useState('delivery-notes');
-  /** After first open (or hover prefetch), keep DN/GRN/Invoice subtree mounted so sub-tabs stay instant. */
-  const [invoicesHubWarm, setInvoicesHubWarm] = useState(() => {
-    if (typeof window === 'undefined') return false;
-    try {
-      return new URLSearchParams(window.location.search).get('tab') === 'invoices';
-    } catch {
-      return false;
-    }
-  });
   const [supplierResponseCount, setSupplierResponseCount] = useState(0); // Count of supplier responses for notification badge
   const [invoiceHubBadgeCount, setInvoiceHubBadgeCount] = useState(0); // DN + invoices needing builder action (Invoices tab)
   const [invoiceSubBadgeDn, setInvoiceSubBadgeDn] = useState(0);
@@ -2016,26 +2007,11 @@ const ProfessionalBuilderDashboardPage = () => {
     }
   }, [searchParams, activeTab]);
 
-  /** Keep DN / GRN / Invoice subtree mounted after first visit so sub-tab switches stay instant. */
-  useLayoutEffect(() => {
-    if (activeTab === 'invoices') setInvoicesHubWarm(true);
-  }, [activeTab]);
-
-  /** Prefetch hub data in the background so DN/GRN/Invoice subtabs often paint without skeletons. */
+  /** Warm hub as soon as we have a user so DN/GRN/Invoice subtabs hit cache on first click (outer tab uses forceMount). */
   useEffect(() => {
-    const uid = user?.id;
-    if (!uid) return;
-    const t = window.setTimeout(() => {
-      warmBuilderInvoicesHub(uid, profile?.id ?? undefined);
-    }, 1200);
-    return () => clearTimeout(t);
+    if (!user?.id) return;
+    warmBuilderInvoicesHub(user.id, profile?.id ?? undefined);
   }, [user?.id, profile?.id]);
-
-  useLayoutEffect(() => {
-    if (activeTab === 'invoices' && user?.id) {
-      warmBuilderInvoicesHub(user.id, profile?.id ?? undefined);
-    }
-  }, [activeTab, user?.id, profile?.id]);
 
   // Invoices tab badge: delivery notes + unacknowledged invoices (+ sub-tab counts + realtime)
   useEffect(() => {
@@ -2475,7 +2451,6 @@ const ProfessionalBuilderDashboardPage = () => {
           deliveriesNavBadgeCount={deliveriesNavBadgeCount}
           invoiceHubBadgeCount={invoiceHubBadgeCount}
           onInvoicesWarm={() => {
-            setInvoicesHubWarm(true);
             if (user?.id) warmBuilderInvoicesHub(user.id, profile?.id ?? undefined);
           }}
         />
@@ -3497,7 +3472,6 @@ const ProfessionalBuilderDashboardPage = () => {
           </TabsContent>
 
           <TabsContent value="invoices" forceMount className="space-y-6">
-            {invoicesHubWarm ? (
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -3636,7 +3610,6 @@ const ProfessionalBuilderDashboardPage = () => {
                 </Tabs>
               </CardContent>
             </Card>
-            ) : null}
           </TabsContent>
 
           {/* Legacy Invoices Tab - Keeping for backward compatibility */}

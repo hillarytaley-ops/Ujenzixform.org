@@ -4,6 +4,7 @@
  * when prefetch finished (hover / idle / warm) before the user switches tabs.
  */
 import { supabase } from '@/integrations/supabase/client';
+import { readPrefetchedBuilderProfileId } from '@/lib/prefetchBuilderProfileRead';
 import { sortSupplyChainDocsNewestFirst } from '@/utils/sortSupplyChainDocs';
 
 const TTL_MS = 90_000;
@@ -32,6 +33,17 @@ export function hubCacheKey(authUserId: string, profileId: string | null | undef
   return `${authUserId}\0${profileId ?? ''}`;
 }
 
+/** Aligns cache + queries with login prefetch when `profile?.id` is still null. */
+export function resolveBuilderHubProfileId(authUserId: string, profileId: string | null | undefined): string | undefined {
+  const explicit =
+    profileId != null && profileId !== '' && String(profileId) !== String(authUserId) ? String(profileId) : undefined;
+  return explicit ?? readPrefetchedBuilderProfileId(authUserId);
+}
+
+function hubKeyResolved(authUserId: string, profileId: string | null | undefined): string {
+  return hubCacheKey(authUserId, resolveBuilderHubProfileId(authUserId, profileId));
+}
+
 type Slot<T> = { at: number; data: T };
 
 type HubSlots = {
@@ -50,7 +62,7 @@ function slotFresh(s: Slot<unknown> | undefined): boolean {
 }
 
 export function invalidateBuilderInvoicesHub(authUserId: string, profileId: string | null | undefined): void {
-  const k = hubCacheKey(authUserId, profileId);
+  const k = hubKeyResolved(authUserId, profileId);
   if (slots?.key === k) slots = null;
 }
 
@@ -59,7 +71,7 @@ export function peekHubDeliveryNotes(
   profileId: string | null | undefined
 ): unknown[] | null {
   if (!authUserId) return null;
-  const k = hubCacheKey(authUserId, profileId);
+  const k = hubKeyResolved(authUserId, profileId);
   if (!slots || slots.key !== k || !slotFresh(slots.deliveryNotes)) return null;
   return slots.deliveryNotes!.data;
 }
@@ -69,7 +81,7 @@ export function peekHubGrns(
   profileId: string | null | undefined
 ): unknown[] | null {
   if (!userId) return null;
-  const k = hubCacheKey(userId, profileId);
+  const k = hubKeyResolved(userId, profileId);
   if (!slots || slots.key !== k || !slotFresh(slots.grns)) return null;
   return slots.grns!.data;
 }
@@ -92,7 +104,7 @@ export function patchHubDeliveryNotes(
   profileId: string | null | undefined,
   data: unknown[]
 ): void {
-  const k = hubCacheKey(authUserId, profileId);
+  const k = hubKeyResolved(authUserId, profileId);
   if (!slots || slots.key !== k) slots = { key: k };
   slots.deliveryNotes = { at: Date.now(), data: [...data] };
   emitHubCacheUpdated();
@@ -103,7 +115,7 @@ export function patchHubGrns(
   profileId: string | null | undefined,
   data: unknown[]
 ): void {
-  const k = hubCacheKey(authUserId, profileId);
+  const k = hubKeyResolved(authUserId, profileId);
   if (!slots || slots.key !== k) slots = { key: k };
   slots.grns = { at: Date.now(), data: [...data] };
   emitHubCacheUpdated();
@@ -114,7 +126,7 @@ export function patchHubInvoices(
   profileId: string | null | undefined,
   data: unknown[]
 ): void {
-  const k = hubCacheKey(authUserId, profileId);
+  const k = hubKeyResolved(authUserId, profileId);
   if (!slots || slots.key !== k) slots = { key: k };
   slots.invoices = { at: Date.now(), data: [...data] };
   emitHubCacheUpdated();
@@ -125,7 +137,7 @@ export function peekHubInvoices(
   profileId: string | null | undefined
 ): unknown[] | null {
   if (!userId) return null;
-  const k = hubCacheKey(userId, profileId);
+  const k = hubKeyResolved(userId, profileId);
   if (!slots || slots.key !== k || !slotFresh(slots.invoices)) return null;
   return slots.invoices!.data;
 }
@@ -138,7 +150,8 @@ export async function fetchBuilderHubDeliveryNotes(
   builderAuthUserId: string,
   builderProfileId: string | null | undefined
 ): Promise<unknown[]> {
-  const builderIds = uniqueBuilderIds(builderAuthUserId, builderProfileId);
+  const resolved = resolveBuilderHubProfileId(builderAuthUserId, builderProfileId);
+  const builderIds = uniqueBuilderIds(builderAuthUserId, resolved ?? builderProfileId);
   if (builderIds.length === 0) return [];
 
   const statuses = [...DN_ACTIVE_STATUSES];
@@ -235,7 +248,8 @@ export async function fetchBuilderHubInvoices(
   userId: string,
   builderProfileId: string | null | undefined
 ): Promise<unknown[]> {
-  const builderKeys = [...new Set([userId, builderProfileId].filter(Boolean))] as string[];
+  const resolved = resolveBuilderHubProfileId(userId, builderProfileId);
+  const builderKeys = [...new Set([userId, resolved ?? builderProfileId].filter(Boolean))] as string[];
 
   const invByKey = (bid: string) =>
     supabase
@@ -309,7 +323,8 @@ function finishInflight(key: string) {
  */
 export function warmBuilderInvoicesHub(authUserId: string | undefined, profileId: string | null | undefined): void {
   if (!authUserId) return;
-  const key = hubCacheKey(authUserId, profileId);
+  const resolvedProfile = resolveBuilderHubProfileId(authUserId, profileId);
+  const key = hubCacheKey(authUserId, resolvedProfile);
   if (
     slots?.key === key &&
     slotFresh(slots.deliveryNotes) &&

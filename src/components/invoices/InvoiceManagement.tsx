@@ -29,7 +29,6 @@ import { useToast } from '@/hooks/use-toast';
 import { sortSupplyChainDocsNewestFirst } from '@/utils/sortSupplyChainDocs';
 import { PaystackCheckout, isPaystackTestModeBanner } from '@/components/payment/PaystackCheckout';
 import { Separator } from '@/components/ui/separator';
-import { Skeleton } from '@/components/ui/skeleton';
 import {
   fetchBuilderHubInvoices,
   patchHubInvoices,
@@ -540,19 +539,13 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
       </div>
 
       {showInitialLoad && (
-        <div className="space-y-3" aria-busy="true" aria-label="Loading invoices">
-          {[0, 1, 2].map((i) => (
-            <Card key={i}>
-              <CardContent className="space-y-3 py-6">
-                <Skeleton className="h-6 w-48" />
-                <Skeleton className="h-4 w-full max-w-md" />
-                <div className="flex gap-2 pt-2">
-                  <Skeleton className="h-10 w-28" />
-                  <Skeleton className="h-10 w-24" />
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+        <div
+          className="flex items-center gap-2 rounded-md border border-dashed bg-muted/30 px-3 py-4 text-sm text-muted-foreground"
+          aria-busy="true"
+          aria-label="Loading invoices"
+        >
+          <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
+          <span>Loading supplier invoices…</span>
         </div>
       )}
 
