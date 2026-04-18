@@ -49,7 +49,8 @@ export const GRNView: React.FC<GRNViewProps> = ({ userId, userRole }) => {
           *,
           purchase_order:purchase_orders(po_number, items)
         `)
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false })
+        .limit(400);
 
       if (userRole === 'builder') {
         query = query.eq('builder_id', userId);

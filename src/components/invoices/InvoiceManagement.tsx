@@ -31,6 +31,11 @@ import { PaystackCheckout, isPaystackTestModeBanner } from '@/components/payment
 import { Separator } from '@/components/ui/separator';
 import { Skeleton } from '@/components/ui/skeleton';
 
+/** Builder invoice hub: cap rows and PO fan-out so `in(...)` never explodes (timeouts → endless skeleton). */
+const BUILDER_INVOICE_PAGE_LIMIT = 350;
+const BUILDER_RECENT_PO_CAP = 400;
+const INVOICE_PO_ID_CHUNK = 40;
+
 interface Invoice {
   id: string;
   invoice_number: string;
@@ -130,7 +135,8 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
           const { data, error } = await supabase
             .from('invoices')
             .select(invoiceSelect)
-            .order('created_at', { ascending: false });
+            .order('created_at', { ascending: false })
+            .limit(500);
           if (error) throw error;
           setInvoices(
             sortSupplyChainDocsNewestFirst((data || []) as unknown as Record<string, unknown>[]) as Invoice[]
@@ -170,31 +176,64 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
       if (userRole === 'builder') {
         const builderKeys = [...new Set([userId, builderProfileId].filter(Boolean))] as string[];
 
-        const [{ data: byBuilderId, error: e1 }, { data: myOrders, error: e2 }] = await Promise.all([
-          supabase.from('invoices').select(invoiceSelect).in('builder_id', builderKeys),
-          supabase.from('purchase_orders').select('id').in('buyer_id', builderKeys),
-        ]);
-        if (e1) throw e1;
+        const invByKey = (bid: string) =>
+          supabase
+            .from('invoices')
+            .select(invoiceSelect)
+            .eq('builder_id', bid)
+            .order('created_at', { ascending: false })
+            .limit(BUILDER_INVOICE_PAGE_LIMIT);
+
+        const byKeyRes =
+          builderKeys.length === 1
+            ? [await invByKey(builderKeys[0])]
+            : await Promise.all(builderKeys.map((k) => invByKey(k)));
+        const eInv = byKeyRes.find((r) => r.error)?.error;
+        if (eInv) throw eInv;
+
+        const byBuilderMap = new Map<string, Invoice>();
+        for (const r of byKeyRes) {
+          for (const inv of (r.data || []) as Invoice[]) {
+            if (inv?.id) byBuilderMap.set(inv.id, inv);
+          }
+        }
+
+        const { data: myOrders, error: e2 } = await supabase
+          .from('purchase_orders')
+          .select('id')
+          .in('buyer_id', builderKeys)
+          .order('created_at', { ascending: false })
+          .limit(BUILDER_RECENT_PO_CAP);
         if (e2) throw e2;
 
         const poIds = (myOrders || []).map((p) => p.id).filter(Boolean);
-        let byPo: Invoice[] = [];
+        const byPoMap = new Map<string, Invoice>();
         if (poIds.length > 0) {
-          const { data: invPo, error: e3 } = await supabase
-            .from('invoices')
-            .select(invoiceSelect)
-            .in('purchase_order_id', poIds);
-          if (e3) throw e3;
-          byPo = (invPo || []) as Invoice[];
+          for (let i = 0; i < poIds.length; i += INVOICE_PO_ID_CHUNK) {
+            const slice = poIds.slice(i, i + INVOICE_PO_ID_CHUNK);
+            const { data: invPo, error: e3 } = await supabase
+              .from('invoices')
+              .select(invoiceSelect)
+              .in('purchase_order_id', slice)
+              .order('created_at', { ascending: false })
+              .limit(BUILDER_INVOICE_PAGE_LIMIT);
+            if (e3) throw e3;
+            for (const inv of (invPo || []) as Invoice[]) {
+              if (inv?.id) byPoMap.set(inv.id, inv);
+            }
+          }
         }
 
         const merged = new Map<string, Invoice>();
-        for (const inv of [...(byBuilderId || []), ...byPo] as Invoice[]) {
-          merged.set(inv.id, inv);
-        }
-        const list = sortSupplyChainDocsNewestFirst(
+        for (const inv of byBuilderMap.values()) merged.set(inv.id, inv);
+        for (const inv of byPoMap.values()) merged.set(inv.id, inv);
+
+        let list = sortSupplyChainDocsNewestFirst(
           Array.from(merged.values()) as unknown as Record<string, unknown>[]
         ) as Invoice[];
+        if (list.length > BUILDER_INVOICE_PAGE_LIMIT) {
+          list = list.slice(0, BUILDER_INVOICE_PAGE_LIMIT);
+        }
         setInvoices(list);
         return;
       }
@@ -202,7 +241,8 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
       const { data, error } = await supabase
         .from('invoices')
         .select(invoiceSelect)
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false })
+        .limit(800);
 
       if (error) throw error;
       setInvoices(
@@ -210,10 +250,15 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
       );
     } catch (error: any) {
       console.error('Error fetching invoices:', error);
+      const code = error?.code as string | undefined;
+      const msg = String(error?.message || '');
+      const timedOut = code === '57014' || /timeout/i.test(msg);
       toast({
-        title: "Error",
-        description: "Failed to load invoices",
-        variant: "destructive",
+        title: timedOut ? 'Invoices timed out' : 'Error',
+        description: timedOut
+          ? 'Too many rows or a slow network. Try Refresh; your admin can add DB indexes on invoices / purchase_orders.'
+          : 'Failed to load invoices',
+        variant: 'destructive',
       });
     } finally {
       if (!silent) setLoading(false);
@@ -517,10 +562,10 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
         <Button
           variant="outline"
           size="sm"
-          disabled={loading}
+          disabled={loading && invoices.length > 0}
           onClick={() => void fetchInvoices({ silent: true })}
         >
-          {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Refresh'}
+          {loading && invoices.length > 0 ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Refresh'}
         </Button>
       </div>
 
