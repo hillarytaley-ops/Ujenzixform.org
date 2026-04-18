@@ -27,6 +27,7 @@ import { createContext, useContext, useEffect, useState, ReactNode, useCallback 
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { prefetchDashboardData, clearPrefetchCache } from '@/services/dataPrefetch';
+import { logger } from '@/utils/logger';
 
 interface AuthContextType {
   user: User | null;
@@ -64,16 +65,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       if (role) {
         localStorage.setItem('user_role', role);
         localStorage.setItem('user_role_id', userId);
-        console.log('AuthContext: Role synced to localStorage:', role);
-        
+        logger.debug(`Role synced to localStorage: ${role}`, undefined, 'AuthContext');
+
         // Trigger data prefetch in background after login
         if (triggerPrefetch) {
           const accessToken = (await supabase.auth.getSession()).data.session?.access_token;
           if (accessToken) {
-            console.log('AuthContext: Starting data prefetch for faster dashboard loading...');
+            logger.debug('Starting data prefetch for faster dashboard loading…', undefined, 'AuthContext');
             // Run prefetch in background - don't await
-            prefetchDashboardData(userId, role, accessToken).catch(err => {
-              console.warn('AuthContext: Prefetch error (non-critical):', err);
+            prefetchDashboardData(userId, role, accessToken).catch((err) => {
+              logger.warn('Prefetch error (non-critical)', err, 'AuthContext');
             });
           }
         }

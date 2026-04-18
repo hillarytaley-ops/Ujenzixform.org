@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Loader2, CheckCircle2, XCircle } from "lucide-react";
 import { PAYSTACK_NAV_KEY } from "@/components/payment/PaystackCheckout";
+import { deliveryProviderNotificationService } from "@/services/DeliveryProviderNotificationService";
 
 /**
  * Paystack redirects here with ?reference=…&trxref=… after the customer attempts payment.
@@ -60,6 +61,66 @@ export default function PaystackPaymentCallback() {
       if (data?.ok === true) {
         setState("ok");
         setMessage("Payment verified. Redirecting…");
+
+        const meta = data?.metadata as Record<string, unknown> | undefined;
+        const orderId = typeof meta?.order_id === "string" ? meta.order_id.trim() : "";
+        if (orderId.startsWith("drq_")) {
+          const drId = orderId.slice(4);
+          const stamp = new Date().toISOString();
+          const ref = typeof data.reference === "string" ? data.reference.trim() : "";
+
+          const { data: updated, error: upErr } = await supabase
+            .from("delivery_requests")
+            .update({
+              status: "delivery_quote_paid",
+              delivery_quote_paid_at: stamp,
+              delivery_quote_paystack_reference: ref || null,
+              updated_at: stamp,
+            })
+            .eq("id", drId)
+            .eq("status", "quote_accepted")
+            .select(
+              "id,pickup_address,delivery_address,pickup_date,material_type,special_instructions,pickup_latitude,pickup_longitude,delivery_latitude,delivery_longitude"
+            )
+            .maybeSingle();
+
+          if (upErr) {
+            console.warn("[paystack-callback] delivery quote update:", upErr.message);
+          } else if (updated) {
+            const row = updated as {
+              id: string;
+              pickup_address: string;
+              delivery_address: string;
+              pickup_date: string | null;
+              material_type: string | null;
+              special_instructions: string | null;
+              pickup_latitude: number | null;
+              pickup_longitude: number | null;
+              delivery_latitude: number | null;
+              delivery_longitude: number | null;
+            };
+            try {
+              await deliveryProviderNotificationService.notifyNearbyProviders(
+                {
+                  id: row.id,
+                  pickup_address: row.pickup_address || "",
+                  delivery_address: row.delivery_address || "",
+                  pickup_date: (row.pickup_date || new Date().toISOString().slice(0, 10)) as string,
+                  material_type: row.material_type || undefined,
+                  special_instructions: row.special_instructions || undefined,
+                  pickup_latitude: row.pickup_latitude,
+                  pickup_longitude: row.pickup_longitude,
+                  delivery_latitude: row.delivery_latitude,
+                  delivery_longitude: row.delivery_longitude,
+                },
+                { radiusKm: 75 }
+              );
+            } catch (e: unknown) {
+              console.warn("[paystack-callback] notifyNearbyProviders:", e);
+            }
+          }
+        }
+
         let navTo = "/home";
         try {
           const raw = sessionStorage.getItem(PAYSTACK_NAV_KEY);

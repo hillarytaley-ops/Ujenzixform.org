@@ -31,7 +31,9 @@ const isGAAvailable = () => {
  */
 export const initGoogleAnalytics = () => {
   if (!GA_MEASUREMENT_ID) {
-    console.log('📊 Google Analytics not configured (VITE_GA_MEASUREMENT_ID missing)');
+    if (import.meta.env.DEV) {
+      console.log('📊 Google Analytics not configured (VITE_GA_MEASUREMENT_ID missing)');
+    }
     return;
   }
 
@@ -43,7 +45,6 @@ export const initGoogleAnalytics = () => {
     };
 
   if (import.meta.env.PROD) {
-    console.log('✅ Google Analytics: production bootstrap (/ga-bootstrap.js when configured)');
     return;
   }
 

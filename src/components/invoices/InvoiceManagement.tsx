@@ -228,6 +228,9 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
         sortSupplyChainDocsNewestFirst((data || []) as unknown as Record<string, unknown>[]) as Invoice[]
       );
     } catch (error: any) {
+      if (error?.name === 'AbortError' || /aborted/i.test(String(error?.message || ''))) {
+        return;
+      }
       console.error('Error fetching invoices:', error);
       const code = error?.code as string | undefined;
       const msg = String(error?.message || '');

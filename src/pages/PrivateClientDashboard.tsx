@@ -66,6 +66,7 @@ import { Navigation as NavigationIcon, QrCode } from "lucide-react";
 import { DashboardMobileActionSheet } from "@/components/dashboard/DashboardMobileActionSheet";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { PrivateClientDashboardNavCards } from "@/components/builders/PrivateClientDashboardNavCards";
+import { BuilderDeliveryQuotePanel } from "@/components/delivery/BuilderDeliveryQuotePanel";
 import { SUPPORT_PHONE_PRIMARY, SUPPORT_EMAIL } from "@/config/appIdentity";
 
 const PrivateClientTabFallback = () => (
@@ -1341,6 +1342,11 @@ const PrivateClientDashboard = () => {
                 <CardDescription>Track your delivery requests - one delivery per order</CardDescription>
               </CardHeader>
               <CardContent>
+                <BuilderDeliveryQuotePanel
+                  profileId={profile?.id}
+                  authUserId={user?.id}
+                  paystackSuccessPath="/private-client-dashboard?tab=deliveries"
+                />
                 {deliveries.length === 0 ? (
                   <div className="text-center py-12 text-gray-500">
                     <Truck className="h-16 w-16 mx-auto mb-4 text-gray-300" />
@@ -1482,6 +1488,11 @@ const PrivateClientDashboard = () => {
                 </CardDescription>
               </CardHeader>
               <CardContent>
+                <BuilderDeliveryQuotePanel
+                  profileId={profile?.id}
+                  authUserId={user?.id}
+                  paystackSuccessPath="/private-client-dashboard?tab=request-delivery"
+                />
                 {/* Info Banner */}
                 <div className="bg-gradient-to-r from-teal-50 to-green-50 border border-teal-200 rounded-lg p-4 mb-6">
                   <div className="flex items-start gap-3">

@@ -71,7 +71,7 @@ export const GRNView: React.FC<GRNViewProps> = ({ userId, userRole, hubCacheProf
       if (!silent && !isBuilder) setSupplierLoading(true);
 
       if (isBuilder) {
-        const sorted = (await fetchBuilderHubGrns(userId)) as GRN[];
+        const sorted = (await fetchBuilderHubGrns(userId, hubCacheProfileId ?? undefined)) as GRN[];
         setGRNs(sorted);
         patchHubGrns(userId, hubCacheProfileId ?? undefined, sorted);
         return;
@@ -107,6 +107,9 @@ export const GRNView: React.FC<GRNViewProps> = ({ userId, userRole, hubCacheProf
       ) as GRN[];
       setGRNs(sorted);
     } catch (error: any) {
+      if (error?.name === 'AbortError' || /aborted/i.test(String(error?.message || ''))) {
+        return;
+      }
       console.error('Error fetching GRNs:', error);
       toast({
         title: "Error",

@@ -1267,6 +1267,11 @@ export type Database = {
           delivery_address: string
           delivery_latitude: number | null
           delivery_longitude: number | null
+          delivery_quote_notes: string | null
+          delivery_quote_paid_at: string | null
+          delivery_quote_paystack_reference: string | null
+          delivery_quote_sent_at: string | null
+          estimated_cost: number | null
           id: string
           material_type: string
           max_rotation_attempts: number | null
@@ -1277,7 +1282,9 @@ export type Database = {
           preferred_time: string | null
           provider_id: string | null
           provider_response: string | null
+          purchase_order_id: string | null
           quantity: number
+          rejection_reason: string | null
           required_vehicle_type: string | null
           response_date: string | null
           response_notes: string | null
@@ -1296,6 +1303,11 @@ export type Database = {
           delivery_address: string
           delivery_latitude?: number | null
           delivery_longitude?: number | null
+          delivery_quote_notes?: string | null
+          delivery_quote_paid_at?: string | null
+          delivery_quote_paystack_reference?: string | null
+          delivery_quote_sent_at?: string | null
+          estimated_cost?: number | null
           id?: string
           material_type: string
           max_rotation_attempts?: number | null
@@ -1306,7 +1318,9 @@ export type Database = {
           preferred_time?: string | null
           provider_id?: string | null
           provider_response?: string | null
+          purchase_order_id?: string | null
           quantity: number
+          rejection_reason?: string | null
           required_vehicle_type?: string | null
           response_date?: string | null
           response_notes?: string | null
@@ -1325,6 +1339,11 @@ export type Database = {
           delivery_address?: string
           delivery_latitude?: number | null
           delivery_longitude?: number | null
+          delivery_quote_notes?: string | null
+          delivery_quote_paid_at?: string | null
+          delivery_quote_paystack_reference?: string | null
+          delivery_quote_sent_at?: string | null
+          estimated_cost?: number | null
           id?: string
           material_type?: string
           max_rotation_attempts?: number | null
@@ -1335,7 +1354,9 @@ export type Database = {
           preferred_time?: string | null
           provider_id?: string | null
           provider_response?: string | null
+          purchase_order_id?: string | null
           quantity?: number
+          rejection_reason?: string | null
           required_vehicle_type?: string | null
           response_date?: string | null
           response_notes?: string | null
@@ -4542,6 +4563,10 @@ export type Database = {
           order_count: number
           order_value_sum: number
         }[]
+      }
+      builder_hub_delivery_notes: {
+        Args: { p_limit?: number }
+        Returns: Database["public"]["Tables"]["delivery_notes"]["Row"][]
       }
       audit_supplier_select_attempts: {
         Args: Record<PropertyKey, never>

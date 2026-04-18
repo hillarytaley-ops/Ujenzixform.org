@@ -104,6 +104,53 @@ serve(async (req) => {
       } else if (inv && inv.builder_id !== metaUser) {
         console.warn("[paystack-webhook] metadata user_id does not match invoice.builder_id; skip", invoiceId);
       }
+    } else if (orderId.startsWith("drq_") && metaUser) {
+      const drId = orderId.slice(4);
+      const admin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
+        auth: { persistSession: false, autoRefreshToken: false },
+      });
+
+      const { data: prof, error: profErr } = await admin
+        .from("profiles")
+        .select("id")
+        .eq("user_id", metaUser)
+        .maybeSingle();
+
+      if (profErr) {
+        console.error("[paystack-webhook] profile lookup:", profErr.message);
+      } else if (prof?.id) {
+        const { data: dr, error: drErr } = await admin
+          .from("delivery_requests")
+          .select("id, builder_id, status")
+          .eq("id", drId)
+          .maybeSingle();
+
+        if (drErr) {
+          console.error("[paystack-webhook] delivery_request lookup:", drErr.message);
+        } else if (
+          dr &&
+          dr.builder_id === prof.id &&
+          dr.status === "quote_accepted"
+        ) {
+          const stamp = new Date().toISOString();
+          const { error: upDr } = await admin
+            .from("delivery_requests")
+            .update({
+              status: "delivery_quote_paid",
+              delivery_quote_paid_at: stamp,
+              delivery_quote_paystack_reference: reference || null,
+              updated_at: stamp,
+            })
+            .eq("id", drId)
+            .eq("status", "quote_accepted");
+
+          if (upDr) {
+            console.error("[paystack-webhook] delivery_request update:", upDr.message);
+          } else {
+            console.log("[paystack-webhook] marked delivery quote paid:", drId);
+          }
+        }
+      }
     }
   }
 

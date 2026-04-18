@@ -173,6 +173,9 @@ export const DeliveryNoteWorkflow: React.FC<DeliveryNoteWorkflowProps> = ({
       setDeliveryNotes(enriched);
       patchHubDeliveryNotes(builderAuthUserId, builderProfileId ?? undefined, enriched);
     } catch (error: any) {
+      if (error?.name === 'AbortError' || /aborted/i.test(String(error?.message || ''))) {
+        return;
+      }
       console.error('Error fetching delivery notes:', error);
       const code = error?.code as string | undefined;
       const msg = String(error?.message || '');

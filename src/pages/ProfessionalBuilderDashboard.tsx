@@ -98,6 +98,7 @@ import {
 } from "@/utils/builderProjectPurchaseOrders";
 import { formatKesCompact } from "@/utils/kesFormat";
 import { MissingDeliveryAddressAlert } from "@/components/builders/MissingDeliveryAddressAlert";
+import { BuilderDeliveryQuotePanel } from "@/components/delivery/BuilderDeliveryQuotePanel";
 import {
   fetchMyMonitoringServiceRequests,
   monitoringRestOpts,
@@ -3119,6 +3120,12 @@ const ProfessionalBuilderDashboardPage = () => {
                 <MissingDeliveryAddressAlert builderId={builderId} userId={userId} />
               ) : null;
             })()}
+
+            <BuilderDeliveryQuotePanel
+              profileId={profile?.id}
+              authUserId={user?.id}
+              paystackSuccessPath="/professional-builder-dashboard?tab=deliveries"
+            />
             
             <Card>
               <CardContent className="p-0">
@@ -3160,6 +3167,11 @@ const ProfessionalBuilderDashboardPage = () => {
                         </CardDescription>
                       </CardHeader>
                       <CardContent>
+                        <BuilderDeliveryQuotePanel
+                          profileId={profile?.id}
+                          authUserId={user?.id}
+                          paystackSuccessPath="/professional-builder-dashboard?tab=deliveries"
+                        />
                         {/* Info Banner */}
                         <div className="bg-gradient-to-r from-teal-50 to-blue-50 border border-teal-200 rounded-lg p-4 mb-6">
                           <div className="flex items-start gap-3">

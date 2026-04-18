@@ -273,7 +273,7 @@ export const DeliveryPromptDialog: React.FC<DeliveryPromptDialogProps> = ({
       
       // Fetch all pending/assigned delivery_requests for this purchase_order or with same composite key
       const duplicateResponse = await fetchWithTimeout(
-        `${SUPABASE_URL}/rest/v1/delivery_requests?status=in.(pending,assigned)&id=neq.${currentDeliveryRequestId}&select=id,purchase_order_id,delivery_address,material_type&limit=100`,
+        `${SUPABASE_URL}/rest/v1/delivery_requests?status=in.(pending,assigned,quoted,quote_accepted,delivery_quote_paid)&id=neq.${currentDeliveryRequestId}&select=id,purchase_order_id,delivery_address,material_type&limit=100`,
         {
           method: 'GET',
           headers: {
@@ -577,7 +577,7 @@ export const DeliveryPromptDialog: React.FC<DeliveryPromptDialogProps> = ({
         // First, check for existing active delivery request
         // CRITICAL: Also select delivery_address to check if we need to protect it
         const checkResponse = await fetchWithTimeout(
-          `${SUPABASE_URL}/rest/v1/delivery_requests?purchase_order_id=eq.${purchaseOrder.id}&status=in.(pending,assigned,accepted,in_transit,picked_up,out_for_delivery,scheduled)&select=id,status,delivery_address&limit=1`,
+          `${SUPABASE_URL}/rest/v1/delivery_requests?purchase_order_id=eq.${purchaseOrder.id}&status=in.(pending,assigned,quoted,quote_accepted,delivery_quote_paid,accepted,in_transit,picked_up,out_for_delivery,scheduled)&select=id,status,delivery_address&limit=1`,
           {
             method: 'GET',
             headers: {
@@ -748,7 +748,7 @@ export const DeliveryPromptDialog: React.FC<DeliveryPromptDialogProps> = ({
         try {
           // Check by purchase_order_id first
           const finalCheckResponse = await fetchWithTimeout(
-            `${SUPABASE_URL}/rest/v1/delivery_requests?purchase_order_id=eq.${purchaseOrder.id}&status=in.(pending,assigned,requested)&select=id,status&limit=1`,
+            `${SUPABASE_URL}/rest/v1/delivery_requests?purchase_order_id=eq.${purchaseOrder.id}&status=in.(pending,assigned,requested,quoted,quote_accepted,delivery_quote_paid)&select=id,status&limit=1`,
             {
               method: 'GET',
               headers: {
@@ -1010,7 +1010,7 @@ export const DeliveryPromptDialog: React.FC<DeliveryPromptDialogProps> = ({
             if (errorText.includes('duplicate') || errorText.includes('Duplicate') || errorText.includes('unique') || errorText.includes('violates')) {
               // Try to find the existing one
               const findResponse = await fetchWithTimeout(
-                `${SUPABASE_URL}/rest/v1/delivery_requests?purchase_order_id=eq.${purchaseOrder.id}&status=in.(pending,assigned,requested)&select=id&limit=1`,
+                `${SUPABASE_URL}/rest/v1/delivery_requests?purchase_order_id=eq.${purchaseOrder.id}&status=in.(pending,assigned,requested,quoted,quote_accepted,delivery_quote_paid)&select=id&limit=1`,
                 {
                   method: 'GET',
                   headers: {

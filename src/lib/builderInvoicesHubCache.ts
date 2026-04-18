@@ -157,40 +157,62 @@ export async function fetchBuilderHubDeliveryNotes(
   const statuses = [...DN_ACTIVE_STATUSES];
   let list: Record<string, unknown>[] = [];
 
-  if (builderIds.length === 1) {
-    const { data: rows, error } = await supabase
-      .from('delivery_notes')
-      .select(DN_LIST_SELECT)
-      .eq('builder_id', builderIds[0])
-      .in('status', statuses)
-      .order('created_at', { ascending: false })
-      .limit(DN_WORKFLOW_LIST_LIMIT);
-    if (error) throw error;
-    list = (rows || []) as Record<string, unknown>[];
-  } else {
-    const perBuilder = Math.max(50, Math.ceil(DN_WORKFLOW_LIST_LIMIT / builderIds.length));
-    const parts = await Promise.all(
-      builderIds.map((bid) =>
-        supabase
-          .from('delivery_notes')
-          .select(DN_LIST_SELECT)
-          .eq('builder_id', bid)
-          .in('status', statuses)
-          .order('created_at', { ascending: false })
-          .limit(perBuilder)
-      )
-    );
-    const firstErr = parts.find((p) => p.error)?.error;
-    if (firstErr) throw firstErr;
-    const merged = new Map<string, Record<string, unknown>>();
-    for (const p of parts) {
-      for (const row of (p.data || []) as Record<string, unknown>[]) {
-        const id = row.id as string;
-        if (id) merged.set(id, row);
+  const { data: rpcRows, error: rpcErr } = await supabase.rpc('builder_hub_delivery_notes', {
+    p_limit: DN_WORKFLOW_LIST_LIMIT,
+  });
+
+  if (!rpcErr && Array.isArray(rpcRows)) {
+    const pick = (r: Record<string, unknown>) => {
+      const o: Record<string, unknown> = {};
+      for (const k of DN_LIST_SELECT.split(',')) {
+        const key = k.trim();
+        if (key in r) o[key] = r[key];
       }
-    }
-    list = sortSupplyChainDocsNewestFirst([...merged.values()]) as Record<string, unknown>[];
+      return o;
+    };
+    list = (rpcRows as Record<string, unknown>[]).map(pick);
+    list = sortSupplyChainDocsNewestFirst(list) as Record<string, unknown>[];
     if (list.length > DN_WORKFLOW_LIST_LIMIT) list = list.slice(0, DN_WORKFLOW_LIST_LIMIT);
+  } else {
+    if (rpcErr) {
+      console.warn('[hub] builder_hub_delivery_notes RPC failed, using direct query:', rpcErr.message);
+    }
+
+    if (builderIds.length === 1) {
+      const { data: rows, error } = await supabase
+        .from('delivery_notes')
+        .select(DN_LIST_SELECT)
+        .eq('builder_id', builderIds[0])
+        .in('status', statuses)
+        .order('created_at', { ascending: false })
+        .limit(DN_WORKFLOW_LIST_LIMIT);
+      if (error) throw error;
+      list = (rows || []) as Record<string, unknown>[];
+    } else {
+      const perBuilder = Math.max(50, Math.ceil(DN_WORKFLOW_LIST_LIMIT / builderIds.length));
+      const parts = await Promise.all(
+        builderIds.map((bid) =>
+          supabase
+            .from('delivery_notes')
+            .select(DN_LIST_SELECT)
+            .eq('builder_id', bid)
+            .in('status', statuses)
+            .order('created_at', { ascending: false })
+            .limit(perBuilder)
+        )
+      );
+      const firstErr = parts.find((p) => p.error)?.error;
+      if (firstErr) throw firstErr;
+      const merged = new Map<string, Record<string, unknown>>();
+      for (const p of parts) {
+        for (const row of (p.data || []) as Record<string, unknown>[]) {
+          const id = row.id as string;
+          if (id) merged.set(id, row);
+        }
+      }
+      list = sortSupplyChainDocsNewestFirst([...merged.values()]) as Record<string, unknown>[];
+      if (list.length > DN_WORKFLOW_LIST_LIMIT) list = list.slice(0, DN_WORKFLOW_LIST_LIMIT);
+    }
   }
 
   if (list.length === 0) return [];
@@ -228,20 +250,45 @@ export async function fetchBuilderHubDeliveryNotes(
   return sortSupplyChainDocsNewestFirst(enriched as unknown as Record<string, unknown>[]) as unknown[];
 }
 
-export async function fetchBuilderHubGrns(userId: string): Promise<unknown[]> {
-  const { data, error } = await supabase
-    .from('goods_received_notes')
-    .select(
-      `
+export async function fetchBuilderHubGrns(
+  userId: string,
+  builderProfileId?: string | null
+): Promise<unknown[]> {
+  const resolved = resolveBuilderHubProfileId(userId, builderProfileId);
+  const builderIds = uniqueBuilderIds(userId, resolved ?? builderProfileId);
+  if (builderIds.length === 0) return [];
+
+  const selectGrn = `
           *,
           purchase_order:purchase_orders(po_number, items)
-        `
+        `;
+
+  if (builderIds.length === 1) {
+    const { data, error } = await supabase
+      .from('goods_received_notes')
+      .select(selectGrn)
+      .eq('builder_id', builderIds[0])
+      .order('created_at', { ascending: false })
+      .limit(400);
+    if (error) throw error;
+    return sortSupplyChainDocsNewestFirst((data || []) as unknown as Record<string, unknown>[]) as unknown[];
+  }
+
+  const parts = await Promise.all(
+    builderIds.map((bid) =>
+      supabase.from('goods_received_notes').select(selectGrn).eq('builder_id', bid).order('created_at', { ascending: false }).limit(400)
     )
-    .eq('builder_id', userId)
-    .order('created_at', { ascending: false })
-    .limit(400);
-  if (error) throw error;
-  return sortSupplyChainDocsNewestFirst((data || []) as unknown as Record<string, unknown>[]) as unknown[];
+  );
+  const firstErr = parts.find((p) => p.error)?.error;
+  if (firstErr) throw firstErr;
+  const merged = new Map<string, Record<string, unknown>>();
+  for (const p of parts) {
+    for (const row of (p.data || []) as Record<string, unknown>[]) {
+      const id = row.id as string;
+      if (id) merged.set(id, row);
+    }
+  }
+  return sortSupplyChainDocsNewestFirst([...merged.values()]) as unknown[];
 }
 
 export async function fetchBuilderHubInvoices(
@@ -347,7 +394,7 @@ export function warmBuilderInvoicesHub(authUserId: string | undefined, profileId
     .catch(() => {})
     .finally(() => finishInflight(key));
 
-  void fetchBuilderHubGrns(authUserId)
+  void fetchBuilderHubGrns(authUserId, profileId)
     .then((data) => {
       if (slots?.key === key) slots.grns = { at: Date.now(), data };
       emitHubCacheUpdated();

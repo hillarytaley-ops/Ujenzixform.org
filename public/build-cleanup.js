@@ -15,7 +15,6 @@
   var KEY = 'ujenzi_build';
   var last = localStorage.getItem(KEY);
   if (last === BUILD) {
-    console.log('🚀 UjenziXform BUILD:', BUILD);
     return;
   }
   localStorage.setItem(KEY, BUILD);
@@ -39,5 +38,4 @@
     window.location.replace(url.toString());
     return;
   }
-  console.log('🚀 UjenziXform BUILD:', BUILD);
 })();

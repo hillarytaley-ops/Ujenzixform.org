@@ -99,8 +99,10 @@ export const initSentry = () => {
     },
   });
 
-  console.log('✅ Sentry initialized for error monitoring');
-  
+  if (import.meta.env.DEV) {
+    console.log('✅ Sentry initialized for error monitoring');
+  }
+
   // Expose test function globally for debugging (only in production)
   if (isProduction) {
     (window as any).testSentry = () => {
@@ -109,7 +111,6 @@ export const initSentry = () => {
       console.log('✅ Test error sent to Sentry! Check your dashboard in 1-2 minutes.');
       return 'Error sent!';
     };
-    console.log('💡 To test Sentry, type: testSentry()');
   }
 };
 

@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
@@ -341,6 +342,10 @@ interface BuilderDeliveryRequest {
   cancellation_reason?: string;
   estimated_cost?: number;
   final_cost?: number;
+  delivery_quote_notes?: string | null;
+  delivery_quote_sent_at?: string | null;
+  delivery_quote_paid_at?: string | null;
+  delivery_quote_paystack_reference?: string | null;
   current_location?: string;
   tracking_updates?: any;
   created_at: string;
@@ -398,6 +403,8 @@ const AdminDashboard = () => {
   const [deliveryApplications, setDeliveryApplications] = useState<DeliveryApplication[]>([]);
   const [builderDeliveryRequests, setBuilderDeliveryRequests] = useState<BuilderDeliveryRequest[]>([]);
   const [alertingNearbyId, setAlertingNearbyId] = useState<string | null>(null);
+  const [quoteDraftById, setQuoteDraftById] = useState<Record<string, { amount: string; notes: string }>>({});
+  const [sendingQuoteId, setSendingQuoteId] = useState<string | null>(null);
   const [mlStats, setMLStats] = useState<MLStats>({
     totalPredictions: 0,
     successRate: 0,
@@ -1165,6 +1172,10 @@ const AdminDashboard = () => {
           cancellation_reason: req.cancellation_reason,
           estimated_cost: req.estimated_cost,
           final_cost: req.final_cost,
+          delivery_quote_notes: req.delivery_quote_notes ?? null,
+          delivery_quote_sent_at: req.delivery_quote_sent_at ?? null,
+          delivery_quote_paid_at: req.delivery_quote_paid_at ?? null,
+          delivery_quote_paystack_reference: req.delivery_quote_paystack_reference ?? null,
           current_location: req.current_location,
           tracking_updates: req.tracking_updates,
           created_at: req.created_at,
@@ -1181,6 +1192,24 @@ const AdminDashboard = () => {
       // Don't clear existing data on error
     }
   };
+
+  useEffect(() => {
+    setQuoteDraftById((prev) => {
+      const next = { ...prev };
+      for (const r of builderDeliveryRequests) {
+        if (next[r.id] === undefined) {
+          next[r.id] = {
+            amount:
+              r.estimated_cost != null && r.estimated_cost !== undefined
+                ? String(r.estimated_cost)
+                : '',
+            notes: r.delivery_quote_notes ?? '',
+          };
+        }
+      }
+      return next;
+    });
+  }, [builderDeliveryRequests]);
   
   const loadDocuments = async () => {
     try {
@@ -3324,6 +3353,10 @@ const AdminDashboard = () => {
                         key={request.id} 
                         className={`p-4 rounded-lg border ${
                           request.status === 'pending' ? 'bg-yellow-900/20 border-yellow-700' :
+                          request.status === 'quoted' ? 'bg-sky-900/20 border-sky-600' :
+                          request.status === 'quote_accepted' ? 'bg-amber-900/20 border-amber-600' :
+                          request.status === 'delivery_quote_paid' ? 'bg-teal-900/20 border-teal-600' :
+                          request.status === 'quote_rejected' ? 'bg-slate-900/40 border-slate-600' :
                           request.status === 'assigned' ? 'bg-blue-900/20 border-blue-700' :
                           request.status === 'in_transit' ? 'bg-purple-900/20 border-purple-700' :
                           request.status === 'delivered' ? 'bg-green-900/20 border-green-700' :
@@ -3337,12 +3370,21 @@ const AdminDashboard = () => {
                               <span className="font-mono text-sm text-gray-400">{request.id.slice(0, 8)}...</span>
                               <Badge className={
                                 request.status === 'pending' ? 'bg-yellow-600' :
+                                request.status === 'quoted' ? 'bg-sky-600' :
+                                request.status === 'quote_accepted' ? 'bg-amber-600' :
+                                request.status === 'delivery_quote_paid' ? 'bg-teal-600' :
+                                request.status === 'quote_rejected' ? 'bg-slate-600' :
                                 request.status === 'assigned' ? 'bg-blue-600' :
                                 request.status === 'in_transit' ? 'bg-purple-600' :
                                 request.status === 'delivered' || request.status === 'completed' ? 'bg-green-600' :
                                 'bg-gray-600'
                               }>
-                                {request.status === 'in_transit' ? 'In Transit' : request.status}
+                                {request.status === 'in_transit' ? 'In Transit' :
+                                 request.status === 'delivery_quote_paid' ? 'Quote paid' :
+                                 request.status === 'quote_accepted' ? 'Awaiting payment' :
+                                 request.status === 'quote_rejected' ? 'Quote declined' :
+                                 request.status === 'quoted' ? 'Quoted' :
+                                 request.status}
                               </Badge>
                               {request.required_vehicle_type && (
                                 <Badge variant="outline" className="border-slate-600">
@@ -3390,10 +3432,21 @@ const AdminDashboard = () => {
                               </div>
                             </div>
 
-                            {request.estimated_cost && (
-                              <div className="p-2 bg-slate-800/30 rounded">
-                                <p className="text-gray-500 text-xs">Estimated Cost</p>
-                                <p className="text-gray-300 text-sm">KES {request.estimated_cost.toLocaleString()}</p>
+                            {(request.estimated_cost != null || request.delivery_quote_notes) && (
+                              <div className="p-2 bg-slate-800/30 rounded space-y-1">
+                                <p className="text-gray-500 text-xs">Delivery quote (KES)</p>
+                                {request.estimated_cost != null && (
+                                  <p className="text-gray-300 text-sm">KES {Number(request.estimated_cost).toLocaleString()}</p>
+                                )}
+                                {request.delivery_quote_notes && (
+                                  <p className="text-gray-400 text-xs whitespace-pre-wrap">{request.delivery_quote_notes}</p>
+                                )}
+                                {request.delivery_quote_sent_at && (
+                                  <p className="text-gray-500 text-xs">Sent {new Date(request.delivery_quote_sent_at).toLocaleString()}</p>
+                                )}
+                                {request.delivery_quote_paid_at && (
+                                  <p className="text-emerald-400 text-xs">Paid {new Date(request.delivery_quote_paid_at).toLocaleString()}</p>
+                                )}
                               </div>
                             )}
 
@@ -3432,8 +3485,141 @@ const AdminDashboard = () => {
                           </div>
 
                           {/* Actions */}
-                          <div className="flex flex-col gap-2 min-w-[180px]">
-                            {request.status === 'pending' && (
+                          <div className="flex flex-col gap-2 min-w-[220px]">
+                            {(request.status === 'pending' || request.status === 'quoted') && (
+                              <>
+                                <div className="space-y-2 rounded-md border border-slate-600 bg-slate-900/40 p-3">
+                                  <Label className="text-gray-300 text-xs">Quote amount (KES)</Label>
+                                  <Input
+                                    type="number"
+                                    min={1}
+                                    step={1}
+                                    className="bg-slate-900 border-slate-600 text-white"
+                                    value={quoteDraftById[request.id]?.amount ?? ''}
+                                    onChange={(e) => {
+                                      const v = e.target.value;
+                                      setQuoteDraftById((p) => ({
+                                        ...p,
+                                        [request.id]: {
+                                          amount: v,
+                                          notes: p[request.id]?.notes ?? request.delivery_quote_notes ?? '',
+                                        },
+                                      }));
+                                    }}
+                                  />
+                                  <Label className="text-gray-300 text-xs">Quote notes (optional)</Label>
+                                  <Textarea
+                                    className="bg-slate-900 border-slate-600 text-white min-h-[72px] text-sm"
+                                    value={quoteDraftById[request.id]?.notes ?? ''}
+                                    onChange={(e) => {
+                                      const v = e.target.value;
+                                      setQuoteDraftById((p) => ({
+                                        ...p,
+                                        [request.id]: {
+                                          amount:
+                                            p[request.id]?.amount ??
+                                            (request.estimated_cost != null ? String(request.estimated_cost) : ''),
+                                          notes: v,
+                                        },
+                                      }));
+                                    }}
+                                  />
+                                  <Button
+                                    size="sm"
+                                    className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                                    disabled={sendingQuoteId === request.id}
+                                    onClick={async () => {
+                                      const draft = quoteDraftById[request.id] ?? {
+                                        amount: '',
+                                        notes: '',
+                                      };
+                                      const amt = parseFloat(String(draft.amount).replace(/,/g, ''));
+                                      if (!Number.isFinite(amt) || amt < 1) {
+                                        toast({
+                                          variant: 'destructive',
+                                          title: 'Invalid amount',
+                                          description: 'Enter a quote of at least KES 1.',
+                                        });
+                                        return;
+                                      }
+                                      setSendingQuoteId(request.id);
+                                      try {
+                                        const { error } = await supabase
+                                          .from('delivery_requests')
+                                          .update({
+                                            estimated_cost: amt,
+                                            delivery_quote_notes: draft.notes?.trim() || null,
+                                            delivery_quote_sent_at: new Date().toISOString(),
+                                            status: 'quoted',
+                                            updated_at: new Date().toISOString(),
+                                          })
+                                          .eq('id', request.id);
+                                        if (error) throw error;
+                                        toast({
+                                          title: request.status === 'quoted' ? 'Quote updated' : 'Quote sent',
+                                          description:
+                                            'The builder can accept and pay with Paystack. After payment, nearby drivers are alerted automatically.',
+                                        });
+                                        loadBuilderDeliveryRequests();
+                                      } catch (e: unknown) {
+                                        toast({
+                                          variant: 'destructive',
+                                          title: 'Could not save quote',
+                                          description: e instanceof Error ? e.message : 'Update failed.',
+                                        });
+                                      } finally {
+                                        setSendingQuoteId(null);
+                                      }
+                                    }}
+                                  >
+                                    {sendingQuoteId === request.id ? (
+                                      <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                                    ) : null}
+                                    {request.status === 'quoted' ? 'Update quote' : 'Send quote to builder'}
+                                  </Button>
+                                </div>
+                                <Button
+                                  size="sm"
+                                  variant="destructive"
+                                  onClick={async () => {
+                                    try {
+                                      await supabase
+                                        .from('delivery_requests')
+                                        .update({
+                                          status: 'cancelled',
+                                          updated_at: new Date().toISOString(),
+                                        })
+                                        .eq('id', request.id);
+
+                                      toast({
+                                        title: '❌ Request Cancelled',
+                                        description: 'Delivery request has been cancelled.',
+                                      });
+                                      loadBuilderDeliveryRequests();
+                                    } catch (error) {
+                                      toast({
+                                        variant: 'destructive',
+                                        title: 'Error',
+                                        description: 'Failed to cancel request.',
+                                      });
+                                    }
+                                  }}
+                                >
+                                  <XCircle className="h-4 w-4 mr-1" />
+                                  Cancel
+                                </Button>
+                              </>
+                            )}
+                            {request.status === 'quote_accepted' && (
+                              <p className="text-xs text-amber-100/90 leading-relaxed">
+                                Builder accepted the quote. Waiting for Paystack payment — nearby drivers are notified
+                                automatically after payment succeeds.
+                              </p>
+                            )}
+                            {request.status === 'quote_rejected' && (
+                              <p className="text-xs text-slate-400">The builder declined this delivery quote.</p>
+                            )}
+                            {request.status === 'delivery_quote_paid' && (
                               <>
                                 <Button
                                   size="sm"
@@ -3502,26 +3688,25 @@ const AdminDashboard = () => {
                                   size="sm"
                                   className="bg-blue-600 hover:bg-blue-700"
                                   onClick={async () => {
-                                    // In production, you'd open a modal to select a provider
                                     try {
                                       await supabase
                                         .from('delivery_requests')
-                                        .update({ 
+                                        .update({
                                           status: 'assigned',
-                                          updated_at: new Date().toISOString()
+                                          updated_at: new Date().toISOString(),
                                         })
                                         .eq('id', request.id);
-                                      
+
                                       toast({
-                                        title: "✅ Request Assigned",
-                                        description: "Delivery request marked as assigned."
+                                        title: '✅ Request Assigned',
+                                        description: 'Delivery request marked as assigned.',
                                       });
                                       loadBuilderDeliveryRequests();
                                     } catch (error) {
                                       toast({
-                                        variant: "destructive",
-                                        title: "Error",
-                                        description: "Failed to assign request."
+                                        variant: 'destructive',
+                                        title: 'Error',
+                                        description: 'Failed to assign request.',
                                       });
                                     }
                                   }}
@@ -3536,22 +3721,22 @@ const AdminDashboard = () => {
                                     try {
                                       await supabase
                                         .from('delivery_requests')
-                                        .update({ 
+                                        .update({
                                           status: 'cancelled',
-                                          updated_at: new Date().toISOString()
+                                          updated_at: new Date().toISOString(),
                                         })
                                         .eq('id', request.id);
-                                      
+
                                       toast({
-                                        title: "❌ Request Cancelled",
-                                        description: "Delivery request has been cancelled."
+                                        title: '❌ Request Cancelled',
+                                        description: 'Delivery request has been cancelled.',
                                       });
                                       loadBuilderDeliveryRequests();
                                     } catch (error) {
                                       toast({
-                                        variant: "destructive",
-                                        title: "Error",
-                                        description: "Failed to cancel request."
+                                        variant: 'destructive',
+                                        title: 'Error',
+                                        description: 'Failed to cancel request.',
                                       });
                                     }
                                   }}
