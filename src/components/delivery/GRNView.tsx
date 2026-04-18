@@ -55,6 +55,8 @@ export const GRNView: React.FC<GRNViewProps> = ({ userId, userRole, hubCacheProf
   const [refreshing, setRefreshing] = useState(false);
   const { toast } = useToast();
 
+  const GRN_FETCH_TIMEOUT_MS = 45_000;
+
   const fetchGRNs = async (opts?: { silent?: boolean }) => {
     const silent = opts?.silent === true;
     const isBuilder = userRole === 'builder';
@@ -71,7 +73,18 @@ export const GRNView: React.FC<GRNViewProps> = ({ userId, userRole, hubCacheProf
       if (!silent && !isBuilder) setSupplierLoading(true);
 
       if (isBuilder) {
-        const sorted = (await fetchBuilderHubGrns(userId, hubCacheProfileId ?? undefined)) as GRN[];
+        const sorted = await new Promise<GRN[]>((resolve, reject) => {
+          const t = setTimeout(() => reject(new Error('grn_fetch_timeout')), GRN_FETCH_TIMEOUT_MS);
+          void fetchBuilderHubGrns(userId, hubCacheProfileId ?? undefined)
+            .then((data) => {
+              clearTimeout(t);
+              resolve(data as GRN[]);
+            })
+            .catch((e) => {
+              clearTimeout(t);
+              reject(e);
+            });
+        });
         setGRNs(sorted);
         patchHubGrns(userId, hubCacheProfileId ?? undefined, sorted);
         return;
@@ -108,6 +121,16 @@ export const GRNView: React.FC<GRNViewProps> = ({ userId, userRole, hubCacheProf
       setGRNs(sorted);
     } catch (error: any) {
       if (error?.name === 'AbortError' || /aborted/i.test(String(error?.message || ''))) {
+        return;
+      }
+      const msg = String(error?.message || '');
+      if (msg.includes('grn_fetch_timeout')) {
+        toast({
+          title: 'GRNs are taking too long',
+          description: 'Try Refresh. If this keeps happening, ask your admin to check GRN / purchase_orders performance on Supabase.',
+          variant: 'destructive',
+        });
+        setGRNs([]);
         return;
       }
       console.error('Error fetching GRNs:', error);
@@ -149,7 +172,7 @@ export const GRNView: React.FC<GRNViewProps> = ({ userId, userRole, hubCacheProf
   useEffect(() => {
     if (userId) {
       void fetchGRNs();
-      
+
       // Mark as viewed by supplier when they view it
       if (userRole === 'supplier') {
         const markAsViewed = async () => {
@@ -158,7 +181,7 @@ export const GRNView: React.FC<GRNViewProps> = ({ userId, userRole, hubCacheProf
             .select('id')
             .eq('user_id', userId)
             .single();
-          
+
           if (supplier) {
             await supabase
               .from('goods_received_notes')
@@ -170,7 +193,7 @@ export const GRNView: React.FC<GRNViewProps> = ({ userId, userRole, hubCacheProf
         markAsViewed();
       }
     }
-  }, [userId, userRole]);
+  }, [userId, userRole, hubCacheProfileId]);
 
   const handleDownloadGRN = (grn: GRN) => {
     const ok = openGrnPrintWindow(grn, {

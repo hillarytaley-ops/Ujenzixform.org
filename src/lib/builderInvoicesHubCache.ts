@@ -258,9 +258,10 @@ export async function fetchBuilderHubGrns(
   const builderIds = uniqueBuilderIds(userId, resolved ?? builderProfileId);
   if (builderIds.length === 0) return [];
 
+  // Omit purchase_orders.items — large JSONB embed often stalls PostgREST; list uses grn.items + po_number.
   const selectGrn = `
           *,
-          purchase_order:purchase_orders(po_number, items)
+          purchase_order:purchase_orders(po_number)
         `;
 
   if (builderIds.length === 1) {
