@@ -228,6 +228,17 @@ export const GRNView: React.FC<GRNViewProps> = ({ userId, userRole, hubCacheProf
         </div>
       )}
 
+      {userRole === 'builder' && !listReady && (
+        <div
+          className="flex items-center gap-2 rounded-md border border-dashed bg-muted/30 px-3 py-8 text-sm text-muted-foreground"
+          aria-busy="true"
+          aria-label="Loading GRNs"
+        >
+          <Loader2 className="h-5 w-5 shrink-0 animate-spin" />
+          <span>Loading GRNs…</span>
+        </div>
+      )}
+
       {listReady && grns.length === 0 && (
         <Card>
           <CardContent className="py-12 text-center">

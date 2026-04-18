@@ -542,6 +542,7 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
   };
 
   const supplierBlockingLoad = userRole !== 'builder' && loading && invoices.length === 0;
+  const builderListLoading = userRole === 'builder' && !listReady;
 
   return (
     <div className="space-y-4">
@@ -576,6 +577,17 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
           aria-label="Loading invoices"
         >
           <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
+          <span>Loading supplier invoices…</span>
+        </div>
+      )}
+
+      {builderListLoading && (
+        <div
+          className="flex items-center gap-2 rounded-md border border-dashed bg-muted/30 px-3 py-8 text-sm text-muted-foreground"
+          aria-busy="true"
+          aria-label="Loading invoices"
+        >
+          <Loader2 className="h-5 w-5 shrink-0 animate-spin" />
           <span>Loading supplier invoices…</span>
         </div>
       )}

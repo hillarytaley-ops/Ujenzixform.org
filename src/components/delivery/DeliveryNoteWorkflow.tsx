@@ -441,6 +441,17 @@ export const DeliveryNoteWorkflow: React.FC<DeliveryNoteWorkflowProps> = ({
         </Button>
       </div>
 
+      {!listReady && (
+        <div
+          className="flex items-center gap-2 rounded-md border border-dashed bg-muted/30 px-3 py-8 text-sm text-muted-foreground"
+          aria-busy="true"
+          aria-label="Loading delivery notes"
+        >
+          <Loader2 className="h-5 w-5 shrink-0 animate-spin" />
+          <span>Loading delivery notes…</span>
+        </div>
+      )}
+
       {listReady && deliveryNotes.length === 0 && (
         <Card>
           <CardContent className="py-12 text-center">
