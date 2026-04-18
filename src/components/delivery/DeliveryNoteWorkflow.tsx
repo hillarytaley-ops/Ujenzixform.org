@@ -15,6 +15,7 @@ import {
 import SignatureCanvas from 'react-signature-canvas';
 import { ResponsiveSignatureCanvas } from '@/components/ui/ResponsiveSignatureCanvas';
 import {
+  builderHubListFetchWithTimeout,
   fetchBuilderHubDeliveryNotes,
   invalidateBuilderInvoicesHub,
   patchHubDeliveryNotes,
@@ -166,14 +167,24 @@ export const DeliveryNoteWorkflow: React.FC<DeliveryNoteWorkflowProps> = ({
         return;
       }
 
-      const enriched = (await fetchBuilderHubDeliveryNotes(
-        builderAuthUserId,
-        builderProfileId ?? undefined
+      const enriched = (await builderHubListFetchWithTimeout(
+        fetchBuilderHubDeliveryNotes(builderAuthUserId, builderProfileId ?? undefined),
+        'dn_fetch_timeout'
       )) as DeliveryNote[];
       setDeliveryNotes(enriched);
       patchHubDeliveryNotes(builderAuthUserId, builderProfileId ?? undefined, enriched);
     } catch (error: any) {
       if (error?.name === 'AbortError' || /aborted/i.test(String(error?.message || ''))) {
+        return;
+      }
+      const msg = String(error?.message || '');
+      if (msg.includes('dn_fetch_timeout')) {
+        toast({
+          title: 'Delivery notes are taking too long',
+          description: 'Try Refresh. If this keeps happening, ask your admin to check delivery_notes / RPC performance on Supabase.',
+          variant: 'destructive',
+        });
+        setDeliveryNotes([]);
         return;
       }
       console.error('Error fetching delivery notes:', error);
@@ -213,7 +224,7 @@ export const DeliveryNoteWorkflow: React.FC<DeliveryNoteWorkflowProps> = ({
 
   useEffect(() => {
     dnFetchGenerationRef.current = 0;
-  }, [builderAuthUserId]);
+  }, [builderAuthUserId, builderProfileId]);
 
   useEffect(() => {
     if (!(builderAuthUserId || builderProfileId)) {

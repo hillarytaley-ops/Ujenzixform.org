@@ -30,6 +30,7 @@ import { sortSupplyChainDocsNewestFirst } from '@/utils/sortSupplyChainDocs';
 import { PaystackCheckout, isPaystackTestModeBanner } from '@/components/payment/PaystackCheckout';
 import { Separator } from '@/components/ui/separator';
 import {
+  builderHubListFetchWithTimeout,
   fetchBuilderHubInvoices,
   patchHubInvoices,
   peekHubInvoices,
@@ -211,7 +212,10 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
       }
 
       if (userRole === 'builder') {
-        const list = (await fetchBuilderHubInvoices(userId, builderProfileId ?? undefined)) as Invoice[];
+        const list = (await builderHubListFetchWithTimeout(
+          fetchBuilderHubInvoices(userId, builderProfileId ?? undefined),
+          'invoice_fetch_timeout'
+        )) as Invoice[];
         setInvoices(list);
         patchHubInvoices(userId, builderProfileId ?? undefined, list);
         return;
@@ -229,6 +233,16 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
       );
     } catch (error: any) {
       if (error?.name === 'AbortError' || /aborted/i.test(String(error?.message || ''))) {
+        return;
+      }
+      const msg = String(error?.message || '');
+      if (msg.includes('invoice_fetch_timeout')) {
+        toast({
+          title: 'Invoices are taking too long',
+          description: 'Try Refresh. If this keeps happening, ask your admin to check invoices / purchase_orders performance on Supabase.',
+          variant: 'destructive',
+        });
+        setInvoices([]);
         return;
       }
       console.error('Error fetching invoices:', error);
@@ -255,7 +269,7 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
 
   useEffect(() => {
     invoiceFetchGenerationRef.current = 0;
-  }, [userId]);
+  }, [userId, userRole, supplierRecordId, builderProfileId]);
 
   useEffect(() => {
     if (!userId) return;

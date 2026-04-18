@@ -13,6 +13,7 @@ import {
 } from '@/utils/grnDocument';
 import { sortSupplyChainDocsNewestFirst } from '@/utils/sortSupplyChainDocs';
 import {
+  builderHubListFetchWithTimeout,
   fetchBuilderHubGrns,
   patchHubGrns,
   peekHubGrns,
@@ -55,8 +56,6 @@ export const GRNView: React.FC<GRNViewProps> = ({ userId, userRole, hubCacheProf
   const [refreshing, setRefreshing] = useState(false);
   const { toast } = useToast();
 
-  const GRN_FETCH_TIMEOUT_MS = 45_000;
-
   const fetchGRNs = async (opts?: { silent?: boolean }) => {
     const silent = opts?.silent === true;
     const isBuilder = userRole === 'builder';
@@ -73,18 +72,10 @@ export const GRNView: React.FC<GRNViewProps> = ({ userId, userRole, hubCacheProf
       if (!silent && !isBuilder) setSupplierLoading(true);
 
       if (isBuilder) {
-        const sorted = await new Promise<GRN[]>((resolve, reject) => {
-          const t = setTimeout(() => reject(new Error('grn_fetch_timeout')), GRN_FETCH_TIMEOUT_MS);
-          void fetchBuilderHubGrns(userId, hubCacheProfileId ?? undefined)
-            .then((data) => {
-              clearTimeout(t);
-              resolve(data as GRN[]);
-            })
-            .catch((e) => {
-              clearTimeout(t);
-              reject(e);
-            });
-        });
+        const sorted = (await builderHubListFetchWithTimeout(
+          fetchBuilderHubGrns(userId, hubCacheProfileId ?? undefined),
+          'grn_fetch_timeout'
+        )) as GRN[];
         setGRNs(sorted);
         patchHubGrns(userId, hubCacheProfileId ?? undefined, sorted);
         return;

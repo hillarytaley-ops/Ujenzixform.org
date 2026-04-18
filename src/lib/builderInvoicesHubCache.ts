@@ -9,6 +9,29 @@ import { sortSupplyChainDocsNewestFirst } from '@/utils/sortSupplyChainDocs';
 
 const TTL_MS = 90_000;
 
+/** Client-side cap so DN / GRN / invoice hub subtabs never spin forever if PostgREST hangs. */
+export const BUILDER_HUB_LIST_FETCH_TIMEOUT_MS = 45_000;
+
+export function builderHubListFetchWithTimeout<T>(
+  promise: Promise<T>,
+  timeoutToken: string,
+  ms: number = BUILDER_HUB_LIST_FETCH_TIMEOUT_MS
+): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const t = setTimeout(() => reject(new Error(timeoutToken)), ms);
+    promise.then(
+      (v) => {
+        clearTimeout(t);
+        resolve(v);
+      },
+      (e) => {
+        clearTimeout(t);
+        reject(e);
+      }
+    );
+  });
+}
+
 const DN_WORKFLOW_LIST_LIMIT = 500;
 const DN_ACTIVE_STATUSES = [
   'pending_signature',
