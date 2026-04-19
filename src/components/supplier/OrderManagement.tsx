@@ -48,6 +48,7 @@ import {
 } from "lucide-react";
 import { supabase, SUPABASE_URL, SUPABASE_ANON_KEY } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { summarizeMonitoringPackageFromPurchaseOrder } from "@/utils/monitoringPackageFromPurchaseOrder";
 import { purchaseOrderRequiresDeliveryProvider } from "@/utils/purchaseOrderFulfillment";
 import { format } from 'date-fns';
 import { getPrefetchedOrders } from '@/services/dataPrefetch';
@@ -87,6 +88,8 @@ interface Order {
   estimated_delivery_time?: string;
   delivery_required?: boolean; // Track if builder requested delivery
   builder_fulfillment_choice?: string | null;
+  /** When the PO looks like a monitoring quote, human-readable package tier */
+  monitoring_package_summary?: string | null;
 }
 
 interface OrderManagementProps {
@@ -128,6 +131,7 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, in
   const transformOrdersQuick = (purchaseOrders: any[]): Order[] => {
     return purchaseOrders.map((po: any, index: number) => {
       const items = Array.isArray(po.items) ? po.items : [];
+      const monitoring_package_summary = summarizeMonitoringPackageFromPurchaseOrder(po as Record<string, unknown>);
       return {
         id: po.id,
         order_number: po.po_number || `ORD-${String(index + 1).padStart(4, '0')}`,
@@ -158,6 +162,7 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, in
         estimated_delivery_time: po.estimated_delivery_time,
         delivery_required: po.delivery_required || false,
         builder_fulfillment_choice: po.builder_fulfillment_choice ?? null,
+        monitoring_package_summary,
       };
     });
   };
@@ -966,6 +971,7 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, in
         realOrders = purchaseOrders.map((po: any, index: number) => {
         const buyer = buyerProfiles[po.buyer_id] || {};
         const items = Array.isArray(po.items) ? po.items : [];
+        const monitoring_package_summary = summarizeMonitoringPackageFromPurchaseOrder(po as Record<string, unknown>);
         // Determine if this is a quote request or an order
         // Quote requests: pending quotes, quoted, or quote-related statuses
         // Orders: quote_accepted and beyond (order_created, awaiting_delivery_request, etc.)
@@ -1042,6 +1048,7 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, in
           estimated_delivery_time: po.estimated_delivery_time || undefined,
           delivery_required: po.delivery_required || false,
           builder_fulfillment_choice: po.builder_fulfillment_choice ?? null,
+          monitoring_package_summary,
         };
       });
       } catch (mapErr) {
@@ -1049,6 +1056,7 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, in
         realOrders = purchaseOrders.map((po: any, index: number) => {
           const buyer = buyerProfiles[po.buyer_id] || {};
           const items = Array.isArray(po.items) ? po.items : [];
+          const monitoring_package_summary = summarizeMonitoringPackageFromPurchaseOrder(po as Record<string, unknown>);
           return {
             id: po.id,
             order_number: po.po_number || `ORD-${String(index + 1).padStart(4, '0')}`,
@@ -1075,6 +1083,7 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, in
             estimated_delivery_time: po.estimated_delivery_time,
             delivery_required: po.delivery_required || false,
             builder_fulfillment_choice: po.builder_fulfillment_choice ?? null,
+            monitoring_package_summary,
           };
         });
       }
@@ -1361,6 +1370,12 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, in
                   </TableCell>
                   <TableCell>
                     <p className="text-sm">{order.items.length} item(s)</p>
+                    {order.monitoring_package_summary ? (
+                      <p className={`text-xs mt-1 max-w-[220px] leading-snug ${mutedText}`}>
+                        <span className="font-medium text-foreground">Monitoring package:</span>{" "}
+                        {order.monitoring_package_summary}
+                      </p>
+                    ) : null}
                   </TableCell>
                   <TableCell className="font-semibold">{formatCurrency(order.total_amount)}</TableCell>
                   <TableCell>
@@ -1687,6 +1702,12 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, in
                     <CardTitle className="text-sm">Order Items</CardTitle>
                   </CardHeader>
                   <CardContent>
+                    {selectedOrder.monitoring_package_summary ? (
+                      <p className="text-sm mb-3 rounded-md border bg-muted/40 px-3 py-2">
+                        <span className="font-semibold">Monitoring package:</span>{" "}
+                        {selectedOrder.monitoring_package_summary}
+                      </p>
+                    ) : null}
                     <Table>
                       <TableHeader>
                         <TableRow>

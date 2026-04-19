@@ -6,6 +6,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useLanguage } from "@/contexts/LanguageContext";
 import Footer from "@/components/Footer";
 import { SUPPORT_PHONE_PRIMARY, SUPPORT_EMAIL } from "@/config/appIdentity";
+import { summarizeMonitoringPackageFromPurchaseOrder } from "@/utils/monitoringPackageFromPurchaseOrder";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -368,6 +369,14 @@ const QuotesManagementContent: React.FC<QuotesManagementContentProps> = ({
                     <div className="min-w-0 flex-1">
                       <h4 className={`font-semibold ${textColor} break-words`}>{quote.builder_name || 'Professional Builder'}</h4>
                       <p className={`text-sm font-medium text-blue-600 break-words mt-0.5`}>{quote.material_name}</p>
+                      {quote.monitoring_package_line ? (
+                        <p className={`text-sm mt-1 ${textColor}`}>
+                          <span className={`font-semibold ${isDarkMode ? "text-slate-200" : "text-slate-800"}`}>
+                            Monitoring package:
+                          </span>{" "}
+                          <span className={mutedText}>{quote.monitoring_package_line}</span>
+                        </p>
+                      ) : null}
                       <p className={`text-sm ${mutedText}`}>Qty: {quote.quantity} {quote.unit}</p>
                       {quote.delivery_address && (
                         <p className={`text-xs mt-1 ${mutedText}`}>
@@ -1037,27 +1046,36 @@ const SupplierDashboard = () => {
       }
 
       // Transform purchase_orders to match quote display format
-      const transformedPOQuotes = (purchaseOrderQuotes || []).map(po => ({
-        id: po.id,
-        material_name: po.items?.[0]?.material_name || po.project_name || 'Quote Request',
-        quantity: po.items?.reduce((sum: number, item: any) => sum + (item.quantity || 0), 0) || 1,
-        unit: po.items?.[0]?.unit || 'items',
-        delivery_address: po.delivery_address || 'To be provided',
-        project_description: po.project_name,
-        special_requirements: null,
-        preferred_delivery_date: po.delivery_date,
-        status: po.status,
-        quote_amount: po.quote_amount || po.total_amount,
-        quote_valid_until: null,
-        supplier_notes: null,
-        created_at: po.created_at,
-        buyer_id: po.buyer_id,
-        purchase_order_id: po.id,
-        // Include all items for display
-        items: po.items,
-        po_number: po.po_number,
-        total_amount: po.total_amount
-      }));
+      const transformedPOQuotes = (purchaseOrderQuotes || []).map((po) => {
+        const monitoringPackageLine = summarizeMonitoringPackageFromPurchaseOrder(po as Record<string, unknown>);
+        const rawMaterial =
+          po.items?.[0]?.material_name || po.items?.[0]?.name || po.project_name || "Quote Request";
+        const material_name =
+          monitoringPackageLine && !String(rawMaterial).toLowerCase().includes("monitoring")
+            ? `${rawMaterial} (monitoring)`
+            : rawMaterial;
+        return {
+          id: po.id,
+          material_name,
+          monitoring_package_line: monitoringPackageLine,
+          quantity: po.items?.reduce((sum: number, item: any) => sum + (item.quantity || 0), 0) || 1,
+          unit: po.items?.[0]?.unit || "items",
+          delivery_address: po.delivery_address || "To be provided",
+          project_description: po.project_name,
+          special_requirements: null,
+          preferred_delivery_date: po.delivery_date,
+          status: po.status,
+          quote_amount: po.quote_amount || po.total_amount,
+          quote_valid_until: null,
+          supplier_notes: null,
+          created_at: po.created_at,
+          buyer_id: po.buyer_id,
+          purchase_order_id: po.id,
+          items: po.items,
+          po_number: po.po_number,
+          total_amount: po.total_amount,
+        };
+      });
 
       // Remove duplicates by id
       const uniqueQuotes = transformedPOQuotes.filter((quote, index, self) => 
