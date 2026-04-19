@@ -30,6 +30,7 @@ import { sortSupplyChainDocsNewestFirst } from '@/utils/sortSupplyChainDocs';
 import { chunkArray } from '@/utils/performance';
 import { PaystackCheckout, isPaystackTestModeBanner } from '@/components/payment/PaystackCheckout';
 import { Separator } from '@/components/ui/separator';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   builderHubListFetchWithTimeout,
   fetchBuilderHubInvoices,
@@ -74,8 +75,6 @@ interface InvoiceManagementProps {
   supplierRecordId?: string | null;
   /** profiles.id — match invoices / PO buyer_id when stored as profile row id (same as delivery notes) */
   builderProfileId?: string | null;
-  /** Supplier hub: show only paid or unpaid rows (builder/admin ignore this). */
-  supplierPaymentFilter?: 'paid' | 'unpaid';
 }
 
 function invoiceIsPaid(i: Invoice): boolean {
@@ -87,8 +86,9 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
   userRole,
   supplierRecordId,
   builderProfileId,
-  supplierPaymentFilter,
 }) => {
+  /** Builder + supplier: split list so paid rows are not mixed with unpaid Pay now rows */
+  const [invoicePaymentListTab, setInvoicePaymentListTab] = useState<'unpaid' | 'paid'>('unpaid');
   const [invoices, setInvoices] = useState<Invoice[]>(() => {
     if (userRole !== 'builder') return [];
     const raw = peekHubInvoices(userId, builderProfileId ?? undefined);
@@ -315,11 +315,13 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
     void fetchInvoices({ silent });
   }, [userId, userRole, supplierRecordId, builderProfileId]);
 
+  const showBuilderSupplierPaymentTabs = userRole === 'builder' || userRole === 'supplier';
+
   const displayInvoices = useMemo(() => {
-    if (userRole !== 'supplier' || !supplierPaymentFilter) return invoices;
-    if (supplierPaymentFilter === 'paid') return invoices.filter(invoiceIsPaid);
+    if (!showBuilderSupplierPaymentTabs) return invoices;
+    if (invoicePaymentListTab === 'paid') return invoices.filter(invoiceIsPaid);
     return invoices.filter((i) => !invoiceIsPaid(i));
-  }, [invoices, userRole, supplierPaymentFilter]);
+  }, [invoices, showBuilderSupplierPaymentTabs, invoicePaymentListTab]);
 
   const builderPayPrompt = useMemo(() => {
     if (userRole !== 'builder') {
@@ -603,7 +605,7 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-3">
         <h3 className="text-lg font-semibold">Supplier invoices (pay here)</h3>
         <Button
           variant="outline"
@@ -626,6 +628,23 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
           )}
         </Button>
       </div>
+
+      {showBuilderSupplierPaymentTabs && (
+        <Tabs
+          value={invoicePaymentListTab}
+          onValueChange={(v) => setInvoicePaymentListTab(v === 'paid' ? 'paid' : 'unpaid')}
+          className="w-full"
+        >
+          <TabsList className="grid h-auto w-full max-w-md grid-cols-2 gap-1 p-1 sm:gap-2">
+            <TabsTrigger value="unpaid" className="text-xs sm:text-sm">
+              Unpaid
+            </TabsTrigger>
+            <TabsTrigger value="paid" className="text-xs sm:text-sm">
+              Paid
+            </TabsTrigger>
+          </TabsList>
+        </Tabs>
+      )}
 
       {supplierBlockingLoad && (
         <div
@@ -683,13 +702,13 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
           {listReady && displayInvoices.length === 0 ? (
             <Card>
               <CardContent className="py-10 text-center text-muted-foreground text-sm">
-                {invoices.length > 0 && userRole === 'supplier' && supplierPaymentFilter ? (
+                {invoices.length > 0 && showBuilderSupplierPaymentTabs ? (
                   <>
-                    No {supplierPaymentFilter === 'paid' ? 'paid' : 'unpaid'} invoices in this tab.
-                    {supplierPaymentFilter === 'unpaid' && invoices.some(invoiceIsPaid) ? (
+                    No {invoicePaymentListTab === 'paid' ? 'paid' : 'unpaid'} invoices in this tab.
+                    {invoicePaymentListTab === 'unpaid' && invoices.some(invoiceIsPaid) ? (
                       <span className="block mt-2">Switch to the Paid tab to see settled invoices.</span>
                     ) : null}
-                    {supplierPaymentFilter === 'paid' && invoices.some((i) => !invoiceIsPaid(i)) ? (
+                    {invoicePaymentListTab === 'paid' && invoices.some((i) => !invoiceIsPaid(i)) ? (
                       <span className="block mt-2">Switch to the Unpaid tab to see invoices still awaiting payment.</span>
                     ) : null}
                   </>
