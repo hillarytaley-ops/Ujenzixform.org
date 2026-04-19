@@ -8,6 +8,12 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
 import { useNavigate, Link, useSearchParams } from "react-router-dom";
 import { useUrlTabSync } from "@/hooks/useUrlTabSync";
 import { supabase, SUPABASE_URL, SUPABASE_ANON_KEY } from "@/integrations/supabase/client";
@@ -51,7 +57,8 @@ import {
   Map as MapIcon,
   FileSignature,
   Receipt,
-  Volume2
+  Volume2,
+  FolderOpen,
 } from "lucide-react";
 import { BuilderProfileEdit } from "@/components/builders/BuilderProfileEdit";
 import { BuilderOrdersTracker } from "@/components/builders/BuilderOrdersTracker";
@@ -2785,38 +2792,59 @@ const ProfessionalBuilderDashboardPage = () => {
                     </div>
                   ) : (
                     <div className="space-y-4">
-                      {/* Project Stats Summary */}
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-                        <div className="bg-blue-50 p-4 rounded-lg">
-                          <p className="text-sm text-blue-700">Active</p>
-                          <p className="text-2xl font-bold text-blue-800">
-                            {projects.filter(p => ['active', 'in_progress'].includes(p.status)).length}
-                          </p>
-                        </div>
-                        <div className="bg-green-50 p-4 rounded-lg">
-                          <p className="text-sm text-green-700">Completed</p>
-                          <p className="text-2xl font-bold text-green-800">
-                            {projects.filter(p => p.status === 'completed').length}
-                          </p>
-                        </div>
-                        <div className="bg-amber-50 p-4 rounded-lg">
-                          <p className="text-sm text-amber-700">On Hold</p>
-                          <p className="text-2xl font-bold text-amber-800">
-                            {projects.filter(p => p.status === 'on_hold').length}
-                          </p>
-                        </div>
-                        <div className="bg-purple-50 p-4 rounded-lg">
-                          <p className="text-sm text-purple-700">Total Budget</p>
-                          <p className="text-xl font-bold text-purple-800">
-                            {formatKesCompact(
-                              projects.reduce((sum, p) => sum + (p.budget || 0), 0)
-                            )}
-                          </p>
-                        </div>
-                      </div>
-                      
-                      {/* Project Cards */}
-                      <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+                      <Accordion type="single" collapsible defaultValue="all-projects" className="w-full">
+                        <div className="rounded-lg border border-slate-200 bg-white/90 shadow-sm overflow-hidden">
+                          <AccordionItem value="all-projects" className="border-0">
+                            <AccordionTrigger className="px-3 sm:px-4 py-3 text-left hover:no-underline data-[state=open]:bg-blue-50/60">
+                              <div className="flex min-w-0 flex-1 items-center gap-3 pr-2">
+                                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-blue-100">
+                                  <FolderOpen className="h-5 w-5 text-blue-700" aria-hidden />
+                                </div>
+                                <div className="min-w-0 text-left">
+                                  <p className="font-semibold text-gray-900">All projects</p>
+                                  <p className="text-xs font-normal text-muted-foreground">
+                                    {projects.length} project{projects.length === 1 ? "" : "s"} ·{" "}
+                                    {formatKesCompact(
+                                      projects.reduce((sum, p) => sum + (p.budget || 0), 0)
+                                    )}{" "}
+                                    total budget · expand or collapse this folder
+                                  </p>
+                                </div>
+                              </div>
+                            </AccordionTrigger>
+                            <AccordionContent className="px-3 sm:px-4 pb-4 pt-0 data-[state=closed]:animate-none">
+                              {/* Project Stats Summary */}
+                              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                                <div className="bg-blue-50 p-4 rounded-lg">
+                                  <p className="text-sm text-blue-700">Active</p>
+                                  <p className="text-2xl font-bold text-blue-800">
+                                    {projects.filter((p) => ["active", "in_progress"].includes(p.status)).length}
+                                  </p>
+                                </div>
+                                <div className="bg-green-50 p-4 rounded-lg">
+                                  <p className="text-sm text-green-700">Completed</p>
+                                  <p className="text-2xl font-bold text-green-800">
+                                    {projects.filter((p) => p.status === "completed").length}
+                                  </p>
+                                </div>
+                                <div className="bg-amber-50 p-4 rounded-lg">
+                                  <p className="text-sm text-amber-700">On Hold</p>
+                                  <p className="text-2xl font-bold text-amber-800">
+                                    {projects.filter((p) => p.status === "on_hold").length}
+                                  </p>
+                                </div>
+                                <div className="bg-purple-50 p-4 rounded-lg">
+                                  <p className="text-sm text-purple-700">Total Budget</p>
+                                  <p className="text-xl font-bold text-purple-800">
+                                    {formatKesCompact(
+                                      projects.reduce((sum, p) => sum + (p.budget || 0), 0)
+                                    )}
+                                  </p>
+                                </div>
+                              </div>
+
+                              {/* Project Cards */}
+                              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
                         {projects.map((project, projectIdx) => (
                           <Card 
                             key={project.id ? String(project.id) : `project-${projectIdx}`} 
@@ -2991,7 +3019,11 @@ const ProfessionalBuilderDashboardPage = () => {
                             </p>
                           </CardContent>
                         </Card>
-                      </div>
+                              </div>
+                            </AccordionContent>
+                          </AccordionItem>
+                        </div>
+                      </Accordion>
                     </div>
                   )}
                 </CardContent>
