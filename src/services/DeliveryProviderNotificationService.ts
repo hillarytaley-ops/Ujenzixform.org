@@ -140,11 +140,12 @@ class DeliveryProviderNotificationService {
     dataExtras?: Record<string, unknown> | null
   ): Promise<boolean> {
     try {
+      // Always persist request_id as a real JSON key when present (undefined is omitted by JSON
+      // serialization and breaks RLS: dr.id = notifications.data->>'request_id').
       const baseData: Record<string, unknown> = {
-        request_id:
-          requestDetails.id != null && requestDetails.id !== ''
-            ? String(requestDetails.id)
-            : undefined,
+        ...(requestDetails.id != null && String(requestDetails.id).trim() !== ''
+          ? { request_id: String(requestDetails.id) }
+          : {}),
         po_number: requestDetails.po_number,
         pickup_address: requestDetails.pickup_address,
         delivery_address: requestDetails.delivery_address,
@@ -458,15 +459,25 @@ class DeliveryProviderNotificationService {
     });
 
     if (!job) {
-      return {
-        totalProviders: 0,
-        notified: 0,
-        failed: 0,
-        errors: [
-          'No delivery coordinates found. Add a map pin on the delivery request or include lat,lng in the address so nearby drivers can be matched.',
-        ],
-        inRangeCount: 0,
-      };
+      console.warn(
+        'notifyNearbyProviders: no coordinates on request; notifying all active providers (same as broadcast).'
+      );
+      const allNoCoords = await this.getActiveProviders();
+      if (allNoCoords.length === 0) {
+        return {
+          totalProviders: 0,
+          notified: 0,
+          failed: 0,
+          errors: ['No active delivery providers available.'],
+          inRangeCount: 0,
+        };
+      }
+      const broadcast = await this.notifyProviderList(allNoCoords, requestDetails, {
+        jobCoords: null,
+        radiusKm,
+      });
+      broadcast.inRangeCount = allNoCoords.length;
+      return broadcast;
     }
 
     const all = await this.getActiveProviders();

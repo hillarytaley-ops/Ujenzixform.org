@@ -3770,6 +3770,7 @@ const AdminDashboard = () => {
                                         await deliveryProviderNotificationService.notifyNearbyProviders(
                                           {
                                             id: request.id,
+                                            po_number: request.po_number ?? undefined,
                                             pickup_address:
                                               request.pickup_address ||
                                               request.pickup_location ||
@@ -3796,6 +3797,13 @@ const AdminDashboard = () => {
                                           variant: 'destructive',
                                           title: 'Nearby alert',
                                           description: result.errors.join(' '),
+                                        });
+                                      } else if (result.notified === 0 && result.totalProviders > 0) {
+                                        toast({
+                                          variant: 'destructive',
+                                          title: 'Alert did not reach providers',
+                                          description:
+                                            `${result.totalProviders} driver account(s) matched but every channel failed (often in-app notifications blocked by RLS, or missing phone/email). Check Supabase logs and apply migration 20260419140000_notifications_insert_staff_delivery_broadcast.sql if staff are not in user_roles as admin.`,
                                         });
                                       } else {
                                         toast({
