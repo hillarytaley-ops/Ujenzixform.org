@@ -40,6 +40,17 @@ function isOpenDeliveryAlertStatus(status: string | undefined | null): boolean {
   return Boolean(status && DELIVERY_ALERT_OPEN_STATUSES.has(status));
 }
 
+/** Jobs the provider may accept or reject on the Alerts tab (matches paid + legacy open statuses). */
+function isDeliveryAcceptRejectStatus(status: string | undefined | null): boolean {
+  if (!status) return false;
+  return (
+    status === 'delivery_quote_paid' ||
+    status === 'pending' ||
+    status === 'requested' ||
+    status === 'assigned'
+  );
+}
+
 interface Notification {
   id: string;
   type: 'new_delivery' | 'status_update' | 'payment' | 'rating' | 'urgent' | 'system';
@@ -1648,10 +1659,11 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
     // Only alert for NEW notifications (not on initial load)
     if (prevNotificationIdsRef.current.size > 0 && newNotifications.length > 0) {
       // Filter to only pending/unread notifications
-      const actionableNotifications = newNotifications.filter(n => 
-        !n.read && 
-        (n.status === 'pending' || !n.status) &&
-        n.delivery_request_id
+      const actionableNotifications = newNotifications.filter(
+        (n) =>
+          !n.read &&
+          n.delivery_request_id &&
+          (isDeliveryAcceptRejectStatus(n.status) || !n.status)
       );
 
       if (actionableNotifications.length > 0 && settings.newDeliveryAlerts) {
@@ -2472,7 +2484,7 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
                       <div className="flex items-center gap-1.5 flex-wrap">
                         <Truck className="h-4 w-4 text-teal-600 flex-shrink-0" />
                         <p className="font-semibold text-sm text-gray-900">{notification.title}</p>
-                        {notification.status === 'pending' && (
+                        {isDeliveryAcceptRejectStatus(notification.status) && (
                           <Badge className="bg-orange-500 text-white text-[10px] px-1.5 py-0 animate-pulse">
                             NEW
                           </Badge>
@@ -2614,8 +2626,8 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
                     </div>
                   )}
 
-                  {/* Action Buttons */}
-                  {notification.status === 'pending' && notification.delivery_request_id ? (
+                  {/* Action Buttons (post-pay pipeline uses delivery_quote_paid, not pending) */}
+                  {isDeliveryAcceptRejectStatus(notification.status) && notification.delivery_request_id ? (
                     <>
                       {/* Show if already accepted by another provider */}
                       {notification.provider_id && notification.provider_id !== userId ? (
