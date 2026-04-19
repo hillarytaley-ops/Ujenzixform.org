@@ -133,7 +133,7 @@ serve(async (req) => {
           dr.status === "quote_accepted"
         ) {
           const stamp = new Date().toISOString();
-          const { error: upDr } = await admin
+          const { data: drPaidRows, error: upDr } = await admin
             .from("delivery_requests")
             .update({
               status: "delivery_quote_paid",
@@ -142,12 +142,26 @@ serve(async (req) => {
               updated_at: stamp,
             })
             .eq("id", drId)
-            .eq("status", "quote_accepted");
+            .eq("status", "quote_accepted")
+            .select("id");
 
           if (upDr) {
             console.error("[paystack-webhook] delivery_request update:", upDr.message);
-          } else {
+          } else if (drPaidRows && drPaidRows.length > 0) {
             console.log("[paystack-webhook] marked delivery quote paid:", drId);
+            const { error: rpcErr } = await admin.rpc("notify_delivery_providers_quote_paid", {
+              p_delivery_request_id: drId,
+            });
+            if (rpcErr) {
+              console.error("[paystack-webhook] notify_delivery_providers_quote_paid:", rpcErr.message);
+            } else {
+              console.log("[paystack-webhook] delivery provider alerts sent for:", drId);
+            }
+          } else {
+            console.log(
+              "[paystack-webhook] delivery quote already paid or status not quote_accepted; skip update and alerts:",
+              drId,
+            );
           }
         }
       }

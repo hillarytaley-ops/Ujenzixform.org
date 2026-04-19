@@ -5,7 +5,6 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Loader2, CheckCircle2, XCircle } from "lucide-react";
 import { PAYSTACK_NAV_KEY } from "@/components/payment/PaystackCheckout";
-import { deliveryProviderNotificationService } from "@/services/DeliveryProviderNotificationService";
 
 /**
  * Paystack redirects here with ?reference=…&trxref=… after the customer attempts payment.
@@ -114,36 +113,16 @@ export default function PaystackPaymentCallback() {
           if (upErr) {
             console.warn("[paystack-callback] delivery quote update:", upErr.message);
           } else if (updated) {
-            const row = updated as {
-              id: string;
-              pickup_address: string;
-              delivery_address: string;
-              pickup_date: string | null;
-              material_type: string | null;
-              special_instructions: string | null;
-              pickup_latitude: number | null;
-              pickup_longitude: number | null;
-              delivery_latitude: number | null;
-              delivery_longitude: number | null;
-            };
+            const row = updated as { id: string };
             try {
-              await deliveryProviderNotificationService.notifyNearbyProviders(
-                {
-                  id: row.id,
-                  pickup_address: row.pickup_address || "",
-                  delivery_address: row.delivery_address || "",
-                  pickup_date: (row.pickup_date || new Date().toISOString().slice(0, 10)) as string,
-                  material_type: row.material_type || undefined,
-                  special_instructions: row.special_instructions || undefined,
-                  pickup_latitude: row.pickup_latitude,
-                  pickup_longitude: row.pickup_longitude,
-                  delivery_latitude: row.delivery_latitude,
-                  delivery_longitude: row.delivery_longitude,
-                },
-                { radiusKm: 75 }
-              );
+              const { error: rpcErr } = await supabase.rpc("notify_delivery_providers_quote_paid", {
+                p_delivery_request_id: row.id,
+              });
+              if (rpcErr) {
+                console.warn("[paystack-callback] notify_delivery_providers_quote_paid:", rpcErr.message);
+              }
             } catch (e: unknown) {
-              console.warn("[paystack-callback] notifyNearbyProviders:", e);
+              console.warn("[paystack-callback] notify_delivery_providers_quote_paid:", e);
             }
           }
         }
