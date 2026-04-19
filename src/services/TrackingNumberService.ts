@@ -498,8 +498,18 @@ class TrackingNumberService {
         throw new Error('This delivery has already been accepted by another provider. First-come-first-served!');
       }
 
-      // Also check if status is not pending (could be cancelled, completed, etc.)
-      if (!['pending', 'assigned', 'accepted'].includes(existingRequest.status)) {
+      // Also check if status is still open for provider acceptance (includes quote-paid pipeline)
+      if (
+        ![
+          'pending',
+          'requested',
+          'assigned',
+          'accepted',
+          'quoted',
+          'quote_accepted',
+          'delivery_quote_paid',
+        ].includes(existingRequest.status)
+      ) {
         console.log(`❌ Delivery ${deliveryRequestId} is no longer available (status: ${existingRequest.status})`);
         throw new Error(`This delivery is no longer available (status: ${existingRequest.status})`);
       }
@@ -620,7 +630,7 @@ class TrackingNumberService {
         
         // Fetch ALL pending/assigned delivery_requests (not just for this provider, to catch all duplicates)
         const duplicateResponse = await fetch(
-          `${SUPABASE_URL}/rest/v1/delivery_requests?status=in.(pending,assigned)&id=neq.${deliveryRequestId}&select=id,purchase_order_id,delivery_address,material_type,status&limit=1000`,
+          `${SUPABASE_URL}/rest/v1/delivery_requests?status=in.(pending,assigned,requested,quoted,quote_accepted,delivery_quote_paid)&id=neq.${deliveryRequestId}&select=id,purchase_order_id,delivery_address,material_type,status&limit=1000`,
           {
             headers: {
               'apikey': SUPABASE_ANON_KEY,

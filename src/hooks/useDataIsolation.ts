@@ -4192,8 +4192,15 @@ export const useDeliveryProviderData = () => {
         throw new Error('This delivery has already been accepted by another provider');
       }
 
-      // If status is not pending, check if we can still accept
-      if (existingRequest.status !== 'pending' && existingRequest.status !== 'assigned') {
+      const openForAccept: string[] = [
+        'pending',
+        'requested',
+        'assigned',
+        'quoted',
+        'quote_accepted',
+        'delivery_quote_paid',
+      ];
+      if (!openForAccept.includes(existingRequest.status)) {
         throw new Error(`Cannot accept delivery with status: ${existingRequest.status}`);
       }
 

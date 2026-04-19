@@ -30,6 +30,20 @@ function materialTypeForDisplay(raw: unknown): string {
   return s;
 }
 
+/** Open jobs on provider Alerts tab; must match delivery_requests RLS for providers */
+const DELIVERY_ALERT_OPEN_STATUSES = new Set([
+  'pending',
+  'requested',
+  'assigned',
+  'quoted',
+  'quote_accepted',
+  'delivery_quote_paid',
+]);
+
+function isOpenDeliveryAlertStatus(status: string | undefined | null): boolean {
+  return Boolean(status && DELIVERY_ALERT_OPEN_STATUSES.has(status));
+}
+
 interface Notification {
   id: string;
   type: 'new_delivery' | 'status_update' | 'payment' | 'rating' | 'urgent' | 'system';
@@ -335,13 +349,17 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
             const existing = deliveryRequestsByPO.get(normalizedPOId);
             
             // Priority: accepted > assigned > in_transit > pending > others
-            const statusPriority = {
-              'accepted': 5,
-              'assigned': 4,
-              'in_transit': 3,
-              'pending': 2,
-              'completed': 1,
-              'cancelled': 0
+            const statusPriority: Record<string, number> = {
+              accepted: 5,
+              assigned: 4,
+              in_transit: 3,
+              delivery_quote_paid: 3,
+              quote_accepted: 2,
+              quoted: 2,
+              pending: 2,
+              requested: 2,
+              completed: 1,
+              cancelled: 0,
             };
             
             const currentPriority = statusPriority[dr.status as keyof typeof statusPriority] || 0;
@@ -392,10 +410,19 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
             // Duplicate found! Keep the best one (shouldn't happen after STEP 1, but safety check)
             duplicatesRemoved++;
             const existing = finalDeliveryRequestsByPO.get(dr.purchase_order_id);
-            const existingScore = (existing.status === 'accepted' || existing.status === 'assigned' || existing.status === 'in_transit' ? 10 : 0) +
+            const highRank = (s: string) =>
+              [
+                'accepted',
+                'assigned',
+                'in_transit',
+                'delivery_quote_paid',
+                'quote_accepted',
+                'quoted',
+              ].includes(s);
+            const existingScore = (highRank(existing.status) ? 10 : 0) +
                                  (existing.provider_id ? 5 : 0) +
                                  (new Date(existing.created_at).getTime() / 1000000);
-            const newScore = (dr.status === 'accepted' || dr.status === 'assigned' || dr.status === 'in_transit' ? 10 : 0) +
+            const newScore = (highRank(dr.status) ? 10 : 0) +
                             (dr.provider_id ? 5 : 0) +
                             (new Date(dr.created_at).getTime() / 1000000);
             if (newScore > existingScore) {
@@ -461,9 +488,20 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
         if (preFilteredPO.has(poId)) {
           const existing = preFilteredPO.get(poId);
           const statusPriority: Record<string, number> = {
-            'accepted': 5, 'assigned': 4, 'in_transit': 3, 'picked_up': 2,
-            'out_for_delivery': 2, 'scheduled': 1, 'pending': 1,
-            'completed': 0, 'cancelled': -1, 'rejected': -1
+            accepted: 5,
+            assigned: 4,
+            in_transit: 3,
+            delivery_quote_paid: 3,
+            quote_accepted: 2,
+            quoted: 2,
+            picked_up: 2,
+            out_for_delivery: 2,
+            scheduled: 1,
+            pending: 1,
+            requested: 1,
+            completed: 0,
+            cancelled: -1,
+            rejected: -1,
           };
           const existingPriority = statusPriority[existing.status] || 0;
           const newPriority = statusPriority[dr.status] || 0;
@@ -678,10 +716,11 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
           continue;
         }
         
-        // Only show pending requests (not delivered, completed, cancelled, rejected)
-        // Allow 'pending', 'assigned' (if not assigned to this provider), 'requested' statuses
-        if (!['pending', 'assigned', 'requested'].includes(dr.status)) {
-          console.log(`🚫 SKIPPING: Delivery request ${dr.id.slice(0, 8)} has status ${dr.status} (not pending/assigned/requested) - should not appear in Alerts tab`);
+        // Only show open requests (includes admin quote → paid pipeline)
+        if (!isOpenDeliveryAlertStatus(dr.status)) {
+          console.log(
+            `🚫 SKIPPING: Delivery request ${dr.id.slice(0, 8)} has status ${dr.status} — not an open alert status`
+          );
           continue;
         }
         
@@ -837,7 +876,7 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
         
         // CRITICAL: Alerts tab MUST show ALL pending/requested/assigned delivery requests — including missing/placeholder address.
         // Do NOT filter out these requests; provider can use "Check Address" to get address from builder.
-        const isPendingStatus = ['pending', 'requested', 'assigned'].includes(dr.status);
+        const isPendingStatus = isOpenDeliveryAlertStatus(dr.status);
         if (!deliveryAddr || deliveryAddr === '') {
           if (isPendingStatus) {
             deliveryAddr = 'Delivery address missing - contact builder';
@@ -902,14 +941,18 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
         }
 
         const matLabel = materialTypeForDisplay(dr.material_type);
+        const highlightOpen =
+          dr.status === 'pending' ||
+          dr.status === 'delivery_quote_paid' ||
+          dr.status === 'quote_accepted';
         finalNotifications.push({
           id: `dr-${dr.id}`, // Use delivery_request id as notification id
           type: 'new_delivery',
-          title: dr.status === 'pending' ? '🚚 New Delivery Request!' : `Delivery ${dr.status}`,
+          title: highlightOpen ? '🚚 New Delivery Request!' : `Delivery ${dr.status}`,
           message: `${matLabel || 'Materials'} delivery to ${deliveryAddr}`,
           timestamp: new Date(dr.created_at),
-          read: dr.status !== 'pending', // Only pending deliveries are unread
-          priority: dr.status === 'pending' ? 'high' : 'medium',
+          read: !highlightOpen,
+          priority: highlightOpen ? 'high' : 'medium',
           actionUrl: `/delivery-dashboard?request=${dr.id}`,
           status: dr.status,
           pickupAddress: dr.pickup_address || dr.pickup_location || '',
@@ -1151,13 +1194,14 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
           // Different purchase orders can legitimately have the same content (address, materials)
           // Each purchase_order_id is unique and should have its own notification
           absolutelyFinal.push(notif);
-        } 
-        // CRITICAL: DO NOT show notifications without purchase_order_id
-        // These are placeholder/default requests that don't have actual orders
-        // We've already filtered these out earlier, but this is a final safety check
-        else {
-          console.log(`🚫 FINAL FILTER: Removing notification ${notif.id} - no purchase_order_id (placeholder/default request)`);
-          return; // Skip notifications without purchase_order_id
+        } else if (notif.delivery_request_id) {
+          // NULL purchase_order_id jobs: keyed by delivery_request_id upstream
+          absolutelyFinal.push(notif);
+        } else {
+          console.log(
+            `🚫 FINAL FILTER: Removing notification ${notif.id} - no purchase_order_id or delivery_request_id`
+          );
+          return;
         }
       });
       
