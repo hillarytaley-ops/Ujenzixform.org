@@ -105,6 +105,8 @@ export const SupplierInvoiceHub: React.FC<SupplierInvoiceHubProps> = ({
 }) => {
   const { toast } = useToast();
   const [subTab, setSubTab] = useState('invoices');
+  /** Nested under Invoices: supplier-facing paid vs unpaid lists */
+  const [invoicePaymentSubTab, setInvoicePaymentSubTab] = useState<'unpaid' | 'paid'>('unpaid');
   const [dnLoading, setDnLoading] = useState(false);
   const [grnLoading, setGrnLoading] = useState(false);
   const [deliveryNotes, setDeliveryNotes] = useState<any[]>([]);
@@ -640,12 +642,32 @@ export const SupplierInvoiceHub: React.FC<SupplierInvoiceHubProps> = ({
 
           <TabsContent value="invoices" forceMount className="mt-0 space-y-4">
             <p className={`text-sm ${mutedText}`}>
-              Invoices tied to your supplier account: edit and send when marked editable.
+              Invoices tied to your supplier account: edit and send when marked editable. Use Unpaid vs Paid to focus
+              each list.
             </p>
+            <Tabs
+              value={invoicePaymentSubTab}
+              onValueChange={(v) => setInvoicePaymentSubTab(v === 'paid' ? 'paid' : 'unpaid')}
+              className="space-y-3"
+            >
+              <TabsList
+                className={`grid h-auto w-full max-w-md grid-cols-2 gap-1 p-1 sm:gap-2 ${
+                  isDarkMode ? 'bg-slate-900' : 'bg-muted'
+                }`}
+              >
+                <TabsTrigger value="unpaid" className="text-xs sm:text-sm">
+                  Unpaid
+                </TabsTrigger>
+                <TabsTrigger value="paid" className="text-xs sm:text-sm">
+                  Paid
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
             <InvoiceManagement
               userId={userId}
               userRole="supplier"
               supplierRecordId={supplierRecordId}
+              supplierPaymentFilter={invoicePaymentSubTab}
             />
           </TabsContent>
 

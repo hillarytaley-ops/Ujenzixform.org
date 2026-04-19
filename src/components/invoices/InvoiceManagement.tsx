@@ -74,6 +74,12 @@ interface InvoiceManagementProps {
   supplierRecordId?: string | null;
   /** profiles.id — match invoices / PO buyer_id when stored as profile row id (same as delivery notes) */
   builderProfileId?: string | null;
+  /** Supplier hub: show only paid or unpaid rows (builder/admin ignore this). */
+  supplierPaymentFilter?: 'paid' | 'unpaid';
+}
+
+function invoiceIsPaid(i: Invoice): boolean {
+  return String(i.payment_status || '').toLowerCase() === 'paid';
 }
 
 export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
@@ -81,6 +87,7 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
   userRole,
   supplierRecordId,
   builderProfileId,
+  supplierPaymentFilter,
 }) => {
   const [invoices, setInvoices] = useState<Invoice[]>(() => {
     if (userRole !== 'builder') return [];
@@ -308,11 +315,17 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
     void fetchInvoices({ silent });
   }, [userId, userRole, supplierRecordId, builderProfileId]);
 
+  const displayInvoices = useMemo(() => {
+    if (userRole !== 'supplier' || !supplierPaymentFilter) return invoices;
+    if (supplierPaymentFilter === 'paid') return invoices.filter(invoiceIsPaid);
+    return invoices.filter((i) => !invoiceIsPaid(i));
+  }, [invoices, userRole, supplierPaymentFilter]);
+
   const builderPayPrompt = useMemo(() => {
     if (userRole !== 'builder') {
       return { needAcknowledge: [] as Invoice[], needPayment: [] as Invoice[] };
     }
-    const unpaid = (i: Invoice) => (i.payment_status || 'pending') !== 'paid';
+    const unpaid = (i: Invoice) => !invoiceIsPaid(i);
     const needAcknowledge = invoices.filter((i) => {
       const st = String(i.status || '').toLowerCase();
       return st === 'sent' && !i.acknowledged_at && unpaid(i);
@@ -430,7 +443,7 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
   /** Builder: one obvious “Pay now” — acknowledges supplier invoice if needed, then opens Paystack / record dialog */
   const handlePayNowClick = async (invoice: Invoice) => {
     if (userRole !== 'builder') return;
-    if ((invoice.payment_status || 'pending') === 'paid') return;
+    if (invoiceIsPaid(invoice)) return;
 
     const st = String(invoice.status || '').toLowerCase();
     if (st === 'cancelled') {
@@ -667,19 +680,31 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
               </Alert>
             )}
 
-          {listReady && invoices.length === 0 ? (
+          {listReady && displayInvoices.length === 0 ? (
             <Card>
               <CardContent className="py-10 text-center text-muted-foreground text-sm">
-                No invoices yet.
+                {invoices.length > 0 && userRole === 'supplier' && supplierPaymentFilter ? (
+                  <>
+                    No {supplierPaymentFilter === 'paid' ? 'paid' : 'unpaid'} invoices in this tab.
+                    {supplierPaymentFilter === 'unpaid' && invoices.some(invoiceIsPaid) ? (
+                      <span className="block mt-2">Switch to the Paid tab to see settled invoices.</span>
+                    ) : null}
+                    {supplierPaymentFilter === 'paid' && invoices.some((i) => !invoiceIsPaid(i)) ? (
+                      <span className="block mt-2">Switch to the Unpaid tab to see invoices still awaiting payment.</span>
+                    ) : null}
+                  </>
+                ) : (
+                  'No invoices yet.'
+                )}
               </CardContent>
             </Card>
           ) : null}
 
-          {invoices.map((invoice) => {
+          {displayInvoices.map((invoice) => {
             const rowStatus = String(invoice.status || '').toLowerCase();
             const showBuilderPayNow =
               userRole === 'builder' &&
-              (invoice.payment_status || 'pending') !== 'paid' &&
+              !invoiceIsPaid(invoice) &&
               rowStatus !== 'cancelled' &&
               (rowStatus !== 'draft' || paystackSandbox);
 
@@ -693,7 +718,7 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
                         PO: {invoice.purchase_order?.po_number || 'N/A'} •{' '}
                         {invoice.supplier?.company_name || 'Supplier'}
                       </p>
-                      {userRole === 'builder' && invoice.payment_status !== 'paid' && (
+                      {userRole === 'builder' && !invoiceIsPaid(invoice) && (
                         <p className="mt-2 text-sm font-medium text-amber-800 dark:text-amber-200">
                           {rowStatus === 'draft' ? (
                             paystackSandbox ? (
