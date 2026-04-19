@@ -1212,29 +1212,13 @@ export const DeliveryPromptDialog: React.FC<DeliveryPromptDialogProps> = ({
       setSubmitting(false);
       
       toast({
-        title: '🚚 Delivery Request Sent!',
-        description: 'Nearby delivery providers are being notified. First responder will be assigned.',
+        title: '🚚 Delivery request submitted',
+        description:
+          'After the admin sends a delivery quote and you pay it with Paystack, drivers will get an alert automatically.',
       });
 
-      // Notify ALL registered delivery providers in background (don't block UI)
-      console.log('🔔 Notifying delivery providers in background...');
-      deliveryProviderNotificationService.notifyAllProviders({
-        id: deliveryRequestId || purchaseOrder.id,
-        po_number: purchaseOrder.po_number,
-        pickup_address: pickupAddress,
-        delivery_address: fullDeliveryAddress,
-        pickup_date: deliveryData.preferredDate,
-        quantity: purchaseOrder.items?.length || 1,
-        special_instructions: deliveryData.specialInstructions
-      }).then(notificationResult => {
-        console.log(`✅ Delivery providers notified: ${notificationResult.notified}/${notificationResult.totalProviders}`);
-        // Log analytics event in background
-        if (deliveryRequestId) {
-          deliveryProviderNotificationService.logNotificationEvent(deliveryRequestId, notificationResult);
-        }
-      }).catch(notifyError => {
-        console.warn('⚠️ Provider notification error (non-critical):', notifyError.message);
-      });
+      // Drivers are notified only after delivery_quote_paid (Paystack + notify_delivery_providers_quote_paid RPC).
+      // Do not call notifyAllProviders here — that would alert providers before payment.
 
       // Call success callback with builder's delivery address so monitoring form can pre-fill site address
       if (onDeliveryRequested) {

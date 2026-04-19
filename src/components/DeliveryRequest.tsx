@@ -14,7 +14,6 @@ import { readAuthSessionForRest } from "@/utils/supabaseAccessToken";
 
 const supabaseRestBase = `${SUPABASE_URL.replace(/\/+$/, "")}/rest/v1`;
 import { MapPin, Package, Truck, Calendar, Shield, AlertTriangle, Navigation, Copy, Check, Map as MapIcon } from "lucide-react";
-import { deliveryProviderNotificationService } from "@/services/DeliveryProviderNotificationService";
 import { MapLocationPicker } from "@/components/location/MapLocationPicker";
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -526,36 +525,14 @@ const DeliveryRequest = () => {
 
       const deliveryRequest = deliveryRequestResult;
 
-      // ✅ AUTO-NOTIFY: Alert ALL registered delivery providers (non-blocking)
-      if (deliveryRequest) {
-        // Don't await - let it run in background
-        deliveryProviderNotificationService.notifyAllProviders({
-          id: deliveryRequest.id,
-          pickup_address: fullPickupAddress,
-          delivery_address: fullDeliveryAddress,
-          pickup_date: formData.preferredDate,
-          material_type: formData.materialType,
-          quantity: parseInt(formData.quantity) || 1,
-          weight_kg: parseFloat(formData.weight) || undefined,
-          budget_range: formData.budgetRange || undefined,
-          special_instructions: formData.specialInstructions.trim() || undefined,
-          pickup_latitude: requestData.pickup_latitude ?? null,
-          pickup_longitude: requestData.pickup_longitude ?? null,
-          delivery_latitude: requestData.delivery_latitude ?? null,
-          delivery_longitude: requestData.delivery_longitude ?? null,
-        }).then(result => {
-          console.log(`✅ Delivery providers notified: ${result.notified}/${result.totalProviders}`);
-          deliveryProviderNotificationService.logNotificationEvent(deliveryRequest.id, result);
-        }).catch(err => {
-          console.error('⚠️ Error notifying delivery providers:', err);
-        });
-      }
+      // Drivers are notified only after delivery_quote_paid (Paystack + notify_delivery_providers_quote_paid RPC).
 
       clearTimeout(safetyTimeout);
 
       toast({
-        title: "🚚 Delivery Request Sent!",
-        description: "Nearby delivery providers have been notified. First responder will be assigned."
+        title: '🚚 Delivery request submitted',
+        description:
+          'After the admin sends a delivery quote and you pay it with Paystack, drivers will get an alert automatically.',
       });
 
       // Reset form

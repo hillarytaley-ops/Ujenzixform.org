@@ -448,6 +448,42 @@ class DeliveryProviderNotificationService {
     requestDetails: DeliveryRequestDetails,
     opts?: { radiusKm?: number }
   ): Promise<NotificationResult> {
+    if (requestDetails.id != null && String(requestDetails.id).trim() !== '') {
+      const { data: drGate } = await supabase
+        .from('delivery_requests')
+        .select('status')
+        .eq('id', requestDetails.id)
+        .maybeSingle();
+      if (!drGate) {
+        return {
+          totalProviders: 0,
+          notified: 0,
+          failed: 0,
+          errors: ['Delivery request not found; alerts were not sent.'],
+          inRangeCount: 0,
+        };
+      }
+      if (drGate.status !== 'delivery_quote_paid') {
+        return {
+          totalProviders: 0,
+          notified: 0,
+          failed: 0,
+          errors: [
+            'Driver alerts are only sent after the builder pays the delivery quote (status must be delivery_quote_paid).',
+          ],
+          inRangeCount: 0,
+        };
+      }
+    } else {
+      return {
+        totalProviders: 0,
+        notified: 0,
+        failed: 0,
+        errors: ['Missing delivery request id; alerts were not sent.'],
+        inRangeCount: 0,
+      };
+    }
+
     const radiusKm = opts?.radiusKm ?? DEFAULT_RADIUS_KM;
     const job = resolveJobCoordinates({
       delivery_latitude: requestDetails.delivery_latitude,
@@ -524,6 +560,43 @@ class DeliveryProviderNotificationService {
         delivery: requestDetails.delivery_address,
         date: requestDetails.pickup_date,
       });
+
+      if (requestDetails.id != null && String(requestDetails.id).trim() !== '') {
+        const { data: drGate } = await supabase
+          .from('delivery_requests')
+          .select('status')
+          .eq('id', requestDetails.id)
+          .maybeSingle();
+        if (!drGate) {
+          return {
+            totalProviders: 0,
+            notified: 0,
+            failed: 0,
+            errors: ['Delivery request not found; provider alerts were not sent.'],
+          };
+        }
+        if (drGate.status !== 'delivery_quote_paid') {
+          console.log(
+            '📵 notifyAllProviders skipped: status is not delivery_quote_paid —',
+            drGate.status
+          );
+          return {
+            totalProviders: 0,
+            notified: 0,
+            failed: 0,
+            errors: [
+              'Provider alerts are sent only after the builder pays the delivery quote (delivery_quote_paid).',
+            ],
+          };
+        }
+      } else {
+        return {
+          totalProviders: 0,
+          notified: 0,
+          failed: 0,
+          errors: ['Missing delivery request id; provider alerts were not sent.'],
+        };
+      }
 
       const all = await this.getActiveProviders();
       if (all.length === 0) {

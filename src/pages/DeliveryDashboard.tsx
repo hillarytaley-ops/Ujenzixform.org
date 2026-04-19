@@ -1734,9 +1734,9 @@ const DeliveryDashboard = () => {
         console.warn('⚠️ Could not fetch provider ID, using user ID:', e);
       }
       
-      // Open jobs + paid admin quote (delivery_quote_paid) so Alerts badge matches drivers who can accept
+      // Open-market jobs: only after builder paid admin delivery quote (matches provider SELECT RLS)
       const response = await fetch(
-        `${SUPABASE_URL}/rest/v1/delivery_requests?status=in.(pending,requested,assigned,delivery_quote_paid)&select=id,status,purchase_order_id,provider_id,delivery_address,material_type,created_at&order=created_at.desc&limit=100`,
+        `${SUPABASE_URL}/rest/v1/delivery_requests?status=in.(delivery_quote_paid)&select=id,status,purchase_order_id,provider_id,delivery_address,material_type,created_at&order=created_at.desc&limit=100`,
         { headers, cache: 'no-store' }
       );
       

@@ -31,15 +31,10 @@ function materialTypeForDisplay(raw: unknown): string {
 }
 
 /**
- * Open jobs on provider Alerts tab (must match delivery_requests RLS for providers).
- * quoted / quote_accepted are excluded — drivers only see jobs after quote is paid (delivery_quote_paid).
+ * Open jobs on provider Alerts tab (must match delivery_requests RLS for the open pool).
+ * Unassigned market jobs are only visible after the builder pays (delivery_quote_paid).
  */
-const DELIVERY_ALERT_OPEN_STATUSES = new Set([
-  'pending',
-  'requested',
-  'assigned',
-  'delivery_quote_paid',
-]);
+const DELIVERY_ALERT_OPEN_STATUSES = new Set(['delivery_quote_paid']);
 
 function isOpenDeliveryAlertStatus(status: string | undefined | null): boolean {
   return Boolean(status && DELIVERY_ALERT_OPEN_STATUSES.has(status));
