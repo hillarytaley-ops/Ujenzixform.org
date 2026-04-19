@@ -81,6 +81,12 @@ export type ProviderForProximity = {
 };
 
 /**
+ * TEMPORARY: when true, proximity and service-area matching are skipped for delivery alerts
+ * (all active providers passed into this function are kept). Set to false to reinstate the km rule.
+ */
+export const DELIVERY_PROXIMITY_FILTER_TEMP_DISABLED = true;
+
+/**
  * Providers within radius (using last known GPS) OR (if no GPS) service-area match against address text.
  * Providers with GPS outside radius are excluded.
  */
@@ -91,6 +97,9 @@ export function filterProvidersByProximity(
   radiusKm: number,
   addressBlob: string
 ): ProviderForProximity[] {
+  if (DELIVERY_PROXIMITY_FILTER_TEMP_DISABLED) {
+    return providers.slice();
+  }
   return providers.filter((p) => {
     const plat = p.current_latitude;
     const plng = p.current_longitude;
