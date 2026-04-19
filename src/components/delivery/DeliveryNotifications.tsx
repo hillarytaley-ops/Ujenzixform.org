@@ -30,13 +30,14 @@ function materialTypeForDisplay(raw: unknown): string {
   return s;
 }
 
-/** Open jobs on provider Alerts tab; must match delivery_requests RLS for providers */
+/**
+ * Open jobs on provider Alerts tab (must match delivery_requests RLS for providers).
+ * quoted / quote_accepted are excluded — drivers only see jobs after quote is paid (delivery_quote_paid).
+ */
 const DELIVERY_ALERT_OPEN_STATUSES = new Set([
   'pending',
   'requested',
   'assigned',
-  'quoted',
-  'quote_accepted',
   'delivery_quote_paid',
 ]);
 
@@ -942,9 +943,7 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
 
         const matLabel = materialTypeForDisplay(dr.material_type);
         const highlightOpen =
-          dr.status === 'pending' ||
-          dr.status === 'delivery_quote_paid' ||
-          dr.status === 'quote_accepted';
+          dr.status === 'pending' || dr.status === 'delivery_quote_paid';
         finalNotifications.push({
           id: `dr-${dr.id}`, // Use delivery_request id as notification id
           type: 'new_delivery',
