@@ -4582,6 +4582,10 @@ export type Database = {
           | { decision: string; notes?: string; request_uuid: string }
         Returns: undefined
       }
+      admin_set_profile_registration_status: {
+        Args: { p_status: string; p_target_user_id: string }
+        Returns: number
+      }
       approve_supplier_application: {
         Args: { application_id: string; approval_notes?: string }
         Returns: Json

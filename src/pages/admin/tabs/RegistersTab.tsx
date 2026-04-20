@@ -10,6 +10,21 @@ import { SuppliersRegister } from '../components/SuppliersRegister';
 import { BuildersRegister } from '../components/BuildersRegister';
 import type { SupplierEditPatch, BuilderEditPatch } from '../types';
 
+/** Admin-only RPC: RLS blocks direct `profiles` updates for other users. */
+async function adminSetProfileRegistrationStatus(
+  client: typeof supabase,
+  userId: string,
+  status: string
+): Promise<{ count: number; error: Error | null }> {
+  const { data, error } = await client.rpc('admin_set_profile_registration_status', {
+    p_target_user_id: userId,
+    p_status: status,
+  });
+  if (error) return { count: 0, error: error as Error };
+  const count = typeof data === 'number' ? data : 0;
+  return { count, error: null };
+}
+
 // Type definitions for the raw database records
 interface RawSupplierRecord {
   /** supplier_applications.id, or synthetic `role-{userId}` for supplier role without application */
@@ -308,7 +323,7 @@ export const RegistersTab: React.FC = () => {
             setSuppliers((prev) => prev.map((s) => (s.id === id ? { ...s, status } : s)));
             toast({
               title: 'Status Updated',
-              description: `Supplier application status changed to ${status}`,
+              description: `Registration status updated to ${status}.`,
             });
             return;
           }
@@ -324,7 +339,7 @@ export const RegistersTab: React.FC = () => {
               setSuppliers((prev) => prev.map((s) => (s.id === id ? { ...s, status } : s)));
               toast({
                 title: 'Status Updated',
-                description: `Supplier application status changed to ${status}`,
+                description: `Registration status updated to ${status}.`,
               });
               return;
             }
@@ -340,22 +355,18 @@ export const RegistersTab: React.FC = () => {
             setSuppliers((prev) => prev.map((s) => (s.id === id ? { ...s, status } : s)));
             toast({
               title: 'Status Updated',
-              description: `Supplier list status updated to ${status}`,
+              description: `Supplier profile status updated to ${status}.`,
             });
             return;
           }
 
-          ({ data: updated, error } = await client
-            .from('profiles')
-            .update({ registration_admin_status: status, updated_at: ts })
-            .eq('user_id', uid)
-            .select('id'));
-          if (error) throw error;
-          if (updated && updated.length > 0) {
+          const profRpc = await adminSetProfileRegistrationStatus(client, uid, status);
+          if (profRpc.error) throw profRpc.error;
+          if (profRpc.count > 0) {
             setSuppliers((prev) => prev.map((s) => (s.id === id ? { ...s, status } : s)));
             toast({
               title: 'Status Updated',
-              description: `Registration status updated on profile (no suppliers row yet).`,
+              description: `Registration status saved on the user profile (no supplier profile row yet).`,
             });
             return;
           }
@@ -364,7 +375,7 @@ export const RegistersTab: React.FC = () => {
             variant: 'destructive',
             title: 'Cannot update status',
             description:
-              'No supplier application, suppliers row, or profile found for this user. Use Demote or ensure the account exists.',
+              'No matching registration or profile was updated for this user. Use Demote if the role should be removed, or confirm the account has a profile row and migrations (including admin profile status RPC) are applied.',
           });
           return;
         }
@@ -379,7 +390,7 @@ export const RegistersTab: React.FC = () => {
           setSuppliers((prev) => prev.map((s) => (s.id === id ? { ...s, status } : s)));
           toast({
             title: 'Status Updated',
-            description: `Supplier application status changed to ${status}`,
+            description: `Registration status updated to ${status}.`,
           });
           return;
         }
@@ -402,21 +413,17 @@ export const RegistersTab: React.FC = () => {
             setSuppliers((prev) => prev.map((s) => (s.id === id ? { ...s, status } : s)));
             toast({
               title: 'Status Updated',
-              description: `Supplier list status updated to ${status}`,
+              description: `Supplier profile status updated to ${status}.`,
             });
             return;
           }
-          ({ data: fb, error: fbErr } = await client
-            .from('profiles')
-            .update({ registration_admin_status: status, updated_at: ts })
-            .eq('user_id', appUid)
-            .select('id'));
-          if (fbErr) throw fbErr;
-          if (fb?.length) {
+          const profRpc = await adminSetProfileRegistrationStatus(client, appUid, status);
+          if (profRpc.error) throw profRpc.error;
+          if (profRpc.count > 0) {
             setSuppliers((prev) => prev.map((s) => (s.id === id ? { ...s, status } : s)));
             toast({
               title: 'Status Updated',
-              description: `Registration status updated on profile.`,
+              description: `Registration status saved on the user profile.`,
             });
             return;
           }
@@ -432,7 +439,7 @@ export const RegistersTab: React.FC = () => {
             setSuppliers((prev) => prev.map((s) => (s.id === id ? { ...s, status } : s)));
             toast({
               title: 'Status Updated',
-              description: `Supplier application status changed to ${status}`,
+              description: `Registration status updated to ${status}.`,
             });
             return;
           }
@@ -441,13 +448,14 @@ export const RegistersTab: React.FC = () => {
         toast({
           variant: 'destructive',
           title: 'Cannot update status',
-          description: 'Could not update this supplier application or mirror status on profile/suppliers.',
+          description:
+            'Could not update this row (application, supplier profile, or user profile). Confirm you are signed in as staff admin and database migrations are applied.',
         });
       } catch (error) {
         console.error('Error updating supplier status:', error);
         toast({
           title: 'Error',
-          description: 'Failed to update supplier status',
+          description: 'Failed to update registration status',
           variant: 'destructive',
         });
       }
@@ -600,7 +608,7 @@ export const RegistersTab: React.FC = () => {
             setBuilders((prev) => prev.map((b) => (b.id === id ? { ...b, status } : b)));
             toast({
               title: 'Status Updated',
-              description: `Builder status changed to ${status}`,
+              description: `Registration status updated to ${status}.`,
             });
             return;
           }
@@ -616,23 +624,19 @@ export const RegistersTab: React.FC = () => {
               setBuilders((prev) => prev.map((b) => (b.id === id ? { ...b, status } : b)));
               toast({
                 title: 'Status Updated',
-                description: `Builder status changed to ${status}`,
+                description: `Registration status updated to ${status}.`,
               });
               return;
             }
           }
 
-          ({ data: updated, error } = await client
-            .from('profiles')
-            .update({ registration_admin_status: status, updated_at: ts })
-            .eq('user_id', uid)
-            .select('id'));
-          if (error) throw error;
-          if (updated && updated.length > 0) {
+          const bProfRpc = await adminSetProfileRegistrationStatus(client, uid, status);
+          if (bProfRpc.error) throw bProfRpc.error;
+          if (bProfRpc.count > 0) {
             setBuilders((prev) => prev.map((b) => (b.id === id ? { ...b, status } : b)));
             toast({
               title: 'Status Updated',
-              description: `Builder list status updated to ${status}`,
+              description: `Registration status saved on the user profile (no builder registration row matched).`,
             });
             return;
           }
@@ -641,7 +645,7 @@ export const RegistersTab: React.FC = () => {
             variant: 'destructive',
             title: 'Cannot update status',
             description:
-              'No builder registration or profile row for this user. Ensure the account exists, or use Demote.',
+              'No matching builder registration or profile was updated. Use Demote if access should be removed, or confirm migrations (admin profile status RPC) are applied.',
           });
           return;
         }
@@ -656,7 +660,7 @@ export const RegistersTab: React.FC = () => {
           setBuilders((prev) => prev.map((b) => (b.id === id ? { ...b, status } : b)));
           toast({
             title: 'Status Updated',
-            description: `Builder status changed to ${status}`,
+            description: `Registration status updated to ${status}.`,
           });
           return;
         }
@@ -669,17 +673,13 @@ export const RegistersTab: React.FC = () => {
         const bUid = (bRow?.auth_user_id as string | undefined)?.trim();
         const bEmail = (bRow?.email as string | undefined)?.trim().toLowerCase();
         if (bUid) {
-          let { data: fb, error: fbErr } = await client
-            .from('profiles')
-            .update({ registration_admin_status: status, updated_at: ts })
-            .eq('user_id', bUid)
-            .select('id');
-          if (fbErr) throw fbErr;
-          if (fb?.length) {
+          const bProfRpc2 = await adminSetProfileRegistrationStatus(client, bUid, status);
+          if (bProfRpc2.error) throw bProfRpc2.error;
+          if (bProfRpc2.count > 0) {
             setBuilders((prev) => prev.map((b) => (b.id === id ? { ...b, status } : b)));
             toast({
               title: 'Status Updated',
-              description: `Registration status updated on profile.`,
+              description: `Registration status saved on the user profile.`,
             });
             return;
           }
@@ -695,7 +695,7 @@ export const RegistersTab: React.FC = () => {
             setBuilders((prev) => prev.map((b) => (b.id === id ? { ...b, status } : b)));
             toast({
               title: 'Status Updated',
-              description: `Builder status changed to ${status}`,
+              description: `Registration status updated to ${status}.`,
             });
             return;
           }
@@ -704,13 +704,14 @@ export const RegistersTab: React.FC = () => {
         toast({
           variant: 'destructive',
           title: 'Cannot update status',
-          description: 'Could not update this builder registration or mirror status on profile.',
+          description:
+            'Could not update this row (builder registration or user profile). Confirm staff admin login and migrations are applied.',
         });
       } catch (error) {
         console.error('Error updating builder status:', error);
         toast({
           title: 'Error',
-          description: 'Failed to update builder status',
+          description: 'Failed to update registration status',
           variant: 'destructive',
         });
       }
