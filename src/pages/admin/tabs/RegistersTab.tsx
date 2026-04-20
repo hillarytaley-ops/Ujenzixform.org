@@ -32,8 +32,11 @@ function registrationStatusFailureDescription(error: unknown): string {
       : error instanceof Error
         ? error.message
         : '';
-  if (/PGRST202|function .* does not exist|schema cache/i.test(raw)) {
-    return `${raw || 'RPC missing.'} Apply Supabase migrations through 20260418180000_expand_admin_profile_registration_status_auth.sql (and 20260418170000).`;
+  if (/registration_admin_status|column.*suppliers|column.*profiles|schema cache/i.test(raw)) {
+    return `${raw} Apply migrations: 20260418160000_registration_admin_status_fallback.sql or 20260418190000_ensure_registration_admin_status_columns.sql (adds the columns), then 20260418170000 and 20260418180000. In Supabase: run SQL / db push, then wait a minute or reload the API schema cache if the message persists.`;
+  }
+  if (/PGRST202|function .* does not exist/i.test(raw)) {
+    return `${raw || 'RPC missing.'} Apply 20260418170000_admin_set_profile_registration_status.sql and 20260418180000_expand_admin_profile_registration_status_auth.sql, then reload the API schema cache.`;
   }
   if (/not authorized|42501|JWT expired|jwt|session/i.test(raw)) {
     return `${raw || 'Not authorized.'} Use Admin Login so your work email gets a Supabase session (password = staff code). “Limited mode” cannot update saved profile status.`;
