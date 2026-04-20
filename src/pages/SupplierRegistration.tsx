@@ -55,6 +55,7 @@ import { normalizePhoneDigits } from "@/utils/phoneNormalize";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { User } from "@supabase/supabase-js";
+import { TermsFeeSummary } from "@/components/legal/TermsFeeSummary";
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // COMPREHENSIVE KENYA CONSTRUCTION MATERIALS CATEGORIES
@@ -1063,6 +1064,7 @@ const SupplierRegistration = () => {
                     </Card>
 
                     <div className="space-y-3">
+                      <TermsFeeSummary className="mb-1" />
                       <div className="flex items-start space-x-2">
                         <Checkbox
                           id="terms"

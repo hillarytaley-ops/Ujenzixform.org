@@ -37,6 +37,7 @@ import {
 import { normalizePhoneDigits } from "@/utils/phoneNormalize";
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { TermsFeeSummary } from '@/components/legal/TermsFeeSummary';
 
 interface CompanyApplication {
   // Company Information
@@ -1079,6 +1080,8 @@ const DeliveryProviderApplication = () => {
                   </div>
                 </div>
 
+                <TermsFeeSummary className="mt-2" />
+
                 {/* Submit Button */}
                 <div className="flex justify-end">
                   <Button 
@@ -1379,6 +1382,8 @@ const DeliveryProviderApplication = () => {
                     onChange={(e) => handlePrivateFormChange('motivation', e.target.value)}
                   />
                 </div>
+
+                <TermsFeeSummary className="mt-2" />
 
                 {/* Submit Button */}
                 <div className="flex justify-end">

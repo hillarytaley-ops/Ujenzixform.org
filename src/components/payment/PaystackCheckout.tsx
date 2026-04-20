@@ -6,6 +6,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Lock, Shield, Loader2, FlaskConical } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { TermsFeeSummary } from "@/components/legal/TermsFeeSummary";
 
 const PAYSTACK_NAV_KEY = "ujenzi_paystack_after";
 
@@ -162,6 +163,8 @@ export function PaystackCheckout({
           checkout page — you are not entering card details in UjenziXform.
         </AlertDescription>
       </Alert>
+
+      <TermsFeeSummary variant="checkout" className="mb-4" />
 
       <div className="space-y-2 mb-4">
         <Label htmlFor="paystack-email">Email for receipt</Label>

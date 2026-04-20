@@ -34,6 +34,7 @@ import { normalizePhoneDigits } from "@/utils/phoneNormalize";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { User as SupabaseUser } from "@supabase/supabase-js";
+import { TermsFeeSummary } from "@/components/legal/TermsFeeSummary";
 
 // Kenyan counties
 const KENYAN_COUNTIES = [
@@ -1009,6 +1010,7 @@ const DeliveryRegistration = () => {
                     </Card>
 
                     <div className="space-y-3">
+                      <TermsFeeSummary className="mb-1" />
                       <div className="flex items-start space-x-2">
                         <Checkbox
                           id="terms"

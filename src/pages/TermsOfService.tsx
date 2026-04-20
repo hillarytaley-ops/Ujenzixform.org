@@ -4,9 +4,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { FileText, Shield, Users, AlertTriangle, Scale, Mail } from "lucide-react";
+import { TERMS_LAST_UPDATED } from "@/lib/termsPublication";
 
 const TermsOfService = () => {
-  const lastUpdated = "April 18, 2026";
+  const lastUpdated = TERMS_LAST_UPDATED;
 
   return (
     <div className="min-h-screen flex flex-col bg-background">

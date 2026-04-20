@@ -17,6 +17,7 @@ import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, For
 import { useToast } from "@/hooks/use-toast";
 import { Shield, Lock, CheckCircle, ArrowLeft, User } from "lucide-react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { TermsFeeSummary } from "@/components/legal/TermsFeeSummary";
 
 const KENYAN_COUNTIES = [
   "Nairobi", "Mombasa", "Kisumu", "Nakuru", "Eldoret", "Thika", "Malindi",
@@ -515,7 +516,7 @@ const PrivateBuilderRegistration = () => {
                   {/* Terms and Privacy */}
                   <div className="space-y-4 border-t pt-4">
                     <h3 className="text-lg font-semibold">Terms & Conditions</h3>
-                    
+                    <TermsFeeSummary />
                     <FormField
                       control={form.control}
                       name="terms_accepted"
