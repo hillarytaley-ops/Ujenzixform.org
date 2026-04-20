@@ -1759,8 +1759,9 @@ const AdminDashboard = () => {
         setFeedbackList(formattedFeedback);
         
         // Calculate feedback stats
-        const positive = formattedFeedback.filter(f => f.rating >= 4).length;
-        const negative = formattedFeedback.filter(f => f.rating <= 2 && f.rating > 0).length;
+        // Feedback form uses 1–10 scale (was 1–5): high scores ≥8, low ≤4
+        const positive = formattedFeedback.filter(f => f.rating >= 8).length;
+        const negative = formattedFeedback.filter(f => f.rating <= 4 && f.rating > 0).length;
         
         setStats((prev) => {
           const next: DashboardStats = {
