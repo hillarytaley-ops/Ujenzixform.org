@@ -1,6 +1,5 @@
--- Broaden who may call admin_set_profile_registration_status:
--- - Staff often use registrations_officer / logistics_officer in user_roles, not only admin.
--- - Active admin_staff rows may authorize by email match when JWT exists (same idea as admin_get_all_users_with_roles).
+-- PL/pgSQL: unqualified "caller_email" inside EXISTS(...) can be parsed as a relation (42P01).
+-- Qualify locals with a block label so SQL subqueries bind to variables, not missing tables.
 
 CREATE OR REPLACE FUNCTION public.admin_set_profile_registration_status(
   p_target_user_id uuid,
