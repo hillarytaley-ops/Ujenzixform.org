@@ -169,14 +169,26 @@ const SupplierRegistration = () => {
           if (!isMounted) return;
           
           if (roleData?.role === 'supplier') {
-            // Already registered as supplier - redirect to dashboard
-            console.log('📝 SupplierRegistration: User already has supplier role, redirecting...');
-            toast({
-              title: "Already Registered",
-              description: "You're already registered as a supplier. Redirecting to your dashboard...",
-              duration: 2000,
-            });
-            setTimeout(() => navigate('/supplier-dashboard'), 1000);
+            // Supplier role but no application row = incomplete onboarding (e.g. old /supplier-auth shortcut)
+            const { data: existingApp } = await supabase
+              .from('supplier_applications')
+              .select('id')
+              .eq('applicant_user_id', user.id)
+              .maybeSingle();
+
+            if (!isMounted) return;
+
+            if (existingApp?.id) {
+              console.log('📝 SupplierRegistration: Supplier with application — redirecting to dashboard');
+              toast({
+                title: "Already Registered",
+                description: "You're already registered as a supplier. Redirecting to your dashboard...",
+                duration: 2000,
+              });
+              setTimeout(() => navigate('/supplier-dashboard'), 1000);
+            } else {
+              console.log('📝 SupplierRegistration: Supplier role but no application — stay to complete onboarding');
+            }
           } else if (roleData?.role === 'builder') {
             // Already registered as builder - can't also be supplier
             console.log('📝 SupplierRegistration: User is already a builder');

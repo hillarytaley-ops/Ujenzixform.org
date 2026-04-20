@@ -8,7 +8,7 @@
 
 import { LEGACY_SUPABASE_AUTH_STORAGE_KEY, readPersistedAuthRawStringSync } from '@/utils/supabaseAccessToken';
 import React, { useState, useRef, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -16,7 +16,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Package, Eye, EyeOff, Loader2, ArrowLeft, Mail, Lock, User, Phone, MapPin, ChevronRight, Briefcase, CheckCircle, Info } from 'lucide-react';
+import { Package, Eye, EyeOff, Loader2, ArrowLeft, Mail, Lock, User, Phone, MapPin, ChevronRight, Briefcase, CheckCircle } from 'lucide-react';
 import { supabase, SUPABASE_URL, SUPABASE_ANON_KEY } from '@/integrations/supabase/client';
 
 const ROLE = 'supplier';
@@ -40,7 +40,30 @@ if (cachedRole === ROLE && cachedUserId) {
 
 console.log('🔐 SupplierAuth BUILD v16 - PRE-FILL FROM GENERAL LOGIN');
 
+const SUPPLIER_REGISTRATION = '/supplier-registration';
+
+const persistLegacySession = (signInData: {
+  access_token: string;
+  refresh_token: string;
+  expires_in: number;
+  token_type: string;
+  user: { id: string; email?: string | null };
+}) => {
+  const session = {
+    access_token: signInData.access_token,
+    refresh_token: signInData.refresh_token,
+    expires_at: Math.floor(Date.now() / 1000) + signInData.expires_in,
+    expires_in: signInData.expires_in,
+    token_type: signInData.token_type,
+    user: signInData.user,
+  };
+  localStorage.setItem(LEGACY_SUPABASE_AUTH_STORAGE_KEY, JSON.stringify(session));
+  localStorage.setItem('user_role_id', signInData.user.id);
+  localStorage.setItem('user_email', signInData.user.email || '');
+};
+
 const SupplierAuth: React.FC = () => {
+  const navigate = useNavigate();
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState<'signin' | 'signup'>('signin');
   const [isLoading, setIsLoading] = useState(false);
@@ -77,11 +100,20 @@ const SupplierAuth: React.FC = () => {
             const currentRole = roleData?.[0]?.role;
             
             if (currentRole === ROLE) {
-              // Already a supplier - redirect to dashboard
-              console.log('🔐 User is already a supplier, redirecting...');
-              localStorage.setItem('user_role', ROLE);
-              localStorage.setItem('user_role_id', parsed.user.id);
-              window.location.href = DASHBOARD;
+              const appRes = await fetch(
+                `${SUPABASE_URL}/rest/v1/supplier_applications?applicant_user_id=eq.${parsed.user.id}&select=id`,
+                { headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${parsed.access_token}` } }
+              );
+              const apps = await appRes.json();
+              if (Array.isArray(apps) && apps.length > 0) {
+                console.log('🔐 Supplier with application — dashboard');
+                localStorage.setItem('user_role', ROLE);
+                localStorage.setItem('user_role_id', parsed.user.id);
+                window.location.href = DASHBOARD;
+                return;
+              }
+              console.log('🔐 Supplier without application — full registration');
+              window.location.href = SUPPLIER_REGISTRATION;
               return;
             }
             
@@ -94,7 +126,7 @@ const SupplierAuth: React.FC = () => {
             
             toast({
               title: '👋 Welcome!',
-              description: 'Complete your supplier registration below.',
+              description: 'Continue to the full supplier form (materials, terms, and bank details).',
             });
           }
         }
@@ -112,11 +144,20 @@ const SupplierAuth: React.FC = () => {
             .maybeSingle();
           
           if (roleData?.role === ROLE) {
-            // Already a supplier - redirect to dashboard
-            console.log('🔐 User is already a supplier, redirecting...');
-            localStorage.setItem('user_role', ROLE);
-            localStorage.setItem('user_role_id', session.user.id);
-            window.location.href = DASHBOARD;
+            const appRes = await fetch(
+              `${SUPABASE_URL}/rest/v1/supplier_applications?applicant_user_id=eq.${session.user.id}&select=id`,
+              { headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${session.access_token}` } }
+            );
+            const apps = await appRes.json();
+            if (Array.isArray(apps) && apps.length > 0) {
+              console.log('🔐 Supplier with application — dashboard');
+              localStorage.setItem('user_role', ROLE);
+              localStorage.setItem('user_role_id', session.user.id);
+              window.location.href = DASHBOARD;
+              return;
+            }
+            console.log('🔐 Supplier without application — full registration');
+            window.location.href = SUPPLIER_REGISTRATION;
             return;
           }
           
@@ -129,7 +170,7 @@ const SupplierAuth: React.FC = () => {
           
           toast({
             title: '👋 Welcome!',
-            description: 'Complete your supplier registration below.',
+            description: 'Continue to the full supplier form (materials, terms, and bank details).',
           });
         }
       } catch (error) {
@@ -222,64 +263,81 @@ const SupplierAuth: React.FC = () => {
     if (!fullName.trim() || !companyName.trim()) { setIsLoading(false); toast({ title: 'Error', description: 'Please enter your full name and company name', variant: 'destructive' }); return; }
     
     try {
-      // If user is pre-filled from general login, use their existing session
+      const syncSupabaseSessionFromLegacyStorage = async () => {
+        const raw = readPersistedAuthRawStringSync();
+        if (!raw) return;
+        try {
+          const p = JSON.parse(raw) as { access_token?: string; refresh_token?: string };
+          if (p.access_token && p.refresh_token) {
+            await supabase.auth.setSession({ access_token: p.access_token, refresh_token: p.refresh_token });
+          }
+        } catch {
+          /* ignore */
+        }
+      };
+
+      const hasSupplierApplication = async (userId: string, accessToken: string) => {
+        const appRes = await fetch(
+          `${SUPABASE_URL}/rest/v1/supplier_applications?applicant_user_id=eq.${userId}&select=id`,
+          { headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${accessToken}` } }
+        );
+        const apps = await appRes.json();
+        return Array.isArray(apps) && apps.length > 0;
+      };
+
+      const goFullSupplierRegistration = async () => {
+        localStorage.removeItem('user_role');
+        await syncSupabaseSessionFromLegacyStorage();
+        toast({
+          title: 'Continue registration',
+          description: 'Next steps: materials, terms & privacy, and payout bank details.',
+        });
+        navigate(SUPPLIER_REGISTRATION);
+      };
+
+      // Logged-in via site session: send them to the full wizard (no role/supplier shortcuts here).
       if (isPrefilledFromLogin && prefilledUserId && prefilledAccessToken) {
-        console.log('🔐 Using pre-filled session from general login...');
-        const userId = prefilledUserId;
+        console.log('🔐 Pre-filled session — routing to full supplier registration');
         const accessToken = prefilledAccessToken;
-        
-        // Check current role
+        const userId = prefilledUserId;
+
         const roleCheckResponse = await fetch(
           `${SUPABASE_URL}/rest/v1/user_roles?user_id=eq.${userId}&select=role`,
-          { headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${accessToken}` } }
+          { headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${accessToken}` } }
         );
         const roleCheckData = await roleCheckResponse.json();
-        const currentRole = roleCheckData?.[0]?.role;
-        
-        // Update or insert role
-        if (currentRole) {
-          console.log('🔐 Updating role from', currentRole, 'to', ROLE);
-          await fetch(`${SUPABASE_URL}/rest/v1/user_roles?user_id=eq.${userId}`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${accessToken}`, 'Prefer': 'return=minimal' },
-            body: JSON.stringify({ role: ROLE }),
+        const currentRole = roleCheckData?.[0]?.role as string | undefined;
+
+        if (currentRole && currentRole !== ROLE) {
+          setIsLoading(false);
+          toast({
+            variant: 'destructive',
+            title: 'Different account type',
+            description: `This account is registered as ${currentRole}. Supplier onboarding is not available from this screen.`,
           });
-        } else {
-          console.log('🔐 Inserting new role:', ROLE);
-          await fetch(`${SUPABASE_URL}/rest/v1/user_roles`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${accessToken}`, 'Prefer': 'return=minimal' },
-            body: JSON.stringify({ user_id: userId, role: ROLE }),
-          });
+          return;
         }
-        
-        // Create supplier profile
-        console.log('🔐 Creating supplier profile...');
-        await fetch(`${SUPABASE_URL}/rest/v1/suppliers`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${accessToken}`, 'Prefer': 'return=minimal,resolution=merge-duplicates' },
-          body: JSON.stringify({ 
-            user_id: userId, 
-            business_name: companyName.trim(),
-            contact_name: fullName.trim(),
-            email: email.trim(),
-            phone: phone || null,
-            location: location || null,
-            status: 'active'
-          }),
-        });
-        
-        // Update localStorage and redirect
-        localStorage.setItem('user_role', ROLE);
-        localStorage.setItem('user_role_id', userId);
-        localStorage.setItem('user_email', email);
-        
-        toast({ title: '✅ Supplier Profile Created!', description: 'Redirecting to your dashboard...' });
-        window.location.href = DASHBOARD;
+
+        if (currentRole === ROLE) {
+          if (await hasSupplierApplication(userId, accessToken)) {
+            localStorage.setItem('user_role', ROLE);
+            localStorage.setItem('user_role_id', userId);
+            localStorage.setItem('user_email', email.trim());
+            toast({ title: 'Welcome back!', description: 'Redirecting to your dashboard...' });
+            window.location.href = DASHBOARD;
+            return;
+          }
+          await goFullSupplierRegistration();
+          setIsLoading(false);
+          return;
+        }
+
+        await goFullSupplierRegistration();
+        setIsLoading(false);
         return;
       }
-      
-      // First, try to sign in to check if user already exists
+
+      // First, try to sign in to check if user already exists (Sign Up tab + existing email)
       console.log('🔐 Checking if user already exists...');
       const signInResponse = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
         method: 'POST',
@@ -287,94 +345,58 @@ const SupplierAuth: React.FC = () => {
         body: JSON.stringify({ email: email.trim(), password }),
       });
       const signInData = await signInResponse.json();
-      
+
       if (signInResponse.ok && signInData.access_token && signInData.user) {
-        // User already exists! Update their role to supplier
-        console.log('🔐 User exists! Updating role to supplier...');
         const userId = signInData.user.id;
         const accessToken = signInData.access_token;
-        
-        // Check current role
+
         const roleCheckResponse = await fetch(
           `${SUPABASE_URL}/rest/v1/user_roles?user_id=eq.${userId}&select=role`,
-          { headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${accessToken}` } }
+          { headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${accessToken}` } }
         );
         const roleCheckData = await roleCheckResponse.json();
-        const currentRole = roleCheckData?.[0]?.role;
-        
-        if (currentRole === ROLE) {
-          // Already a supplier - just redirect
-          console.log('🔐 User is already a supplier, redirecting...');
-          localStorage.setItem(LEGACY_SUPABASE_AUTH_STORAGE_KEY, JSON.stringify({
-            access_token: accessToken,
-            refresh_token: signInData.refresh_token,
-            expires_at: Math.floor(Date.now() / 1000) + signInData.expires_in,
-            expires_in: signInData.expires_in,
-            token_type: signInData.token_type,
-            user: signInData.user
-          }));
-          localStorage.setItem('user_role', ROLE);
-          localStorage.setItem('user_role_id', userId);
-          localStorage.setItem('user_email', signInData.user.email || '');
-          toast({ title: 'Welcome back!', description: 'Redirecting to your dashboard...' });
-          window.location.href = DASHBOARD;
-          return;
-        }
-        
-        // Update or insert role
-        if (currentRole) {
-          // Update existing role
-          console.log('🔐 Updating role from', currentRole, 'to', ROLE);
-          await fetch(`${SUPABASE_URL}/rest/v1/user_roles?user_id=eq.${userId}`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${accessToken}`, 'Prefer': 'return=minimal' },
-            body: JSON.stringify({ role: ROLE }),
-          });
-        } else {
-          // Insert new role
-          console.log('🔐 Inserting new role:', ROLE);
-          await fetch(`${SUPABASE_URL}/rest/v1/user_roles`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${accessToken}`, 'Prefer': 'return=minimal' },
-            body: JSON.stringify({ user_id: userId, role: ROLE }),
-          });
-        }
-        
-        // Create/update supplier profile
-        console.log('🔐 Creating supplier profile...');
-        await fetch(`${SUPABASE_URL}/rest/v1/suppliers`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${accessToken}`, 'Prefer': 'return=minimal,resolution=merge-duplicates' },
-          body: JSON.stringify({ 
-            user_id: userId, 
-            business_name: companyName.trim(),
-            contact_name: fullName.trim(),
-            email: email.trim(),
-            phone: phone || null,
-            location: location || null,
-            status: 'active'
-          }),
-        });
-        
-        // Store session and redirect
-        localStorage.setItem(LEGACY_SUPABASE_AUTH_STORAGE_KEY, JSON.stringify({
+        const currentRole = roleCheckData?.[0]?.role as string | undefined;
+
+        persistLegacySession({
           access_token: accessToken,
           refresh_token: signInData.refresh_token,
-          expires_at: Math.floor(Date.now() / 1000) + signInData.expires_in,
           expires_in: signInData.expires_in,
           token_type: signInData.token_type,
-          user: signInData.user
-        }));
-        localStorage.setItem('user_role', ROLE);
-        localStorage.setItem('user_role_id', userId);
-        localStorage.setItem('user_email', signInData.user.email || '');
-        
-        toast({ title: '✅ Supplier Profile Created!', description: 'Redirecting to your dashboard...' });
-        window.location.href = DASHBOARD;
+          user: signInData.user,
+        });
+
+        if (currentRole === ROLE) {
+          if (await hasSupplierApplication(userId, accessToken)) {
+            localStorage.setItem('user_role', ROLE);
+            toast({ title: 'Welcome back!', description: 'Redirecting to your dashboard...' });
+            window.location.href = DASHBOARD;
+            return;
+          }
+          await goFullSupplierRegistration();
+          setIsLoading(false);
+          return;
+        }
+
+        if (currentRole) {
+          setIsLoading(false);
+          toast({
+            variant: 'destructive',
+            title: 'Account already registered',
+            description: `This email is already a ${currentRole}. Use the correct portal or contact support to change account type.`,
+          });
+          return;
+        }
+
+        await supabase.auth.setSession({
+          access_token: accessToken,
+          refresh_token: signInData.refresh_token,
+        });
+        await goFullSupplierRegistration();
+        setIsLoading(false);
         return;
       }
-      
-      // User doesn't exist - create new account
+
+      // New auth user — full onboarding happens on /supplier-registration (role assigned there).
       console.log('🔐 Creating new user account...');
       const response = await fetch(`${SUPABASE_URL}/auth/v1/signup`, {
         method: 'POST',
@@ -382,36 +404,48 @@ const SupplierAuth: React.FC = () => {
         body: JSON.stringify({ email: email.trim(), password, data: { full_name: fullName.trim(), role: ROLE, company_name: companyName.trim() } }),
       });
       const data = await response.json();
-      
-      if (!response.ok || data.error) { 
-        // Check if error is "already registered"
+
+      if (!response.ok || data.error) {
         if (data.error_description?.includes('already') || data.msg?.includes('already')) {
           setIsLoading(false);
-          toast({ 
-            title: 'Account exists', 
+          toast({
+            title: 'Account exists',
             description: 'This email is already registered. Please check your password and try again.',
-            variant: 'destructive' 
+            variant: 'destructive',
           });
           return;
         }
-        setIsLoading(false); 
-        toast({ title: 'Registration failed', description: data.error_description || data.error || data.msg, variant: 'destructive' }); 
-        return; 
+        setIsLoading(false);
+        toast({ title: 'Registration failed', description: data.error_description || data.error || data.msg, variant: 'destructive' });
+        return;
       }
-      
-      // Insert role into user_roles table
-      if (data.user?.id) {
-        console.log('🔐 Inserting role for new user:', data.user.id, ROLE);
-        try {
-          await fetch(`${SUPABASE_URL}/rest/v1/user_roles`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${data.access_token || SUPABASE_ANON_KEY}`, 'Prefer': 'return=minimal' },
-            body: JSON.stringify({ user_id: data.user.id, role: ROLE }),
-          });
-        } catch (roleErr) { console.log('🔐 Role insert error:', roleErr); }
+
+      if (data.access_token && data.refresh_token && data.user) {
+        persistLegacySession({
+          access_token: data.access_token,
+          refresh_token: data.refresh_token,
+          expires_in: data.expires_in ?? 3600,
+          token_type: data.token_type ?? 'bearer',
+          user: data.user,
+        });
+        await supabase.auth.setSession({
+          access_token: data.access_token,
+          refresh_token: data.refresh_token,
+        });
+        toast({
+          title: 'Account created',
+          description: 'Continue to complete materials, agreements, and bank details.',
+        });
+        navigate(SUPPLIER_REGISTRATION);
+        setIsLoading(false);
+        return;
       }
-      
-      toast({ title: 'Account created!', description: 'Please check your email to verify.' });
+
+      toast({
+        title: 'Check your email',
+        description: `After you verify your email, open ${SUPPLIER_REGISTRATION} to finish supplier onboarding (materials, terms, bank).`,
+        duration: 10000,
+      });
       setActiveTab('signin');
     } catch (err: any) {
       toast({ title: 'Registration failed', description: err.message, variant: 'destructive' });
@@ -456,7 +490,7 @@ const SupplierAuth: React.FC = () => {
                       <Alert className="bg-green-50 border-green-200">
                         <CheckCircle className="h-4 w-4 text-green-600" />
                         <AlertDescription className="text-green-800">
-                          <strong>Already logged in!</strong> Complete your supplier profile below.
+                          <strong>Already logged in!</strong> Continue to the full supplier registration for materials, legal agreements, and payout bank details.
                         </AlertDescription>
                       </Alert>
                     )}
@@ -500,9 +534,9 @@ const SupplierAuth: React.FC = () => {
                       {isLoading ? (
                         <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Creating...</>
                       ) : isPrefilledFromLogin ? (
-                        'Complete Registration'
+                        'Continue to full registration'
                       ) : (
-                        'Create Account'
+                        'Create account & continue'
                       )}
                     </Button>
                   </form>
