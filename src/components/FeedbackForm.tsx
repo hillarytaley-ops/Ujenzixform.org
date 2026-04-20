@@ -9,7 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { MessageSquare, Shield, AlertTriangle, CheckCircle } from "lucide-react";
+import { Star, MessageSquare, Shield, AlertTriangle, CheckCircle } from "lucide-react";
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 
@@ -39,7 +39,7 @@ const feedbackSchema = z.object({
       (message) => !/javascript:|vbscript:|data:|file:/i.test(message),
       "Message contains suspicious content"
     ),
-  rating: z.number().min(1, "Please select a rating").max(10, "Invalid rating"),
+  rating: z.number().min(1, "Please select a rating").max(5, "Invalid rating"),
   gdprConsent: z.boolean().refine(val => val === true, "You must agree to the privacy policy"),
   honeypot: z.string().max(0, "Bot detected") // Should be empty
 });
@@ -372,38 +372,34 @@ export function FeedbackForm({ onSuccess }: FeedbackFormProps) {
         </div>
 
         <div className="space-y-4">
-          <Label className="text-lg font-medium">Rate your experience (1–10) *</Label>
-          <p className="text-sm text-muted-foreground text-center">
-            1 = very poor, 10 = excellent
-          </p>
-          <div className="flex flex-wrap justify-center gap-1.5 sm:gap-2 p-4 bg-gray-50 rounded-lg max-w-xl mx-auto">
-            {Array.from({ length: 10 }, (_, i) => i + 1).map((n) => (
+          <Label className="text-lg font-medium">Rate Your Experience *</Label>
+          <div className="flex justify-center gap-2 p-4 bg-gray-50 rounded-lg">
+            {[1, 2, 3, 4, 5].map((star) => (
               <button
-                key={n}
+                key={star}
                 type="button"
-                onClick={() => handleRatingClick(n)}
-                onMouseEnter={() => setHoveredRating(n)}
+                onClick={() => handleRatingClick(star)}
+                onMouseEnter={() => setHoveredRating(star)}
                 onMouseLeave={() => setHoveredRating(0)}
-                className={`min-w-[2.25rem] h-10 px-2 rounded-md text-sm font-semibold transition-all border-2 ${
-                  n === rating
-                    ? "bg-primary text-primary-foreground border-primary scale-105 shadow-md"
-                    : n <= (hoveredRating || rating)
-                      ? "bg-amber-100 border-amber-300 text-amber-950 hover:bg-amber-200"
-                      : "bg-white border-gray-200 text-gray-600 hover:border-amber-200 hover:bg-amber-50/80"
-                }`}
+                className="p-2 hover:scale-125 transition-all duration-200 rounded-full hover:bg-yellow-100"
               >
-                {n}
+                <Star
+                  className={`h-10 w-10 ${
+                    star <= (hoveredRating || rating)
+                      ? "fill-yellow-400 text-yellow-400 drop-shadow-sm"
+                      : "text-gray-300 hover:text-yellow-300"
+                  }`}
+                />
               </button>
             ))}
           </div>
-          <div className="text-center text-sm text-gray-600 min-h-[3rem] flex items-center justify-center px-2">
-            {rating === 0 && "Tap a number from 1 to 10"}
-            {rating >= 1 && rating <= 3 && "😞 Very poor — we need to improve significantly"}
-            {rating >= 4 && rating <= 5 && "😐 Below expectations — tell us what went wrong"}
-            {rating >= 6 && rating <= 7 && "🙂 OK — room to improve"}
-            {rating === 8 && "😊 Good — solid experience"}
-            {rating === 9 && "🌟 Very good — thank you!"}
-            {rating === 10 && "🤩 Excellent — 10/10, outstanding!"}
+          <div className="text-center text-sm text-gray-600">
+            {rating === 0 && "Please select a rating"}
+            {rating === 1 && "😞 Poor - We need to improve"}
+            {rating === 2 && "😐 Fair - Room for improvement"}
+            {rating === 3 && "🙂 Good - Meeting expectations"}
+            {rating === 4 && "😊 Very Good - Exceeding expectations"}
+            {rating === 5 && "🤩 Excellent - Outstanding service!"}
           </div>
           {errors.rating && (
             <p className="text-sm text-destructive text-center">Please select a rating</p>
