@@ -70,7 +70,6 @@ import {
   CheckCircle2,
   Navigation,
   ShoppingCart,
-  CreditCard,
   FileBarChart,
   Sparkles,
   Bot,
@@ -166,7 +165,8 @@ import { AdminTab } from "@/config/staffPermissions";
 import { 
   OverviewTab, 
   MonitoringTab, 
-  FeedbackTab 
+  FeedbackTab,
+  FinancialTab,
 } from "@/pages/admin/tabs";
 import { RegistersTab } from "@/pages/admin/tabs/RegistersTab";
 import { 
@@ -263,34 +263,6 @@ interface MLStats {
   activeModels: number;
   todayPredictions: number;
   errorRate: number;
-}
-
-// Financial Documents Interfaces
-interface FinancialDocument {
-  id: string;
-  type: 'invoice' | 'payment' | 'purchase_order' | 'purchase_receipt' | 'delivery_order' | 'quotation';
-  reference: string;
-  amount: number;
-  currency: string;
-  status: string;
-  date: string;
-  partyName: string;
-  partyEmail?: string;
-  description?: string;
-  items?: any[];
-}
-
-interface FinancialStats {
-  totalInvoices: number;
-  totalPayments: number;
-  totalPurchaseOrders: number;
-  totalReceipts: number;
-  totalDeliveryOrders: number;
-  totalQuotations: number;
-  totalRevenue: number;
-  pendingPayments: number;
-  completedPayments: number;
-  overdueInvoices: number;
 }
 
 interface DeliveryApplication {
@@ -461,20 +433,6 @@ const AdminDashboard = () => {
     todayPredictions: 0,
     errorRate: 0
   });
-  const [financialDocuments, setFinancialDocuments] = useState<FinancialDocument[]>([]);
-  const [financialStats, setFinancialStats] = useState<FinancialStats>({
-    totalInvoices: 0,
-    totalPayments: 0,
-    totalPurchaseOrders: 0,
-    totalReceipts: 0,
-    totalDeliveryOrders: 0,
-    totalQuotations: 0,
-    totalRevenue: 0,
-    pendingPayments: 0,
-    completedPayments: 0,
-    overdueInvoices: 0
-  });
-  const [financialFilter, setFinancialFilter] = useState<'all' | 'invoice' | 'payment' | 'purchase_order' | 'purchase_receipt' | 'delivery_order' | 'quotation'>('all');
   const [searchTerm, setSearchTerm] = useState("");
   const [filterRole, setFilterRole] = useState("all");
   const ADMIN_TABS = [
@@ -719,7 +677,6 @@ const AdminDashboard = () => {
         { event: '*', schema: 'public', table: 'purchase_orders' },
         (payload) => {
           console.log('🛒 Purchase order change:', payload);
-          loadFinancialData();
         }
       )
       .subscribe();
@@ -995,7 +952,6 @@ const AdminDashboard = () => {
           await loadBuilderDeliveryRequests();
           break;
         case 'financial':
-          await loadFinancialData();
           break;
         case 'ml':
           loadMLActivities();
@@ -1452,191 +1408,6 @@ const AdminDashboard = () => {
     }
   };
 
-  const loadFinancialData = async () => {
-    try {
-      // Use admin client if available
-      const client = supabase;
-      
-      const allFinancialDocs: FinancialDocument[] = [];
-      let stats: FinancialStats = {
-        totalInvoices: 0,
-        totalPayments: 0,
-        totalPurchaseOrders: 0,
-        totalReceipts: 0,
-        totalDeliveryOrders: 0,
-        totalQuotations: 0,
-        totalRevenue: 0,
-        pendingPayments: 0,
-        completedPayments: 0,
-        overdueInvoices: 0
-      };
-
-      // Load all financial data in parallel for better performance
-      const [invoicesRes, paymentsRes, poRes, receiptsRes, deliveryOrdersRes, quotationsRes] = await Promise.all([
-        client.from('invoices').select('id, invoice_number, total_amount, status, created_at, due_date, issuer_id, supplier_id, items, notes').order('created_at', { ascending: false }),
-        client.from('payments').select('id, amount, currency, provider, reference, description, status, transaction_id, created_at, user_id').order('created_at', { ascending: false }),
-        client.from('purchase_orders').select('id, po_number, total_amount, status, created_at, delivery_address, items, special_instructions, buyer_id, supplier_id').order('created_at', { ascending: false }),
-        client.from('purchase_receipts').select('id, receipt_number, total_amount, status, created_at, payment_method, payment_reference, items, special_instructions, buyer_id').order('created_at', { ascending: false }),
-        client.from('delivery_orders').select('id, order_number, status, created_at, delivery_address, pickup_address, materials, notes, total_items, qr_coded_items, builder_id, supplier_id').order('created_at', { ascending: false }),
-        client.from('quotation_requests').select('id, material_name, quantity, unit, quote_amount, status, created_at, delivery_address, project_description, special_requirements, requester_id, supplier_id, supplier_notes').order('created_at', { ascending: false })
-      ]);
-
-      // Process Invoices
-      if (!invoicesRes.error && invoicesRes.data) {
-        const invoices = invoicesRes.data;
-        stats.totalInvoices = invoices.length;
-        stats.overdueInvoices = invoices.filter(inv => inv.status === 'overdue').length;
-        
-        invoices.forEach((inv: any) => {
-          allFinancialDocs.push({
-            id: inv.id,
-            type: 'invoice',
-            reference: inv.invoice_number,
-            amount: inv.total_amount || 0,
-            currency: 'KES',
-            status: inv.status,
-            date: inv.created_at,
-            partyName: `Invoice #${inv.invoice_number}`,
-            description: inv.notes || 'Invoice',
-            items: inv.items
-          });
-        });
-      }
-
-      // Process Payments
-      if (!paymentsRes.error && paymentsRes.data) {
-        const payments = paymentsRes.data;
-        stats.totalPayments = payments.length;
-        stats.completedPayments = payments.filter(p => p.status === 'completed').length;
-        stats.pendingPayments = payments.filter(p => p.status === 'pending').length;
-        stats.totalRevenue = payments
-          .filter(p => p.status === 'completed')
-          .reduce((sum, p) => sum + (p.amount || 0), 0);
-        
-        payments.forEach((pmt: any) => {
-          allFinancialDocs.push({
-            id: pmt.id,
-            type: 'payment',
-            reference: pmt.reference || pmt.transaction_id || 'N/A',
-            amount: pmt.amount || 0,
-            currency: pmt.currency || 'KES',
-            status: pmt.status,
-            date: pmt.created_at,
-            partyName: pmt.provider || 'Unknown Provider',
-            description: pmt.description || `Payment via ${pmt.provider}`
-          });
-        });
-      }
-
-      // Process Purchase Orders
-      if (!poRes.error && poRes.data) {
-        const purchaseOrders = poRes.data;
-        stats.totalPurchaseOrders = purchaseOrders.length;
-        
-        purchaseOrders.forEach((po: any) => {
-          allFinancialDocs.push({
-            id: po.id,
-            type: 'purchase_order',
-            reference: po.po_number,
-            amount: po.total_amount || 0,
-            currency: 'KES',
-            status: po.status,
-            date: po.created_at,
-            partyName: `PO #${po.po_number}`,
-            description: po.special_instructions || 'Purchase Order',
-            items: po.items
-          });
-        });
-      }
-
-      // Process Purchase Receipts
-      if (!receiptsRes.error && receiptsRes.data) {
-        const receipts = receiptsRes.data;
-        stats.totalReceipts = receipts.length;
-        
-        receipts.forEach((rec: any) => {
-          allFinancialDocs.push({
-            id: rec.id,
-            type: 'purchase_receipt',
-            reference: rec.receipt_number,
-            amount: rec.total_amount || 0,
-            currency: 'KES',
-            status: rec.status,
-            date: rec.created_at,
-            partyName: `Receipt #${rec.receipt_number}`,
-            description: `${rec.payment_method || 'Payment'} - ${rec.special_instructions || 'Purchase Receipt'}`
-          });
-        });
-      }
-
-      // Process Delivery Orders
-      if (!deliveryOrdersRes.error && deliveryOrdersRes.data) {
-        const deliveryOrders = deliveryOrdersRes.data;
-        stats.totalDeliveryOrders = deliveryOrders.length;
-        
-        deliveryOrders.forEach((dOrder: any) => {
-          // Calculate total from materials if available
-          let totalAmount = 0;
-          if (dOrder.materials && Array.isArray(dOrder.materials)) {
-            totalAmount = dOrder.materials.reduce((sum: number, item: any) => {
-              return sum + ((item.price || 0) * (item.quantity || 1));
-            }, 0);
-          }
-          
-          allFinancialDocs.push({
-            id: dOrder.id,
-            type: 'delivery_order',
-            reference: dOrder.order_number,
-            amount: totalAmount,
-            currency: 'KES',
-            status: dOrder.status,
-            date: dOrder.created_at,
-            partyName: `Delivery #${dOrder.order_number}`,
-            description: dOrder.notes || `${dOrder.total_items} items (${dOrder.qr_coded_items || 0} QR coded) - From: ${dOrder.pickup_address?.substring(0, 30) || 'N/A'}...`,
-            items: dOrder.materials
-          });
-        });
-      }
-
-      // Process Quotation Requests
-      if (!quotationsRes.error && quotationsRes.data) {
-        const quotations = quotationsRes.data;
-        stats.totalQuotations = quotations.length;
-        
-        quotations.forEach((quote: any) => {
-          allFinancialDocs.push({
-            id: quote.id,
-            type: 'quotation',
-            reference: `QR-${quote.id.substring(0, 8).toUpperCase()}`,
-            amount: quote.quote_amount || 0,
-            currency: 'KES',
-            status: quote.status,
-            date: quote.created_at,
-            partyName: quote.material_name,
-            description: `${quote.quantity} ${quote.unit} - ${quote.project_description || quote.special_requirements || 'Quote Request'}`
-          });
-        });
-      }
-
-      // Sort all financial documents by date (newest first)
-      allFinancialDocs.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-      
-      setFinancialDocuments(allFinancialDocs);
-      setFinancialStats(stats);
-      console.log('💰 Loaded', allFinancialDocs.length, 'financial documents:', {
-        invoices: stats.totalInvoices,
-        payments: stats.totalPayments,
-        purchaseOrders: stats.totalPurchaseOrders,
-        receipts: stats.totalReceipts,
-        deliveryOrders: stats.totalDeliveryOrders,
-        quotations: stats.totalQuotations
-      });
-      
-    } catch (error) {
-      console.error('Error loading financial data:', error);
-    }
-  };
-  
   const loadMLActivities = () => {
     // Load ML activities from localStorage (simulated ML system)
     try {
@@ -2549,7 +2320,6 @@ const AdminDashboard = () => {
             }}
             deliveryAppsCount={deliveryApplications.length}
             deliveryRequestsCount={builderDeliveryRequests.length}
-            financialDocsCount={financialDocuments.length}
             chatStats={chatStats}
           />
           
@@ -2648,7 +2418,7 @@ const AdminDashboard = () => {
             {shouldShowTab('financial') && (
               <TabsTrigger value="financial" className="data-[state=active]:bg-emerald-600">
                 <DollarSign className="h-4 w-4 mr-2" />
-                Financial ({financialDocuments.length})
+                Finance
               </TabsTrigger>
             )}
             {shouldShowTab('ml') && (
@@ -3267,30 +3037,17 @@ const AdminDashboard = () => {
                           </div>
                         </div>
 
-                        <div className="mb-4 p-4 rounded-xl border border-slate-600 bg-slate-800/40">
-                          <div className="flex items-center gap-2 text-gray-300 text-sm font-medium mb-3">
-                            <CreditCard className="h-4 w-4 text-emerald-400" />
-                            Payout bank account
-                          </div>
-                          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-3 text-sm">
-                            <div>
-                              <p className="text-gray-500 text-xs mb-0.5">Bank</p>
-                              <p className="text-white">{app.bank_name?.trim() || '—'}</p>
-                            </div>
-                            <div>
-                              <p className="text-gray-500 text-xs mb-0.5">Account name</p>
-                              <p className="text-white">{app.bank_account_holder_name?.trim() || '—'}</p>
-                            </div>
-                            <div>
-                              <p className="text-gray-500 text-xs mb-0.5">Account number</p>
-                              <p className="text-white font-mono">{app.bank_account_number?.trim() || '—'}</p>
-                            </div>
-                            <div>
-                              <p className="text-gray-500 text-xs mb-0.5">Branch</p>
-                              <p className="text-white">{app.bank_branch?.trim() || '—'}</p>
-                            </div>
-                          </div>
-                        </div>
+                        <p className="text-gray-500 text-xs mb-4">
+                          Payout bank details for all delivery providers are in the{" "}
+                          <button
+                            type="button"
+                            className="font-medium text-emerald-400 hover:underline"
+                            onClick={() => setActiveTab("financial")}
+                          >
+                            Finance
+                          </button>{" "}
+                          tab.
+                        </p>
 
                         {/* Additional Info */}
                         <div className="grid md:grid-cols-3 gap-4 mb-4">
@@ -4331,452 +4088,9 @@ const AdminDashboard = () => {
             </Card>
           </TabsContent>
 
-          {/* Financial Documents Tab */}
+          {/* Finance — standalone (documents + supplier & delivery payout registries) */}
           <TabsContent value="financial" className="space-y-6">
-            {/* Financial Stats - Top Row */}
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-              <Card className="bg-gradient-to-br from-emerald-900/40 to-emerald-800/20 border-emerald-700/50">
-                <CardContent className="p-4">
-                  <div className="flex items-center gap-3">
-                    <div className="p-3 bg-emerald-600/30 rounded-xl">
-                      <FileText className="h-6 w-6 text-emerald-400" />
-                    </div>
-                    <div>
-                      <p className="text-2xl font-bold text-white">{financialStats.totalInvoices}</p>
-                      <p className="text-sm text-emerald-300">Invoices</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-              
-              <Card className="bg-gradient-to-br from-blue-900/40 to-blue-800/20 border-blue-700/50">
-                <CardContent className="p-4">
-                  <div className="flex items-center gap-3">
-                    <div className="p-3 bg-blue-600/30 rounded-xl">
-                      <CreditCard className="h-6 w-6 text-blue-400" />
-                    </div>
-                    <div>
-                      <p className="text-2xl font-bold text-white">{financialStats.totalPayments}</p>
-                      <p className="text-sm text-blue-300">Payments</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-              
-              <Card className="bg-gradient-to-br from-orange-900/40 to-orange-800/20 border-orange-700/50">
-                <CardContent className="p-4">
-                  <div className="flex items-center gap-3">
-                    <div className="p-3 bg-orange-600/30 rounded-xl">
-                      <ShoppingCart className="h-6 w-6 text-orange-400" />
-                    </div>
-                    <div>
-                      <p className="text-2xl font-bold text-white">{financialStats.totalPurchaseOrders}</p>
-                      <p className="text-sm text-orange-300">Purchase Orders</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-              
-              <Card className="bg-gradient-to-br from-purple-900/40 to-purple-800/20 border-purple-700/50">
-                <CardContent className="p-4">
-                  <div className="flex items-center gap-3">
-                    <div className="p-3 bg-purple-600/30 rounded-xl">
-                      <FileCheck className="h-6 w-6 text-purple-400" />
-                    </div>
-                    <div>
-                      <p className="text-2xl font-bold text-white">{financialStats.totalReceipts}</p>
-                      <p className="text-sm text-purple-300">Receipts</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-              
-              <Card className="bg-gradient-to-br from-teal-900/40 to-teal-800/20 border-teal-700/50">
-                <CardContent className="p-4">
-                  <div className="flex items-center gap-3">
-                    <div className="p-3 bg-teal-600/30 rounded-xl">
-                      <Truck className="h-6 w-6 text-teal-400" />
-                    </div>
-                    <div>
-                      <p className="text-2xl font-bold text-white">{financialStats.totalDeliveryOrders}</p>
-                      <p className="text-sm text-teal-300">Delivery Orders</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-              
-              <Card className="bg-gradient-to-br from-pink-900/40 to-pink-800/20 border-pink-700/50">
-                <CardContent className="p-4">
-                  <div className="flex items-center gap-3">
-                    <div className="p-3 bg-pink-600/30 rounded-xl">
-                      <ClipboardList className="h-6 w-6 text-pink-400" />
-                    </div>
-                    <div>
-                      <p className="text-2xl font-bold text-white">{financialStats.totalQuotations}</p>
-                      <p className="text-sm text-pink-300">Quotations</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-            
-            {/* Financial Stats - Bottom Row */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <Card className="bg-gradient-to-br from-green-900/40 to-green-800/20 border-green-700/50">
-                <CardContent className="p-4">
-                  <div className="flex items-center gap-3">
-                    <div className="p-3 bg-green-600/30 rounded-xl">
-                      <TrendingUp className="h-6 w-6 text-green-400" />
-                    </div>
-                    <div>
-                      <p className="text-2xl font-bold text-white">KES {financialStats.totalRevenue.toLocaleString()}</p>
-                      <p className="text-sm text-green-300">Total Revenue</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-              
-              <Card className="bg-gradient-to-br from-yellow-900/40 to-yellow-800/20 border-yellow-700/50">
-                <CardContent className="p-4">
-                  <div className="flex items-center gap-3">
-                    <div className="p-3 bg-yellow-600/30 rounded-xl">
-                      <Clock className="h-6 w-6 text-yellow-400" />
-                    </div>
-                    <div>
-                      <p className="text-2xl font-bold text-white">{financialStats.pendingPayments}</p>
-                      <p className="text-sm text-yellow-300">Pending Payments</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-              
-              <Card className="bg-gradient-to-br from-cyan-900/40 to-cyan-800/20 border-cyan-700/50">
-                <CardContent className="p-4">
-                  <div className="flex items-center gap-3">
-                    <div className="p-3 bg-cyan-600/30 rounded-xl">
-                      <CheckCircle className="h-6 w-6 text-cyan-400" />
-                    </div>
-                    <div>
-                      <p className="text-2xl font-bold text-white">{financialStats.completedPayments}</p>
-                      <p className="text-sm text-cyan-300">Completed</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-              
-              <Card className="bg-gradient-to-br from-red-900/40 to-red-800/20 border-red-700/50">
-                <CardContent className="p-4">
-                  <div className="flex items-center gap-3">
-                    <div className="p-3 bg-red-600/30 rounded-xl">
-                      <AlertTriangle className="h-6 w-6 text-red-400" />
-                    </div>
-                    <div>
-                      <p className="text-2xl font-bold text-white">{financialStats.overdueInvoices}</p>
-                      <p className="text-sm text-red-300">Overdue</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-
-            {/* Financial Documents by Type */}
-            <Card className="bg-slate-900/50 border-slate-800">
-              <CardHeader>
-                <CardTitle className="text-white flex items-center gap-2">
-                  <PieChart className="h-5 w-5 text-emerald-400" />
-                  Filter by Document Type
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-3 md:grid-cols-6 gap-4">
-                  <div 
-                    className={`p-4 rounded-lg cursor-pointer transition-all ${financialFilter === 'invoice' ? 'bg-emerald-600/40 border-2 border-emerald-500' : 'bg-slate-800/50 hover:bg-slate-700/50'}`}
-                    onClick={() => setFinancialFilter(financialFilter === 'invoice' ? 'all' : 'invoice')}
-                  >
-                    <FileText className="h-8 w-8 text-emerald-400 mx-auto mb-2" />
-                    <p className="text-xl font-bold text-white text-center">{financialStats.totalInvoices}</p>
-                    <p className="text-xs text-gray-400 text-center">Invoices</p>
-                  </div>
-                  <div 
-                    className={`p-4 rounded-lg cursor-pointer transition-all ${financialFilter === 'payment' ? 'bg-blue-600/40 border-2 border-blue-500' : 'bg-slate-800/50 hover:bg-slate-700/50'}`}
-                    onClick={() => setFinancialFilter(financialFilter === 'payment' ? 'all' : 'payment')}
-                  >
-                    <CreditCard className="h-8 w-8 text-blue-400 mx-auto mb-2" />
-                    <p className="text-xl font-bold text-white text-center">{financialStats.totalPayments}</p>
-                    <p className="text-xs text-gray-400 text-center">Payments</p>
-                  </div>
-                  <div 
-                    className={`p-4 rounded-lg cursor-pointer transition-all ${financialFilter === 'purchase_order' ? 'bg-orange-600/40 border-2 border-orange-500' : 'bg-slate-800/50 hover:bg-slate-700/50'}`}
-                    onClick={() => setFinancialFilter(financialFilter === 'purchase_order' ? 'all' : 'purchase_order')}
-                  >
-                    <ShoppingCart className="h-8 w-8 text-orange-400 mx-auto mb-2" />
-                    <p className="text-xl font-bold text-white text-center">{financialStats.totalPurchaseOrders}</p>
-                    <p className="text-xs text-gray-400 text-center">Purchase Orders</p>
-                  </div>
-                  <div 
-                    className={`p-4 rounded-lg cursor-pointer transition-all ${financialFilter === 'purchase_receipt' ? 'bg-purple-600/40 border-2 border-purple-500' : 'bg-slate-800/50 hover:bg-slate-700/50'}`}
-                    onClick={() => setFinancialFilter(financialFilter === 'purchase_receipt' ? 'all' : 'purchase_receipt')}
-                  >
-                    <FileCheck className="h-8 w-8 text-purple-400 mx-auto mb-2" />
-                    <p className="text-xl font-bold text-white text-center">{financialStats.totalReceipts}</p>
-                    <p className="text-xs text-gray-400 text-center">Receipts</p>
-                  </div>
-                  <div 
-                    className={`p-4 rounded-lg cursor-pointer transition-all ${financialFilter === 'delivery_order' ? 'bg-teal-600/40 border-2 border-teal-500' : 'bg-slate-800/50 hover:bg-slate-700/50'}`}
-                    onClick={() => setFinancialFilter(financialFilter === 'delivery_order' ? 'all' : 'delivery_order')}
-                  >
-                    <Truck className="h-8 w-8 text-teal-400 mx-auto mb-2" />
-                    <p className="text-xl font-bold text-white text-center">{financialStats.totalDeliveryOrders}</p>
-                    <p className="text-xs text-gray-400 text-center">Delivery Orders</p>
-                  </div>
-                  <div 
-                    className={`p-4 rounded-lg cursor-pointer transition-all ${financialFilter === 'quotation' ? 'bg-pink-600/40 border-2 border-pink-500' : 'bg-slate-800/50 hover:bg-slate-700/50'}`}
-                    onClick={() => setFinancialFilter(financialFilter === 'quotation' ? 'all' : 'quotation')}
-                  >
-                    <ClipboardList className="h-8 w-8 text-pink-400 mx-auto mb-2" />
-                    <p className="text-xl font-bold text-white text-center">{financialStats.totalQuotations}</p>
-                    <p className="text-xs text-gray-400 text-center">Quotations</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Financial Documents Table */}
-            <Card className="bg-slate-900/50 border-slate-800">
-              <CardHeader>
-                <div className="flex justify-between items-center flex-wrap gap-4">
-                  <CardTitle className="text-white flex items-center gap-2">
-                    <DollarSign className="h-5 w-5 text-emerald-400" />
-                    All Financial Documents ({financialFilter === 'all' ? financialDocuments.length : financialDocuments.filter(d => d.type === financialFilter).length})
-                  </CardTitle>
-                  <div className="flex gap-2">
-                    <Select value={financialFilter} onValueChange={(value: any) => setFinancialFilter(value)}>
-                      <SelectTrigger className="w-[180px] bg-slate-800 border-slate-700 text-white">
-                        <SelectValue placeholder="Filter by type" />
-                      </SelectTrigger>
-                      <SelectContent className="bg-slate-800 border-slate-700">
-                        <SelectItem value="all" className="text-white">All Documents</SelectItem>
-                        <SelectItem value="invoice" className="text-white">Invoices</SelectItem>
-                        <SelectItem value="payment" className="text-white">Payments</SelectItem>
-                        <SelectItem value="purchase_order" className="text-white">Purchase Orders</SelectItem>
-                        <SelectItem value="purchase_receipt" className="text-white">Receipts</SelectItem>
-                        <SelectItem value="delivery_order" className="text-white">Delivery Orders</SelectItem>
-                        <SelectItem value="quotation" className="text-white">Quotations</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={loadFinancialData}
-                      className="border-emerald-700 text-emerald-400 hover:bg-emerald-900/30"
-                    >
-                      <RefreshCw className="h-4 w-4 mr-2" />
-                      Refresh
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="border-blue-700 text-blue-400 hover:bg-blue-900/30"
-                    >
-                      <Download className="h-4 w-4 mr-2" />
-                      Export
-                    </Button>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow className="border-slate-700">
-                        <TableHead className="text-gray-400">Type</TableHead>
-                        <TableHead className="text-gray-400">Reference</TableHead>
-                        <TableHead className="text-gray-400">Amount</TableHead>
-                        <TableHead className="text-gray-400">Status</TableHead>
-                        <TableHead className="text-gray-400">Description</TableHead>
-                        <TableHead className="text-gray-400">Date</TableHead>
-                        <TableHead className="text-gray-400">Actions</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {(financialFilter === 'all' ? financialDocuments : financialDocuments.filter(d => d.type === financialFilter))
-                        .slice(0, 50)
-                        .map((doc) => (
-                        <TableRow key={doc.id} className="border-slate-700 hover:bg-slate-800/50">
-                          <TableCell>
-                            <Badge className={
-                              doc.type === 'invoice' ? 'bg-emerald-600' :
-                              doc.type === 'payment' ? 'bg-blue-600' :
-                              doc.type === 'purchase_order' ? 'bg-orange-600' :
-                              doc.type === 'purchase_receipt' ? 'bg-purple-600' :
-                              doc.type === 'delivery_order' ? 'bg-teal-600' :
-                              doc.type === 'quotation' ? 'bg-pink-600' :
-                              'bg-gray-600'
-                            }>
-                              <div className="flex items-center gap-1">
-                                {doc.type === 'invoice' && <FileText className="h-3 w-3" />}
-                                {doc.type === 'payment' && <CreditCard className="h-3 w-3" />}
-                                {doc.type === 'purchase_order' && <ShoppingCart className="h-3 w-3" />}
-                                {doc.type === 'purchase_receipt' && <FileCheck className="h-3 w-3" />}
-                                {doc.type === 'delivery_order' && <Truck className="h-3 w-3" />}
-                                {doc.type === 'quotation' && <ClipboardList className="h-3 w-3" />}
-                                {doc.type.replace(/_/g, ' ')}
-                              </div>
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="text-white font-mono font-medium">
-                            {doc.reference}
-                          </TableCell>
-                          <TableCell className="text-white font-semibold">
-                            <span className="text-emerald-400">{doc.currency}</span> {doc.amount.toLocaleString()}
-                          </TableCell>
-                          <TableCell>
-                            <Badge className={
-                              doc.status === 'completed' || doc.status === 'paid' ? 'bg-green-600' :
-                              doc.status === 'pending' || doc.status === 'draft' ? 'bg-yellow-600' :
-                              doc.status === 'processing' || doc.status === 'sent' ? 'bg-blue-600' :
-                              doc.status === 'overdue' || doc.status === 'failed' || doc.status === 'cancelled' ? 'bg-red-600' :
-                              'bg-gray-600'
-                            }>
-                              {doc.status}
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="text-gray-400 max-w-[200px] truncate">
-                            {doc.description || doc.partyName}
-                          </TableCell>
-                          <TableCell className="text-gray-400 text-sm">
-                            {new Date(doc.date).toLocaleDateString('en-KE', {
-                              year: 'numeric',
-                              month: 'short',
-                              day: 'numeric',
-                              hour: '2-digit',
-                              minute: '2-digit'
-                            })}
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex gap-2">
-                              <Button size="sm" variant="outline" className="h-8 border-blue-700 text-blue-400 hover:bg-blue-900/30">
-                                <Eye className="h-3 w-3" />
-                              </Button>
-                              <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                  <Button size="sm" variant="outline" className="h-8 border-slate-700 text-gray-400 hover:bg-slate-800">
-                                    <MoreVertical className="h-3 w-3" />
-                                  </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent className="bg-slate-800 border-slate-700">
-                                  <DropdownMenuLabel className="text-gray-400">Actions</DropdownMenuLabel>
-                                  <DropdownMenuSeparator className="bg-slate-700" />
-                                  <DropdownMenuItem className="text-white hover:bg-slate-700">
-                                    <Eye className="h-4 w-4 mr-2" /> View Details
-                                  </DropdownMenuItem>
-                                  <DropdownMenuItem className="text-white hover:bg-slate-700">
-                                    <Download className="h-4 w-4 mr-2" /> Download PDF
-                                  </DropdownMenuItem>
-                                  <DropdownMenuItem className="text-white hover:bg-slate-700">
-                                    <FileText className="h-4 w-4 mr-2" /> View Items
-                                  </DropdownMenuItem>
-                                </DropdownMenuContent>
-                              </DropdownMenu>
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                  {financialDocuments.length === 0 && (
-                    <div className="text-center py-8">
-                      <DollarSign className="h-12 w-12 text-gray-600 mx-auto mb-3" />
-                      <p className="text-gray-400">No financial documents found</p>
-                      <p className="text-gray-500 text-sm mt-1">Financial records will appear here as transactions occur</p>
-                    </div>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Recent Transactions Summary */}
-            <div className="grid md:grid-cols-2 gap-6">
-              <Card className="bg-slate-900/50 border-slate-800">
-                <CardHeader>
-                  <CardTitle className="text-white flex items-center gap-2">
-                    <TrendingUp className="h-5 w-5 text-green-400" />
-                    Recent Payments
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-3">
-                    {financialDocuments
-                      .filter(d => d.type === 'payment')
-                      .slice(0, 5)
-                      .map((doc) => (
-                        <div key={doc.id} className="flex items-center justify-between p-3 bg-slate-800/50 rounded-lg">
-                          <div className="flex items-center gap-3">
-                            <div className="p-2 bg-blue-600/30 rounded-lg">
-                              <CreditCard className="h-4 w-4 text-blue-400" />
-                            </div>
-                            <div>
-                              <p className="text-white text-sm font-medium">{doc.reference}</p>
-                              <p className="text-gray-500 text-xs">{doc.partyName}</p>
-                            </div>
-                          </div>
-                          <div className="text-right">
-                            <p className="text-emerald-400 font-semibold">{doc.currency} {doc.amount.toLocaleString()}</p>
-                            <Badge className={doc.status === 'completed' ? 'bg-green-600' : 'bg-yellow-600'} variant="outline">
-                              {doc.status}
-                            </Badge>
-                          </div>
-                        </div>
-                    ))}
-                    {financialDocuments.filter(d => d.type === 'payment').length === 0 && (
-                      <p className="text-gray-500 text-center py-4">No recent payments</p>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card className="bg-slate-900/50 border-slate-800">
-                <CardHeader>
-                  <CardTitle className="text-white flex items-center gap-2">
-                    <FileText className="h-5 w-5 text-emerald-400" />
-                    Recent Invoices
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-3">
-                    {financialDocuments
-                      .filter(d => d.type === 'invoice')
-                      .slice(0, 5)
-                      .map((doc) => (
-                        <div key={doc.id} className="flex items-center justify-between p-3 bg-slate-800/50 rounded-lg">
-                          <div className="flex items-center gap-3">
-                            <div className="p-2 bg-emerald-600/30 rounded-lg">
-                              <FileText className="h-4 w-4 text-emerald-400" />
-                            </div>
-                            <div>
-                              <p className="text-white text-sm font-medium">{doc.reference}</p>
-                              <p className="text-gray-500 text-xs">{new Date(doc.date).toLocaleDateString()}</p>
-                            </div>
-                          </div>
-                          <div className="text-right">
-                            <p className="text-emerald-400 font-semibold">{doc.currency} {doc.amount.toLocaleString()}</p>
-                            <Badge className={
-                              doc.status === 'paid' ? 'bg-green-600' : 
-                              doc.status === 'overdue' ? 'bg-red-600' : 
-                              'bg-yellow-600'
-                            } variant="outline">
-                              {doc.status}
-                            </Badge>
-                          </div>
-                        </div>
-                    ))}
-                    {financialDocuments.filter(d => d.type === 'invoice').length === 0 && (
-                      <p className="text-gray-500 text-center py-4">No recent invoices</p>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
+            <FinancialTab />
           </TabsContent>
 
           <TabsContent value="supply-chain-docs" className="space-y-6">
@@ -4793,7 +4107,7 @@ const AdminDashboard = () => {
                     className="font-medium text-emerald-400 hover:underline"
                     onClick={() => setActiveTab("financial")}
                   >
-                    Financial
+                    Finance
                   </button>{" "}
                   and{" "}
                   <button

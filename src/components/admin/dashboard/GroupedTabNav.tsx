@@ -78,7 +78,8 @@ interface GroupedTabNavProps {
   };
   deliveryAppsCount: number;
   deliveryRequestsCount: number;
-  financialDocsCount: number;
+  /** Optional badge on Finance tab (e.g. document count). Omitted when Finance is fully self-contained in FinancialTab. */
+  financialDocsCount?: number;
   // Communication stats
   chatStats?: {
     unreadChats: number;
@@ -181,12 +182,28 @@ export const GroupedTabNav: React.FC<GroupedTabNavProps> = ({
       ],
     },
     {
-      id: 'finance-system',
-      label: 'Finance & system',
-      icon: Layers,
+      id: 'finance',
+      label: 'Finance',
+      icon: DollarSign,
       color: 'emerald',
       tabs: [
-        { value: 'financial', label: 'Financial', icon: DollarSign, badge: financialDocsCount || undefined },
+        {
+          value: 'financial',
+          label: 'Finance',
+          icon: DollarSign,
+          badge:
+            financialDocsCount != null && financialDocsCount > 0
+              ? financialDocsCount
+              : undefined,
+        },
+      ],
+    },
+    {
+      id: 'finance-system',
+      label: 'System',
+      icon: Layers,
+      color: 'slate',
+      tabs: [
         { value: 'documents', label: 'Documents', icon: Folder },
         { value: 'supply-chain-docs', label: 'DN · GRN · Invoices', icon: ClipboardList },
         { value: 'staff', label: 'Staff', icon: UserCheck },
