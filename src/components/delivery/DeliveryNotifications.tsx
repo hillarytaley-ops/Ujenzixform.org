@@ -183,7 +183,7 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
       // CRITICAL: MUST include delivery_address field - this is the address filled by builder in delivery request form
       // CRITICAL: Also fetch pickup_address and all address-related fields to ensure we get the builder-provided address
       const drResponse = await fetch(
-        `${url}/rest/v1/delivery_requests?order=created_at.desc&limit=200&select=id,status,purchase_order_id,provider_id,delivery_address,pickup_address,delivery_coordinates,material_type,quantity,created_at,builder_id,rejection_reason,estimated_cost,budget_range,delivery_latitude,delivery_longitude,pickup_latitude,pickup_longitude`,
+        `${url}/rest/v1/delivery_requests?order=created_at.desc&limit=200&select=id,status,purchase_order_id,provider_id,delivery_address,pickup_address,delivery_coordinates,material_type,quantity,created_at,builder_id,rejection_reason,delivery_latitude,delivery_longitude,pickup_latitude,pickup_longitude`,
         { headers, cache: 'no-store' }
       );
       
@@ -967,7 +967,6 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
           deliveryAddress: deliveryAddr,
           materialType: matLabel,
           quantity: dr.quantity || '',
-          estimatedCost: dr.estimated_cost || dr.budget_range || 0,
           purchase_order_id: dr.purchase_order_id ?? (poId === dr.id ? undefined : poId), // Use real PO id; for null-po requests key is dr.id so pass undefined
           po_number: poNumber || undefined, // CRITICAL: Include po_number for deduplication
           delivery_request_id: dr.id, // For accepting
@@ -1133,7 +1132,6 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
               deliveryAddress: po.delivery_address || '',
               materialType: materialType,
               quantity: po.items?.length || 1,
-              estimatedCost: po.total_amount || 0,
               purchase_order_id: po.id, // CRITICAL
               po_number: po.po_number || undefined, // CRITICAL: Include po_number for deduplication
               delivery_request_id: undefined // No delivery_request yet
@@ -1606,7 +1604,7 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
       if (Notification.permission === 'granted') {
         try {
           const notificationOptions: NotificationOptions & { vibrate?: number[] } = {
-            body: `${notification.materialType || 'Construction Materials'} - ${notification.estimatedCost ? `KES ${notification.estimatedCost.toLocaleString()}` : 'New delivery available'}`,
+            body: `${notification.materialType || 'Construction Materials'} — new delivery available`,
             icon: '/ujenzixform-logo.png',
             badge: '/badge.png',
             tag: notification.delivery_request_id || notification.id,
@@ -1684,7 +1682,7 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
         // Show toast notification
         toast({
           title: '🚚 New Delivery Request!',
-          description: `${latestNotification.materialType || 'Construction Materials'}${latestNotification.estimatedCost ? ` - KES ${latestNotification.estimatedCost.toLocaleString()}` : ''}`,
+          description: `${latestNotification.materialType || 'Construction Materials'}`,
           duration: 10000,
         });
       }
@@ -2504,11 +2502,6 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
                       {notification.materialType && (
                         <p className="text-xs text-gray-600 mt-0.5">
                           📦 {notification.materialType} {notification.quantity && `(${notification.quantity} items)`}
-                        </p>
-                      )}
-                      {notification.estimatedCost && notification.estimatedCost > 0 && (
-                        <p className="text-[10px] text-gray-500 mt-0.5">
-                          💰 Ksh {notification.estimatedCost.toLocaleString()}
                         </p>
                       )}
                     </div>

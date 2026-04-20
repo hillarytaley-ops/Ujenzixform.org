@@ -153,7 +153,6 @@ class DeliveryProviderNotificationService {
         material_type: requestDetails.material_type,
         quantity: requestDetails.quantity,
         weight_kg: requestDetails.weight_kg,
-        budget_range: requestDetails.budget_range,
         ...(dataExtras && Object.keys(dataExtras).length ? dataExtras : {}),
       };
       const nearby = Boolean(dataExtras?.nearby_job);
@@ -200,7 +199,6 @@ class DeliveryProviderNotificationService {
         `📍 To: ${requestDetails.delivery_address}\n` +
         `📅 Date: ${new Date(requestDetails.pickup_date).toLocaleDateString()}\n` +
         `📦 Material: ${requestDetails.material_type || 'Construction materials'}\n` +
-        `${requestDetails.budget_range ? `💰 Budget: ${requestDetails.budget_range}\n` : ''}` +
         `\nFirst to accept gets the job! Login to accept.`;
 
       const result = await notificationService.sendSMS({
