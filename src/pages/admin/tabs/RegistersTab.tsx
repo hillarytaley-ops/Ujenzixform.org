@@ -200,21 +200,27 @@ export const RegistersTab: React.FC = () => {
         }
       });
 
-      // Synthetic rows: surface admin-only status stored on suppliers / profiles when no application row matches.
+      // Synthetic suppliers: admin status may live on suppliers OR profiles (role-only users may lack a suppliers row).
       const syntheticSupplierUids = suppliersData.filter((s) => s.id.startsWith('role-')).map((s) => s.id.replace(/^role-/, ''));
       if (syntheticSupplierUids.length > 0) {
-        const { data: supHoldRows } = await client
-          .from('suppliers')
-          .select('user_id, registration_admin_status')
-          .in('user_id', syntheticSupplierUids);
-        const statusByUid = new Map(
+        const [{ data: supHoldRows }, { data: profForSuppliers }] = await Promise.all([
+          client.from('suppliers').select('user_id, registration_admin_status').in('user_id', syntheticSupplierUids),
+          client.from('profiles').select('user_id, registration_admin_status').in('user_id', syntheticSupplierUids),
+        ]);
+        const fromSuppliers = new Map(
           (supHoldRows || []).map((r) => [r.user_id as string, r.registration_admin_status as string | null])
+        );
+        const fromProfiles = new Map(
+          (profForSuppliers || []).map((r) => [r.user_id as string, r.registration_admin_status as string | null])
         );
         suppliersData = suppliersData.map((row) => {
           if (!row.id.startsWith('role-')) return row;
           const u = row.id.replace(/^role-/, '');
-          const rs = statusByUid.get(u);
-          if (rs && String(rs).trim()) return { ...row, status: rs };
+          const supV = fromSuppliers.get(u);
+          const profV = fromProfiles.get(u);
+          const rs =
+            (supV && String(supV).trim()) || (profV && String(profV).trim()) || null;
+          if (rs) return { ...row, status: rs };
           return row;
         });
       }
@@ -339,26 +345,103 @@ export const RegistersTab: React.FC = () => {
             return;
           }
 
+          ({ data: updated, error } = await client
+            .from('profiles')
+            .update({ registration_admin_status: status, updated_at: ts })
+            .eq('user_id', uid)
+            .select('id'));
+          if (error) throw error;
+          if (updated && updated.length > 0) {
+            setSuppliers((prev) => prev.map((s) => (s.id === id ? { ...s, status } : s)));
+            toast({
+              title: 'Status Updated',
+              description: `Registration status updated on profile (no suppliers row yet).`,
+            });
+            return;
+          }
+
           toast({
             variant: 'destructive',
             title: 'Cannot update status',
             description:
-              'No supplier application or suppliers row for this user. Ensure they have completed supplier onboarding, or use Demote.',
+              'No supplier application, suppliers row, or profile found for this user. Use Demote or ensure the account exists.',
           });
           return;
         }
 
-        const { error } = await client
+        let { data: appUpdated, error: appErr } = await client
           .from('supplier_applications')
           .update({ status, updated_at: ts })
-          .eq('id', id);
+          .eq('id', id)
+          .select('id');
+        if (appErr) throw appErr;
+        if (appUpdated && appUpdated.length > 0) {
+          setSuppliers((prev) => prev.map((s) => (s.id === id ? { ...s, status } : s)));
+          toast({
+            title: 'Status Updated',
+            description: `Supplier application status changed to ${status}`,
+          });
+          return;
+        }
 
-        if (error) throw error;
+        const { data: appRow } = await client
+          .from('supplier_applications')
+          .select('applicant_user_id, email')
+          .eq('id', id)
+          .maybeSingle();
+        const appUid = (appRow?.applicant_user_id as string | undefined)?.trim();
+        const appEmail = (appRow?.email as string | undefined)?.trim().toLowerCase();
+        if (appUid) {
+          let { data: fb, error: fbErr } = await client
+            .from('suppliers')
+            .update({ registration_admin_status: status, updated_at: ts })
+            .eq('user_id', appUid)
+            .select('id');
+          if (fbErr) throw fbErr;
+          if (fb?.length) {
+            setSuppliers((prev) => prev.map((s) => (s.id === id ? { ...s, status } : s)));
+            toast({
+              title: 'Status Updated',
+              description: `Supplier list status updated to ${status}`,
+            });
+            return;
+          }
+          ({ data: fb, error: fbErr } = await client
+            .from('profiles')
+            .update({ registration_admin_status: status, updated_at: ts })
+            .eq('user_id', appUid)
+            .select('id'));
+          if (fbErr) throw fbErr;
+          if (fb?.length) {
+            setSuppliers((prev) => prev.map((s) => (s.id === id ? { ...s, status } : s)));
+            toast({
+              title: 'Status Updated',
+              description: `Registration status updated on profile.`,
+            });
+            return;
+          }
+        }
+        if (appEmail) {
+          const { data: byEmail, error: emErr } = await client
+            .from('supplier_applications')
+            .update({ status, updated_at: ts })
+            .eq('email', appEmail)
+            .select('id');
+          if (emErr) throw emErr;
+          if (byEmail?.length) {
+            setSuppliers((prev) => prev.map((s) => (s.id === id ? { ...s, status } : s)));
+            toast({
+              title: 'Status Updated',
+              description: `Supplier application status changed to ${status}`,
+            });
+            return;
+          }
+        }
 
-        setSuppliers((prev) => prev.map((s) => (s.id === id ? { ...s, status } : s)));
         toast({
-          title: 'Status Updated',
-          description: `Supplier application status changed to ${status}`,
+          variant: 'destructive',
+          title: 'Cannot update status',
+          description: 'Could not update this supplier application or mirror status on profile/suppliers.',
         });
       } catch (error) {
         console.error('Error updating supplier status:', error);
@@ -563,17 +646,65 @@ export const RegistersTab: React.FC = () => {
           return;
         }
 
-        const { error } = await client
+        let { data: brUpdated, error: brErr } = await client
           .from('builder_registrations')
           .update({ status, updated_at: ts })
-          .eq('id', id);
+          .eq('id', id)
+          .select('id');
+        if (brErr) throw brErr;
+        if (brUpdated && brUpdated.length > 0) {
+          setBuilders((prev) => prev.map((b) => (b.id === id ? { ...b, status } : b)));
+          toast({
+            title: 'Status Updated',
+            description: `Builder status changed to ${status}`,
+          });
+          return;
+        }
 
-        if (error) throw error;
+        const { data: bRow } = await client
+          .from('builder_registrations')
+          .select('auth_user_id, email')
+          .eq('id', id)
+          .maybeSingle();
+        const bUid = (bRow?.auth_user_id as string | undefined)?.trim();
+        const bEmail = (bRow?.email as string | undefined)?.trim().toLowerCase();
+        if (bUid) {
+          let { data: fb, error: fbErr } = await client
+            .from('profiles')
+            .update({ registration_admin_status: status, updated_at: ts })
+            .eq('user_id', bUid)
+            .select('id');
+          if (fbErr) throw fbErr;
+          if (fb?.length) {
+            setBuilders((prev) => prev.map((b) => (b.id === id ? { ...b, status } : b)));
+            toast({
+              title: 'Status Updated',
+              description: `Registration status updated on profile.`,
+            });
+            return;
+          }
+        }
+        if (bEmail) {
+          const { data: byEmail, error: emErr } = await client
+            .from('builder_registrations')
+            .update({ status, updated_at: ts })
+            .eq('email', bEmail)
+            .select('id');
+          if (emErr) throw emErr;
+          if (byEmail?.length) {
+            setBuilders((prev) => prev.map((b) => (b.id === id ? { ...b, status } : b)));
+            toast({
+              title: 'Status Updated',
+              description: `Builder status changed to ${status}`,
+            });
+            return;
+          }
+        }
 
-        setBuilders((prev) => prev.map((b) => (b.id === id ? { ...b, status } : b)));
         toast({
-          title: 'Status Updated',
-          description: `Builder status changed to ${status}`,
+          variant: 'destructive',
+          title: 'Cannot update status',
+          description: 'Could not update this builder registration or mirror status on profile.',
         });
       } catch (error) {
         console.error('Error updating builder status:', error);
