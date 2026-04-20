@@ -41,6 +41,7 @@ import {
   UserMinus,
   Loader2,
   PauseCircle,
+  PlayCircle,
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -199,6 +200,8 @@ export const SuppliersRegister: React.FC<SuppliersRegisterProps> = ({
         return <Badge className="bg-yellow-600">Pending</Badge>;
       case 'on_hold':
         return <Badge className="bg-orange-600">On Hold</Badge>;
+      case 'active':
+        return <Badge className="bg-slate-600">Active</Badge>;
       default:
         return <Badge className="bg-gray-600 capitalize">{status}</Badge>;
     }
@@ -229,6 +232,10 @@ export const SuppliersRegister: React.FC<SuppliersRegisterProps> = ({
     onUpdateStatus(supplier.id, 'on_hold', { rowEmail: supplier.email });
   };
 
+  const handleMarkActive = (supplier: SupplierRecord) => {
+    onUpdateStatus(supplier.id, 'active', { rowEmail: supplier.email });
+  };
+
   const openEditSupplier = (supplier: SupplierRecord) => {
     setEditSupplier(supplier);
     setEditForm({
@@ -241,7 +248,7 @@ export const SuppliersRegister: React.FC<SuppliersRegisterProps> = ({
         supplier.address ||
         [supplier.town, supplier.county].filter(Boolean).join(', ') ||
         '',
-      status: ['pending', 'approved', 'rejected', 'on_hold'].includes(supplier.status)
+      status: ['pending', 'approved', 'rejected', 'on_hold', 'active'].includes(supplier.status)
         ? supplier.status
         : 'pending',
     });
@@ -591,6 +598,17 @@ export const SuppliersRegister: React.FC<SuppliersRegisterProps> = ({
                                 <PauseCircle className="h-4 w-4 mr-2" />
                                 On Hold
                               </DropdownMenuItem>
+                              {String(supplier.status || '').toLowerCase().replace(/\s+/g, '_') === 'on_hold' && (
+                                <DropdownMenuItem
+                                  className="text-green-400 focus:text-green-300 focus:bg-slate-800 cursor-pointer"
+                                  disabled={actionBusy}
+                                  title="Clears hold on application, supplier profile, or user profile (same paths as On Hold)"
+                                  onSelect={() => handleMarkActive(supplier)}
+                                >
+                                  <PlayCircle className="h-4 w-4 mr-2" />
+                                  Mark active (remove hold)
+                                </DropdownMenuItem>
+                              )}
                               <DropdownMenuSeparator className="bg-slate-700" />
                               <DropdownMenuItem
                                 className="text-amber-400 focus:text-amber-300 focus:bg-slate-800 cursor-pointer"
@@ -942,6 +960,7 @@ export const SuppliersRegister: React.FC<SuppliersRegisterProps> = ({
                     <option value="approved">Approved</option>
                     <option value="rejected">Rejected</option>
                     <option value="on_hold">On Hold</option>
+                    <option value="active">Active</option>
                   </select>
                 </div>
               )}

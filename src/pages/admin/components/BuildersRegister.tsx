@@ -43,6 +43,7 @@ import {
   UserMinus,
   Loader2,
   PauseCircle,
+  PlayCircle,
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -191,6 +192,8 @@ export const BuildersRegister: React.FC<BuildersRegisterProps> = ({
         return <Badge className="bg-yellow-600">Pending</Badge>;
       case 'on_hold':
         return <Badge className="bg-orange-600">On Hold</Badge>;
+      case 'active':
+        return <Badge className="bg-slate-600">Active</Badge>;
       default:
         return <Badge className="bg-gray-600 capitalize">{status}</Badge>;
     }
@@ -232,6 +235,10 @@ export const BuildersRegister: React.FC<BuildersRegisterProps> = ({
     onUpdateStatus(builder.id, 'on_hold', { rowEmail: builder.email });
   };
 
+  const handleMarkActive = (builder: BuilderRecord) => {
+    onUpdateStatus(builder.id, 'active', { rowEmail: builder.email });
+  };
+
   const openEditBuilder = (builder: BuilderRecord) => {
     setEditBuilder(builder);
     setEditForm({
@@ -242,7 +249,7 @@ export const BuildersRegister: React.FC<BuildersRegisterProps> = ({
       county: builder.county || '',
       town: builder.town || '',
       physical_address: builder.physical_address || '',
-      status: ['pending', 'approved', 'rejected', 'on_hold'].includes(builder.status)
+      status: ['pending', 'approved', 'rejected', 'on_hold', 'active'].includes(builder.status)
         ? builder.status
         : 'pending',
     });
@@ -606,6 +613,17 @@ export const BuildersRegister: React.FC<BuildersRegisterProps> = ({
                                 <PauseCircle className="h-4 w-4 mr-2" />
                                 On Hold
                               </DropdownMenuItem>
+                              {String(builder.status || '').toLowerCase().replace(/\s+/g, '_') === 'on_hold' && (
+                                <DropdownMenuItem
+                                  className="text-green-400 focus:text-green-300 focus:bg-slate-800 cursor-pointer"
+                                  disabled={actionBusy}
+                                  title="Clears hold on registration or user profile (same paths as On Hold)"
+                                  onSelect={() => handleMarkActive(builder)}
+                                >
+                                  <PlayCircle className="h-4 w-4 mr-2" />
+                                  Mark active (remove hold)
+                                </DropdownMenuItem>
+                              )}
                               <DropdownMenuSeparator className="bg-slate-700" />
                               <DropdownMenuItem
                                 className="text-amber-400 focus:text-amber-300 focus:bg-slate-800 cursor-pointer"
@@ -982,6 +1000,7 @@ export const BuildersRegister: React.FC<BuildersRegisterProps> = ({
                     <option value="approved">Approved</option>
                     <option value="rejected">Rejected</option>
                     <option value="on_hold">On Hold</option>
+                    <option value="active">Active</option>
                   </select>
                 </div>
               )}
