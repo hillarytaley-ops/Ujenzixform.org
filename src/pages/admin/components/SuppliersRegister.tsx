@@ -227,10 +227,6 @@ export const SuppliersRegister: React.FC<SuppliersRegisterProps> = ({
 
   const handleSetOnHold = (supplier: SupplierRecord) => {
     onUpdateStatus(supplier.id, 'on_hold');
-    toast({
-      title: 'On Hold',
-      description: `${supplier.company_name} is marked on hold.`,
-    });
   };
 
   const openEditSupplier = (supplier: SupplierRecord) => {
@@ -583,17 +579,14 @@ export const SuppliersRegister: React.FC<SuppliersRegisterProps> = ({
                                 className="text-orange-400 focus:text-orange-300 focus:bg-slate-800 cursor-pointer"
                                 disabled={
                                   actionBusy ||
-                                  isSyntheticSupplierRow(supplier) ||
-                                  supplier.status === 'on_hold'
+                                  String(supplier.status || '').toLowerCase().replace(/\s+/g, '_') === 'on_hold'
                                 }
                                 title={
-                                  isSyntheticSupplierRow(supplier)
-                                    ? 'No application row — status is managed in Edit for this user'
-                                    : supplier.status === 'on_hold'
-                                      ? 'Already on hold'
-                                      : undefined
+                                  String(supplier.status || '').toLowerCase().replace(/\s+/g, '_') === 'on_hold'
+                                    ? 'Already on hold'
+                                    : 'Sets supplier application status (linked by user id when the list row is role-only)'
                                 }
-                                onClick={() => handleSetOnHold(supplier)}
+                                onSelect={() => handleSetOnHold(supplier)}
                               >
                                 <PauseCircle className="h-4 w-4 mr-2" />
                                 On Hold

@@ -243,19 +243,41 @@ export const RegistersTab: React.FC = () => {
   const isSyntheticSupplierRow = (s: RawSupplierRecord) => s.id.startsWith('role-');
 
   const updateSupplierStatus = useCallback(async (id: string, status: string) => {
-    if (id.startsWith('role-')) {
-      toast({
-        variant: 'destructive',
-        title: 'Cannot update status',
-        description: 'This row has no supplier application. Use Edit or Demote.',
-      });
-      return;
-    }
+    const ts = new Date().toISOString();
     try {
       const client = supabase;
+      if (id.startsWith('role-')) {
+        const uid = id.replace(/^role-/, '').trim();
+        if (!uid) {
+          toast({ variant: 'destructive', title: 'Error', description: 'Missing user id for this row.' });
+          return;
+        }
+        const { data: updated, error } = await client
+          .from('supplier_applications')
+          .update({ status, updated_at: ts })
+          .eq('applicant_user_id', uid)
+          .select('id');
+        if (error) throw error;
+        if (updated && updated.length > 0) {
+          setSuppliers(prev => prev.map(s => (s.id === id ? { ...s, status } : s)));
+          toast({
+            title: 'Status Updated',
+            description: `Supplier application status changed to ${status}`,
+          });
+          return;
+        }
+        toast({
+          variant: 'destructive',
+          title: 'Cannot update status',
+          description:
+            'No supplier application is linked to this user id. Use Edit for profile data or Demote to remove the role.',
+        });
+        return;
+      }
+
       const { error } = await client
         .from('supplier_applications')
-        .update({ status, updated_at: new Date().toISOString() })
+        .update({ status, updated_at: ts })
         .eq('id', id);
 
       if (error) throw error;
@@ -398,19 +420,41 @@ export const RegistersTab: React.FC = () => {
   const isSyntheticBuilderRow = (b: RawBuilderRecord) => b.id.startsWith('role-');
 
   const updateBuilderStatus = useCallback(async (id: string, status: string) => {
-    if (id.startsWith('role-')) {
-      toast({
-        variant: 'destructive',
-        title: 'Cannot update status',
-        description: 'This row has no builder application. Use Edit to change the profile, or Demote.',
-      });
-      return;
-    }
+    const ts = new Date().toISOString();
     try {
       const client = supabase;
+      if (id.startsWith('role-')) {
+        const uid = id.replace(/^role-/, '').trim();
+        if (!uid) {
+          toast({ variant: 'destructive', title: 'Error', description: 'Missing user id for this row.' });
+          return;
+        }
+        const { data: updated, error } = await client
+          .from('builder_registrations')
+          .update({ status, updated_at: ts })
+          .eq('auth_user_id', uid)
+          .select('id');
+        if (error) throw error;
+        if (updated && updated.length > 0) {
+          setBuilders(prev => prev.map(b => (b.id === id ? { ...b, status } : b)));
+          toast({
+            title: 'Status Updated',
+            description: `Builder status changed to ${status}`,
+          });
+          return;
+        }
+        toast({
+          variant: 'destructive',
+          title: 'Cannot update status',
+          description:
+            'No builder registration is linked to this user id. Use Edit for profile data or Demote to remove the role.',
+        });
+        return;
+      }
+
       const { error } = await client
         .from('builder_registrations')
-        .update({ status, updated_at: new Date().toISOString() })
+        .update({ status, updated_at: ts })
         .eq('id', id);
 
       if (error) throw error;

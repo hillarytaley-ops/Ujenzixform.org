@@ -230,10 +230,6 @@ export const BuildersRegister: React.FC<BuildersRegisterProps> = ({
 
   const handleSetOnHold = (builder: BuilderRecord) => {
     onUpdateStatus(builder.id, 'on_hold');
-    toast({
-      title: 'On Hold',
-      description: `${builder.full_name} is marked on hold.`,
-    });
   };
 
   const openEditBuilder = (builder: BuilderRecord) => {
@@ -598,17 +594,14 @@ export const BuildersRegister: React.FC<BuildersRegisterProps> = ({
                                 className="text-orange-400 focus:text-orange-300 focus:bg-slate-800 cursor-pointer"
                                 disabled={
                                   actionBusy ||
-                                  isSyntheticBuilderRow(builder) ||
-                                  builder.status === 'on_hold'
+                                  String(builder.status || '').toLowerCase().replace(/\s+/g, '_') === 'on_hold'
                                 }
                                 title={
-                                  isSyntheticBuilderRow(builder)
-                                    ? 'No application row — status is managed in Edit for this user'
-                                    : builder.status === 'on_hold'
-                                      ? 'Already on hold'
-                                      : undefined
+                                  String(builder.status || '').toLowerCase().replace(/\s+/g, '_') === 'on_hold'
+                                    ? 'Already on hold'
+                                    : 'Sets builder registration status (linked by user id when the list row is role-only)'
                                 }
-                                onClick={() => handleSetOnHold(builder)}
+                                onSelect={() => handleSetOnHold(builder)}
                               >
                                 <PauseCircle className="h-4 w-4 mr-2" />
                                 On Hold
