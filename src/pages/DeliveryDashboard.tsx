@@ -1688,30 +1688,14 @@ const DeliveryDashboard = () => {
         'Authorization': `Bearer ${accessToken}`
       };
 
-      /** Alerts tab badge: max(deduped open delivery_requests, unread in-app delivery_request notifications). */
-      const applyAlertsBadgeCount = async (fromDr: number) => {
-        if (!user?.id) {
-          setNotificationCount(fromDr);
-          setPendingNotificationCount(fromDr);
-          return;
-        }
-        try {
-          const nRes = await fetch(
-            `${SUPABASE_URL}/rest/v1/notifications?user_id=eq.${encodeURIComponent(user.id)}&type=eq.delivery_request&read=eq.false&select=id`,
-            { headers, cache: 'no-store' }
-          );
-          let nUnread = 0;
-          if (nRes.ok) {
-            const rows = await nRes.json();
-            nUnread = Array.isArray(rows) ? rows.length : 0;
-          }
-          const merged = Math.max(fromDr, nUnread);
-          setNotificationCount(merged);
-          setPendingNotificationCount(merged);
-        } catch {
-          setNotificationCount(fromDr);
-          setPendingNotificationCount(fromDr);
-        }
+      /**
+       * Alerts tab badge: deduplicated open delivery jobs only (matches Alerts list logic).
+       * Do not merge with raw unread `notifications` rows — each broadcast inserts one row per
+       * provider, so Math.max inflated the badge (e.g. 37) vs deduped cards (e.g. 6).
+       */
+      const applyAlertsBadgeCount = (fromDr: number) => {
+        setNotificationCount(fromDr);
+        setPendingNotificationCount(fromDr);
       };
 
       // CRITICAL: Count only PENDING delivery requests that are NOT yet accepted by this provider
@@ -1757,6 +1741,24 @@ const DeliveryDashboard = () => {
           // Only count pending/requested/assigned with NULL provider_id (not yet accepted)
           return !dr.provider_id || dr.provider_id === null;
         });
+
+        /** Open jobs with no purchase_order_id (Alerts list keys by delivery_request id). */
+        const countOpenJobsWithoutPurchaseOrder = (list: any[]): number => {
+          const seen: Record<string, boolean> = {};
+          let n = 0;
+          for (const dr of list) {
+            const p = dr?.purchase_order_id;
+            const s = p == null ? '' : String(p).trim();
+            const hasPo = s !== '' && s !== 'null' && s !== 'undefined';
+            if (hasPo) continue;
+            const id = dr?.id;
+            if (!id || seen[id]) continue;
+            seen[id] = true;
+            n++;
+          }
+          return n;
+        };
+        const noPoExtra = countOpenJobsWithoutPurchaseOrder(pendingRequests);
         
         // STEP 3: Filter out requests without purchase_order_id (placeholder/default requests)
         const requestsWithPO = pendingRequests.filter((dr: any) => 
@@ -1787,7 +1789,38 @@ const DeliveryDashboard = () => {
               // Add null check to prevent "is not a constructor" errors
               if (!validPOs || !Array.isArray(validPOs)) {
                 console.warn('⚠️ Invalid purchase_orders response:', validPOs);
-                await applyAlertsBadgeCount(0);
+                if (!requestsWithPO || !Array.isArray(requestsWithPO)) {
+                  applyAlertsBadgeCount(noPoExtra);
+                  return;
+                }
+                const normalizeMaterialTypeFb = (materialType: string | undefined | null): string => {
+                  if (!materialType) return '';
+                  const normalized = String(materialType).trim().toLowerCase();
+                  if (
+                    normalized.includes('steel') ||
+                    normalized.includes('construction') ||
+                    normalized.includes('material')
+                  ) {
+                    return 'construction_materials';
+                  }
+                  return normalized;
+                };
+                const seenCb: Record<string, boolean> = {};
+                const seenPo: Record<string, boolean> = {};
+                const fb = requestsWithPO.filter((dr: any) => {
+                  if (dr.delivery_address && dr.material_type) {
+                    const normalizedAddress = String(dr.delivery_address).trim().toLowerCase();
+                    const normalizedMaterial = normalizeMaterialTypeFb(dr.material_type);
+                    const compositeKey = `${normalizedAddress}|${normalizedMaterial}`;
+                    if (seenCb[compositeKey]) return false;
+                    seenCb[compositeKey] = true;
+                    return true;
+                  }
+                  if (dr.purchase_order_id && seenPo[dr.purchase_order_id]) return false;
+                  if (dr.purchase_order_id) seenPo[dr.purchase_order_id] = true;
+                  return true;
+                }).length;
+                applyAlertsBadgeCount(fb + noPoExtra);
                 return;
               }
               // Use object-based lookup instead of Set to avoid minification errors
@@ -1867,14 +1900,14 @@ const DeliveryDashboard = () => {
               
               console.log(`📊 Notification count: ${data.length} total → ${activeRequests.length} active → ${pendingRequests.length} pending (not accepted by this provider) → ${requestsWithPO.length} with PO → ${uniqueCount} unique valid`);
               const countToShow = uniqueCount > 0 ? uniqueCount : (requestsWithPO.length > 0 ? uniquePOIds.length : 0);
-              await applyAlertsBadgeCount(countToShow);
+              applyAlertsBadgeCount(countToShow + noPoExtra);
             } else {
               console.warn('⚠️ Failed to verify purchase_orders for notification count');
               // Fallback: count using composite key deduplication (same logic as above)
               // Add null check to prevent "is not a constructor" errors
               if (!requestsWithPO || !Array.isArray(requestsWithPO)) {
                 console.warn('⚠️ requestsWithPO is invalid:', requestsWithPO);
-                await applyAlertsBadgeCount(0);
+                applyAlertsBadgeCount(noPoExtra);
                 return;
               }
               
@@ -1905,7 +1938,7 @@ const DeliveryDashboard = () => {
                 if (dr.purchase_order_id) seenPOIds[dr.purchase_order_id] = true;
                 return true;
               }).length;
-              await applyAlertsBadgeCount(uniqueCount);
+              applyAlertsBadgeCount(uniqueCount + noPoExtra);
             }
           } catch (verifyError) {
             console.warn('⚠️ Error verifying purchase_orders:', verifyError);
@@ -1913,7 +1946,7 @@ const DeliveryDashboard = () => {
             // Add null check to prevent "is not a constructor" errors
             if (!requestsWithPO || !Array.isArray(requestsWithPO)) {
               console.warn('⚠️ requestsWithPO is invalid:', requestsWithPO);
-              await applyAlertsBadgeCount(0);
+              applyAlertsBadgeCount(noPoExtra);
               return;
             }
             
@@ -1944,20 +1977,24 @@ const DeliveryDashboard = () => {
                 if (dr.purchase_order_id) seenPOIds[dr.purchase_order_id] = true;
               return true;
             }).length;
-            await applyAlertsBadgeCount(uniqueCount);
+            applyAlertsBadgeCount(uniqueCount + noPoExtra);
           }
         } else {
-          // No valid requests
-          console.log('📊 Notification count: 0 (no valid delivery requests)');
-          await applyAlertsBadgeCount(0);
+          // No purchase_order_id on any pending row — still count open jobs without PO
+          console.log(`📊 Notification count: open jobs without PO only → ${noPoExtra}`);
+          applyAlertsBadgeCount(noPoExtra);
         }
       } else {
-        await applyAlertsBadgeCount(0);
+        applyAlertsBadgeCount(0);
       }
     } catch (error) {
       console.error('Error loading notification counts:', error);
     }
   }, [user?.id]);
+
+  const refreshAlertsBadge = useCallback(() => {
+    void loadNotificationCounts();
+  }, [loadNotificationCounts]);
 
   const refreshBuilderInvoicePayPrompts = useCallback(async () => {
     if (!user?.id) {
@@ -2309,17 +2346,23 @@ const DeliveryDashboard = () => {
   useEffect(() => {
     if (!user?.id) return;
     loadNotificationCounts();
-    
-    // Set up real-time subscription to update counts when delivery_requests change
+
+    let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+    const scheduleBadgeRefresh = () => {
+      if (debounceTimer) clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => {
+        debounceTimer = null;
+        loadNotificationCounts();
+      }, 350);
+    };
+
+    // Realtime: coalesce bursts so badge matches list after the last write
     const subscription = supabase
       .channel('alerts-count-updates')
-      .on('postgres_changes', 
-        { event: '*', schema: 'public', table: 'delivery_requests' },
-        () => {
-          console.log('🔔 delivery_requests changed, refreshing counts...');
-          loadNotificationCounts();
-        }
-      )
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'delivery_requests' }, () => {
+        console.log('🔔 delivery_requests changed, scheduling alerts badge refresh...');
+        scheduleBadgeRefresh();
+      })
       .on(
         'postgres_changes',
         {
@@ -2331,17 +2374,32 @@ const DeliveryDashboard = () => {
         (payload) => {
           const row = payload.new as { type?: string };
           if (row?.type === 'delivery_request') {
-            console.log('🔔 delivery_request notification inserted, refreshing counts...');
-            loadNotificationCounts();
+            console.log('🔔 delivery_request notification inserted, scheduling alerts badge refresh...');
+            scheduleBadgeRefresh();
+          }
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'notifications',
+          filter: `user_id=eq.${user.id}`,
+        },
+        (payload) => {
+          const row = payload.new as { type?: string };
+          if (row?.type === 'delivery_request') {
+            scheduleBadgeRefresh();
           }
         }
       )
       .subscribe();
-    
-    // Also refresh every 30 seconds as backup
+
     const interval = setInterval(loadNotificationCounts, 30000);
-    
+
     return () => {
+      if (debounceTimer) clearTimeout(debounceTimer);
       subscription.unsubscribe();
       clearInterval(interval);
     };
@@ -3308,8 +3366,13 @@ const DeliveryDashboard = () => {
                 onNotificationClick={(notification) =>
                   console.log("Notification clicked:", notification)
                 }
+                onOpenDeliveryJobsChanged={refreshAlertsBadge}
                 onAcceptDelivery={(_requestId) => {
-                  loadNotificationCounts();
+                  refreshAlertsBadge();
+                  refetchData();
+                }}
+                onRejectDelivery={() => {
+                  refreshAlertsBadge();
                   refetchData();
                 }}
               />

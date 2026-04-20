@@ -93,13 +93,16 @@ interface DeliveryNotificationsProps {
   onNotificationClick?: (notification: Notification) => void;
   onAcceptDelivery?: (requestId: string) => void;
   onRejectDelivery?: (requestId: string) => void;
+  /** Parent can refresh Alerts nav badge using the same dedupe as this list. */
+  onOpenDeliveryJobsChanged?: () => void;
 }
 
 export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
   userId,
   onNotificationClick,
   onAcceptDelivery,
-  onRejectDelivery
+  onRejectDelivery,
+  onOpenDeliveryJobsChanged,
 }) => {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [acceptingId, setAcceptingId] = useState<string | null>(null);
@@ -1310,13 +1313,13 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
 
       setNotifications(sortedByProximity);
       // Don't set unreadCount here - it will be set from uniqueNotifications
-      
+      onOpenDeliveryJobsChanged?.();
     } catch (error: any) {
       console.error('❌ Error loading notifications:', error.message || error);
     } finally {
       setLoading(false);
     }
-  }, [userId]);
+  }, [userId, onOpenDeliveryJobsChanged]);
 
   const patchDeliveryRequestRejected = async (
     requestId: string,
