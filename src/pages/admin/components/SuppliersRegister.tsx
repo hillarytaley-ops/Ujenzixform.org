@@ -40,6 +40,7 @@ import {
   Trash2,
   UserMinus,
   Loader2,
+  PauseCircle,
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -221,6 +222,14 @@ export const SuppliersRegister: React.FC<SuppliersRegisterProps> = ({
     toast({
       title: 'Supplier Rejected',
       description: `${supplier.company_name} has been rejected.`,
+    });
+  };
+
+  const handleSetOnHold = (supplier: SupplierRecord) => {
+    onUpdateStatus(supplier.id, 'on_hold');
+    toast({
+      title: 'On Hold',
+      description: `${supplier.company_name} is marked on hold.`,
     });
   };
 
@@ -569,6 +578,25 @@ export const SuppliersRegister: React.FC<SuppliersRegisterProps> = ({
                               >
                                 <Pencil className="h-4 w-4 mr-2" />
                                 Edit record
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                className="text-orange-400 focus:text-orange-300 focus:bg-slate-800 cursor-pointer"
+                                disabled={
+                                  actionBusy ||
+                                  isSyntheticSupplierRow(supplier) ||
+                                  supplier.status === 'on_hold'
+                                }
+                                title={
+                                  isSyntheticSupplierRow(supplier)
+                                    ? 'No application row — status is managed in Edit for this user'
+                                    : supplier.status === 'on_hold'
+                                      ? 'Already on hold'
+                                      : undefined
+                                }
+                                onClick={() => handleSetOnHold(supplier)}
+                              >
+                                <PauseCircle className="h-4 w-4 mr-2" />
+                                On Hold
                               </DropdownMenuItem>
                               <DropdownMenuSeparator className="bg-slate-700" />
                               <DropdownMenuItem
