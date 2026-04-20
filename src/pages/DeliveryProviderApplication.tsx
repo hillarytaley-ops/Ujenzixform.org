@@ -31,8 +31,10 @@ import {
   Send,
   Upload,
   AlertTriangle,
-  Info
+  Info,
+  CreditCard,
 } from "lucide-react";
+import { normalizePhoneDigits } from "@/utils/phoneNormalize";
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -67,6 +69,11 @@ interface CompanyApplication {
   // Additional Information
   whyJoinUjenziXform: string;
   additionalServices: string;
+
+  bankName: string;
+  bankAccountHolderName: string;
+  bankAccountNumber: string;
+  bankBranch: string;
 }
 
 interface PrivateApplication {
@@ -99,6 +106,11 @@ interface PrivateApplication {
   // Additional Information
   motivation: string;
   additionalSkills: string;
+
+  bankName: string;
+  bankAccountHolderName: string;
+  bankAccountNumber: string;
+  bankBranch: string;
 }
 
 interface ExistingApplication {
@@ -221,7 +233,11 @@ const DeliveryProviderApplication = () => {
     insuranceCoverage: "",
     certifications: [],
     whyJoinUjenziXform: "",
-    additionalServices: ""
+    additionalServices: "",
+    bankName: "",
+    bankAccountHolderName: "",
+    bankAccountNumber: "",
+    bankBranch: "",
   });
 
   const [privateForm, setPrivateForm] = useState<PrivateApplication>({
@@ -244,7 +260,11 @@ const DeliveryProviderApplication = () => {
     emergencyContact: "",
     emergencyPhone: "",
     motivation: "",
-    additionalSkills: ""
+    additionalSkills: "",
+    bankName: "",
+    bankAccountHolderName: "",
+    bankAccountNumber: "",
+    bankBranch: "",
   });
 
   const handleCompanyFormChange = (field: keyof CompanyApplication, value: any) => {
@@ -281,6 +301,28 @@ const DeliveryProviderApplication = () => {
       return;
     }
 
+    const phoneDb = normalizePhoneDigits(companyForm.contactPhone);
+    if (phoneDb.length < 9 || phoneDb.length > 15) {
+      toast({
+        title: "Invalid phone number",
+        description: "Enter a valid business phone (9–15 digits).",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (
+      !companyForm.bankName.trim() ||
+      !companyForm.bankAccountHolderName.trim() ||
+      !companyForm.bankAccountNumber.trim()
+    ) {
+      toast({
+        title: "Bank details required",
+        description: "Please complete payout bank name, account holder, and account number.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setIsSubmitting(true);
     try {
       // Insert into delivery_provider_registrations table
@@ -290,7 +332,7 @@ const DeliveryProviderApplication = () => {
           auth_user_id: currentUser.id,
           full_name: companyForm.contactPerson,
           email: companyForm.contactEmail,
-          phone: companyForm.contactPhone,
+          phone: phoneDb,
           company_name: companyForm.companyName,
           business_registration_number: companyForm.businessRegistration,
           is_company: true,
@@ -308,7 +350,11 @@ const DeliveryProviderApplication = () => {
           terms_accepted: true,
           privacy_accepted: true,
           background_check_consent: true,
-          status: 'pending'
+          status: 'pending',
+          bank_name: companyForm.bankName.trim(),
+          bank_account_holder_name: companyForm.bankAccountHolderName.trim(),
+          bank_account_number: companyForm.bankAccountNumber.trim(),
+          bank_branch: companyForm.bankBranch.trim() || null,
         });
 
       if (error) throw error;
@@ -318,7 +364,7 @@ const DeliveryProviderApplication = () => {
       await syncDeliveryProviderDetails({
         userId: currentUser.id,
         providerName: (companyForm.companyName || companyForm.contactPerson).trim(),
-        phone: companyForm.contactPhone.trim(),
+        phone: phoneDb,
         email: companyForm.contactEmail.trim().toLowerCase(),
         address: companyForm.businessAddress?.trim() || companyForm.operatingAreas[0] || undefined,
         providerType: 'company',
@@ -326,6 +372,10 @@ const DeliveryProviderApplication = () => {
         serviceAreas: companyForm.operatingAreas.length > 0 ? companyForm.operatingAreas : ['Nairobi'],
         contactPerson: companyForm.contactPerson.trim(),
         drivingLicenseNumber: 'Company Fleet',
+        bankName: companyForm.bankName.trim(),
+        bankAccountHolderName: companyForm.bankAccountHolderName.trim(),
+        bankAccountNumber: companyForm.bankAccountNumber.trim(),
+        bankBranch: companyForm.bankBranch.trim() || undefined,
         isVerified: false,
       });
       
@@ -356,7 +406,11 @@ const DeliveryProviderApplication = () => {
         insuranceCoverage: "",
         certifications: [],
         whyJoinUjenziXform: "",
-        additionalServices: ""
+        additionalServices: "",
+        bankName: "",
+        bankAccountHolderName: "",
+        bankAccountNumber: "",
+        bankBranch: "",
       });
     } catch (error: any) {
       console.error('Company application error:', error);
@@ -380,6 +434,28 @@ const DeliveryProviderApplication = () => {
       return;
     }
 
+    const phoneDb = normalizePhoneDigits(privateForm.phoneNumber);
+    if (phoneDb.length < 9 || phoneDb.length > 15) {
+      toast({
+        title: "Invalid phone number",
+        description: "Enter a valid phone number (9–15 digits).",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (
+      !privateForm.bankName.trim() ||
+      !privateForm.bankAccountHolderName.trim() ||
+      !privateForm.bankAccountNumber.trim()
+    ) {
+      toast({
+        title: "Bank details required",
+        description: "Please complete payout bank name, account holder, and account number.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setIsSubmitting(true);
     try {
       // Insert into delivery_provider_registrations table
@@ -389,7 +465,7 @@ const DeliveryProviderApplication = () => {
           auth_user_id: currentUser.id,
           full_name: privateForm.fullName,
           email: privateForm.email,
-          phone: privateForm.phoneNumber,
+          phone: phoneDb,
           id_number: privateForm.idNumber,
           is_company: false,
           county: privateForm.availableAreas[0] || 'Nairobi',
@@ -409,7 +485,11 @@ const DeliveryProviderApplication = () => {
           terms_accepted: true,
           privacy_accepted: true,
           background_check_consent: privateForm.hasGoodConductCert,
-          status: 'pending'
+          status: 'pending',
+          bank_name: privateForm.bankName.trim(),
+          bank_account_holder_name: privateForm.bankAccountHolderName.trim(),
+          bank_account_number: privateForm.bankAccountNumber.trim(),
+          bank_branch: privateForm.bankBranch.trim() || null,
         });
 
       if (error) throw error;
@@ -419,13 +499,17 @@ const DeliveryProviderApplication = () => {
       await syncDeliveryProviderDetails({
         userId: currentUser.id,
         providerName: privateForm.fullName.trim(),
-        phone: privateForm.phoneNumber.trim(),
+        phone: phoneDb,
         email: privateForm.email.trim().toLowerCase(),
         address: privateForm.address?.trim() || privateForm.availableAreas[0] || undefined,
         providerType: 'individual',
         vehicleTypes: [privateForm.vehicleType || 'motorcycle'],
         serviceAreas: privateForm.availableAreas.length > 0 ? privateForm.availableAreas : ['Nairobi'],
         drivingLicenseNumber: privateForm.drivingLicense?.trim(),
+        bankName: privateForm.bankName.trim(),
+        bankAccountHolderName: privateForm.bankAccountHolderName.trim(),
+        bankAccountNumber: privateForm.bankAccountNumber.trim(),
+        bankBranch: privateForm.bankBranch.trim() || undefined,
         isVerified: false,
       });
       
@@ -455,7 +539,11 @@ const DeliveryProviderApplication = () => {
         emergencyContact: "",
         emergencyPhone: "",
         motivation: "",
-        additionalSkills: ""
+        additionalSkills: "",
+        bankName: "",
+        bankAccountHolderName: "",
+        bankAccountNumber: "",
+        bankBranch: "",
       });
     } catch (error: any) {
       console.error('Private application error:', error);
@@ -921,6 +1009,51 @@ const DeliveryProviderApplication = () => {
                   </div>
                 </div>
 
+                <div className="space-y-4 border rounded-lg p-4 bg-muted/30">
+                  <h3 className="text-lg font-semibold flex items-center gap-2">
+                    <CreditCard className="h-5 w-5" />
+                    Payout bank account *
+                  </h3>
+                  <p className="text-sm text-muted-foreground">
+                    Required for settlements. Use the account that should receive payouts.
+                  </p>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="companyBankName">Bank name *</Label>
+                      <Input
+                        id="companyBankName"
+                        value={companyForm.bankName}
+                        onChange={(e) => handleCompanyFormChange('bankName', e.target.value)}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="companyBankBranch">Branch (optional)</Label>
+                      <Input
+                        id="companyBankBranch"
+                        value={companyForm.bankBranch}
+                        onChange={(e) => handleCompanyFormChange('bankBranch', e.target.value)}
+                      />
+                    </div>
+                    <div className="space-y-2 md:col-span-2">
+                      <Label htmlFor="companyBankHolder">Account holder name *</Label>
+                      <Input
+                        id="companyBankHolder"
+                        value={companyForm.bankAccountHolderName}
+                        onChange={(e) => handleCompanyFormChange('bankAccountHolderName', e.target.value)}
+                      />
+                    </div>
+                    <div className="space-y-2 md:col-span-2">
+                      <Label htmlFor="companyBankAcct">Account number *</Label>
+                      <Input
+                        id="companyBankAcct"
+                        inputMode="numeric"
+                        value={companyForm.bankAccountNumber}
+                        onChange={(e) => handleCompanyFormChange('bankAccountNumber', e.target.value)}
+                      />
+                    </div>
+                  </div>
+                </div>
+
                 {/* Additional Information */}
                 <div className="space-y-4">
                   <h3 className="text-lg font-semibold">Additional Information</h3>
@@ -1139,6 +1272,51 @@ const DeliveryProviderApplication = () => {
                           <SelectItem value="expert">Expert (5+ years)</SelectItem>
                         </SelectContent>
                       </Select>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-4 border rounded-lg p-4 bg-muted/30">
+                  <h3 className="text-lg font-semibold flex items-center gap-2">
+                    <CreditCard className="h-5 w-5" />
+                    Payout bank account *
+                  </h3>
+                  <p className="text-sm text-muted-foreground">
+                    Required for driver payouts.
+                  </p>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="privateBankName">Bank name *</Label>
+                      <Input
+                        id="privateBankName"
+                        value={privateForm.bankName}
+                        onChange={(e) => handlePrivateFormChange('bankName', e.target.value)}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="privateBankBranch">Branch (optional)</Label>
+                      <Input
+                        id="privateBankBranch"
+                        value={privateForm.bankBranch}
+                        onChange={(e) => handlePrivateFormChange('bankBranch', e.target.value)}
+                      />
+                    </div>
+                    <div className="space-y-2 md:col-span-2">
+                      <Label htmlFor="privateBankHolder">Account holder name *</Label>
+                      <Input
+                        id="privateBankHolder"
+                        value={privateForm.bankAccountHolderName}
+                        onChange={(e) => handlePrivateFormChange('bankAccountHolderName', e.target.value)}
+                      />
+                    </div>
+                    <div className="space-y-2 md:col-span-2">
+                      <Label htmlFor="privateBankAcct">Account number *</Label>
+                      <Input
+                        id="privateBankAcct"
+                        inputMode="numeric"
+                        value={privateForm.bankAccountNumber}
+                        onChange={(e) => handlePrivateFormChange('bankAccountNumber', e.target.value)}
+                      />
                     </div>
                   </div>
                 </div>

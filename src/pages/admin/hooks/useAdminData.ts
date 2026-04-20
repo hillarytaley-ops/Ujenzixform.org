@@ -204,6 +204,10 @@ export const useRegistrations = () => {
             material_categories: s.materials_offered as string[] | undefined,
             status: (s.status as string) || 'pending',
             created_at: s.created_at as string,
+            bank_name: s.bank_name as string | null | undefined,
+            bank_account_holder_name: s.bank_account_holder_name as string | null | undefined,
+            bank_account_number: s.bank_account_number as string | null | undefined,
+            bank_branch: s.bank_branch as string | null | undefined,
           });
         });
       }
@@ -250,6 +254,10 @@ export const useRegistrations = () => {
           service_areas: (d.service_areas as string[]) || (d.service_counties as string[]) || undefined,
           status: (d.status as string) || 'pending',
           created_at: d.created_at as string,
+          bank_name: d.bank_name as string | null | undefined,
+          bank_account_holder_name: d.bank_account_holder_name as string | null | undefined,
+          bank_account_number: d.bank_account_number as string | null | undefined,
+          bank_branch: d.bank_branch as string | null | undefined,
         });
       });
 
@@ -275,6 +283,10 @@ export const useRegistrations = () => {
             (d.status as string) ||
             ((d.is_verified as boolean) ? 'approved' : 'pending'),
           created_at: d.created_at as string,
+          bank_name: d.bank_name as string | null | undefined,
+          bank_account_holder_name: d.bank_account_holder_name as string | null | undefined,
+          bank_account_number: d.bank_account_number as string | null | undefined,
+          bank_branch: d.bank_branch as string | null | undefined,
         });
       });
 
@@ -747,6 +759,12 @@ export const useDeliveryApplications = () => {
         created_at: app.created_at as string,
         reviewed_at: app.reviewed_at as string | undefined,
         reviewed_by: app.reviewed_by as string | undefined,
+        bank_name: app.bank_name as string | null | undefined,
+        bank_account_holder_name: app.bank_account_holder_name as string | null | undefined,
+        bank_account_number: app.bank_account_number as string | null | undefined,
+        bank_branch: app.bank_branch as string | null | undefined,
+        _registration_id: app.id as string,
+        _source: 'registration',
       }));
 
       setApplications(formattedApps);

@@ -27,8 +27,10 @@ import {
   Loader2,
   KeyRound,
   FileText,
-  Shield
+  Shield,
+  CreditCard,
 } from "lucide-react";
+import { normalizePhoneDigits } from "@/utils/phoneNormalize";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { User as SupabaseUser } from "@supabase/supabase-js";
@@ -92,6 +94,11 @@ const DeliveryRegistration = () => {
   // Terms
   const [acceptTerms, setAcceptTerms] = useState(false);
   const [acceptPrivacy, setAcceptPrivacy] = useState(false);
+
+  const [bankName, setBankName] = useState("");
+  const [bankAccountHolderName, setBankAccountHolderName] = useState("");
+  const [bankAccountNumber, setBankAccountNumber] = useState("");
+  const [bankBranch, setBankBranch] = useState("");
 
   // Check if user is already logged in and pre-fill email
   useEffect(() => {
@@ -209,6 +216,22 @@ const DeliveryRegistration = () => {
       });
       return false;
     }
+    if (!county.trim()) {
+      toast({
+        variant: "destructive",
+        title: "Base county required",
+        description: "Please select your base county.",
+      });
+      return false;
+    }
+    if (!bankName.trim() || !bankAccountHolderName.trim() || !bankAccountNumber.trim()) {
+      toast({
+        variant: "destructive",
+        title: "Bank details required",
+        description: "Please complete payout bank name, account holder, and account number.",
+      });
+      return false;
+    }
     return true;
   };
 
@@ -234,6 +257,16 @@ const DeliveryRegistration = () => {
         variant: "destructive",
         title: "Accept Terms",
         description: "Please accept the terms and conditions and privacy policy."
+      });
+      return;
+    }
+
+    const phoneDb = normalizePhoneDigits(phone);
+    if (phoneDb.length < 9 || phoneDb.length > 15) {
+      toast({
+        variant: "destructive",
+        title: "Invalid phone number",
+        description: "Enter a valid phone number (9–15 digits).",
       });
       return;
     }
@@ -264,7 +297,7 @@ const DeliveryRegistration = () => {
           options: {
             data: {
               full_name: providerType === 'individual' ? fullName : companyName,
-              phone: phone,
+              phone: phoneDb,
               user_type: 'delivery'
             }
           }
@@ -289,7 +322,7 @@ const DeliveryRegistration = () => {
           user_id: userId,
           email: email.trim().toLowerCase(),
           full_name: providerType === 'individual' ? fullName : companyName,
-          phone: phone,
+          phone: phoneDb,
           company_name: providerType === 'company' ? companyName : null,
           location: `${town}, ${county}`,
           physical_address: physicalAddress,
@@ -315,13 +348,17 @@ const DeliveryRegistration = () => {
             email: email.trim().toLowerCase(),
             full_name: providerType === 'individual' ? fullName : companyName,
             company_name: providerType === 'company' ? companyName : null,
-            phone: phone,
+            phone: phoneDb,
             county: county,
             physical_address: physicalAddress,
             vehicle_type: vehicleType,
             vehicle_registration: licensePlate,
             driving_license_number: drivingLicense,
             service_areas: serviceAreas,
+            bank_name: bankName.trim(),
+            bank_account_holder_name: bankAccountHolderName.trim(),
+            bank_account_number: bankAccountNumber.trim(),
+            bank_branch: bankBranch.trim() || null,
             status: 'approved',
             terms_accepted: acceptTerms,
             privacy_accepted: acceptPrivacy,
@@ -343,13 +380,17 @@ const DeliveryRegistration = () => {
         await syncDeliveryProviderDetails({
           userId,
           providerName: providerType === 'individual' ? fullName.trim() : (companyName.trim() || fullName.trim()),
-          phone: phone.trim(),
+          phone: phoneDb,
           email: email.trim().toLowerCase(),
           address: physicalAddress?.trim() || county || undefined,
           providerType: providerType === 'company' ? 'company' : 'individual',
           vehicleTypes: vehicleType ? [vehicleType] : ['motorcycle'],
           serviceAreas: serviceAreas.length > 0 ? serviceAreas : [county].filter(Boolean),
           drivingLicenseNumber: drivingLicense?.trim(),
+          bankName: bankName.trim(),
+          bankAccountHolderName: bankAccountHolderName.trim(),
+          bankAccountNumber: bankAccountNumber.trim(),
+          bankBranch: bankBranch.trim() || undefined,
           isVerified: true,
         });
       } catch (dpSyncErr) {
@@ -879,6 +920,34 @@ const DeliveryRegistration = () => {
                         </Select>
                       </div>
                     </div>
+
+                    <div className="space-y-3 pt-2 border-t border-teal-100">
+                      <div className="flex items-center gap-2 text-sm font-semibold text-teal-900">
+                        <CreditCard className="h-4 w-4" />
+                        Payout bank account *
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        Required for driver payouts. Use the account that should receive earnings.
+                      </p>
+                      <div className="grid gap-3 md:grid-cols-2">
+                        <div className="space-y-2">
+                          <Label htmlFor="dr-bankName">Bank name *</Label>
+                          <Input id="dr-bankName" value={bankName} onChange={(e) => setBankName(e.target.value)} placeholder="e.g. KCB" />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="dr-bankBranch">Branch (optional)</Label>
+                          <Input id="dr-bankBranch" value={bankBranch} onChange={(e) => setBankBranch(e.target.value)} />
+                        </div>
+                        <div className="space-y-2 md:col-span-2">
+                          <Label htmlFor="dr-bankHolder">Account holder name *</Label>
+                          <Input id="dr-bankHolder" value={bankAccountHolderName} onChange={(e) => setBankAccountHolderName(e.target.value)} />
+                        </div>
+                        <div className="space-y-2 md:col-span-2">
+                          <Label htmlFor="dr-bankAcct">Account number *</Label>
+                          <Input id="dr-bankAcct" inputMode="numeric" value={bankAccountNumber} onChange={(e) => setBankAccountNumber(e.target.value)} />
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 )}
 
@@ -926,6 +995,16 @@ const DeliveryRegistration = () => {
                           <p><strong>License Plate:</strong> {licensePlate}</p>
                           <p><strong>Service Areas:</strong> {serviceAreas.join(", ")}</p>
                         </div>
+                      </CardContent>
+                    </Card>
+
+                    <Card className="bg-amber-50 border-amber-200">
+                      <CardContent className="pt-6 space-y-2 text-sm">
+                        <h3 className="font-semibold flex items-center gap-2">
+                          <CreditCard className="h-4 w-4" /> Payout bank
+                        </h3>
+                        <p><strong>Bank:</strong> {bankName} {bankBranch ? `(${bankBranch})` : ''}</p>
+                        <p><strong>Account:</strong> {bankAccountHolderName} · {bankAccountNumber}</p>
                       </CardContent>
                     </Card>
 

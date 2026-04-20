@@ -87,6 +87,10 @@ interface DeliveryProviderRecord {
   updated_at?: string;
   reviewed_at?: string;
   reviewed_by?: string;
+  bank_name?: string | null;
+  bank_account_holder_name?: string | null;
+  bank_account_number?: string | null;
+  bank_branch?: string | null;
 }
 
 interface DeliveryProvidersRegisterProps {
@@ -200,6 +204,7 @@ export const DeliveryProvidersRegister: React.FC<DeliveryProvidersRegisterProps>
     const headers = [
       'Full Name', 'Email', 'Phone', 'Company Name', 'County', 'Town',
       'Vehicle Type', 'Vehicle Registration', 'License Number', 'Service Areas',
+      'Bank Name', 'Account Holder', 'Account Number', 'Branch',
       'Base Rate/km', 'Status', 'Created At'
     ];
     const csvData = filteredProviders.map(p => [
@@ -213,6 +218,10 @@ export const DeliveryProvidersRegister: React.FC<DeliveryProvidersRegisterProps>
       p.vehicle_registration,
       p.driving_license_number,
       p.service_areas?.join('; ') || '',
+      p.bank_name || '',
+      p.bank_account_holder_name || '',
+      p.bank_account_number || '',
+      p.bank_branch || '',
       p.base_rate_per_km || '',
       p.status,
       new Date(p.created_at).toLocaleDateString()
@@ -606,6 +615,31 @@ export const DeliveryProvidersRegister: React.FC<DeliveryProvidersRegisterProps>
                       <span className="text-gray-400">Emergency Phone:</span>
                       <span className="text-white">{selectedProvider.emergency_contact_phone || 'N/A'}</span>
                     </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <h4 className="text-sm font-medium text-gray-400 flex items-center gap-2">
+                  <CreditCard className="h-4 w-4 text-emerald-400" />
+                  Payout bank account
+                </h4>
+                <div className="bg-slate-800 p-4 rounded-lg space-y-2 text-sm">
+                  <div className="flex justify-between gap-4">
+                    <span className="text-gray-400 shrink-0">Bank:</span>
+                    <span className="text-white text-right">{selectedProvider.bank_name?.trim() || '—'}</span>
+                  </div>
+                  <div className="flex justify-between gap-4">
+                    <span className="text-gray-400 shrink-0">Branch:</span>
+                    <span className="text-white text-right">{selectedProvider.bank_branch?.trim() || '—'}</span>
+                  </div>
+                  <div className="flex justify-between gap-4">
+                    <span className="text-gray-400 shrink-0">Account holder:</span>
+                    <span className="text-white text-right">{selectedProvider.bank_account_holder_name?.trim() || '—'}</span>
+                  </div>
+                  <div className="flex justify-between gap-4">
+                    <span className="text-gray-400 shrink-0">Account number:</span>
+                    <span className="text-white font-mono text-right">{selectedProvider.bank_account_number?.trim() || '—'}</span>
                   </div>
                 </div>
               </div>

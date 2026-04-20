@@ -223,6 +223,10 @@ interface RegistrationRecord {
   service_areas?: string[];
   status: string;
   created_at: string;
+  bank_name?: string | null;
+  bank_account_holder_name?: string | null;
+  bank_account_number?: string | null;
+  bank_branch?: string | null;
 }
 
 interface DocumentRecord {
@@ -310,6 +314,10 @@ interface DeliveryApplication {
   reviewed_by?: string;
   _registration_id?: string | null;
   _source?: string;
+  bank_name?: string | null;
+  bank_account_holder_name?: string | null;
+  bank_account_number?: string | null;
+  bank_branch?: string | null;
 }
 
 /** Format PO `items` JSONB for admin delivery cards (one line per SKU). */
@@ -1997,7 +2005,11 @@ const AdminDashboard = () => {
           reviewed_at: null,
           reviewed_by: null,
           _registration_id: row.registration_id,
-          _source: row.source
+          _source: row.source,
+          bank_name: row.bank_name ?? null,
+          bank_account_holder_name: row.bank_account_holder_name ?? null,
+          bank_account_number: row.bank_account_number ?? null,
+          bank_branch: row.bank_branch ?? null,
         }));
         setDeliveryApplications(formattedApps);
         console.log('📦 Loaded', formattedApps.length, 'delivery providers (RPC)');
@@ -2037,7 +2049,11 @@ const AdminDashboard = () => {
           reviewed_at: app.reviewed_at,
           reviewed_by: app.reviewed_by,
           _registration_id: app.id,
-          _source: 'registration'
+          _source: 'registration',
+          bank_name: app.bank_name ?? null,
+          bank_account_holder_name: app.bank_account_holder_name ?? null,
+          bank_account_number: app.bank_account_number ?? null,
+          bank_branch: app.bank_branch ?? null,
         }));
         setDeliveryApplications(formattedApps);
         console.log('📦 Loaded', formattedApps.length, 'delivery applications (fallback)');
@@ -2058,7 +2074,9 @@ const AdminDashboard = () => {
       // Schema uses: address (not county), materials_offered (not material_categories)
       const { data: suppliers, error: suppliersError } = await client
         .from('supplier_applications')
-        .select('id, company_name, contact_person, email, phone, address, materials_offered, status, created_at')
+        .select(
+          'id, company_name, contact_person, email, phone, address, materials_offered, status, created_at, bank_name, bank_account_holder_name, bank_account_number, bank_branch'
+        )
         .order('created_at', { ascending: false })
         .limit(50);
 
@@ -2078,7 +2096,11 @@ const AdminDashboard = () => {
             county: s.address, // Schema uses address, not county
             material_categories: s.materials_offered, // Schema uses materials_offered
             status: s.status || 'pending',
-            created_at: s.created_at
+            created_at: s.created_at,
+            bank_name: s.bank_name,
+            bank_account_holder_name: s.bank_account_holder_name,
+            bank_account_number: s.bank_account_number,
+            bank_branch: s.bank_branch,
           });
         });
       }
@@ -2100,12 +2122,18 @@ const AdminDashboard = () => {
           service_areas: row.service_areas,
           status: row.status,
           is_verified: row.status === 'approved',
-          created_at: row.created_at
+          created_at: row.created_at,
+          bank_name: row.bank_name,
+          bank_account_holder_name: row.bank_account_holder_name,
+          bank_account_number: row.bank_account_number,
+          bank_branch: row.bank_branch,
         }));
       } else {
         const { data: deliveryRegs, error: deliveryRegsError } = await client
           .from('delivery_provider_registrations')
-          .select('id, full_name, email, phone, county, vehicle_type, vehicle_registration, service_areas, status, created_at')
+          .select(
+            'id, full_name, email, phone, county, vehicle_type, vehicle_registration, service_areas, status, created_at, bank_name, bank_account_holder_name, bank_account_number, bank_branch'
+          )
           .order('created_at', { ascending: false })
           .limit(50);
         if (!deliveryRegsError && deliveryRegs) {
@@ -2133,7 +2161,11 @@ const AdminDashboard = () => {
             vehicle_type: d.vehicle_type,
             service_areas: d.service_areas || d.service_counties,
             status: d.status || (d.is_verified ? 'approved' : 'pending'),
-            created_at: d.created_at
+            created_at: d.created_at,
+            bank_name: d.bank_name,
+            bank_account_holder_name: d.bank_account_holder_name,
+            bank_account_number: d.bank_account_number,
+            bank_branch: d.bank_branch,
           });
         });
       }
@@ -3232,6 +3264,31 @@ const AdminDashboard = () => {
                               License
                             </div>
                             <p className="text-white font-medium">{app.driving_license_number}</p>
+                          </div>
+                        </div>
+
+                        <div className="mb-4 p-4 rounded-xl border border-slate-600 bg-slate-800/40">
+                          <div className="flex items-center gap-2 text-gray-300 text-sm font-medium mb-3">
+                            <CreditCard className="h-4 w-4 text-emerald-400" />
+                            Payout bank account
+                          </div>
+                          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-3 text-sm">
+                            <div>
+                              <p className="text-gray-500 text-xs mb-0.5">Bank</p>
+                              <p className="text-white">{app.bank_name?.trim() || '—'}</p>
+                            </div>
+                            <div>
+                              <p className="text-gray-500 text-xs mb-0.5">Account name</p>
+                              <p className="text-white">{app.bank_account_holder_name?.trim() || '—'}</p>
+                            </div>
+                            <div>
+                              <p className="text-gray-500 text-xs mb-0.5">Account number</p>
+                              <p className="text-white font-mono">{app.bank_account_number?.trim() || '—'}</p>
+                            </div>
+                            <div>
+                              <p className="text-gray-500 text-xs mb-0.5">Branch</p>
+                              <p className="text-white">{app.bank_branch?.trim() || '—'}</p>
+                            </div>
                           </div>
                         </div>
 

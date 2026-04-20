@@ -1147,6 +1147,10 @@ export type Database = {
         Row: {
           address: string | null
           availability_schedule: Json | null
+          bank_account_holder_name: string | null
+          bank_account_number: string | null
+          bank_branch: string | null
+          bank_name: string | null
           capacity_kg: number | null
           contact_person: string | null
           created_at: string
@@ -1184,6 +1188,10 @@ export type Database = {
         Insert: {
           address?: string | null
           availability_schedule?: Json | null
+          bank_account_holder_name?: string | null
+          bank_account_number?: string | null
+          bank_branch?: string | null
+          bank_name?: string | null
           capacity_kg?: number | null
           contact_person?: string | null
           created_at?: string
@@ -1221,6 +1229,10 @@ export type Database = {
         Update: {
           address?: string | null
           availability_schedule?: Json | null
+          bank_account_holder_name?: string | null
+          bank_account_number?: string | null
+          bank_branch?: string | null
+          bank_name?: string | null
           capacity_kg?: number | null
           contact_person?: string | null
           created_at?: string
@@ -3821,6 +3833,10 @@ export type Database = {
           address: string | null
           applicant_user_id: string
           application_notes: string | null
+          bank_account_holder_name: string | null
+          bank_account_number: string | null
+          bank_branch: string | null
+          bank_name: string | null
           business_registration_number: string | null
           company_name: string
           contact_person: string
@@ -3841,6 +3857,10 @@ export type Database = {
           address?: string | null
           applicant_user_id: string
           application_notes?: string | null
+          bank_account_holder_name?: string | null
+          bank_account_number?: string | null
+          bank_branch?: string | null
+          bank_name?: string | null
           business_registration_number?: string | null
           company_name: string
           contact_person: string
@@ -3861,6 +3881,10 @@ export type Database = {
           address?: string | null
           applicant_user_id?: string
           application_notes?: string | null
+          bank_account_holder_name?: string | null
+          bank_account_number?: string | null
+          bank_branch?: string | null
+          bank_name?: string | null
           business_registration_number?: string | null
           company_name?: string
           contact_person?: string

@@ -20,6 +20,10 @@ export interface DeliveryProviderSyncPayload {
   serviceAreas?: string[];
   contactPerson?: string;
   drivingLicenseNumber?: string;
+  bankName?: string;
+  bankAccountHolderName?: string;
+  bankAccountNumber?: string;
+  bankBranch?: string;
   isVerified?: boolean;
   isActive?: boolean;
 }
@@ -42,6 +46,10 @@ export async function syncDeliveryProviderDetails(
     serviceAreas = [],
     contactPerson,
     drivingLicenseNumber,
+    bankName,
+    bankAccountHolderName,
+    bankAccountNumber,
+    bankBranch,
     isVerified = false,
     isActive = true,
   } = payload;
@@ -75,6 +83,10 @@ export async function syncDeliveryProviderDetails(
       vehicle_types: Array.isArray(vehicleTypes) && vehicleTypes.length > 0 ? vehicleTypes : ['motorcycle'],
       service_areas: Array.isArray(serviceAreas) ? serviceAreas : [],
       driving_license_number: drivingLicenseNumber?.trim() || null,
+      bank_name: bankName?.trim() || null,
+      bank_account_holder_name: bankAccountHolderName?.trim() || null,
+      bank_account_number: bankAccountNumber?.trim() || null,
+      bank_branch: bankBranch?.trim() || null,
       is_verified: isVerified,
       is_active: isActive,
       updated_at: new Date().toISOString(),

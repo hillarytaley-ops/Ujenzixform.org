@@ -48,8 +48,10 @@ import {
   EyeOff,
   CheckCircle,
   Loader2,
-  KeyRound
+  KeyRound,
+  CreditCard,
 } from "lucide-react";
+import { normalizePhoneDigits } from "@/utils/phoneNormalize";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { User } from "@supabase/supabase-js";
@@ -110,6 +112,7 @@ const SupplierRegistration = () => {
   
   // Business Information
   const [businessName, setBusinessName] = useState("");
+  const [contactPerson, setContactPerson] = useState("");
   const [businessRegNumber, setBusinessRegNumber] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -131,6 +134,12 @@ const SupplierRegistration = () => {
   // Terms
   const [acceptTerms, setAcceptTerms] = useState(false);
   const [acceptPrivacy, setAcceptPrivacy] = useState(false);
+
+  // Payout bank (required for supplier onboarding)
+  const [bankName, setBankName] = useState("");
+  const [bankAccountHolderName, setBankAccountHolderName] = useState("");
+  const [bankAccountNumber, setBankAccountNumber] = useState("");
+  const [bankBranch, setBankBranch] = useState("");
 
   // Check if user is already logged in and pre-fill email
   useEffect(() => {
@@ -217,7 +226,7 @@ const SupplierRegistration = () => {
   const validateStep1 = () => {
     // If user is already logged in, they don't need to provide password
     if (existingUser) {
-      if (!businessName || !phone) {
+      if (!businessName || !contactPerson.trim() || !phone) {
         toast({
           variant: "destructive",
           title: "Missing Information",
@@ -227,7 +236,7 @@ const SupplierRegistration = () => {
       }
     } else {
       // New user needs email and password
-      if (!businessName || !email || !password || !phone) {
+      if (!businessName || !contactPerson.trim() || !email || !password || !phone) {
         toast({
           variant: "destructive",
           title: "Missing Information",
@@ -299,6 +308,29 @@ const SupplierRegistration = () => {
       return;
     }
 
+    const phoneDb = normalizePhoneDigits(phone);
+    if (phoneDb.length < 10 || phoneDb.length > 15) {
+      toast({
+        variant: "destructive",
+        title: "Invalid phone number",
+        description: "Enter a valid mobile number (10–15 digits), e.g. 0712345678 or +254712345678.",
+      });
+      return;
+    }
+
+    if (
+      !bankName.trim() ||
+      !bankAccountHolderName.trim() ||
+      !bankAccountNumber.trim()
+    ) {
+      toast({
+        variant: "destructive",
+        title: "Bank details required",
+        description: "Please complete your payout bank name, account holder name, and account number.",
+      });
+      return;
+    }
+
     setLoading(true);
     console.log('📝 SupplierRegistration: Starting submission...');
 
@@ -346,7 +378,7 @@ const SupplierRegistration = () => {
           options: {
             data: {
               business_name: businessName,
-              phone: phone,
+              phone: phoneDb,
               user_type: 'supplier',
               role: 'supplier'
             }
@@ -382,7 +414,7 @@ const SupplierRegistration = () => {
             user_id: userId,
             email: email.trim().toLowerCase(),
             full_name: businessName,
-            phone: phone,
+            phone: phoneDb,
             company_name: businessName,
             location: `${town}, ${county}`,
             description: businessDescription,
@@ -489,11 +521,16 @@ const SupplierRegistration = () => {
               applicant_user_id: userId,
               email: email.trim().toLowerCase(),
               company_name: businessName,
-              phone: phone,
-              county: county,
-              address: physicalAddress,
-              material_categories: selectedCategories.length > 0 ? selectedCategories : ['General'],
-              status: 'approved'
+              contact_person: contactPerson.trim(),
+              phone: phoneDb,
+              address: [physicalAddress, town, county].filter(Boolean).join(', '),
+              materials_offered: selectedCategories.length > 0 ? selectedCategories : ['General'],
+              business_registration_number: businessRegNumber.trim() || null,
+              bank_name: bankName.trim(),
+              bank_account_holder_name: bankAccountHolderName.trim(),
+              bank_account_number: bankAccountNumber.trim(),
+              bank_branch: bankBranch.trim() || null,
+              status: 'pending',
             });
           
           if (supplierAppError) {
@@ -695,6 +732,17 @@ const SupplierRegistration = () => {
                           onChange={(e) => setBusinessRegNumber(e.target.value)}
                         />
                       </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="contactPerson">Contact person (primary) *</Label>
+                      <Input
+                        id="contactPerson"
+                        placeholder="Name of owner or main representative"
+                        value={contactPerson}
+                        onChange={(e) => setContactPerson(e.target.value)}
+                        required
+                      />
                     </div>
 
                     {/* Show logged-in user notice if already authenticated */}
@@ -930,9 +978,12 @@ const SupplierRegistration = () => {
                         <h3 className="font-semibold">Business Information</h3>
                         <div className="grid gap-2 text-sm">
                           <p><strong>Business Name:</strong> {businessName}</p>
+                          <p><strong>Contact person:</strong> {contactPerson}</p>
                           <p><strong>Email:</strong> {email}</p>
                           <p><strong>Phone:</strong> {phone}</p>
                           <p><strong>Location:</strong> {town}, {county}</p>
+                          <p><strong>Bank:</strong> {bankName || '—'} {bankBranch ? `(${bankBranch})` : ''}</p>
+                          <p><strong>Payout account:</strong> {bankAccountHolderName || '—'} · {bankAccountNumber || '—'}</p>
                         </div>
                       </CardContent>
                     </Card>
@@ -943,6 +994,59 @@ const SupplierRegistration = () => {
                         <p className="text-sm">
                           <strong>Categories:</strong> {selectedCategories.join(", ")}
                         </p>
+                      </CardContent>
+                    </Card>
+
+                    <Card className="bg-amber-50 border-amber-200">
+                      <CardContent className="pt-6 space-y-4">
+                        <div className="flex items-center gap-2">
+                          <CreditCard className="h-5 w-5 text-amber-700" />
+                          <h3 className="font-semibold">Payout bank account *</h3>
+                        </div>
+                        <p className="text-sm text-muted-foreground">
+                          Required for settlements. Use the account that should receive payouts.
+                        </p>
+                        <div className="grid gap-4 md:grid-cols-2">
+                          <div className="space-y-2">
+                            <Label htmlFor="bankName">Bank name *</Label>
+                            <Input
+                              id="bankName"
+                              value={bankName}
+                              onChange={(e) => setBankName(e.target.value)}
+                              placeholder="e.g. Equity Bank"
+                              required
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="bankBranch">Branch (optional)</Label>
+                            <Input
+                              id="bankBranch"
+                              value={bankBranch}
+                              onChange={(e) => setBankBranch(e.target.value)}
+                              placeholder="e.g. Westlands"
+                            />
+                          </div>
+                          <div className="space-y-2 md:col-span-2">
+                            <Label htmlFor="bankAccountHolderName">Account holder name (as on bank record) *</Label>
+                            <Input
+                              id="bankAccountHolderName"
+                              value={bankAccountHolderName}
+                              onChange={(e) => setBankAccountHolderName(e.target.value)}
+                              required
+                            />
+                          </div>
+                          <div className="space-y-2 md:col-span-2">
+                            <Label htmlFor="bankAccountNumber">Account number *</Label>
+                            <Input
+                              id="bankAccountNumber"
+                              inputMode="numeric"
+                              autoComplete="off"
+                              value={bankAccountNumber}
+                              onChange={(e) => setBankAccountNumber(e.target.value)}
+                              required
+                            />
+                          </div>
+                        </div>
                       </CardContent>
                     </Card>
 

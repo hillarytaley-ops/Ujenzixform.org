@@ -75,6 +75,10 @@ export interface RegistrationRecord {
   service_areas?: string[];
   status: string;
   created_at: string;
+  bank_name?: string | null;
+  bank_account_holder_name?: string | null;
+  bank_account_number?: string | null;
+  bank_branch?: string | null;
 }
 
 // Document Record
@@ -170,6 +174,12 @@ export interface DeliveryApplication {
   created_at: string;
   reviewed_at?: string;
   reviewed_by?: string;
+  bank_name?: string | null;
+  bank_account_holder_name?: string | null;
+  bank_account_number?: string | null;
+  bank_branch?: string | null;
+  _registration_id?: string | null;
+  _source?: string;
 }
 
 // Builder Delivery Request

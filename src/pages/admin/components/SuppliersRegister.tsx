@@ -36,6 +36,7 @@ import {
   FileText,
   ExternalLink,
   Filter,
+  CreditCard,
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
@@ -78,6 +79,10 @@ interface SupplierRecord {
   source?: 'registration' | 'active';
   created_at: string;
   updated_at?: string;
+  bank_name?: string | null;
+  bank_account_holder_name?: string | null;
+  bank_account_number?: string | null;
+  bank_branch?: string | null;
 }
 
 interface SuppliersRegisterProps {
@@ -171,7 +176,8 @@ export const SuppliersRegister: React.FC<SuppliersRegisterProps> = ({
   const exportToCSV = () => {
     const headers = [
       'Company Name', 'Contact Person', 'Email', 'Phone', 'County', 'Town',
-      'Business Type', 'Material Categories', 'Status', 'Verified', 'Created At'
+      'Business Type', 'Material Categories', 'Bank Name', 'Account Holder', 'Account Number', 'Branch',
+      'Status', 'Verified', 'Created At'
     ];
     const csvData = filteredSuppliers.map(s => [
       s.company_name,
@@ -182,6 +188,10 @@ export const SuppliersRegister: React.FC<SuppliersRegisterProps> = ({
       s.town || '',
       s.business_type || '',
       s.material_categories?.join('; ') || '',
+      s.bank_name || '',
+      s.bank_account_holder_name || '',
+      s.bank_account_number || '',
+      s.bank_branch || '',
       s.status,
       s.is_verified ? 'Yes' : 'No',
       new Date(s.created_at).toLocaleDateString()
@@ -519,6 +529,31 @@ export const SuppliersRegister: React.FC<SuppliersRegisterProps> = ({
                     <div className="flex justify-between">
                       <span className="text-gray-400">Address:</span>
                       <span className="text-white text-right">{selectedSupplier.physical_address || 'N/A'}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-2 md:col-span-2">
+                  <h4 className="text-sm font-medium text-gray-400 flex items-center gap-2">
+                    <CreditCard className="h-4 w-4 text-emerald-400" />
+                    Payout bank account
+                  </h4>
+                  <div className="bg-slate-800 p-4 rounded-lg space-y-2 text-sm">
+                    <div className="flex justify-between gap-4">
+                      <span className="text-gray-400 shrink-0">Bank:</span>
+                      <span className="text-white text-right">{selectedSupplier.bank_name?.trim() || '—'}</span>
+                    </div>
+                    <div className="flex justify-between gap-4">
+                      <span className="text-gray-400 shrink-0">Branch:</span>
+                      <span className="text-white text-right">{selectedSupplier.bank_branch?.trim() || '—'}</span>
+                    </div>
+                    <div className="flex justify-between gap-4">
+                      <span className="text-gray-400 shrink-0">Account holder:</span>
+                      <span className="text-white text-right">{selectedSupplier.bank_account_holder_name?.trim() || '—'}</span>
+                    </div>
+                    <div className="flex justify-between gap-4">
+                      <span className="text-gray-400 shrink-0">Account number:</span>
+                      <span className="text-white font-mono text-right">{selectedSupplier.bank_account_number?.trim() || '—'}</span>
                     </div>
                   </div>
                 </div>

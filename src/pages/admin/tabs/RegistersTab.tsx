@@ -48,6 +48,10 @@ interface RawSupplierRecord {
   source?: 'registration' | 'active';
   created_at: string;
   updated_at?: string;
+  bank_name?: string | null;
+  bank_account_holder_name?: string | null;
+  bank_account_number?: string | null;
+  bank_branch?: string | null;
 }
 
 interface RawBuilderRecord {
