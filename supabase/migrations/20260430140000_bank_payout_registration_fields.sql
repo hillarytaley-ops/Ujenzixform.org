@@ -19,7 +19,10 @@ ALTER TABLE public.delivery_providers
   ADD COLUMN IF NOT EXISTS bank_branch text;
 
 -- Admin RPC: include payout fields (replaces 20260439_admin_list_all_delivery_providers.sql)
-CREATE OR REPLACE FUNCTION public.admin_list_all_delivery_providers()
+-- PostgreSQL cannot change RETURNS TABLE columns via CREATE OR REPLACE; drop first.
+DROP FUNCTION IF EXISTS public.admin_list_all_delivery_providers();
+
+CREATE FUNCTION public.admin_list_all_delivery_providers()
 RETURNS TABLE(
   id uuid,
   registration_id uuid,
@@ -105,3 +108,5 @@ $$;
 
 COMMENT ON FUNCTION public.admin_list_all_delivery_providers() IS
   'Admin only: returns all delivery providers from registrations + providers (no registration), including payout bank fields.';
+
+GRANT EXECUTE ON FUNCTION public.admin_list_all_delivery_providers() TO authenticated;
