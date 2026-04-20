@@ -355,6 +355,18 @@ export type SupplierEditPatch = {
   status?: string;
 };
 
+/** Admin edits on builder_registrations or profiles (synthetic role-only rows) */
+export type BuilderEditPatch = {
+  full_name: string;
+  email: string;
+  phone: string;
+  company_name: string;
+  county: string;
+  town: string;
+  physical_address: string;
+  status?: string;
+};
+
 // Sort Options
 export interface SortOptions {
   field: string;

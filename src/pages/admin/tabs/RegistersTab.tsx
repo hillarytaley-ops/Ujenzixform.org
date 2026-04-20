@@ -8,7 +8,7 @@ import { normalizePhoneDigits } from '@/utils/phoneNormalize';
 import { useToast } from '@/hooks/use-toast';
 import { SuppliersRegister } from '../components/SuppliersRegister';
 import { BuildersRegister } from '../components/BuildersRegister';
-import type { SupplierEditPatch } from '../types';
+import type { SupplierEditPatch, BuilderEditPatch } from '../types';
 
 // Type definitions for the raw database records
 interface RawSupplierRecord {
@@ -61,6 +61,8 @@ interface RawSupplierRecord {
 interface RawBuilderRecord {
   id: string;
   auth_user_id?: string;
+  /** user_roles.role for synthetic rows from get_users_with_roles (demote uses this) */
+  db_user_role?: string;
   full_name: string;
   email: string;
   phone: string;
@@ -135,7 +137,10 @@ export const RegistersTab: React.FC = () => {
         auth_user_id: (row.applicant_user_id as string) || (row as RawSupplierRecord).auth_user_id,
         applicant_user_id: row.applicant_user_id as string | undefined,
       })) as RawSupplierRecord[];
-      let buildersData = (buildersRes.data || []) as RawBuilderRecord[];
+      let buildersData = ((buildersRes.data || []) as Record<string, unknown>[]).map((row) => ({
+        ...(row as unknown as RawBuilderRecord),
+        auth_user_id: (row.auth_user_id as string) || (row as RawBuilderRecord).auth_user_id,
+      })) as RawBuilderRecord[];
 
       // Get users with roles from database function
       const usersWithRoles = usersWithRolesRes.data || [];
@@ -174,17 +179,22 @@ export const RegistersTab: React.FC = () => {
         }
         
         if (['builder', 'professional_builder', 'private_builder'].includes(role) && !existingBuilderEmails.has(email)) {
+          const created =
+            typeof user.created_at === 'string' && user.created_at
+              ? user.created_at
+              : new Date().toISOString();
           buildersData.push({
-            id: user.user_id,
+            id: `role-${user.user_id}`,
             auth_user_id: user.user_id,
-            full_name: user.full_name || email.split('@')[0] || 'Unknown',
+            db_user_role: role,
+            full_name: email.split('@')[0] || 'Unknown',
             email: user.email || '',
             phone: '',
             county: 'Not specified',
             builder_type: role === 'professional_builder' ? 'professional' : 'private',
             builder_category: role === 'professional_builder' ? 'professional' : 'private',
             status: 'active',
-            created_at: user.role_created_at || user.user_created_at,
+            created_at: created,
           });
           existingBuilderEmails.add(email);
         }
@@ -233,6 +243,14 @@ export const RegistersTab: React.FC = () => {
   const isSyntheticSupplierRow = (s: RawSupplierRecord) => s.id.startsWith('role-');
 
   const updateSupplierStatus = useCallback(async (id: string, status: string) => {
+    if (id.startsWith('role-')) {
+      toast({
+        variant: 'destructive',
+        title: 'Cannot update status',
+        description: 'This row has no supplier application. Use Edit or Demote.',
+      });
+      return;
+    }
     try {
       const client = supabase;
       const { error } = await client
@@ -374,7 +392,20 @@ export const RegistersTab: React.FC = () => {
     [fetchAllData, toast]
   );
 
+  const builderTargetUserId = (b: RawBuilderRecord) =>
+    (b.auth_user_id || (b.id.startsWith('role-') ? b.id.replace(/^role-/, '') : '') || '').trim();
+
+  const isSyntheticBuilderRow = (b: RawBuilderRecord) => b.id.startsWith('role-');
+
   const updateBuilderStatus = useCallback(async (id: string, status: string) => {
+    if (id.startsWith('role-')) {
+      toast({
+        variant: 'destructive',
+        title: 'Cannot update status',
+        description: 'This row has no builder application. Use Edit to change the profile, or Demote.',
+      });
+      return;
+    }
     try {
       const client = supabase;
       const { error } = await client
@@ -398,6 +429,142 @@ export const RegistersTab: React.FC = () => {
       });
     }
   }, [toast]);
+
+  const saveBuilderEdit = useCallback(
+    async (b: RawBuilderRecord, patch: BuilderEditPatch) => {
+      const uid = builderTargetUserId(b);
+      if (!uid) {
+        toast({ title: 'Error', description: 'Missing user id for this row.', variant: 'destructive' });
+        return;
+      }
+      try {
+        if (!isSyntheticBuilderRow(b)) {
+          const phoneDb = normalizePhoneDigits(patch.phone);
+          if (phoneDb.length < 9 || phoneDb.length > 15) {
+            toast({
+              variant: 'destructive',
+              title: 'Invalid phone',
+              description: 'Enter 9–15 digits for builder registration phone.',
+            });
+            return;
+          }
+          const { error } = await supabase
+            .from('builder_registrations')
+            .update({
+              full_name: patch.full_name.trim(),
+              email: patch.email.trim().toLowerCase(),
+              phone: phoneDb,
+              company_name: patch.company_name.trim() || null,
+              county: patch.county.trim() || 'Nairobi',
+              town: patch.town.trim() || null,
+              physical_address: patch.physical_address.trim() || null,
+              ...(patch.status
+                ? { status: patch.status, updated_at: new Date().toISOString() }
+                : { updated_at: new Date().toISOString() }),
+            })
+            .eq('id', b.id);
+          if (error) throw error;
+        } else {
+          const phoneDb = normalizePhoneDigits(patch.phone);
+          const { error } = await supabase
+            .from('profiles')
+            .update({
+              full_name: patch.full_name.trim(),
+              phone: phoneDb || null,
+              company_name: patch.company_name.trim() || null,
+              builder_category: b.builder_category === 'professional' ? 'professional' : 'private',
+              is_professional: b.builder_category === 'professional',
+              updated_at: new Date().toISOString(),
+            })
+            .eq('user_id', uid);
+          if (error) throw error;
+        }
+        toast({ title: 'Saved', description: 'Builder record updated.' });
+        await fetchAllData();
+      } catch (error: unknown) {
+        console.error('saveBuilderEdit', error);
+        toast({
+          title: 'Save failed',
+          description: error instanceof Error ? error.message : 'Could not update builder',
+          variant: 'destructive',
+        });
+      }
+    },
+    [fetchAllData, toast]
+  );
+
+  const BUILDER_ROLE_KEYS = ['professional_builder', 'private_builder', 'builder'] as const;
+
+  const demoteBuilder = useCallback(
+    async (b: RawBuilderRecord) => {
+      const uid = builderTargetUserId(b);
+      if (!uid) {
+        toast({ title: 'Error', description: 'Missing user id.', variant: 'destructive' });
+        return;
+      }
+      try {
+        const specific = b.db_user_role;
+        if (specific && BUILDER_ROLE_KEYS.includes(specific as (typeof BUILDER_ROLE_KEYS)[number])) {
+          const { error } = await supabase.from('user_roles').delete().eq('user_id', uid).eq('role', specific);
+          if (error) throw error;
+        } else {
+          for (const role of BUILDER_ROLE_KEYS) {
+            await supabase.from('user_roles').delete().eq('user_id', uid).eq('role', role);
+          }
+        }
+        toast({
+          title: 'Builder demoted',
+          description: 'Builder role removed. The user account still exists.',
+        });
+        await fetchAllData();
+      } catch (error: unknown) {
+        console.error('demoteBuilder', error);
+        toast({
+          title: 'Demote failed',
+          description: error instanceof Error ? error.message : 'Could not remove builder role',
+          variant: 'destructive',
+        });
+      }
+    },
+    [fetchAllData, toast]
+  );
+
+  const deleteBuilderRegistration = useCallback(
+    async (b: RawBuilderRecord) => {
+      const uid = builderTargetUserId(b);
+      if (!uid) {
+        toast({ title: 'Error', description: 'Missing user id.', variant: 'destructive' });
+        return;
+      }
+      try {
+        if (!isSyntheticBuilderRow(b)) {
+          const { error: regErr } = await supabase.from('builder_registrations').delete().eq('id', b.id);
+          if (regErr) throw regErr;
+        }
+        const specific = b.db_user_role;
+        if (specific && BUILDER_ROLE_KEYS.includes(specific as (typeof BUILDER_ROLE_KEYS)[number])) {
+          await supabase.from('user_roles').delete().eq('user_id', uid).eq('role', specific);
+        } else {
+          for (const role of BUILDER_ROLE_KEYS) {
+            await supabase.from('user_roles').delete().eq('user_id', uid).eq('role', role);
+          }
+        }
+        toast({
+          title: 'Removed',
+          description: 'Builder registration (if any) and builder roles were removed. Auth user is unchanged.',
+        });
+        await fetchAllData();
+      } catch (error: unknown) {
+        console.error('deleteBuilderRegistration', error);
+        toast({
+          title: 'Delete failed',
+          description: error instanceof Error ? error.message : 'Could not delete builder data',
+          variant: 'destructive',
+        });
+      }
+    },
+    [fetchAllData, toast]
+  );
 
   // Calculate totals for tab badges
   // Separate builders into Professional and Private
@@ -556,6 +723,9 @@ export const RegistersTab: React.FC = () => {
             loading={loading}
             onRefresh={fetchAllData}
             onUpdateStatus={updateBuilderStatus}
+            onSaveBuilderEdit={saveBuilderEdit}
+            onDemoteBuilder={demoteBuilder}
+            onDeleteBuilder={deleteBuilderRegistration}
           />
         </TabsContent>
 
@@ -565,6 +735,9 @@ export const RegistersTab: React.FC = () => {
             loading={loading}
             onRefresh={fetchAllData}
             onUpdateStatus={updateBuilderStatus}
+            onSaveBuilderEdit={saveBuilderEdit}
+            onDemoteBuilder={demoteBuilder}
+            onDeleteBuilder={deleteBuilderRegistration}
           />
         </TabsContent>
       </Tabs>

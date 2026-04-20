@@ -3,6 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import {
   Table,
   TableBody,
@@ -31,18 +32,40 @@ import {
   MapPin,
   Briefcase,
   Award,
-  Calendar,
   Clock,
   FileText,
   ExternalLink,
   Hammer,
   Shield,
+  MoreVertical,
+  Pencil,
+  Trash2,
+  UserMinus,
+  Loader2,
 } from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import {
+  AlertDialog,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
+import type { BuilderEditPatch } from '../types';
 
 interface BuilderRecord {
   id: string;
   auth_user_id?: string;
+  db_user_role?: string;
   full_name: string;
   email: string;
   phone: string;
@@ -79,13 +102,27 @@ interface BuildersRegisterProps {
   loading: boolean;
   onRefresh: () => void;
   onUpdateStatus: (id: string, status: string) => void;
+  onSaveBuilderEdit: (builder: BuilderRecord, patch: BuilderEditPatch) => Promise<void>;
+  onDemoteBuilder: (builder: BuilderRecord) => Promise<void>;
+  onDeleteBuilder: (builder: BuilderRecord) => Promise<void>;
 }
+
+const isSyntheticBuilderRow = (b: BuilderRecord) => b.id.startsWith('role-');
+
+const formatRegisteredDate = (iso: string) => {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? '—' : d.toLocaleDateString();
+};
 
 export const BuildersRegister: React.FC<BuildersRegisterProps> = ({
   builders,
   loading,
   onRefresh,
   onUpdateStatus,
+  onSaveBuilderEdit,
+  onDemoteBuilder,
+  onDeleteBuilder,
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState<string>('all');
@@ -93,6 +130,21 @@ export const BuildersRegister: React.FC<BuildersRegisterProps> = ({
   const [filterCounty, setFilterCounty] = useState<string>('all');
   const [selectedBuilder, setSelectedBuilder] = useState<BuilderRecord | null>(null);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
+  const [editBuilder, setEditBuilder] = useState<BuilderRecord | null>(null);
+  const [editForm, setEditForm] = useState({
+    full_name: '',
+    email: '',
+    phone: '',
+    company_name: '',
+    county: '',
+    town: '',
+    physical_address: '',
+    status: 'pending',
+  });
+  const [confirmDanger, setConfirmDanger] = useState<null | { type: 'demote' | 'delete'; builder: BuilderRecord }>(
+    null
+  );
+  const [actionBusy, setActionBusy] = useState(false);
   const { toast } = useToast();
 
   // Get unique values for filters
@@ -123,6 +175,7 @@ export const BuildersRegister: React.FC<BuildersRegisterProps> = ({
     pending: builders.filter(b => b.status === 'pending').length,
     approved: builders.filter(b => b.status === 'approved').length,
     rejected: builders.filter(b => b.status === 'rejected').length,
+    onHold: builders.filter(b => b.status === 'on_hold').length,
     professional: builders.filter(b => b.builder_category === 'professional').length,
     private: builders.filter(b => b.builder_category === 'private').length,
   }), [builders]);
@@ -135,8 +188,10 @@ export const BuildersRegister: React.FC<BuildersRegisterProps> = ({
         return <Badge className="bg-red-600">Rejected</Badge>;
       case 'pending':
         return <Badge className="bg-yellow-600">Pending</Badge>;
+      case 'on_hold':
+        return <Badge className="bg-orange-600">On Hold</Badge>;
       default:
-        return <Badge className="bg-gray-600">{status}</Badge>;
+        return <Badge className="bg-gray-600 capitalize">{status}</Badge>;
     }
   };
 
@@ -172,6 +227,64 @@ export const BuildersRegister: React.FC<BuildersRegisterProps> = ({
     });
   };
 
+  const openEditBuilder = (builder: BuilderRecord) => {
+    setEditBuilder(builder);
+    setEditForm({
+      full_name: builder.full_name || '',
+      email: builder.email || '',
+      phone: builder.phone || '',
+      company_name: builder.company_name || '',
+      county: builder.county || '',
+      town: builder.town || '',
+      physical_address: builder.physical_address || '',
+      status: ['pending', 'approved', 'rejected', 'on_hold'].includes(builder.status)
+        ? builder.status
+        : 'pending',
+    });
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editBuilder) return;
+    setActionBusy(true);
+    try {
+      const patch: BuilderEditPatch = {
+        full_name: editForm.full_name,
+        email: editForm.email,
+        phone: editForm.phone,
+        company_name: editForm.company_name,
+        county: editForm.county,
+        town: editForm.town,
+        physical_address: editForm.physical_address,
+        ...(isSyntheticBuilderRow(editBuilder) ? {} : { status: editForm.status }),
+      };
+      await onSaveBuilderEdit(editBuilder, patch);
+      setEditBuilder(null);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setActionBusy(false);
+    }
+  };
+
+  const runDangerConfirm = async () => {
+    if (!confirmDanger) return;
+    setActionBusy(true);
+    try {
+      if (confirmDanger.type === 'demote') {
+        await onDemoteBuilder(confirmDanger.builder);
+      } else {
+        await onDeleteBuilder(confirmDanger.builder);
+      }
+      setConfirmDanger(null);
+      setShowDetailsModal(false);
+      setSelectedBuilder(null);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setActionBusy(false);
+    }
+  };
+
   const exportToCSV = () => {
     const headers = [
       'Full Name', 'Email', 'Phone', 'Company Name', 'County', 'Town',
@@ -190,7 +303,7 @@ export const BuildersRegister: React.FC<BuildersRegisterProps> = ({
       b.years_experience || '',
       b.nca_license_number || '',
       b.status,
-      new Date(b.created_at).toLocaleDateString()
+      formatRegisteredDate(b.created_at)
     ]);
 
     const csvContent = [headers, ...csvData]
@@ -214,7 +327,7 @@ export const BuildersRegister: React.FC<BuildersRegisterProps> = ({
   return (
     <div className="space-y-6">
       {/* Stats Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
         <Card className="bg-slate-900/50 border-slate-800">
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
@@ -256,6 +369,17 @@ export const BuildersRegister: React.FC<BuildersRegisterProps> = ({
                 <p className="text-2xl font-bold text-white">{stats.rejected}</p>
               </div>
               <XCircle className="h-8 w-8 text-red-500" />
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="bg-orange-900/20 border-orange-800/50">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-orange-300">On Hold</p>
+                <p className="text-2xl font-bold text-white">{stats.onHold}</p>
+              </div>
+              <Clock className="h-8 w-8 text-orange-400" />
             </div>
           </CardContent>
         </Card>
@@ -315,6 +439,8 @@ export const BuildersRegister: React.FC<BuildersRegisterProps> = ({
                 <option value="pending">Pending</option>
                 <option value="approved">Approved</option>
                 <option value="rejected">Rejected</option>
+                <option value="on_hold">On Hold</option>
+                <option value="active">Active</option>
               </select>
               <select
                 value={filterCategory}
@@ -426,24 +552,63 @@ export const BuildersRegister: React.FC<BuildersRegisterProps> = ({
                       </TableCell>
                       <TableCell>{getStatusBadge(builder.status)}</TableCell>
                       <TableCell className="text-gray-400 text-sm">
-                        {new Date(builder.created_at).toLocaleDateString()}
+                        {formatRegisteredDate(builder.created_at)}
                       </TableCell>
                       <TableCell>
-                        <div className="flex gap-1">
+                        <div className="flex items-center gap-1 flex-wrap">
                           <Button
                             size="sm"
                             variant="ghost"
                             className="text-blue-400 hover:text-blue-300"
+                            title="View details"
                             onClick={() => handleViewDetails(builder)}
                           >
                             <Eye className="h-4 w-4" />
                           </Button>
-                          {builder.status === 'pending' && (
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="text-gray-300 hover:text-white"
+                                disabled={actionBusy}
+                                title="Admin actions"
+                              >
+                                <MoreVertical className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="bg-slate-900 border-slate-700 text-white">
+                              <DropdownMenuItem
+                                className="focus:bg-slate-800 cursor-pointer"
+                                onClick={() => openEditBuilder(builder)}
+                              >
+                                <Pencil className="h-4 w-4 mr-2" />
+                                Edit record
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator className="bg-slate-700" />
+                              <DropdownMenuItem
+                                className="text-amber-400 focus:text-amber-300 focus:bg-slate-800 cursor-pointer"
+                                onClick={() => setConfirmDanger({ type: 'demote', builder })}
+                              >
+                                <UserMinus className="h-4 w-4 mr-2" />
+                                Demote (remove builder role)
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                className="text-red-400 focus:text-red-300 focus:bg-slate-800 cursor-pointer"
+                                onClick={() => setConfirmDanger({ type: 'delete', builder })}
+                              >
+                                <Trash2 className="h-4 w-4 mr-2" />
+                                Delete registration
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                          {!isSyntheticBuilderRow(builder) && builder.status === 'pending' && (
                             <>
                               <Button
                                 size="sm"
                                 variant="ghost"
                                 className="text-green-400 hover:text-green-300"
+                                title="Approve"
                                 onClick={() => handleApprove(builder)}
                               >
                                 <CheckCircle className="h-4 w-4" />
@@ -452,6 +617,7 @@ export const BuildersRegister: React.FC<BuildersRegisterProps> = ({
                                 size="sm"
                                 variant="ghost"
                                 className="text-red-400 hover:text-red-300"
+                                title="Reject"
                                 onClick={() => handleReject(builder)}
                               >
                                 <XCircle className="h-4 w-4" />
@@ -680,7 +846,7 @@ export const BuildersRegister: React.FC<BuildersRegisterProps> = ({
                     <span className="ml-2">{getStatusBadge(selectedBuilder.status)}</span>
                   </div>
                   <div className="text-sm text-gray-400">
-                    Registered: {new Date(selectedBuilder.created_at).toLocaleDateString()}
+                    Registered: {formatRegisteredDate(selectedBuilder.created_at)}
                   </div>
                 </div>
                 {selectedBuilder.status === 'pending' && (
@@ -712,6 +878,136 @@ export const BuildersRegister: React.FC<BuildersRegisterProps> = ({
           )}
         </DialogContent>
       </Dialog>
+
+      <Dialog open={!!editBuilder} onOpenChange={(open) => !open && setEditBuilder(null)}>
+        <DialogContent className="max-w-lg bg-slate-900 border-slate-700 text-white">
+          <DialogHeader>
+            <DialogTitle className="text-white">Edit builder</DialogTitle>
+            <DialogDescription className="text-gray-400">
+              {editBuilder && isSyntheticBuilderRow(editBuilder)
+                ? 'Role-only row: contact updates apply to the user profile. Email is shown for reference only.'
+                : 'Updates the builder registration record.'}
+            </DialogDescription>
+          </DialogHeader>
+          {editBuilder && (
+            <div className="space-y-3 py-2">
+              <div className="space-y-1">
+                <Label className="text-gray-300">Full name</Label>
+                <Input
+                  value={editForm.full_name}
+                  onChange={(e) => setEditForm((f) => ({ ...f, full_name: e.target.value }))}
+                  className="bg-slate-800 border-slate-600"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-gray-300">Email</Label>
+                <Input
+                  type="email"
+                  value={editForm.email}
+                  onChange={(e) => setEditForm((f) => ({ ...f, email: e.target.value }))}
+                  className="bg-slate-800 border-slate-600"
+                  disabled={isSyntheticBuilderRow(editBuilder)}
+                />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-gray-300">Phone</Label>
+                <Input
+                  value={editForm.phone}
+                  onChange={(e) => setEditForm((f) => ({ ...f, phone: e.target.value }))}
+                  className="bg-slate-800 border-slate-600"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-gray-300">Company name</Label>
+                <Input
+                  value={editForm.company_name}
+                  onChange={(e) => setEditForm((f) => ({ ...f, company_name: e.target.value }))}
+                  className="bg-slate-800 border-slate-600"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-gray-300">County</Label>
+                <Input
+                  value={editForm.county}
+                  onChange={(e) => setEditForm((f) => ({ ...f, county: e.target.value }))}
+                  className="bg-slate-800 border-slate-600"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-gray-300">Town</Label>
+                <Input
+                  value={editForm.town}
+                  onChange={(e) => setEditForm((f) => ({ ...f, town: e.target.value }))}
+                  className="bg-slate-800 border-slate-600"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-gray-300">Physical address</Label>
+                <Input
+                  value={editForm.physical_address}
+                  onChange={(e) => setEditForm((f) => ({ ...f, physical_address: e.target.value }))}
+                  className="bg-slate-800 border-slate-600"
+                />
+              </div>
+              {!isSyntheticBuilderRow(editBuilder) && (
+                <div className="space-y-1">
+                  <Label className="text-gray-300">Registration status</Label>
+                  <select
+                    value={editForm.status}
+                    onChange={(e) => setEditForm((f) => ({ ...f, status: e.target.value }))}
+                    className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-md text-sm"
+                  >
+                    <option value="pending">Pending</option>
+                    <option value="approved">Approved</option>
+                    <option value="rejected">Rejected</option>
+                    <option value="on_hold">On Hold</option>
+                  </select>
+                </div>
+              )}
+              <div className="flex justify-end gap-2 pt-4">
+                <Button variant="outline" onClick={() => setEditBuilder(null)} disabled={actionBusy}>
+                  Cancel
+                </Button>
+                <Button onClick={handleSaveEdit} disabled={actionBusy} className="bg-blue-600 hover:bg-blue-700">
+                  {actionBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Save'}
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      <AlertDialog open={!!confirmDanger} onOpenChange={(open) => !open && setConfirmDanger(null)}>
+        <AlertDialogContent className="bg-slate-900 border-slate-700 text-white">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-white">
+              {confirmDanger?.type === 'delete' ? 'Delete builder registration?' : 'Demote builder?'}
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-gray-400">
+              {confirmDanger?.type === 'delete'
+                ? 'Removes the builder application (if any) and builder roles. The auth user is not deleted.'
+                : 'Removes the builder role from this user. They keep their account and can register again.'}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="border-slate-600 bg-slate-800 text-white hover:bg-slate-700">
+              Cancel
+            </AlertDialogCancel>
+            <Button
+              type="button"
+              className={
+                confirmDanger?.type === 'delete'
+                  ? 'bg-red-600 hover:bg-red-700'
+                  : 'bg-amber-600 hover:bg-amber-700'
+              }
+              onClick={() => runDangerConfirm()}
+              disabled={actionBusy}
+            >
+              {actionBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Confirm'}
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

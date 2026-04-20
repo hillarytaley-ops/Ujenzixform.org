@@ -179,6 +179,7 @@ export const SuppliersRegister: React.FC<SuppliersRegisterProps> = ({
     pending: suppliers.filter(s => s.status === 'pending').length,
     approved: suppliers.filter(s => s.status === 'approved').length,
     rejected: suppliers.filter(s => s.status === 'rejected').length,
+    onHold: suppliers.filter(s => s.status === 'on_hold').length,
     verified: suppliers.filter(s => s.is_verified).length,
   }), [suppliers]);
 
@@ -195,8 +196,10 @@ export const SuppliersRegister: React.FC<SuppliersRegisterProps> = ({
         return <Badge className="bg-red-600">Rejected</Badge>;
       case 'pending':
         return <Badge className="bg-yellow-600">Pending</Badge>;
+      case 'on_hold':
+        return <Badge className="bg-orange-600">On Hold</Badge>;
       default:
-        return <Badge className="bg-gray-600">{status}</Badge>;
+        return <Badge className="bg-gray-600 capitalize">{status}</Badge>;
     }
   };
 
@@ -233,7 +236,7 @@ export const SuppliersRegister: React.FC<SuppliersRegisterProps> = ({
         supplier.address ||
         [supplier.town, supplier.county].filter(Boolean).join(', ') ||
         '',
-      status: ['pending', 'approved', 'rejected'].includes(supplier.status)
+      status: ['pending', 'approved', 'rejected', 'on_hold'].includes(supplier.status)
         ? supplier.status
         : 'pending',
     });
@@ -324,7 +327,7 @@ export const SuppliersRegister: React.FC<SuppliersRegisterProps> = ({
   return (
     <div className="space-y-6">
       {/* Stats Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
         <Card className="bg-slate-900/50 border-slate-800">
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
@@ -366,6 +369,17 @@ export const SuppliersRegister: React.FC<SuppliersRegisterProps> = ({
                 <p className="text-2xl font-bold text-white">{stats.rejected}</p>
               </div>
               <XCircle className="h-8 w-8 text-red-500" />
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="bg-orange-900/20 border-orange-800/50">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-orange-300">On Hold</p>
+                <p className="text-2xl font-bold text-white">{stats.onHold}</p>
+              </div>
+              <Clock className="h-8 w-8 text-orange-400" />
             </div>
           </CardContent>
         </Card>
@@ -414,6 +428,8 @@ export const SuppliersRegister: React.FC<SuppliersRegisterProps> = ({
                 <option value="pending">Pending</option>
                 <option value="approved">Approved</option>
                 <option value="rejected">Rejected</option>
+                <option value="on_hold">On Hold</option>
+                <option value="active">Active</option>
               </select>
               <select
                 value={filterCounty}
@@ -904,6 +920,7 @@ export const SuppliersRegister: React.FC<SuppliersRegisterProps> = ({
                     <option value="pending">Pending</option>
                     <option value="approved">Approved</option>
                     <option value="rejected">Rejected</option>
+                    <option value="on_hold">On Hold</option>
                   </select>
                 </div>
               )}
