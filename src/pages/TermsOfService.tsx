@@ -6,7 +6,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { FileText, Shield, Users, AlertTriangle, Scale, Mail } from "lucide-react";
 
 const TermsOfService = () => {
-  const lastUpdated = "December 3, 2025";
+  const lastUpdated = "April 18, 2026";
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
@@ -152,9 +152,12 @@ const TermsOfService = () => {
 
             <h4 className="font-semibold mt-6">Transaction Fees</h4>
             <p>
-              Platform fees may apply to certain transactions. Fee structures are clearly displayed 
-              before transaction confirmation. Suppliers and delivery providers agree to the applicable 
-              commission rates upon registration.
+              UjenziXform charges a <strong>0.5% service fee</strong> on the total price of each item, or on
+              the price per unit of measure where pricing is per unit. This fee applies in addition to any
+              other platform or payment charges that may be shown at checkout or in your account. Fee
+              structures are displayed before you confirm a transaction where applicable. Suppliers and
+              delivery providers agree to applicable commission and fee terms upon registration and use of
+              the platform.
             </p>
 
             <h4 className="font-semibold mt-6">Refunds & Disputes</h4>
@@ -194,6 +197,13 @@ const TermsOfService = () => {
             <p className="mt-4">
               Our total liability for any claims arising from these terms shall not exceed the amount 
               paid by you to UjenziXform in the twelve (12) months preceding the claim.
+            </p>
+            <p className="mt-4">
+              During delivery while goods are <strong>in transit</strong>, UjenziXform is not liable for
+              loss or damage arising from <strong>theft</strong> or a <strong>major accident</strong>. Risk
+              during physical carriage is between the parties arranging and performing the delivery (for
+              example, the supplier, the delivery provider, and the recipient), subject to any separate
+              agreement or insurance those parties may have.
             </p>
           </CardContent>
         </Card>
