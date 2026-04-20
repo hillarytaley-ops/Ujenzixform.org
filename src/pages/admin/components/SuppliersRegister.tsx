@@ -111,7 +111,7 @@ interface SuppliersRegisterProps {
   suppliers: SupplierRecord[];
   loading: boolean;
   onRefresh: () => void;
-  onUpdateStatus: (id: string, status: string) => void;
+  onUpdateStatus: (id: string, status: string, opts?: { rowEmail?: string }) => void;
   onSaveSupplierEdit: (supplier: SupplierRecord, patch: SupplierEditPatch) => Promise<void>;
   onDemoteSupplier: (supplier: SupplierRecord) => Promise<void>;
   onDeleteSupplier: (supplier: SupplierRecord) => Promise<void>;
@@ -210,7 +210,7 @@ export const SuppliersRegister: React.FC<SuppliersRegisterProps> = ({
   };
 
   const handleApprove = (supplier: SupplierRecord) => {
-    onUpdateStatus(supplier.id, 'approved');
+    onUpdateStatus(supplier.id, 'approved', { rowEmail: supplier.email });
     toast({
       title: 'Supplier Approved',
       description: `${supplier.company_name} has been approved.`,
@@ -218,7 +218,7 @@ export const SuppliersRegister: React.FC<SuppliersRegisterProps> = ({
   };
 
   const handleReject = (supplier: SupplierRecord) => {
-    onUpdateStatus(supplier.id, 'rejected');
+    onUpdateStatus(supplier.id, 'rejected', { rowEmail: supplier.email });
     toast({
       title: 'Supplier Rejected',
       description: `${supplier.company_name} has been rejected.`,
@@ -226,7 +226,7 @@ export const SuppliersRegister: React.FC<SuppliersRegisterProps> = ({
   };
 
   const handleSetOnHold = (supplier: SupplierRecord) => {
-    onUpdateStatus(supplier.id, 'on_hold');
+    onUpdateStatus(supplier.id, 'on_hold', { rowEmail: supplier.email });
   };
 
   const openEditSupplier = (supplier: SupplierRecord) => {

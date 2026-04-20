@@ -200,6 +200,43 @@ export const RegistersTab: React.FC = () => {
         }
       });
 
+      // Synthetic rows: surface admin-only status stored on suppliers / profiles when no application row matches.
+      const syntheticSupplierUids = suppliersData.filter((s) => s.id.startsWith('role-')).map((s) => s.id.replace(/^role-/, ''));
+      if (syntheticSupplierUids.length > 0) {
+        const { data: supHoldRows } = await client
+          .from('suppliers')
+          .select('user_id, registration_admin_status')
+          .in('user_id', syntheticSupplierUids);
+        const statusByUid = new Map(
+          (supHoldRows || []).map((r) => [r.user_id as string, r.registration_admin_status as string | null])
+        );
+        suppliersData = suppliersData.map((row) => {
+          if (!row.id.startsWith('role-')) return row;
+          const u = row.id.replace(/^role-/, '');
+          const rs = statusByUid.get(u);
+          if (rs && String(rs).trim()) return { ...row, status: rs };
+          return row;
+        });
+      }
+
+      const syntheticBuilderUids = buildersData.filter((b) => b.id.startsWith('role-')).map((b) => b.id.replace(/^role-/, ''));
+      if (syntheticBuilderUids.length > 0) {
+        const { data: profHoldRows } = await client
+          .from('profiles')
+          .select('user_id, registration_admin_status')
+          .in('user_id', syntheticBuilderUids);
+        const bStatusByUid = new Map(
+          (profHoldRows || []).map((r) => [r.user_id as string, r.registration_admin_status as string | null])
+        );
+        buildersData = buildersData.map((row) => {
+          if (!row.id.startsWith('role-')) return row;
+          const u = row.id.replace(/^role-/, '');
+          const rs = bStatusByUid.get(u);
+          if (rs && String(rs).trim()) return { ...row, status: rs };
+          return row;
+        });
+      }
+
       console.log('📊 User registrations loaded:', {
         suppliers: suppliersData.length,
         builders: buildersData.length,
@@ -242,60 +279,98 @@ export const RegistersTab: React.FC = () => {
 
   const isSyntheticSupplierRow = (s: RawSupplierRecord) => s.id.startsWith('role-');
 
-  const updateSupplierStatus = useCallback(async (id: string, status: string) => {
-    const ts = new Date().toISOString();
-    try {
-      const client = supabase;
-      if (id.startsWith('role-')) {
-        const uid = id.replace(/^role-/, '').trim();
-        if (!uid) {
-          toast({ variant: 'destructive', title: 'Error', description: 'Missing user id for this row.' });
-          return;
-        }
-        const { data: updated, error } = await client
-          .from('supplier_applications')
-          .update({ status, updated_at: ts })
-          .eq('applicant_user_id', uid)
-          .select('id');
-        if (error) throw error;
-        if (updated && updated.length > 0) {
-          setSuppliers(prev => prev.map(s => (s.id === id ? { ...s, status } : s)));
+  const updateSupplierStatus = useCallback(
+    async (id: string, status: string, opts?: { rowEmail?: string }) => {
+      const ts = new Date().toISOString();
+      const rowEmail = opts?.rowEmail?.trim().toLowerCase();
+      try {
+        const client = supabase;
+        if (id.startsWith('role-')) {
+          const uid = id.replace(/^role-/, '').trim();
+          if (!uid) {
+            toast({ variant: 'destructive', title: 'Error', description: 'Missing user id for this row.' });
+            return;
+          }
+
+          let { data: updated, error } = await client
+            .from('supplier_applications')
+            .update({ status, updated_at: ts })
+            .eq('applicant_user_id', uid)
+            .select('id');
+          if (error) throw error;
+          if (updated && updated.length > 0) {
+            setSuppliers((prev) => prev.map((s) => (s.id === id ? { ...s, status } : s)));
+            toast({
+              title: 'Status Updated',
+              description: `Supplier application status changed to ${status}`,
+            });
+            return;
+          }
+
+          if (rowEmail) {
+            ({ data: updated, error } = await client
+              .from('supplier_applications')
+              .update({ status, updated_at: ts })
+              .eq('email', rowEmail)
+              .select('id'));
+            if (error) throw error;
+            if (updated && updated.length > 0) {
+              setSuppliers((prev) => prev.map((s) => (s.id === id ? { ...s, status } : s)));
+              toast({
+                title: 'Status Updated',
+                description: `Supplier application status changed to ${status}`,
+              });
+              return;
+            }
+          }
+
+          ({ data: updated, error } = await client
+            .from('suppliers')
+            .update({ registration_admin_status: status, updated_at: ts })
+            .eq('user_id', uid)
+            .select('id'));
+          if (error) throw error;
+          if (updated && updated.length > 0) {
+            setSuppliers((prev) => prev.map((s) => (s.id === id ? { ...s, status } : s)));
+            toast({
+              title: 'Status Updated',
+              description: `Supplier list status updated to ${status}`,
+            });
+            return;
+          }
+
           toast({
-            title: 'Status Updated',
-            description: `Supplier application status changed to ${status}`,
+            variant: 'destructive',
+            title: 'Cannot update status',
+            description:
+              'No supplier application or suppliers row for this user. Ensure they have completed supplier onboarding, or use Demote.',
           });
           return;
         }
+
+        const { error } = await client
+          .from('supplier_applications')
+          .update({ status, updated_at: ts })
+          .eq('id', id);
+
+        if (error) throw error;
+
+        setSuppliers((prev) => prev.map((s) => (s.id === id ? { ...s, status } : s)));
         toast({
-          variant: 'destructive',
-          title: 'Cannot update status',
-          description:
-            'No supplier application is linked to this user id. Use Edit for profile data or Demote to remove the role.',
+          title: 'Status Updated',
+          description: `Supplier application status changed to ${status}`,
         });
-        return;
+      } catch (error) {
+        console.error('Error updating supplier status:', error);
+        toast({
+          title: 'Error',
+          description: 'Failed to update supplier status',
+          variant: 'destructive',
+        });
       }
-
-      const { error } = await client
-        .from('supplier_applications')
-        .update({ status, updated_at: ts })
-        .eq('id', id);
-
-      if (error) throw error;
-
-      setSuppliers(prev => prev.map(s => s.id === id ? { ...s, status } : s));
-      toast({
-        title: 'Status Updated',
-        description: `Supplier application status changed to ${status}`,
-      });
-    } catch (error) {
-      console.error('Error updating supplier status:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to update supplier status',
-        variant: 'destructive',
-      });
-    }
-  }, [toast]);
+    },
+    [toast]
+  );
 
   const saveSupplierEdit = useCallback(
     async (s: RawSupplierRecord, patch: SupplierEditPatch) => {
@@ -419,60 +494,98 @@ export const RegistersTab: React.FC = () => {
 
   const isSyntheticBuilderRow = (b: RawBuilderRecord) => b.id.startsWith('role-');
 
-  const updateBuilderStatus = useCallback(async (id: string, status: string) => {
-    const ts = new Date().toISOString();
-    try {
-      const client = supabase;
-      if (id.startsWith('role-')) {
-        const uid = id.replace(/^role-/, '').trim();
-        if (!uid) {
-          toast({ variant: 'destructive', title: 'Error', description: 'Missing user id for this row.' });
-          return;
-        }
-        const { data: updated, error } = await client
-          .from('builder_registrations')
-          .update({ status, updated_at: ts })
-          .eq('auth_user_id', uid)
-          .select('id');
-        if (error) throw error;
-        if (updated && updated.length > 0) {
-          setBuilders(prev => prev.map(b => (b.id === id ? { ...b, status } : b)));
+  const updateBuilderStatus = useCallback(
+    async (id: string, status: string, opts?: { rowEmail?: string }) => {
+      const ts = new Date().toISOString();
+      const rowEmail = opts?.rowEmail?.trim().toLowerCase();
+      try {
+        const client = supabase;
+        if (id.startsWith('role-')) {
+          const uid = id.replace(/^role-/, '').trim();
+          if (!uid) {
+            toast({ variant: 'destructive', title: 'Error', description: 'Missing user id for this row.' });
+            return;
+          }
+
+          let { data: updated, error } = await client
+            .from('builder_registrations')
+            .update({ status, updated_at: ts })
+            .eq('auth_user_id', uid)
+            .select('id');
+          if (error) throw error;
+          if (updated && updated.length > 0) {
+            setBuilders((prev) => prev.map((b) => (b.id === id ? { ...b, status } : b)));
+            toast({
+              title: 'Status Updated',
+              description: `Builder status changed to ${status}`,
+            });
+            return;
+          }
+
+          if (rowEmail) {
+            ({ data: updated, error } = await client
+              .from('builder_registrations')
+              .update({ status, updated_at: ts })
+              .eq('email', rowEmail)
+              .select('id'));
+            if (error) throw error;
+            if (updated && updated.length > 0) {
+              setBuilders((prev) => prev.map((b) => (b.id === id ? { ...b, status } : b)));
+              toast({
+                title: 'Status Updated',
+                description: `Builder status changed to ${status}`,
+              });
+              return;
+            }
+          }
+
+          ({ data: updated, error } = await client
+            .from('profiles')
+            .update({ registration_admin_status: status, updated_at: ts })
+            .eq('user_id', uid)
+            .select('id'));
+          if (error) throw error;
+          if (updated && updated.length > 0) {
+            setBuilders((prev) => prev.map((b) => (b.id === id ? { ...b, status } : b)));
+            toast({
+              title: 'Status Updated',
+              description: `Builder list status updated to ${status}`,
+            });
+            return;
+          }
+
           toast({
-            title: 'Status Updated',
-            description: `Builder status changed to ${status}`,
+            variant: 'destructive',
+            title: 'Cannot update status',
+            description:
+              'No builder registration or profile row for this user. Ensure the account exists, or use Demote.',
           });
           return;
         }
+
+        const { error } = await client
+          .from('builder_registrations')
+          .update({ status, updated_at: ts })
+          .eq('id', id);
+
+        if (error) throw error;
+
+        setBuilders((prev) => prev.map((b) => (b.id === id ? { ...b, status } : b)));
         toast({
-          variant: 'destructive',
-          title: 'Cannot update status',
-          description:
-            'No builder registration is linked to this user id. Use Edit for profile data or Demote to remove the role.',
+          title: 'Status Updated',
+          description: `Builder status changed to ${status}`,
         });
-        return;
+      } catch (error) {
+        console.error('Error updating builder status:', error);
+        toast({
+          title: 'Error',
+          description: 'Failed to update builder status',
+          variant: 'destructive',
+        });
       }
-
-      const { error } = await client
-        .from('builder_registrations')
-        .update({ status, updated_at: ts })
-        .eq('id', id);
-
-      if (error) throw error;
-
-      setBuilders(prev => prev.map(b => b.id === id ? { ...b, status } : b));
-      toast({
-        title: 'Status Updated',
-        description: `Builder status changed to ${status}`,
-      });
-    } catch (error) {
-      console.error('Error updating builder status:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to update builder status',
-        variant: 'destructive',
-      });
-    }
-  }, [toast]);
+    },
+    [toast]
+  );
 
   const saveBuilderEdit = useCallback(
     async (b: RawBuilderRecord, patch: BuilderEditPatch) => {

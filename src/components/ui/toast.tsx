@@ -14,7 +14,8 @@ const ToastViewport = React.forwardRef<
   <ToastPrimitives.Viewport
     ref={ref}
     className={cn(
-      "fixed top-0 z-[10050] flex max-h-screen w-full flex-col-reverse p-4 sm:top-auto sm:flex-col md:max-w-[420px]",
+      /* Below portaled Select/Dropdown (z-[10200]) so filter menus stay usable; above Dialog content (z-[10100]) */
+      "fixed top-0 z-[10140] flex max-h-screen w-full flex-col-reverse p-4 sm:top-auto sm:flex-col md:max-w-[420px]",
       "sm:right-4 sm:bottom-[140px]",
       className
     )}

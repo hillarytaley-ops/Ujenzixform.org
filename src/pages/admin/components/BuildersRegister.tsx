@@ -102,7 +102,7 @@ interface BuildersRegisterProps {
   builders: BuilderRecord[];
   loading: boolean;
   onRefresh: () => void;
-  onUpdateStatus: (id: string, status: string) => void;
+  onUpdateStatus: (id: string, status: string, opts?: { rowEmail?: string }) => void;
   onSaveBuilderEdit: (builder: BuilderRecord, patch: BuilderEditPatch) => Promise<void>;
   onDemoteBuilder: (builder: BuilderRecord) => Promise<void>;
   onDeleteBuilder: (builder: BuilderRecord) => Promise<void>;
@@ -213,7 +213,7 @@ export const BuildersRegister: React.FC<BuildersRegisterProps> = ({
   };
 
   const handleApprove = (builder: BuilderRecord) => {
-    onUpdateStatus(builder.id, 'approved');
+    onUpdateStatus(builder.id, 'approved', { rowEmail: builder.email });
     toast({
       title: 'Builder Approved',
       description: `${builder.full_name} has been approved.`,
@@ -221,7 +221,7 @@ export const BuildersRegister: React.FC<BuildersRegisterProps> = ({
   };
 
   const handleReject = (builder: BuilderRecord) => {
-    onUpdateStatus(builder.id, 'rejected');
+    onUpdateStatus(builder.id, 'rejected', { rowEmail: builder.email });
     toast({
       title: 'Builder Rejected',
       description: `${builder.full_name} has been rejected.`,
@@ -229,7 +229,7 @@ export const BuildersRegister: React.FC<BuildersRegisterProps> = ({
   };
 
   const handleSetOnHold = (builder: BuilderRecord) => {
-    onUpdateStatus(builder.id, 'on_hold');
+    onUpdateStatus(builder.id, 'on_hold', { rowEmail: builder.email });
   };
 
   const openEditBuilder = (builder: BuilderRecord) => {

@@ -2837,6 +2837,7 @@ export type Database = {
           id: string
           is_professional: boolean | null
           phone: string | null
+          registration_admin_status: string | null
           updated_at: string
           user_id: string
           user_type: string | null
@@ -2853,6 +2854,7 @@ export type Database = {
           id?: string
           is_professional?: boolean | null
           phone?: string | null
+          registration_admin_status?: string | null
           updated_at?: string
           user_id: string
           user_type?: string | null
@@ -2869,6 +2871,7 @@ export type Database = {
           id?: string
           is_professional?: boolean | null
           phone?: string | null
+          registration_admin_status?: string | null
           updated_at?: string
           user_id?: string
           user_type?: string | null
@@ -4233,6 +4236,7 @@ export type Database = {
           phone: string | null
           profile_id: string | null
           rating: number | null
+          registration_admin_status: string | null
           specialties: string[] | null
           updated_at: string
           user_id: string | null
@@ -4250,6 +4254,7 @@ export type Database = {
           phone?: string | null
           profile_id?: string | null
           rating?: number | null
+          registration_admin_status?: string | null
           specialties?: string[] | null
           updated_at?: string
           user_id?: string | null
@@ -4267,6 +4272,7 @@ export type Database = {
           phone?: string | null
           profile_id?: string | null
           rating?: number | null
+          registration_admin_status?: string | null
           specialties?: string[] | null
           updated_at?: string
           user_id?: string | null
