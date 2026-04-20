@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import {
@@ -29,20 +30,40 @@ import {
   Mail,
   Phone,
   MapPin,
-  Building,
   Package,
-  Calendar,
   Clock,
   FileText,
   ExternalLink,
-  Filter,
   CreditCard,
+  MoreVertical,
+  Pencil,
+  Trash2,
+  UserMinus,
+  Loader2,
 } from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import {
+  AlertDialog,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
+import type { SupplierEditPatch } from '../types';
 
 interface SupplierRecord {
   id: string;
   auth_user_id?: string;
+  applicant_user_id?: string;
   user_id?: string;
   profile_id?: string;
   contact_person: string;
@@ -90,19 +111,46 @@ interface SuppliersRegisterProps {
   loading: boolean;
   onRefresh: () => void;
   onUpdateStatus: (id: string, status: string) => void;
+  onSaveSupplierEdit: (supplier: SupplierRecord, patch: SupplierEditPatch) => Promise<void>;
+  onDemoteSupplier: (supplier: SupplierRecord) => Promise<void>;
+  onDeleteSupplier: (supplier: SupplierRecord) => Promise<void>;
 }
+
+const isSyntheticSupplierRow = (s: SupplierRecord) => s.id.startsWith('role-');
+
+const formatRegisteredDate = (iso: string) => {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? '—' : d.toLocaleDateString();
+};
 
 export const SuppliersRegister: React.FC<SuppliersRegisterProps> = ({
   suppliers,
   loading,
   onRefresh,
   onUpdateStatus,
+  onSaveSupplierEdit,
+  onDemoteSupplier,
+  onDeleteSupplier,
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [filterCounty, setFilterCounty] = useState<string>('all');
   const [selectedSupplier, setSelectedSupplier] = useState<SupplierRecord | null>(null);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
+  const [editSupplier, setEditSupplier] = useState<SupplierRecord | null>(null);
+  const [editForm, setEditForm] = useState({
+    company_name: '',
+    contact_person: '',
+    email: '',
+    phone: '',
+    address: '',
+    status: 'pending',
+  });
+  const [confirmDanger, setConfirmDanger] = useState<null | { type: 'demote' | 'delete'; supplier: SupplierRecord }>(
+    null
+  );
+  const [actionBusy, setActionBusy] = useState(false);
   const { toast } = useToast();
 
   // Get unique counties for filter
@@ -173,6 +221,64 @@ export const SuppliersRegister: React.FC<SuppliersRegisterProps> = ({
     });
   };
 
+  const openEditSupplier = (supplier: SupplierRecord) => {
+    setEditSupplier(supplier);
+    setEditForm({
+      company_name: supplier.company_name || '',
+      contact_person: supplier.contact_person || '',
+      email: supplier.email || '',
+      phone: supplier.phone || '',
+      address:
+        supplier.physical_address ||
+        supplier.address ||
+        [supplier.town, supplier.county].filter(Boolean).join(', ') ||
+        '',
+      status: ['pending', 'approved', 'rejected'].includes(supplier.status)
+        ? supplier.status
+        : 'pending',
+    });
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editSupplier) return;
+    setActionBusy(true);
+    try {
+      const patch: SupplierEditPatch = {
+        company_name: editForm.company_name,
+        contact_person: editForm.contact_person,
+        email: editForm.email,
+        phone: editForm.phone,
+        address: editForm.address,
+        ...(isSyntheticSupplierRow(editSupplier) ? {} : { status: editForm.status }),
+      };
+      await onSaveSupplierEdit(editSupplier, patch);
+      setEditSupplier(null);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setActionBusy(false);
+    }
+  };
+
+  const runDangerConfirm = async () => {
+    if (!confirmDanger) return;
+    setActionBusy(true);
+    try {
+      if (confirmDanger.type === 'demote') {
+        await onDemoteSupplier(confirmDanger.supplier);
+      } else {
+        await onDeleteSupplier(confirmDanger.supplier);
+      }
+      setConfirmDanger(null);
+      setShowDetailsModal(false);
+      setSelectedSupplier(null);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setActionBusy(false);
+    }
+  };
+
   const exportToCSV = () => {
     const headers = [
       'Company Name', 'Contact Person', 'Email', 'Phone', 'County', 'Town',
@@ -194,7 +300,7 @@ export const SuppliersRegister: React.FC<SuppliersRegisterProps> = ({
       s.bank_branch || '',
       s.status,
       s.is_verified ? 'Yes' : 'No',
-      new Date(s.created_at).toLocaleDateString()
+      formatRegisteredDate(s.created_at)
     ]);
 
     const csvContent = [headers, ...csvData]
@@ -415,25 +521,64 @@ export const SuppliersRegister: React.FC<SuppliersRegisterProps> = ({
                       </TableCell>
                       <TableCell>{getStatusBadge(supplier.status)}</TableCell>
                       <TableCell className="text-gray-400 text-sm">
-                        {new Date(supplier.created_at).toLocaleDateString()}
+                        {formatRegisteredDate(supplier.created_at)}
                       </TableCell>
                       <TableCell>
-                        <div className="flex gap-1">
+                        <div className="flex items-center gap-1 flex-wrap">
                           <Button
                             size="sm"
                             variant="ghost"
                             className="text-blue-400 hover:text-blue-300"
                             onClick={() => handleViewDetails(supplier)}
+                            title="View details"
                           >
                             <Eye className="h-4 w-4" />
                           </Button>
-                          {supplier.status === 'pending' && (
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="text-gray-300 hover:text-white"
+                                disabled={actionBusy}
+                                title="Admin actions"
+                              >
+                                <MoreVertical className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="bg-slate-900 border-slate-700 text-white">
+                              <DropdownMenuItem
+                                className="focus:bg-slate-800 cursor-pointer"
+                                onClick={() => openEditSupplier(supplier)}
+                              >
+                                <Pencil className="h-4 w-4 mr-2" />
+                                Edit record
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator className="bg-slate-700" />
+                              <DropdownMenuItem
+                                className="text-amber-400 focus:text-amber-300 focus:bg-slate-800 cursor-pointer"
+                                onClick={() => setConfirmDanger({ type: 'demote', supplier })}
+                              >
+                                <UserMinus className="h-4 w-4 mr-2" />
+                                Demote (remove supplier role)
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                className="text-red-400 focus:text-red-300 focus:bg-slate-800 cursor-pointer"
+                                onClick={() => setConfirmDanger({ type: 'delete', supplier })}
+                              >
+                                <Trash2 className="h-4 w-4 mr-2" />
+                                Delete registration
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                          {!isSyntheticSupplierRow(supplier) && supplier.status === 'pending' && (
                             <>
                               <Button
                                 size="sm"
                                 variant="ghost"
                                 className="text-green-400 hover:text-green-300"
                                 onClick={() => handleApprove(supplier)}
+                                title="Approve"
                               >
                                 <CheckCircle className="h-4 w-4" />
                               </Button>
@@ -442,6 +587,7 @@ export const SuppliersRegister: React.FC<SuppliersRegisterProps> = ({
                                 variant="ghost"
                                 className="text-red-400 hover:text-red-300"
                                 onClick={() => handleReject(supplier)}
+                                title="Reject"
                               >
                                 <XCircle className="h-4 w-4" />
                               </Button>
@@ -693,6 +839,118 @@ export const SuppliersRegister: React.FC<SuppliersRegisterProps> = ({
           )}
         </DialogContent>
       </Dialog>
+
+      <Dialog open={!!editSupplier} onOpenChange={(open) => !open && setEditSupplier(null)}>
+        <DialogContent className="max-w-lg bg-slate-900 border-slate-700 text-white">
+          <DialogHeader>
+            <DialogTitle className="text-white">Edit supplier</DialogTitle>
+            <DialogDescription className="text-gray-400">
+              {editSupplier && isSyntheticSupplierRow(editSupplier)
+                ? 'This row is linked to auth only (no application). Updates apply to the suppliers profile.'
+                : 'Updates the supplier application record.'}
+            </DialogDescription>
+          </DialogHeader>
+          {editSupplier && (
+            <div className="space-y-3 py-2">
+              <div className="space-y-1">
+                <Label className="text-gray-300">Company name</Label>
+                <Input
+                  value={editForm.company_name}
+                  onChange={(e) => setEditForm((f) => ({ ...f, company_name: e.target.value }))}
+                  className="bg-slate-800 border-slate-600"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-gray-300">Contact person</Label>
+                <Input
+                  value={editForm.contact_person}
+                  onChange={(e) => setEditForm((f) => ({ ...f, contact_person: e.target.value }))}
+                  className="bg-slate-800 border-slate-600"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-gray-300">Email</Label>
+                <Input
+                  type="email"
+                  value={editForm.email}
+                  onChange={(e) => setEditForm((f) => ({ ...f, email: e.target.value }))}
+                  className="bg-slate-800 border-slate-600"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-gray-300">Phone</Label>
+                <Input
+                  value={editForm.phone}
+                  onChange={(e) => setEditForm((f) => ({ ...f, phone: e.target.value }))}
+                  className="bg-slate-800 border-slate-600"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-gray-300">Address / location</Label>
+                <Input
+                  value={editForm.address}
+                  onChange={(e) => setEditForm((f) => ({ ...f, address: e.target.value }))}
+                  className="bg-slate-800 border-slate-600"
+                />
+              </div>
+              {!isSyntheticSupplierRow(editSupplier) && (
+                <div className="space-y-1">
+                  <Label className="text-gray-300">Application status</Label>
+                  <select
+                    value={editForm.status}
+                    onChange={(e) => setEditForm((f) => ({ ...f, status: e.target.value }))}
+                    className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-md text-sm"
+                  >
+                    <option value="pending">Pending</option>
+                    <option value="approved">Approved</option>
+                    <option value="rejected">Rejected</option>
+                  </select>
+                </div>
+              )}
+              <div className="flex justify-end gap-2 pt-4">
+                <Button variant="outline" onClick={() => setEditSupplier(null)} disabled={actionBusy}>
+                  Cancel
+                </Button>
+                <Button onClick={handleSaveEdit} disabled={actionBusy} className="bg-green-600 hover:bg-green-700">
+                  {actionBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Save'}
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      <AlertDialog open={!!confirmDanger} onOpenChange={(open) => !open && setConfirmDanger(null)}>
+        <AlertDialogContent className="bg-slate-900 border-slate-700 text-white">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-white">
+              {confirmDanger?.type === 'delete' ? 'Delete supplier registration?' : 'Demote supplier?'}
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-gray-400">
+              {confirmDanger?.type === 'delete'
+                ? 'This removes the supplier application (if present), removes the supplier role, and deletes the suppliers profile row when it exists. The auth user account is not deleted.'
+                : 'This removes only the supplier role from the user. They keep their login and can register again as a supplier.'}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="border-slate-600 bg-slate-800 text-white hover:bg-slate-700">
+              Cancel
+            </AlertDialogCancel>
+            <Button
+              type="button"
+              className={
+                confirmDanger?.type === 'delete'
+                  ? 'bg-red-600 hover:bg-red-700'
+                  : 'bg-amber-600 hover:bg-amber-700'
+              }
+              onClick={() => runDangerConfirm()}
+              disabled={actionBusy}
+            >
+              {actionBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Confirm'}
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

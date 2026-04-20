@@ -345,6 +345,16 @@ export interface FilterOptions {
   dateTo?: string;
 }
 
+/** Admin edits on supplier_applications or suppliers (role-only rows) */
+export type SupplierEditPatch = {
+  company_name: string;
+  contact_person: string;
+  email: string;
+  phone: string;
+  address: string;
+  status?: string;
+};
+
 // Sort Options
 export interface SortOptions {
   field: string;

@@ -4,14 +4,18 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Building2, Store, Users, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
+import { normalizePhoneDigits } from '@/utils/phoneNormalize';
 import { useToast } from '@/hooks/use-toast';
 import { SuppliersRegister } from '../components/SuppliersRegister';
 import { BuildersRegister } from '../components/BuildersRegister';
+import type { SupplierEditPatch } from '../types';
 
 // Type definitions for the raw database records
 interface RawSupplierRecord {
+  /** supplier_applications.id, or synthetic `role-{userId}` for supplier role without application */
   id: string;
   auth_user_id?: string;
+  applicant_user_id?: string;
   user_id?: string;
   profile_id?: string;
   contact_person: string;
@@ -126,7 +130,11 @@ export const RegistersTab: React.FC = () => {
       }
 
       // Get data from registration tables
-      let suppliersData = (suppliersRes.data || []) as RawSupplierRecord[];
+      let suppliersData = ((suppliersRes.data || []) as Record<string, unknown>[]).map((row) => ({
+        ...(row as unknown as RawSupplierRecord),
+        auth_user_id: (row.applicant_user_id as string) || (row as RawSupplierRecord).auth_user_id,
+        applicant_user_id: row.applicant_user_id as string | undefined,
+      })) as RawSupplierRecord[];
       let buildersData = (buildersRes.data || []) as RawBuilderRecord[];
 
       // Get users with roles from database function
@@ -145,17 +153,22 @@ export const RegistersTab: React.FC = () => {
         if (!email || !role) return;
         
         if (role === 'supplier' && !existingSupplierEmails.has(email)) {
+          const created =
+            typeof user.created_at === 'string' && user.created_at
+              ? user.created_at
+              : new Date().toISOString();
           suppliersData.push({
-            id: user.user_id,
+            id: `role-${user.user_id}`,
             auth_user_id: user.user_id,
-            contact_person: user.full_name || email.split('@')[0] || 'Unknown',
+            applicant_user_id: user.user_id,
+            contact_person: email.split('@')[0] || 'Unknown',
             email: user.email || '',
             phone: '',
-            company_name: user.full_name || 'Not specified',
+            company_name: 'Not specified',
             county: 'Not specified',
             material_categories: [],
             status: 'active',
-            created_at: user.role_created_at || user.user_created_at,
+            created_at: created,
           });
           existingSupplierEmails.add(email);
         }
@@ -214,6 +227,11 @@ export const RegistersTab: React.FC = () => {
   }, [fetchAllData]);
 
   // Update status handlers
+  const supplierTargetUserId = (s: RawSupplierRecord) =>
+    s.auth_user_id || s.applicant_user_id || s.user_id || '';
+
+  const isSyntheticSupplierRow = (s: RawSupplierRecord) => s.id.startsWith('role-');
+
   const updateSupplierStatus = useCallback(async (id: string, status: string) => {
     try {
       const client = supabase;
@@ -238,6 +256,123 @@ export const RegistersTab: React.FC = () => {
       });
     }
   }, [toast]);
+
+  const saveSupplierEdit = useCallback(
+    async (s: RawSupplierRecord, patch: SupplierEditPatch) => {
+      const uid = supplierTargetUserId(s);
+      if (!uid) {
+        toast({ title: 'Error', description: 'Missing user id for this row.', variant: 'destructive' });
+        return;
+      }
+      try {
+        if (!isSyntheticSupplierRow(s)) {
+          const phoneDb = normalizePhoneDigits(patch.phone);
+          if (phoneDb.length < 10 || phoneDb.length > 15) {
+            toast({
+              variant: 'destructive',
+              title: 'Invalid phone',
+              description: 'Enter 10–15 digits (e.g. 0712345678 or +254712345678).',
+            });
+            return;
+          }
+          const { error } = await supabase
+            .from('supplier_applications')
+            .update({
+              company_name: patch.company_name.trim(),
+              contact_person: patch.contact_person.trim(),
+              email: patch.email.trim().toLowerCase(),
+              phone: phoneDb,
+              address: patch.address.trim() || null,
+              ...(patch.status ? { status: patch.status, updated_at: new Date().toISOString() } : { updated_at: new Date().toISOString() }),
+            })
+            .eq('id', s.id);
+          if (error) throw error;
+        } else {
+          const { error } = await supabase
+            .from('suppliers')
+            .update({
+              company_name: patch.company_name.trim(),
+              contact_person: patch.contact_person.trim(),
+              email: patch.email.trim().toLowerCase(),
+              phone: patch.phone.trim(),
+              address: patch.address.trim() || null,
+              updated_at: new Date().toISOString(),
+            })
+            .eq('user_id', uid);
+          if (error) throw error;
+        }
+        toast({ title: 'Saved', description: 'Supplier record updated.' });
+        await fetchAllData();
+      } catch (error: unknown) {
+        console.error('saveSupplierEdit', error);
+        toast({
+          title: 'Save failed',
+          description: error instanceof Error ? error.message : 'Could not update supplier',
+          variant: 'destructive',
+        });
+      }
+    },
+    [fetchAllData, toast]
+  );
+
+  const demoteSupplier = useCallback(
+    async (s: RawSupplierRecord) => {
+      const uid = supplierTargetUserId(s);
+      if (!uid) {
+        toast({ title: 'Error', description: 'Missing user id.', variant: 'destructive' });
+        return;
+      }
+      try {
+        const { error } = await supabase.from('user_roles').delete().eq('user_id', uid).eq('role', 'supplier');
+        if (error) throw error;
+        toast({
+          title: 'Supplier demoted',
+          description: 'The supplier role was removed. The user account still exists.',
+        });
+        await fetchAllData();
+      } catch (error: unknown) {
+        console.error('demoteSupplier', error);
+        toast({
+          title: 'Demote failed',
+          description: error instanceof Error ? error.message : 'Could not remove supplier role',
+          variant: 'destructive',
+        });
+      }
+    },
+    [fetchAllData, toast]
+  );
+
+  const deleteSupplierRegistration = useCallback(
+    async (s: RawSupplierRecord) => {
+      const uid = supplierTargetUserId(s);
+      if (!uid) {
+        toast({ title: 'Error', description: 'Missing user id.', variant: 'destructive' });
+        return;
+      }
+      try {
+        if (!isSyntheticSupplierRow(s)) {
+          const { error: appErr } = await supabase.from('supplier_applications').delete().eq('id', s.id);
+          if (appErr) throw appErr;
+        }
+        const { error: roleErr } = await supabase.from('user_roles').delete().eq('user_id', uid).eq('role', 'supplier');
+        if (roleErr) throw roleErr;
+        await supabase.from('suppliers').delete().eq('user_id', uid);
+        toast({
+          title: 'Removed',
+          description: 'Supplier application (if any), supplier role, and supplier profile row were removed where present.',
+        });
+        await fetchAllData();
+      } catch (error: unknown) {
+        console.error('deleteSupplierRegistration', error);
+        toast({
+          title: 'Delete failed',
+          description: error instanceof Error ? error.message : 'Could not delete supplier data',
+          variant: 'destructive',
+        });
+      }
+    },
+    [fetchAllData, toast]
+  );
 
   const updateBuilderStatus = useCallback(async (id: string, status: string) => {
     try {
@@ -409,6 +544,9 @@ export const RegistersTab: React.FC = () => {
             loading={loading}
             onRefresh={fetchAllData}
             onUpdateStatus={updateSupplierStatus}
+            onSaveSupplierEdit={saveSupplierEdit}
+            onDemoteSupplier={demoteSupplier}
+            onDeleteSupplier={deleteSupplierRegistration}
           />
         </TabsContent>
 
