@@ -25,6 +25,22 @@ async function adminSetProfileRegistrationStatus(
   return { count, error: null };
 }
 
+function registrationStatusFailureDescription(error: unknown): string {
+  const raw =
+    error && typeof error === 'object' && 'message' in error
+      ? String((error as { message?: string }).message)
+      : error instanceof Error
+        ? error.message
+        : '';
+  if (/PGRST202|function .* does not exist|schema cache/i.test(raw)) {
+    return `${raw || 'RPC missing.'} Apply Supabase migrations through 20260418180000_expand_admin_profile_registration_status_auth.sql (and 20260418170000).`;
+  }
+  if (/not authorized|42501|JWT expired|jwt|session/i.test(raw)) {
+    return `${raw || 'Not authorized.'} Use Admin Login so your work email gets a Supabase session (password = staff code). “Limited mode” cannot update saved profile status.`;
+  }
+  return raw || 'Failed to update registration status';
+}
+
 // Type definitions for the raw database records
 interface RawSupplierRecord {
   /** supplier_applications.id, or synthetic `role-{userId}` for supplier role without application */
@@ -306,6 +322,16 @@ export const RegistersTab: React.FC = () => {
       const rowEmail = opts?.rowEmail?.trim().toLowerCase();
       try {
         const client = supabase;
+        const { data: authData } = await client.auth.getSession();
+        if (!authData?.session) {
+          toast({
+            variant: 'destructive',
+            title: 'Supabase session required',
+            description:
+              'Admin is in limited mode (no JWT). Open Admin Login again and ensure your work email signs into Supabase using your staff code as the password so status changes can be saved.',
+          });
+          return;
+        }
         if (id.startsWith('role-')) {
           const uid = id.replace(/^role-/, '').trim();
           if (!uid) {
@@ -455,7 +481,7 @@ export const RegistersTab: React.FC = () => {
         console.error('Error updating supplier status:', error);
         toast({
           title: 'Error',
-          description: 'Failed to update registration status',
+          description: registrationStatusFailureDescription(error),
           variant: 'destructive',
         });
       }
@@ -591,6 +617,16 @@ export const RegistersTab: React.FC = () => {
       const rowEmail = opts?.rowEmail?.trim().toLowerCase();
       try {
         const client = supabase;
+        const { data: authData } = await client.auth.getSession();
+        if (!authData?.session) {
+          toast({
+            variant: 'destructive',
+            title: 'Supabase session required',
+            description:
+              'Admin is in limited mode (no JWT). Open Admin Login again and ensure your work email signs into Supabase using your staff code as the password so status changes can be saved.',
+          });
+          return;
+        }
         if (id.startsWith('role-')) {
           const uid = id.replace(/^role-/, '').trim();
           if (!uid) {
@@ -711,7 +747,7 @@ export const RegistersTab: React.FC = () => {
         console.error('Error updating builder status:', error);
         toast({
           title: 'Error',
-          description: 'Failed to update registration status',
+          description: registrationStatusFailureDescription(error),
           variant: 'destructive',
         });
       }
