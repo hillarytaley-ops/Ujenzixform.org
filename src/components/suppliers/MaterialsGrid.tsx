@@ -43,6 +43,7 @@ import { FileText, BookOpen } from 'lucide-react';
 import { ProductModal, materialToProduct, Product } from '@/components/products';
 import { PostOrderPaystackModal } from '@/components/payment/PostOrderPaystackModal';
 import { useAuth } from '@/contexts/AuthContext';
+import { sendEmailViaEdgeFunction, emailTemplates } from '@/lib/email';
 import {
   getCartProjectId,
   getCartProjectName,
@@ -1567,6 +1568,43 @@ export const MaterialsGrid: React.FC<MaterialsGridProps> = ({ embeddedInDashboar
       }
 
       const total = material.unit_price * qty;
+      const orderItemsPayload = [
+        {
+          material_id: material.id,
+          material_name: material.name,
+          category: material.category,
+          quantity: qty,
+          unit: material.unit,
+          unit_price: material.unit_price,
+        },
+      ];
+      try {
+        const uemail = user.email?.trim();
+        const meta = user.user_metadata as Record<string, unknown> | undefined;
+        const fn = typeof meta?.full_name === 'string' ? meta.full_name.trim() : '';
+        const displayName = fn || uemail?.split('@')[0] || 'Customer';
+        const dashPath =
+          userRole === 'professional_builder'
+            ? '/professional-builder-dashboard'
+            : '/private-client-dashboard';
+        if (uemail && orderData?.id) {
+          const pendingTpl = emailTemplates.builderOrderPlacedAwaitingPayment({
+            customerName: displayName,
+            poNumber,
+            orderId: orderData.id,
+            total,
+            items: orderItemsPayload,
+            dashboardPath: dashPath,
+          });
+          void sendEmailViaEdgeFunction({
+            to: uemail,
+            subject: pendingTpl.subject,
+            html: pendingTpl.html,
+          });
+        }
+      } catch (emailErr) {
+        console.warn('MaterialsGrid Buy Now: awaiting-payment email skipped:', emailErr);
+      }
       const successPath =
         userRole === 'private_client'
           ? '/private-client-dashboard'

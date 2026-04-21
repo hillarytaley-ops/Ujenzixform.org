@@ -37,6 +37,7 @@ import { MonitoringServicePrompt } from '@/components/builders/MonitoringService
 import { PostOrderPaystackModal } from '@/components/payment/PostOrderPaystackModal';
 import { setCartProjectContext, clearCartProjectContext } from '@/utils/builderCartProject';
 import { catalogMaterialIdFromCartLineId } from '@/utils/cartLineId';
+import { sendEmailViaEdgeFunction, emailTemplates } from '@/lib/email';
 
 // Project interface for project selection
 interface BuilderProject {
@@ -658,6 +659,35 @@ export const CartSidebar: React.FC = () => {
         unit: item.unit,
         unit_price: item.unit_price
       }));
+
+      try {
+        const { data: authSnap } = await supabase.auth.getUser();
+        const uemail = authSnap.user?.email?.trim();
+        const meta = authSnap.user?.user_metadata as Record<string, unknown> | undefined;
+        const fn = typeof meta?.full_name === 'string' ? meta.full_name.trim() : '';
+        const displayName = fn || uemail?.split('@')[0] || 'Customer';
+        const dashPath =
+          currentRole === 'professional_builder'
+            ? '/professional-builder-dashboard'
+            : '/private-client-dashboard';
+        if (uemail) {
+          const pendingTpl = emailTemplates.builderOrderPlacedAwaitingPayment({
+            customerName: displayName,
+            poNumber,
+            orderId: orderData.id as string,
+            total: orderTotal,
+            items: orderPayload.items,
+            dashboardPath: dashPath,
+          });
+          void sendEmailViaEdgeFunction({
+            to: uemail,
+            subject: pendingTpl.subject,
+            html: pendingTpl.html,
+          });
+        }
+      } catch (emailErr) {
+        console.warn('Cart Buy Now: awaiting-payment email skipped:', emailErr);
+      }
 
       setLastOrderId(orderData.id);
       setLastOrderTotal(orderTotal);

@@ -10,6 +10,7 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { appendUjenziContactFooter } from "../_shared/emailShell.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -93,6 +94,8 @@ serve(async (req: Request) => {
       htmlBody = htmlBody.replace(new RegExp(placeholder, "g"), value);
       textBody = textBody.replace(new RegExp(placeholder, "g"), value);
     });
+
+    htmlBody = appendUjenziContactFooter(htmlBody);
 
     // Log the email attempt
     const { data: logEntry, error: logError } = await supabase

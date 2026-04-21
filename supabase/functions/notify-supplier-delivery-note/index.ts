@@ -11,6 +11,7 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.56.0";
 import { Resend } from "https://esm.sh/resend@4.0.0";
+import { htmlSupplierDeliveryNoteReady } from "../_shared/emailShell.ts";
 
 const corsHeaders: Record<string, string> = {
   "Access-Control-Allow-Origin": "*",
@@ -148,29 +149,12 @@ serve(async (req: Request): Promise<Response> => {
   }
 
   const dnLabel = (dn.dn_number as string)?.trim() || deliveryNoteId.slice(0, 8);
-  const subject = `Delivery note ${dnLabel} — order delivered`;
-  const html = `
-<!DOCTYPE html>
-<html>
-<head><meta charset="utf-8"/><meta name="viewport" content="width=device-width"/></head>
-<body style="font-family:system-ui,sans-serif;line-height:1.5;color:#333;max-width:640px;margin:0 auto;padding:20px;">
-  <h1 style="color:#ea580c;margin:0 0 8px;">UjenziXform</h1>
-  <p style="color:#64748b;margin:0 0 20px;">Construction materials platform</p>
-  <div style="background:#fff7ed;border:1px solid #fed7aa;border-radius:8px;padding:16px;margin-bottom:16px;">
-    <h2 style="margin:0 0 8px;font-size:18px;">Delivery note ready</h2>
-    <p style="margin:0;">A delivery has been completed and a <strong>delivery note</strong> is available for your records.</p>
-  </div>
-  <table style="width:100%;border-collapse:collapse;font-size:14px;">
-    <tr><td style="padding:6px 0;font-weight:600;width:140px;">DN</td><td>${dnLabel}</td></tr>
-    ${poNumber ? `<tr><td style="padding:6px 0;font-weight:600;">PO</td><td>${poNumber}</td></tr>` : ""}
-    <tr><td style="padding:6px 0;font-weight:600;">Status</td><td>${(dn.status as string) || "—"}</td></tr>
-  </table>
-  <p style="margin-top:20px;font-size:14px;color:#64748b;">
-    Sign in to your <strong>supplier dashboard</strong> → <strong>Invoice</strong> → <strong>Delivery notes</strong> to review details and continue the workflow (inspection / GRN / invoice).
-  </p>
-  <p style="margin-top:24px;font-size:12px;color:#94a3b8;">This message was sent automatically when the delivery note was created.</p>
-</body>
-</html>`;
+  const { subject, html } = htmlSupplierDeliveryNoteReady({
+    companyName,
+    dnLabel,
+    poNumber,
+    status: (dn.status as string) || "—",
+  });
 
   const resend = new Resend(resendKey);
   const from = Deno.env.get("RESEND_FROM_DELIVERY_NOTE") ?? "UjenziXform <onboarding@resend.dev>";

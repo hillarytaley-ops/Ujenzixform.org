@@ -1,85 +1,69 @@
 /**
  * ╔══════════════════════════════════════════════════════════════════════════════════════╗
- * ║                                                                                      ║
- * ║   📧 EMAIL SERVICE - Resend Integration for UjenziXform                                ║
- * ║                                                                                      ║
- * ║   CREATED: January 22, 2026                                                          ║
- * ║   FEATURES:                                                                          ║
- * ║   1. Order confirmation emails                                                       ║
- * ║   2. Quote notifications                                                             ║
- * ║   3. Delivery updates                                                                ║
- * ║   4. Welcome emails                                                                  ║
- * ║                                                                                      ║
- * ║   SETUP:                                                                             ║
- * ║   1. Sign up at https://resend.com                                                   ║
- * ║   2. Verify your domain (ujenzixform.org)                                             ║
- * ║   3. Get API key and add to Supabase Edge Functions                                  ║
- * ║                                                                                      ║
+ * ║   📧 EMAIL SERVICE — Resend via Edge Function / Vercel API                           ║
+ * ║   Branded templates: logo + company contact + line items (orders / receipts).      ║
  * ╚══════════════════════════════════════════════════════════════════════════════════════╝
  */
 
 import { supabase } from '@/integrations/supabase/client';
 import { invokeEdgeFunction } from '@/lib/invokeEdgeFunction';
+import {
+  wrapTransactionalEmail,
+  escapeHtml,
+  formatKes,
+  lineItemsTableHtml,
+  lineItemsFromUnknown,
+  emailPublicOrigin,
+  type LineItemRow,
+} from '@/lib/emailLayout';
 
-// Email templates for different notifications
+const accentGreen = '#15803d';
+const accentBlue = '#1d4ed8';
+const accentIndigo = '#4f46e5';
+
+function ctaButton(href: string, label: string, color: string): string {
+  return `<p style="margin:24px 0 0;"><a href="${escapeHtml(href)}" style="display:inline-block;background:${color};color:#fff;text-decoration:none;padding:12px 24px;border-radius:8px;font-weight:600;">${escapeHtml(label)}</a></p>`;
+}
+
 export const emailTemplates = {
-  // Welcome email for new users
-  welcome: (userName: string, role: string) => ({
-    subject: `Welcome to UjenziXform - Kenya's Construction Marketplace`,
-    html: `
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <style>
-            body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #333; }
-            .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-            .header { background: linear-gradient(135deg, #16a34a 0%, #15803d 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
-            .content { background: #f9fafb; padding: 30px; border-radius: 0 0 10px 10px; }
-            .button { display: inline-block; background: #16a34a; color: white; padding: 12px 30px; text-decoration: none; border-radius: 6px; margin: 20px 0; }
-            .footer { text-align: center; padding: 20px; color: #666; font-size: 12px; }
-          </style>
-        </head>
-        <body>
-          <div class="container">
-            <div class="header">
-              <h1>🏗️ Welcome to UjenziXform!</h1>
-            </div>
-            <div class="content">
-              <h2>Karibu, ${userName}!</h2>
-              <p>Thank you for joining UjenziXform - Kenya's premier construction materials marketplace.</p>
-              <p>As a <strong>${role}</strong>, you now have access to:</p>
-              <ul>
-                ${role === 'supplier' ? `
-                  <li>✅ List your products to thousands of builders</li>
-                  <li>✅ Manage orders and quotes</li>
-                  <li>✅ Track deliveries in real-time</li>
-                  <li>✅ Grow your construction business</li>
-                ` : role === 'professional_builder' ? `
-                  <li>✅ Request quotes from multiple suppliers</li>
-                  <li>✅ Compare prices instantly</li>
-                  <li>✅ Track all your projects</li>
-                  <li>✅ Manage your construction team</li>
-                ` : `
-                  <li>✅ Browse quality building materials</li>
-                  <li>✅ Compare prices from verified suppliers</li>
-                  <li>✅ Track your orders in real-time</li>
-                  <li>✅ Secure payment with M-Pesa</li>
-                `}
-              </ul>
-              <a href="https://ujenzixform.org/home" class="button">Get Started →</a>
-              <p>Need help? Our support team is available 24/7 via live chat.</p>
-            </div>
-            <div class="footer">
-              <p>UjenziXform - Building Kenya, One Project at a Time</p>
-              <p>© 2026 UjenziXform. All rights reserved.</p>
-            </div>
-          </div>
-        </body>
-      </html>
-    `
-  }),
+  welcome: (userName: string, role: string) => {
+    const bullets =
+      role === 'supplier'
+        ? `<ul style="margin:12px 0;padding-left:20px;">
+            <li>List your products to builders nationwide</li>
+            <li>Manage orders and quotes</li>
+            <li>Track deliveries</li>
+          </ul>`
+        : role === 'professional_builder'
+          ? `<ul style="margin:12px 0;padding-left:20px;">
+            <li>Request quotes from multiple suppliers</li>
+            <li>Compare prices</li>
+            <li>Track projects</li>
+          </ul>`
+          : `<ul style="margin:12px 0;padding-left:20px;">
+            <li>Browse verified materials</li>
+            <li>Compare supplier prices</li>
+            <li>Secure checkout (Paystack / M-Pesa where enabled)</li>
+          </ul>`;
+    const body = `
+      <p style="margin:0;">Karibu, <strong>${escapeHtml(userName)}</strong>!</p>
+      <p style="margin:16px 0 0;">Thank you for joining <strong>UjenziXform</strong>. You are registered as a <strong>${escapeHtml(role)}</strong>.</p>
+      ${bullets}
+      ${ctaButton(`${emailPublicOrigin()}/home`, 'Open your dashboard →', accentGreen)}
+      <p style="margin:20px 0 0;color:#64748b;font-size:14px;">Questions? Reply to this email or write to <a href="mailto:info@ujenzixform.org">info@ujenzixform.org</a>.</p>
+    `;
+    return {
+      subject: `Welcome to UjenziXform`,
+      html: wrapTransactionalEmail({
+        accent: accentGreen,
+        title: 'Welcome aboard',
+        subtitle: 'Kenya’s construction marketplace',
+        preheader: `Welcome, ${userName}`,
+        bodyHtml: body,
+      }),
+    };
+  },
 
-  // Order confirmation email
   orderConfirmation: (orderDetails: {
     orderNumber: string;
     customerName: string;
@@ -87,67 +71,178 @@ export const emailTemplates = {
     total: number;
     deliveryAddress: string;
     estimatedDelivery: string;
-  }) => ({
-    subject: `Order Confirmed - ${orderDetails.orderNumber} | UjenziXform`,
-    html: `
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <style>
-            body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #333; }
-            .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-            .header { background: linear-gradient(135deg, #16a34a 0%, #15803d 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
-            .content { background: #f9fafb; padding: 30px; border-radius: 0 0 10px 10px; }
-            .order-box { background: white; border-radius: 8px; padding: 20px; margin: 20px 0; border: 1px solid #e5e7eb; }
-            .item-row { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #f3f4f6; }
-            .total-row { display: flex; justify-content: space-between; padding: 15px 0; font-weight: bold; font-size: 18px; color: #16a34a; }
-            .button { display: inline-block; background: #16a34a; color: white; padding: 12px 30px; text-decoration: none; border-radius: 6px; margin: 20px 0; }
-            .footer { text-align: center; padding: 20px; color: #666; font-size: 12px; }
-          </style>
-        </head>
-        <body>
-          <div class="container">
-            <div class="header">
-              <h1>✅ Order Confirmed!</h1>
-              <p>Order #${orderDetails.orderNumber}</p>
-            </div>
-            <div class="content">
-              <h2>Asante, ${orderDetails.customerName}!</h2>
-              <p>Your order has been confirmed and is being processed.</p>
-              
-              <div class="order-box">
-                <h3>Order Details</h3>
-                ${orderDetails.items.map(item => `
-                  <div class="item-row">
-                    <span>${item.name} x${item.quantity}</span>
-                    <span>KES ${item.price.toLocaleString()}</span>
-                  </div>
-                `).join('')}
-                <div class="total-row">
-                  <span>Total</span>
-                  <span>KES ${orderDetails.total.toLocaleString()}</span>
-                </div>
-              </div>
+  }) => {
+    const rows: LineItemRow[] = orderDetails.items.map((i) => ({
+      name: i.name,
+      quantity: i.quantity,
+      unitPrice: i.price / Math.max(1, i.quantity),
+    }));
+    const body = `
+      <p style="margin:0;">Asante, <strong>${escapeHtml(orderDetails.customerName)}</strong>!</p>
+      <p style="margin:12px 0 0;">Your order <strong>${escapeHtml(orderDetails.orderNumber)}</strong> is confirmed.</p>
+      <h3 style="margin:24px 0 8px;font-size:15px;color:#0f172a;">Materials</h3>
+      ${lineItemsTableHtml(rows)}
+      <p style="margin:8px 0 0;text-align:right;font-weight:700;">Total: ${formatKes(orderDetails.total)}</p>
+      <h3 style="margin:24px 0 8px;font-size:15px;color:#0f172a;">Delivery</h3>
+      <p style="margin:0;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:14px;">${escapeHtml(orderDetails.deliveryAddress)}</p>
+      <p style="margin:10px 0 0;"><strong>Estimated:</strong> ${escapeHtml(orderDetails.estimatedDelivery)}</p>
+      ${ctaButton(`${emailPublicOrigin()}/home`, 'View order status →', accentGreen)}
+    `;
+    return {
+      subject: `Order confirmed — ${orderDetails.orderNumber}`,
+      html: wrapTransactionalEmail({
+        accent: accentGreen,
+        title: 'Order confirmed',
+        subtitle: orderDetails.orderNumber,
+        bodyHtml: body,
+      }),
+    };
+  },
 
-              <div class="order-box">
-                <h3>📍 Delivery Address</h3>
-                <p>${orderDetails.deliveryAddress}</p>
-                <p><strong>Estimated Delivery:</strong> ${orderDetails.estimatedDelivery}</p>
-              </div>
+  /** After Buy Now: order exists; user should complete Paystack if prompted. */
+  builderOrderPlacedAwaitingPayment: (p: {
+    customerName: string;
+    poNumber: string;
+    orderId: string;
+    total: number;
+    items: unknown;
+    /** Path only, e.g. `/professional-builder-dashboard` */
+    dashboardPath?: string;
+  }) => {
+    const dash = (p.dashboardPath?.trim() || '/private-client-dashboard').replace(/\/$/, '');
+    const rows = lineItemsFromUnknown(p.items);
+    const body = `
+      <p style="margin:0;">Hello <strong>${escapeHtml(p.customerName)}</strong>,</p>
+      <p style="margin:14px 0 0;">Your order <strong>${escapeHtml(p.poNumber)}</strong> has been placed.</p>
+      <div style="margin:18px 0;padding:14px 16px;background:#fffbeb;border:1px solid #fcd34d;border-radius:8px;color:#92400e;">
+        <strong>Awaiting payment</strong> — if a Paystack window opens, complete payment there. If you closed it, open your cart or dashboard and pay from your order summary when ready.
+      </div>
+      <h3 style="margin:20px 0 8px;font-size:15px;">Materials purchased</h3>
+      ${lineItemsTableHtml(rows)}
+      <p style="margin:8px 0 0;text-align:right;font-weight:700;">Total due: ${formatKes(p.total)}</p>
+      ${ctaButton(`${emailPublicOrigin()}${dash}`, 'Go to dashboard →', accentGreen)}
+    `;
+    return {
+      subject: `Order placed — complete payment (${p.poNumber})`,
+      html: wrapTransactionalEmail({
+        accent: '#ca8a04',
+        title: 'Order placed',
+        subtitle: `PO ${escapeHtml(p.poNumber)}`,
+        preheader: `Total ${formatKes(p.total)} — payment pending`,
+        bodyHtml: body,
+      }),
+    };
+  },
 
-              <a href="https://ujenzixform.org/tracking" class="button">Track Your Order →</a>
-            </div>
-            <div class="footer">
-              <p>Questions? Reply to this email or use our live chat.</p>
-              <p>© 2026 UjenziXform. All rights reserved.</p>
-            </div>
-          </div>
-        </body>
-      </html>
-    `
-  }),
+  builderPaymentReceived: (p: {
+    customerName: string;
+    poNumber: string;
+    total: number;
+    reference?: string;
+    items?: unknown;
+    dashboardPath?: string;
+  }) => {
+    const dash = (p.dashboardPath?.trim() || '/private-client-dashboard').replace(/\/$/, '');
+    const rows = p.items ? lineItemsFromUnknown(p.items) : [];
+    const refLine = p.reference
+      ? `<p style="margin:12px 0 0;font-size:14px;color:#475569;">Paystack reference: <code style="background:#f1f5f9;padding:2px 6px;border-radius:4px;">${escapeHtml(p.reference)}</code></p>`
+      : '';
+    const body = `
+      <p style="margin:0;">Hello <strong>${escapeHtml(p.customerName)}</strong>,</p>
+      <p style="margin:14px 0 0;">We received your payment for order <strong>${escapeHtml(p.poNumber)}</strong>.</p>
+      <div style="margin:18px 0;padding:14px 16px;background:#ecfdf5;border:1px solid #86efac;border-radius:8px;color:#14532d;">
+        <strong>Payment received</strong> — ${formatKes(p.total)}
+      </div>
+      ${refLine}
+      ${rows.length ? `<h3 style="margin:22px 0 8px;font-size:15px;">Materials</h3>${lineItemsTableHtml(rows)}` : ''}
+      ${ctaButton(`${emailPublicOrigin()}${dash}`, 'Open dashboard →', accentGreen)}
+    `;
+    return {
+      subject: `Payment received — ${p.poNumber}`,
+      html: wrapTransactionalEmail({
+        accent: accentGreen,
+        title: 'Payment received',
+        subtitle: formatKes(p.total),
+        bodyHtml: body,
+      }),
+    };
+  },
 
-  // Quote request notification (for suppliers)
+  builderDeliveryQuotePaid: (p: {
+    customerName: string;
+    requestId: string;
+    reference?: string;
+    dashboardPath?: string;
+  }) => {
+    const dash = (p.dashboardPath?.trim() || '/private-client-dashboard').replace(/\/$/, '');
+    const ref = p.reference
+      ? `<p style="margin:12px 0 0;font-size:14px;">Reference: <code>${escapeHtml(p.reference)}</code></p>`
+      : '';
+    const body = `
+      <p style="margin:0;">Hello <strong>${escapeHtml(p.customerName)}</strong>,</p>
+      <p style="margin:14px 0 0;">Your <strong>delivery quote payment</strong> was received. Providers can proceed with your job.</p>
+      <p style="margin:12px 0 0;">Request ID: <code>${escapeHtml(p.requestId)}</code></p>
+      ${ref}
+      ${ctaButton(`${emailPublicOrigin()}${dash}?tab=deliveries`, 'View deliveries →', accentBlue)}
+    `;
+    return {
+      subject: 'Delivery quote paid',
+      html: wrapTransactionalEmail({
+        accent: accentBlue,
+        title: 'Delivery payment received',
+        subtitle: 'Your delivery request is funded',
+        bodyHtml: body,
+      }),
+    };
+  },
+
+  builderMonitoringPaid: (p: {
+    customerName: string;
+    requestId: string;
+    reference?: string;
+    dashboardPath?: string;
+  }) => {
+    const dash = (p.dashboardPath?.trim() || '/private-client-dashboard').replace(/\/$/, '');
+    const ref = p.reference
+      ? `<p style="margin:12px 0 0;font-size:14px;">Reference: <code>${escapeHtml(p.reference)}</code></p>`
+      : '';
+    const body = `
+      <p style="margin:0;">Hello <strong>${escapeHtml(p.customerName)}</strong>,</p>
+      <p style="margin:14px 0 0;">Your <strong>site monitoring</strong> package payment was received.</p>
+      <p style="margin:12px 0 0;">Request ID: <code>${escapeHtml(p.requestId)}</code></p>
+      ${ref}
+      ${ctaButton(`${emailPublicOrigin()}${dash}`, 'Dashboard →', accentIndigo)}
+    `;
+    return {
+      subject: 'Monitoring package paid',
+      html: wrapTransactionalEmail({
+        accent: accentIndigo,
+        title: 'Monitoring payment received',
+        bodyHtml: body,
+      }),
+    };
+  },
+
+  builderInvoicePaid: (p: { customerName: string; invoiceLabel: string; reference?: string }) => {
+    const ref = p.reference
+      ? `<p style="margin:12px 0 0;">Reference: <code>${escapeHtml(p.reference)}</code></p>`
+      : '';
+    const body = `
+      <p style="margin:0;">Hello <strong>${escapeHtml(p.customerName)}</strong>,</p>
+      <p style="margin:14px 0 0;">Your invoice <strong>${escapeHtml(p.invoiceLabel)}</strong> is marked <strong>paid</strong>.</p>
+      ${ref}
+      ${ctaButton(`${emailPublicOrigin()}/professional-builder-dashboard`, 'Builder dashboard →', accentBlue)}
+    `;
+    return {
+      subject: `Invoice paid — ${p.invoiceLabel}`,
+      html: wrapTransactionalEmail({
+        accent: accentGreen,
+        title: 'Invoice paid',
+        bodyHtml: body,
+      }),
+    };
+  },
+
   quoteRequest: (details: {
     supplierName: string;
     builderName: string;
@@ -155,67 +250,33 @@ export const emailTemplates = {
     materials: Array<{ name: string; quantity: number; unit: string }>;
     deliveryAddress: string;
     projectDescription?: string;
-  }) => ({
-    subject: `New Quote Request from ${details.builderName} | UjenziXform`,
-    html: `
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <style>
-            body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #333; }
-            .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-            .header { background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
-            .content { background: #f9fafb; padding: 30px; border-radius: 0 0 10px 10px; }
-            .quote-box { background: white; border-radius: 8px; padding: 20px; margin: 20px 0; border: 1px solid #e5e7eb; }
-            .material-row { padding: 10px 0; border-bottom: 1px solid #f3f4f6; }
-            .button { display: inline-block; background: #2563eb; color: white; padding: 12px 30px; text-decoration: none; border-radius: 6px; margin: 20px 0; }
-            .urgent { background: #fef3c7; border-left: 4px solid #f59e0b; padding: 15px; margin: 15px 0; }
-            .footer { text-align: center; padding: 20px; color: #666; font-size: 12px; }
-          </style>
-        </head>
-        <body>
-          <div class="container">
-            <div class="header">
-              <h1>📋 New Quote Request</h1>
-            </div>
-            <div class="content">
-              <h2>Hello, ${details.supplierName}!</h2>
-              <p>You have received a new quote request.</p>
-              
-              <div class="urgent">
-                ⚡ <strong>Respond quickly!</strong> Builders often choose the first supplier to respond.
-              </div>
+  }) => {
+    const rows: LineItemRow[] = details.materials.map((m) => ({
+      name: m.name,
+      quantity: m.quantity,
+      unit: m.unit,
+    }));
+    const body = `
+      <p style="margin:0;">Hello <strong>${escapeHtml(details.supplierName)}</strong>,</p>
+      <p style="margin:14px 0 0;">You have a new quote request from <strong>${escapeHtml(details.builderName)}</strong>.</p>
+      ${details.builderCompany ? `<p style="margin:8px 0 0;">Company: ${escapeHtml(details.builderCompany)}</p>` : ''}
+      <p style="margin:8px 0 0;"><strong>Delivery location:</strong> ${escapeHtml(details.deliveryAddress)}</p>
+      ${details.projectDescription ? `<p style="margin:8px 0 0;"><strong>Project:</strong> ${escapeHtml(details.projectDescription)}</p>` : ''}
+      <h3 style="margin:20px 0 8px;font-size:15px;">Materials</h3>
+      ${lineItemsTableHtml(rows)}
+      ${ctaButton(`${emailPublicOrigin()}/supplier-dashboard`, 'Respond in supplier dashboard →', accentBlue)}
+    `;
+    return {
+      subject: `New quote request — ${details.builderName}`,
+      html: wrapTransactionalEmail({
+        accent: accentBlue,
+        title: 'New quote request',
+        subtitle: details.builderName,
+        bodyHtml: body,
+      }),
+    };
+  },
 
-              <div class="quote-box">
-                <h3>👤 Builder Details</h3>
-                <p><strong>Name:</strong> ${details.builderName}</p>
-                ${details.builderCompany ? `<p><strong>Company:</strong> ${details.builderCompany}</p>` : ''}
-                <p><strong>Delivery Location:</strong> ${details.deliveryAddress}</p>
-                ${details.projectDescription ? `<p><strong>Project:</strong> ${details.projectDescription}</p>` : ''}
-              </div>
-
-              <div class="quote-box">
-                <h3>🧱 Materials Requested</h3>
-                ${details.materials.map(m => `
-                  <div class="material-row">
-                    <strong>${m.name}</strong><br>
-                    Quantity: ${m.quantity} ${m.unit}
-                  </div>
-                `).join('')}
-              </div>
-
-              <a href="https://ujenzixform.org/supplier-dashboard" class="button">Respond to Quote →</a>
-            </div>
-            <div class="footer">
-              <p>© 2026 UjenziXform. All rights reserved.</p>
-            </div>
-          </div>
-        </body>
-      </html>
-    `
-  }),
-
-  // Delivery update notification
   deliveryUpdate: (details: {
     customerName: string;
     orderNumber: string;
@@ -225,114 +286,58 @@ export const emailTemplates = {
     estimatedTime?: string;
   }) => {
     const statusMessages = {
-      dispatched: { emoji: '📦', title: 'Order Dispatched!', message: 'Your order is on its way!' },
-      in_transit: { emoji: '🚚', title: 'In Transit', message: 'Your delivery is on the move.' },
-      arriving: { emoji: '📍', title: 'Almost There!', message: 'Your delivery will arrive soon.' },
-      delivered: { emoji: '✅', title: 'Delivered!', message: 'Your order has been delivered.' }
+      dispatched: { emoji: '📦', title: 'Order dispatched', message: 'Your order is on its way.' },
+      in_transit: { emoji: '🚚', title: 'In transit', message: 'Your delivery is on the move.' },
+      arriving: { emoji: '📍', title: 'Almost there', message: 'Your delivery will arrive soon.' },
+      delivered: { emoji: '✅', title: 'Delivered', message: 'Your order has been delivered.' },
     };
-    
-    const statusInfo = statusMessages[details.status];
-    
+    const st = statusMessages[details.status];
+    const driver =
+      details.driverName || details.driverPhone
+        ? `<div style="margin:16px 0;padding:14px;background:#ecfdf5;border-radius:8px;border:1px solid #bbf7d0;">
+            <strong>Driver</strong><br/>
+            ${details.driverName ? escapeHtml(details.driverName) : ''}
+            ${details.driverPhone ? `<br/>📞 ${escapeHtml(details.driverPhone)}` : ''}
+          </div>`
+        : '';
+    const body = `
+      <p style="margin:0;">Hello <strong>${escapeHtml(details.customerName)}</strong>,</p>
+      <p style="margin:14px 0 0;">${st.message}</p>
+      <p style="margin:10px 0 0;"><strong>Order</strong> ${escapeHtml(details.orderNumber)}</p>
+      ${details.estimatedTime ? `<p style="margin:8px 0 0;">Estimated: ${escapeHtml(details.estimatedTime)}</p>` : ''}
+      ${driver}
+      ${ctaButton(`${emailPublicOrigin()}/home`, 'Track order →', accentGreen)}
+    `;
     return {
-      subject: `${statusInfo.emoji} ${statusInfo.title} - Order ${details.orderNumber} | UjenziXform`,
-      html: `
-        <!DOCTYPE html>
-        <html>
-          <head>
-            <style>
-              body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #333; }
-              .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-              .header { background: linear-gradient(135deg, #16a34a 0%, #15803d 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
-              .content { background: #f9fafb; padding: 30px; border-radius: 0 0 10px 10px; }
-              .status-box { background: white; border-radius: 8px; padding: 20px; margin: 20px 0; border: 1px solid #e5e7eb; text-align: center; }
-              .status-emoji { font-size: 48px; }
-              .driver-box { background: #ecfdf5; border-radius: 8px; padding: 15px; margin: 15px 0; }
-              .button { display: inline-block; background: #16a34a; color: white; padding: 12px 30px; text-decoration: none; border-radius: 6px; margin: 20px 0; }
-              .footer { text-align: center; padding: 20px; color: #666; font-size: 12px; }
-            </style>
-          </head>
-          <body>
-            <div class="container">
-              <div class="header">
-                <h1>${statusInfo.emoji} ${statusInfo.title}</h1>
-                <p>Order #${details.orderNumber}</p>
-              </div>
-              <div class="content">
-                <h2>Hello, ${details.customerName}!</h2>
-                <p>${statusInfo.message}</p>
-                
-                <div class="status-box">
-                  <div class="status-emoji">${statusInfo.emoji}</div>
-                  <h3>${statusInfo.title}</h3>
-                  ${details.estimatedTime ? `<p>Estimated arrival: <strong>${details.estimatedTime}</strong></p>` : ''}
-                </div>
-
-                ${details.driverName ? `
-                  <div class="driver-box">
-                    <h4>🚗 Your Driver</h4>
-                    <p><strong>${details.driverName}</strong></p>
-                    ${details.driverPhone ? `<p>📞 ${details.driverPhone}</p>` : ''}
-                  </div>
-                ` : ''}
-
-                <a href="https://ujenzixform.org/tracking" class="button">Track Live →</a>
-              </div>
-              <div class="footer">
-                <p>© 2026 UjenziXform. All rights reserved.</p>
-              </div>
-            </div>
-          </body>
-        </html>
-      `
+      subject: `${st.emoji} ${st.title} — ${details.orderNumber}`,
+      html: wrapTransactionalEmail({
+        accent: accentGreen,
+        title: `${st.emoji} ${st.title}`,
+        subtitle: `Order ${escapeHtml(details.orderNumber)}`,
+        bodyHtml: body,
+      }),
     };
   },
 
-  // Password reset email
-  passwordReset: (userName: string, resetLink: string) => ({
-    subject: `Reset Your Password | UjenziXform`,
-    html: `
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <style>
-            body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #333; }
-            .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-            .header { background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
-            .content { background: #f9fafb; padding: 30px; border-radius: 0 0 10px 10px; }
-            .button { display: inline-block; background: #6366f1; color: white; padding: 12px 30px; text-decoration: none; border-radius: 6px; margin: 20px 0; }
-            .warning { background: #fef3c7; border-left: 4px solid #f59e0b; padding: 15px; margin: 15px 0; }
-            .footer { text-align: center; padding: 20px; color: #666; font-size: 12px; }
-          </style>
-        </head>
-        <body>
-          <div class="container">
-            <div class="header">
-              <h1>🔐 Password Reset</h1>
-            </div>
-            <div class="content">
-              <h2>Hello, ${userName}!</h2>
-              <p>We received a request to reset your password. Click the button below to create a new password:</p>
-              
-              <a href="${resetLink}" class="button">Reset Password →</a>
-              
-              <div class="warning">
-                ⚠️ This link expires in 1 hour. If you didn't request this, please ignore this email.
-              </div>
-              
-              <p>If the button doesn't work, copy and paste this link into your browser:</p>
-              <p style="word-break: break-all; color: #6366f1;">${resetLink}</p>
-            </div>
-            <div class="footer">
-              <p>© 2026 UjenziXform. All rights reserved.</p>
-            </div>
-          </div>
-        </body>
-      </html>
-    `
-  })
+  passwordReset: (userName: string, resetLink: string) => {
+    const body = `
+      <p style="margin:0;">Hello <strong>${escapeHtml(userName)}</strong>,</p>
+      <p style="margin:14px 0 0;">We received a request to reset your password.</p>
+      ${ctaButton(resetLink, 'Reset password →', accentIndigo)}
+      <p style="margin:20px 0 0;font-size:13px;color:#64748b;">If you did not request this, you can ignore this email. Link expires in one hour.</p>
+      <p style="margin:10px 0 0;word-break:break-all;font-size:12px;color:#6366f1;">${escapeHtml(resetLink)}</p>
+    `;
+    return {
+      subject: 'Reset your password',
+      html: wrapTransactionalEmail({
+        accent: accentIndigo,
+        title: 'Password reset',
+        bodyHtml: body,
+      }),
+    };
+  },
 };
 
-// Type definitions for email sending
 export interface SendEmailParams {
   to: string;
   subject: string;
@@ -340,13 +345,11 @@ export interface SendEmailParams {
   from?: string;
 }
 
-/**
- * Sends mail via same-origin Vercel API (`/api/send-email`) so the browser never hits Supabase
- * Edge Function CORS. Falls back to `supabase.functions.invoke` when `/api/send-email` is missing (e.g. local Vite).
- */
 export const sendEmailViaEdgeFunction = async (params: SendEmailParams): Promise<{ success: boolean; error?: string }> => {
   try {
-    const { data: { session } } = await supabase.auth.getSession();
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
     const token = session?.access_token;
     const origin = typeof window !== 'undefined' ? window.location.origin : '';
 
@@ -363,7 +366,6 @@ export const sendEmailViaEdgeFunction = async (params: SendEmailParams): Promise
       if (response.ok) {
         return { success: true };
       }
-      // Vercel often returns 500 when RESEND_API_KEY (or other server env) is missing — fall through to Edge Function.
       if (response.status !== 404) {
         console.warn(
           'sendEmailViaEdgeFunction: /api/send-email failed, trying Supabase Edge send-email:',
@@ -372,11 +374,7 @@ export const sendEmailViaEdgeFunction = async (params: SendEmailParams): Promise
       }
     }
 
-    const { error } = await invokeEdgeFunction(
-      'send-email',
-      { body: params },
-      { hasRecipient: !!params.to }
-    );
+    const { error } = await invokeEdgeFunction('send-email', { body: params }, { hasRecipient: !!params.to });
     if (error) {
       const msg =
         error && typeof error === 'object' && 'message' in error
@@ -390,4 +388,3 @@ export const sendEmailViaEdgeFunction = async (params: SendEmailParams): Promise
     return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
   }
 };
-

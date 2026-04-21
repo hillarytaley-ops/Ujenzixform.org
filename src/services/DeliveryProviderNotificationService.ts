@@ -13,6 +13,7 @@
 import { supabase } from '@/integrations/supabase/client';
 import notificationService from './NotificationService';
 import { sendEmailViaEdgeFunction } from '@/lib/email';
+import { escapeHtml, wrapTransactionalEmail } from '@/lib/emailLayout';
 import { captureError, captureMessage } from '@/lib/sentry';
 import {
   filterProvidersByProximity,
@@ -103,20 +104,24 @@ class DeliveryProviderNotificationService {
     email: string,
     requestDetails: DeliveryRequestDetails
   ): Promise<boolean> {
-    const safe = (s: string) =>
-      s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
     try {
       const subject = 'UjenziXform: New delivery request';
-      const html = `
-        <p>A new delivery job is available.</p>
-        <ul>
-          <li><strong>Pickup:</strong> ${safe(requestDetails.pickup_address)}</li>
-          <li><strong>Delivery:</strong> ${safe(requestDetails.delivery_address)}</li>
-          <li><strong>Date:</strong> ${safe(new Date(requestDetails.pickup_date).toLocaleString())}</li>
-          <li><strong>Material:</strong> ${safe(requestDetails.material_type || 'Construction materials')}</li>
+      const bodyHtml = `
+        <p style="margin:0;">A new delivery job is available.</p>
+        <ul style="margin:14px 0;padding-left:20px;line-height:1.6;">
+          <li><strong>Pickup:</strong> ${escapeHtml(requestDetails.pickup_address)}</li>
+          <li><strong>Delivery:</strong> ${escapeHtml(requestDetails.delivery_address)}</li>
+          <li><strong>Date:</strong> ${escapeHtml(new Date(requestDetails.pickup_date).toLocaleString())}</li>
+          <li><strong>Material:</strong> ${escapeHtml(requestDetails.material_type || 'Construction materials')}</li>
         </ul>
-        <p>Sign in to the delivery dashboard to accept.</p>
+        <p style="margin:16px 0 0;">Sign in to the delivery dashboard to accept.</p>
       `;
+      const html = wrapTransactionalEmail({
+        accent: '#1d4ed8',
+        title: 'New delivery request',
+        subtitle: 'Open jobs near you',
+        bodyHtml,
+      });
       const { success } = await sendEmailViaEdgeFunction({ to: email, subject, html });
       return success;
     } catch (e: unknown) {
