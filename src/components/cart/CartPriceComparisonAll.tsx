@@ -223,6 +223,40 @@ export const CartPriceComparisonAll: React.FC<CartPriceComparisonAllProps> = ({
         suppliersData.forEach(s => uniqueSupplierIds.add(s.id));
       }
 
+      // RLS on `suppliers` often hides rows from buyers even when those suppliers have public prices.
+      // SECURITY DEFINER RPC returns name + address for the exact UUIDs on the price rows.
+      const uuidLike = (id: string | undefined) => !!id && id.length === 36 && id !== 'admin-catalog' && id !== 'general';
+      const compareRpcIds = [...uniqueSupplierIds].filter(uuidLike).slice(0, 200);
+      if (compareRpcIds.length > 0) {
+        try {
+          const { data: rpcRows, error: rpcErr } = await supabase.rpc('get_suppliers_for_price_compare', {
+            p_supplier_ids: compareRpcIds,
+          });
+          if (rpcErr) {
+            console.warn('get_suppliers_for_price_compare:', rpcErr.message);
+          } else if (Array.isArray(rpcRows)) {
+            for (const row of rpcRows as any[]) {
+              const s: any = {
+                id: row.id,
+                user_id: row.user_id,
+                profile_id: row.profile_id,
+                company_name: row.company_name,
+                rating: row.rating,
+                location: row.location || row.profile_location || null,
+                address: row.address,
+                display_location: row.display_location,
+              };
+              const merged = mergeProfileIntoSupplier(s);
+              suppliersMap.set(merged.id, merged);
+              if (merged.user_id) suppliersMap.set(merged.user_id, merged);
+              if (merged.profile_id) suppliersMap.set(merged.profile_id, merged);
+            }
+          }
+        } catch (e) {
+          console.warn('get_suppliers_for_price_compare failed', e);
+        }
+      }
+
       const missingIds = [...uniqueSupplierIds].filter((id) => !suppliersMap.has(id));
       if (missingIds.length > 0) {
         const { data: extraRows } = await supabase
@@ -258,6 +292,8 @@ export const CartPriceComparisonAll: React.FC<CartPriceComparisonAllProps> = ({
       };
 
       const resolveAddressLine = (supplier: any | undefined): string => {
+        const fromRpc = supplier?.display_location && String(supplier.display_location).trim();
+        if (fromRpc) return fromRpc.slice(0, 160);
         const line = supplierLocationLine(supplier);
         if (line) return line;
         return 'No address on file — contact supplier for location';
