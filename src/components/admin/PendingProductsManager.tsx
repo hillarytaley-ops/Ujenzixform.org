@@ -85,6 +85,13 @@ interface PendingProduct {
 }
 
 // Product requests from suppliers (different table)
+interface ProductRequestVariant {
+  name: string;
+  color?: string | null;
+  price: number;
+  unit?: string | null;
+}
+
 interface ProductRequest {
   id: string;
   supplier_id: string;
@@ -92,7 +99,10 @@ interface ProductRequest {
   category: string;
   description?: string;
   suggested_price: number;
-  image_data?: string; // Base64 image
+  image_data?: string; // URL or data URL
+  unit?: string | null;
+  additional_images?: string[] | null;
+  variants?: ProductRequestVariant[] | null;
   status: 'pending' | 'approved' | 'rejected';
   created_at: string;
 }
@@ -577,7 +587,17 @@ export const PendingProductsManager: React.FC = () => {
                     
                     {/* Request Info */}
                     <h3 className="font-semibold text-white">{request.product_name}</h3>
-                    <Badge variant="outline" className="text-slate-300 mt-1">{request.category}</Badge>
+                    <div className="flex flex-wrap gap-1 mt-1">
+                      <Badge variant="outline" className="text-slate-300">{request.category}</Badge>
+                      {request.unit && (
+                        <Badge variant="secondary" className="text-slate-200">per {request.unit}</Badge>
+                      )}
+                      {Array.isArray(request.variants) && request.variants.length > 0 && (
+                        <Badge variant="secondary" className="bg-orange-900/50 text-orange-200">
+                          {request.variants.length} variant{request.variants.length === 1 ? '' : 's'}
+                        </Badge>
+                      )}
+                    </div>
                     
                     {request.description && (
                       <p className="text-slate-400 text-sm mt-2 line-clamp-2">{request.description}</p>
@@ -1003,25 +1023,41 @@ export const PendingProductsManager: React.FC = () => {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Package className="h-5 w-5 text-orange-400" />
-              Supplier Product Request
+              Supplier material upload
             </DialogTitle>
           </DialogHeader>
           {selectedRequest && (
             <div className="space-y-4">
-              {/* Image */}
-              <div className="w-full h-48 rounded-lg overflow-hidden bg-slate-800">
-                {selectedRequest.image_data ? (
-                  <img
-                    src={selectedRequest.image_data}
-                    alt={selectedRequest.product_name}
-                    className="w-full h-full object-contain"
-                  />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center">
-                    <ImageIcon className="h-16 w-16 text-slate-500" />
-                    <span className="text-slate-500 ml-2">No image attached</span>
+              {/* Main + extra angles */}
+              <div className="space-y-2">
+                <Label className="text-slate-400">Photos</Label>
+                <div className="flex flex-wrap gap-2">
+                  <div className="h-36 w-36 flex-shrink-0 rounded-lg overflow-hidden bg-slate-800 border border-slate-600">
+                    {selectedRequest.image_data ? (
+                      <img
+                        src={selectedRequest.image_data}
+                        alt={selectedRequest.product_name}
+                        className="h-full w-full object-contain"
+                      />
+                    ) : (
+                      <div className="h-full w-full flex flex-col items-center justify-center p-2 text-center">
+                        <ImageIcon className="h-8 w-8 text-slate-500" />
+                        <span className="text-[10px] text-slate-500">Main</span>
+                      </div>
+                    )}
                   </div>
-                )}
+                  {(Array.isArray(selectedRequest.additional_images) ? selectedRequest.additional_images : []).map(
+                    (url, idx) =>
+                      url ? (
+                        <div
+                          key={`${idx}-${url.slice(0, 32)}`}
+                          className="h-36 w-36 flex-shrink-0 rounded-lg overflow-hidden bg-slate-800 border border-slate-600"
+                        >
+                          <img src={url} alt={`Angle ${idx + 2}`} className="h-full w-full object-contain" />
+                        </div>
+                      ) : null
+                  )}
+                </div>
               </div>
               
               <div className="grid grid-cols-2 gap-4">
@@ -1034,9 +1070,12 @@ export const PendingProductsManager: React.FC = () => {
                   <p className="text-white">{selectedRequest.category}</p>
                 </div>
                 <div>
-                  <Label className="text-slate-400">Suggested Price</Label>
+                  <Label className="text-slate-400">Reference price</Label>
                   <p className="text-green-400 font-bold">
                     KES {selectedRequest.suggested_price?.toLocaleString() || '0'}
+                    {selectedRequest.unit ? (
+                      <span className="text-sm font-normal text-slate-400"> / {selectedRequest.unit}</span>
+                    ) : null}
                   </p>
                 </div>
                 <div>
@@ -1046,6 +1085,34 @@ export const PendingProductsManager: React.FC = () => {
                   </p>
                 </div>
               </div>
+
+              {Array.isArray(selectedRequest.variants) && selectedRequest.variants.length > 0 && (
+                <div>
+                  <Label className="text-slate-400 mb-2 block">Variants</Label>
+                  <div className="rounded-md border border-slate-600 overflow-hidden">
+                    <table className="w-full text-sm">
+                      <thead className="bg-slate-800 text-slate-400">
+                        <tr>
+                          <th className="text-left p-2 font-medium">Name / size</th>
+                          <th className="text-left p-2 font-medium">Color</th>
+                          <th className="text-left p-2 font-medium">Unit</th>
+                          <th className="text-right p-2 font-medium">Price (KES)</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {selectedRequest.variants.map((v, i) => (
+                          <tr key={i} className="border-t border-slate-700 text-slate-200">
+                            <td className="p-2">{v.name}</td>
+                            <td className="p-2">{v.color || '—'}</td>
+                            <td className="p-2">{v.unit || selectedRequest.unit || '—'}</td>
+                            <td className="p-2 text-right text-green-400">{Number(v.price).toLocaleString()}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
               
               {selectedRequest.description && (
                 <div>

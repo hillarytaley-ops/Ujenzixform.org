@@ -13,7 +13,7 @@
  * ║   │  1. ADMIN uploads all product images (quality control)                     │   ║
  * ║   │  2. SUPPLIER browses admin-uploaded products                               │   ║
  * ║   │  3. SUPPLIER sets/updates prices for products they want to sell            │   ║
- * ║   │  4. SUPPLIER can request new products via "Request New Product" form       │   ║
+ * ║   │  4. SUPPLIER uploads catalog requests (photos, variants, prices, units)    │   ║
  * ║   │  5. ADMIN receives request and uploads the new product image               │   ║
  * ║   │  6. SUPPLIER can then set price for the newly uploaded product             │   ║
  * ║   └─────────────────────────────────────────────────────────────────────────────┘   ║
@@ -24,14 +24,14 @@
  * ║   │  ✅ Set/update prices for products                                         │   ║
  * ║   │  ✅ Set stock availability (In Stock / Out of Stock)                       │   ║
  * ║   │  ✅ Request new products to be added by admin                              │   ║
- * ║   │  ❌ Upload product images (admin only)                                     │   ║
+ * ║   │  ✅ Upload reference photos + variants on "Upload material" request        │   ║
  * ║   │  ❌ Delete products (admin only)                                           │   ║
  * ║   └─────────────────────────────────────────────────────────────────────────────┘   ║
  * ║                                                                                      ║
  * ║   🚫 DO NOT:                                                                         ║
- * ║   - Add image upload for suppliers (admin only)                                    ║
+ * ║   - Remove supplier catalog-request uploads (photos / variants) without replacement ║
  * ║   - Allow suppliers to delete admin-uploaded products                              ║
- * ║   - Remove the "Request New Product" functionality                                 ║
+ * ║   - Remove the catalog material request flow                                       ║
  * ║                                                                                      ║
  * ╚══════════════════════════════════════════════════════════════════════════════════════╝
  */
@@ -74,7 +74,8 @@ import {
   DollarSign,
   AlertCircle,
   Image as ImageIcon,
-  Trash2
+  Trash2,
+  Layers
 } from "lucide-react";
 import { supabase, SUPABASE_ANON_KEY } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -274,7 +275,9 @@ export const ProductManagement: React.FC<ProductManagementProps> = ({ supplierId
   const [newVariantLabel, setNewVariantLabel] = useState('');
   const [newVariantPrice, setNewVariantPrice] = useState('');
   
-  // Request form state with multiple images
+  type RequestVariantRow = { id: string; name: string; color: string; price: string; unit: string };
+
+  // Request form: multi-angle photos + optional variants (size/color/price/unit)
   const [requestForm, setRequestForm] = useState({
     productName: '',
     category: '',
@@ -282,6 +285,7 @@ export const ProductManagement: React.FC<ProductManagementProps> = ({ supplierId
     suggestedPrice: '',
     unit: 'piece',
     images: [] as { file: File; preview: string }[],
+    variants: [] as RequestVariantRow[],
   });
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -859,7 +863,69 @@ export const ProductManagement: React.FC<ProductManagementProps> = ({ supplierId
     setEditingVariantPrices({});
   };
 
-  // Request a new product to be added by admin
+  const fileToDataUrl = (file: File) =>
+    new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = () => reject(new Error('read failed'));
+      reader.readAsDataURL(file);
+    });
+
+  /** Upload to product-images/supplier-material-requests/{auth.uid()}/…; fall back to data URL if storage fails */
+  const uploadMaterialRequestImages = async (images: { file: File }[]): Promise<string[]> => {
+    const uid = user?.id;
+    const out: string[] = [];
+    for (let i = 0; i < images.length; i++) {
+      const file = images[i].file;
+      if (uid) {
+        const ext = (file.name.split('.').pop() || 'jpg').replace(/[^a-z0-9]/gi, '') || 'jpg';
+        const path = `supplier-material-requests/${uid}/${Date.now()}-${i}.${ext}`;
+        const { error } = await supabase.storage.from('product-images').upload(path, file, {
+          cacheControl: '3600',
+          upsert: false,
+        });
+        if (!error) {
+          const { data } = supabase.storage.from('product-images').getPublicUrl(path);
+          out.push(data.publicUrl);
+          continue;
+        }
+        console.warn('Storage upload failed, using inline image:', error.message);
+      }
+      out.push(await fileToDataUrl(file));
+    }
+    return out;
+  };
+
+  const addRequestVariantRow = () => {
+    setRequestForm((prev) => ({
+      ...prev,
+      variants: [
+        ...prev.variants,
+        {
+          id: `v-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+          name: '',
+          color: '',
+          price: '',
+          unit: prev.unit || 'piece',
+        },
+      ],
+    }));
+  };
+
+  const removeRequestVariantRow = (id: string) => {
+    setRequestForm((prev) => ({ ...prev, variants: prev.variants.filter((v) => v.id !== id) }));
+  };
+
+  const updateRequestVariantRow = (id: string, patch: Partial<RequestVariantRow>) => {
+    setRequestForm((prev) => ({
+      ...prev,
+      variants: prev.variants.map((v) => (v.id === id ? { ...v, ...patch } : v)),
+    }));
+  };
+
+  const COLOR_SWATCHES = ['White', 'Black', 'Brown', 'Grey', 'Silver', 'Beige', 'Wood tone', 'Green', 'Blue', 'Red', '—'];
+
+  // Request a new catalog material (admin reviews before publishing)
   const handleRequestNewProduct = async () => {
     if (!requestForm.productName || !requestForm.category) {
       toast({
@@ -870,10 +936,48 @@ export const ProductManagement: React.FC<ProductManagementProps> = ({ supplierId
       return;
     }
 
-    if (!requestForm.suggestedPrice) {
+    const basePrice = parseFloat(requestForm.suggestedPrice);
+    const variantPayload = requestForm.variants
+      .filter((v) => v.name.trim() && v.price.trim())
+      .map((v) => ({
+        name: v.name.trim(),
+        color: v.color.trim() || null,
+        price: parseFloat(v.price),
+        unit: (v.unit || requestForm.unit || 'piece').trim(),
+      }))
+      .filter((v) => !Number.isNaN(v.price) && v.price >= 0);
+
+    for (const v of requestForm.variants) {
+      const partial = (v.name.trim() && !v.price.trim()) || (!v.name.trim() && v.price.trim());
+      if (partial) {
+        toast({
+          title: 'Incomplete variant',
+          description: 'Each variant needs both a name (e.g. size) and a price, or clear the row.',
+          variant: 'destructive'
+        });
+        return;
+      }
+    }
+
+    const minVariant = variantPayload.length ? Math.min(...variantPayload.map((v) => v.price)) : 0;
+    let suggestedForDb = 0;
+    if (!Number.isNaN(basePrice) && basePrice > 0) suggestedForDb = basePrice;
+    else if (variantPayload.length) suggestedForDb = minVariant;
+
+    if (!suggestedForDb || suggestedForDb <= 0 || Number.isNaN(suggestedForDb)) {
       toast({
-        title: 'Price Required',
-        description: 'Please enter your selling price',
+        title: 'Price required',
+        description: 'Enter a base selling price, or add at least one variant with a price.',
+        variant: 'destructive'
+      });
+      return;
+    }
+
+    const effectiveSupplierId = getEffectiveSupplierId();
+    if (!effectiveSupplierId) {
+      toast({
+        title: 'Supplier not found',
+        description: 'Please refresh and try again.',
         variant: 'destructive'
       });
       return;
@@ -881,51 +985,47 @@ export const ProductManagement: React.FC<ProductManagementProps> = ({ supplierId
 
     try {
       setIsSubmitting(true);
-      
-      // Convert images to base64
-      const imageDataArray: string[] = [];
-      for (const img of requestForm.images) {
-        const reader = new FileReader();
-        const base64 = await new Promise<string>((resolve) => {
-          reader.onload = () => resolve(reader.result as string);
-          reader.readAsDataURL(img.file);
-        });
-        imageDataArray.push(base64);
-      }
-      
-      const { error } = await (supabase
-        .from('product_requests' as any)
-        .insert({
-          supplier_id: supplierId,
-          product_name: requestForm.productName,
-          category: requestForm.category,
-          description: requestForm.description,
-          suggested_price: parseFloat(requestForm.suggestedPrice) || 0,
-          unit: requestForm.unit,
-          image_data: imageDataArray[0] || '', // Main image
-          additional_images: imageDataArray.slice(1), // Additional angles
-          status: 'pending',
-          created_at: new Date().toISOString()
-        }));
-      
+
+      const imageUrls = await uploadMaterialRequestImages(requestForm.images);
+
+      const { error } = await supabase.from('product_requests' as any).insert({
+        supplier_id: effectiveSupplierId,
+        product_name: requestForm.productName.trim(),
+        category: requestForm.category,
+        description: requestForm.description?.trim() || null,
+        suggested_price: suggestedForDb,
+        unit: requestForm.unit,
+        image_data: imageUrls[0] || null,
+        additional_images: imageUrls.slice(1),
+        variants: variantPayload,
+        status: 'pending',
+        created_at: new Date().toISOString(),
+      });
+
       if (error) {
-        console.log('Product request table not available');
+        console.error('product_requests insert:', error);
+        toast({
+          title: 'Could not submit',
+          description: error.message || 'Database error. If this persists, contact support.',
+          variant: 'destructive'
+        });
+        return;
       }
-      
+
       setShowRequestDialog(false);
       resetRequestForm();
-      
+
       toast({
-        title: 'Request Submitted!',
-        description: 'Your product request has been sent to admin for review.',
+        title: 'Request submitted',
+        description: 'Admin will review photos, variants, and pricing before adding the material to the catalog.',
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error submitting request:', error);
       toast({
-        title: 'Request Sent',
-        description: 'Your product request has been noted.',
+        title: 'Submit failed',
+        description: error?.message || 'Please try again.',
+        variant: 'destructive'
       });
-      setShowRequestDialog(false);
     } finally {
       setIsSubmitting(false);
     }
@@ -942,6 +1042,7 @@ export const ProductManagement: React.FC<ProductManagementProps> = ({ supplierId
       suggestedPrice: '',
       unit: 'piece',
       images: [],
+      variants: [],
     });
   };
 
@@ -1074,6 +1175,18 @@ export const ProductManagement: React.FC<ProductManagementProps> = ({ supplierId
   const textColor = isDarkMode ? 'text-white' : 'text-gray-900';
   const mutedText = isDarkMode ? 'text-gray-400' : 'text-gray-500';
 
+  const basePriceNum = parseFloat(requestForm.suggestedPrice);
+  const canSubmitMaterialRequest =
+    Boolean(requestForm.productName.trim() && requestForm.category) &&
+    ((!Number.isNaN(basePriceNum) && basePriceNum > 0) ||
+      requestForm.variants.some(
+        (v) =>
+          v.name.trim() &&
+          v.price.trim() &&
+          !Number.isNaN(parseFloat(v.price)) &&
+          parseFloat(v.price) > 0
+      ));
+
   return (
     <div className="space-y-6">
       {/* Info Banner */}
@@ -1087,7 +1200,7 @@ export const ProductManagement: React.FC<ProductManagementProps> = ({ supplierId
               <h3 className="font-semibold text-blue-800">How Product Pricing Works</h3>
               <p className="text-sm text-blue-700 mt-1">
                 Browse products uploaded by admin and set your prices. To request a new product, 
-                click "Request New Product" and admin will upload it for you.
+                use &quot;Upload material&quot; to send photos, variants, and prices for admin review.
               </p>
             </div>
           </div>
@@ -1111,18 +1224,18 @@ export const ProductManagement: React.FC<ProductManagementProps> = ({ supplierId
           }}>
             <DialogTrigger asChild>
               <Button className="bg-orange-500 hover:bg-orange-600">
-                <Plus className="h-4 w-4 mr-2" />
-                Request New Product
+                <Upload className="h-4 w-4 mr-2" />
+                Upload material
               </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+            <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle className="flex items-center gap-2">
                   <Package className="h-5 w-5 text-orange-500" />
-                  Request New Product
+                  Upload material
                 </DialogTitle>
                 <DialogDescription>
-                  Fill in the product details and upload photos from all angles. Admin will review and add it to the catalog.
+                  Add photos from several angles, optional variants (size, color, unit, price), and your default selling price. Admin reviews before publishing to the catalog.
                 </DialogDescription>
               </DialogHeader>
               
@@ -1233,11 +1346,116 @@ export const ProductManagement: React.FC<ProductManagementProps> = ({ supplierId
                   </div>
                 </div>
 
+                {/* Variants: size / color / unit / price per SKU */}
+                <div className="space-y-3 rounded-lg border border-orange-200 bg-orange-50/40 p-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <Label className="flex items-center gap-2 text-sm font-semibold text-gray-800">
+                      <Layers className="h-4 w-4 text-orange-600" />
+                      Variants (optional)
+                    </Label>
+                    <Button type="button" variant="outline" size="sm" className="h-8" onClick={addRequestVariantRow}>
+                      <Plus className="h-3.5 w-3.5 mr-1" />
+                      Add variant
+                    </Button>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Use this when the same product comes in different sizes, colors, or prices (e.g. door 800×2100 vs 900×2100, or red vs grey paint).
+                  </p>
+                  {requestForm.variants.length === 0 ? (
+                    <p className="text-xs text-gray-500 italic">No variants yet — one base price below is enough for a single SKU.</p>
+                  ) : (
+                    <div className="space-y-3">
+                      {requestForm.variants.map((row) => (
+                        <div
+                          key={row.id}
+                          className="grid grid-cols-1 gap-2 rounded-md border bg-white p-2 sm:grid-cols-12 sm:items-end"
+                        >
+                          <div className="space-y-1 sm:col-span-4">
+                            <Label className="text-[10px] uppercase text-gray-500">Variant / size</Label>
+                            <Input
+                              placeholder="e.g. 900×2100 mm, 50kg bag"
+                              value={row.name}
+                              onChange={(e) => updateRequestVariantRow(row.id, { name: e.target.value })}
+                              className="h-9 text-sm"
+                            />
+                          </div>
+                          <div className="space-y-1 sm:col-span-3">
+                            <Label className="text-[10px] uppercase text-gray-500">Color</Label>
+                            <Input
+                              placeholder="e.g. Mahogany"
+                              value={row.color}
+                              onChange={(e) => updateRequestVariantRow(row.id, { color: e.target.value })}
+                              className="h-9 text-sm"
+                            />
+                            <div className="flex flex-wrap gap-1 pt-0.5">
+                              {COLOR_SWATCHES.map((c) => (
+                                <button
+                                  key={c}
+                                  type="button"
+                                  className="rounded border border-gray-200 bg-gray-50 px-1.5 py-0.5 text-[10px] text-gray-600 hover:bg-orange-100"
+                                  onClick={() =>
+                                    updateRequestVariantRow(row.id, { color: c === '—' ? '' : c })
+                                  }
+                                >
+                                  {c}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                          <div className="space-y-1 sm:col-span-2">
+                            <Label className="text-[10px] uppercase text-gray-500">Unit</Label>
+                            <Select
+                              value={row.unit || requestForm.unit}
+                              onValueChange={(value) => updateRequestVariantRow(row.id, { unit: value })}
+                            >
+                              <SelectTrigger className="h-9 text-sm">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {UNITS.map((unit) => (
+                                  <SelectItem key={unit} value={unit}>
+                                    {unit}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div className="space-y-1 sm:col-span-2">
+                            <Label className="text-[10px] uppercase text-gray-500">Price (KES)</Label>
+                            <Input
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              placeholder="0"
+                              value={row.price}
+                              onChange={(e) => updateRequestVariantRow(row.id, { price: e.target.value })}
+                              className="h-9 text-sm"
+                            />
+                          </div>
+                          <div className="flex sm:col-span-1 sm:justify-end">
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="h-9 w-9 text-red-600"
+                              onClick={() => removeRequestVariantRow(row.id)}
+                              aria-label="Remove variant"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
                 {/* Price Input - Prominent */}
                 <div className="space-y-2">
                   <Label className="flex items-center gap-2">
                     <DollarSign className="h-4 w-4 text-green-600" />
-                    Your Selling Price (KES) *
+                    Default selling price (KES)
+                    <span className="text-xs font-normal text-muted-foreground">(required if no variant prices)</span>
                   </Label>
                   <div className="relative">
                     <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground font-medium">KES</span>
@@ -1256,6 +1474,9 @@ export const ProductManagement: React.FC<ProductManagementProps> = ({ supplierId
                       </span>
                     )}
                   </div>
+                  <p className="text-xs text-muted-foreground">
+                    If you added variants with prices above, you can leave this at 0 — we will use the lowest variant price as the reference.
+                  </p>
                 </div>
 
                 {/* Description */}
@@ -1287,7 +1508,7 @@ export const ProductManagement: React.FC<ProductManagementProps> = ({ supplierId
                 </Button>
                 <Button 
                   onClick={handleRequestNewProduct}
-                  disabled={isSubmitting || !requestForm.productName || !requestForm.category || !requestForm.suggestedPrice}
+                  disabled={isSubmitting || !canSubmitMaterialRequest}
                   className="bg-orange-500 hover:bg-orange-600"
                 >
                   {isSubmitting ? (
@@ -1297,8 +1518,8 @@ export const ProductManagement: React.FC<ProductManagementProps> = ({ supplierId
                     </>
                   ) : (
                     <>
-                      <Plus className="h-4 w-4 mr-2" />
-                      Submit Request
+                      <Upload className="h-4 w-4 mr-2" />
+                      Submit for review
                     </>
                   )}
                 </Button>
@@ -1344,7 +1565,7 @@ export const ProductManagement: React.FC<ProductManagementProps> = ({ supplierId
             <Package className="h-12 w-12 text-gray-400 mb-4" />
             <h3 className={`font-semibold ${textColor}`}>No Products Available</h3>
             <p className={`${mutedText} text-center mt-2`}>
-              Admin hasn't uploaded any products yet. Click "Request New Product" to suggest products.
+              Admin hasn't uploaded any products yet. Use Upload material to suggest a catalog item.
             </p>
           </CardContent>
         </Card>
