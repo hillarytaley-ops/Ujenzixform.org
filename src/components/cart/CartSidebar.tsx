@@ -26,6 +26,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useCart, CartItem } from '@/contexts/CartContext';
 import { ShoppingCart, Trash2, Plus, Minus, Package, X, FileText, CreditCard, Scale, Store, Users, Truck, Video, Building2, MapPin } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/contexts/AuthContext';
 import { supabase, SUPABASE_URL, SUPABASE_ANON_KEY } from '@/integrations/supabase/client';
 import { readAuthUserIdSync, readAuthSessionForRest } from '@/utils/supabaseAccessToken';
 import { CartPriceComparison } from './CartPriceComparison';
@@ -94,6 +95,7 @@ export const CartSidebar: React.FC = () => {
     setIsCartOpen 
   } = useCart();
   const { toast } = useToast();
+  const { user: authUser } = useAuth();
   const [comparisonItem, setComparisonItem] = useState<CartItem | null>(null);
   const [showComparison, setShowComparison] = useState(false);
   const [showCompareAll, setShowCompareAll] = useState(false);
@@ -431,7 +433,16 @@ export const CartSidebar: React.FC = () => {
       return;
     }
     
-    if (currentRole !== 'private_client' && currentRole !== 'admin') {
+    const canShopDirect =
+      (currentRole === 'private_client' ||
+        currentRole === 'admin' ||
+        currentRole === 'builder' ||
+        (!currentRole && !!authUser)) &&
+      currentRole !== 'supplier' &&
+      currentRole !== 'delivery_driver' &&
+      currentRole !== 'delivery_provider';
+
+    if (!canShopDirect) {
       console.log('🚫 Non-private-client attempted direct purchase - blocked');
       toast({
         title: '⚠️ Private Client Required',
@@ -933,6 +944,11 @@ export const CartSidebar: React.FC = () => {
                   ═══════════════════════════════════════════════════════════════════════════════ */}
               {(() => {
                 const effectiveRole = userRole || localStorage.getItem('user_role');
+                const sessionUser = authUser;
+                const canDirectPurchase =
+                  effectiveRole === 'private_client' ||
+                  effectiveRole === 'builder' ||
+                  (!!sessionUser && !effectiveRole);
                 
                 // PROFESSIONAL BUILDER: Compare & Request Quote (unified)
                 if (effectiveRole === 'professional_builder') {
@@ -954,9 +970,42 @@ export const CartSidebar: React.FC = () => {
                     </>
                   );
                 }
+
+                // ADMIN: Both options (must run before generic direct-purchase branch — admin is also "can pay")
+                if (effectiveRole === 'admin') {
+                  return (
+                    <>
+                      <div className="grid grid-cols-2 gap-2">
+                        <Button 
+                          className="bg-blue-600 hover:bg-blue-700 h-12 flex flex-col items-center justify-center"
+                          onClick={() => setShowMultiSupplierQuote(true)}
+                        >
+                          <FileText className="h-4 w-4 mb-0.5" />
+                          <span className="text-xs">Request Quote</span>
+                        </Button>
+                        <Button 
+                          className="bg-green-600 hover:bg-green-700 h-12 flex flex-col items-center justify-center"
+                          onClick={handleBuyNow}
+                          disabled={isProcessing}
+                        >
+                          <CreditCard className="h-4 w-4 mb-0.5" />
+                          <span className="text-xs">Buy Now</span>
+                        </Button>
+                      </div>
+                      <p className="text-[10px] text-center text-purple-600 font-medium">
+                        👑 Admin: Full access to both quote requests and direct purchases
+                      </p>
+                    </>
+                  );
+                }
                 
-                // PRIVATE CLIENT: Compare Prices + Buy Now
-                if (effectiveRole === 'private_client') {
+                // PRIVATE CLIENT (and legacy builder / logged-in without role row): Compare + Buy Now + Paystack
+                if (
+                  canDirectPurchase &&
+                  effectiveRole !== 'supplier' &&
+                  effectiveRole !== 'delivery_driver' &&
+                  effectiveRole !== 'delivery_provider'
+                ) {
                   return (
                     <>
                       <Button 
@@ -989,34 +1038,6 @@ export const CartSidebar: React.FC = () => {
                       </Button>
                       <p className="text-[10px] text-center text-green-600 font-medium">
                         🏠 Private Client: Compare prices or buy directly!
-                      </p>
-                    </>
-                  );
-                }
-                
-                // ADMIN: Both options
-                if (effectiveRole === 'admin') {
-                  return (
-                    <>
-                      <div className="grid grid-cols-2 gap-2">
-                        <Button 
-                          className="bg-blue-600 hover:bg-blue-700 h-12 flex flex-col items-center justify-center"
-                          onClick={() => setShowMultiSupplierQuote(true)}
-                        >
-                          <FileText className="h-4 w-4 mb-0.5" />
-                          <span className="text-xs">Request Quote</span>
-                        </Button>
-                        <Button 
-                          className="bg-green-600 hover:bg-green-700 h-12 flex flex-col items-center justify-center"
-                          onClick={handleBuyNow}
-                          disabled={isProcessing}
-                        >
-                          <CreditCard className="h-4 w-4 mb-0.5" />
-                          <span className="text-xs">Buy Now</span>
-                        </Button>
-                      </div>
-                      <p className="text-[10px] text-center text-purple-600 font-medium">
-                        👑 Admin: Full access to both quote requests and direct purchases
                       </p>
                     </>
                   );
@@ -1085,6 +1106,11 @@ export const CartSidebar: React.FC = () => {
           onClose={() => setShowCompareAll(false)}
           onQuotesSent={() => {
             setIsCartOpen(false);
+          }}
+          onContinueToPayment={async () => {
+            setShowCompareAll(false);
+            await new Promise((r) => setTimeout(r, 200));
+            await handleBuyNow();
           }}
         />
       </SheetContent>

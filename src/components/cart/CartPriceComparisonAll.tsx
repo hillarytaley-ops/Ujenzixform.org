@@ -40,7 +40,8 @@ import {
   X,
   Send,
   Store,
-  MapPin
+  MapPin,
+  CreditCard
 } from 'lucide-react';
 
 interface SupplierPrice {
@@ -64,20 +65,23 @@ interface SupplierColumn {
   user_id?: string;
   name: string;
   rating?: number;
-  /** Single line for UI: built from suppliers.address, physical_address, county, location */
-  locationLabel?: string;
+  /** Always shown under the name (real address or explicit placeholder). */
+  addressLine: string;
 }
 
 interface CartPriceComparisonAllProps {
   isOpen: boolean;
   onClose: () => void;
   onQuotesSent?: () => void;
+  /** After choosing a supplier with Select, buyers can run checkout (PO + Paystack) without hunting the cart footer. */
+  onContinueToPayment?: () => void | Promise<void>;
 }
 
 export const CartPriceComparisonAll: React.FC<CartPriceComparisonAllProps> = ({
   isOpen,
   onClose,
-  onQuotesSent
+  onQuotesSent,
+  onContinueToPayment,
 }) => {
   const { items, updateCartItem, clearCart } = useCart();
   const { toast } = useToast();
@@ -88,9 +92,9 @@ export const CartPriceComparisonAll: React.FC<CartPriceComparisonAllProps> = ({
   const [sending, setSending] = useState(false);
   const [notes, setNotes] = useState('');
   
-  // Get user role
+  // Get user role (only true pros use quote-only flow; admins/private clients use supplier select + payment)
   const userRole = localStorage.getItem('user_role');
-  const isProfessionalBuilder = userRole === 'professional_builder' || userRole === 'admin';
+  const isProfessionalBuilder = userRole === 'professional_builder';
 
   useEffect(() => {
     if (isOpen && items.length > 0) {
@@ -112,7 +116,7 @@ export const CartPriceComparisonAll: React.FC<CartPriceComparisonAllProps> = ({
       try {
         const { data: rows, error: suppliersErr } = await supabase
           .from('suppliers')
-          .select('id, user_id, company_name, rating, location, address, physical_address, county')
+          .select('id, user_id, profile_id, company_name, rating, location, address, physical_address, county')
           .order('rating', { ascending: false })
           .limit(500);
         if (suppliersErr) {
@@ -125,9 +129,64 @@ export const CartPriceComparisonAll: React.FC<CartPriceComparisonAllProps> = ({
       }
 
       const suppliersMap = new Map<string, any>();
-      suppliersData.forEach((s: any) => {
+
+      const profileByPk = new Map<string, { id: string; user_id?: string; location?: string | null; company_name?: string | null }>();
+      const profileByAuthUser = new Map<string, { id: string; user_id?: string; location?: string | null; company_name?: string | null }>();
+      const linkIds = [
+        ...new Set(
+          [
+            ...suppliersData.map((s: any) => s.user_id).filter(Boolean),
+            ...suppliersData.map((s: any) => s.profile_id).filter(Boolean),
+          ] as string[]
+        ),
+      ] as string[];
+      if (linkIds.length > 0) {
+        const { data: profRows, error: profErr } = await supabase
+          .from('profiles')
+          .select('id, user_id, location, company_name')
+          .in('id', linkIds.slice(0, 300));
+        if (!profErr && profRows) {
+          profRows.forEach((p: any) => {
+            profileByPk.set(p.id, p);
+            if (p.user_id) profileByAuthUser.set(p.user_id, p);
+          });
+        }
+        const stillMissing = linkIds.filter((id) => !profileByPk.has(id));
+        if (stillMissing.length > 0) {
+          const { data: profByAuth } = await supabase
+            .from('profiles')
+            .select('id, user_id, location, company_name')
+            .in('user_id', stillMissing.slice(0, 300));
+          profByAuth?.forEach((p: any) => {
+            profileByPk.set(p.id, p);
+            if (p.user_id) profileByAuthUser.set(p.user_id, p);
+          });
+        }
+      }
+
+      const mergeProfileIntoSupplier = (s: any) => {
+        if (!s) return s;
+        const prof =
+          (s.user_id && (profileByPk.get(s.user_id) || profileByAuthUser.get(s.user_id))) ||
+          (s.profile_id ? profileByPk.get(s.profile_id) : undefined);
+        return {
+          ...s,
+          company_name:
+            (s.company_name && String(s.company_name).trim()) ||
+            (prof?.company_name && String(prof.company_name).trim()) ||
+            s.company_name,
+          location:
+            (s.location && String(s.location).trim()) ||
+            (prof?.location && String(prof.location).trim()) ||
+            s.location,
+        };
+      };
+
+      suppliersData.forEach((raw: any) => {
+        const s = mergeProfileIntoSupplier(raw);
         suppliersMap.set(s.id, s);
         if (s.user_id) suppliersMap.set(s.user_id, s);
+        if (s.profile_id) suppliersMap.set(s.profile_id, s);
       });
 
       // Fetch prices — cart lines use `catalogUuid::v:idx:n` for variants; supplier_product_prices.product_id is catalog UUID only.
@@ -164,14 +223,54 @@ export const CartPriceComparisonAll: React.FC<CartPriceComparisonAllProps> = ({
         suppliersData.forEach(s => uniqueSupplierIds.add(s.id));
       }
 
-      const supplierColumns: SupplierColumn[] = Array.from(uniqueSupplierIds).map(id => {
+      const missingIds = [...uniqueSupplierIds].filter((id) => !suppliersMap.has(id));
+      if (missingIds.length > 0) {
+        const { data: extraRows } = await supabase
+          .from('suppliers')
+          .select('id, user_id, profile_id, company_name, rating, location, address, physical_address, county')
+          .in('id', missingIds.slice(0, 200));
+        extraRows?.forEach((raw: any) => {
+          const s = mergeProfileIntoSupplier(raw);
+          suppliersMap.set(s.id, s);
+          if (s.user_id) suppliersMap.set(s.user_id, s);
+          if (s.profile_id) suppliersMap.set(s.profile_id, s);
+        });
+      }
+
+      const cartSupplierNames = new Map<string, string>();
+      items.forEach((it) => {
+        const sid = it.supplier_id;
+        const nm = it.supplier_name?.trim();
+        if (sid && nm) cartSupplierNames.set(sid, nm);
+      });
+
+      const resolveSupplierName = (id: string, supplier: any | undefined): string => {
+        const fromRow = supplier?.company_name?.trim?.();
+        if (fromRow) return fromRow;
+        const fromCart = cartSupplierNames.get(id);
+        if (fromCart) return fromCart;
+        const prof = supplier?.user_id
+          ? profileByPk.get(supplier.user_id) || profileByAuthUser.get(supplier.user_id)
+          : undefined;
+        const fromProf = prof?.company_name?.trim?.();
+        if (fromProf) return fromProf;
+        return 'Supplier';
+      };
+
+      const resolveAddressLine = (supplier: any | undefined): string => {
+        const line = supplierLocationLine(supplier);
+        if (line) return line;
+        return 'No address on file — contact supplier for location';
+      };
+
+      const supplierColumns: SupplierColumn[] = Array.from(uniqueSupplierIds).map((id) => {
         const supplier = suppliersMap.get(id);
         return {
           id,
           user_id: supplier?.user_id,
-          name: supplier?.company_name || 'Supplier',
+          name: resolveSupplierName(id, supplier),
           rating: supplier?.rating,
-          locationLabel: supplierLocationLine(supplier),
+          addressLine: resolveAddressLine(supplier),
         };
       }).sort((a, b) => (b.rating || 0) - (a.rating || 0));
 
@@ -186,7 +285,7 @@ export const CartPriceComparisonAll: React.FC<CartPriceComparisonAllProps> = ({
           const supplier = suppliersMap.get(p.supplier_id);
           return {
             supplier_id: p.supplier_id,
-            supplier_name: supplier?.company_name || 'Supplier',
+            supplier_name: resolveSupplierName(p.supplier_id, supplier),
             price: p.price,
             in_stock: p.in_stock ?? true
           };
@@ -550,12 +649,10 @@ export const CartPriceComparisonAll: React.FC<CartPriceComparisonAllProps> = ({
                                 {supplier.name}
                               </span>
                             </div>
-                            {supplier.locationLabel && (
-                              <div className="flex items-start justify-center gap-0.5 text-[9px] text-gray-600 w-full px-0.5">
-                                <MapPin className="h-2.5 w-2.5 shrink-0 mt-0.5 text-gray-400" aria-hidden />
-                                <span className="line-clamp-2 text-center leading-tight break-words">{supplier.locationLabel}</span>
-                              </div>
-                            )}
+                            <div className="flex min-h-[2rem] items-start justify-center gap-0.5 text-[10px] text-gray-600 w-full px-0.5">
+                              <MapPin className="h-3 w-3 shrink-0 mt-0.5 text-gray-500" aria-hidden />
+                              <span className="line-clamp-3 text-center leading-snug break-words">{supplier.addressLine}</span>
+                            </div>
                             {isCheapest && (
                               <Badge className="bg-green-500 text-[9px] px-1.5 py-0">
                                 <Trophy className="h-2 w-2 mr-0.5" />
@@ -730,13 +827,26 @@ export const CartPriceComparisonAll: React.FC<CartPriceComparisonAllProps> = ({
                   </div>
                 </div>
               ) : (
-                <div className="flex items-center justify-between">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <p className="text-sm text-gray-500">
-                    Click <strong>Select</strong> to buy all items from that supplier
+                    Tap <strong>Select</strong> on a supplier to lock cart prices, then{' '}
+                    <strong>Pay now with Paystack</strong> to complete checkout.
                   </p>
-                  <Button variant="outline" onClick={onClose}>
-                    Close
-                  </Button>
+                  <div className="flex flex-wrap gap-2 justify-end">
+                    {onContinueToPayment && (
+                      <Button
+                        type="button"
+                        className="bg-green-600 hover:bg-green-700 text-white"
+                        onClick={() => void Promise.resolve(onContinueToPayment())}
+                      >
+                        <CreditCard className="h-4 w-4 mr-2" />
+                        Pay now with Paystack
+                      </Button>
+                    )}
+                    <Button variant="outline" onClick={onClose}>
+                      Close
+                    </Button>
+                  </div>
                 </div>
               )}
             </div>
