@@ -871,6 +871,17 @@ export const ProductManagement: React.FC<ProductManagementProps> = ({ supplierId
       reader.readAsDataURL(file);
     });
 
+  /** PostgREST 400 when new columns are missing (migration not applied yet). */
+  const isProductRequestsSchemaMismatch = (err: { message?: string; code?: string } | null) => {
+    if (!err?.message) return false;
+    const m = err.message.toLowerCase();
+    return (
+      err.code === 'PGRST204' ||
+      (m.includes('column') && (m.includes('could not find') || m.includes('does not exist'))) ||
+      m.includes('schema cache')
+    );
+  };
+
   /** Upload to product-images/supplier-material-requests/{auth.uid()}/…; fall back to data URL if storage fails */
   const uploadMaterialRequestImages = async (images: { file: File }[]): Promise<string[]> => {
     const uid = user?.id;
@@ -987,26 +998,60 @@ export const ProductManagement: React.FC<ProductManagementProps> = ({ supplierId
       setIsSubmitting(true);
 
       const imageUrls = await uploadMaterialRequestImages(requestForm.images);
+      // Never put base64 blobs in additional_images — large JSON bodies cause PostgREST 400.
+      const additionalImageUrls = imageUrls.slice(1).filter((u) => /^https?:\/\//i.test(u));
+      const droppedInlineAngles =
+        imageUrls.length > 1 && additionalImageUrls.length < imageUrls.length - 1;
 
-      const { error } = await supabase.from('product_requests' as any).insert({
+      const primaryImage = imageUrls[0] || '';
+
+      const fullRow = {
         supplier_id: effectiveSupplierId,
         product_name: requestForm.productName.trim(),
         category: requestForm.category,
         description: requestForm.description?.trim() || null,
         suggested_price: suggestedForDb,
         unit: requestForm.unit,
-        image_data: imageUrls[0] || null,
-        additional_images: imageUrls.slice(1),
+        image_data: primaryImage || null,
+        additional_images: additionalImageUrls,
         variants: variantPayload,
-        status: 'pending',
-        created_at: new Date().toISOString(),
-      });
+        status: 'pending' as const,
+      };
+
+      let { error } = await supabase.from('product_requests' as any).insert(fullRow);
+      let usedLegacyRow = false;
+
+      if (error && isProductRequestsSchemaMismatch(error)) {
+        const legacyDescription = [
+          requestForm.description?.trim(),
+          `[Material request metadata]\nUnit: ${requestForm.unit}`,
+          variantPayload.length ? `Variants (JSON):\n${JSON.stringify(variantPayload, null, 2)}` : '',
+          additionalImageUrls.length
+            ? `Additional image URLs:\n${additionalImageUrls.join('\n')}`
+            : '',
+        ]
+          .filter(Boolean)
+          .join('\n\n---\n');
+
+        const legacyRow = {
+          supplier_id: effectiveSupplierId,
+          product_name: requestForm.productName.trim(),
+          category: requestForm.category,
+          description: legacyDescription || null,
+          suggested_price: suggestedForDb,
+          image_data: primaryImage || '',
+          status: 'pending' as const,
+        };
+        ({ error } = await supabase.from('product_requests' as any).insert(legacyRow));
+        usedLegacyRow = true;
+      }
 
       if (error) {
-        console.error('product_requests insert:', error);
+        console.error('product_requests insert:', error, (error as any)?.details, (error as any)?.hint);
+        const detail = (error as any)?.details || (error as any)?.hint;
         toast({
           title: 'Could not submit',
-          description: error.message || 'Database error. If this persists, contact support.',
+          description: [error.message, detail].filter(Boolean).join(' — ') || 'Database error.',
           variant: 'destructive'
         });
         return;
@@ -1015,10 +1060,20 @@ export const ProductManagement: React.FC<ProductManagementProps> = ({ supplierId
       setShowRequestDialog(false);
       resetRequestForm();
 
-      toast({
-        title: 'Request submitted',
-        description: 'Admin will review photos, variants, and pricing before adding the material to the catalog.',
-      });
+      if (droppedInlineAngles) {
+        toast({
+          title: 'Request submitted (partial photos)',
+          description:
+            'Extra angles could not be stored inline. Upload smaller files or ensure storage is enabled so all photos use URLs.',
+        });
+      } else {
+        toast({
+          title: usedLegacyRow ? 'Request submitted (legacy format)' : 'Request submitted',
+          description: usedLegacyRow
+            ? 'Your database is missing the latest product_requests columns; variants and unit were embedded in the description. Run the migration 20260421120000_product_requests_material_variants.sql when possible.'
+            : 'Admin will review photos, variants, and pricing before adding the material to the catalog.',
+        });
+      }
     } catch (error: any) {
       console.error('Error submitting request:', error);
       toast({
