@@ -17,6 +17,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useCart } from '@/contexts/CartContext';
+import { supplierLocationLine } from '@/utils/supplierLocationLine';
 import { useToast } from '@/hooks/use-toast';
 import { 
   Scale, 
@@ -45,6 +46,9 @@ interface Material {
   supplier?: {
     company_name: string;
     location?: string;
+    address?: string;
+    physical_address?: string;
+    county?: string;
     rating?: number;
   };
 }
@@ -182,13 +186,14 @@ export const PriceComparisonTable: React.FC<PriceComparisonTableProps> = ({
         unit_price: material.unit_price,
         image_url: material.image_url,
         supplier_name: material.supplier?.company_name || 'UjenziXform Catalog',
-        supplier_id: material.supplier_id
+        supplier_id: material.supplier_id,
+        supplier_location: supplierLocationLine(material.supplier),
       }, 1);
     });
     
     toast({
       title: '✅ Added to Cart!',
-      description: `${supplier.itemCount} items from ${supplier.name} added to cart`,
+      description: `${supplier.itemCount} items from ${supplier.name}${supplier.location ? ` in ${supplier.location}` : ''} added to cart`,
     });
     onClose();
   };
@@ -202,7 +207,8 @@ export const PriceComparisonTable: React.FC<PriceComparisonTableProps> = ({
       unit_price: material.unit_price,
       image_url: material.image_url,
       supplier_name: material.supplier?.company_name || 'UjenziXform Catalog',
-      supplier_id: material.supplier_id
+      supplier_id: material.supplier_id,
+      supplier_location: supplierLocationLine(material.supplier),
     }, 1);
     
     toast({

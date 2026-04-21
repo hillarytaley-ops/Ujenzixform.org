@@ -35,6 +35,7 @@ import { getDefaultCategoryImage } from '@/config/defaultCategoryImages';
 import { LazyImage } from '@/components/ui/LazyImage';
 import { useSearchParams } from 'react-router-dom';
 import { useCart } from '@/contexts/CartContext';
+import { supplierLocationLine } from '@/utils/supplierLocationLine';
 import { PriceComparisonModal } from './PriceComparisonModal';
 import { PriceComparisonTable } from './PriceComparisonTable';
 import { QuoteCart, QuoteCartButton, QuoteCartItem } from './QuoteCart';
@@ -2179,7 +2180,14 @@ export const MaterialsGrid: React.FC<MaterialsGridProps> = ({ embeddedInDashboar
                       unit_price: unitPrice,
                       image_url: imageUrl,
                       supplier_name: material.supplier?.company_name || 'UjenziXform Catalog',
-                      supplier_id: material.supplier_id
+                      supplier_id: material.supplier_id,
+                      supplier_location: supplierLocationLine({
+                        location: material.supplier?.location,
+                        address: (material.supplier as { address?: string })?.address,
+                        physical_address: (material.supplier as { physical_address?: string })
+                          ?.physical_address,
+                        county: (material.supplier as { county?: string })?.county,
+                      }),
                     }, qtyToAdd);
                     
                     // Show success toast

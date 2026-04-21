@@ -48,6 +48,7 @@ interface CartItem {
   image_url?: string;
   supplier_name?: string;
   supplier_id?: string;
+  supplier_location?: string;
 }
 
 interface AlternativePrice {
@@ -246,7 +247,8 @@ export const CartPriceComparison: React.FC<CartPriceComparisonProps> = ({
       unit_price: alt.price,
       image_url: alt.image_url,
       supplier_name: alt.supplier_name,
-      supplier_id: alt.supplier_id
+      supplier_id: alt.supplier_id,
+      supplier_location: alt.locationLabel,
     }, cartItem.quantity);
 
     const savings = cartItem.unit_price - alt.price;
@@ -308,6 +310,12 @@ export const CartPriceComparison: React.FC<CartPriceComparisonProps> = ({
             <div className="flex-1">
               <p className="font-medium text-sm line-clamp-1">{cartItem.name}</p>
               <p className="text-xs text-gray-500">{cartItem.supplier_name}</p>
+              {cartItem.supplier_location ? (
+                <p className="text-[10px] text-gray-500 flex items-start gap-0.5 mt-0.5">
+                  <MapPin className="h-3 w-3 shrink-0 mt-0.5 text-gray-400" aria-hidden />
+                  <span className="line-clamp-2">{cartItem.supplier_location}</span>
+                </p>
+              ) : null}
             </div>
             <div className="text-right">
               <p className="font-bold text-blue-600">KES {cartItem.unit_price.toLocaleString()}</p>

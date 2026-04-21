@@ -28,6 +28,8 @@ export interface CartItem {
   image_url?: string;
   supplier_name: string;
   supplier_id?: string;
+  /** Store / pickup location for transparency (delivery, builders, clients). */
+  supplier_location?: string;
 }
 
 interface CartContextType {

@@ -53,6 +53,23 @@ interface BuilderProject {
 /** Radix Select forbids SelectItem with value=""; use this for "no project" in the cart project picker. */
 const CART_NO_PROJECT_SELECT_VALUE = '__ujenzi_no_project__';
 
+const supplierIdLooksLikeUuid = (id?: string) =>
+  !!id && id.length === 36 && id !== 'admin-catalog' && id !== 'general';
+
+const cartSupplierGroupKey = (item: CartItem): string => {
+  if (supplierIdLooksLikeUuid(item.supplier_id)) {
+    return `sid:${item.supplier_id}`;
+  }
+  const name = (item.supplier_name || 'UjenziXform Catalog').trim();
+  const loc = (item.supplier_location || '').trim();
+  return `nm:${name}|${loc}`;
+};
+
+const primarySupplierLocationLabel = (supplierItems: CartItem[]): string => {
+  const fromCart = supplierItems.map((i) => i.supplier_location?.trim()).find(Boolean);
+  return fromCart || '';
+};
+
 // Parse Supabase/PostgREST error response so we can show the real server error (e.g. trigger/DB message)
 const parseSupabaseError = (body: string, status: number): string => {
   if (!body || !body.trim()) return `Server ${status}`;
@@ -574,7 +591,7 @@ export const CartSidebar: React.FC = () => {
         toast({
           title: 'Choose a supplier first',
           description:
-            'Open “Compare Prices Across Suppliers” in your cart, tap Select on the supplier you want, then use Buy Now. That locks your order to the right supplier.',
+            'Open Compare Prices Across Suppliers in your cart to see each supplier’s store location, tap Select on the supplier you want, then use Buy Now. That locks your order to the right supplier.',
           variant: 'destructive',
         });
         setIsProcessing(false);
@@ -784,21 +801,45 @@ export const CartSidebar: React.FC = () => {
                 {/* Group items by supplier for display */}
                 {(() => {
                   const groupedItems: Record<string, CartItem[]> = {};
-                  items.forEach(item => {
-                    const supplierKey = item.supplier_name || 'UjenziXform Catalog';
+                  items.forEach((item) => {
+                    const supplierKey = cartSupplierGroupKey(item);
                     if (!groupedItems[supplierKey]) {
                       groupedItems[supplierKey] = [];
                     }
                     groupedItems[supplierKey].push(item);
                   });
-                  
-                  return Object.entries(groupedItems).map(([supplierName, supplierItems]) => (
-                    <div key={supplierName} className="space-y-2">
-                      {/* Supplier Header */}
-                      <div className="flex items-center gap-2 bg-blue-50 rounded-lg px-3 py-2 border border-blue-200">
-                        <Store className="h-4 w-4 text-blue-600" />
-                        <span className="text-sm font-semibold text-blue-800">{supplierName}</span>
-                        <Badge className="bg-blue-600 ml-auto">{supplierItems.length} item(s)</Badge>
+
+                  return Object.entries(groupedItems).map(([groupKey, supplierItems]) => {
+                    const displayName = (supplierItems[0]?.supplier_name || 'UjenziXform Catalog').trim();
+                    const loc = primarySupplierLocationLabel(supplierItems);
+                    const isCatalog =
+                      displayName === 'UjenziXform Catalog' ||
+                      displayName === 'Admin Catalog' ||
+                      displayName === 'General Catalog';
+                    const headerMain = isCatalog
+                      ? `Materials from ${displayName}`
+                      : loc
+                        ? `Ordering materials from ${displayName} in ${loc}`
+                        : `Ordering materials from ${displayName}`;
+                    const headerSub = !isCatalog && !loc
+                      ? 'Store location: open Compare Prices Across Suppliers below to see listed suppliers and their addresses.'
+                      : null;
+
+                    return (
+                    <div key={groupKey} className="space-y-2">
+                      {/* Supplier Header — always surface store location when known */}
+                      <div className="flex items-start gap-2 bg-blue-50 rounded-lg px-3 py-2 border border-blue-200">
+                        <Store className="h-4 w-4 text-blue-600 shrink-0 mt-0.5" />
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-semibold text-blue-800 leading-snug">{headerMain}</p>
+                          {!isCatalog && !loc && headerSub ? (
+                            <p className="text-[10px] text-blue-600 mt-0.5 flex items-start gap-1 leading-snug">
+                              <MapPin className="h-3 w-3 shrink-0 mt-0.5" aria-hidden />
+                              <span>{headerSub}</span>
+                            </p>
+                          ) : null}
+                        </div>
+                        <Badge className="bg-blue-600 shrink-0 self-start">{supplierItems.length} item(s)</Badge>
                       </div>
                       
                       {/* Items from this supplier */}
@@ -880,7 +921,8 @@ export const CartSidebar: React.FC = () => {
                         </div>
                       ))}
                     </div>
-                  ));
+                    );
+                  });
                 })()}
               </div>
             </ScrollArea>
@@ -985,17 +1027,19 @@ export const CartSidebar: React.FC = () => {
                   return (
                     <>
                       <Button 
-                        className="w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 h-14 flex items-center justify-center gap-3"
+                        className="w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 h-auto min-h-[3.5rem] py-3 flex items-center justify-center gap-3"
                         onClick={() => setShowCompareAll(true)}
                       >
-                        <Scale className="h-5 w-5" />
-                        <div className="text-left">
+                        <Scale className="h-5 w-5 shrink-0" />
+                        <div className="text-left min-w-0">
                           <span className="text-sm font-semibold">Compare Prices & Request Quotes</span>
-                          <p className="text-[10px] opacity-80">Select suppliers to send quote requests</p>
+                          <p className="text-[10px] opacity-90 leading-snug mt-0.5">
+                            See other suppliers in your area with their store locations, then select who receives your quote requests.
+                          </p>
                         </div>
                       </Button>
                       <p className="text-[10px] text-center text-blue-600 font-medium">
-                        🏗️ Professional Builder: Compare prices, select suppliers, and request quotes!
+                        Professional Builder: use the comparison table to review suppliers, locations, and pricing before requesting quotes.
                       </p>
                     </>
                   );
@@ -1040,11 +1084,16 @@ export const CartSidebar: React.FC = () => {
                     <>
                       <Button 
                         variant="outline"
-                        className="w-full border-emerald-300 text-emerald-700 hover:bg-emerald-50 h-10 mb-2"
+                        className="w-full border-2 border-emerald-500 text-emerald-800 hover:bg-emerald-50 h-auto min-h-[3rem] py-2.5 px-3 mb-2 flex items-start gap-2 justify-start text-left"
                         onClick={() => setShowCompareAll(true)}
                       >
-                        <Scale className="h-4 w-4 mr-2" />
-                        Compare Prices Across Suppliers
+                        <Scale className="h-5 w-5 shrink-0 mt-0.5 text-emerald-600" />
+                        <span className="min-w-0">
+                          <span className="block text-sm font-semibold">Compare Prices Across Suppliers</span>
+                          <span className="block text-[11px] font-normal text-emerald-900/85 leading-snug mt-0.5">
+                            Opens a list of suppliers with each store&apos;s location so you can compare who is near you before you buy.
+                          </span>
+                        </span>
                       </Button>
                       <Button 
                         className="w-full bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 h-14 flex items-center justify-center gap-3"
@@ -1067,7 +1116,7 @@ export const CartSidebar: React.FC = () => {
                         )}
                       </Button>
                       <p className="text-[10px] text-center text-green-600 font-medium">
-                        🏠 Private Client: Compare prices or buy directly!
+                        Private Client: compare suppliers (with locations) or buy directly from your chosen store.
                       </p>
                     </>
                   );
@@ -1103,7 +1152,7 @@ export const CartSidebar: React.FC = () => {
               })()}
               
               <p className="text-[10px] text-center text-gray-500">
-                💡 Professional Builders request quotes • Private Clients buy directly
+                Professional Builders: request quotes after comparing suppliers and locations. Private Clients: buy directly once you have picked a supplier and price.
               </p>
             </div>
           </>

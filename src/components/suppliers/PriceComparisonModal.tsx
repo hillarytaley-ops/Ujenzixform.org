@@ -20,6 +20,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useCart } from '@/contexts/CartContext';
+import { supplierLocationLine } from '@/utils/supplierLocationLine';
 import { useToast } from '@/hooks/use-toast';
 import { buildMaterialCartLineId } from '@/utils/cartLineId';
 import { 
@@ -48,6 +49,9 @@ interface Material {
   supplier?: {
     company_name: string;
     location?: string;
+    address?: string;
+    physical_address?: string;
+    county?: string;
     rating?: number;
   };
 }
@@ -95,7 +99,8 @@ export const PriceComparisonModal: React.FC<PriceComparisonModalProps> = ({
       unit_price: material.unit_price,
       image_url: material.image_url,
       supplier_name: material.supplier?.company_name || 'UjenziXform Catalog',
-      supplier_id: material.supplier_id
+      supplier_id: material.supplier_id,
+      supplier_location: supplierLocationLine(material.supplier),
     }, 1);
     
     toast({

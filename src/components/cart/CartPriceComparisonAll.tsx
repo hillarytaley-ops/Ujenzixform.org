@@ -47,6 +47,8 @@ import {
 interface SupplierPrice {
   supplier_id: string;
   supplier_name: string;
+  /** Human-readable store location (same idea as column header address line). */
+  supplier_location?: string;
   price: number;
   in_stock: boolean;
 }
@@ -322,6 +324,7 @@ export const CartPriceComparisonAll: React.FC<CartPriceComparisonAllProps> = ({
           return {
             supplier_id: p.supplier_id,
             supplier_name: resolveSupplierName(p.supplier_id, supplier),
+            supplier_location: resolveAddressLine(supplier),
             price: p.price,
             in_stock: p.in_stock ?? true
           };
@@ -415,7 +418,8 @@ export const CartPriceComparisonAll: React.FC<CartPriceComparisonAllProps> = ({
         updateCartItem(comp.product_id, {
           unit_price: alt.price,
           supplier_name: alt.supplier_name,
-          supplier_id: alt.supplier_id
+          supplier_id: alt.supplier_id,
+          supplier_location: alt.supplier_location || supplier.addressLine,
         });
         updatedCount++;
       }
@@ -423,7 +427,7 @@ export const CartPriceComparisonAll: React.FC<CartPriceComparisonAllProps> = ({
 
     toast({
       title: '✅ Cart Updated!',
-      description: `${updatedCount} item${updatedCount !== 1 ? 's' : ''} now from ${supplier.name}`,
+      description: `${updatedCount} item${updatedCount !== 1 ? 's' : ''} now from ${supplier.name} — ${supplier.addressLine}`,
     });
 
     onClose();
@@ -635,11 +639,11 @@ export const CartPriceComparisonAll: React.FC<CartPriceComparisonAllProps> = ({
               <p className="text-sm">
                 {isProfessionalBuilder ? (
                   <>
-                    <strong>✓ Select suppliers</strong> you want to request quotes from, then click <strong>"Send Quote Requests"</strong>
+                    <strong>✓ Select suppliers</strong> you want to request quotes from (each column shows the store location for that supplier), then click <strong>Send Quote Requests</strong>
                   </>
                 ) : (
                   <>
-                    <strong>✓ Click "Select"</strong> on a supplier to buy all items from them at their prices
+                    <strong>✓ Click Select</strong> on a supplier to buy from them at their prices. Compare columns to see <strong>other suppliers and their store locations</strong> in your area.
                   </>
                 )}
               </p>
