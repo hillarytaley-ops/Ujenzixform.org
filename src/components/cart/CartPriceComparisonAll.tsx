@@ -28,6 +28,7 @@ import {
   getCartProjectLocation,
 } from '@/utils/builderCartProject';
 import { readAuthSessionForRest } from '@/utils/supabaseAccessToken';
+import { supplierLocationLine } from '@/utils/supplierLocationLine';
 import { useToast } from '@/hooks/use-toast';
 import { 
   Scale, 
@@ -38,7 +39,8 @@ import {
   Check,
   X,
   Send,
-  Store
+  Store,
+  MapPin
 } from 'lucide-react';
 
 interface SupplierPrice {
@@ -62,7 +64,8 @@ interface SupplierColumn {
   user_id?: string;
   name: string;
   rating?: number;
-  location?: string;
+  /** Single line for UI: built from suppliers.address, physical_address, county, location */
+  locationLabel?: string;
 }
 
 interface CartPriceComparisonAllProps {
@@ -108,7 +111,7 @@ export const CartPriceComparisonAll: React.FC<CartPriceComparisonAllProps> = ({
       let suppliersData: any[] = [];
       try {
         const suppliersResponse = await fetch(
-          `${SUPABASE_URL}/rest/v1/suppliers?select=id,user_id,company_name,rating,location&order=rating.desc.nullslast&limit=50`,
+          `${SUPABASE_URL}/rest/v1/suppliers?select=id,user_id,company_name,rating,location,address,physical_address,county&order=rating.desc.nullslast&limit=500`,
           { headers: { 'apikey': SUPABASE_ANON_KEY }, cache: 'no-store' }
         );
         if (suppliersResponse.ok) {
@@ -162,7 +165,7 @@ export const CartPriceComparisonAll: React.FC<CartPriceComparisonAllProps> = ({
           user_id: supplier?.user_id,
           name: supplier?.company_name || 'Supplier',
           rating: supplier?.rating,
-          location: supplier?.location
+          locationLabel: supplierLocationLine(supplier),
         };
       }).sort((a, b) => (b.rating || 0) - (a.rating || 0));
 
@@ -524,7 +527,7 @@ export const CartPriceComparisonAll: React.FC<CartPriceComparisonAllProps> = ({
                       return (
                         <th 
                           key={supplier.id} 
-                          className={`text-center p-2 border-b border-r min-w-[130px] ${isCheapest ? 'bg-green-100' : 'bg-gray-50'} ${isSelected ? 'bg-blue-100' : ''}`}
+                          className={`text-center p-2 border-b border-r min-w-[140px] max-w-[180px] ${isCheapest ? 'bg-green-100' : 'bg-gray-50'} ${isSelected ? 'bg-blue-100' : ''}`}
                         >
                           <div className="flex flex-col items-center gap-1">
                             {/* Checkbox for Professional Builders */}
@@ -536,21 +539,27 @@ export const CartPriceComparisonAll: React.FC<CartPriceComparisonAllProps> = ({
                               />
                             )}
                             <div className="flex items-center gap-1">
-                              <Store className="h-3 w-3 text-gray-400" />
-                              <span className="font-medium text-xs text-gray-800 line-clamp-1">
+                              <Store className="h-3 w-3 text-gray-400 shrink-0" />
+                              <span className="font-medium text-xs text-gray-800 line-clamp-2">
                                 {supplier.name}
                               </span>
                             </div>
+                            {supplier.locationLabel && (
+                              <div className="flex items-start justify-center gap-0.5 text-[9px] text-gray-600 w-full px-0.5">
+                                <MapPin className="h-2.5 w-2.5 shrink-0 mt-0.5 text-gray-400" aria-hidden />
+                                <span className="line-clamp-2 text-center leading-tight break-words">{supplier.locationLabel}</span>
+                              </div>
+                            )}
                             {isCheapest && (
                               <Badge className="bg-green-500 text-[9px] px-1.5 py-0">
                                 <Trophy className="h-2 w-2 mr-0.5" />
                                 BEST
                               </Badge>
                             )}
-                            {supplier.rating && (
+                            {supplier.rating != null && !Number.isNaN(Number(supplier.rating)) && (
                               <div className="flex items-center gap-0.5 text-yellow-500 text-[10px]">
                                 <Star className="h-2.5 w-2.5 fill-current" />
-                                {supplier.rating.toFixed(1)}
+                                {Number(supplier.rating).toFixed(1)}
                               </div>
                             )}
                           </div>

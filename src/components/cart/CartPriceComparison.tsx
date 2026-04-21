@@ -22,6 +22,7 @@ import { useCart } from '@/contexts/CartContext';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { catalogMaterialIdFromCartLineId } from '@/utils/cartLineId';
+import { supplierLocationLine } from '@/utils/supplierLocationLine';
 import { 
   Scale, 
   Store, 
@@ -33,7 +34,8 @@ import {
   TrendingDown,
   RefreshCw,
   Loader2,
-  Package
+  Package,
+  MapPin
 } from 'lucide-react';
 
 interface CartItem {
@@ -57,6 +59,7 @@ interface AlternativePrice {
   in_stock: boolean;
   rating?: number;
   image_url?: string;
+  locationLabel?: string;
 }
 
 interface CartPriceComparisonProps {
@@ -90,7 +93,7 @@ export const CartPriceComparison: React.FC<CartPriceComparisonProps> = ({
       // 1. Fetch all suppliers first (to map IDs to names)
       const { data: suppliersData, error: suppliersError } = await supabase
         .from('suppliers')
-        .select('id, user_id, company_name, rating, location');
+        .select('id, user_id, company_name, rating, location, address, physical_address, county');
 
       if (suppliersError) {
         console.error('Error fetching suppliers:', suppliersError);
@@ -152,7 +155,8 @@ export const CartPriceComparison: React.FC<CartPriceComparisonProps> = ({
             price: sp.price,
             in_stock: sp.in_stock ?? true,
             rating: supplier.rating,
-            image_url: adminMaterial?.image_url || cartItem.image_url
+            image_url: adminMaterial?.image_url || cartItem.image_url,
+            locationLabel: supplierLocationLine(supplier),
           });
         }
       }
@@ -204,7 +208,8 @@ export const CartPriceComparison: React.FC<CartPriceComparisonProps> = ({
             price: material.unit_price,
             in_stock: material.in_stock ?? true,
             rating: supplier.rating,
-            image_url: material.image_url || cartItem.image_url
+            image_url: material.image_url || cartItem.image_url,
+            locationLabel: supplierLocationLine(supplier),
           });
         }
       }
@@ -367,12 +372,20 @@ export const CartPriceComparison: React.FC<CartPriceComparisonProps> = ({
                         )}
                         <div className="flex-1 min-w-0">
                           <p className="font-medium text-sm line-clamp-1">{alt.product_name}</p>
-                          <div className="flex items-center gap-1">
-                            <p className="text-xs text-gray-500">{alt.supplier_name}</p>
-                            {alt.rating && (
-                              <div className="flex items-center gap-0.5 text-yellow-500">
-                                <Star className="h-3 w-3 fill-current" />
-                                <span className="text-[10px]">{alt.rating.toFixed(1)}</span>
+                          <div className="flex flex-col gap-0.5 min-w-0">
+                            <div className="flex items-center gap-1 flex-wrap">
+                              <p className="text-xs text-gray-500">{alt.supplier_name}</p>
+                              {alt.rating != null && !Number.isNaN(Number(alt.rating)) && (
+                                <div className="flex items-center gap-0.5 text-yellow-500">
+                                  <Star className="h-3 w-3 fill-current" />
+                                  <span className="text-[10px]">{Number(alt.rating).toFixed(1)}</span>
+                                </div>
+                              )}
+                            </div>
+                            {alt.locationLabel && (
+                              <div className="flex items-start gap-0.5 text-[10px] text-gray-500">
+                                <MapPin className="h-3 w-3 shrink-0 mt-0.5 text-gray-400" aria-hidden />
+                                <span className="line-clamp-2 leading-tight">{alt.locationLabel}</span>
                               </div>
                             )}
                           </div>
