@@ -1,4 +1,4 @@
-import { SUPABASE_URL, SUPABASE_ANON_KEY } from '@/integrations/supabase/client';
+import { supabase, SUPABASE_URL, SUPABASE_ANON_KEY } from '@/integrations/supabase/client';
 /**
  * ╔══════════════════════════════════════════════════════════════════════════════════════╗
  * ║                                                                                      ║
@@ -107,18 +107,21 @@ export const CartPriceComparisonAll: React.FC<CartPriceComparisonAllProps> = ({
   const fetchAllPrices = async () => {
     setLoading(true);
     try {
-      // Fetch suppliers
+      // Suppliers require an authenticated Supabase session — anon REST gets zero rows under RLS.
       let suppliersData: any[] = [];
       try {
-        const suppliersResponse = await fetch(
-          `${SUPABASE_URL}/rest/v1/suppliers?select=id,user_id,company_name,rating,location,address,physical_address,county&order=rating.desc.nullslast&limit=500`,
-          { headers: { 'apikey': SUPABASE_ANON_KEY }, cache: 'no-store' }
-        );
-        if (suppliersResponse.ok) {
-          suppliersData = await suppliersResponse.json();
+        const { data: rows, error: suppliersErr } = await supabase
+          .from('suppliers')
+          .select('id, user_id, company_name, rating, location, address, physical_address, county')
+          .order('rating', { ascending: false })
+          .limit(500);
+        if (suppliersErr) {
+          console.warn('Suppliers fetch failed:', suppliersErr.message);
+        } else {
+          suppliersData = rows ?? [];
         }
       } catch (e) {
-        console.warn('Suppliers fetch failed');
+        console.warn('Suppliers fetch failed', e);
       }
 
       const suppliersMap = new Map<string, any>();
@@ -134,16 +137,19 @@ export const CartPriceComparisonAll: React.FC<CartPriceComparisonAllProps> = ({
       let pricesData: any[] = [];
       
       try {
-        const productIdsParam = productIds.join(',');
-        const pricesResponse = await fetch(
-          `${SUPABASE_URL}/rest/v1/supplier_product_prices?select=product_id,supplier_id,price,in_stock&product_id=in.(${productIdsParam})`,
-          { headers: { 'apikey': SUPABASE_ANON_KEY }, cache: 'no-store' }
-        );
-        if (pricesResponse.ok) {
-          pricesData = await pricesResponse.json();
+        if (productIds.length > 0) {
+          const { data: rows, error: pricesErr } = await supabase
+            .from('supplier_product_prices')
+            .select('product_id, supplier_id, price, in_stock')
+            .in('product_id', productIds);
+          if (pricesErr) {
+            console.warn('Prices fetch failed:', pricesErr.message);
+          } else {
+            pricesData = rows ?? [];
+          }
         }
       } catch (e) {
-        console.warn('Prices fetch failed');
+        console.warn('Prices fetch failed', e);
       }
 
       // Collect unique suppliers from prices AND all suppliers for quote requests

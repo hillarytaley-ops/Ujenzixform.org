@@ -91,8 +91,27 @@ export function PaystackCheckout({
         },
       });
 
+      const edgeMessage = async (): Promise<string | null> => {
+        if (data && typeof data === "object" && "error" in data && typeof (data as { error: string }).error === "string") {
+          return (data as { error: string }).error;
+        }
+        if (error && typeof error === "object" && error !== null && "context" in error) {
+          const ctx = (error as { context?: { json?: () => Promise<unknown> } }).context;
+          if (ctx && typeof ctx.json === "function") {
+            try {
+              const body = (await ctx.json()) as { error?: string };
+              if (body?.error && typeof body.error === "string") return body.error;
+            } catch {
+              /* ignore */
+            }
+          }
+        }
+        return null;
+      };
+
       if (error) {
-        throw new Error(error.message || "Could not start checkout");
+        const parsed = await edgeMessage();
+        throw new Error(parsed || error.message || "Could not start checkout");
       }
 
       if (data?.error) {

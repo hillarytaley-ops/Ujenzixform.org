@@ -278,24 +278,21 @@ export const CartSidebar: React.FC = () => {
       let defaultSupplierId: string | null = null;
       
       try {
-        const suppliersResponse = await fetchWithTimeout(
-          `${SUPABASE_URL}/rest/v1/suppliers?select=id,user_id,company_name&limit=50`,
-          { headers: { 'apikey': SUPABASE_ANON_KEY } },
-          8000
-        );
-        
-        if (suppliersResponse.ok) {
-          const suppliersData = await suppliersResponse.json();
-          if (suppliersData && suppliersData.length > 0) {
-            suppliersData.forEach((s: any) => {
-              suppliersMap[s.id] = s.company_name;
-              if (s.user_id) suppliersMap[s.user_id] = s.company_name;
-            });
-            defaultSupplierId = suppliersData[0].user_id || suppliersData[0].id;
-          }
+        const { data: suppliersData, error: suppliersErr } = await supabase
+          .from('suppliers')
+          .select('id, user_id, company_name')
+          .limit(50);
+        if (suppliersErr) {
+          console.warn('Suppliers fetch failed:', suppliersErr.message);
+        } else if (suppliersData && suppliersData.length > 0) {
+          suppliersData.forEach((s: any) => {
+            suppliersMap[s.id] = s.company_name;
+            if (s.user_id) suppliersMap[s.user_id] = s.company_name;
+          });
+          defaultSupplierId = suppliersData[0].user_id || suppliersData[0].id;
         }
       } catch (e) {
-        console.warn('Suppliers fetch failed');
+        console.warn('Suppliers fetch failed', e);
       }
 
       // Group items by supplier

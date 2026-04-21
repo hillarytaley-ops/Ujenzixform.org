@@ -136,6 +136,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
               .maybeSingle();
             if (profile?.full_name) {
               localStorage.setItem('user_name', profile.full_name);
+              localStorage.setItem('user_display_name', profile.full_name);
             }
           } catch {
             // optional
@@ -193,15 +194,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       if (initialSession?.user) {
         setSession(initialSession);
         setUser(initialSession.user);
-        // Save email to localStorage for instant display on refresh
         if (initialSession.user.email) {
           localStorage.setItem('user_email', initialSession.user.email);
         }
+        localStorage.setItem('user_id', initialSession.user.id);
+        // If getSession() wins the race before INITIAL_SESSION, we must still run the same
+        // deferred work (role + profile → user_name). Previously only fetchUserRole ran here,
+        // so display names disappeared until the next full sign-in.
         if (!rolesFetched) {
           rolesFetched = true;
-          window.setTimeout(() => {
-            if (mounted) void fetchUserRole(initialSession.user.id);
-          }, 0);
+          schedulePostAuthWork(initialSession.user.id, initialSession.user.email, false);
         }
       }
       setLoading(false);
