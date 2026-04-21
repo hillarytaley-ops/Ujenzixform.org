@@ -1518,11 +1518,19 @@ export const EnhancedQRCodeManager: React.FC<EnhancedQRCodeManagerProps> = ({
     }
   };
 
-  // Sequential print QR codes for a specific order with progress tracking
+  /** Thermal strip: one document, 57mm × 32mm per label, QR codes stacked vertically, single print job. */
   const printOrderQRCodes = async (orderGroup: OrderGroup, selectedOnly: boolean = false) => {
-    const itemsToPrint = selectedOnly 
-      ? orderGroup.items.filter(item => selectedItems.has(item.id))
-      : orderGroup.items.filter(item => !item.dispatch_scanned); // Only print pending items
+    const escapeHtml = (s: string) =>
+      String(s ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+
+    const itemsToPrint = (selectedOnly
+      ? orderGroup.items.filter((item) => selectedItems.has(item.id))
+      : orderGroup.items.filter((item) => !item.dispatch_scanned)
+    ).sort((a, b) => a.item_sequence - b.item_sequence);
 
     if (itemsToPrint.length === 0) {
       toast({
@@ -1533,136 +1541,152 @@ export const EnhancedQRCodeManager: React.FC<EnhancedQRCodeManagerProps> = ({
       return;
     }
 
-    // Set printing progress
+    const LABEL_W_MM = 57;
+    const LABEL_H_MM = 32;
+
     setPrintingProgress({ orderId: orderGroup.order_id, current: 0, total: itemsToPrint.length });
 
-    // Sequential printing - one at a time
-    for (let i = 0; i < itemsToPrint.length; i++) {
-      const item = itemsToPrint[i];
-      setPrintingProgress({ orderId: orderGroup.order_id, current: i + 1, total: itemsToPrint.length });
+    try {
+      const rows: { qrDataUrl: string; item: MaterialItem }[] = [];
+      for (let i = 0; i < itemsToPrint.length; i++) {
+        const item = itemsToPrint[i];
+        setPrintingProgress({ orderId: orderGroup.order_id, current: i + 1, total: itemsToPrint.length });
+        const qrDataUrl = await QRCodeLib.toDataURL(item.qr_code, {
+          width: 280,
+          margin: 1,
+          errorCorrectionLevel: 'H',
+        });
+        rows.push({ qrDataUrl, item });
+      }
 
-      // Generate QR code for this item
-      const qrDataUrl = await QRCodeLib.toDataURL(item.qr_code, {
-        width: 200,
-        margin: 2,
-        errorCorrectionLevel: 'H',
-      });
+      const orderRef = escapeHtml(orderGroup.order_number || orderGroup.order_id);
+      const labelsHtml = rows
+        .map(({ qrDataUrl, item }) => {
+          const mat = escapeHtml(item.material_type);
+          const code = escapeHtml(item.qr_code);
+          return `
+        <div class="label">
+          <div class="line order">Order ${orderRef}</div>
+          <div class="line mat">${mat}</div>
+          <div class="line seq">#${item.item_sequence}</div>
+          <img class="qr" src="${qrDataUrl}" alt="" />
+          <div class="line hint">SCAN TO DISPATCH</div>
+          <div class="line mono">${code}</div>
+        </div>`;
+        })
+        .join('\n');
 
-      // Create print window for single item
+      const printHTML = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Labels — Order ${orderRef}</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    @page { size: ${LABEL_W_MM}mm ${LABEL_H_MM}mm; margin: 0; }
+    html, body {
+      width: ${LABEL_W_MM}mm;
+      margin: 0;
+      padding: 0;
+      font-family: system-ui, Arial, sans-serif;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+    .strip {
+      width: ${LABEL_W_MM}mm;
+      margin: 0 auto;
+    }
+    .label {
+      width: ${LABEL_W_MM}mm;
+      height: ${LABEL_H_MM}mm;
+      min-height: ${LABEL_H_MM}mm;
+      max-height: ${LABEL_H_MM}mm;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 0.4mm 1mm;
+      overflow: hidden;
+      page-break-after: always;
+      break-after: page;
+      border-bottom: 0.15mm solid #ddd;
+    }
+    .label:last-child {
+      page-break-after: auto;
+      break-after: auto;
+      border-bottom: none;
+    }
+    .line {
+      line-height: 1.05;
+      text-align: center;
+      max-width: ${LABEL_W_MM - 2}mm;
+      overflow: hidden;
+    }
+    .line.order { font-size: 1.55mm; font-weight: 700; color: #0f172a; }
+    .line.mat { font-size: 1.65mm; font-weight: 600; color: #1e293b; margin-top: 0.1mm; white-space: nowrap; text-overflow: ellipsis; }
+    .line.seq { font-size: 1.45mm; color: #334155; margin-bottom: 0.1mm; }
+    .qr {
+      width: 17mm;
+      height: 17mm;
+      object-fit: contain;
+      image-rendering: pixelated;
+      flex-shrink: 0;
+    }
+    .line.hint { font-size: 1.35mm; font-weight: 700; color: #047857; margin-top: 0.1mm; }
+    .line.mono {
+      font-family: ui-monospace, monospace;
+      font-size: 1.1mm;
+      color: #475569;
+      word-break: break-all;
+      max-height: 2.6mm;
+      line-height: 1.1;
+      margin-top: 0.05mm;
+    }
+    @media print {
+      .label { border-bottom-color: transparent; }
+    }
+  </style>
+</head>
+<body>
+  <div class="strip">
+    ${labelsHtml}
+  </div>
+  <script>
+    window.onload = function () {
+      window.focus();
+      window.print();
+      setTimeout(function () { window.close(); }, 800);
+    };
+  </script>
+</body>
+</html>`;
+
       const printWindow = window.open('', '_blank');
       if (!printWindow) {
         toast({
           title: "Error",
-          description: "Please allow popups to print QR codes",
+          description: "Please allow popups to print labels",
           variant: "destructive",
         });
-        setPrintingProgress(null);
         return;
       }
-
-      // Build print HTML for single item
-      const printHTML = `
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <title>QR Code ${item.item_sequence}</title>
-          <style>
-            * { margin: 0; padding: 0; box-sizing: border-box; }
-            body { font-family: Arial, sans-serif; padding: 20px; display: flex; justify-content: center; align-items: center; min-height: 100vh; }
-            .qr-item { 
-              border: 2px solid #000; 
-              text-align: center; 
-              border-radius: 8px;
-              background: #fff;
-              width: 300px;
-              overflow: hidden;
-            }
-            .qr-number-header {
-              background: #0891b2;
-              color: white;
-              padding: 10px 8px;
-            }
-            .qr-number {
-              font-size: 18px;
-              font-weight: bold;
-              margin-bottom: 4px;
-            }
-            .qr-code-text { 
-              font-family: monospace; 
-              font-size: 8px; 
-              color: #e0f2fe; 
-              word-break: break-all; 
-            }
-            .qr-image-container {
-              padding: 15px;
-              background: white;
-            }
-            .qr-item img { width: 200px; height: 200px; }
-            .product-footer {
-              background: #f8fafc;
-              padding: 12px 8px;
-              border-top: 1px solid #e5e7eb;
-            }
-            .product-name { 
-              font-size: 14px; 
-              font-weight: bold; 
-              color: #1e293b;
-              text-transform: uppercase;
-              margin-bottom: 4px;
-            }
-            .scan-me {
-              font-size: 10px;
-              color: #059669;
-              font-weight: bold;
-            }
-            @media print {
-              body { padding: 0; }
-              .qr-item { border: 2px solid #000; }
-              .qr-number-header { background: #333 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-            }
-          </style>
-        </head>
-        <body>
-          <div class="qr-item">
-            <div class="qr-number-header">
-              <div class="qr-number">QR #${item.item_sequence}</div>
-              <div class="qr-code-text">${item.qr_code}</div>
-            </div>
-            <div class="qr-image-container">
-              <img src="${qrDataUrl}" alt="QR Code" />
-            </div>
-            <div class="product-footer">
-              <div class="product-name">${item.material_type}</div>
-              <div class="scan-me">📱 SCAN TO DISPATCH</div>
-            </div>
-          </div>
-          <script>
-            window.onload = function() { 
-              window.print(); 
-              setTimeout(() => window.close(), 1000);
-            }
-          </script>
-        </body>
-        </html>
-      `;
-
       printWindow.document.write(printHTML);
       printWindow.document.close();
 
-      // Wait a bit before printing next item (allows printer to process)
-      if (i < itemsToPrint.length - 1) {
-        await new Promise(resolve => setTimeout(resolve, 1000));
-      }
-    }
-
-    // Clear progress after all items printed
-    setTimeout(() => {
-      setPrintingProgress(null);
       toast({
-        title: "✅ All Labels Printed",
-        description: `Successfully printed ${itemsToPrint.length} label(s) for Order #${orderGroup.order_number}`,
+        title: "Print sheet ready",
+        description: `${itemsToPrint.length} label(s) at ${LABEL_W_MM}×${LABEL_H_MM} mm in one document. Choose your thermal printer once — labels will feed continuously.`,
       });
-    }, 2000);
+    } catch (e) {
+      console.error(e);
+      toast({
+        title: "Print failed",
+        description: e instanceof Error ? e.message : "Could not build label sheet",
+        variant: "destructive",
+      });
+    } finally {
+      setPrintingProgress(null);
+    }
   };
 
   // Generic print function for a list of items - SEQUENTIAL (one at a time)
@@ -2590,7 +2614,7 @@ export const EnhancedQRCodeManager: React.FC<EnhancedQRCodeManagerProps> = ({
               >
                 <Printer className="h-4 w-4 mr-1" />
                 {printingProgress?.orderId === group.order_id 
-                  ? `Printing ${printingProgress.current} of ${printingProgress.total}`
+                  ? `Preparing ${printingProgress.current} of ${printingProgress.total}`
                   : 'Print Labels'
                 }
               </Button>
@@ -3412,7 +3436,7 @@ const OrderAccordionItem: React.FC<{
               >
                 <Printer className="h-4 w-4 mr-1" />
                 {printingProgress?.orderId === group.order_id 
-                  ? `Printing ${printingProgress.current} of ${printingProgress.total}`
+                  ? `Preparing ${printingProgress.current} of ${printingProgress.total}`
                   : 'Print Labels'
                 }
               </Button>
