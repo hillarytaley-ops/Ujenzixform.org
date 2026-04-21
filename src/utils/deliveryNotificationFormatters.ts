@@ -29,7 +29,9 @@ export function formatSupplierPickupDisplay(
   supplierRow: Record<string, unknown> | null | undefined
 ): string {
   const name = (companyName || 'Supplier').trim();
-  if (!supplierRow) return `${name} — store address not loaded; open order details`;
+  if (!supplierRow) {
+    return `${name} — store address could not be loaded`;
+  }
   const line = supplierLocationLine(supplierRow as SupplierLocationFields);
   if (line) return `${name} — ${line}`;
   return `${name} — add street/town in supplier profile for drivers`;
@@ -55,7 +57,10 @@ export function resolvePickupForProvider(
   return 'Supplier pickup — link order in dashboard for full store address';
 }
 
-/** REST: load supplier rows for pickup address lines (chunked for long URL limits). */
+/**
+ * Load supplier storefront fields for pickup lines.
+ * Uses SECURITY DEFINER RPC — direct REST on `suppliers` is empty for delivery providers under RLS.
+ */
 export async function fetchSuppliersByIds(
   restUrl: string,
   headers: Record<string, string>,
@@ -66,17 +71,37 @@ export async function fetchSuppliersByIds(
   for (let i = 0; i < uuids.length; i += 80) {
     const chunk = uuids.slice(i, i + 80);
     try {
-      const res = await fetch(
-        `${restUrl}/rest/v1/suppliers?id=in.(${chunk.join(',')})&select=id,company_name,location,address,physical_address,county`,
-        { headers, cache: 'no-store' }
-      );
-      if (res.ok) {
-        const rows = (await res.json()) as Record<string, unknown>[];
-        rows.forEach((r) => {
-          const id = r.id as string;
-          if (id) map.set(id, r);
-        });
-      }
+      const res = await fetch(`${restUrl}/rest/v1/rpc/get_suppliers_for_price_compare`, {
+        method: 'POST',
+        headers: {
+          ...headers,
+          'Content-Type': 'application/json',
+          Prefer: 'return=representation',
+        },
+        body: JSON.stringify({ p_supplier_ids: chunk }),
+      });
+      if (!res.ok) continue;
+      const rows = (await res.json()) as Record<string, unknown>[];
+      rows.forEach((r) => {
+        const id = r.id as string;
+        if (!id) return;
+        const display = (r.display_location && String(r.display_location).trim()) || '';
+        const addr = (r.address && String(r.address).trim()) || display;
+        const loc = (r.location && String(r.location).trim()) || '';
+        const row = {
+          id,
+          company_name: r.company_name,
+          address: addr || undefined,
+          location: loc || undefined,
+          physical_address: undefined,
+          county: undefined,
+        };
+        map.set(id, row);
+        const uid = r.user_id as string | undefined;
+        if (uid && uid.length === 36 && uid !== id) {
+          map.set(uid, row);
+        }
+      });
     } catch {
       /* ignore */
     }
