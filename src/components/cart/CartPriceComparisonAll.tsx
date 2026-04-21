@@ -29,6 +29,7 @@ import {
 } from '@/utils/builderCartProject';
 import { readAuthSessionForRest } from '@/utils/supabaseAccessToken';
 import { supplierLocationLine } from '@/utils/supplierLocationLine';
+import { cartReadyForDirectCheckout } from '@/utils/cartSupplierCheckout';
 import { useToast } from '@/hooks/use-toast';
 import { 
   Scale, 
@@ -420,10 +421,21 @@ export const CartPriceComparisonAll: React.FC<CartPriceComparisonAllProps> = ({
           supplier_name: alt.supplier_name,
           supplier_id: alt.supplier_id,
           supplier_location: alt.supplier_location || supplier.addressLine,
+          supplier_pick_confirmed: true,
         });
         updatedCount++;
       }
     });
+
+    if (updatedCount === 0) {
+      toast({
+        title: 'Could not apply that supplier',
+        description:
+          'No in-stock price was found for this supplier on every cart line. Try another supplier or adjust your cart.',
+        variant: 'destructive',
+      });
+      return;
+    }
 
     toast({
       title: '✅ Cart Updated!',
@@ -593,6 +605,7 @@ export const CartPriceComparisonAll: React.FC<CartPriceComparisonAllProps> = ({
   // Get total items in cart
   const totalItems = items.reduce((sum, item) => sum + item.quantity, 0);
   const totalValue = items.reduce((sum, item) => sum + (item.unit_price * item.quantity), 0);
+  const checkoutSupplierLocked = cartReadyForDirectCheckout(items);
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
@@ -869,14 +882,20 @@ export const CartPriceComparisonAll: React.FC<CartPriceComparisonAllProps> = ({
               ) : (
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <p className="text-sm text-gray-500">
-                    Tap <strong>Select</strong> on a supplier to lock cart prices, then{' '}
-                    <strong>Pay now with Paystack</strong> to complete checkout.
+                    Tap <strong>Select</strong> on a supplier column to lock every line to that store (with location), then{' '}
+                    <strong>Pay now with Paystack</strong> is enabled.
                   </p>
                   <div className="flex flex-wrap gap-2 justify-end">
                     {onContinueToPayment && (
                       <Button
                         type="button"
-                        className="bg-green-600 hover:bg-green-700 text-white"
+                        className="bg-green-600 hover:bg-green-700 text-white disabled:opacity-60"
+                        disabled={!checkoutSupplierLocked}
+                        title={
+                          checkoutSupplierLocked
+                            ? undefined
+                            : 'Select a supplier above first so your order is tied to that store.'
+                        }
                         onClick={() => void Promise.resolve(onContinueToPayment())}
                       >
                         <CreditCard className="h-4 w-4 mr-2" />

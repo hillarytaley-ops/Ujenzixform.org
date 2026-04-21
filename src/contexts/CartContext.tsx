@@ -30,6 +30,8 @@ export interface CartItem {
   supplier_id?: string;
   /** Store / pickup location for transparency (delivery, builders, clients). */
   supplier_location?: string;
+  /** Set when the user explicitly picks this supplier (compare Select or switch-supplier in compare modal). */
+  supplier_pick_confirmed?: boolean;
 }
 
 interface CartContextType {

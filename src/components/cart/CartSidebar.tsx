@@ -38,6 +38,7 @@ import { PostOrderPaystackModal } from '@/components/payment/PostOrderPaystackMo
 import { setCartProjectContext, clearCartProjectContext } from '@/utils/builderCartProject';
 import { catalogMaterialIdFromCartLineId } from '@/utils/cartLineId';
 import { sendEmailViaEdgeFunction, emailTemplates } from '@/lib/email';
+import { cartReadyForDirectCheckout, supplierIdValidForCheckout } from '@/utils/cartSupplierCheckout';
 
 // Project interface for project selection
 interface BuilderProject {
@@ -53,11 +54,8 @@ interface BuilderProject {
 /** Radix Select forbids SelectItem with value=""; use this for "no project" in the cart project picker. */
 const CART_NO_PROJECT_SELECT_VALUE = '__ujenzi_no_project__';
 
-const supplierIdLooksLikeUuid = (id?: string) =>
-  !!id && id.length === 36 && id !== 'admin-catalog' && id !== 'general';
-
 const cartSupplierGroupKey = (item: CartItem): string => {
-  if (supplierIdLooksLikeUuid(item.supplier_id)) {
+  if (supplierIdValidForCheckout(item.supplier_id)) {
     return `sid:${item.supplier_id}`;
   }
   const name = (item.supplier_name || 'UjenziXform Catalog').trim();
@@ -112,6 +110,7 @@ export const CartSidebar: React.FC = () => {
     isCartOpen,
     setIsCartOpen 
   } = useCart();
+  const supplierCheckoutReady = cartReadyForDirectCheckout(items);
   const { toast } = useToast();
   const { user: authUser } = useAuth();
   const [comparisonItem, setComparisonItem] = useState<CartItem | null>(null);
@@ -501,89 +500,40 @@ export const CartSidebar: React.FC = () => {
         .filter(Boolean);
       console.log('🛒 Cart product IDs:', productIds);
       
-      // STEP 1: Check if any item already has a valid supplier_id from user selection
-      const itemWithSupplier = items.find(item => 
-        item.supplier_id && 
-        item.supplier_id !== 'admin-catalog' && 
-        item.supplier_id !== 'general' &&
-        item.supplier_id.length === 36
-      );
-      
-      if (itemWithSupplier?.supplier_id) {
-        validatedSupplierId = itemWithSupplier.supplier_id;
-        supplierName = itemWithSupplier.supplier_name || 'Selected Supplier';
-        console.log('📦 Using supplier from cart item:', validatedSupplierId);
+      // Require an explicit supplier choice (Compare → Select). No auto-pick from price tables.
+      if (!cartReadyForDirectCheckout(items)) {
+        const allValidIds = items.every((item) => supplierIdValidForCheckout(item.supplier_id));
+        const singleSupplier =
+          allValidIds && new Set(items.map((i) => i.supplier_id)).size === 1;
+        const allConfirmed = items.every((i) => i.supplier_pick_confirmed === true);
+        let description =
+          'Open Compare Prices Across Suppliers, tap Select on the supplier and store location you want, then use Buy Now or Pay now with Paystack. Your order must be tied to that supplier.';
+        if (allValidIds && singleSupplier && !allConfirmed) {
+          description =
+            'You still need to tap Select on that supplier in Compare Prices Across Suppliers so we know which store should fulfil this order.';
+        } else if (allValidIds && !singleSupplier) {
+          description =
+            'All cart lines must be from the same supplier. Open Compare Prices Across Suppliers and tap Select on one supplier so every item is repriced from that store.';
+        }
+        toast({
+          title: 'Choose a supplier first',
+          description,
+          variant: 'destructive',
+        });
+        setIsProcessing(false);
+        return;
       }
-      
+
+      validatedSupplierId = items[0].supplier_id!;
+      supplierName = items[0].supplier_name || 'Selected Supplier';
+      console.log('📦 Using explicitly selected supplier from cart:', validatedSupplierId);
+
       const restHeaders: Record<string, string> = {
         apikey: SUPABASE_ANON_KEY,
         Authorization: `Bearer ${accessToken}`,
       };
 
-      // STEP 2: If no supplier from cart, find supplier who has PRICED these products
-      if (!validatedSupplierId && productIds.length > 0) {
-        console.log('🔍 Finding supplier who priced these products...');
-        try {
-          // Supabase REST API in.() filter expects comma-separated values WITHOUT quotes for UUIDs
-          const productIdsParam = productIds.join(',');
-          const pricesResponse = await fetchWithTimeout(
-            `${SUPABASE_URL}/rest/v1/supplier_product_prices?product_id=in.(${productIdsParam})&select=supplier_id&limit=1`,
-            { headers: restHeaders },
-            5000
-          );
-          
-          if (pricesResponse.ok) {
-            const prices = await pricesResponse.json();
-            if (prices && prices.length > 0) {
-              validatedSupplierId = prices[0].supplier_id;
-              console.log('📦 Using supplier who priced products:', validatedSupplierId);
-              
-              // Get supplier name
-              try {
-                const nameResponse = await fetchWithTimeout(
-                  `${SUPABASE_URL}/rest/v1/suppliers?id=eq.${validatedSupplierId}&select=company_name`,
-                  { headers: restHeaders },
-                  3000
-                );
-                if (nameResponse.ok) {
-                  const nameData = await nameResponse.json();
-                  supplierName = nameData?.[0]?.company_name || 'Supplier';
-                }
-              } catch (e) {
-                console.warn('Could not fetch supplier name');
-              }
-            }
-          }
-        } catch (e) {
-          console.warn('Product prices lookup failed');
-        }
-      }
-      
-      // STEP 3: If still no supplier, get first available supplier
-      if (!validatedSupplierId) {
-        console.log('🔍 Finding any available supplier...');
-        try {
-          const supplierResponse = await fetchWithTimeout(
-            `${SUPABASE_URL}/rest/v1/suppliers?select=id,company_name&limit=1`,
-            { headers: restHeaders },
-            5000
-          );
-          
-          if (supplierResponse.ok) {
-            const suppliers = await supplierResponse.json();
-            if (suppliers && suppliers.length > 0) {
-              validatedSupplierId = suppliers[0].id;
-              supplierName = suppliers[0].company_name;
-              console.log('📦 Using first available supplier:', validatedSupplierId, supplierName);
-            }
-          }
-        } catch (e) {
-          console.warn('Supplier fetch failed');
-        }
-      }
-      
       if (
-        !validatedSupplierId ||
         validatedSupplierId === userId ||
         validatedSupplierId === 'admin-catalog' ||
         validatedSupplierId === 'general'
@@ -1060,12 +1010,18 @@ export const CartSidebar: React.FC = () => {
                         <Button 
                           className="bg-green-600 hover:bg-green-700 h-12 flex flex-col items-center justify-center"
                           onClick={handleBuyNow}
-                          disabled={isProcessing}
+                          disabled={isProcessing || !supplierCheckoutReady}
+                          title={!supplierCheckoutReady ? 'Select a supplier in Compare Prices first (tap Select).' : undefined}
                         >
                           <CreditCard className="h-4 w-4 mb-0.5" />
                           <span className="text-xs">Buy Now</span>
                         </Button>
                       </div>
+                      {!supplierCheckoutReady && (
+                        <p className="text-[10px] text-center text-amber-700 font-medium">
+                          Use Compare Prices → <strong>Select</strong> on a supplier before Buy Now.
+                        </p>
+                      )}
                       <p className="text-[10px] text-center text-purple-600 font-medium">
                         👑 Admin: Full access to both quote requests and direct purchases
                       </p>
@@ -1096,9 +1052,10 @@ export const CartSidebar: React.FC = () => {
                         </span>
                       </Button>
                       <Button 
-                        className="w-full bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 h-14 flex items-center justify-center gap-3"
+                        className="w-full bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 h-14 flex items-center justify-center gap-3 disabled:opacity-60"
                         onClick={handleBuyNow}
-                        disabled={isProcessing}
+                        disabled={isProcessing || !supplierCheckoutReady}
+                        title={!supplierCheckoutReady ? 'Select a supplier in Compare Prices first (tap Select).' : undefined}
                       >
                         {isProcessing ? (
                           <>
@@ -1110,13 +1067,22 @@ export const CartSidebar: React.FC = () => {
                             <CreditCard className="h-5 w-5" />
                             <div className="text-left">
                               <span className="text-sm font-semibold">Buy Now - KES {getTotalPrice().toLocaleString()}</span>
-                              <p className="text-[10px] opacity-80">Complete your purchase instantly</p>
+                              <p className="text-[10px] opacity-80">
+                                {supplierCheckoutReady
+                                  ? 'Complete your purchase instantly'
+                                  : 'Select a supplier (Compare Prices → Select) before paying'}
+                              </p>
                             </div>
                           </>
                         )}
                       </Button>
+                      {!supplierCheckoutReady && (
+                        <p className="text-[10px] text-center text-amber-700 font-medium">
+                          Tap Compare Prices Across Suppliers, then <strong>Select</strong> on the supplier whose store will fulfil this order. Buy Now stays off until that is done.
+                        </p>
+                      )}
                       <p className="text-[10px] text-center text-green-600 font-medium">
-                        Private Client: compare suppliers (with locations) or buy directly from your chosen store.
+                        Private Client: compare suppliers (with locations), tap Select, then buy from that store.
                       </p>
                     </>
                   );

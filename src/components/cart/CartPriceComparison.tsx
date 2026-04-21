@@ -49,6 +49,7 @@ interface CartItem {
   supplier_name?: string;
   supplier_id?: string;
   supplier_location?: string;
+  supplier_pick_confirmed?: boolean;
 }
 
 interface AlternativePrice {
@@ -249,6 +250,7 @@ export const CartPriceComparison: React.FC<CartPriceComparisonProps> = ({
       supplier_name: alt.supplier_name,
       supplier_id: alt.supplier_id,
       supplier_location: alt.locationLabel,
+      supplier_pick_confirmed: true,
     }, cartItem.quantity);
 
     const savings = cartItem.unit_price - alt.price;
