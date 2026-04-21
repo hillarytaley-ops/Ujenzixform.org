@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -109,6 +109,21 @@ const MATERIAL_TYPES = [
   'mixed'
 ];
 
+/** Prefills delivery instructions so providers see what is being moved (matches "Products in this order"). */
+function buildDeliveryInstructionsFromPoItems(
+  items: PurchaseOrderItem[] | undefined | null
+): string {
+  if (!items?.length) return '';
+  return items
+    .map((item) => {
+      const name = (item.material_name || item.name || 'Item').trim();
+      const unitLabel = (item.unit || 'unit').trim();
+      const qtyPart = `${item.quantity} ${unitLabel}`.trim();
+      return `${qtyPart} - ${name}`;
+    })
+    .join('\n');
+}
+
 export const DeliveryPromptDialog: React.FC<DeliveryPromptDialogProps> = ({
   isOpen,
   onOpenChange,
@@ -128,6 +143,7 @@ export const DeliveryPromptDialog: React.FC<DeliveryPromptDialogProps> = ({
     preferredTime: '',
     specialInstructions: ''
   });
+  const lastPrefilledPurchaseOrderId = useRef<string | null>(null);
   const { toast } = useToast();
 
   // Required for Send Request: address or coordinates (same validation as submit) — ensures address is never missing on provider dashboard
@@ -223,17 +239,31 @@ export const DeliveryPromptDialog: React.FC<DeliveryPromptDialogProps> = ({
   // Pre-fill form with purchase order data
   useEffect(() => {
     if (purchaseOrder) {
-      setDeliveryData(prev => ({
-        ...prev,
-        // CRITICAL: Don't pre-populate with purchase_order.delivery_address if it's a placeholder
-        // The builder should enter their own delivery address, not inherit "To be provided"
-        deliveryAddress: (purchaseOrder.delivery_address && 
-                         purchaseOrder.delivery_address.toLowerCase() !== 'to be provided' &&
-                         purchaseOrder.delivery_address.toLowerCase() !== 'tbd' &&
-                         purchaseOrder.delivery_address.toLowerCase() !== 'n/a') 
-                         ? purchaseOrder.delivery_address : '',
-        preferredDate: purchaseOrder.delivery_date || ''
-      }));
+      const fromItems = buildDeliveryInstructionsFromPoItems(purchaseOrder.items);
+      const poIdChanged = lastPrefilledPurchaseOrderId.current !== purchaseOrder.id;
+      if (poIdChanged) {
+        lastPrefilledPurchaseOrderId.current = purchaseOrder.id;
+      }
+      setDeliveryData(prev => {
+        const next: typeof prev = {
+          ...prev,
+          // CRITICAL: Don't pre-populate with purchase_order.delivery_address if it's a placeholder
+          // The builder should enter their own delivery address, not inherit "To be provided"
+          deliveryAddress: (purchaseOrder.delivery_address && 
+                           purchaseOrder.delivery_address.toLowerCase() !== 'to be provided' &&
+                           purchaseOrder.delivery_address.toLowerCase() !== 'tbd' &&
+                           purchaseOrder.delivery_address.toLowerCase() !== 'n/a') 
+                           ? purchaseOrder.delivery_address : '',
+          preferredDate: purchaseOrder.delivery_date || ''
+        };
+        // Prefill materials for providers: new PO → always from items; same PO → only if still empty (e.g. items arrived async)
+        if (fromItems && (poIdChanged || !prev.specialInstructions.trim())) {
+          next.specialInstructions = fromItems;
+        } else if (poIdChanged && !fromItems) {
+          next.specialInstructions = '';
+        }
+        return next;
+      });
     }
   }, [purchaseOrder]);
 
