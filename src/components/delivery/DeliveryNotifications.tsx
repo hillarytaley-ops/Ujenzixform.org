@@ -21,6 +21,11 @@ import { trackingNumberService } from '@/services/TrackingNumberService';
 import { cleanupDuplicateDeliveryRequests, cleanupDuplicatePurchaseOrders, checkForDuplicateDeliveryRequests, deleteDeliveryRequestsWithoutAddress, deleteDuplicateDeliveryRequestsByCompositeKey } from '@/utils/cleanupDuplicateDeliveryRequests';
 import { checkDeliveryAddress } from '@/utils/checkDeliveryAddress';
 import { haversineKm, resolveJobCoordinates } from '@/utils/deliveryProximity';
+import {
+  formatOrderItemsQuantityLine,
+  resolvePickupForProvider,
+  fetchSuppliersByIds,
+} from '@/utils/deliveryNotificationFormatters';
 
 /** DB sometimes stores placeholder 0; treat as empty for card copy */
 function materialTypeForDisplay(raw: unknown): string {
@@ -552,7 +557,7 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
       if (poIdsToVerify.length > 0) {
         try {
           const verifyResponse = await fetch(
-            `${url}/rest/v1/purchase_orders?id=in.(${poIdsToVerify.join(',')})&select=id,po_number,delivery_address&limit=1000`,
+            `${url}/rest/v1/purchase_orders?id=in.(${poIdsToVerify.join(',')})&select=id,po_number,delivery_address,supplier_id,items&limit=1000`,
             { headers, cache: 'no-store' }
           );
           
@@ -598,6 +603,15 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
           // If verification fails, assume all are valid to ensure alerts show
           validPOIds = new Set(poIdsToVerify);
         }
+      }
+
+      const supplierById = new Map<string, Record<string, unknown>>();
+      const sidFromPoMap = [...poMap.values()]
+        .map((p: any) => p?.supplier_id)
+        .filter((id: unknown): id is string => typeof id === 'string' && id.length === 36);
+      if (sidFromPoMap.length > 0) {
+        const initialSuppliers = await fetchSuppliersByIds(url, headers, sidFromPoMap);
+        initialSuppliers.forEach((v, k) => supplierById.set(k, v));
       }
       
       // CRITICAL FIX: Use a Map to ensure ONLY ONE notification per purchase_order_id
@@ -799,7 +813,7 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
             console.log(`📍 FALLBACK: Purchase order ${poId.slice(0, 8)} not in map, fetching directly...`);
             try {
               const poFetchResponse = await fetch(
-                `${url}/rest/v1/purchase_orders?id=eq.${poId}&select=id,po_number,delivery_address&limit=1`,
+                `${url}/rest/v1/purchase_orders?id=eq.${poId}&select=id,po_number,delivery_address,supplier_id,items&limit=1`,
                 { headers, cache: 'no-store' }
               );
               console.log(`📍 FALLBACK: Purchase order fetch response status: ${poFetchResponse.status}`);
@@ -860,7 +874,7 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
           if (!po && poId) {
             try {
               const poFetchResponse = await fetch(
-                `${url}/rest/v1/purchase_orders?id=eq.${poId}&select=id,po_number,delivery_address&limit=1`,
+                `${url}/rest/v1/purchase_orders?id=eq.${poId}&select=id,po_number,delivery_address,supplier_id,items&limit=1`,
                 { headers, cache: 'no-store' }
               );
               if (poFetchResponse.ok) {
@@ -951,22 +965,49 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
         }
 
         const matLabel = materialTypeForDisplay(dr.material_type);
+        const linkedPoId =
+          dr.purchase_order_id && String(dr.purchase_order_id).length === 36
+            ? String(dr.purchase_order_id)
+            : null;
+        let poRow = linkedPoId && poMap.has(linkedPoId) ? poMap.get(linkedPoId) : null;
+        if (poRow?.supplier_id && !supplierById.has(String(poRow.supplier_id))) {
+          const more = await fetchSuppliersByIds(url, headers, [String(poRow.supplier_id)]);
+          more.forEach((v, k) => supplierById.set(k, v));
+        }
+        const supRow = poRow?.supplier_id
+          ? supplierById.get(String(poRow.supplier_id))
+          : undefined;
+        const qtyLine =
+          formatOrderItemsQuantityLine(poRow?.items) ||
+          (dr.quantity != null && String(dr.quantity).trim() !== ''
+            ? `${matLabel || 'Materials'}: ${dr.quantity}`.trim()
+            : '');
+        const pickupResolved = resolvePickupForProvider(
+          dr.pickup_address || dr.pickup_location,
+          poRow?.supplier_id ? String(poRow.supplier_id) : undefined,
+          supRow,
+          (supRow?.company_name as string) || undefined
+        );
+        const msgCore = matLabel || 'Materials';
+        const message = qtyLine
+          ? `${msgCore} — ${qtyLine} — deliver to ${deliveryAddr}`
+          : `${msgCore} delivery to ${deliveryAddr}`;
         const highlightOpen =
           dr.status === 'pending' || dr.status === 'delivery_quote_paid';
         finalNotifications.push({
           id: `dr-${dr.id}`, // Use delivery_request id as notification id
           type: 'new_delivery',
           title: highlightOpen ? '🚚 New Delivery Request!' : `Delivery ${dr.status}`,
-          message: `${matLabel || 'Materials'} delivery to ${deliveryAddr}`,
+          message,
           timestamp: new Date(dr.created_at),
           read: !highlightOpen,
           priority: highlightOpen ? 'high' : 'medium',
           actionUrl: `/delivery-dashboard?request=${dr.id}`,
           status: dr.status,
-          pickupAddress: dr.pickup_address || dr.pickup_location || '',
+          pickupAddress: pickupResolved,
           deliveryAddress: deliveryAddr,
           materialType: matLabel,
-          quantity: dr.quantity || '',
+          quantity: qtyLine || (dr.quantity != null ? String(dr.quantity) : ''),
           purchase_order_id: dr.purchase_order_id ?? (poId === dr.id ? undefined : poId), // Use real PO id; for null-po requests key is dr.id so pass undefined
           po_number: poNumber || undefined, // CRITICAL: Include po_number for deduplication
           delivery_request_id: dr.id, // For accepting
@@ -1024,6 +1065,24 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
       if (poResponse.ok) {
         const purchaseOrders = await poResponse.json();
         console.log(`✅ Loaded ${purchaseOrders.length} purchase_orders`);
+
+        purchaseOrders.forEach((po: any) => {
+          if (po?.id) {
+            const prev = poMap.get(po.id);
+            poMap.set(po.id, prev ? { ...prev, ...po } : po);
+          }
+        });
+        const sidNeed = [
+          ...new Set(
+            purchaseOrders
+              .map((p: any) => p?.supplier_id)
+              .filter((id: unknown): id is string => typeof id === 'string' && id.length === 36)
+          ),
+        ].filter((id) => !supplierById.has(id));
+        if (sidNeed.length > 0) {
+          const extraSuppliers = await fetchSuppliersByIds(url, headers, sidNeed);
+          extraSuppliers.forEach((v, k) => supplierById.set(k, v));
+        }
         
         let skippedCount = 0;
         // Only add purchase_orders that DON'T have a delivery_request AND haven't been added yet
@@ -1118,20 +1177,34 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
               console.error(`🚫 BLOCKED: Purchase order ${po.id} duplicate detected right before adding, skipping`);
               return;
             }
+            const qtyText =
+              formatOrderItemsQuantityLine(po.items) ||
+              (Array.isArray(po.items) && po.items.length > 0
+                ? `${po.items.length} order line(s) — open order for quantities`
+                : '');
+            const sup = po.supplier_id ? supplierById.get(String(po.supplier_id)) : undefined;
+            const pickupLine = resolvePickupForProvider(
+              undefined,
+              po.supplier_id ? String(po.supplier_id) : undefined,
+              sup,
+              (sup?.company_name as string) || undefined
+            );
             finalNotifications.push({
               id: `po-${po.id}`,
               type: 'new_delivery',
               title: '🚚 New Delivery Request!',
-              message: `${materialType} delivery to ${po.delivery_address || 'Unknown location'}`,
+              message: qtyText
+                ? `${materialType} — ${qtyText} — deliver to ${po.delivery_address || 'Unknown location'}`
+                : `${materialType} delivery to ${po.delivery_address || 'Unknown location'}`,
               timestamp: new Date(po.delivery_requested_at || po.order_created_at || po.created_at),
               read: false,
               priority: 'high',
               actionUrl: `/delivery-dashboard?order=${po.id}`,
               status: 'pending',
-              pickupAddress: 'Supplier location',
+              pickupAddress: pickupLine,
               deliveryAddress: po.delivery_address || '',
               materialType: materialType,
-              quantity: po.items?.length || 1,
+              quantity: qtyText || String(po.items?.length || ''),
               purchase_order_id: po.id, // CRITICAL
               po_number: po.po_number || undefined, // CRITICAL: Include po_number for deduplication
               delivery_request_id: undefined // No delivery_request yet
@@ -2501,9 +2574,18 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
                       </div>
                       {notification.materialType && (
                         <p className="text-xs text-gray-600 mt-0.5">
-                          📦 {notification.materialType} {notification.quantity && `(${notification.quantity} items)`}
+                          📦 Materials: {notification.materialType}
                         </p>
                       )}
+                      {notification.quantity != null &&
+                        String(notification.quantity).trim() !== '' && (
+                          <p
+                            className="text-xs text-gray-800 mt-0.5 font-medium leading-snug line-clamp-3"
+                            title={String(notification.quantity)}
+                          >
+                            📊 Quantities: {String(notification.quantity)}
+                          </p>
+                        )}
                     </div>
                     <Badge 
                       variant={notification.priority === 'high' ? 'destructive' : 'outline'} 

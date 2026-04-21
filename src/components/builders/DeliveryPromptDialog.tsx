@@ -40,6 +40,7 @@ import {
 } from 'lucide-react';
 import { supabase, SUPABASE_URL, SUPABASE_ANON_KEY } from '@/integrations/supabase/client';
 import { readAuthSessionForRest } from '@/utils/supabaseAccessToken';
+import { supplierLocationLine } from '@/utils/supplierLocationLine';
 import { useToast } from '@/hooks/use-toast';
 import { MonitoringServicePrompt } from './MonitoringServicePrompt';
 import { deliveryProviderNotificationService } from '@/services/DeliveryProviderNotificationService';
@@ -445,14 +446,17 @@ export const DeliveryPromptDialog: React.FC<DeliveryPromptDialogProps> = ({
       if (purchaseOrder.supplier_id) {
         try {
           const supplierResponse = await fetchWithTimeout(
-            `${SUPABASE_URL}/rest/v1/suppliers?id=eq.${purchaseOrder.supplier_id}&select=address,company_name`,
+            `${SUPABASE_URL}/rest/v1/suppliers?id=eq.${purchaseOrder.supplier_id}&select=address,company_name,location,physical_address,county`,
             { headers: { 'apikey': SUPABASE_ANON_KEY } },
             5000
           );
           if (supplierResponse.ok) {
             const suppliers = await supplierResponse.json();
             if (suppliers?.[0]) {
-              pickupAddress = suppliers[0].address || `${suppliers[0].company_name} - Pickup Location`;
+              const s = suppliers[0];
+              const line = supplierLocationLine(s);
+              const name = (s.company_name || 'Supplier').trim();
+              pickupAddress = line ? `${name} — ${line}` : (s.address ? `${name} — ${s.address}` : `${name} — add store address in supplier profile`);
             }
           }
         } catch (e) {
