@@ -2115,15 +2115,15 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Bell className="h-5 w-5" />
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex min-w-0 flex-wrap items-center gap-2">
+          <Bell className="h-5 w-5 shrink-0" />
           <h3 className="font-semibold">Notifications</h3>
           {unreadCount > 0 && (
             <Badge className="bg-red-500 text-white animate-pulse">{unreadCount}</Badge>
           )}
         </div>
-        <div className="flex gap-2">
+        <div className="flex w-full min-w-0 flex-wrap gap-2 sm:w-auto sm:justify-end">
           <Button variant="ghost" size="sm" onClick={() => setShowSettings(!showSettings)}>
             {showSettings ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
             {showSettings ? 'Hide Settings' : 'Settings'}
@@ -2553,11 +2553,13 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
                   }`}
                 >
                   {/* Compact Header */}
-                  <div className="flex items-start justify-between mb-2">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        <Truck className="h-4 w-4 text-teal-600 flex-shrink-0" />
-                        <p className="font-semibold text-sm text-gray-900">{notification.title}</p>
+                  <div className="mb-2 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <Truck className="h-4 w-4 shrink-0 text-teal-600" />
+                        <p className="min-w-0 flex-1 break-words text-sm font-semibold text-gray-900 sm:flex-none">
+                          {notification.title}
+                        </p>
                         {isDeliveryAcceptRejectStatus(notification.status) && (
                           <Badge className="bg-orange-500 text-white text-[10px] px-1.5 py-0 animate-pulse">
                             NEW
@@ -2589,7 +2591,7 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
                     </div>
                     <Badge 
                       variant={notification.priority === 'high' ? 'destructive' : 'outline'} 
-                      className="text-[10px] font-medium px-1.5 py-0 flex-shrink-0"
+                      className="w-fit shrink-0 self-start text-[10px] font-medium px-1.5 py-0 sm:self-auto"
                     >
                       {notification.priority}
                     </Badge>
@@ -2597,16 +2599,22 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
 
                   {/* Compact Location Blocks */}
                   {notification.pickupAddress && (
-                    <div className="bg-green-50/80 rounded-md px-2 py-1.5 mb-1.5 border border-green-200">
-                      <p className="text-[10px] font-semibold text-green-800 uppercase">📦 Pickup</p>
-                      <p className="text-xs text-green-900 truncate" title={notification.pickupAddress}>{notification.pickupAddress}</p>
+                    <div className="mb-1.5 rounded-md border border-green-200 bg-green-50/80 px-2 py-1.5">
+                      <p className="text-[10px] font-semibold uppercase leading-snug text-green-800">📦 Pickup</p>
+                      <p className="min-w-0 break-words text-xs leading-snug text-green-900" title={notification.pickupAddress}>
+                        {notification.pickupAddress}
+                      </p>
                     </div>
                   )}
 
                   {notification.deliveryAddress && (
-                    <div className="bg-orange-50/80 rounded-md px-2 py-1.5 mb-2 border border-orange-200">
-                      <p className="text-[10px] font-semibold text-orange-800 uppercase">📍 Delivery address (from builder — use this for delivery)</p>
-                      <p className="text-xs text-orange-900 truncate" title={notification.deliveryAddress}>{notification.deliveryAddress}</p>
+                    <div className="mb-2 rounded-md border border-orange-200 bg-orange-50/80 px-2 py-1.5">
+                      <p className="text-[10px] font-semibold uppercase leading-snug text-orange-800 break-words">
+                        📍 Delivery address (from builder — use this for delivery)
+                      </p>
+                      <p className="min-w-0 break-words text-xs leading-snug text-orange-900" title={notification.deliveryAddress}>
+                        {notification.deliveryAddress}
+                      </p>
                     </div>
                   )}
                   {(!notification.deliveryAddress || notification.deliveryAddress === 'Delivery address missing - contact builder') && notification.delivery_request_id && (
@@ -2717,7 +2725,7 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
                         </div>
                       ) : (
                         <div className="flex flex-col gap-2">
-                          <div className="flex gap-2">
+                          <div className="flex flex-col gap-2 min-[420px]:flex-row">
                             <Button
                               size="sm"
                               onClick={() => handleAcceptDelivery(notification.delivery_request_id!)}

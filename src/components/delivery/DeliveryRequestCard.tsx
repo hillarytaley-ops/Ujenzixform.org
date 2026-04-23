@@ -370,7 +370,7 @@ export const DeliveryRequestCard: React.FC<DeliveryRequestCardProps> = ({
                     <div className="w-2 h-2 bg-green-500 rounded-full flex-shrink-0"></div>
                     <div className="flex-1 min-w-0">
                       <p className={`text-[9px] sm:text-[10px] ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>Pickup</p>
-                      <p className={`text-[11px] sm:text-xs font-medium truncate ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                      <p className={`text-[11px] sm:text-xs font-medium break-words ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
                         {delivery.pickup_location}
                       </p>
                     </div>
@@ -379,7 +379,7 @@ export const DeliveryRequestCard: React.FC<DeliveryRequestCardProps> = ({
                     <div className="w-2 h-2 bg-red-500 rounded-full flex-shrink-0"></div>
                     <div className="flex-1 min-w-0">
                       <p className={`text-[9px] sm:text-[10px] ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>Delivery</p>
-                      <p className={`text-[11px] sm:text-xs font-medium truncate ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                      <p className={`text-[11px] sm:text-xs font-medium break-words ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
                         {delivery.delivery_location}
                       </p>
                     </div>
@@ -390,7 +390,7 @@ export const DeliveryRequestCard: React.FC<DeliveryRequestCardProps> = ({
                 <div className="space-y-0.5">
                   <div className="flex items-center gap-1">
                     <Package className="h-3 w-3 text-gray-400 flex-shrink-0" />
-                    <span className={`text-[11px] sm:text-xs truncate ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                    <span className={`min-w-0 text-[11px] sm:text-xs break-words ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
                       {delivery.material_type} - {delivery.quantity}
                     </span>
                   </div>

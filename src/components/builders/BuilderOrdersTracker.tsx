@@ -1502,25 +1502,28 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({
     return (
     <Card key={order.id} className="border overflow-hidden">
       <CardContent className="p-0">
-        {/* Order header — main row expands; Re-request is its own control (not nested in expand button). */}
-        <div className="flex w-full min-w-0 items-center gap-1.5 sm:gap-2 px-2 py-2 sm:px-3 sm:py-2.5 hover:bg-gray-50/90 transition-colors">
+        {/* Order header — stack on narrow screens so PO + status are readable; actions wrap below. */}
+        <div className="flex w-full min-w-0 flex-col gap-2 px-2 py-2 sm:flex-row sm:items-center sm:gap-2 sm:px-3 sm:py-2.5 hover:bg-gray-50/90 transition-colors">
           <button
             type="button"
-            className="flex min-w-0 flex-1 items-center gap-2 sm:gap-3 text-left rounded-md outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
+            className="flex min-w-0 w-full items-center gap-2 sm:flex-1 sm:gap-3 text-left rounded-md outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
             onClick={() => setExpandedOrder(isExpanded ? null : order.id)}
           >
             <div className="shrink-0 rounded-lg bg-blue-50 p-1.5">
               <QrCode className="h-5 w-5 text-blue-600" aria-hidden />
             </div>
             <div className="min-w-0 flex-1 overflow-hidden">
-              <p className="truncate text-sm font-semibold text-gray-900" title={order.po_number}>
+              <p
+                className="break-all text-sm font-semibold text-gray-900 sm:truncate sm:break-normal"
+                title={order.po_number}
+              >
                 {order.po_number}
               </p>
-              <p className="flex items-center gap-1 truncate text-xs text-gray-500">
+              <p className="flex min-w-0 flex-wrap items-center gap-x-1 gap-y-0.5 text-xs text-gray-500">
                 <Calendar className="h-3 w-3 shrink-0" aria-hidden />
-                <span className="truncate">{format(new Date(order.created_at), 'MMM dd, yyyy')}</span>
+                <span className="shrink-0">{format(new Date(order.created_at), 'MMM dd, yyyy')}</span>
                 <span className="shrink-0 text-gray-400 hidden sm:inline">·</span>
-                <span className="truncate text-gray-600 hidden sm:inline">
+                <span className="text-gray-600 sm:inline">
                   KES {order.total_amount?.toLocaleString() ?? '0'}
                 </span>
               </p>
@@ -1567,19 +1570,20 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({
             <span className="shrink-0 text-xs font-medium text-gray-600 md:hidden">{progress}%</span>
             <Badge
               title={statusLabel}
-              className={`${getStatusColor(order.status)} max-w-[36vw] sm:max-w-[180px] shrink-0 truncate px-2 py-1 text-xs whitespace-nowrap inline-flex items-center gap-1`}
+              className={`${getStatusColor(order.status)} max-w-full sm:max-w-[200px] shrink-0 px-2 py-1 text-xs inline-flex items-center gap-1 sm:truncate sm:whitespace-nowrap`}
             >
               <span className="shrink-0">{getStatusIcon(order.status)}</span>
-              <span className="truncate">{statusLabel}</span>
+              <span className="min-w-0 break-words text-left leading-tight sm:truncate">{statusLabel}</span>
             </Badge>
           </button>
+          <div className="flex w-full min-w-0 flex-wrap items-center justify-end gap-1.5 border-t border-gray-100 pt-2 sm:w-auto sm:flex-nowrap sm:border-t-0 sm:pt-0 sm:pl-0">
           {shouldShowRerequestDelivery(order, deliveryRequestsList) ? (
             <Button
               type="button"
               variant="outline"
               size="sm"
               title="Notify delivery providers again"
-              className="shrink-0 h-8 border-orange-300 bg-orange-50 px-2 text-orange-900 hover:bg-orange-100"
+              className="h-8 shrink-0 border-orange-300 bg-orange-50 px-2 text-orange-900 hover:bg-orange-100"
               onClick={(e) => {
                 e.stopPropagation();
                 setSelectedOrderForDelivery(order);
@@ -1616,6 +1620,7 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({
           >
             {isExpanded ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
           </button>
+          </div>
         </div>
         
         {/* Order Details (Expanded) */}
@@ -1774,21 +1779,28 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({
                 return (
                   <Alert className="border-orange-200 bg-orange-50">
                     <Truck className="h-4 w-4 shrink-0 text-orange-700" />
-                    <AlertDescription className="text-sm space-y-2 text-gray-900">
+                    <AlertDescription className="min-w-0 text-sm space-y-2 text-gray-900">
                       <p>
                         <strong>Re-request delivery.</strong> This order is set for delivery but there is no assigned provider and no active open request tied to it. Use the button below (or <strong>Re-request</strong> on the order row) only when you want providers notified again — refreshing the page does not send anything by itself.
                       </p>
                       <Button
                         type="button"
                         size="sm"
-                        className="bg-orange-700 hover:bg-orange-800 text-white"
+                        className="h-auto w-full max-w-full whitespace-normal bg-orange-700 px-3 py-2 text-left hover:bg-orange-800 text-white sm:w-auto"
                         onClick={(e) => {
                           e.stopPropagation();
                           openDialog();
                         }}
                       >
-                        <Truck className="h-3.5 w-3.5 mr-1" />
-                        Re-request delivery
+                        <span className="flex items-start gap-2">
+                          <Truck className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+                          <span className="flex min-w-0 flex-col gap-0.5">
+                            <span className="font-semibold">Re-request delivery</span>
+                            <span className="break-all font-mono text-[11px] font-normal opacity-90">
+                              {order.po_number}
+                            </span>
+                          </span>
+                        </span>
                       </Button>
                     </AlertDescription>
                   </Alert>
@@ -2113,15 +2125,15 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({
       
       {/* Active Filter Indicator */}
       {activeFilter !== 'all' && (
-        <div className="flex items-center justify-between bg-blue-50 border border-blue-200 rounded-lg px-4 py-2">
-          <span className="text-sm text-blue-700">
+        <div className="flex flex-col gap-2 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2 sm:flex-row sm:items-center sm:justify-between sm:px-4">
+          <span className="min-w-0 text-sm text-blue-700 break-words">
             Showing: <strong className="capitalize">{activeFilter.replace('_', ' ')}</strong> orders ({filteredOrders.length})
           </span>
           <Button 
             variant="ghost" 
             size="sm" 
             onClick={() => setActiveFilter('all')}
-            className="text-blue-600 hover:text-blue-800 hover:bg-blue-100"
+            className="w-full shrink-0 text-blue-600 hover:text-blue-800 hover:bg-blue-100 sm:w-auto"
           >
             Show All Orders
           </Button>
@@ -2130,15 +2142,17 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({
 
       {/* Orders List */}
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
-          <div>
-            <CardTitle className="flex items-center gap-2">
-              <Package className="h-5 w-5 text-blue-600" />
+        <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div className="min-w-0 space-y-1">
+            <CardTitle className="flex flex-wrap items-center gap-2 text-lg sm:text-2xl">
+              <Package className="h-5 w-5 shrink-0 text-blue-600" />
               Your Orders
             </CardTitle>
-            <CardDescription>Track your material orders and deliveries</CardDescription>
+            <CardDescription className="break-words">
+              Track your material orders and deliveries
+            </CardDescription>
           </div>
-          <Button variant="outline" size="sm" onClick={fetchOrders}>
+          <Button variant="outline" size="sm" onClick={fetchOrders} className="w-full shrink-0 sm:w-auto">
             <RefreshCw className="h-4 w-4 mr-2" />
             Refresh
           </Button>
@@ -2165,8 +2179,8 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({
               return (
                 <Alert className="border-orange-200 bg-orange-50 dark:bg-orange-950/30">
                   <Truck className="h-4 w-4 shrink-0 text-orange-800" />
-                  <AlertDescription className="text-sm text-orange-950 dark:text-orange-100 space-y-3">
-                    <p>
+                  <AlertDescription className="min-w-0 space-y-3 text-sm text-orange-950 dark:text-orange-100">
+                    <p className="break-words">
                       <strong>Re-request delivery if needed.</strong> An order is marked for delivery but has no assigned provider and no active open delivery request. Use{' '}
                       <strong>Re-request</strong> on the order row, expand for details, or open the next affected order below.
                     </p>
@@ -2174,14 +2188,21 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({
                       <Button
                         type="button"
                         size="sm"
-                        className="bg-orange-800 hover:bg-orange-900 text-white border-0"
+                        className="h-auto w-full max-w-full whitespace-normal border-0 bg-orange-800 px-3 py-2 text-left hover:bg-orange-900 text-white"
                         onClick={() => {
                           setSelectedOrderForDelivery(firstRerequestOrder);
                           setShowDeliveryPrompt(true);
                         }}
                       >
-                        <Truck className="h-3.5 w-3.5 mr-1" />
-                        Re-request delivery ({firstRerequestOrder.po_number})
+                        <span className="flex items-start gap-2">
+                          <Truck className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+                          <span className="flex min-w-0 flex-col gap-0.5">
+                            <span className="font-semibold">Re-request delivery</span>
+                            <span className="break-all font-mono text-[11px] font-normal opacity-90">
+                              {firstRerequestOrder.po_number}
+                            </span>
+                          </span>
+                        </span>
                       </Button>
                     ) : null}
                   </AlertDescription>
@@ -2218,9 +2239,9 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({
               {/* Supplier Responded Orders */}
               {supplierResponded.length > 0 && (
                 <div className="space-y-3">
-                  <div className="flex items-center gap-2 pb-2 border-b border-blue-200">
-                    <CheckCircle className="h-5 w-5 text-blue-600" />
-                    <h3 className="text-lg font-semibold text-blue-700">
+                  <div className="flex min-w-0 items-start gap-2 border-b border-blue-200 pb-2">
+                    <CheckCircle className="h-5 w-5 shrink-0 text-blue-600" />
+                    <h3 className="min-w-0 flex-1 break-words text-base font-semibold text-blue-700 sm:text-lg">
                       Quotes Responded to by Supplier ({supplierResponded.length})
                     </h3>
                   </div>
@@ -2235,9 +2256,9 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({
               {/* Orders Accepted by Delivery Provider */}
               {acceptedByProvider.length > 0 && (
                 <div className="space-y-3">
-                  <div className="flex items-center gap-2 pb-2 border-b border-green-200">
-                    <CheckCircle className="h-5 w-5 text-green-600" />
-                    <h3 className="text-lg font-semibold text-green-700">
+                  <div className="flex min-w-0 items-start gap-2 border-b border-green-200 pb-2">
+                    <CheckCircle className="h-5 w-5 shrink-0 text-green-600" />
+                    <h3 className="min-w-0 flex-1 break-words text-base font-semibold text-green-700 sm:text-lg">
                       Accepted by Delivery Provider ({acceptedByProvider.length})
                     </h3>
                   </div>
@@ -2252,9 +2273,9 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({
               {/* Orders Awaiting Delivery Provider Response */}
               {awaitingProvider.length > 0 && (
                 <div className="space-y-3">
-                  <div className="flex items-center gap-2 pb-2 border-b border-amber-200">
-                    <Clock className="h-5 w-5 text-amber-600" />
-                    <h3 className="text-lg font-semibold text-amber-700">
+                  <div className="flex min-w-0 items-start gap-2 border-b border-amber-200 pb-2">
+                    <Clock className="h-5 w-5 shrink-0 text-amber-600" />
+                    <h3 className="min-w-0 flex-1 break-words text-base font-semibold text-amber-700 sm:text-lg">
                       Awaiting Delivery Provider Response ({awaitingProvider.length})
                     </h3>
                   </div>

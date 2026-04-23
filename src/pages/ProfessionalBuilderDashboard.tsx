@@ -2415,7 +2415,7 @@ const ProfessionalBuilderDashboardPage = () => {
       </div>
 
       {/* Main Content */}
-      <div className="container mx-auto max-w-7xl px-4 py-8">
+      <div className="container mx-auto max-w-7xl min-w-0 px-3 py-6 sm:px-4 sm:py-8">
         {/* Delivery address needed – prompt from driver (Check Address) so builder sees it */}
         {deliveryAddressNeededNotifications.length > 0 && (
           <div className="mb-4 rounded-lg border-2 border-amber-400 bg-amber-50 p-4 shadow-sm">
@@ -2500,18 +2500,20 @@ const ProfessionalBuilderDashboardPage = () => {
                 />
               </div>
             ) : (
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between">
-                  <div>
-                    <CardTitle className="flex items-center gap-2">
-                      <Building2 className="h-5 w-5 text-blue-600" />
+              <Card className="min-w-0 overflow-hidden">
+                <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div className="min-w-0 space-y-1">
+                    <CardTitle className="flex flex-wrap items-center gap-2 text-lg sm:text-2xl">
+                      <Building2 className="h-5 w-5 shrink-0 text-blue-600" />
                       Active Projects
                     </CardTitle>
-                    <CardDescription>Manage your construction projects</CardDescription>
+                    <CardDescription className="break-words">
+                      Manage your construction projects
+                    </CardDescription>
                   </div>
                   <Dialog open={showCreateProject} onOpenChange={setShowCreateProject}>
                     <Button 
-                      className="bg-blue-600 hover:bg-blue-700"
+                      className="w-full shrink-0 bg-blue-600 hover:bg-blue-700 sm:w-auto"
                       onClick={() => setShowCreateProject(true)}
                     >
                       <Briefcase className="h-4 w-4 mr-2" />
@@ -2770,10 +2772,10 @@ const ProfessionalBuilderDashboardPage = () => {
                       <Building2 className="h-16 w-16 mx-auto mb-4 text-gray-300" />
                       <p className="text-lg font-medium">No active projects</p>
                       <p className="text-sm mb-4">Create your first project to get started</p>
-                      <div className="flex gap-2 justify-center">
+                      <div className="flex flex-col gap-2 justify-center sm:flex-row">
                         <Button 
                           onClick={() => setShowCreateProject(true)}
-                          className="bg-blue-600 hover:bg-blue-700"
+                          className="w-full bg-blue-600 hover:bg-blue-700 sm:w-auto"
                         >
                           <Briefcase className="h-4 w-4 mr-2" />
                           Create Your First Project
@@ -2784,6 +2786,7 @@ const ProfessionalBuilderDashboardPage = () => {
                             fetchProjects();
                           }}
                           variant="outline"
+                          className="w-full sm:w-auto"
                         >
                           <Clock className="h-4 w-4 mr-2" />
                           Refresh Projects
@@ -2802,7 +2805,7 @@ const ProfessionalBuilderDashboardPage = () => {
                                 </div>
                                 <div className="min-w-0 text-left">
                                   <p className="font-semibold text-gray-900">All projects</p>
-                                  <p className="text-xs font-normal text-muted-foreground">
+                                  <p className="text-xs font-normal leading-snug text-muted-foreground break-words">
                                     {projects.length} project{projects.length === 1 ? "" : "s"} ·{" "}
                                     {formatKesCompact(
                                       projects.reduce((sum, p) => sum + (p.budget || 0), 0)
@@ -2814,28 +2817,28 @@ const ProfessionalBuilderDashboardPage = () => {
                             </AccordionTrigger>
                             <AccordionContent className="px-3 sm:px-4 pb-4 pt-0 data-[state=closed]:animate-none">
                               {/* Project Stats Summary */}
-                              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-                                <div className="bg-blue-50 p-4 rounded-lg">
-                                  <p className="text-sm text-blue-700">Active</p>
-                                  <p className="text-2xl font-bold text-blue-800">
+                              <div className="mb-6 grid grid-cols-2 gap-2 sm:gap-4 md:grid-cols-4">
+                                <div className="min-w-0 rounded-lg bg-blue-50 p-3 sm:p-4">
+                                  <p className="text-xs text-blue-700 sm:text-sm">Active</p>
+                                  <p className="text-xl font-bold text-blue-800 sm:text-2xl">
                                     {projects.filter((p) => ["active", "in_progress"].includes(p.status)).length}
                                   </p>
                                 </div>
-                                <div className="bg-green-50 p-4 rounded-lg">
-                                  <p className="text-sm text-green-700">Completed</p>
-                                  <p className="text-2xl font-bold text-green-800">
+                                <div className="min-w-0 rounded-lg bg-green-50 p-3 sm:p-4">
+                                  <p className="text-xs text-green-700 sm:text-sm">Completed</p>
+                                  <p className="text-xl font-bold text-green-800 sm:text-2xl">
                                     {projects.filter((p) => p.status === "completed").length}
                                   </p>
                                 </div>
-                                <div className="bg-amber-50 p-4 rounded-lg">
-                                  <p className="text-sm text-amber-700">On Hold</p>
-                                  <p className="text-2xl font-bold text-amber-800">
+                                <div className="min-w-0 rounded-lg bg-amber-50 p-3 sm:p-4">
+                                  <p className="text-xs text-amber-700 sm:text-sm">On Hold</p>
+                                  <p className="text-xl font-bold text-amber-800 sm:text-2xl">
                                     {projects.filter((p) => p.status === "on_hold").length}
                                   </p>
                                 </div>
-                                <div className="bg-purple-50 p-4 rounded-lg">
-                                  <p className="text-sm text-purple-700">Total Budget</p>
-                                  <p className="text-xl font-bold text-purple-800">
+                                <div className="min-w-0 rounded-lg bg-purple-50 p-3 sm:p-4 md:col-span-1 col-span-2">
+                                  <p className="text-xs text-purple-700 sm:text-sm">Total Budget</p>
+                                  <p className="break-words text-lg font-bold text-purple-800 sm:text-xl">
                                     {formatKesCompact(
                                       projects.reduce((sum, p) => sum + (p.budget || 0), 0)
                                     )}
@@ -2852,11 +2855,11 @@ const ProfessionalBuilderDashboardPage = () => {
                             onClick={() => setSelectedProject(project)}
                           >
                             <CardContent className="p-5">
-                              <div className="flex items-start justify-between mb-3">
-                                <div className="flex-1 min-w-0">
-                                  <h3 className="font-bold text-lg truncate">{project.name}</h3>
+                              <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                                <div className="min-w-0 flex-1">
+                                  <h3 className="break-words text-lg font-bold sm:line-clamp-2">{project.name}</h3>
                                   {project.id && (
-                                    <p className="text-[11px] text-gray-400 font-mono truncate" title={String(project.id)}>
+                                    <p className="font-mono text-[11px] text-gray-400 break-all sm:truncate" title={String(project.id)}>
                                       Ref {String(project.id).replace(/-/g, '').slice(0, 8)}…
                                     </p>
                                   )}
@@ -2869,19 +2872,19 @@ const ProfessionalBuilderDashboardPage = () => {
                                       })}
                                     </p>
                                   )}
-                                  <p className="text-sm text-gray-500 flex items-center gap-1 mt-1">
-                                    <MapPin className="h-3 w-3 shrink-0" />
-                                    <span className="truncate">{project.location}</span>
+                                  <p className="mt-1 flex items-start gap-1 text-sm text-gray-500">
+                                    <MapPin className="mt-0.5 h-3 w-3 shrink-0" />
+                                    <span className="min-w-0 break-words">{project.location}</span>
                                   </p>
                                 </div>
                                 <Badge 
-                                  className={
+                                  className={`w-fit shrink-0 self-start capitalize sm:self-auto ${
                                     project.status === 'active' ? 'bg-green-500 text-white' :
                                     project.status === 'in_progress' ? 'bg-blue-500 text-white' :
                                     project.status === 'completed' ? 'bg-emerald-600 text-white' :
                                     project.status === 'on_hold' ? 'bg-amber-500 text-white' :
                                     'bg-gray-500 text-white'
-                                  }
+                                  }`}
                                 >
                                   {project.status?.replace('_', ' ') || 'Active'}
                                 </Badge>
@@ -2961,10 +2964,10 @@ const ProfessionalBuilderDashboardPage = () => {
                               </div>
                               
                               {/* Action Buttons */}
-                              <div className="flex gap-2 mt-3">
+                              <div className="mt-3 flex min-w-0 flex-col gap-2 sm:flex-row sm:gap-2">
                                 <Button 
                                   variant="outline" 
-                                  className="flex-1"
+                                  className="w-full min-w-0 sm:flex-1"
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     e.preventDefault();
@@ -2978,10 +2981,11 @@ const ProfessionalBuilderDashboardPage = () => {
                                     }, 100);
                                   }}
                                 >
-                                  <Eye className="h-4 w-4 mr-2" />
+                                  <Eye className="h-4 w-4 mr-2 shrink-0" />
                                   View Details
                                 </Button>
                                 <Link 
+                                  className="block w-full min-w-0 sm:flex-1"
                                   to={`/suppliers?from=dashboard&project_id=${project.id}`}
                                   onClick={(e) => {
                                     e.stopPropagation();
@@ -2993,9 +2997,9 @@ const ProfessionalBuilderDashboardPage = () => {
                                   }}
                                 >
                                   <Button 
-                                    className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
+                                    className="w-full min-w-0 bg-blue-600 hover:bg-blue-700 text-white"
                                   >
-                                    <ShoppingCart className="h-4 w-4 mr-2" />
+                                    <ShoppingCart className="h-4 w-4 mr-2 shrink-0" />
                                     Order Materials
                                   </Button>
                                 </Link>
