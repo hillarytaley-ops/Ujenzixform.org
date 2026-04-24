@@ -43,7 +43,8 @@ import {
   MapPin,
   Building2,
   LogOut,
-  RefreshCw
+  RefreshCw,
+  Wallet,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -84,6 +85,7 @@ import {
 } from "@/lib/purchaseOrderMetrics";
 import { Navigation as NavigationIcon, Receipt } from "lucide-react";
 import { SupplierInvoiceHub } from "@/components/supplier/SupplierInvoiceHub";
+import { SupplierFinanceTab } from "@/components/supplier/SupplierFinanceTab";
 
 const SupplierTabFallback = () => (
   <div
@@ -745,7 +747,7 @@ const SupplierDashboard = () => {
   });
   const [recentOrders, setRecentOrders] = useState<RecentOrder[]>([]);
   const [ordersForOrdersTab, setOrdersForOrdersTab] = useState<any[]>([]); // Full orders for OrderManagement (so Orders tab shows immediately)
-  const SUPPLIER_TABS = ['overview', 'materials', 'view-orders', 'scan-qr', 'tracking', 'analytics', 'invoice', 'reports'];
+  const SUPPLIER_TABS = ['overview', 'materials', 'view-orders', 'scan-qr', 'tracking', 'analytics', 'finance', 'invoice', 'reports'];
   const [activeTab, setActiveTab] = useUrlTabSync(SUPPLIER_TABS, 'overview');
   const [viewOrdersSubTab, setViewOrdersSubTab] = useState('quotes');
   const [showProfileEdit, setShowProfileEdit] = useState(false);
@@ -2227,7 +2229,7 @@ const SupplierDashboard = () => {
         </div>
 
         {/* Navigation Cards — 2 cols on phone, 3 on small phones, then 4 / 8 */}
-        <div className="mb-6 grid w-full grid-cols-2 gap-2 min-[420px]:grid-cols-3 sm:grid-cols-4 sm:gap-3 md:grid-cols-4 lg:grid-cols-8">
+        <div className="mb-6 grid w-full grid-cols-2 gap-2 min-[420px]:grid-cols-3 sm:grid-cols-3 sm:gap-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-9">
           <Button 
             className={`h-auto w-full min-w-0 py-3 sm:py-4 transition-all ${activeTab === 'overview' 
               ? 'bg-gradient-to-r from-slate-600 to-slate-700 ring-2 ring-slate-400 shadow-lg' 
@@ -2305,6 +2307,17 @@ const SupplierDashboard = () => {
             </div>
           </Button>
           <Button 
+            className={`h-auto w-full min-w-0 py-3 sm:py-4 transition-all ${activeTab === 'finance' 
+              ? 'bg-gradient-to-r from-emerald-600 to-teal-600 ring-2 ring-emerald-300 shadow-lg' 
+              : isDarkMode ? 'bg-slate-700 hover:bg-slate-600' : 'bg-gray-100 hover:bg-gray-200 text-gray-700'}`}
+            onClick={() => setActiveTab('finance')}
+          >
+            <div className="flex flex-col items-center gap-1.5 sm:gap-2 px-1">
+              <Wallet className="h-5 w-5 sm:h-6 sm:w-6 shrink-0" />
+              <span className="text-[10px] sm:text-xs md:text-sm text-center leading-tight">Finance</span>
+            </div>
+          </Button>
+          <Button 
             className={`h-auto w-full min-w-0 py-3 sm:py-4 transition-all ${activeTab === 'invoice' 
               ? 'bg-gradient-to-r from-rose-500 to-pink-600 ring-2 ring-rose-300 shadow-lg' 
               : isDarkMode ? 'bg-slate-700 hover:bg-slate-600' : 'bg-gray-100 hover:bg-gray-200 text-gray-700'}`}
@@ -2337,6 +2350,7 @@ const SupplierDashboard = () => {
             <TabsTrigger value="scan-qr">QR Codes</TabsTrigger>
             <TabsTrigger value="tracking">Tracking</TabsTrigger>
             <TabsTrigger value="analytics">Analytics</TabsTrigger>
+            <TabsTrigger value="finance">Finance</TabsTrigger>
             <TabsTrigger value="invoice">Invoice</TabsTrigger>
             <TabsTrigger value="reports">Reports</TabsTrigger>
           </TabsList>
@@ -2861,6 +2875,25 @@ const SupplierDashboard = () => {
                     </div>
                   </div>
                 </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* ═══════════════════════════════════════════════════════════════════════════════════ */}
+          {/* FINANCE TAB — paid / unpaid / pipeline */}
+          {/* ═══════════════════════════════════════════════════════════════════════════════════ */}
+          <TabsContent value="finance">
+            <Card className={cardBg}>
+              <CardContent className="pt-6">
+                <SupplierFinanceTab
+                  supplierRecordId={supplierRecordId}
+                  purchaseOrders={ordersForOrdersTab}
+                  isDarkMode={isDarkMode}
+                  textColor={textColor}
+                  mutedText={mutedText}
+                  cardBg={cardBg}
+                  onOpenInvoices={() => setActiveTab('invoice')}
+                />
               </CardContent>
             </Card>
           </TabsContent>
