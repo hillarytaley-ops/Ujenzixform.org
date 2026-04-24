@@ -323,6 +323,15 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
     return invoices.filter((i) => !invoiceIsPaid(i));
   }, [invoices, showBuilderSupplierPaymentTabs, invoicePaymentListTab]);
 
+  const displayInvoicesTotalAmount = useMemo(
+    () =>
+      displayInvoices.reduce((sum, inv) => {
+        const n = Number(inv.total_amount);
+        return sum + (Number.isFinite(n) ? n : 0);
+      }, 0),
+    [displayInvoices]
+  );
+
   const builderPayPrompt = useMemo(() => {
     if (userRole !== 'builder') {
       return { needAcknowledge: [] as Invoice[], needPayment: [] as Invoice[] };
@@ -822,6 +831,42 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
               </Card>
             );
           })}
+
+          {displayInvoices.length > 0 && (
+            <div
+              className="flex flex-col gap-2 rounded-lg border border-border bg-muted/50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
+              role="region"
+              aria-label="Invoice list total"
+            >
+              <p className="text-sm text-muted-foreground">
+                {showBuilderSupplierPaymentTabs ? (
+                  invoicePaymentListTab === 'paid' ? (
+                    <>
+                      <span className="font-medium text-foreground">Paid invoices</span> — subtotal for{' '}
+                      {displayInvoices.length} invoice{displayInvoices.length === 1 ? '' : 's'} in this tab
+                    </>
+                  ) : (
+                    <>
+                      <span className="font-medium text-foreground">Unpaid invoices</span> — subtotal for{' '}
+                      {displayInvoices.length} invoice{displayInvoices.length === 1 ? '' : 's'} in this tab
+                    </>
+                  )
+                ) : (
+                  <>
+                    <span className="font-medium text-foreground">Total</span> — {displayInvoices.length} invoice
+                    {displayInvoices.length === 1 ? '' : 's'}
+                  </>
+                )}
+              </p>
+              <p className="text-lg font-bold tabular-nums sm:text-xl">
+                KES{' '}
+                {displayInvoicesTotalAmount.toLocaleString(undefined, {
+                  minimumFractionDigits: 0,
+                  maximumFractionDigits: 0,
+                })}
+              </p>
+            </div>
+          )}
         </>
       )}
 
