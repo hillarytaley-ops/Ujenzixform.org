@@ -2,7 +2,11 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Loader2, Wallet, TrendingDown, TrendingUp, PieChart, Receipt } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase, isAbortLikeSupabaseError } from '@/integrations/supabase/client';
+import {
+  builderHubListFetchWithTimeout,
+  SUPPLIER_DOC_LIST_FETCH_TIMEOUT_MS,
+} from '@/lib/builderInvoicesHubCache';
 import {
   computeSupplierFinanceMetrics,
   type SupplierInvoiceRow,
@@ -28,6 +32,29 @@ function formatKes(amount: number) {
   }).format(amount || 0);
 }
 
+function messageFromUnknown(e: unknown): string {
+  if (e instanceof Error) return e.message;
+  if (e && typeof e === 'object' && 'message' in e) {
+    const m = (e as { message?: unknown }).message;
+    if (typeof m === 'string' && m.trim()) return m;
+  }
+  return 'Could not load invoices';
+}
+
+function mapRpcInvoiceRows(raw: unknown[]): SupplierInvoiceRow[] {
+  return raw.map((r) => {
+    const o = r as Record<string, unknown>;
+    return {
+      id: o.id != null ? String(o.id) : undefined,
+      total_amount: o.total_amount as SupplierInvoiceRow['total_amount'],
+      amount_paid: o.amount_paid as SupplierInvoiceRow['amount_paid'],
+      payment_status: o.payment_status as string | null,
+      status: o.status as string | null,
+      purchase_order_id: o.purchase_order_id != null ? String(o.purchase_order_id) : null,
+    };
+  });
+}
+
 export const SupplierFinanceTab: React.FC<SupplierFinanceTabProps> = ({
   supplierRecordId,
   purchaseOrders,
@@ -50,18 +77,43 @@ export const SupplierFinanceTab: React.FC<SupplierFinanceTabProps> = ({
     setLoading(true);
     setError(null);
     try {
-      const { data, error: qErr } = await supabase
-        .from('invoices')
-        .select('id,total_amount,amount_paid,payment_status,status,purchase_order_id')
-        .eq('supplier_id', supplierRecordId)
-        .order('created_at', { ascending: false })
-        .limit(2000);
-
-      if (qErr) throw qErr;
-      setInvoices(data || []);
+      const rows = await builderHubListFetchWithTimeout(
+        (async () => {
+          const rpcArgs = { p_supplier_id: supplierRecordId };
+          let rpc = await supabase.rpc('list_invoices_for_supplier', rpcArgs);
+          if (rpc.error && isAbortLikeSupabaseError(rpc.error)) {
+            await new Promise((r) => setTimeout(r, 200));
+            rpc = await supabase.rpc('list_invoices_for_supplier', rpcArgs);
+          }
+          if (!rpc.error && Array.isArray(rpc.data)) {
+            return mapRpcInvoiceRows(rpc.data as unknown[]);
+          }
+          if (rpc.error && !isAbortLikeSupabaseError(rpc.error)) {
+            console.warn(
+              '[Finance] list_invoices_for_supplier RPC unavailable, using direct select:',
+              rpc.error.message
+            );
+          }
+          const { data, error } = await supabase
+            .from('invoices')
+            .select('id,total_amount,amount_paid,payment_status,status,purchase_order_id')
+            .eq('supplier_id', supplierRecordId)
+            .order('created_at', { ascending: false })
+            .limit(2000);
+          if (error) throw error;
+          return mapRpcInvoiceRows((data || []) as unknown[]);
+        })(),
+        'supplier_finance_invoice_list_timeout',
+        SUPPLIER_DOC_LIST_FETCH_TIMEOUT_MS
+      );
+      setInvoices(rows);
     } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : 'Could not load invoices';
-      setError(msg);
+      const msg = messageFromUnknown(e);
+      if (msg.includes('supplier_finance_invoice_list_timeout')) {
+        setError('Invoice list timed out. Try Refresh, or open the Invoice hub once to warm the connection.');
+      } else {
+        setError(msg);
+      }
       setInvoices([]);
     } finally {
       setLoading(false);
