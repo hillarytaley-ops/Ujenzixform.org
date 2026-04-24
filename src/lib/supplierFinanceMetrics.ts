@@ -43,12 +43,18 @@ export function computeSupplierFinanceMetrics(
     if (invStatus === 'cancelled' || ps === 'cancelled') continue;
 
     const total = num(inv.total_amount);
-    const paid = num(inv.amount_paid);
+    const recordedPaid = num(inv.amount_paid);
     activeInvoicedTotal += total;
     activeInvoiceCount += 1;
-    paidCash += paid;
+    // Paystack webhook historically set payment_status = 'paid' without backfilling amount_paid.
+    // Treat full "paid" as received total when amount_paid is still zero.
+    let cashReceived = recordedPaid;
+    if (ps === 'paid' && cashReceived === 0 && total > 0) {
+      cashReceived = total;
+    }
+    paidCash += cashReceived;
     if (ps !== 'paid') {
-      unpaidOnInvoices += Math.max(0, total - paid);
+      unpaidOnInvoices += Math.max(0, total - recordedPaid);
     }
   }
 

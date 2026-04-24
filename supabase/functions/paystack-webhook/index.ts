@@ -134,7 +134,7 @@ serve(async (req) => {
 
       const { data: inv, error: invErr } = await admin
         .from("invoices")
-        .select("id, builder_id, payment_status, notes")
+        .select("id, builder_id, payment_status, notes, total_amount")
         .eq("id", invoiceId)
         .maybeSingle();
 
@@ -146,10 +146,21 @@ serve(async (req) => {
           ? `\n[${stamp}] Paystack charge.success — ref: ${reference}`
           : `\n[${stamp}] Paystack charge.success`;
         const prevNotes = typeof inv.notes === "string" ? inv.notes : "";
+        const invTotal = Number((inv as { total_amount?: unknown }).total_amount);
+        const amountFromGateway =
+          paidMajor != null && Number.isFinite(paidMajor) ? paidMajor : null;
+        const amountPaid =
+          amountFromGateway != null && amountFromGateway > 0
+            ? amountFromGateway
+            : Number.isFinite(invTotal) && invTotal > 0
+            ? invTotal
+            : 0;
         const { error: upErr } = await admin
           .from("invoices")
           .update({
             payment_status: "paid",
+            amount_paid: amountPaid,
+            paid_at: stamp,
             updated_at: stamp,
             notes: `${prevNotes}${line}`.trim(),
           })
