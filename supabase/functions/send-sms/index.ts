@@ -141,7 +141,7 @@ serve(async (req) => {
       const messagingEnv = username === 'sandbox' ? 'sandbox' : 'live'
       const deliveryHint =
         messagingEnv === 'sandbox'
-          ? "Sandbox mode: Africa's Talking returned Success, but SMS is only delivered to numbers you added as sandbox test phones in the AT dashboard. Real handsets will not receive until you use live credentials (username + API key from production) and an approved sender ID."
+          ? "Sandbox mode: Africa's Talking returned Success. Per AT sandbox docs, delivery is exercised via the Simulator (https://simulator.africastalking.com:1517/) — register numbers there; do not expect normal handset SMS. For real phones, use live credentials (production username + API key) and an approved sender ID."
           : undefined
 
       return new Response(

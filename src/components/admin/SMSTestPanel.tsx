@@ -381,9 +381,9 @@ export const SMSTestPanel: React.FC = () => {
                   )}
                   {result.success && result.messagingEnv === 'sandbox' && (
                     <p className="text-xs text-amber-800 dark:text-amber-200 mt-2 p-2 rounded-md bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800">
-                      <strong>Sandbox:</strong> AT returned Success, but phones only receive SMS if this number is a{' '}
-                      <strong>registered sandbox test phone</strong> in Africa&apos;s Talking. For real delivery, set
-                      Supabase secrets to your <strong>live</strong> username + API key (and approved sender ID).
+                      <strong>Sandbox:</strong> AT returned Success. Sandbox flows are meant for the Africa&apos;s Talking{' '}
+                      <strong>Simulator</strong> (<a className="underline" href="https://simulator.africastalking.com:1517/" target="_blank" rel="noopener noreferrer">simulator</a>) — register numbers there; do not expect a normal handset SMS. For real phones, set Supabase secrets to your{' '}
+                      <strong>live</strong> username + API key (and approved sender ID).
                     </p>
                   )}
                   {result.error && (
@@ -430,8 +430,11 @@ export const SMSTestPanel: React.FC = () => {
                 <code className="text-xs">AFRICASTALKING_USERNAME</code>.
               </li>
               <li>
-                If username is <code className="text-xs">sandbox</code>, add each test phone in the Africa&apos;s Talking
-                sandbox dashboard — otherwise you will see Success + an AT message ID but <strong>no SMS on the device</strong>.
+                If username is <code className="text-xs">sandbox</code>, use the Africa&apos;s Talking{' '}
+                <a className="underline" href="https://simulator.africastalking.com:1517/" target="_blank" rel="noopener noreferrer">Simulator</a>{' '}
+                for sandbox traffic (see{' '}
+                <a className="underline" href="https://help.africastalking.com/en/articles/1170660-how-do-i-get-started-on-the-africa-s-talking-sandbox" target="_blank" rel="noopener noreferrer">AT sandbox help</a>
+                ). Otherwise you may see Success + a message ID but <strong>no SMS on a real device</strong>.
               </li>
               <li>
                 For production, use your <strong>live</strong> AT username and key, plus an approved{' '}
