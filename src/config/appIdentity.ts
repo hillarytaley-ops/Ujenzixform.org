@@ -18,11 +18,11 @@ export const SUPPORT_EMAIL =
 /** Public footer & Contact — override via VITE_SUPPORT_PHONE_* if numbers change. */
 export const SUPPORT_PHONE_PRIMARY = {
   tel: (
-    (import.meta.env.VITE_SUPPORT_PHONE_PRIMARY_TEL as string | undefined) || '+254726749849'
+    (import.meta.env.VITE_SUPPORT_PHONE_PRIMARY_TEL as string | undefined) || '+254715612073'
   ).replace(/\s/g, ''),
   display:
     (import.meta.env.VITE_SUPPORT_PHONE_PRIMARY_DISPLAY as string | undefined)?.trim() ||
-    '+254 726 749 849',
+    '+254 715 612 073',
 } as const;
 
 export const SUPPORT_PHONE_SECONDARY = {
