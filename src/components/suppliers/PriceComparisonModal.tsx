@@ -69,6 +69,10 @@ export const PriceComparisonModal: React.FC<PriceComparisonModalProps> = ({
   selectedMaterials,
   allMaterials
 }) => {
+  const effectiveRole =
+    (localStorage.getItem('user_role') || '').trim().toLowerCase();
+  if (effectiveRole === 'supplier') return null;
+
   const { addToCart } = useCart();
   const { toast } = useToast();
 

@@ -1125,14 +1125,20 @@ export const CartSidebar: React.FC = () => {
         )}
 
         {/* Price Comparison Modal */}
-        <CartPriceComparison
-          isOpen={showComparison}
-          onClose={() => {
-            setShowComparison(false);
-            setComparisonItem(null);
-          }}
-          cartItem={comparisonItem}
-        />
+        {(() => {
+          const effectiveRole = userRole || localStorage.getItem('user_role');
+          if (effectiveRole === 'supplier') return null;
+          return (
+            <CartPriceComparison
+              isOpen={showComparison}
+              onClose={() => {
+                setShowComparison(false);
+                setComparisonItem(null);
+              }}
+              cartItem={comparisonItem}
+            />
+          );
+        })()}
 
         {/* Multi-Supplier Quote Dialog (for Professional Builders) */}
         <MultiSupplierQuoteDialog
@@ -1146,18 +1152,24 @@ export const CartSidebar: React.FC = () => {
         />
 
         {/* Unified Compare & Quote Dialog */}
-        <CartPriceComparisonAll
-          isOpen={showCompareAll}
-          onClose={() => setShowCompareAll(false)}
-          onQuotesSent={() => {
-            setIsCartOpen(false);
-          }}
-          onContinueToPayment={async () => {
-            setShowCompareAll(false);
-            await new Promise((r) => setTimeout(r, 200));
-            await handleBuyNow();
-          }}
-        />
+        {(() => {
+          const effectiveRole = userRole || localStorage.getItem('user_role');
+          if (effectiveRole === 'supplier') return null;
+          return (
+            <CartPriceComparisonAll
+              isOpen={showCompareAll}
+              onClose={() => setShowCompareAll(false)}
+              onQuotesSent={() => {
+                setIsCartOpen(false);
+              }}
+              onContinueToPayment={async () => {
+                setShowCompareAll(false);
+                await new Promise((r) => setTimeout(r, 200));
+                await handleBuyNow();
+              }}
+            />
+          );
+        })()}
       </SheetContent>
     </Sheet>
 

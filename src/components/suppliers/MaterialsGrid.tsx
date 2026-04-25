@@ -401,6 +401,7 @@ export const MaterialsGrid: React.FC<MaterialsGridProps> = ({ embeddedInDashboar
   
   // Derive auth state from AuthContext with localStorage fallback
   const userRole = authUserRole || localStorage.getItem('user_role');
+  const isSupplierRole = String(userRole || '').trim().toLowerCase() === 'supplier';
   
   // Check authentication from multiple sources for reliability
   const isAuthenticated = !!authUser || !!localStorage.getItem('user_id') || (() => {
@@ -622,6 +623,7 @@ export const MaterialsGrid: React.FC<MaterialsGridProps> = ({ embeddedInDashboar
   
   // Toggle item for comparison
   const toggleCompare = (materialId: string) => {
+    if (isSupplierRole) return;
     setCompareItems(prev => {
       const newSet = new Set(prev);
       if (newSet.has(materialId)) {
@@ -1901,7 +1903,7 @@ export const MaterialsGrid: React.FC<MaterialsGridProps> = ({ embeddedInDashboar
             <Package className="h-4 w-4 mr-2" />
             Refresh
           </Button>
-          {compareItems.size > 0 && (
+          {!isSupplierRole && compareItems.size > 0 && (
             <Button 
               onClick={() => setIsCompareModalOpen(true)} 
               className="bg-purple-600 hover:bg-purple-700 animate-pulse shadow-lg shadow-purple-300"
@@ -2442,8 +2444,8 @@ export const MaterialsGrid: React.FC<MaterialsGridProps> = ({ embeddedInDashboar
                         </div>
                       )}
                       
-                      {/* Compare Price Checkbox - Hidden for Professional Builders (they get pricing via quotes) */}
-                      {userRole !== 'professional_builder' && (
+                      {/* Compare Price Checkbox - Hidden for Professional Builders and Suppliers */}
+                      {!isSupplierRole && userRole !== 'professional_builder' && (
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
@@ -2773,12 +2775,14 @@ export const MaterialsGrid: React.FC<MaterialsGridProps> = ({ embeddedInDashboar
       </Dialog>
       
       {/* Price Comparison Table - Enhanced matrix view */}
-      <PriceComparisonTable
-        isOpen={isCompareModalOpen}
-        onClose={() => setIsCompareModalOpen(false)}
-        selectedMaterials={getComparisonMaterials()}
-        allMaterials={materials}
-      />
+      {!isSupplierRole && (
+        <PriceComparisonTable
+          isOpen={isCompareModalOpen}
+          onClose={() => setIsCompareModalOpen(false)}
+          selectedMaterials={getComparisonMaterials()}
+          allMaterials={materials}
+        />
+      )}
 
       {/* Quote Cart removed - now using unified cart for all builders */}
 
