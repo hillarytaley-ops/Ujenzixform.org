@@ -119,6 +119,23 @@ interface OrderStats {
   totalRevenue: number;
 }
 
+function formatRpcError(error: unknown): string {
+  if (error && typeof error === 'object') {
+    const o = error as { message?: string; details?: string; hint?: string };
+    const msg = typeof o.message === 'string' ? o.message.trim() : '';
+    if (msg) return msg;
+    const det = typeof o.details === 'string' ? o.details.trim() : '';
+    if (det) return det;
+    const hint = typeof o.hint === 'string' ? o.hint.trim() : '';
+    if (hint) return hint;
+  }
+  try {
+    return JSON.stringify(error);
+  } catch {
+    return 'Request failed';
+  }
+}
+
 export const AdminOrdersManager: React.FC = () => {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
@@ -476,7 +493,7 @@ export const AdminOrdersManager: React.FC = () => {
       toast({
         variant: 'destructive',
         title: 'Delete failed',
-        description: error.message,
+        description: formatRpcError(error),
       });
       return;
     }
@@ -506,7 +523,7 @@ export const AdminOrdersManager: React.FC = () => {
       toast({
         variant: 'destructive',
         title: 'Bulk delete failed',
-        description: error.message,
+        description: formatRpcError(error),
       });
       return;
     }
