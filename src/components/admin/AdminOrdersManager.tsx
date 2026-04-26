@@ -79,6 +79,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
+import { Checkbox } from '@/components/ui/checkbox';
 
 interface OrderItem {
   name: string;
@@ -129,6 +130,8 @@ export const AdminOrdersManager: React.FC = () => {
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [showOrderDetails, setShowOrderDetails] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [selectedOrderIds, setSelectedOrderIds] = useState<Set<string>>(() => new Set());
+  const [bulkDeleting, setBulkDeleting] = useState(false);
   const [stats, setStats] = useState<OrderStats>({
     total: 0,
     pending: 0,
@@ -145,9 +148,14 @@ export const AdminOrdersManager: React.FC = () => {
     loadOrders();
   }, []);
 
+  useEffect(() => {
+    setSelectedOrderIds(new Set());
+  }, [searchQuery, statusFilter, dateFilter]);
+
   const loadOrders = async () => {
     try {
       setLoading(true);
+      setSelectedOrderIds(new Set());
       console.log('📦 AdminOrdersManager: Loading all orders...');
       
       // Use native fetch with timeout
@@ -373,6 +381,56 @@ export const AdminOrdersManager: React.FC = () => {
       return sortDirection === 'desc' ? -comparison : comparison;
     });
 
+  const filteredIdList = filteredOrders.map((o) => o.id);
+  const selectedOnPageCount = filteredOrders.filter((o) => selectedOrderIds.has(o.id)).length;
+  const allFilteredSelected =
+    filteredIdList.length > 0 && selectedOnPageCount === filteredIdList.length;
+  const someFilteredSelected =
+    selectedOnPageCount > 0 && selectedOnPageCount < filteredIdList.length;
+
+  const toggleSelectOrderId = (id: string) => {
+    setSelectedOrderIds((prev) => {
+      const n = new Set(prev);
+      if (n.has(id)) n.delete(id);
+      else n.add(id);
+      return n;
+    });
+  };
+
+  const toggleSelectAllFiltered = () => {
+    setSelectedOrderIds((prev) => {
+      const n = new Set(prev);
+      const all = filteredIdList.length > 0 && filteredIdList.every((fid) => n.has(fid));
+      if (all) {
+        filteredIdList.forEach((fid) => n.delete(fid));
+      } else {
+        filteredIdList.forEach((fid) => n.add(fid));
+      }
+      return n;
+    });
+  };
+
+  const removeOrdersFromState = (ids: string[]) => {
+    const idSet = new Set(ids);
+    setOrders((prev) => {
+      const next = prev.filter((o) => !idSet.has(o.id));
+      calculateStats(next);
+      return next;
+    });
+    setSelectedOrderIds((prev) => {
+      const n = new Set(prev);
+      ids.forEach((id) => n.delete(id));
+      return n;
+    });
+    setSelectedOrder((cur) => {
+      if (cur && idSet.has(cur.id)) {
+        queueMicrotask(() => setShowOrderDetails(false));
+        return null;
+      }
+      return cur;
+    });
+  };
+
   const exportToCSV = () => {
     const headers = ['PO Number', 'Status', 'Buyer', 'Supplier', 'Total Amount', 'Items', 'Created At'];
     const rows = filteredOrders.map(order => [
@@ -426,17 +484,40 @@ export const AdminOrdersManager: React.FC = () => {
       title: 'Order deleted',
       description: typeof data === 'number' ? `Removed ${data} purchase order row(s).` : 'Removed.',
     });
-    setOrders((prev) => {
-      const next = prev.filter((o) => o.id !== orderId);
-      calculateStats(next);
-      return next;
+    removeOrdersFromState([orderId]);
+  };
+
+  const handleBulkDelete = async () => {
+    const ids = [...selectedOrderIds].filter((id) => orders.some((o) => o.id === id));
+    if (ids.length === 0) {
+      toast({
+        variant: 'destructive',
+        title: 'Nothing to delete',
+        description: 'Select at least one order in the table.',
+      });
+      return;
+    }
+    setBulkDeleting(true);
+    const { data, error } = await supabase.rpc('admin_delete_purchase_orders', {
+      _purchase_order_ids: ids,
     });
-    setSelectedOrder((cur) => {
-      if (cur?.id === orderId) {
-        queueMicrotask(() => setShowOrderDetails(false));
-      }
-      return cur?.id === orderId ? null : cur;
+    setBulkDeleting(false);
+    if (error) {
+      toast({
+        variant: 'destructive',
+        title: 'Bulk delete failed',
+        description: error.message,
+      });
+      return;
+    }
+    toast({
+      title: 'Orders deleted',
+      description:
+        typeof data === 'number'
+          ? `Removed ${data} purchase order row(s) from ${ids.length} selected.`
+          : `Removed ${ids.length} order(s).`,
     });
+    removeOrdersFromState(ids);
   };
 
   if (loading) {
@@ -582,7 +663,56 @@ export const AdminOrdersManager: React.FC = () => {
               </Select>
             </div>
             
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2 items-center">
+              {selectedOrderIds.size > 0 && (
+                <>
+                  <span className="text-sm text-slate-400 self-center mr-1">
+                    {selectedOrderIds.size} selected
+                  </span>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-slate-400 hover:text-white"
+                    onClick={() => setSelectedOrderIds(new Set())}
+                    disabled={bulkDeleting}
+                  >
+                    Clear
+                  </Button>
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        disabled={bulkDeleting}
+                        className="gap-1"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                        Delete selected
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent className="bg-slate-900 border-slate-700 text-white">
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Delete {selectedOrderIds.size} order(s)?</AlertDialogTitle>
+                        <AlertDialogDescription className="text-slate-300">
+                          Permanently removes all selected purchase orders and their related delivery / QR / request
+                          data. This cannot be undone.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel className="border-slate-600 bg-slate-800 text-white hover:bg-slate-700">
+                          Cancel
+                        </AlertDialogCancel>
+                        <AlertDialogAction
+                          className="bg-red-600 text-white hover:bg-red-700"
+                          onClick={() => void handleBulkDelete()}
+                        >
+                          {bulkDeleting ? 'Deleting…' : 'Delete all selected'}
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                </>
+              )}
               <Button variant="outline" size="sm" onClick={exportToCSV} className="border-slate-600 text-slate-300">
                 <Download className="h-4 w-4 mr-2" />
                 Export CSV
@@ -610,6 +740,21 @@ export const AdminOrdersManager: React.FC = () => {
             <Table>
               <TableHeader>
                 <TableRow className="border-slate-700 hover:bg-slate-800/50">
+                  <TableHead className="text-slate-300 w-[44px]">
+                    <Checkbox
+                      aria-label="Select all orders in this list"
+                      checked={
+                        allFilteredSelected
+                          ? true
+                          : someFilteredSelected
+                            ? 'indeterminate'
+                            : false
+                      }
+                      onCheckedChange={() => toggleSelectAllFiltered()}
+                      disabled={bulkDeleting || filteredOrders.length === 0}
+                      className="border-slate-500 data-[state=checked]:bg-orange-600 data-[state=checked]:border-orange-600"
+                    />
+                  </TableHead>
                   <TableHead className="text-slate-300">PO Number</TableHead>
                   <TableHead className="text-slate-300">
                     <Button 
@@ -654,6 +799,15 @@ export const AdminOrdersManager: React.FC = () => {
               <TableBody>
                 {filteredOrders.map((order) => (
                   <TableRow key={order.id} className="border-slate-700 hover:bg-slate-800/50">
+                    <TableCell className="w-[44px]">
+                      <Checkbox
+                        aria-label={`Select order ${order.po_number}`}
+                        checked={selectedOrderIds.has(order.id)}
+                        onCheckedChange={() => toggleSelectOrderId(order.id)}
+                        disabled={bulkDeleting || deletingId === order.id}
+                        className="border-slate-500 data-[state=checked]:bg-orange-600 data-[state=checked]:border-orange-600"
+                      />
+                    </TableCell>
                     <TableCell className="font-mono text-white text-sm">
                       {order.po_number}
                     </TableCell>
@@ -719,7 +873,7 @@ export const AdminOrdersManager: React.FC = () => {
                             <Button
                               variant="ghost"
                               size="sm"
-                              disabled={deletingId === order.id}
+                              disabled={bulkDeleting || deletingId === order.id}
                               className="text-red-400 hover:text-red-300 hover:bg-red-950/40"
                               title="Delete order permanently"
                             >
@@ -755,7 +909,7 @@ export const AdminOrdersManager: React.FC = () => {
                 
                 {filteredOrders.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={9} className="text-center py-12">
+                    <TableCell colSpan={10} className="text-center py-12">
                       <ShoppingCart className="h-12 w-12 mx-auto mb-4 text-slate-600" />
                       <p className="text-slate-400">No orders found</p>
                       <p className="text-slate-500 text-sm mt-1">Try adjusting your filters</p>
@@ -869,7 +1023,7 @@ export const AdminOrdersManager: React.FC = () => {
                     <Button
                       variant="destructive"
                       size="sm"
-                      disabled={deletingId === selectedOrder.id}
+                      disabled={bulkDeleting || deletingId === selectedOrder.id}
                       className="gap-2"
                     >
                       <Trash2 className="h-4 w-4" />
