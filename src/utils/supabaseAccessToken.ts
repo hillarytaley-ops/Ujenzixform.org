@@ -1,4 +1,4 @@
-import { supabase, SUPABASE_URL } from "@/integrations/supabase/client";
+import { supabase, SUPABASE_ANON_KEY, SUPABASE_URL } from "@/integrations/supabase/client";
 
 /** Storage key Supabase JS uses for persisted session (sb-<ref>-auth-token). */
 export function persistedSessionStorageKey(): string {
@@ -103,6 +103,24 @@ export function readAccessTokenSyncBestEffort(): string {
   const t = readPersistedAccessTokenSync();
   if (t) return t;
   return readLegacyAuthBlob()?.access_token || "";
+}
+
+/**
+ * Value for `Authorization` on raw PostgREST `fetch()` calls.
+ * Prefer a user JWT (authenticated role) when passed or found in persisted session — required
+ * after anon SELECT was revoked on catalog tables. Falls back to anon key for logged-out reads
+ * (DB must still GRANT SELECT on marketplace tables to anon for public browsing).
+ */
+export function getPostgrestAuthorizationHeaderSync(
+  preferredAccessToken?: string | null
+): string {
+  const fromArg =
+    preferredAccessToken && String(preferredAccessToken).trim().length > 0
+      ? String(preferredAccessToken).trim()
+      : "";
+  const t = fromArg || readAccessTokenSyncBestEffort();
+  if (t) return `Bearer ${t}`;
+  return `Bearer ${SUPABASE_ANON_KEY}`;
 }
 
 /**

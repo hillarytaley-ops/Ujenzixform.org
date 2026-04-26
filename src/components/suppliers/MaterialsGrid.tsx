@@ -16,7 +16,10 @@
  * ╚══════════════════════════════════════════════════════════════════════════════════════╝
  */
 
-import { readPersistedAuthRawStringSync } from '@/utils/supabaseAccessToken';
+import {
+  readPersistedAuthRawStringSync,
+  getPostgrestAuthorizationHeaderSync,
+} from '@/utils/supabaseAccessToken';
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -389,7 +392,13 @@ export const MaterialsGrid: React.FC<MaterialsGridProps> = ({ embeddedInDashboar
   const [totalMaterialsCount, setTotalMaterialsCount] = useState(0);
   
   // Use AuthContext for reliable auth state (instead of making separate Supabase calls)
-  const { user: authUser, userRole: authUserRole, loading: authLoading } = useAuth();
+  const { user: authUser, userRole: authUserRole, loading: authLoading, session } = useAuth();
+
+  /** User JWT for PostgREST catalog reads (anon lost SELECT after DB hardening). */
+  const postgrestAuthorization = useMemo(
+    () => getPostgrestAuthorizationHeaderSync(session?.access_token),
+    [session?.access_token]
+  );
   
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
@@ -584,7 +593,7 @@ export const MaterialsGrid: React.FC<MaterialsGridProps> = ({ embeddedInDashboar
           {
             headers: {
               'apikey': SUPABASE_ANON_KEY,
-              'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+              'Authorization': postgrestAuthorization,
               'Content-Type': 'application/json'
             }
           }
@@ -917,7 +926,7 @@ export const MaterialsGrid: React.FC<MaterialsGridProps> = ({ embeddedInDashboar
         {
           headers: {
             'apikey': SUPABASE_ANON_KEY,
-            'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+            'Authorization': postgrestAuthorization,
             'Content-Type': 'application/json'
           }
         }
@@ -985,7 +994,7 @@ export const MaterialsGrid: React.FC<MaterialsGridProps> = ({ embeddedInDashboar
           {
             headers: {
               'apikey': SUPABASE_ANON_KEY,
-              'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+              'Authorization': postgrestAuthorization,
               'Content-Type': 'application/json',
               'Cache-Control': 'no-cache, no-store, must-revalidate',
               'Pragma': 'no-cache'
@@ -1063,7 +1072,7 @@ export const MaterialsGrid: React.FC<MaterialsGridProps> = ({ embeddedInDashboar
               {
                 headers: {
                   'apikey': SUPABASE_ANON_KEY,
-                  'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+                  'Authorization': postgrestAuthorization,
                   'Content-Type': 'application/json',
                   'Cache-Control': 'no-cache, no-store, must-revalidate'
                 },
@@ -1076,7 +1085,7 @@ export const MaterialsGrid: React.FC<MaterialsGridProps> = ({ embeddedInDashboar
               {
                 headers: {
                   'apikey': SUPABASE_ANON_KEY,
-                  'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+                  'Authorization': postgrestAuthorization,
                   'Content-Type': 'application/json',
                   'Prefer': 'count=exact',
                   'Cache-Control': 'no-cache, no-store, must-revalidate'
@@ -1177,7 +1186,7 @@ export const MaterialsGrid: React.FC<MaterialsGridProps> = ({ embeddedInDashboar
             {
               headers: {
                 'apikey': SUPABASE_ANON_KEY,
-                'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+                'Authorization': postgrestAuthorization,
                 'Content-Type': 'application/json',
                 'Prefer': 'count=exact'
               }
@@ -1241,7 +1250,7 @@ export const MaterialsGrid: React.FC<MaterialsGridProps> = ({ embeddedInDashboar
           {
             headers: {
               'apikey': SUPABASE_ANON_KEY,
-              'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+              'Authorization': postgrestAuthorization,
               'Content-Type': 'application/json'
             }
           }
@@ -2690,7 +2699,7 @@ export const MaterialsGrid: React.FC<MaterialsGridProps> = ({ embeddedInDashboar
                     {
                       headers: {
                         'apikey': SUPABASE_ANON_KEY,
-                        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+                        'Authorization': postgrestAuthorization,
                         'Content-Type': 'application/json'
                       }
                     }

@@ -31,6 +31,7 @@ import {
 } from 'lucide-react';
 import { useCart } from '@/contexts/CartContext';
 import { useToast } from '@/hooks/use-toast';
+import { getPostgrestAuthorizationHeaderSync } from '@/utils/supabaseAccessToken';
 
 // Supabase config for fetching images
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
@@ -88,7 +89,7 @@ export const MobileBookView: React.FC<MobileBookViewProps> = ({
         {
           headers: {
             'apikey': SUPABASE_ANON_KEY,
-            'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+            'Authorization': getPostgrestAuthorizationHeaderSync(),
             'Content-Type': 'application/json'
           }
         }
