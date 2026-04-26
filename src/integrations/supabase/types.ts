@@ -4586,6 +4586,18 @@ export type Database = {
         Args: { p_status: string; p_target_user_id: string }
         Returns: number
       }
+      admin_delete_purchase_orders: {
+        Args: { _purchase_order_ids: string[] }
+        Returns: number
+      }
+      admin_delete_purchase_orders_for_builder: {
+        Args: { _builder_user_id: string }
+        Returns: number
+      }
+      is_super_admin: {
+        Args: { _user_id: string }
+        Returns: boolean
+      }
       approve_supplier_application: {
         Args: { application_id: string; approval_notes?: string }
         Returns: Json

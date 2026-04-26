@@ -1,5 +1,5 @@
 import { readPersistedAuthRawStringSync } from '@/utils/supabaseAccessToken';
-import { SUPABASE_URL, SUPABASE_ANON_KEY } from '@/integrations/supabase/client';
+import { supabase, SUPABASE_URL, SUPABASE_ANON_KEY } from '@/integrations/supabase/client';
 /**
  * ╔══════════════════════════════════════════════════════════════════════════════════════╗
  * ║                                                                                      ║
@@ -65,8 +65,20 @@ import {
   QrCode,
   AlertCircle,
   TrendingUp,
-  ArrowUpDown
+  ArrowUpDown,
+  Trash2
 } from 'lucide-react';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 
 interface OrderItem {
   name: string;
@@ -116,6 +128,7 @@ export const AdminOrdersManager: React.FC = () => {
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [showOrderDetails, setShowOrderDetails] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const [stats, setStats] = useState<OrderStats>({
     total: 0,
     pending: 0,
@@ -395,6 +408,37 @@ export const AdminOrdersManager: React.FC = () => {
     }
   };
 
+  const handleDeleteOrder = async (orderId: string) => {
+    setDeletingId(orderId);
+    const { data, error } = await supabase.rpc('admin_delete_purchase_orders', {
+      _purchase_order_ids: [orderId],
+    });
+    setDeletingId(null);
+    if (error) {
+      toast({
+        variant: 'destructive',
+        title: 'Delete failed',
+        description: error.message,
+      });
+      return;
+    }
+    toast({
+      title: 'Order deleted',
+      description: typeof data === 'number' ? `Removed ${data} purchase order row(s).` : 'Removed.',
+    });
+    setOrders((prev) => {
+      const next = prev.filter((o) => o.id !== orderId);
+      calculateStats(next);
+      return next;
+    });
+    setSelectedOrder((cur) => {
+      if (cur?.id === orderId) {
+        queueMicrotask(() => setShowOrderDetails(false));
+      }
+      return cur?.id === orderId ? null : cur;
+    });
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -657,17 +701,54 @@ export const AdminOrdersManager: React.FC = () => {
                       {new Date(order.created_at).toLocaleDateString()}
                     </TableCell>
                     <TableCell>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => {
-                          setSelectedOrder(order);
-                          setShowOrderDetails(true);
-                        }}
-                        className="text-blue-400 hover:text-blue-300"
-                      >
-                        <Eye className="h-4 w-4" />
-                      </Button>
+                      <div className="flex items-center gap-1">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            setSelectedOrder(order);
+                            setShowOrderDetails(true);
+                          }}
+                          className="text-blue-400 hover:text-blue-300"
+                          title="View details"
+                        >
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              disabled={deletingId === order.id}
+                              className="text-red-400 hover:text-red-300 hover:bg-red-950/40"
+                              title="Delete order permanently"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent className="bg-slate-900 border-slate-700 text-white">
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Delete this order?</AlertDialogTitle>
+                              <AlertDialogDescription className="text-slate-300">
+                                Permanently removes purchase order{' '}
+                                <span className="font-mono text-slate-100">{order.po_number}</span> and related
+                                delivery/QR rows. This cannot be undone.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel className="border-slate-600 bg-slate-800 text-white hover:bg-slate-700">
+                                Cancel
+                              </AlertDialogCancel>
+                              <AlertDialogAction
+                                className="bg-red-600 text-white hover:bg-red-700"
+                                onClick={() => handleDeleteOrder(order.id)}
+                              >
+                                {deletingId === order.id ? 'Deleting…' : 'Delete permanently'}
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -779,6 +860,44 @@ export const AdminOrdersManager: React.FC = () => {
                 <span className="text-2xl font-bold text-emerald-400">
                   KES {(selectedOrder.total_amount || 0).toLocaleString()}
                 </span>
+              </div>
+
+              <div className="pt-4 border-t border-red-900/40">
+                <p className="text-sm text-red-300/90 mb-3">Danger zone — removes this order and linked records from the database.</p>
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      disabled={deletingId === selectedOrder.id}
+                      className="gap-2"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                      {deletingId === selectedOrder.id ? 'Deleting…' : 'Delete order'}
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent className="bg-slate-900 border-slate-700 text-white">
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Delete this order permanently?</AlertDialogTitle>
+                      <AlertDialogDescription className="text-slate-300">
+                        This runs the admin delete procedure for{' '}
+                        <span className="font-mono text-slate-100">{selectedOrder.po_number}</span>. You cannot undo
+                        this.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel className="border-slate-600 bg-slate-800 text-white hover:bg-slate-700">
+                        Cancel
+                      </AlertDialogCancel>
+                      <AlertDialogAction
+                        className="bg-red-600 text-white hover:bg-red-700"
+                        onClick={() => handleDeleteOrder(selectedOrder.id)}
+                      >
+                        Delete permanently
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
               </div>
             </div>
           )}
