@@ -34,6 +34,7 @@
  */
 
 import { readPersistedAuthRawStringSync } from '@/utils/supabaseAccessToken';
+import { resolveSupplierCompanyNames } from '@/lib/resolveSupplierCompanyNames';
 import React, { useState, useEffect, useRef } from 'react';
 import { SUPABASE_ANON_KEY, SUPABASE_URL, supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -561,7 +562,7 @@ export const MaterialImagesManager: React.FC = () => {
       const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
       
       const response = await fetch(
-        `${SUPABASE_URL}/rest/v1/materials?select=id,name,category,image_url,supplier_id,created_at&image_url=not.is.null&order=created_at.desc`,
+        `${SUPABASE_URL}/rest/v1/materials?select=id,name,category,image_url,supplier_id,approval_status,created_at&image_url=not.is.null&order=created_at.desc&limit=2000`,
         { headers, signal: controller.signal }
       );
       
@@ -573,13 +574,20 @@ export const MaterialImagesManager: React.FC = () => {
         return;
       }
       
-      const data = await response.json();
-      console.log(`🏪 Loaded ${data?.length || 0} supplier materials`);
-      
-      // Transform data - supplier info will be fetched separately if needed
-      const transformed = ((data || []) as any[]).map((item: any) => ({
+      const raw = (await response.json()) as any[];
+      const approvedRows = (raw || []).filter(
+        (item: any) => !item.approval_status || item.approval_status === 'approved'
+      );
+      console.log(`🏪 Loaded ${raw?.length || 0} materials with images (${approvedRows.length} approved for marketplace)`);
+
+      const labels = await resolveSupplierCompanyNames(approvedRows);
+      const transformed = approvedRows.map((item: any) => ({
         ...item,
-        supplier: { company_name: 'Supplier' } // Default, can be enhanced later
+        supplier: {
+          company_name:
+            (item.supplier_id && labels.get(item.supplier_id)) ||
+            (item.supplier_id ? 'Supplier' : 'Platform catalog'),
+        },
       }));
       
       setSupplierMaterials(transformed as SupplierMaterial[]);
@@ -1351,7 +1359,20 @@ export const MaterialImagesManager: React.FC = () => {
   // Approve/reject supplier image for marketplace display
   const updateSupplierImageApproval = async (material: SupplierMaterial, approved: boolean) => {
     try {
-      // Add to approved images list or remove
+      // Keep marketplace row in sync (MaterialsGrid reads materials.approval_status).
+      const { error: matErr } = await (supabase as any)
+        .from('materials')
+        .update({
+          approval_status: approved ? 'approved' : 'rejected',
+          rejection_reason: approved ? null : 'Rejected from Material Images',
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', material.id);
+      if (matErr) {
+        console.error('materials approval update:', matErr);
+        throw matErr;
+      }
+
       const { error } = await (supabase as any)
         .from('approved_material_images')
         .upsert({
@@ -1372,6 +1393,8 @@ export const MaterialImagesManager: React.FC = () => {
         title: approved ? 'Image approved' : 'Image rejected',
         description: `${material.name} image has been ${approved ? 'approved for' : 'rejected from'} marketplace display`,
       });
+
+      await fetchSupplierMaterials();
     } catch (err: any) {
       toast({
         title: 'Error',

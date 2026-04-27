@@ -54,6 +54,7 @@ import {
   getCartProjectLocation,
 } from '@/utils/builderCartProject';
 import { buildMaterialCartLineId } from '@/utils/cartLineId';
+import { resolveSupplierCompanyNames } from '@/lib/resolveSupplierCompanyNames';
 
 // iOS/Safari compatibility check
 const isIOSSafari = () => {
@@ -1246,7 +1247,7 @@ export const MaterialsGrid: React.FC<MaterialsGridProps> = ({ embeddedInDashboar
       
       try {
         const response = await fetch(
-          `${SUPABASE_URL}/rest/v1/materials?select=*&order=created_at.desc&limit=100`,
+          `${SUPABASE_URL}/rest/v1/materials?select=*&order=created_at.desc&limit=2000`,
           {
             headers: {
               'apikey': SUPABASE_ANON_KEY,
@@ -1265,64 +1266,54 @@ export const MaterialsGrid: React.FC<MaterialsGridProps> = ({ embeddedInDashboar
 
       // Filter supplier materials:
       // - Only approved products (or no approval status for backward compatibility)
-      // - Accept any valid image (base64, Supabase storage, or will use category default)
-      const supplierMaterials = data ? data
-        .filter(item => {
-          // Must be approved (or no approval status for backward compatibility)
-          const isApproved = !item.approval_status || item.approval_status === 'approved';
-          
-          // Log filtered out items for debugging
-          if (!isApproved) {
-            console.log(`⏳ Supplier product "${item.name}" filtered out - status: ${item.approval_status}`);
-          }
-          
-          return isApproved;
-        })
-        .map(item => {
-          // Accept images that are:
-          // 1. Base64 data URLs (starts with 'data:image/')
-          // 2. Supabase storage URLs (contains 'supabase.co/storage')
-          // 3. If no valid image, will use category default in the UI
-          const imageUrl = item.image_url || '';
-          const isBase64 = imageUrl.startsWith('data:image/');
-          const isSupabaseStorage = imageUrl.includes('supabase.co/storage');
-          const hasValidImage = imageUrl && (isBase64 || isSupabaseStorage);
-          
-          return {
-            ...item,
-            image_url: hasValidImage ? imageUrl : '', // Will fallback to category default in UI
-            supplier: {
-              company_name: 'Supplier',
-              location: 'Kenya',
-              rating: 4.5
+      // - Keep image_url for base64, Supabase storage, site-relative paths, or http(s)
+      const approvedRows = data
+        ? data.filter((item: any) => {
+            const isApproved = !item.approval_status || item.approval_status === 'approved';
+            if (!isApproved) {
+              console.log(`⏳ Supplier product "${item.name}" filtered out - status: ${item.approval_status}`);
             }
-          };
-        }) : [];
+            return isApproved;
+          })
+        : [];
+
+      const supplierLabels = await resolveSupplierCompanyNames(approvedRows);
+
+      const supplierMaterials = approvedRows.map((item: any) => {
+        const imageUrl = item.image_url || '';
+        const isBase64 = imageUrl.startsWith('data:image/');
+        const isSupabaseStorage = imageUrl.includes('supabase.co/storage');
+        const isHttpLike =
+          typeof imageUrl === 'string' &&
+          (imageUrl.startsWith('http://') ||
+            imageUrl.startsWith('https://') ||
+            imageUrl.startsWith('/'));
+        const hasValidImage = Boolean(imageUrl && (isBase64 || isSupabaseStorage || isHttpLike));
+
+        const company =
+          (item.supplier_id && supplierLabels.get(item.supplier_id)) || 'Supplier';
+
+        return {
+          ...item,
+          image_url: hasValidImage ? imageUrl : '',
+          supplier: {
+            company_name: company,
+            location: 'Kenya',
+            rating: 4.5,
+          },
+        };
+      });
       
       console.log(`📦 Supplier materials loaded: ${supplierMaterials.length} approved products`);
 
-      // Combine: Admin materials FIRST, then supplier-uploaded materials
+      // Combine: Admin materials FIRST, then supplier-uploaded materials.
+      // Do not dedupe by name — same product name can exist on admin catalog and as a supplier listing.
       const combinedMaterials = [...adminMaterials, ...supplierMaterials];
       
       console.log(`🔗 Combined materials: ${adminMaterials.length} admin + ${supplierMaterials.length} supplier = ${combinedMaterials.length} total`);
       
-      // Remove duplicates by name (keep first occurrence - admin images take priority)
-      const seenNames = new Set<string>();
-      const duplicates: string[] = [];
-      const allMaterials = combinedMaterials.filter(m => {
-        const normalizedName = m.name.toLowerCase().trim();
-        if (seenNames.has(normalizedName)) {
-          duplicates.push(m.name);
-          return false;
-        }
-        seenNames.add(normalizedName);
-        return true;
-      });
-      
-      console.log(`✅ Final materials after deduplication: ${allMaterials.length}`);
-      if (duplicates.length > 0) {
-        console.log(`🔄 Removed ${duplicates.length} duplicate(s):`, duplicates);
-      }
+      const allMaterials = combinedMaterials;
+      console.log(`✅ Final materials: ${allMaterials.length}`);
 
       // Show empty state if no materials
       if (allMaterials.length === 0) {

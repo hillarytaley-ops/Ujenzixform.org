@@ -14,6 +14,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { resolveSupplierCompanyNames } from '@/lib/resolveSupplierCompanyNames';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -156,50 +157,6 @@ const PRODUCT_CATEGORIES = [
   // MISCELLANEOUS
   'Geotextiles', 'Polythene', 'Tarpaulins', 'Signage', 'Other'
 ];
-
-/**
- * materials.supplier_id follows supplier RLS (often auth uid). public.suppliers rows are
- * matched by user_id and/or id — a simple embed suppliers:supplier_id only hits id and
- * yields null → UI showed "Unknown" for everyone.
- */
-async function resolveSupplierCompanyNames(
-  rows: { supplier_id?: string | null }[]
-): Promise<Map<string, string>> {
-  const keys = [...new Set(rows.map((r) => r.supplier_id).filter((id): id is string => Boolean(id)))];
-  const byKey = new Map<string, string>();
-  if (keys.length === 0) return byKey;
-
-  const { data: matchUser, error: errUser } = await (supabase as any)
-    .from('suppliers')
-    .select('id, user_id, company_name')
-    .in('user_id', keys);
-  if (!errUser) {
-    for (const s of matchUser || []) {
-      if (s.company_name) {
-        if (s.user_id) byKey.set(s.user_id, s.company_name);
-        if (s.id) byKey.set(s.id, s.company_name);
-      }
-    }
-  }
-
-  const missing = keys.filter((k) => !byKey.has(k));
-  if (missing.length === 0) return byKey;
-
-  const { data: matchId, error: errId } = await (supabase as any)
-    .from('suppliers')
-    .select('id, user_id, company_name')
-    .in('id', missing);
-  if (!errId) {
-    for (const s of matchId || []) {
-      if (s.company_name) {
-        if (s.id) byKey.set(s.id, s.company_name);
-        if (s.user_id) byKey.set(s.user_id, s.company_name);
-      }
-    }
-  }
-
-  return byKey;
-}
 
 export const PendingProductsManager: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'requests' | 'pending' | 'approved' | 'rejected'>('pending');
