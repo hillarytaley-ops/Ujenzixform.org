@@ -35,6 +35,7 @@
 
 import { readPersistedAuthRawStringSync } from '@/utils/supabaseAccessToken';
 import { resolveSupplierCompanyNames } from '@/lib/resolveSupplierCompanyNames';
+import { getDefaultCategoryImage } from '@/config/defaultCategoryImages';
 import React, { useState, useEffect, useRef } from 'react';
 import { SUPABASE_ANON_KEY, SUPABASE_URL, supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -562,7 +563,7 @@ export const MaterialImagesManager: React.FC = () => {
       const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
       
       const response = await fetch(
-        `${SUPABASE_URL}/rest/v1/materials?select=id,name,category,image_url,supplier_id,approval_status,created_at&image_url=not.is.null&order=created_at.desc&limit=2000`,
+        `${SUPABASE_URL}/rest/v1/materials?select=id,name,category,image_url,supplier_id,approval_status,created_at&order=created_at.desc&limit=2000`,
         { headers, signal: controller.signal }
       );
       
@@ -1870,7 +1871,11 @@ export const MaterialImagesManager: React.FC = () => {
                 <Card key={material.id} className="bg-slate-800/50 border-slate-700 overflow-hidden group">
                   <div className="relative aspect-square">
                     <img
-                      src={material.image_url || ''}
+                      src={
+                        (material.image_url && material.image_url.trim()) ||
+                        getDefaultCategoryImage(material.category) ||
+                        ''
+                      }
                       alt={material.name}
                       className="w-full h-full object-cover"
                       onError={(e) => {

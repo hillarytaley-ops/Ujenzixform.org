@@ -65,6 +65,10 @@ import {
   Image as ImageIcon
 } from 'lucide-react';
 
+/** 1×1 transparent PNG — approved_material_images.image_url is NOT NULL */
+const APPROVED_IMAGE_PLACEHOLDER =
+  'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+
 interface PendingProduct {
   id: string;
   supplier_id: string | null;
@@ -286,13 +290,32 @@ export const PendingProductsManager: React.FC = () => {
       
       if (error) throw error;
 
+      // Material Images admin + legacy flows use approved_material_images; keep in sync with materials.
+      const imageUrl =
+        (product.image_url && String(product.image_url).trim()) || APPROVED_IMAGE_PLACEHOLDER;
+      const { data: authData } = await supabase.auth.getUser();
+      const approverId = authData?.user?.id ?? null;
+      const { error: amiErr } = await (supabase as any).from('approved_material_images').upsert(
+        {
+          material_id: product.id,
+          image_url: imageUrl,
+          is_approved: true,
+          approved_by: approverId,
+          approved_at: new Date().toISOString(),
+        },
+        { onConflict: 'material_id' }
+      );
+      if (amiErr) {
+        console.warn('approved_material_images upsert (non-fatal):', amiErr);
+      }
+
       void getCounts().then(setCounts);
       setShowPreviewDialog(false);
       setSelectedProduct(null);
 
       toast({
         title: 'Product approved',
-        description: `${product.name} moved to Approved — review it there or in the marketplace.`,
+        description: `${product.name} is approved — visible on the marketplace and under Admin → Material Images → Supplier Images.`,
       });
 
       setActiveTab('approved');
@@ -331,6 +354,15 @@ export const PendingProductsManager: React.FC = () => {
         .eq('id', selectedProduct.id);
       
       if (error) throw error;
+
+      const { error: amiRejErr } = await (supabase as any)
+        .from('approved_material_images')
+        .update({
+          is_approved: false,
+          approved_at: new Date().toISOString(),
+        })
+        .eq('material_id', selectedProduct.id);
+      if (amiRejErr) console.warn('approved_material_images update (non-fatal):', amiRejErr);
       
       toast({
         title: 'Product rejected',

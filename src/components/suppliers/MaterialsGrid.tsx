@@ -1166,11 +1166,9 @@ export const MaterialsGrid: React.FC<MaterialsGridProps> = ({ embeddedInDashboar
             });
             
             adminMaterials = processedMaterials;
-            
-            // Set materials immediately for fast display
-            setMaterials(processedMaterials);
-            setLoading(false);
-            console.log(`✅ ${processedMaterials.length} materials ready (${FIRST_BATCH_WITH_IMAGES} with images, rest lazy-loaded)`);
+            // Do not setMaterials here — supplier rows are merged below; early setMaterials hid
+            // approved supplier products until reload and looked like "changes did nothing".
+            console.log(`✅ ${processedMaterials.length} admin catalog rows ready (will merge supplier materials next)`);
           }
         } catch (loadError) {
           console.error('❌ Fast load failed:', loadError);
