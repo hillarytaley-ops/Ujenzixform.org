@@ -66,7 +66,7 @@ import {
 
 interface PendingProduct {
   id: string;
-  supplier_id: string;
+  supplier_id: string | null;
   name: string;
   description: string;
   category: string;
@@ -157,8 +157,52 @@ const PRODUCT_CATEGORIES = [
   'Geotextiles', 'Polythene', 'Tarpaulins', 'Signage', 'Other'
 ];
 
+/**
+ * materials.supplier_id follows supplier RLS (often auth uid). public.suppliers rows are
+ * matched by user_id and/or id — a simple embed suppliers:supplier_id only hits id and
+ * yields null → UI showed "Unknown" for everyone.
+ */
+async function resolveSupplierCompanyNames(
+  rows: { supplier_id?: string | null }[]
+): Promise<Map<string, string>> {
+  const keys = [...new Set(rows.map((r) => r.supplier_id).filter((id): id is string => Boolean(id)))];
+  const byKey = new Map<string, string>();
+  if (keys.length === 0) return byKey;
+
+  const { data: matchUser, error: errUser } = await (supabase as any)
+    .from('suppliers')
+    .select('id, user_id, company_name')
+    .in('user_id', keys);
+  if (!errUser) {
+    for (const s of matchUser || []) {
+      if (s.company_name) {
+        if (s.user_id) byKey.set(s.user_id, s.company_name);
+        if (s.id) byKey.set(s.id, s.company_name);
+      }
+    }
+  }
+
+  const missing = keys.filter((k) => !byKey.has(k));
+  if (missing.length === 0) return byKey;
+
+  const { data: matchId, error: errId } = await (supabase as any)
+    .from('suppliers')
+    .select('id, user_id, company_name')
+    .in('id', missing);
+  if (!errId) {
+    for (const s of matchId || []) {
+      if (s.company_name) {
+        if (s.id) byKey.set(s.id, s.company_name);
+        if (s.user_id) byKey.set(s.user_id, s.company_name);
+      }
+    }
+  }
+
+  return byKey;
+}
+
 export const PendingProductsManager: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'requests' | 'pending' | 'approved' | 'rejected'>('requests');
+  const [activeTab, setActiveTab] = useState<'requests' | 'pending' | 'approved' | 'rejected'>('pending');
   const [products, setProducts] = useState<PendingProduct[]>([]);
   const [productRequests, setProductRequests] = useState<ProductRequest[]>([]);
   const [loading, setLoading] = useState(true);
@@ -216,39 +260,44 @@ export const PendingProductsManager: React.FC = () => {
         return;
       }
 
-      // Fetch products with supplier info
       const { data, error } = await (supabase as any)
         .from('materials')
-        .select(`
-          *,
-          suppliers:supplier_id (
-            company_name
-          )
-        `)
+        .select('*')
         .eq('approval_status', activeTab)
         .order('created_at', { ascending: false });
-      
+
       if (error) throw error;
-      
-      // Transform data to include supplier info
-      const transformedData = (data || []).map((item: any) => ({
+
+      const rows = data || [];
+      const labels = await resolveSupplierCompanyNames(rows);
+      const transformedData: PendingProduct[] = rows.map((item: any) => ({
         ...item,
-        supplier: item.suppliers ? { company_name: item.suppliers.company_name } : undefined
+        supplier: item.supplier_id && labels.has(item.supplier_id)
+          ? { company_name: labels.get(item.supplier_id)! }
+          : undefined,
       }));
-      
+
       setProducts(transformedData);
     } catch (err) {
       console.error('Error fetching products:', err);
-      // If the query fails, try without the supplier join
       try {
         const { data, error } = await (supabase as any)
           .from('materials')
           .select('*')
           .eq('approval_status', activeTab)
           .order('created_at', { ascending: false });
-        
+
         if (!error) {
-          setProducts(data || []);
+          const rows = data || [];
+          const labels = await resolveSupplierCompanyNames(rows);
+          setProducts(
+            rows.map((item: any) => ({
+              ...item,
+              supplier: item.supplier_id && labels.has(item.supplier_id)
+                ? { company_name: labels.get(item.supplier_id)! }
+                : undefined,
+            }))
+          );
         }
       } catch (fallbackErr) {
         console.error('Fallback query failed:', fallbackErr);
@@ -496,7 +545,8 @@ export const PendingProductsManager: React.FC = () => {
                   <div className="flex items-center gap-2">
                     <Store className="h-4 w-4 text-slate-400" />
                     <span className="text-slate-300">
-                      {product.supplier?.company_name || 'Unknown'}
+                      {product.supplier?.company_name ||
+                        (product.supplier_id ? 'Unknown' : 'Platform catalog')}
                     </span>
                   </div>
                 </TableCell>
@@ -861,7 +911,10 @@ export const PendingProductsManager: React.FC = () => {
                 </div>
                 <div>
                   <Label className="text-slate-400">Supplier</Label>
-                  <p className="text-white">{selectedProduct.supplier?.company_name || 'Unknown'}</p>
+                  <p className="text-white">
+                    {selectedProduct.supplier?.company_name ||
+                      (selectedProduct.supplier_id ? 'Unknown' : 'Platform catalog')}
+                  </p>
                 </div>
               </div>
               {selectedProduct.description && (
