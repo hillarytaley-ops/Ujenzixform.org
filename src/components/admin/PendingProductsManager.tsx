@@ -203,16 +203,19 @@ export const PendingProductsManager: React.FC = () => {
   };
 
   // Fetch products based on approval status (materials table)
-  const fetchProducts = async () => {
+  const fetchProducts = async (options?: { silent?: boolean }) => {
+    const silent = options?.silent === true;
     try {
-      setLoading(true);
-      
+      if (!silent) {
+        setLoading(true);
+      }
+
       if (activeTab === 'requests') {
         await fetchProductRequests();
-        setLoading(false);
+        if (!silent) setLoading(false);
         return;
       }
-      
+
       // Fetch products with supplier info
       const { data, error } = await (supabase as any)
         .from('materials')
@@ -252,14 +255,14 @@ export const PendingProductsManager: React.FC = () => {
         setProducts([]);
       }
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchProducts();
+    void fetchProducts();
     // Always fetch requests count
-    fetchProductRequests();
+    void fetchProductRequests();
   }, [activeTab]);
 
   // Approve a product
@@ -276,13 +279,17 @@ export const PendingProductsManager: React.FC = () => {
         .eq('id', product.id);
       
       if (error) throw error;
-      
+
+      void getCounts().then(setCounts);
+      setShowPreviewDialog(false);
+      setSelectedProduct(null);
+
       toast({
         title: 'Product approved',
-        description: `${product.name} is now visible in the marketplace`,
+        description: `${product.name} moved to Approved — review it there or in the marketplace.`,
       });
-      
-      fetchProducts();
+
+      setActiveTab('approved');
     } catch (err: any) {
       toast({
         title: 'Error',
@@ -327,7 +334,8 @@ export const PendingProductsManager: React.FC = () => {
       setShowRejectDialog(false);
       setRejectionReason('');
       setSelectedProduct(null);
-      fetchProducts();
+      void getCounts().then(setCounts);
+      setActiveTab('rejected');
     } catch (err: any) {
       toast({
         title: 'Error',
@@ -366,7 +374,7 @@ export const PendingProductsManager: React.FC = () => {
       
       setShowEditDialog(false);
       setSelectedProduct(null);
-      fetchProducts();
+      void fetchProducts({ silent: true });
     } catch (err: any) {
       toast({
         title: 'Error',
@@ -422,17 +430,157 @@ export const PendingProductsManager: React.FC = () => {
   const [counts, setCounts] = useState({ requests: 0, pending: 0, approved: 0, rejected: 0 });
   
   useEffect(() => {
-    getCounts().then(setCounts);
+    void getCounts().then(setCounts);
   }, [products, productRequests]);
 
-  if (loading) {
+  const renderMaterialsTable = (tab: 'pending' | 'approved' | 'rejected') => {
+    if (activeTab !== tab) return null;
+    if (loading) {
+      return (
+        <div className="flex items-center justify-center py-16">
+          <Loader2 className="h-8 w-8 animate-spin text-orange-500" />
+          <span className="ml-3 text-slate-400">Loading products...</span>
+        </div>
+      );
+    }
+    if (filteredProducts.length === 0) {
+      return (
+        <Card className="bg-slate-800/50 border-slate-700">
+          <CardContent className="py-12 text-center">
+            <Package className="h-12 w-12 text-slate-500 mx-auto mb-4" />
+            <p className="text-slate-400">No {tab} products found</p>
+          </CardContent>
+        </Card>
+      );
+    }
     return (
-      <div className="flex items-center justify-center py-12">
-        <Loader2 className="h-8 w-8 animate-spin text-orange-500" />
-        <span className="ml-3 text-slate-400">Loading products...</span>
-      </div>
+      <Card className="bg-slate-800/50 border-slate-700 overflow-hidden">
+        <Table>
+          <TableHeader>
+            <TableRow className="border-slate-700 hover:bg-slate-700/50">
+              <TableHead className="text-slate-300">Product</TableHead>
+              <TableHead className="text-slate-300">Supplier</TableHead>
+              <TableHead className="text-slate-300">Category</TableHead>
+              <TableHead className="text-slate-300">Price</TableHead>
+              <TableHead className="text-slate-300">Date</TableHead>
+              <TableHead className="text-slate-300 text-right">Actions</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {filteredProducts.map((product) => (
+              <TableRow key={product.id} className="border-slate-700 hover:bg-slate-700/30">
+                <TableCell>
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 rounded-lg overflow-hidden bg-slate-700 flex-shrink-0">
+                      {product.image_url ? (
+                        <img
+                          src={product.image_url}
+                          alt={product.name}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center">
+                          <ImageIcon className="h-6 w-6 text-slate-500" />
+                        </div>
+                      )}
+                    </div>
+                    <div>
+                      <p className="font-medium text-white">{product.name}</p>
+                      <p className="text-xs text-slate-400 line-clamp-1">
+                        {product.description || 'No description'}
+                      </p>
+                    </div>
+                  </div>
+                </TableCell>
+                <TableCell>
+                  <div className="flex items-center gap-2">
+                    <Store className="h-4 w-4 text-slate-400" />
+                    <span className="text-slate-300">
+                      {product.supplier?.company_name || 'Unknown'}
+                    </span>
+                  </div>
+                </TableCell>
+                <TableCell>
+                  <Badge variant="outline" className="text-slate-300">
+                    {product.category}
+                  </Badge>
+                </TableCell>
+                <TableCell>
+                  <div className="flex items-center gap-1 text-green-400 font-medium">
+                    <DollarSign className="h-4 w-4" />
+                    KES {product.unit_price.toLocaleString()}
+                  </div>
+                  <p className="text-xs text-slate-400">per {product.unit}</p>
+                </TableCell>
+                <TableCell className="text-slate-400 text-sm">
+                  {new Date(product.created_at).toLocaleDateString()}
+                </TableCell>
+                <TableCell>
+                  <div className="flex items-center justify-end gap-2">
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => {
+                        setSelectedProduct(product);
+                        setShowPreviewDialog(true);
+                      }}
+                      className="text-slate-300 hover:bg-slate-700"
+                    >
+                      <Eye className="h-4 w-4" />
+                    </Button>
+                    {tab === 'pending' && (
+                      <>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => openEditDialog(product)}
+                          className="text-blue-400 hover:bg-blue-500/20"
+                        >
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => handleApprove(product)}
+                          disabled={processing}
+                          className="text-green-400 hover:bg-green-500/20"
+                        >
+                          <Check className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => {
+                            setSelectedProduct(product);
+                            setShowRejectDialog(true);
+                          }}
+                          className="text-red-400 hover:bg-red-500/20"
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </>
+                    )}
+                    {tab === 'rejected' && (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => handleApprove(product)}
+                        disabled={processing}
+                        className="text-green-400 hover:bg-green-500/20"
+                        title="Re-approve"
+                      >
+                        <Check className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </div>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </Card>
     );
-  }
+  };
 
   return (
     <div className="space-y-6">
@@ -445,7 +593,7 @@ export const PendingProductsManager: React.FC = () => {
           </p>
         </div>
         <Button
-          onClick={fetchProducts}
+          onClick={() => void fetchProducts()}
           variant="outline"
           className="border-slate-700 text-slate-300 hover:bg-slate-700"
         >
@@ -664,142 +812,14 @@ export const PendingProductsManager: React.FC = () => {
           )}
         </TabsContent>
 
-        {/* Products Table */}
-        <TabsContent value={activeTab} className="mt-6">
-          {filteredProducts.length === 0 ? (
-            <Card className="bg-slate-800/50 border-slate-700">
-              <CardContent className="py-12 text-center">
-                <Package className="h-12 w-12 text-slate-500 mx-auto mb-4" />
-                <p className="text-slate-400">No {activeTab} products found</p>
-              </CardContent>
-            </Card>
-          ) : (
-            <Card className="bg-slate-800/50 border-slate-700 overflow-hidden">
-              <Table>
-                <TableHeader>
-                  <TableRow className="border-slate-700 hover:bg-slate-700/50">
-                    <TableHead className="text-slate-300">Product</TableHead>
-                    <TableHead className="text-slate-300">Supplier</TableHead>
-                    <TableHead className="text-slate-300">Category</TableHead>
-                    <TableHead className="text-slate-300">Price</TableHead>
-                    <TableHead className="text-slate-300">Date</TableHead>
-                    <TableHead className="text-slate-300 text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredProducts.map((product) => (
-                    <TableRow key={product.id} className="border-slate-700 hover:bg-slate-700/30">
-                      <TableCell>
-                        <div className="flex items-center gap-3">
-                          <div className="w-12 h-12 rounded-lg overflow-hidden bg-slate-700 flex-shrink-0">
-                            {product.image_url ? (
-                              <img
-                                src={product.image_url}
-                                alt={product.name}
-                                className="w-full h-full object-cover"
-                              />
-                            ) : (
-                              <div className="w-full h-full flex items-center justify-center">
-                                <ImageIcon className="h-6 w-6 text-slate-500" />
-                              </div>
-                            )}
-                          </div>
-                          <div>
-                            <p className="font-medium text-white">{product.name}</p>
-                            <p className="text-xs text-slate-400 line-clamp-1">
-                              {product.description || 'No description'}
-                            </p>
-                          </div>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          <Store className="h-4 w-4 text-slate-400" />
-                          <span className="text-slate-300">
-                            {product.supplier?.company_name || 'Unknown'}
-                          </span>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="outline" className="text-slate-300">
-                          {product.category}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-1 text-green-400 font-medium">
-                          <DollarSign className="h-4 w-4" />
-                          KES {product.unit_price.toLocaleString()}
-                        </div>
-                        <p className="text-xs text-slate-400">per {product.unit}</p>
-                      </TableCell>
-                      <TableCell className="text-slate-400 text-sm">
-                        {new Date(product.created_at).toLocaleDateString()}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center justify-end gap-2">
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => {
-                              setSelectedProduct(product);
-                              setShowPreviewDialog(true);
-                            }}
-                            className="text-slate-300 hover:bg-slate-700"
-                          >
-                            <Eye className="h-4 w-4" />
-                          </Button>
-                          {activeTab === 'pending' && (
-                            <>
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                onClick={() => openEditDialog(product)}
-                                className="text-blue-400 hover:bg-blue-500/20"
-                              >
-                                <Edit className="h-4 w-4" />
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                onClick={() => handleApprove(product)}
-                                disabled={processing}
-                                className="text-green-400 hover:bg-green-500/20"
-                              >
-                                <Check className="h-4 w-4" />
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                onClick={() => {
-                                  setSelectedProduct(product);
-                                  setShowRejectDialog(true);
-                                }}
-                                className="text-red-400 hover:bg-red-500/20"
-                              >
-                                <X className="h-4 w-4" />
-                              </Button>
-                            </>
-                          )}
-                          {activeTab === 'rejected' && (
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              onClick={() => handleApprove(product)}
-                              disabled={processing}
-                              className="text-green-400 hover:bg-green-500/20"
-                              title="Re-approve"
-                            >
-                              <Check className="h-4 w-4" />
-                            </Button>
-                          )}
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </Card>
-          )}
+        <TabsContent value="pending" className="mt-6">
+          {renderMaterialsTable('pending')}
+        </TabsContent>
+        <TabsContent value="approved" className="mt-6">
+          {renderMaterialsTable('approved')}
+        </TabsContent>
+        <TabsContent value="rejected" className="mt-6">
+          {renderMaterialsTable('rejected')}
         </TabsContent>
       </Tabs>
 
