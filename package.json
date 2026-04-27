@@ -38,7 +38,9 @@
     "supabase:login": "supabase login",
     "supabase:link": "supabase link",
     "supabase:deploy-send-sms": "supabase functions deploy send-sms",
-    "supabase:deploy-camera-vision-upload-ticket": "supabase functions deploy camera-vision-upload-ticket"
+    "supabase:deploy-camera-vision-upload-ticket": "supabase functions deploy camera-vision-upload-ticket",
+    "email:templates": "node scripts/email-templates.mjs build",
+    "email:templates:preview": "node scripts/email-templates.mjs preview"
   },
   "dependencies": {
     "@capacitor/android": "^7.4.3",

@@ -1,0 +1,7 @@
+{
+  "siteUrl": "http://localhost:5173",
+  "mockEmail": "builder.preview@example.com",
+  "mockConfirmationUrlMagicLink": "http://localhost:5173/auth?preview=1&type=magiclink",
+  "mockConfirmationUrlConfirm": "http://localhost:5173/auth?preview=1&type=signup",
+  "mockConfirmationUrlRecovery": "http://localhost:5173/reset-password?preview=1&type=recovery"
+}

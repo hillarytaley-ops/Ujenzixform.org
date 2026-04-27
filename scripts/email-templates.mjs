@@ -1,0 +1,147 @@
+/**
+ * Compose Supabase Auth HTML emails from partials; optional browser preview with mock data.
+ *
+ * Usage:
+ *   node scripts/email-templates.mjs build
+ *   node scripts/email-templates.mjs preview [--port 4750]
+ */
+
+import { readFileSync, writeFileSync, mkdirSync, existsSync, readdirSync, statSync } from "node:fs";
+import { join, dirname, relative, resolve, sep } from "node:path";
+import { fileURLToPath } from "node:url";
+import { createServer } from "node:http";
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const PROJECT_ROOT = join(__dirname, "..");
+const TEMPLATES_ROOT = join(PROJECT_ROOT, "email-templates");
+const PAGES_DIR = join(TEMPLATES_ROOT, "pages");
+const OUT_DIR = join(TEMPLATES_ROOT, "dist");
+const PREVIEW_DIR = join(TEMPLATES_ROOT, "preview-html");
+const CONFIG_PATH = join(TEMPLATES_ROOT, "config.json");
+
+function loadConfig() {
+  if (!existsSync(CONFIG_PATH)) {
+    return {
+      siteUrl: "http://localhost:5173",
+      mockEmail: "preview@example.com",
+      mockConfirmationUrlMagicLink: "http://localhost:5173/auth?preview=1",
+      mockConfirmationUrlConfirm: "http://localhost:5173/auth?preview=1&type=signup",
+      mockConfirmationUrlRecovery: "http://localhost:5173/reset-password?preview=1",
+    };
+  }
+  const buf = readFileSync(CONFIG_PATH);
+  const asUtf8 = buf.toString("utf8");
+  try {
+    return JSON.parse(asUtf8);
+  } catch {
+    if (buf.length >= 2 && buf[1] === 0) return JSON.parse(buf.toString("utf16le"));
+    throw new Error(`Invalid JSON in ${CONFIG_PATH}`);
+  }
+}
+
+function resolveIncludes(html) {
+  let result = html;
+  for (;;) {
+    const match = /@@INCLUDE:([^@]+)@@/.exec(result);
+    if (!match) break;
+    const rel = match[1].trim();
+    const abs = join(TEMPLATES_ROOT, rel);
+    if (!existsSync(abs)) throw new Error(`Missing partial: ${rel}`);
+    const partial = readFileSync(abs, "utf8");
+    result = result.replace(match[0], partial);
+  }
+  return result;
+}
+
+function composePage(filename) {
+  const pagePath = join(PAGES_DIR, filename);
+  const raw = readFileSync(pagePath, "utf8");
+  return resolveIncludes(raw);
+}
+
+function applyPreviewMocks(html, { confirmationUrl, email, siteUrl }) {
+  return html
+    .replaceAll("{{ .ConfirmationURL }}", confirmationUrl)
+    .replaceAll("{{ .Email }}", email)
+    .replaceAll("{{ .SiteURL }}", siteUrl);
+}
+
+function buildAll() {
+  mkdirSync(OUT_DIR, { recursive: true });
+  const pages = readdirSync(PAGES_DIR).filter((f) => f.endsWith(".html"));
+  for (const page of pages) {
+    const composed = composePage(page);
+    writeFileSync(join(OUT_DIR, page), composed, "utf8");
+    console.log(`Wrote ${relative(PROJECT_ROOT, join(OUT_DIR, page))}`);
+  }
+}
+
+function previewAll(port) {
+  const cfg = loadConfig();
+  mkdirSync(PREVIEW_DIR, { recursive: true });
+  buildAll();
+
+  const mapping = [
+    { src: "magic-link.html", confirmationUrl: cfg.mockConfirmationUrlMagicLink },
+    { src: "confirm-signup.html", confirmationUrl: cfg.mockConfirmationUrlConfirm },
+    { src: "reset-password.html", confirmationUrl: cfg.mockConfirmationUrlRecovery },
+  ];
+
+  for (const { src, confirmationUrl } of mapping) {
+    const composed = composePage(src);
+    const mocked = applyPreviewMocks(composed, {
+      confirmationUrl,
+      email: cfg.mockEmail,
+      siteUrl: cfg.siteUrl,
+    });
+    writeFileSync(join(PREVIEW_DIR, src), mocked, "utf8");
+    console.log(`Preview: ${relative(PROJECT_ROOT, join(PREVIEW_DIR, src))}`);
+  }
+
+  const indexHtml = `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"/><title>Auth email previews</title>
+<style>body{font-family:system-ui,sans-serif;max-width:720px;margin:2rem auto;padding:0 1rem}a{display:block;margin:.75rem 0}</style></head><body>
+<h1>Supabase Auth email previews (mock data)</h1>
+<p>These files mirror <code>email-templates/pages/*.html</code> with placeholders replaced for local visual QA. Production copies live in <code>email-templates/dist/</code> with <code>{{ .ConfirmationURL }}</code> etc. intact for the Supabase dashboard.</p>
+<ul>
+<li><a href="/magic-link.html">Magic link</a></li>
+<li><a href="/confirm-signup.html">Confirm signup</a></li>
+<li><a href="/reset-password.html">Reset password</a></li>
+</ul>
+</body></html>`;
+  writeFileSync(join(PREVIEW_DIR, "index.html"), indexHtml, "utf8");
+
+  const server = createServer((req, res) => {
+    const url = new URL(req.url || "/", `http://127.0.0.1:${port}`);
+    let pathname = decodeURIComponent(url.pathname);
+    if (pathname === "/") pathname = "/index.html";
+    const safe = pathname.replace(/^\/+/, "").replace(/\//g, sep);
+    const filePath = resolve(PREVIEW_DIR, safe);
+    const base = resolve(PREVIEW_DIR) + sep;
+    if (!filePath.startsWith(base) || !existsSync(filePath) || !statSync(filePath).isFile()) {
+      res.writeHead(404);
+      res.end("Not found");
+      return;
+    }
+    const body = readFileSync(filePath);
+    const ct = safe.endsWith(".html") ? "text/html; charset=utf-8" : "application/octet-stream";
+    res.writeHead(200, { "Content-Type": ct, "Cache-Control": "no-store" });
+    res.end(body);
+  });
+
+  server.listen(port, () => {
+    console.log(`\nEmail preview: http://127.0.0.1:${port}/\n`);
+  });
+}
+
+const cmd = process.argv[2] || "build";
+if (cmd === "build") {
+  buildAll();
+} else if (cmd === "preview") {
+  let port = 4750;
+  const i = process.argv.indexOf("--port");
+  if (i !== -1 && process.argv[i + 1]) port = Number(process.argv[i + 1]) || 4750;
+  previewAll(port);
+} else {
+  console.error("Usage: node scripts/email-templates.mjs build|preview [--port 4750]");
+  process.exit(1);
+}
