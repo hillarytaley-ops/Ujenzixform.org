@@ -1,5 +1,5 @@
 // Auth — post-sign-in uses REST fetch for user_roles + React Router navigate (avoids supabase-js auth deadlocks + stuck "Signing in…").
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useLayoutEffect, useCallback } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { PRIVACY_POLICY_URL, TERMS_OF_SERVICE_URL } from "@/config/appIdentity";
 import { sanitizeRegistrationNextPath } from "@/utils/authRegistrationNext";
@@ -175,6 +175,28 @@ const Auth = () => {
     },
     [navigate, toast, searchParams]
   );
+
+  /** Already signed in (e.g. visitor) + registration QR → skip auth UI and open the form. */
+  useLayoutEffect(() => {
+    const nextPath = sanitizeRegistrationNextPath(searchParams.get("next"));
+    if (!nextPath) return;
+
+    let cancelled = false;
+    void (async () => {
+      const { data: { session: localSession } } = await supabase.auth.getSession();
+      if (cancelled || !localSession?.user) return;
+
+      const roles = await fetchUserRolesViaRest(localSession.user.id, localSession.access_token);
+      if (cancelled) return;
+      if (roles.includes("admin") || roles.includes("super_admin")) return;
+
+      navigate(nextPath, { replace: true });
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [navigate, searchParams]);
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {

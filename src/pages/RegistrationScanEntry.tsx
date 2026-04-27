@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useLayoutEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { REGISTRATION_SCAN_KIND_TO_PATH } from "@/utils/authRegistrationNext";
@@ -10,7 +10,7 @@ const RegistrationScanEntry = () => {
   const { kind } = useParams<{ kind: string }>();
   const navigate = useNavigate();
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const target = kind ? REGISTRATION_SCAN_KIND_TO_PATH[kind] : undefined;
     if (!target) {
       navigate("/auth", { replace: true });
@@ -20,14 +20,23 @@ const RegistrationScanEntry = () => {
     let cancelled = false;
 
     void (async () => {
+      // Prefer local session first so signed-in visitors skip /auth (no network wait for getUser).
+      const { data: { session } } = await supabase.auth.getSession();
+      if (cancelled) return;
+      if (session?.user) {
+        navigate(target, { replace: true });
+        return;
+      }
+
       const { data: { user } } = await supabase.auth.getUser();
       if (cancelled) return;
       if (user) {
         navigate(target, { replace: true });
-      } else {
-        const qs = new URLSearchParams({ next: target, tab: "signin" });
-        navigate(`/auth?${qs.toString()}`, { replace: true });
+        return;
       }
+
+      const qs = new URLSearchParams({ next: target, tab: "signin" });
+      navigate(`/auth?${qs.toString()}`, { replace: true });
     })();
 
     return () => {
