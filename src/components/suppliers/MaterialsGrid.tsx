@@ -1262,16 +1262,24 @@ export const MaterialsGrid: React.FC<MaterialsGridProps> = ({ embeddedInDashboar
         // Silent fail - continue with admin materials
       }
 
+      // IDs already returned from admin_material_images (includes supplier products mirrored on approve)
+      const adminCatalogIds = new Set(adminMaterials.map((m) => m.id));
+
       // Filter supplier materials:
       // - Only approved products (or no approval status for backward compatibility)
+      // - Skip rows whose id is already in the admin catalog (mirrored supplier → admin_material_images)
       // - Keep image_url for base64, Supabase storage, site-relative paths, or http(s)
       const approvedRows = data
         ? data.filter((item: any) => {
             const isApproved = !item.approval_status || item.approval_status === 'approved';
             if (!isApproved) {
               console.log(`⏳ Supplier product "${item.name}" filtered out - status: ${item.approval_status}`);
+              return false;
             }
-            return isApproved;
+            if (adminCatalogIds.has(item.id)) {
+              return false;
+            }
+            return true;
           })
         : [];
 

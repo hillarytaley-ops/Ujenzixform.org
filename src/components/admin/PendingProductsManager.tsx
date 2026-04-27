@@ -309,14 +309,50 @@ export const PendingProductsManager: React.FC = () => {
         console.warn('approved_material_images upsert (non-fatal):', amiErr);
       }
 
+      // Mirror into admin_material_images so the same product appears under
+      // Admin → Material Images → "Admin Uploads" (and the marketplace catalog query).
+      const p = product as PendingProduct & {
+        pricing_type?: string | null;
+        variants?: unknown;
+        additional_images?: unknown;
+      };
+      const { error: catalogErr } = await (supabase as any).from('admin_material_images').upsert(
+        {
+          id: product.id,
+          name: product.name,
+          category: product.category || 'Other',
+          image_url: imageUrl,
+          description: product.description || '',
+          unit: product.unit || 'unit',
+          suggested_price: Number(product.unit_price) || 0,
+          is_approved: true,
+          is_featured: false,
+          pricing_type: p.pricing_type || 'single',
+          variants: p.variants ?? [],
+          additional_images: p.additional_images ?? null,
+          uploaded_by: approverId,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: 'id' }
+      );
       void getCounts().then(setCounts);
       setShowPreviewDialog(false);
       setSelectedProduct(null);
 
-      toast({
-        title: 'Product approved',
-        description: `${product.name} is approved — visible on the marketplace and under Admin → Material Images → Supplier Images.`,
-      });
+      if (catalogErr) {
+        console.warn('admin_material_images upsert (catalog mirror):', catalogErr);
+        toast({
+          title: 'Partially approved',
+          description:
+            'materials row is approved, but mirroring to admin_material_images failed (check Admin RLS / console). Refresh Material Images after fixing.',
+          variant: 'destructive',
+        });
+      } else {
+        toast({
+          title: 'Product approved',
+          description: `${product.name} is on the marketplace and in Admin → Material Images (Admin Uploads + Supplier Images).`,
+        });
+      }
 
       setActiveTab('approved');
     } catch (err: any) {
@@ -363,6 +399,12 @@ export const PendingProductsManager: React.FC = () => {
         })
         .eq('material_id', selectedProduct.id);
       if (amiRejErr) console.warn('approved_material_images update (non-fatal):', amiRejErr);
+
+      const { error: delCatErr } = await (supabase as any)
+        .from('admin_material_images')
+        .delete()
+        .eq('id', selectedProduct.id);
+      if (delCatErr) console.warn('admin_material_images delete mirror (non-fatal):', delCatErr);
       
       toast({
         title: 'Product rejected',
