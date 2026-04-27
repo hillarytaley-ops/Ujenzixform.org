@@ -5,6 +5,7 @@ import { PRIVACY_POLICY_URL, TERMS_OF_SERVICE_URL } from "@/config/appIdentity";
 import { sanitizeRegistrationNextPath } from "@/utils/authRegistrationNext";
 import type { Session } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
+import { edgeIsAdminStaffPortalEmail } from "@/utils/edgeGuestPublic";
 import { fetchUserRolesViaRest } from "@/lib/userRolesRest";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -232,15 +233,9 @@ const Auth = () => {
     let cancelled = false;
     const t = window.setTimeout(() => {
       void (async () => {
-        const { data, error } = await supabase.rpc("is_admin_staff_portal_email", {
-          p_email: raw,
-        });
+        const ok = await edgeIsAdminStaffPortalEmail(raw);
         if (cancelled) return;
-        if (error) {
-          setStaffPortalEligible(false);
-          return;
-        }
-        setStaffPortalEligible(data === true);
+        setStaffPortalEligible(ok);
       })();
     }, 450);
     return () => {

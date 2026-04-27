@@ -1,4 +1,5 @@
 import { supplierLocationLine, type SupplierLocationFields } from '@/utils/supplierLocationLine';
+import { edgeGetSuppliersForPriceCompare } from '@/utils/edgeGuestPublic';
 
 const PLACEHOLDER_PICKUP = /pickup location\s*$/i;
 
@@ -59,11 +60,9 @@ export function resolvePickupForProvider(
 
 /**
  * Load supplier storefront fields for pickup lines.
- * Uses SECURITY DEFINER RPC — direct REST on `suppliers` is empty for delivery providers under RLS.
+ * Uses Edge `public-suppliers-for-price-compare` (service_role RPC) — anon PostgREST cannot EXECUTE DEFINER RPCs.
  */
 export async function fetchSuppliersByIds(
-  restUrl: string,
-  headers: Record<string, string>,
   supplierIds: Iterable<string>
 ): Promise<Map<string, Record<string, unknown>>> {
   const map = new Map<string, Record<string, unknown>>();
@@ -71,17 +70,8 @@ export async function fetchSuppliersByIds(
   for (let i = 0; i < uuids.length; i += 80) {
     const chunk = uuids.slice(i, i + 80);
     try {
-      const res = await fetch(`${restUrl}/rest/v1/rpc/get_suppliers_for_price_compare`, {
-        method: 'POST',
-        headers: {
-          ...headers,
-          'Content-Type': 'application/json',
-          Prefer: 'return=representation',
-        },
-        body: JSON.stringify({ p_supplier_ids: chunk }),
-      });
-      if (!res.ok) continue;
-      const rows = (await res.json()) as Record<string, unknown>[];
+      const rows = await edgeGetSuppliersForPriceCompare(chunk);
+      if (!rows.length) continue;
       rows.forEach((r) => {
         const id = r.id as string;
         if (!id) return;

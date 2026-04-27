@@ -16,6 +16,18 @@ verify_jwt = false
 [functions.verify-admin-staff-login]
 verify_jwt = false
 
+# Pre-auth staff tab on /auth (replaces anon EXECUTE on SECURITY DEFINER RPC).
+[functions.is-admin-staff-portal-email]
+verify_jwt = false
+
+# Guest monitoring access code (replaces anon DEFINER RPC).
+[functions.resolve-monitoring-access-code]
+verify_jwt = false
+
+# Supplier storefront fields for cart compare + delivery alerts (replaces anon DEFINER RPC).
+[functions.public-suppliers-for-price-compare]
+verify_jwt = false
+
 # Optional path: browser calls Edge (with user JWT) instead of PostgREST RPC for stream metadata.
 [functions.camera-stream-url]
 verify_jwt = true

@@ -45,6 +45,7 @@ import {
   PanelLeft
 } from "lucide-react";
 import { SUPABASE_ANON_KEY, SUPABASE_URL, supabase } from '@/integrations/supabase/client';
+import { edgeResolveMonitoringAccessCode } from '@/utils/edgeGuestPublic';
 import {
   fetchMyMonitoringServiceRequests,
   monitoringRestOpts,
@@ -766,17 +767,16 @@ const Monitoring = () => {
     setLoadingCameras(true);
 
     try {
-      // SECURITY DEFINER RPC: validates code + returns only assigned cameras (works for guests without JWT)
-      const { data: rpcData, error: rpcError } = await supabase.rpc('resolve_monitoring_access_code', {
-        p_code: code.trim(),
-      });
-
-      if (rpcError) {
-        console.error('📹 resolve_monitoring_access_code:', rpcError);
-        throw new Error(rpcError.message || 'Failed to resolve access code');
+      // Edge + service_role (anon cannot EXECUTE SECURITY DEFINER RPC).
+      let rawPayload: unknown;
+      try {
+        rawPayload = await edgeResolveMonitoringAccessCode(code.trim());
+      } catch (e) {
+        console.error('📹 resolve_monitoring_access_code (edge):', e);
+        throw new Error(
+          e instanceof Error ? e.message : 'Failed to resolve access code'
+        );
       }
-
-      let rawPayload: unknown = rpcData;
       if (typeof rawPayload === 'string') {
         try {
           rawPayload = JSON.parse(rawPayload);

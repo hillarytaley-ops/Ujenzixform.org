@@ -610,7 +610,7 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
         .map((p: any) => p?.supplier_id)
         .filter((id: unknown): id is string => typeof id === 'string' && id.length === 36);
       if (sidFromPoMap.length > 0) {
-        const initialSuppliers = await fetchSuppliersByIds(url, headers, sidFromPoMap);
+        const initialSuppliers = await fetchSuppliersByIds(sidFromPoMap);
         initialSuppliers.forEach((v, k) => supplierById.set(k, v));
       }
       
@@ -971,7 +971,7 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
             : null;
         let poRow = linkedPoId && poMap.has(linkedPoId) ? poMap.get(linkedPoId) : null;
         if (poRow?.supplier_id && !supplierById.has(String(poRow.supplier_id))) {
-          const more = await fetchSuppliersByIds(url, headers, [String(poRow.supplier_id)]);
+          const more = await fetchSuppliersByIds([String(poRow.supplier_id)]);
           more.forEach((v, k) => supplierById.set(k, v));
         }
         const supRow = poRow?.supplier_id
@@ -1080,7 +1080,7 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
           ),
         ].filter((id) => !supplierById.has(id));
         if (sidNeed.length > 0) {
-          const extraSuppliers = await fetchSuppliersByIds(url, headers, sidNeed);
+          const extraSuppliers = await fetchSuppliersByIds(sidNeed);
           extraSuppliers.forEach((v, k) => supplierById.set(k, v));
         }
         

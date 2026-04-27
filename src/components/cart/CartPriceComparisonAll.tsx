@@ -1,4 +1,5 @@
-import { supabase, SUPABASE_URL, SUPABASE_ANON_KEY } from '@/integrations/supabase/client';
+import { supabase, SUPABASE_ANON_KEY, SUPABASE_URL } from '@/integrations/supabase/client';
+import { edgeGetSuppliersForPriceCompare } from '@/utils/edgeGuestPublic';
 /**
  * ╔══════════════════════════════════════════════════════════════════════════════════════╗
  * ║                                                                                      ║
@@ -232,12 +233,8 @@ export const CartPriceComparisonAll: React.FC<CartPriceComparisonAllProps> = ({
       const compareRpcIds = [...uniqueSupplierIds].filter(uuidLike).slice(0, 200);
       if (compareRpcIds.length > 0) {
         try {
-          const { data: rpcRows, error: rpcErr } = await supabase.rpc('get_suppliers_for_price_compare', {
-            p_supplier_ids: compareRpcIds,
-          });
-          if (rpcErr) {
-            console.warn('get_suppliers_for_price_compare:', rpcErr.message);
-          } else if (Array.isArray(rpcRows)) {
+          const rpcRows = await edgeGetSuppliersForPriceCompare(compareRpcIds);
+          if (Array.isArray(rpcRows) && rpcRows.length > 0) {
             for (const row of rpcRows as any[]) {
               const s: any = {
                 id: row.id,
@@ -256,7 +253,7 @@ export const CartPriceComparisonAll: React.FC<CartPriceComparisonAllProps> = ({
             }
           }
         } catch (e) {
-          console.warn('get_suppliers_for_price_compare failed', e);
+          console.warn('get_suppliers_for_price_compare (edge) failed', e);
         }
       }
 

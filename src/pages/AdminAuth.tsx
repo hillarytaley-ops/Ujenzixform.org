@@ -307,90 +307,70 @@ const AdminAuth = () => {
         staffName = 'Super Administrator';
       } else {
         try {
-          const viaEdge =
-            import.meta.env.VITE_ADMIN_STAFF_LOGIN_VIA_EDGE === "true";
-
-          console.log(
-            viaEdge
-              ? "🔐 Verifying staff via verify-admin-staff-login Edge…"
-              : "🔐 Verifying staff via verify_admin_staff_login RPC…"
-          );
+          console.log("🔐 Verifying staff via verify-admin-staff-login Edge…");
 
           let rpcData: unknown;
           let rpcError: { message?: string } | null = null;
 
-          if (viaEdge) {
-            const res = await fetch(
-              `${SUPABASE_URL}/functions/v1/verify-admin-staff-login`,
-              {
-                method: "POST",
-                headers: {
-                  apikey: SUPABASE_ANON_KEY,
-                  Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
-                  "Content-Type": "application/json",
-                },
-                body: JSON.stringify({
-                  p_email: normalizedEmail,
-                  p_staff_code: normalizedCode,
-                }),
-              }
-            );
-
-            if (res.status === 404) {
-              toast({
-                variant: "destructive",
-                title: "Staff login service unavailable",
-                description:
-                  "Deploy the verify-admin-staff-login Edge Function, or turn off VITE_ADMIN_STAFF_LOGIN_VIA_EDGE.",
-              });
-              setLoading(false);
-              return;
+          const res = await fetch(
+            `${SUPABASE_URL}/functions/v1/verify-admin-staff-login`,
+            {
+              method: "POST",
+              headers: {
+                apikey: SUPABASE_ANON_KEY,
+                Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                p_email: normalizedEmail,
+                p_staff_code: normalizedCode,
+              }),
             }
+          );
 
-            rpcData = await res.json().catch(() => null);
-
-            if (res.status === 429) {
-              toast({
-                variant: "destructive",
-                title: "Too many attempts",
-                description:
-                  (rpcData as { message?: string })?.message ||
-                  "Please wait before trying again, or contact an administrator.",
-              });
-              setLoading(false);
-              return;
-            }
-
-            if (!res.ok) {
-              rpcError = {
-                message:
-                  (rpcData as { error?: string })?.error ||
-                  res.statusText ||
-                  "Edge verify failed",
-              };
-            }
-          } else {
-            const out = await db.rpc("verify_admin_staff_login", {
-              p_email: normalizedEmail,
-              p_staff_code: normalizedCode,
+          if (res.status === 404) {
+            toast({
+              variant: "destructive",
+              title: "Staff login service unavailable",
+              description:
+                "Deploy the verify-admin-staff-login Edge Function (supabase functions deploy verify-admin-staff-login).",
             });
-            rpcData = out.data;
-            rpcError = out.error;
+            setLoading(false);
+            return;
+          }
+
+          rpcData = await res.json().catch(() => null);
+
+          if (res.status === 429) {
+            toast({
+              variant: "destructive",
+              title: "Too many attempts",
+              description:
+                (rpcData as { message?: string })?.message ||
+                "Please wait before trying again, or contact an administrator.",
+            });
+            setLoading(false);
+            return;
+          }
+
+          if (!res.ok) {
+            rpcError = {
+              message:
+                (rpcData as { error?: string })?.error ||
+                res.statusText ||
+                "Edge verify failed",
+            };
           }
 
           if (rpcError) {
             console.error("🔐 Staff verify RPC error:", rpcError);
             const msg = (rpcError as { message?: string }).message || "";
-            if (
-              /could not find the function|verify_admin_staff_login|PGRST202/i.test(
-                msg
-              )
-            ) {
+            if (/verify_admin_staff_login|PGRST202|Edge verify failed/i.test(msg)) {
               toast({
                 variant: "destructive",
-                title: "Database not ready",
+                title: "Staff login unavailable",
                 description:
-                  "Run the latest Supabase migration (verify_admin_staff_login), then try again.",
+                  "Confirm the verify-admin-staff-login Edge Function is deployed and SUPABASE_SERVICE_ROLE_KEY is set.",
               });
               setLoading(false);
               return;
