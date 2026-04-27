@@ -40,7 +40,8 @@
     "supabase:deploy-send-sms": "supabase functions deploy send-sms",
     "supabase:deploy-camera-vision-upload-ticket": "supabase functions deploy camera-vision-upload-ticket",
     "email:templates": "node scripts/email-templates.mjs build",
-    "email:templates:preview": "node scripts/email-templates.mjs preview"
+    "email:templates:preview": "node scripts/email-templates.mjs preview",
+    "email:templates:preview:open": "node scripts/email-templates.mjs preview --open"
   },
   "dependencies": {
     "@capacitor/android": "^7.4.3",

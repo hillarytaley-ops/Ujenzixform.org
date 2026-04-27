@@ -3,21 +3,29 @@
  *
  * Usage:
  *   node scripts/email-templates.mjs build
- *   node scripts/email-templates.mjs preview [--port 4750]
+ *   node scripts/email-templates.mjs preview [--port 4750] [--open]
  */
 
 import { readFileSync, writeFileSync, mkdirSync, existsSync, readdirSync, statSync } from "node:fs";
 import { join, dirname, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createServer } from "node:http";
+import { exec } from "node:child_process";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PROJECT_ROOT = join(__dirname, "..");
 const TEMPLATES_ROOT = join(PROJECT_ROOT, "email-templates");
 const PAGES_DIR = join(TEMPLATES_ROOT, "pages");
-const OUT_DIR = join(TEMPLATES_ROOT, "dist");
+/* Output folder avoids root "dist" (gitignored); supabase-ready may be committed. */
+const OUT_DIR = join(TEMPLATES_ROOT, "supabase-ready");
 const PREVIEW_DIR = join(TEMPLATES_ROOT, "preview-html");
 const CONFIG_PATH = join(TEMPLATES_ROOT, "config.json");
+
+function readUtf8File(path) {
+  const buf = readFileSync(path);
+  if (buf.length >= 2 && buf[1] === 0) return buf.toString("utf16le");
+  return buf.toString("utf8");
+}
 
 function loadConfig() {
   if (!existsSync(CONFIG_PATH)) {
@@ -47,7 +55,7 @@ function resolveIncludes(html) {
     const rel = match[1].trim();
     const abs = join(TEMPLATES_ROOT, rel);
     if (!existsSync(abs)) throw new Error(`Missing partial: ${rel}`);
-    const partial = readFileSync(abs, "utf8");
+    const partial = readUtf8File(abs);
     result = result.replace(match[0], partial);
   }
   return result;
@@ -55,7 +63,7 @@ function resolveIncludes(html) {
 
 function composePage(filename) {
   const pagePath = join(PAGES_DIR, filename);
-  const raw = readFileSync(pagePath, "utf8");
+  const raw = readUtf8File(pagePath);
   return resolveIncludes(raw);
 }
 
@@ -76,7 +84,17 @@ function buildAll() {
   }
 }
 
-function previewAll(port) {
+function openBrowser(url) {
+  if (process.platform === "win32") {
+    exec(`cmd /c start "" "${url}"`, () => {});
+  } else if (process.platform === "darwin") {
+    exec(`open "${url}"`, () => {});
+  } else {
+    exec(`xdg-open "${url}"`, () => {});
+  }
+}
+
+function previewAll(port, openBrowserFlag) {
   const cfg = loadConfig();
   mkdirSync(PREVIEW_DIR, { recursive: true });
   buildAll();
@@ -101,7 +119,7 @@ function previewAll(port) {
   const indexHtml = `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"/><title>Auth email previews</title>
 <style>body{font-family:system-ui,sans-serif;max-width:720px;margin:2rem auto;padding:0 1rem}a{display:block;margin:.75rem 0}</style></head><body>
 <h1>Supabase Auth email previews (mock data)</h1>
-<p>These files mirror <code>email-templates/pages/*.html</code> with placeholders replaced for local visual QA. Production copies live in <code>email-templates/dist/</code> with <code>{{ .ConfirmationURL }}</code> etc. intact for the Supabase dashboard.</p>
+<p>These files mirror <code>email-templates/pages/*.html</code> with placeholders replaced for local visual QA. Supabase-ready HTML (Go placeholders preserved) is in <code>email-templates/supabase-ready/</code> for dashboard paste.</p>
 <ul>
 <li><a href="/magic-link.html">Magic link</a></li>
 <li><a href="/confirm-signup.html">Confirm signup</a></li>
@@ -129,7 +147,9 @@ function previewAll(port) {
   });
 
   server.listen(port, () => {
-    console.log(`\nEmail preview: http://127.0.0.1:${port}/\n`);
+    const url = `http://127.0.0.1:${port}/`;
+    console.log(`\nEmail preview: ${url}\n`);
+    if (openBrowserFlag) openBrowser(url);
   });
 }
 
@@ -140,8 +160,9 @@ if (cmd === "build") {
   let port = 4750;
   const i = process.argv.indexOf("--port");
   if (i !== -1 && process.argv[i + 1]) port = Number(process.argv[i + 1]) || 4750;
-  previewAll(port);
+  const openFlag = process.argv.includes("--open");
+  previewAll(port, openFlag);
 } else {
-  console.error("Usage: node scripts/email-templates.mjs build|preview [--port 4750]");
+  console.error("Usage: node scripts/email-templates.mjs build|preview [--port 4750] [--open]");
   process.exit(1);
 }

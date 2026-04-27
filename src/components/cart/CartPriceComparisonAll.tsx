@@ -120,7 +120,7 @@ export const CartPriceComparisonAll: React.FC<CartPriceComparisonAllProps> = ({
       try {
         const { data: rows, error: suppliersErr } = await supabase
           .from('suppliers')
-          .select('id, user_id, profile_id, company_name, rating, location, address, physical_address, county')
+          .select('id, user_id, profile_id, company_name, rating, location, address')
           .order('rating', { ascending: false })
           .limit(500);
         if (suppliersErr) {
@@ -232,36 +232,58 @@ export const CartPriceComparisonAll: React.FC<CartPriceComparisonAllProps> = ({
       const uuidLike = (id: string | undefined) => !!id && id.length === 36 && id !== 'admin-catalog' && id !== 'general';
       const compareRpcIds = [...uniqueSupplierIds].filter(uuidLike).slice(0, 200);
       if (compareRpcIds.length > 0) {
-        try {
-          const rpcRows = await edgeGetSuppliersForPriceCompare(compareRpcIds);
-          if (Array.isArray(rpcRows) && rpcRows.length > 0) {
-            for (const row of rpcRows as any[]) {
-              const s: any = {
-                id: row.id,
-                user_id: row.user_id,
-                profile_id: row.profile_id,
-                company_name: row.company_name,
-                rating: row.rating,
-                location: row.location || row.profile_location || null,
-                address: row.address,
-                display_location: row.display_location,
-              };
-              const merged = mergeProfileIntoSupplier(s);
-              suppliersMap.set(merged.id, merged);
-              if (merged.user_id) suppliersMap.set(merged.user_id, merged);
-              if (merged.profile_id) suppliersMap.set(merged.profile_id, merged);
-            }
+        const applyRpcRows = (rpcRows: any[]) => {
+          for (const row of rpcRows) {
+            const s: any = {
+              id: row.id,
+              user_id: row.user_id,
+              profile_id: row.profile_id,
+              company_name: row.company_name,
+              rating: row.rating,
+              location: row.location || row.profile_location || null,
+              address: row.address,
+              display_location: row.display_location,
+            };
+            const merged = mergeProfileIntoSupplier(s);
+            suppliersMap.set(merged.id, merged);
+            if (merged.user_id) suppliersMap.set(merged.user_id, merged);
+            if (merged.profile_id) suppliersMap.set(merged.profile_id, merged);
           }
+        };
+
+        let rpcRows: any[] = [];
+        try {
+          const { data: directRpc, error: rpcErr } = await supabase.rpc('get_suppliers_for_price_compare', {
+            p_supplier_ids: compareRpcIds,
+          });
+          if (!rpcErr && Array.isArray(directRpc)) rpcRows = directRpc;
         } catch (e) {
-          console.warn('get_suppliers_for_price_compare (edge) failed', e);
+          console.warn('get_suppliers_for_price_compare (rpc) failed', e);
         }
+
+        const coveredIds = new Set(
+          rpcRows.map((r: { id?: string }) => (typeof r?.id === 'string' ? r.id : '')).filter(Boolean)
+        );
+        const uncovered = compareRpcIds.filter((id) => !coveredIds.has(id));
+        if (uncovered.length > 0) {
+          try {
+            const edgeRows = await edgeGetSuppliersForPriceCompare(uncovered);
+            if (Array.isArray(edgeRows) && edgeRows.length > 0) {
+              rpcRows = [...rpcRows, ...edgeRows];
+            }
+          } catch (e) {
+            console.warn('get_suppliers_for_price_compare (edge) failed', e);
+          }
+        }
+
+        if (rpcRows.length > 0) applyRpcRows(rpcRows);
       }
 
       const missingIds = [...uniqueSupplierIds].filter((id) => !suppliersMap.has(id));
       if (missingIds.length > 0) {
         const { data: extraRows } = await supabase
           .from('suppliers')
-          .select('id, user_id, profile_id, company_name, rating, location, address, physical_address, county')
+          .select('id, user_id, profile_id, company_name, rating, location, address')
           .in('id', missingIds.slice(0, 200));
         extraRows?.forEach((raw: any) => {
           const s = mergeProfileIntoSupplier(raw);
@@ -272,10 +294,13 @@ export const CartPriceComparisonAll: React.FC<CartPriceComparisonAllProps> = ({
       }
 
       const cartSupplierNames = new Map<string, string>();
+      const cartSupplierLocations = new Map<string, string>();
       items.forEach((it) => {
         const sid = it.supplier_id;
         const nm = it.supplier_name?.trim();
         if (sid && nm) cartSupplierNames.set(sid, nm);
+        const loc = it.supplier_location?.trim();
+        if (sid && loc) cartSupplierLocations.set(sid, loc);
       });
 
       const resolveSupplierName = (id: string, supplier: any | undefined): string => {
@@ -291,11 +316,13 @@ export const CartPriceComparisonAll: React.FC<CartPriceComparisonAllProps> = ({
         return 'Supplier';
       };
 
-      const resolveAddressLine = (supplier: any | undefined): string => {
+      const resolveAddressLine = (supplierId: string, supplier: any | undefined): string => {
         const fromRpc = supplier?.display_location && String(supplier.display_location).trim();
         if (fromRpc) return fromRpc.slice(0, 160);
         const line = supplierLocationLine(supplier);
         if (line) return line;
+        const fromCart = cartSupplierLocations.get(supplierId);
+        if (fromCart) return fromCart.slice(0, 160);
         return 'No address on file — contact supplier for location';
       };
 
@@ -306,7 +333,7 @@ export const CartPriceComparisonAll: React.FC<CartPriceComparisonAllProps> = ({
           user_id: supplier?.user_id,
           name: resolveSupplierName(id, supplier),
           rating: supplier?.rating,
-          addressLine: resolveAddressLine(supplier),
+          addressLine: resolveAddressLine(id, supplier),
         };
       }).sort((a, b) => (b.rating || 0) - (a.rating || 0));
 
@@ -322,7 +349,7 @@ export const CartPriceComparisonAll: React.FC<CartPriceComparisonAllProps> = ({
           return {
             supplier_id: p.supplier_id,
             supplier_name: resolveSupplierName(p.supplier_id, supplier),
-            supplier_location: resolveAddressLine(supplier),
+            supplier_location: resolveAddressLine(p.supplier_id, supplier),
             price: p.price,
             in_stock: p.in_stock ?? true
           };
@@ -764,41 +791,44 @@ export const CartPriceComparisonAll: React.FC<CartPriceComparisonAllProps> = ({
                     </tr>
                   ))}
                   
-                  {/* TOTALS Row */}
-                  <tr className="bg-gray-200 font-bold sticky bottom-0">
-                    <td className="p-3 border-t-2 border-gray-400 bg-gray-200 sticky left-0 text-gray-800">
-                      TOTAL
-                    </td>
-                    <td className="p-2 border-t-2 border-gray-400 text-center text-gray-600">
-                      {comparisons.reduce((sum, c) => sum + c.quantity, 0)}
-                    </td>
-                    {allSuppliers.map((supplier) => {
-                      const { total, itemCount } = getSupplierTotal(supplier.id);
-                      const isCheapest = cheapestSupplier?.id === supplier.id;
-                      const hasAllItems = itemCount === comparisons.length;
-                      const isSelected = selectedSuppliers.has(supplier.id);
-                      
-                      return (
-                        <td 
-                          key={`total-${supplier.id}`}
-                          className={`p-3 border-t-2 border-gray-400 text-center ${isCheapest ? 'bg-green-200 text-green-800' : 'bg-gray-100'} ${isSelected ? 'bg-blue-100' : ''}`}
-                        >
-                          {total > 0 ? (
-                            <div>
-                              <div className="text-sm">KES {total.toLocaleString()}</div>
-                              {!hasAllItems && (
-                                <div className="text-[10px] font-normal text-orange-600">
-                                  ({itemCount}/{comparisons.length} items)
-                                </div>
-                              )}
-                            </div>
-                          ) : (
-                            <span className="text-gray-400">—</span>
-                          )}
-                        </td>
-                      );
-                    })}
-                  </tr>
+                  {/* TOTALS row: hide when one material × qty 1 (same number already shown as unit price) */}
+                  {(comparisons.length > 1 ||
+                    comparisons.some((c) => c.quantity !== 1)) && (
+                    <tr className="bg-gray-200 font-bold sticky bottom-0">
+                      <td className="p-3 border-t-2 border-gray-400 bg-gray-200 sticky left-0 text-gray-800">
+                        TOTAL
+                      </td>
+                      <td className="p-2 border-t-2 border-gray-400 text-center text-gray-600">
+                        {comparisons.reduce((sum, c) => sum + c.quantity, 0)}
+                      </td>
+                      {allSuppliers.map((supplier) => {
+                        const { total, itemCount } = getSupplierTotal(supplier.id);
+                        const isCheapest = cheapestSupplier?.id === supplier.id;
+                        const hasAllItems = itemCount === comparisons.length;
+                        const isSelected = selectedSuppliers.has(supplier.id);
+
+                        return (
+                          <td
+                            key={`total-${supplier.id}`}
+                            className={`p-3 border-t-2 border-gray-400 text-center ${isCheapest ? 'bg-green-200 text-green-800' : 'bg-gray-100'} ${isSelected ? 'bg-blue-100' : ''}`}
+                          >
+                            {total > 0 ? (
+                              <div>
+                                <div className="text-sm">KES {total.toLocaleString()}</div>
+                                {!hasAllItems && (
+                                  <div className="text-[10px] font-normal text-orange-600">
+                                    ({itemCount}/{comparisons.length} items)
+                                  </div>
+                                )}
+                              </div>
+                            ) : (
+                              <span className="text-gray-400">—</span>
+                            )}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  )}
                   
                   {/* Action Row for Private Clients - Select buttons */}
                   {!isProfessionalBuilder && (
