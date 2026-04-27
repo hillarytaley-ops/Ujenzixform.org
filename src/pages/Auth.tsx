@@ -1,6 +1,6 @@
 // Auth — post-sign-in uses REST fetch for user_roles + React Router navigate (avoids supabase-js auth deadlocks + stuck "Signing in…").
 import { useState, useRef, useEffect, useCallback } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { PRIVACY_POLICY_URL, TERMS_OF_SERVICE_URL } from "@/config/appIdentity";
 import type { Session } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
@@ -115,9 +115,13 @@ const EMAIL_LIKE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 const Auth = () => {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [formLoading, setFormLoading] = useState(false);
   const [showResetDialog, setShowResetDialog] = useState(false);
-  const [authTab, setAuthTab] = useState("signin");
+  const [authTab, setAuthTab] = useState(() => {
+    const t = searchParams.get("tab");
+    return t === "signup" ? "signup" : "signin";
+  });
   const [signInEmail, setSignInEmail] = useState("");
   const [signInPassword, setSignInPassword] = useState("");
   const [signUpEmail, setSignUpEmail] = useState("");
@@ -208,6 +212,24 @@ const Auth = () => {
       window.clearTimeout(t);
     };
   }, [authTab, signInEmail, signUpEmail]);
+
+  useEffect(() => {
+    const t = searchParams.get("tab");
+    if (t === "signup") setAuthTab("signup");
+    else if (t === "signin") setAuthTab("signin");
+  }, [searchParams]);
+
+  const onAuthTabChange = (value: string) => {
+    setAuthTab(value);
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        if (value === "signin" || value === "signup") next.set("tab", value);
+        return next;
+      },
+      { replace: true }
+    );
+  };
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -370,7 +392,7 @@ const Auth = () => {
             <CardDescription>Kenya's Premier Construction Platform</CardDescription>
           </CardHeader>
           <CardContent>
-            <Tabs value={authTab} onValueChange={setAuthTab} className="w-full">
+            <Tabs value={authTab} onValueChange={onAuthTabChange} className="w-full">
               <TabsList className="grid w-full grid-cols-2">
                 <TabsTrigger value="signin">Sign In</TabsTrigger>
                 <TabsTrigger value="signup">Sign Up</TabsTrigger>

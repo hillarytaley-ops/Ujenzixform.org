@@ -258,6 +258,7 @@ const App = () => {
                     {/* Public Routes - Accessible to everyone after single sign in */}
                     <Route path="/" element={<Auth />} />
                     <Route path="/auth" element={<Auth />} />
+                    <Route path="/author" element={<Auth />} />
                     <Route path="/unified-auth" element={<SuspenseWrapper><UnifiedAuth /></SuspenseWrapper>} />
 
                     {ALL_PUBLIC_AUTH_REDIRECTS.map(({ path: aliasPath, to }) => (

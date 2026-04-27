@@ -152,6 +152,7 @@ import { ThemeToggle, ThemeProvider } from "@/components/admin/dashboard/ThemeTo
 import { MobileNav } from "@/components/admin/dashboard/MobileNav";
 import { GroupedTabNav } from "@/components/admin/dashboard/GroupedTabNav";
 import { AdminSupplyChainDocsPanel } from "@/components/admin/AdminSupplyChainDocsPanel";
+import { AuthPageQrDownloads } from "@/components/admin/AuthPageQrDownloads";
 import {
   canAccessAdminDashboardStorage,
   isAdminStaffLocalSessionValid,
@@ -3889,6 +3890,7 @@ const AdminDashboard = () => {
 
           {/* Documents Tab */}
           <TabsContent value="documents" className="space-y-6">
+            <AuthPageQrDownloads />
             {/* Document Stats */}
             <div className="grid md:grid-cols-4 gap-4">
               <Card className="bg-gradient-to-br from-purple-900/40 to-purple-800/20 border-purple-700/50">

@@ -8,6 +8,7 @@
 const EXACT_AUTH_ENTRY_PATHS = new Set<string>([
   '/',
   '/auth',
+  '/author',
   '/unified-auth',
   '/admin-login',
   '/reset-password',

@@ -4,6 +4,8 @@
  */
 export const AUTH_ENTRY_ROUTES = {
   primary: "/auth",
+  /** Same UI as `primary`; use for marketing / QR labels ("Author page"). */
+  author: "/author",
   home: "/home",
   unified: "/unified-auth",
   professionalBuilderAuth: "/professional-builder-auth",
