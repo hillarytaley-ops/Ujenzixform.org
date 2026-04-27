@@ -2,6 +2,7 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { PRIVACY_POLICY_URL, TERMS_OF_SERVICE_URL } from "@/config/appIdentity";
+import { sanitizeRegistrationNextPath } from "@/utils/authRegistrationNext";
 import type { Session } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchUserRolesViaRest } from "@/lib/userRolesRest";
@@ -134,15 +135,28 @@ const Auth = () => {
 
   const completeSignInNavigation = useCallback(
     async (session: Session) => {
+      const nextPath = sanitizeRegistrationNextPath(searchParams.get("next"));
+
       if (session.user.email) {
         localStorage.setItem('user_email', session.user.email);
       }
       localStorage.setItem('user_id', session.user.id);
 
       const roles = await fetchUserRolesViaRest(session.user.id, session.access_token);
-      const path = pickDashboardPath(roles);
+      const isElevatedStaff = roles.includes("admin") || roles.includes("super_admin");
 
-      authDevLog("Role data:", roles, "→", path);
+      authDevLog("Role data:", roles, "next:", nextPath);
+
+      if (nextPath && !isElevatedStaff) {
+        const picked =
+          ROLE_REDIRECT_PRIORITY.find((r) => roles.includes(r)) ?? roles[0] ?? "";
+        if (picked) localStorage.setItem("user_role", picked);
+        toast({ title: "✅ Welcome!" });
+        navigate(nextPath, { replace: true });
+        return;
+      }
+
+      const path = pickDashboardPath(roles);
 
       if (path) {
         const picked =
@@ -159,7 +173,7 @@ const Auth = () => {
       });
       navigate('/home', { replace: true });
     },
-    [navigate, toast]
+    [navigate, toast, searchParams]
   );
 
   useEffect(() => {
@@ -326,6 +340,17 @@ const Auth = () => {
         isSubmitting.current = false;
         return;
       }
+
+      if (data.session?.user) {
+        toast({ title: "✅ Account created" });
+        setFormLoading(false);
+        isSubmitting.current = false;
+        await completeSignInNavigation(data.session);
+        return;
+      }
+
+      setFormLoading(false);
+      isSubmitting.current = false;
     } catch (err: unknown) {
       toast({
         variant: "destructive",
@@ -341,10 +366,15 @@ const Auth = () => {
     if (formLoading) return;
     setFormLoading(true);
     try {
+      const nextSafe = sanitizeRegistrationNextPath(searchParams.get("next"));
+      const qs = new URLSearchParams();
+      if (nextSafe) qs.set("next", nextSafe);
+      const redirectTo = `${window.location.origin}/auth${qs.toString() ? `?${qs.toString()}` : ""}`;
+
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
-          redirectTo: `${window.location.origin}/home`,
+          redirectTo,
           skipBrowserRedirect: false,
         },
       });

@@ -18,6 +18,7 @@ import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
 import AdminAuth from "./pages/AdminAuth";
 import AdminDashboard from "./pages/AdminDashboard";
+import RegistrationScanEntry from "./pages/RegistrationScanEntry";
 
 // Lazy load non-critical pages for better bundle splitting
 const Builders = lazyImport(() => import("./pages/Builders"));
@@ -259,6 +260,7 @@ const App = () => {
                     <Route path="/" element={<Auth />} />
                     <Route path="/auth" element={<Auth />} />
                     <Route path="/author" element={<Auth />} />
+                    <Route path="/register/scan/:kind" element={<RegistrationScanEntry />} />
                     <Route path="/unified-auth" element={<SuspenseWrapper><UnifiedAuth /></SuspenseWrapper>} />
 
                     {ALL_PUBLIC_AUTH_REDIRECTS.map(({ path: aliasPath, to }) => (

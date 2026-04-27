@@ -31,23 +31,23 @@ const QR_ENTRIES: QrEntry[] = [
   {
     id: "supplier-registration",
     title: "Supplier registration",
-    path: "/supplier-registration",
+    path: "/register/scan/supplier",
     filename: "ujenzixform-qr-supplier-registration.png",
-    blurb: "New supplier onboarding form.",
+    blurb: "Not signed in → auth first; signed in → supplier form.",
   },
   {
     id: "private-builder-registration",
     title: "Private client registration",
-    path: "/private-client-registration",
+    path: "/register/scan/private-builder",
     filename: "ujenzixform-qr-private-client-registration.png",
-    blurb: "Private / home builder registration.",
+    blurb: "Not signed in → auth first; signed in → private client form.",
   },
   {
     id: "professional-builder-registration",
     title: "Professional builder registration",
-    path: "/professional-builder-registration",
+    path: "/register/scan/professional-builder",
     filename: "ujenzixform-qr-professional-builder-registration.png",
-    blurb: "Professional builder onboarding.",
+    blurb: "Not signed in → auth first; signed in → professional builder form.",
   },
 ];
 
@@ -108,9 +108,9 @@ export function AuthPageQrDownloads() {
           Public links — downloadable QR codes
         </CardTitle>
         <CardDescription className="text-gray-400">
-          Codes use <code className="text-cyan-200/90">{base}</code> so scans match production (e.g.{" "}
-          <code className="text-cyan-200/90">/auth</code>). For local or preview URLs, set{" "}
-          <code className="text-cyan-200/90">VITE_QR_LINK_BASE_URL</code> in env.
+          Codes use <code className="text-cyan-200/90">{base}</code> for production scans. Registration QRs use{" "}
+          <code className="text-cyan-200/90">/register/scan/…</code> so guests hit auth first, signed-in users go straight
+          to the form. Override host with <code className="text-cyan-200/90">VITE_QR_LINK_BASE_URL</code> for local/preview.
         </CardDescription>
       </CardHeader>
       <CardContent>

@@ -24,6 +24,7 @@ const EXACT_AUTH_ENTRY_PATHS = new Set<string>([
  */
 export function shouldHideFloatingChrome(pathname: string): boolean {
   if (EXACT_AUTH_ENTRY_PATHS.has(pathname)) return true;
+  if (pathname.startsWith("/register/scan")) return true;
   if (pathname.includes('-registration')) return true;
   if (pathname.includes('-signin')) return true;
   // e.g. /private-client-auth, /supplier-auth, /delivery-auth
