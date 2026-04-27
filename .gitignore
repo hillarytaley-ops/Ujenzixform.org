@@ -9,10 +9,10 @@ coverage/
 # Production builds
 dist/
 build/
+*.zip
 
 # Auth email preview output (npm run email:templates:preview)
 email-templates/preview-html/
-*.zip
 
 # Generated from scripts/generate-favicon.mjs (created by npm run build)
 public/favicon.ico
