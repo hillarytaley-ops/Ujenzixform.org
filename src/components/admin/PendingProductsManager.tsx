@@ -463,9 +463,10 @@ export const PendingProductsManager: React.FC = () => {
         { onConflict: 'id' }
       );
 
+      // Legacy product_requests (20251226) has no updated_at; newer migrations add it.
       const { error: reqErr } = await (supabase as any)
         .from('product_requests')
-        .update({ status: 'approved', updated_at: new Date().toISOString() })
+        .update({ status: 'approved' })
         .eq('id', request.id);
       if (reqErr) throw reqErr;
 
