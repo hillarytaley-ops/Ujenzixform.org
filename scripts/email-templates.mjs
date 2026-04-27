@@ -16,7 +16,6 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const PROJECT_ROOT = join(__dirname, "..");
 const TEMPLATES_ROOT = join(PROJECT_ROOT, "email-templates");
 const PAGES_DIR = join(TEMPLATES_ROOT, "pages");
-/* Output folder avoids root "dist" (gitignored); supabase-ready may be committed. */
 const OUT_DIR = join(TEMPLATES_ROOT, "supabase-ready");
 const PREVIEW_DIR = join(TEMPLATES_ROOT, "preview-html");
 const CONFIG_PATH = join(TEMPLATES_ROOT, "config.json");
@@ -119,7 +118,7 @@ function previewAll(port, openBrowserFlag) {
   const indexHtml = `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"/><title>Auth email previews</title>
 <style>body{font-family:system-ui,sans-serif;max-width:720px;margin:2rem auto;padding:0 1rem}a{display:block;margin:.75rem 0}</style></head><body>
 <h1>Supabase Auth email previews (mock data)</h1>
-<p>These files mirror <code>email-templates/pages/*.html</code> with placeholders replaced for local visual QA. Supabase-ready HTML (Go placeholders preserved) is in <code>email-templates/supabase-ready/</code> for dashboard paste.</p>
+<p>Source: <code>email-templates/pages/</code> plus partials. Dashboard-ready HTML with Go placeholders: <code>email-templates/supabase-ready/</code>.</p>
 <ul>
 <li><a href="/magic-link.html">Magic link</a></li>
 <li><a href="/confirm-signup.html">Confirm signup</a></li>
@@ -128,8 +127,9 @@ function previewAll(port, openBrowserFlag) {
 </body></html>`;
   writeFileSync(join(PREVIEW_DIR, "index.html"), indexHtml, "utf8");
 
+  let boundPort = port;
   const server = createServer((req, res) => {
-    const url = new URL(req.url || "/", `http://127.0.0.1:${port}`);
+    const url = new URL(req.url || "/", `http://127.0.0.1:${boundPort}`);
     let pathname = decodeURIComponent(url.pathname);
     if (pathname === "/") pathname = "/index.html";
     const safe = pathname.replace(/^\/+/, "").replace(/\//g, sep);
@@ -146,11 +146,34 @@ function previewAll(port, openBrowserFlag) {
     res.end(body);
   });
 
-  server.listen(port, () => {
-    const url = `http://127.0.0.1:${port}/`;
-    console.log(`\nEmail preview: ${url}\n`);
-    if (openBrowserFlag) openBrowser(url);
-  });
+  const portMax = port + 40;
+  const listenFrom = (tryPort) => {
+    if (tryPort > portMax) {
+      console.error(`No free port between ${port} and ${portMax} (EADDRINUSE). Close the other preview or use --port.`);
+      process.exit(1);
+    }
+    const onErr = (err) => {
+      if (err.code === "EADDRINUSE") {
+        server.off("error", onErr);
+        listenFrom(tryPort + 1);
+      } else {
+        console.error("Preview server error:", err.message);
+        process.exit(1);
+      }
+    };
+    server.once("error", onErr);
+    server.listen(tryPort, "127.0.0.1", () => {
+      server.off("error", onErr);
+      boundPort = tryPort;
+      if (tryPort !== port) {
+        console.log(`Port ${port} was busy; using ${tryPort} instead.`);
+      }
+      const url = `http://127.0.0.1:${boundPort}/`;
+      console.log(`\nEmail preview: ${url}\n`);
+      if (openBrowserFlag) openBrowser(url);
+    });
+  };
+  listenFrom(port);
 }
 
 const cmd = process.argv[2] || "build";
