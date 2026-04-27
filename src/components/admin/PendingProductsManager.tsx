@@ -369,6 +369,128 @@ export const PendingProductsManager: React.FC = () => {
     }
   };
 
+  /**
+   * Supplier Requests (product_requests): approval used to only set status — nothing showed on
+   * the marketplace or Material Images. This inserts materials + mirrors, then marks the request approved.
+   */
+  const approveSupplierProductRequest = async (request: ProductRequest) => {
+    setProcessing(true);
+    try {
+      let rawVariants: unknown[] = [];
+      if (Array.isArray(request.variants)) rawVariants = request.variants as unknown[];
+      else if (typeof request.variants === 'string') {
+        try {
+          rawVariants = JSON.parse(request.variants) as unknown[];
+        } catch {
+          rawVariants = [];
+        }
+      }
+      const normalizedVariants = rawVariants.map((v: any, i: number) => ({
+        id:
+          typeof v?.id === 'string'
+            ? v.id
+            : typeof globalThis.crypto?.randomUUID === 'function'
+              ? globalThis.crypto.randomUUID()
+              : `var-${i}-${request.id}`,
+        sizeLabel: String(v?.name ?? v?.sizeLabel ?? `Option ${i + 1}`),
+        price: Number(v?.price) || 0,
+        stock: typeof v?.stock === 'number' ? v.stock : 100,
+      }));
+      const mainPrice =
+        normalizedVariants.length > 0
+          ? normalizedVariants[0].price
+          : Number(request.suggested_price) || 0;
+
+      const imageUrl =
+        (request.image_data && String(request.image_data).trim()) || APPROVED_IMAGE_PLACEHOLDER;
+
+      const { data: inserted, error: insErr } = await (supabase as any)
+        .from('materials')
+        .insert([
+          {
+            supplier_id: request.supplier_id,
+            name: request.product_name,
+            description: request.description ?? '',
+            category: request.category,
+            unit: request.unit || 'unit',
+            unit_price: mainPrice,
+            image_url: imageUrl,
+            additional_images: Array.isArray(request.additional_images) ? request.additional_images : [],
+            pricing_type: normalizedVariants.length > 0 ? 'variants' : 'single',
+            variants: normalizedVariants,
+            in_stock: true,
+            approval_status: 'approved',
+            rejection_reason: null,
+            updated_at: new Date().toISOString(),
+          },
+        ])
+        .select('id')
+        .single();
+      if (insErr) throw insErr;
+      const materialId = inserted.id as string;
+
+      const { data: authData } = await supabase.auth.getUser();
+      const approverId = authData?.user?.id ?? null;
+
+      await (supabase as any).from('approved_material_images').upsert(
+        {
+          material_id: materialId,
+          image_url: imageUrl,
+          is_approved: true,
+          approved_by: approverId,
+          approved_at: new Date().toISOString(),
+        },
+        { onConflict: 'material_id' }
+      );
+
+      const { error: catErr } = await (supabase as any).from('admin_material_images').upsert(
+        {
+          id: materialId,
+          name: request.product_name,
+          category: request.category || 'Other',
+          image_url: imageUrl,
+          description: request.description || '',
+          unit: request.unit || 'unit',
+          suggested_price: mainPrice,
+          is_approved: true,
+          is_featured: false,
+          pricing_type: normalizedVariants.length > 0 ? 'variants' : 'single',
+          variants: normalizedVariants,
+          additional_images: Array.isArray(request.additional_images) ? request.additional_images : null,
+          uploaded_by: approverId,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: 'id' }
+      );
+
+      const { error: reqErr } = await (supabase as any)
+        .from('product_requests')
+        .update({ status: 'approved', updated_at: new Date().toISOString() })
+        .eq('id', request.id);
+      if (reqErr) throw reqErr;
+
+      void getCounts().then(setCounts);
+      await fetchProductRequests();
+      setSelectedRequest(null);
+      setShowRequestPreviewDialog(false);
+      setActiveTab('approved');
+      toast({
+        title: 'Request approved',
+        description: catErr
+          ? `${request.product_name} is live in materials; admin catalog mirror failed (check console / RLS).`
+          : `${request.product_name} is live on the marketplace and in Material Images.`,
+      });
+    } catch (err: any) {
+      toast({
+        title: 'Could not publish request',
+        description: err.message || 'Failed to create catalog product from this request.',
+        variant: 'destructive',
+      });
+    } finally {
+      setProcessing(false);
+    }
+  };
+
   // Reject a product
   const handleReject = async () => {
     if (!selectedProduct) return;
@@ -908,15 +1030,8 @@ export const PendingProductsManager: React.FC = () => {
                         <Button
                           size="sm"
                           variant="ghost"
-                          onClick={async () => {
-                            // Mark as approved
-                            await (supabase as any)
-                              .from('product_requests')
-                              .update({ status: 'approved' })
-                              .eq('id', request.id);
-                            toast({ title: 'Request approved', description: 'You can now add this product to the materials catalog' });
-                            fetchProductRequests();
-                          }}
+                          onClick={() => void approveSupplierProductRequest(request)}
+                          disabled={processing}
                           className="text-green-400 hover:bg-green-500/20"
                         >
                           <Check className="h-4 w-4" />
@@ -1338,16 +1453,11 @@ export const PendingProductsManager: React.FC = () => {
               Close
             </Button>
             <Button
-              onClick={async () => {
+              onClick={() => {
                 if (!selectedRequest) return;
-                await (supabase as any)
-                  .from('product_requests')
-                  .update({ status: 'approved' })
-                  .eq('id', selectedRequest.id);
-                toast({ title: 'Request approved!' });
-                setShowRequestPreviewDialog(false);
-                fetchProductRequests();
+                void approveSupplierProductRequest(selectedRequest);
               }}
+              disabled={processing}
               className="bg-green-600 hover:bg-green-700"
             >
               <Check className="h-4 w-4 mr-2" />
