@@ -48,14 +48,12 @@ export const InstantPasswordReset: React.FC<InstantPasswordResetProps> = ({ onBa
 
     try {
       // Use Supabase's OTP system for recovery - sends 6-digit code!
+      // Do not pass options.data here — it can make Auth send a confirmation *link* instead of a 6-digit OTP (see Supabase issue #9285).
       const { error } = await supabase.auth.signInWithOtp({
         email: email.trim(),
         options: {
           shouldCreateUser: false,
-          data: {
-            purpose: 'password_reset' // Track this is for password reset
-          }
-        }
+        },
       });
 
       if (error) throw error;
@@ -191,10 +189,7 @@ export const InstantPasswordReset: React.FC<InstantPasswordResetProps> = ({ onBa
         email: email.trim(),
         options: {
           shouldCreateUser: false,
-          data: {
-            purpose: 'password_reset'
-          }
-        }
+        },
       });
 
       if (error) throw error;
