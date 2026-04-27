@@ -404,6 +404,8 @@ export const PendingProductsManager: React.FC = () => {
       const imageUrl =
         (request.image_data && String(request.image_data).trim()) || APPROVED_IMAGE_PLACEHOLDER;
 
+      // Do not send additional_images on materials — many production DBs never had this column
+      // (only product_requests / admin_material_images). Extra angles stay on admin mirror row.
       const { data: inserted, error: insErr } = await (supabase as any)
         .from('materials')
         .insert([
@@ -415,7 +417,6 @@ export const PendingProductsManager: React.FC = () => {
             unit: request.unit || 'unit',
             unit_price: mainPrice,
             image_url: imageUrl,
-            additional_images: Array.isArray(request.additional_images) ? request.additional_images : [],
             pricing_type: normalizedVariants.length > 0 ? 'variants' : 'single',
             variants: normalizedVariants,
             in_stock: true,
