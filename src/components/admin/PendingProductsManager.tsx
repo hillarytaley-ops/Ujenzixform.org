@@ -62,7 +62,8 @@ import {
   Edit,
   AlertTriangle,
   DollarSign,
-  Image as ImageIcon
+  Image as ImageIcon,
+  Trash2
 } from 'lucide-react';
 
 /** 1×1 transparent PNG — approved_material_images.image_url is NOT NULL */
@@ -174,6 +175,8 @@ export const PendingProductsManager: React.FC = () => {
   const [showPreviewDialog, setShowPreviewDialog] = useState(false);
   const [showRequestPreviewDialog, setShowRequestPreviewDialog] = useState(false);
   const [showRejectDialog, setShowRejectDialog] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [productToDelete, setProductToDelete] = useState<PendingProduct | null>(null);
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [rejectionReason, setRejectionReason] = useState('');
   const [editForm, setEditForm] = useState({
@@ -466,6 +469,36 @@ export const PendingProductsManager: React.FC = () => {
     }
   };
 
+  const handleConfirmDeleteMaterial = async () => {
+    if (!productToDelete) return;
+    setProcessing(true);
+    try {
+      const id = productToDelete.id;
+      await (supabase as any).from('supplier_product_prices').delete().eq('product_id', id);
+      await (supabase as any).from('approved_material_images').delete().eq('material_id', id);
+      await (supabase as any).from('admin_material_images').delete().eq('id', id);
+      const { error } = await (supabase as any).from('materials').delete().eq('id', id);
+      if (error) throw error;
+
+      toast({
+        title: 'Product removed',
+        description: `${productToDelete.name} was deleted from the catalog.`,
+      });
+      setShowDeleteDialog(false);
+      setProductToDelete(null);
+      void getCounts().then(setCounts);
+      void fetchProducts({ silent: true });
+    } catch (err: any) {
+      toast({
+        title: 'Delete failed',
+        description: err.message || 'Could not delete this product (check related orders or RLS).',
+        variant: 'destructive',
+      });
+    } finally {
+      setProcessing(false);
+    }
+  };
+
   // Open edit dialog
   const openEditDialog = (product: PendingProduct) => {
     setSelectedProduct(product);
@@ -653,6 +686,19 @@ export const PendingProductsManager: React.FC = () => {
                         <Check className="h-4 w-4" />
                       </Button>
                     )}
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => {
+                        setProductToDelete(product);
+                        setShowDeleteDialog(true);
+                      }}
+                      disabled={processing}
+                      className="text-slate-400 hover:bg-red-500/20 hover:text-red-400"
+                      title="Delete from catalog"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
                   </div>
                 </TableCell>
               </TableRow>
@@ -670,7 +716,13 @@ export const PendingProductsManager: React.FC = () => {
         <div>
           <h2 className="text-2xl font-bold text-white">Product Submissions</h2>
           <p className="text-slate-400 mt-1">
-            Review and approve supplier product submissions
+            Review and approve supplier product submissions.
+          </p>
+          <p className="text-slate-500 text-sm mt-2 max-w-3xl">
+            &quot;Unknown&quot; supplier and older dates usually mean legacy or demo rows in the database: migrations applied
+            default product images (for example under public/images/suppliers) and set existing materials to approved for
+            backward compatibility, so they were never individually approved in this screen. Use the trash icon to remove any
+            row you do not want.
           </p>
         </div>
         <Button
@@ -1015,6 +1067,57 @@ export const PendingProductsManager: React.FC = () => {
                 <>
                   <X className="h-4 w-4 mr-2" />
                   Reject Product
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete catalog row (materials + related) */}
+      <Dialog
+        open={showDeleteDialog}
+        onOpenChange={(open) => {
+          setShowDeleteDialog(open);
+          if (!open) setProductToDelete(null);
+        }}
+      >
+        <DialogContent className="bg-slate-900 border-slate-700 text-white">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-red-400">
+              <Trash2 className="h-5 w-5" />
+              Delete product
+            </DialogTitle>
+            <DialogDescription className="text-slate-400">
+              Permanently remove &quot;{productToDelete?.name}&quot; from the database (materials, mirrored admin
+              catalog row if any, price rows for this product id). This cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowDeleteDialog(false);
+                setProductToDelete(null);
+              }}
+              className="border-slate-600"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={() => void handleConfirmDeleteMaterial()}
+              disabled={processing}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              {processing ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Deleting...
+                </>
+              ) : (
+                <>
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Delete permanently
                 </>
               )}
             </Button>
