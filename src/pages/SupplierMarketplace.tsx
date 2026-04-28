@@ -35,6 +35,7 @@ import { useToast } from "@/hooks/use-toast";
 import Navigation from "@/components/Navigation";
 import Footer from "@/components/Footer";
 import { MaterialsGrid } from "@/components/suppliers/MaterialsGrid";
+import { MaterialsListDownloadButton } from "@/components/suppliers/MaterialsListDownloadButton";
 import { CartSidebar } from "@/components/cart/CartSidebar";
 import { FloatingCartButton } from "@/components/cart/FloatingCartButton";
 // FloatingSocialSidebar moved to App.tsx for global availability
@@ -441,8 +442,8 @@ const SupplierMarketplace = () => {
       {/* Search Bar - Sticky */}
       <section className="bg-white border-b shadow-sm sticky top-0 z-20">
         <div className="container mx-auto px-4 py-4">
-          <div className="flex flex-col sm:flex-row gap-3 max-w-4xl mx-auto">
-            <div className="flex-1 relative">
+          <div className="flex flex-col xl:flex-row gap-3 max-w-6xl mx-auto xl:items-center">
+            <div className="flex-1 min-w-0 relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
               <Input
                 placeholder="Search materials (cement, steel, tiles...)"
@@ -451,20 +452,23 @@ const SupplierMarketplace = () => {
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
             </div>
-            
-            <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-              <SelectTrigger className="w-full sm:w-56 h-12">
-                <Filter className="h-4 w-4 mr-2 text-gray-400" />
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {MATERIAL_CATEGORIES.map((category) => (
-                  <SelectItem key={category} value={category}>
-                    {category}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+
+            <div className="flex flex-col sm:flex-row gap-3 sm:items-center shrink-0">
+              <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+                <SelectTrigger className="w-full sm:w-56 h-12">
+                  <Filter className="h-4 w-4 mr-2 text-gray-400" />
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {MATERIAL_CATEGORIES.map((category) => (
+                    <SelectItem key={category} value={category}>
+                      {category}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <MaterialsListDownloadButton />
+            </div>
           </div>
         </div>
       </section>
