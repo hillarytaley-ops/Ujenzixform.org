@@ -29,7 +29,7 @@ import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { supabase, SUPABASE_URL, SUPABASE_ANON_KEY } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { Search, ShoppingCart, Store, Package, Filter, PartyPopper, Plus, Minus, Check, Scale, Camera, ChevronDown, ChevronLeft, ChevronRight, X, Eye, ChevronsLeft, ChevronsRight } from 'lucide-react';
+import { Search, ShoppingCart, Store, Package, Filter, PartyPopper, Plus, Minus, Check, Scale, Camera, ChevronDown, ChevronLeft, ChevronRight, X, Eye, ChevronsLeft, ChevronsRight, Download, Loader2 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
@@ -55,6 +55,11 @@ import {
 } from '@/utils/builderCartProject';
 import { buildMaterialCartLineId } from '@/utils/cartLineId';
 import { resolveSupplierCompanyNames } from '@/lib/resolveSupplierCompanyNames';
+import {
+  buildCsvFromGridMaterials,
+  gridMaterialsCsvFilename,
+  triggerFileDownload,
+} from '@/lib/materialsListExport';
 
 // iOS/Safari compatibility check
 const isIOSSafari = () => {
@@ -451,6 +456,7 @@ export const MaterialsGrid: React.FC<MaterialsGridProps> = ({ embeddedInDashboar
   const [showBookView, setShowBookView] = useState(false);
   const [bookViewStartIndex, setBookViewStartIndex] = useState(0);
   const [isMobile, setIsMobile] = useState(false);
+  const [exportingList, setExportingList] = useState(false);
 
   /** Paystack after direct grid “Buy Now” (same intent as cart checkout). */
   const [paystackAfterBuyOpen, setPaystackAfterBuyOpen] = useState(false);
@@ -800,7 +806,51 @@ export const MaterialsGrid: React.FC<MaterialsGridProps> = ({ embeddedInDashboar
     console.log(`🔍 Search filter: "${searchQuery}" found ${filtered.length} results`);
     return filtered;
   }, [materials, searchQuery, selectedCategory, priceRange, stockFilter]);
-  
+
+  /** Same rows as “Load … more from database” — used by that button and by full-list download. */
+  const appendRemainingCatalogMaterials = async (): Promise<Material[]> => {
+    if (!hasMoreMaterials || materials.length >= totalMaterialsCount) return [];
+    const currentCount = materials.length;
+    const BATCH_SIZE = 100;
+    const moreMaterialsRaw: any[] = [];
+    for (let offset = currentCount; offset < totalMaterialsCount; offset += BATCH_SIZE) {
+      const response = await fetch(
+        `${SUPABASE_URL}/rest/v1/admin_material_images?select=id,name,category,description,unit,suggested_price,image_url&order=created_at.desc&limit=${BATCH_SIZE}&offset=${offset}`,
+        {
+          headers: {
+            apikey: SUPABASE_ANON_KEY,
+            Authorization: postgrestAuthorization,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+      if (!response.ok) break;
+      const data = await response.json();
+      if (!data?.length) break;
+      moreMaterialsRaw.push(...data);
+      if (data.length < BATCH_SIZE) break;
+    }
+    return moreMaterialsRaw.map(
+      (item: any): Material => ({
+        id: item.id,
+        supplier_id: 'admin-catalog',
+        name: item.name || 'Unnamed Material',
+        category: item.category || 'Uncategorized',
+        description: item.description || '',
+        unit: item.unit && item.unit.trim() ? item.unit : 'unit',
+        unit_price: item.suggested_price || 0,
+        image_url: item.image_url,
+        additional_images: [],
+        in_stock: true,
+        supplier: {
+          company_name: 'Admin Catalog',
+          location: 'Kenya',
+          rating: 5.0,
+        },
+      })
+    );
+  };
+
   // Pagination calculations - use computedFilteredMaterials for immediate reactivity
   const totalPages = useMemo(() => Math.ceil(computedFilteredMaterials.length / itemsPerPage), [computedFilteredMaterials.length, itemsPerPage]);
   
@@ -1909,6 +1959,57 @@ export const MaterialsGrid: React.FC<MaterialsGridProps> = ({ embeddedInDashboar
             <Package className="h-4 w-4 mr-2" />
             Refresh
           </Button>
+          <Button
+            type="button"
+            variant="outline"
+            disabled={loading || exportingList || (materials.length === 0 && !hasMoreMaterials)}
+            onClick={async () => {
+              if (exportingList) return;
+              setExportingList(true);
+              try {
+                let list = [...materials];
+                if (hasMoreMaterials) {
+                  const extra = await appendRemainingCatalogMaterials();
+                  if (extra.length > 0) {
+                    list = [...list, ...extra];
+                    setMaterials(list);
+                    setHasMoreMaterials(false);
+                  }
+                }
+                if (list.length === 0) {
+                  toast({
+                    variant: 'destructive',
+                    title: 'Nothing to export',
+                    description: 'The grid has no materials loaded yet.',
+                  });
+                  return;
+                }
+                const name = gridMaterialsCsvFilename();
+                const blob = buildCsvFromGridMaterials(list);
+                triggerFileDownload(blob, name);
+                toast({
+                  title: 'Materials list downloaded',
+                  description: `${list.length} products from this grid saved as ${name}. Open in Excel or Google Sheets.`,
+                });
+              } catch (err) {
+                console.error('Materials list export:', err);
+                toast({
+                  variant: 'destructive',
+                  title: 'Download failed',
+                  description: err instanceof Error ? err.message : 'Could not build the file.',
+                });
+              } finally {
+                setExportingList(false);
+              }
+            }}
+          >
+            {exportingList ? (
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" aria-hidden />
+            ) : (
+              <Download className="h-4 w-4 mr-2" aria-hidden />
+            )}
+            Download materials list
+          </Button>
           {!isSupplierRole && compareItems.size > 0 && (
             <Button 
               onClick={() => setIsCompareModalOpen(true)} 
@@ -2685,58 +2786,13 @@ export const MaterialsGrid: React.FC<MaterialsGridProps> = ({ embeddedInDashboar
             onClick={async () => {
               setLoadingMore(true);
               try {
-                // Fetch remaining materials - use larger batch for faster loading
-                const currentCount = materials.length;
-                const BATCH_SIZE = 100; // Increased from 25 for faster loading
-                let moreMaterials: any[] = [];
-                
-                for (let offset = currentCount; offset < totalMaterialsCount; offset += BATCH_SIZE) {
-                  const response = await fetch(
-                    `${SUPABASE_URL}/rest/v1/admin_material_images?select=id,name,category,description,unit,suggested_price,image_url&order=created_at.desc&limit=${BATCH_SIZE}&offset=${offset}`,
-                    {
-                      headers: {
-                        'apikey': SUPABASE_ANON_KEY,
-                        'Authorization': postgrestAuthorization,
-                        'Content-Type': 'application/json'
-                      }
-                    }
-                  );
-                  if (response.ok) {
-                    const data = await response.json();
-                    if (data && data.length > 0) {
-                      moreMaterials = [...moreMaterials, ...data];
-                    }
-                    if (data.length < BATCH_SIZE) break;
-                  } else {
-                    break;
-                  }
-                }
-                
-                if (moreMaterials.length > 0) {
-                  const newMaterials: Material[] = moreMaterials.map((item: any) => ({
-                    id: item.id,
-                    supplier_id: 'admin-catalog',
-                    name: item.name || 'Unnamed Material',
-                    category: item.category || 'Uncategorized',
-                    description: item.description || '',
-                    unit: (item.unit && item.unit.trim()) ? item.unit : 'unit',
-                    unit_price: item.suggested_price || 0,
-                    image_url: item.image_url,
-                    additional_images: [],
-                    in_stock: true,
-                    supplier: {
-                      company_name: 'Admin Catalog',
-                      location: 'Kenya',
-                      rating: 5.0
-                    }
-                  }));
-                  
-                  // Only update materials - filteredMaterials will be recomputed via useMemo
-                  setMaterials(prev => [...prev, ...newMaterials]);
+                const newMaterials = await appendRemainingCatalogMaterials();
+                if (newMaterials.length > 0) {
+                  setMaterials((prev) => [...prev, ...newMaterials]);
                   setHasMoreMaterials(false);
                   toast({
                     title: '✅ Loaded all materials',
-                    description: `Now showing all ${materials.length + newMaterials.length} materials`,
+                    description: `Added ${newMaterials.length} more from the catalog. The full list is now in the grid.`,
                   });
                 }
               } catch (error) {

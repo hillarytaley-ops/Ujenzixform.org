@@ -1,62 +1,41 @@
-import { SUPABASE_ANON_KEY, SUPABASE_URL } from '@/integrations/supabase/client';
+/**
+ * CSV export for rows currently loaded in MaterialsGrid (what you see in the catalog).
+ */
 
-export type MaterialListRow = {
+export type GridMaterialCsvRow = {
+  id: string;
   name: string;
   category: string;
   unit: string;
-  suggested_price: number | null;
+  unit_price: number;
+  in_stock?: boolean;
+  supplier?: { company_name?: string };
+  description?: string;
 };
 
-function restV1Base(): string {
-  return `${SUPABASE_URL.replace(/\/+$/, '')}/rest/v1`;
+/** Excel-ready list of everything currently in the materials grid. */
+export function gridMaterialsCsvFilename(): string {
+  return `UjenziXform-materials-list-${new Date().toISOString().slice(0, 10)}.csv`;
 }
 
-/** All approved catalog materials (same source as the marketplace grid). */
-export async function fetchApprovedMaterialsList(authorization: string): Promise<MaterialListRow[]> {
-  const headers: Record<string, string> = {
-    apikey: SUPABASE_ANON_KEY,
-    Authorization: authorization,
-    Accept: 'application/json',
-  };
-  const rows: MaterialListRow[] = [];
-  const pageSize = 500;
-  let offset = 0;
-
-  for (;;) {
-    const url = `${restV1Base()}/admin_material_images?select=name,category,unit,suggested_price&is_approved=eq.true&order=name.asc&limit=${pageSize}&offset=${offset}`;
-    const res = await fetch(url, { headers, cache: 'no-store' });
-    const text = await res.text();
-    if (!res.ok) {
-      throw new Error(`List request failed (${res.status}): ${text.slice(0, 160)}`);
-    }
-    let chunk: MaterialListRow[];
-    try {
-      chunk = JSON.parse(text) as MaterialListRow[];
-    } catch {
-      throw new Error('Invalid response when loading materials list');
-    }
-    if (!Array.isArray(chunk) || chunk.length === 0) break;
-    rows.push(...chunk);
-    if (chunk.length < pageSize) break;
-    offset += pageSize;
-    if (offset > 12_000) break;
-  }
-  return rows;
-}
-
-export function materialsListCsvFilename(): string {
-  return `ujenzixform-materials-list-${new Date().toISOString().slice(0, 10)}.csv`;
-}
-
-/** UTF-8 CSV with BOM for Excel. */
-export function buildMaterialsCsvBlob(rows: MaterialListRow[]): Blob {
+/** UTF-8 CSV with BOM for Excel / Google Sheets. */
+export function buildCsvFromGridMaterials(rows: GridMaterialCsvRow[]): Blob {
   const bom = '\uFEFF';
   const escape = (cell: string) => {
     const s = cell ?? '';
     if (/[",\n\r]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
     return s;
   };
-  const header = ['Name', 'Category', 'Unit', 'Suggested price (KES)'];
+  const header = [
+    'Name',
+    'Category',
+    'Unit',
+    'Price (KES)',
+    'Supplier',
+    'In stock',
+    'Description',
+    'Product ID',
+  ];
   const lines = [
     header.join(','),
     ...rows.map((r) =>
@@ -64,7 +43,11 @@ export function buildMaterialsCsvBlob(rows: MaterialListRow[]): Blob {
         escape(r.name || ''),
         escape(r.category || ''),
         escape((r.unit || '').trim() || '-'),
-        String(Number(r.suggested_price) || 0),
+        String(Number(r.unit_price) || 0),
+        escape(r.supplier?.company_name || ''),
+        r.in_stock ? 'Yes' : 'No',
+        escape((r.description || '').replace(/\s+/g, ' ').trim().slice(0, 500)),
+        escape(r.id || ''),
       ].join(','),
     ),
   ];
