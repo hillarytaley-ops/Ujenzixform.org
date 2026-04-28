@@ -38,7 +38,11 @@ import {
   EmailIcon,
   PhoneIcon
 } from './SocialMediaIcons';
-import { SOCIAL_INSTAGRAM_URL, SOCIAL_TIKTOK_URL } from '@/config/appIdentity';
+import {
+  SOCIAL_INSTAGRAM_URL,
+  SOCIAL_TIKTOK_URL,
+  SOCIAL_WHATSAPP_URL,
+} from '@/config/appIdentity';
 
 /**
  * ⚠️ PROTECTED: Pages where the floating social button should NOT appear
@@ -57,7 +61,7 @@ const HIDDEN_ON_PAGES = [
 
 // Social links configuration
 const SOCIAL_LINKS = [
-  { name: 'WhatsApp', href: 'https://wa.me/254712345678', icon: WhatsAppIcon, bg: 'bg-[#25D366]', hoverBg: 'hover:bg-[#20BD5A]' },
+  { name: 'WhatsApp', href: SOCIAL_WHATSAPP_URL, icon: WhatsAppIcon, bg: 'bg-[#25D366]', hoverBg: 'hover:bg-[#20BD5A]' },
   { name: 'Facebook', href: 'https://www.facebook.com/profile.php?id=61588491484665', icon: FacebookIcon, bg: 'bg-[#1877F2]', hoverBg: 'hover:bg-[#166FE5]' },
   { name: 'X', href: 'https://x.com/UjenziXform', icon: TwitterIcon, bg: 'bg-black', hoverBg: 'hover:bg-gray-800' },
   { name: 'Instagram', href: SOCIAL_INSTAGRAM_URL, icon: InstagramIcon, bg: 'bg-gradient-to-br from-purple-600 via-pink-500 to-orange-400', hoverBg: '' },

@@ -42,6 +42,11 @@ export const SOCIAL_TIKTOK_URL =
   (import.meta.env.VITE_SOCIAL_TIKTOK_URL as string | undefined) ||
   'https://www.tiktok.com/@ujenzixform';
 
+/** Official WhatsApp chat link (wa.me message link). Override via VITE_SOCIAL_WHATSAPP_URL. */
+export const SOCIAL_WHATSAPP_URL =
+  (import.meta.env.VITE_SOCIAL_WHATSAPP_URL as string | undefined) ||
+  'https://wa.me/message/3VWSHQ4REFLMK1';
+
 /** localStorage session blob (UX cache; auth is server-verified). */
 export const STORAGE_SESSION_KEY = 'ujenzixform_session';
 export const STORAGE_SESSION_KEY_LEGACY = 'mradipro_session';

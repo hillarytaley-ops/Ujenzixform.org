@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import {
   SOCIAL_INSTAGRAM_URL,
   SOCIAL_TIKTOK_URL,
+  SOCIAL_WHATSAPP_URL,
   SUPPORT_PHONE_PRIMARY,
 } from "@/config/appIdentity";
 import {
@@ -155,7 +156,7 @@ const Footer = () => {
               <a href="https://www.youtube.com/@ujenziXform" target="_blank" rel="noopener noreferrer" className={footerSocialClass} title="YouTube">
                 <YouTubeIcon size={20} />
               </a>
-              <a href="https://wa.me/254712345678" target="_blank" rel="noopener noreferrer" className={footerSocialClass} title="WhatsApp">
+              <a href={SOCIAL_WHATSAPP_URL} target="_blank" rel="noopener noreferrer" className={footerSocialClass} title="Message Ujenzi Xform on WhatsApp">
                 <WhatsAppIcon size={20} />
               </a>
             </div>
