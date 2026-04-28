@@ -1,4 +1,4 @@
-import { SUPABASE_ANON_KEY, SUPABASE_URL } from '@/integrations/supabase/client';
+import { supabase, SUPABASE_ANON_KEY, SUPABASE_URL } from '@/integrations/supabase/client';
 
 function edgeFunctionsOrigin(): string {
   return `${SUPABASE_URL.replace(/\/+$/, '')}/functions/v1`;
@@ -12,19 +12,43 @@ function edgeHeaders(): Record<string, string> {
   };
 }
 
-/** Pre-auth staff tab (replaces anon RPC on SECURITY DEFINER). */
+/**
+ * Pre-auth staff tab: Edge (rate-limited) first, then PostgREST RPC fallback when Edge is missing or errors.
+ * Requires EXECUTE on public.is_admin_staff_portal_email(text) for anon (see migrations).
+ */
 export async function edgeIsAdminStaffPortalEmail(p_email: string): Promise<boolean> {
-  const res = await fetch(`${edgeFunctionsOrigin()}/is-admin-staff-portal-email`, {
-    method: 'POST',
-    headers: edgeHeaders(),
-    body: JSON.stringify({ p_email }),
-  });
-  if (!res.ok) return false;
+  const normalized = p_email.toLowerCase().trim();
+  if (!normalized) return false;
+
   try {
-    return (await res.json()) === true;
+    const res = await fetch(`${edgeFunctionsOrigin()}/is-admin-staff-portal-email`, {
+      method: 'POST',
+      headers: edgeHeaders(),
+      body: JSON.stringify({ p_email: normalized }),
+    });
+    if (res.ok) {
+      try {
+        const j: unknown = await res.json();
+        if (j === true) return true;
+        if (j === false) return false;
+      } catch {
+        /* fall through to RPC */
+      }
+    }
   } catch {
+    /* fall through to RPC */
+  }
+
+  const { data, error } = await supabase.rpc('is_admin_staff_portal_email', {
+    p_email: normalized,
+  });
+  if (error) {
+    if (import.meta.env.DEV) {
+      console.warn('[edgeIsAdminStaffPortalEmail] RPC fallback failed:', error.message);
+    }
     return false;
   }
+  return data === true || data === 't' || data === 'true';
 }
 
 /** Guest monitoring access code (replaces anon DEFINER RPC). */
