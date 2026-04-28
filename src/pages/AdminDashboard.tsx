@@ -1,4 +1,8 @@
-import { clearSupabasePersistedSessionSync, readPersistedAuthRawStringSync } from '@/utils/supabaseAccessToken';
+import {
+  clearSupabasePersistedSessionSync,
+  getAccessTokenWithPersistenceFallback,
+  readPersistedAuthRawStringSync,
+} from '@/utils/supabaseAccessToken';
 import {
   readAdminOverviewStatsFromSession,
   writeAdminOverviewStatsToSession,
@@ -882,16 +886,26 @@ const AdminDashboard = () => {
     if (loadChatStatsInFlight.current) return;
     loadChatStatsInFlight.current = true;
     try {
-      const headers = {
-        'apikey': SUPABASE_ANON_KEY,
-        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
-        'Content-Type': 'application/json'
+      const accessToken = await getAccessTokenWithPersistenceFallback();
+      if (!accessToken && isAdminStaffLocalSessionValid()) {
+        setChatStats({ unreadChats: 0, openConversations: 0, pendingFeedback: 0 });
+        return;
+      }
+      if (!accessToken) {
+        return;
+      }
+
+      const headers: Record<string, string> = {
+        apikey: SUPABASE_ANON_KEY,
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
       };
 
+      const base = SUPABASE_URL.replace(/\/+$/, '');
       const [messagesResponse, conversationsResponse, feedbackResponse] = await Promise.all([
-        fetch(`${SUPABASE_URL}/rest/v1/chat_messages?sender_type=eq.client&read=eq.false&select=id`, { headers }),
-        fetch(`${SUPABASE_URL}/rest/v1/conversations?status=eq.open&select=id`, { headers }),
-        fetch(`${SUPABASE_URL}/rest/v1/chat_feedback?select=id`, { headers })
+        fetch(`${base}/rest/v1/chat_messages?sender_type=eq.client&read=eq.false&select=id`, { headers }),
+        fetch(`${base}/rest/v1/conversations?status=eq.open&select=id`, { headers }),
+        fetch(`${base}/rest/v1/chat_feedback?select=id`, { headers }),
       ]);
 
       const unreadChats = messagesResponse.ok ? (await messagesResponse.json()).length : 0;

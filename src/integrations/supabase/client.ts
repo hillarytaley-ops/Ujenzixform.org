@@ -34,7 +34,7 @@ const LEGACY_DEV_ANON_KEY =
 
 function resolveSupabaseUrl(): string {
   const v = (import.meta.env.VITE_SUPABASE_URL as string | undefined)?.trim();
-  if (v) return v;
+  if (v) return v.replace(/\/+$/, '');
   if (import.meta.env.DEV) {
     console.warn('[supabase] VITE_SUPABASE_URL unset; using legacy dev project URL');
     return LEGACY_DEV_URL;
