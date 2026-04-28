@@ -55,11 +55,8 @@ import {
 } from '@/utils/builderCartProject';
 import { buildMaterialCartLineId } from '@/utils/cartLineId';
 import { resolveSupplierCompanyNames } from '@/lib/resolveSupplierCompanyNames';
-import {
-  buildCsvFromGridMaterials,
-  gridMaterialsCsvFilename,
-  triggerFileDownload,
-} from '@/lib/materialsListExport';
+import { triggerFileDownload } from '@/lib/materialsListExport';
+import { buildPdfFromGridMaterials, gridMaterialsPdfFilename } from '@/lib/materialsListPdf';
 
 // iOS/Safari compatibility check
 const isIOSSafari = () => {
@@ -1984,12 +1981,12 @@ export const MaterialsGrid: React.FC<MaterialsGridProps> = ({ embeddedInDashboar
                   });
                   return;
                 }
-                const name = gridMaterialsCsvFilename();
-                const blob = buildCsvFromGridMaterials(list);
+                const name = gridMaterialsPdfFilename();
+                const blob = buildPdfFromGridMaterials(list);
                 triggerFileDownload(blob, name);
                 toast({
-                  title: 'Materials list downloaded',
-                  description: `${list.length} products from this grid saved as ${name}. Open in Excel or Google Sheets.`,
+                  title: 'PDF ready',
+                  description: `${list.length} materials saved as ${name}.`,
                 });
               } catch (err) {
                 console.error('Materials list export:', err);
@@ -2008,7 +2005,7 @@ export const MaterialsGrid: React.FC<MaterialsGridProps> = ({ embeddedInDashboar
             ) : (
               <Download className="h-4 w-4 mr-2" aria-hidden />
             )}
-            Download materials list
+            Download PDF list
           </Button>
           {!isSupplierRole && compareItems.size > 0 && (
             <Button 
