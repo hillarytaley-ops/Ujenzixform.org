@@ -5,7 +5,6 @@ import { PRIVACY_POLICY_URL, TERMS_OF_SERVICE_URL } from "@/config/appIdentity";
 import { sanitizeRegistrationNextPath } from "@/utils/authRegistrationNext";
 import type { Session } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
-import { edgeIsAdminStaffPortalEmail } from "@/utils/edgeGuestPublic";
 import { fetchUserRolesViaRest } from "@/lib/userRolesRest";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -113,8 +112,6 @@ function rejectAfter(ms: number, message: string): Promise<never> {
   return new Promise((_, rej) => setTimeout(() => rej(new Error(message)), ms));
 }
 
-const EMAIL_LIKE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
 const Auth = () => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -128,8 +125,6 @@ const Auth = () => {
   const [signInPassword, setSignInPassword] = useState("");
   const [signUpEmail, setSignUpEmail] = useState("");
   const [signUpPassword, setSignUpPassword] = useState("");
-  /** Shown only when the email typed on the active tab matches an active admin_staff row (via RPC). */
-  const [staffPortalEligible, setStaffPortalEligible] = useState(false);
   const isSubmitting = useRef(false);
   const passwordSignInFlowRef = useRef(false);
   const { toast } = useToast();
@@ -223,26 +218,6 @@ const Auth = () => {
 
     return () => subscription.unsubscribe();
   }, [toast, completeSignInNavigation]);
-
-  useEffect(() => {
-    const raw = (authTab === "signin" ? signInEmail : signUpEmail).trim();
-    if (!EMAIL_LIKE.test(raw)) {
-      setStaffPortalEligible(false);
-      return;
-    }
-    let cancelled = false;
-    const t = window.setTimeout(() => {
-      void (async () => {
-        const ok = await edgeIsAdminStaffPortalEmail(raw);
-        if (cancelled) return;
-        setStaffPortalEligible(ok);
-      })();
-    }, 450);
-    return () => {
-      cancelled = true;
-      window.clearTimeout(t);
-    };
-  }, [authTab, signInEmail, signUpEmail]);
 
   useEffect(() => {
     const t = searchParams.get("tab");
@@ -551,16 +526,17 @@ const Auth = () => {
               </a>
             </div>
 
-            {staffPortalEligible ? (
-              <div className="mt-4 pt-4 border-t">
-                <Link to="/admin-login">
-                  <Button variant="outline" className="w-full bg-slate-800 text-white hover:bg-slate-700 border-slate-700">
-                    <Shield className="mr-2 h-4 w-4" />
-                    Staff Access
-                  </Button>
-                </Link>
-              </div>
-            ) : null}
+            <div className="mt-4 pt-4 border-t">
+              <Link to="/admin-login">
+                <Button variant="outline" className="w-full bg-slate-800 text-white hover:bg-slate-700 border-slate-700">
+                  <Shield className="mr-2 h-4 w-4" />
+                  Staff portal
+                </Button>
+              </Link>
+              <p className="mt-2 text-center text-xs text-muted-foreground">
+                Authorized staff: sign in with your work email and staff code on the next page.
+              </p>
+            </div>
           </CardContent>
         </Card>
       </AnimatedSection>
