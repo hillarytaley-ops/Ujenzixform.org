@@ -10,9 +10,19 @@ import { Mail, Loader2, ArrowLeft, AlertCircle, Key, CheckCircle } from 'lucide-
 
 interface SimplePasswordResetProps {
   onBack?: () => void;
+  /** Alias used by some parent pages (e.g. Auth dialog). */
+  onClose?: () => void;
+  onSuccess?: () => void;
 }
 
-export const SimplePasswordReset: React.FC<SimplePasswordResetProps> = ({ onBack }) => {
+const RESET_REDIRECT_PATH = '/reset-password';
+
+export const SimplePasswordReset: React.FC<SimplePasswordResetProps> = ({
+  onBack,
+  onClose,
+  onSuccess,
+}) => {
+  const handleBack = onBack ?? onClose ?? onSuccess;
   const [step, setStep] = useState<'email' | 'code' | 'success'>('email');
   const [email, setEmail] = useState('');
   const [code, setCode] = useState('');
@@ -45,12 +55,9 @@ export const SimplePasswordReset: React.FC<SimplePasswordResetProps> = ({ onBack
     setLoading(true);
 
     try {
-      // Use OTP for password recovery
-      const { error } = await supabase.auth.signInWithOtp({
-        email: email.trim(),
-        options: {
-          shouldCreateUser: false,
-        }
+      // Recovery email (not magic link): use Reset Password template + verify type `recovery`.
+      const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+        redirectTo: `${window.location.origin}${RESET_REDIRECT_PATH}`,
       });
 
       if (error) throw error;
@@ -109,11 +116,10 @@ export const SimplePasswordReset: React.FC<SimplePasswordResetProps> = ({ onBack
     setLoading(true);
 
     try {
-      // Verify OTP
       const { error: verifyError } = await supabase.auth.verifyOtp({
         email: email.trim(),
         token: code,
-        type: 'email',
+        type: 'recovery',
       });
 
       if (verifyError) throw verifyError;
@@ -154,11 +160,8 @@ export const SimplePasswordReset: React.FC<SimplePasswordResetProps> = ({ onBack
 
     setLoading(true);
     try {
-      const { error } = await supabase.auth.signInWithOtp({
-        email: email.trim(),
-        options: {
-          shouldCreateUser: false,
-        }
+      const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+        redirectTo: `${window.location.origin}${RESET_REDIRECT_PATH}`,
       });
 
       if (error) throw error;
@@ -216,8 +219,8 @@ export const SimplePasswordReset: React.FC<SimplePasswordResetProps> = ({ onBack
             <Alert className="bg-blue-50 border-blue-200">
               <AlertCircle className="h-4 w-4 text-blue-600" />
               <AlertDescription className="text-xs text-blue-800">
-                <strong>📱 Quick & Easy:</strong> You'll receive a 6-digit numeric code. 
-                Just copy and paste it - no links to click!
+                <strong>Quick reset:</strong> You should receive a 6-digit code in the password-reset email.
+                If the message looks empty, check spam — your project email template may need a visible code line (see Supabase Reset Password template).
               </AlertDescription>
             </Alert>
 
@@ -235,12 +238,12 @@ export const SimplePasswordReset: React.FC<SimplePasswordResetProps> = ({ onBack
               )}
             </Button>
 
-            {onBack && (
+            {handleBack && (
               <Button
                 type="button"
                 variant="ghost"
                 className="w-full"
-                onClick={onBack}
+                onClick={handleBack}
                 disabled={loading}
               >
                 <ArrowLeft className="h-4 w-4 mr-2" />
