@@ -49,3 +49,7 @@ verify_jwt = false
 # Paystack servers only (HMAC x-paystack-signature).
 [functions.paystack-webhook]
 verify_jwt = false
+
+# eTIMS / VFD integrator: JWT checked inside; Basic auth to upstream from Edge secrets.
+[functions.etims-proxy]
+verify_jwt = false
