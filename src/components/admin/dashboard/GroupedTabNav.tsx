@@ -180,7 +180,6 @@ export const GroupedTabNav: React.FC<GroupedTabNavProps> = ({
         { value: 'messaging', label: 'Messaging', icon: MessageCircle },
         { value: 'feedback', label: 'Feedback', icon: MessageSquare, badge: chatStats?.pendingFeedback || undefined },
         { value: 'sms-test', label: 'SMS Test', icon: MessageSquare },
-        { value: 'etims-test', label: 'eTIMS test', icon: Landmark },
       ],
     },
     {
@@ -198,6 +197,7 @@ export const GroupedTabNav: React.FC<GroupedTabNavProps> = ({
               ? financialDocsCount
               : undefined,
         },
+        { value: 'etims-test', label: 'eTIMS test', icon: Landmark },
       ],
     },
     {
