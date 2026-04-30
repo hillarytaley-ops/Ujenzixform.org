@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
 import { invokeEtimsProxy } from "@/lib/etims/invokeEtimsProxy";
+import { EtimsPurchaseOrderSubmitCard } from "@/components/admin/EtimsPurchaseOrderSubmitCard";
 
 function secretsDashboardUrl(): string | null {
   const raw = import.meta.env.VITE_SUPABASE_URL;
@@ -72,7 +73,12 @@ function extractIntegratorPayload(root: unknown): {
   return { httpStatus, statusCode, message, rows, raw: root };
 }
 
-export const EtimsTestPanel: React.FC = () => {
+export type EtimsTestPanelProps = {
+  /** Supplier row id: restricts PO submit to that supplier’s orders */
+  enforceSupplierId?: string | null;
+};
+
+export const EtimsTestPanel: React.FC<EtimsTestPanelProps> = ({ enforceSupplierId }) => {
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [lastLabel, setLastLabel] = useState<string | null>(null);
@@ -229,6 +235,10 @@ export const EtimsTestPanel: React.FC = () => {
           </details>
         </div>
       )}
+
+      <div className="border-t border-border pt-6">
+        <EtimsPurchaseOrderSubmitCard enforceSupplierId={enforceSupplierId} />
+      </div>
     </div>
   );
 };

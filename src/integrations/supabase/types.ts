@@ -3160,6 +3160,11 @@ export type Database = {
           delivery_notes: string | null
           delivery_requested_at: string | null
           delivery_required: boolean | null
+          etims_error: string | null
+          etims_response: Json | null
+          etims_submitted_at: string | null
+          etims_trader_invoice_no: string | null
+          etims_verification_url: string | null
           id: string
           items: Json
           payment_terms: string | null
@@ -3186,6 +3191,11 @@ export type Database = {
           delivery_notes?: string | null
           delivery_requested_at?: string | null
           delivery_required?: boolean | null
+          etims_error?: string | null
+          etims_response?: Json | null
+          etims_submitted_at?: string | null
+          etims_trader_invoice_no?: string | null
+          etims_verification_url?: string | null
           id?: string
           items?: Json
           payment_terms?: string | null
@@ -3212,6 +3222,11 @@ export type Database = {
           delivery_notes?: string | null
           delivery_requested_at?: string | null
           delivery_required?: boolean | null
+          etims_error?: string | null
+          etims_response?: Json | null
+          etims_submitted_at?: string | null
+          etims_trader_invoice_no?: string | null
+          etims_verification_url?: string | null
           id?: string
           items?: Json
           payment_terms?: string | null

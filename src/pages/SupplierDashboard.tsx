@@ -2940,7 +2940,7 @@ const SupplierDashboard = () => {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <EtimsTestPanel />
+                <EtimsTestPanel enforceSupplierId={supplierRecordId} />
               </CardContent>
             </Card>
           </TabsContent>
