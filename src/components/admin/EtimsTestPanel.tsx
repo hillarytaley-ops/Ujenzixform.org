@@ -62,7 +62,8 @@ export const EtimsTestPanel: React.FC = () => {
         <Landmark className="h-4 w-4" />
         <AlertTitle className="text-slate-100">Integrator smoke test</AlertTitle>
         <AlertDescription className="text-slate-400">
-          Calls Edge <code className="text-slate-300">etims-proxy</code> → your test API. Configure secrets in Supabase
+          Calls Edge <code className="text-slate-300">etims-proxy</code> → your test API (signed-in supplier or admin).
+          Configure secrets in Supabase
           {secretsUrl ? (
             <>
               {" "}

@@ -4795,7 +4795,7 @@ const AdminDashboard = () => {
                 </CardTitle>
                 <CardDescription className="text-gray-400">
                   Calls the deployed Edge function <code className="text-slate-300">etims-proxy</code> using your
-                  Supabase session (admin / super_admin only).
+                  Supabase session.
                 </CardDescription>
               </CardHeader>
               <CardContent>

@@ -11,6 +11,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { EtimsTestPanel } from "@/components/admin/EtimsTestPanel";
 import { DashboardLoader } from "@/components/ui/DashboardLoader";
 import { toast } from "sonner";
 import { 
@@ -83,7 +84,7 @@ import {
   buildOrderStatusChartData,
   countOrdersInStatusBucket,
 } from "@/lib/purchaseOrderMetrics";
-import { Navigation as NavigationIcon, Receipt } from "lucide-react";
+import { Navigation as NavigationIcon, Receipt, Landmark } from "lucide-react";
 import { SupplierInvoiceHub } from "@/components/supplier/SupplierInvoiceHub";
 import { SupplierFinanceTab } from "@/components/supplier/SupplierFinanceTab";
 
@@ -747,7 +748,7 @@ const SupplierDashboard = () => {
   });
   const [recentOrders, setRecentOrders] = useState<RecentOrder[]>([]);
   const [ordersForOrdersTab, setOrdersForOrdersTab] = useState<any[]>([]); // Full orders for OrderManagement (so Orders tab shows immediately)
-  const SUPPLIER_TABS = ['overview', 'materials', 'view-orders', 'scan-qr', 'tracking', 'analytics', 'finance', 'invoice', 'reports'];
+  const SUPPLIER_TABS = ['overview', 'materials', 'view-orders', 'scan-qr', 'tracking', 'analytics', 'finance', 'invoice', 'etims-test', 'reports'];
   const [activeTab, setActiveTab] = useUrlTabSync(SUPPLIER_TABS, 'overview');
   const [viewOrdersSubTab, setViewOrdersSubTab] = useState('quotes');
   const [showProfileEdit, setShowProfileEdit] = useState(false);
@@ -2229,7 +2230,7 @@ const SupplierDashboard = () => {
         </div>
 
         {/* Navigation Cards — 2 cols on phone, 3 on small phones, then 4 / 8 */}
-        <div className="mb-6 grid w-full grid-cols-2 gap-2 min-[420px]:grid-cols-3 sm:grid-cols-3 sm:gap-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-9">
+        <div className="mb-6 grid w-full grid-cols-2 gap-2 min-[420px]:grid-cols-3 sm:grid-cols-3 sm:gap-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-10">
           <Button 
             className={`h-auto w-full min-w-0 py-3 sm:py-4 transition-all ${activeTab === 'overview' 
               ? 'bg-gradient-to-r from-slate-600 to-slate-700 ring-2 ring-slate-400 shadow-lg' 
@@ -2329,6 +2330,17 @@ const SupplierDashboard = () => {
             </div>
           </Button>
           <Button 
+            className={`h-auto w-full min-w-0 py-3 sm:py-4 transition-all ${activeTab === 'etims-test' 
+              ? 'bg-gradient-to-r from-sky-600 to-cyan-700 ring-2 ring-sky-300 shadow-lg' 
+              : isDarkMode ? 'bg-slate-700 hover:bg-slate-600' : 'bg-gray-100 hover:bg-gray-200 text-gray-700'}`}
+            onClick={() => setActiveTab('etims-test')}
+          >
+            <div className="flex flex-col items-center gap-1.5 sm:gap-2 px-1">
+              <Landmark className="h-5 w-5 sm:h-6 sm:w-6 shrink-0" />
+              <span className="text-[10px] sm:text-xs md:text-sm text-center leading-tight">eTIMS test</span>
+            </div>
+          </Button>
+          <Button 
             className={`h-auto w-full min-w-0 py-3 sm:py-4 transition-all ${activeTab === 'reports' 
               ? 'bg-gradient-to-r from-green-500 to-emerald-600 ring-2 ring-green-300 shadow-lg' 
               : isDarkMode ? 'bg-slate-700 hover:bg-slate-600' : 'bg-gray-100 hover:bg-gray-200 text-gray-700'}`}
@@ -2352,6 +2364,7 @@ const SupplierDashboard = () => {
             <TabsTrigger value="analytics">Analytics</TabsTrigger>
             <TabsTrigger value="finance">Finance</TabsTrigger>
             <TabsTrigger value="invoice">Invoice</TabsTrigger>
+            <TabsTrigger value="etims-test">eTIMS test</TabsTrigger>
             <TabsTrigger value="reports">Reports</TabsTrigger>
           </TabsList>
 
@@ -2912,6 +2925,24 @@ const SupplierDashboard = () => {
                 cardBg={cardBg}
               />
             )}
+          </TabsContent>
+
+          <TabsContent value="etims-test">
+            <Card className={cardBg}>
+              <CardHeader>
+                <CardTitle className={`flex items-center gap-2 ${textColor}`}>
+                  <Landmark className="h-5 w-5 text-sky-500 shrink-0" />
+                  eTIMS (KRA integrator) test
+                </CardTitle>
+                <CardDescription className={mutedText}>
+                  Smoke-test the deployed Edge function <code className="text-xs">etims-proxy</code> against your
+                  integrator sandbox. Requires Edge secrets in Supabase.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <EtimsTestPanel />
+              </CardContent>
+            </Card>
           </TabsContent>
 
           {/* ═══════════════════════════════════════════════════════════════════════════════════ */}
