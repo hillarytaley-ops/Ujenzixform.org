@@ -99,6 +99,7 @@ import {
   ClipboardPenLine,
   HardHat,
   Factory,
+  Landmark,
 } from "lucide-react";
 import { AdminScanDashboard } from "@/components/qr/AdminScanDashboard";
 import { EnhancedQRCodeManager } from "@/components/qr/EnhancedQRCodeManager";
@@ -121,6 +122,7 @@ import { JobPositionsManager } from "@/components/admin/JobPositionsManager";
 import { AnalyticsDashboard } from "@/components/analytics/AnalyticsDashboard";
 import { ReviewsManager } from "@/components/reviews/ReviewsManager";
 import { SMSTestPanel } from "@/components/admin/SMSTestPanel";
+import { EtimsTestPanel } from "@/components/admin/EtimsTestPanel";
 import { Camera, UserCog, MessageCircle, Link2, Navigation as NavigationIcon } from "lucide-react";
 import { CameraAssignment } from "@/components/admin/CameraAssignment";
 import { TrackingTab } from "@/components/tracking/TrackingTab";
@@ -446,7 +448,7 @@ const AdminDashboard = () => {
     "monitoring-requests", "camera-assignment", "feedback", "documents", "financial",
     "ml", "security", "staff", "activity-log", "scanning", "qr-codes", "communications",
     "builder-moderation", "delivery-analytics", "delivery-pay", "settings", "careers", "user-roles",
-    "messaging", "analytics", "reviews", "sms-test", "tracking", "voice-calls",
+    "messaging", "analytics", "reviews", "sms-test", "etims-test", "tracking", "voice-calls",
     "supply-chain-docs"
   ] as const;
   const [activeTab, setActiveTab] = useUrlTabSync([...ADMIN_TABS], "overview");
@@ -2106,7 +2108,7 @@ const AdminDashboard = () => {
   // Helper function to check if a tab should be shown
   const shouldShowTab = (tab: string): boolean => {
     // Admin-only tabs (not in permissions config)
-    const adminOnlyTabs = ['pending-products', 'qr-codes', 'videos', 'user-roles', 'messaging', 'careers', 'analytics', 'reviews', 'sms-test'];
+    const adminOnlyTabs = ['pending-products', 'qr-codes', 'videos', 'user-roles', 'messaging', 'careers', 'analytics', 'reviews', 'sms-test', 'etims-test'];
     if (adminOnlyTabs.includes(tab)) {
       return isAdminStaff || isSuperAdminStaff;
     }
@@ -2530,6 +2532,12 @@ const AdminDashboard = () => {
               <TabsTrigger value="sms-test" className="data-[state=active]:bg-green-600">
                 <MessageSquare className="h-4 w-4 mr-2" />
                 SMS Test
+              </TabsTrigger>
+            )}
+            {shouldShowTab('etims-test') && (
+              <TabsTrigger value="etims-test" className="data-[state=active]:bg-slate-600">
+                <Landmark className="h-4 w-4 mr-2" />
+                eTIMS test
               </TabsTrigger>
             )}
           </TabsList>
@@ -4774,6 +4782,24 @@ const AdminDashboard = () => {
               </CardHeader>
               <CardContent>
                 <SMSTestPanel />
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="etims-test" className="space-y-6">
+            <Card className="bg-slate-900/50 border-slate-800">
+              <CardHeader>
+                <CardTitle className="text-white flex items-center gap-2">
+                  <Landmark className="h-5 w-5 text-sky-400" />
+                  eTIMS (integrator) smoke test
+                </CardTitle>
+                <CardDescription className="text-gray-400">
+                  Calls the deployed Edge function <code className="text-slate-300">etims-proxy</code> using your
+                  Supabase session (admin / super_admin only).
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <EtimsTestPanel />
               </CardContent>
             </Card>
           </TabsContent>
