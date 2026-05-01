@@ -1,6 +1,6 @@
 /**
- * Types aligned with the approved integrator VFD / eTIMS REST API (SalesReq, etc.).
- * Field meanings: see integrator Swagger / KRA OSCU documentation.
+ * Types aligned with VFD REST **SalesReq** / **SalesItem** (POST `/api/v1/invoices`).
+ * See integrator Swagger (`SalesReq`, `SalesItem`, `SalesRes`) and Postman collection.
  */
 
 export type PaymentTypeCode = "01" | "02" | "03" | "04" | "05" | "06" | "07";
@@ -16,20 +16,22 @@ export type SalesStatusCode = "01" | "02" | "03" | "04" | "05" | "06";
 
 export interface EtimsSalesItem {
   itemCode: string;
-  /** Duplicate for integrators that deserialize snake_case only */
+  /** Duplicate for runtimes that only bind snake_case */
   item_code?: string;
   qty: number;
   pkg?: number;
   unitPrice: number;
   amount: number;
   discountAmount?: number;
-  /** Optional override per line (integrator extension); omit if unused */
+  /** A–E per Swagger (e.g. D = Non VAT); omit if unused */
   taxCode?: string;
+  /** Pharmacy / insurance; omit unless required */
   insuranceCompanyCode?: string;
 }
 
 export interface EtimsGenerateInvoiceRequest {
   traderInvoiceNo: string;
+  /** Original invoice ref for credit notes; omit for normal sales (Swagger) */
   traderOrgInvoiceNo?: string;
   totalAmount: number;
   paymentType: PaymentTypeCode;

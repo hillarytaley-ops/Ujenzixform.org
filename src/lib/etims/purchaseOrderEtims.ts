@@ -1,9 +1,11 @@
 /**
- * Map UjenziXform purchase_orders → integrator sales invoice payload.
+ * Map UjenziXform purchase_orders → VFD REST **SalesReq** (POST /invoices), e.g. Swagger `SalesReq` / `SalesItem`.
+ * Base path: `/api/v1/` (see integrator Postman: Generate Invoice).
  *
- * Convention: each element in `purchase_orders.items` JSON array may include:
- *   `etims_item_code` (string, required for submission) — item code from your integrator/OSCU catalog.
- *   `quantity` or `qty`, `unit_price` or `unitPrice`, optional `discountAmount`, `pkg` (default 0).
+ * Each `purchase_orders.items` element may include:
+ *   `etims_item_code` (or `itemCode` / `item_code`) — integrator **itemCode** (must exist on OSCU item master).
+ *   `quantity` or `qty`, `unit_price` or `unitPrice`, optional `discountAmount`, `pkg`.
+ *   Optional line fields accepted by many deployments: `taxCode` / `tax_code` (A–E), `insuranceCompanyCode`.
  */
 import { formatEtimsSalesDate } from "./salesDate";
 import type { EtimsGenerateInvoiceRequest, EtimsSalesItem } from "./types";
@@ -11,21 +13,6 @@ import { invokeEtimsProxy } from "./invokeEtimsProxy";
 import { supabase } from "@/integrations/supabase/client";
 
 export type PoItemJson = Record<string, unknown>;
-
-/** Legacy demo / tutorial values — never valid on a real integrator tenant; ignore everywhere (compare uppercase). */
-const DISCOURAGED_ETIMS_ITEM_CODES = new Set(["KE1UCT0000014"]);
-
-function normalizeForDiscouragedCheck(code: string): string {
-  return code
-    .replace(/[\u200B-\u200D\uFEFF]/g, "")
-    .trim()
-    .toUpperCase();
-}
-
-export function isDiscouragedEtimsItemCode(code: string): boolean {
-  const t = normalizeForDiscouragedCheck(code);
-  return t.length > 0 && DISCOURAGED_ETIMS_ITEM_CODES.has(t);
-}
 
 export function parsePurchaseOrderItems(items: unknown): PoItemJson[] {
   if (!Array.isArray(items)) return [];
@@ -38,7 +25,7 @@ export function lineEtimsItemCode(line: PoItemJson): string {
   for (const k of keys) {
     const raw = line[k];
     const v = typeof raw === "string" ? raw.trim() : "";
-    if (!v || isDiscouragedEtimsItemCode(v)) continue;
+    if (!v) continue;
     return v;
   }
   return "";
@@ -107,7 +94,7 @@ export async function enrichPurchaseOrderItemsWithEtimsCatalogCodes(
     for (const row of sppRows ?? []) {
       const r = row as { product_id?: string; etims_item_code?: string | null };
       const code = typeof r.etims_item_code === "string" ? r.etims_item_code.trim() : "";
-      if (r.product_id && code && !isDiscouragedEtimsItemCode(code)) codeByProduct.set(String(r.product_id), code);
+      if (r.product_id && code) codeByProduct.set(String(r.product_id), code);
     }
   }
 
@@ -117,7 +104,7 @@ export async function enrichPurchaseOrderItemsWithEtimsCatalogCodes(
     for (const row of matRows ?? []) {
       const r = row as { id?: string; etims_item_code?: string | null };
       const code = typeof r.etims_item_code === "string" ? r.etims_item_code.trim() : "";
-      if (r.id && code && !isDiscouragedEtimsItemCode(code)) codeByProduct.set(String(r.id), code);
+      if (r.id && code) codeByProduct.set(String(r.id), code);
     }
   }
 
@@ -127,7 +114,7 @@ export async function enrichPurchaseOrderItemsWithEtimsCatalogCodes(
     for (const row of amiRows ?? []) {
       const r = row as { id?: string; etims_item_code?: string | null };
       const code = typeof r.etims_item_code === "string" ? r.etims_item_code.trim() : "";
-      if (r.id && code && !isDiscouragedEtimsItemCode(code)) codeByProduct.set(String(r.id), code);
+      if (r.id && code) codeByProduct.set(String(r.id), code);
     }
   }
 
@@ -206,7 +193,7 @@ export function buildEtimsInvoiceBodyFromPurchaseOrder(
     const discountAmount = num(line.discountAmount ?? line.discount_amount, 0);
     const pkg = num(line.pkg, 0);
     const amount = num(line.amount, unitPrice * qty - discountAmount);
-    // Integrator payload: itemCode + item_code only (no extra non-schema fields).
+    // SalesItem: itemCode (+ item_code duplicate for some deserializers). Optional taxCode, insuranceCompanyCode.
     const row: EtimsSalesItem = {
       itemCode,
       item_code: itemCode,
@@ -218,6 +205,8 @@ export function buildEtimsInvoiceBodyFromPurchaseOrder(
     };
     const taxCode = str(line.taxCode ?? line.tax_code);
     if (taxCode) row.taxCode = taxCode;
+    const ins = str(line.insuranceCompanyCode ?? line.insurance_company_code);
+    if (ins) row.insuranceCompanyCode = ins;
     salesItems.push(row);
   }
 
