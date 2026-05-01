@@ -148,9 +148,12 @@ const UNITS = [
   'lot', 'job', 'day', 'hour'
 ];
 
+const SUPPLIER_CATALOG_FOCUS_KEY = "supplier_catalog_focus_product_id";
+
 export const SupplierProductManager: React.FC<SupplierProductManagerProps> = ({ supplierId }) => {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
+  const [highlightProductId, setHighlightProductId] = useState<string | null>(null);
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -181,6 +184,44 @@ export const SupplierProductManager: React.FC<SupplierProductManagerProps> = ({ 
   useEffect(() => {
     fetchProducts();
   }, [supplierId]);
+
+  useEffect(() => {
+    if (loading) return;
+    let focusId: string | null = null;
+    try {
+      focusId = sessionStorage.getItem(SUPPLIER_CATALOG_FOCUS_KEY);
+    } catch {
+      return;
+    }
+    if (!focusId?.trim()) return;
+    const id = focusId.trim();
+    const found = products.some((p) => p.id === id);
+    if (!found) {
+      try {
+        sessionStorage.removeItem(SUPPLIER_CATALOG_FOCUS_KEY);
+      } catch {
+        /* ignore */
+      }
+      toast({
+        title: "Product not in My Products",
+        description:
+          "This catalog id may only exist on your price list. Use Bulk eTIMS codes above with your materials CSV, or add the product here first.",
+      });
+      return;
+    }
+    const timer = window.setTimeout(() => {
+      const el = document.querySelector(`[data-supplier-product-id="${id}"]`);
+      el?.scrollIntoView({ behavior: "smooth", block: "center" });
+      setHighlightProductId(id);
+      window.setTimeout(() => setHighlightProductId(null), 10000);
+      try {
+        sessionStorage.removeItem(SUPPLIER_CATALOG_FOCUS_KEY);
+      } catch {
+        /* ignore */
+      }
+    }, 450);
+    return () => clearTimeout(timer);
+  }, [loading, products, toast]);
 
   const fetchProducts = async () => {
     try {
@@ -982,7 +1023,13 @@ export const SupplierProductManager: React.FC<SupplierProductManagerProps> = ({ 
             const totalImages = 1 + additionalImages.filter(img => img).length;
             
             return (
-            <Card key={product.id} className="overflow-hidden hover:shadow-lg transition-shadow">
+            <Card
+              key={product.id}
+              data-supplier-product-id={product.id}
+              className={`overflow-hidden hover:shadow-lg transition-shadow${
+                highlightProductId === product.id ? " ring-2 ring-orange-500 ring-offset-2 ring-offset-background" : ""
+              }`}
+            >
               {/* Product Image */}
               <div className="relative aspect-square bg-muted">
                 {imageUrl ? (

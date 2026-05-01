@@ -18,6 +18,7 @@ import {
   CommandList,
 } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { ToastAction } from "@/components/ui/toast";
 import { useToast } from "@/hooks/use-toast";
 import {
   isDiscouragedEtimsItemCode,
@@ -58,6 +59,8 @@ export type EtimsPurchaseOrderSubmitCardProps = {
   invoiceExchangeRate?: number | null;
   /** Optional; only sent if non-empty (integrator may ignore or reject) */
   invoiceCountryCode?: string | null;
+  /** Supplier dashboard: jump to My Materials for this catalog / materials id */
+  onOpenCatalogForEtims?: (catalogMaterialId: string) => void;
 };
 
 export const EtimsPurchaseOrderSubmitCard: React.FC<EtimsPurchaseOrderSubmitCardProps> = ({
@@ -65,6 +68,7 @@ export const EtimsPurchaseOrderSubmitCard: React.FC<EtimsPurchaseOrderSubmitCard
   invoiceCurrency,
   invoiceExchangeRate,
   invoiceCountryCode,
+  onOpenCatalogForEtims,
 }) => {
   const { toast } = useToast();
   const [poId, setPoId] = useState("");
@@ -194,7 +198,33 @@ export const EtimsPurchaseOrderSubmitCard: React.FC<EtimsPurchaseOrderSubmitCard
           /no item with name/i.test(r.message) || /item.*not found/i.test(r.message)
             ? " The integrator has no item registered with that identifier for this environment. Confirm the code exists on your OSCU/VFD item master, or register the SKU with KRA before invoicing."
             : "";
-        toast({ variant: "destructive", title: "eTIMS submit failed", description: `${r.message}${hint}` });
+        const focusCatalogId = typeof r.focusCatalogId === "string" && r.focusCatalogId.trim() ? r.focusCatalogId.trim() : undefined;
+        const openCatalog = onOpenCatalogForEtims && focusCatalogId ? () => onOpenCatalogForEtims(focusCatalogId) : undefined;
+        toast({
+          variant: "destructive",
+          title: "eTIMS submit failed",
+          description: `${r.message}${hint}`,
+          ...(openCatalog
+            ? {
+                action: (
+                  <ToastAction altText="Open My Materials to add item code" onClick={openCatalog}>
+                    My Materials
+                  </ToastAction>
+                ),
+              }
+            : focusCatalogId
+              ? {
+                  action: (
+                    <ToastAction
+                      altText="Copy catalog id"
+                      onClick={() => void navigator.clipboard?.writeText?.(focusCatalogId)}
+                    >
+                      Copy id
+                    </ToastAction>
+                  ),
+                }
+              : {}),
+        });
         return;
       }
       toast({ title: "Submitted", description: "Invoice sent to integrator; order row updated." });

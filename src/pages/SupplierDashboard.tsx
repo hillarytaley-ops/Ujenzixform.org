@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef, lazy, Suspense } from "react";
+import React, { useState, useEffect, useMemo, useRef, lazy, Suspense, useCallback } from "react";
 import { Link } from "react-router-dom";
 import { useUrlTabSync } from "@/hooks/useUrlTabSync";
 import { supabase, SUPABASE_URL, SUPABASE_ANON_KEY } from "@/integrations/supabase/client";
@@ -751,6 +751,21 @@ const SupplierDashboard = () => {
   const SUPPLIER_TABS = ['overview', 'materials', 'view-orders', 'scan-qr', 'tracking', 'analytics', 'finance', 'invoice', 'etims-test', 'reports'];
   const [activeTab, setActiveTab] = useUrlTabSync(SUPPLIER_TABS, 'overview');
   const [viewOrdersSubTab, setViewOrdersSubTab] = useState('quotes');
+  const [materialsSubTab, setMaterialsSubTab] = useState<"add-products" | "my-products" | "view-inventory">("add-products");
+
+  const openCatalogForEtimsProduct = useCallback(
+    (catalogMaterialId: string) => {
+      try {
+        sessionStorage.setItem("supplier_catalog_focus_product_id", catalogMaterialId.trim());
+      } catch {
+        /* ignore */
+      }
+      setMaterialsSubTab("my-products");
+      setActiveTab("materials");
+    },
+    [setActiveTab],
+  );
+
   const [showProfileEdit, setShowProfileEdit] = useState(false);
   const [showProfileView, setShowProfileView] = useState(false);
   const [quoteRequests, setQuoteRequests] = useState<any[]>([]);
@@ -2465,7 +2480,15 @@ const SupplierDashboard = () => {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <Tabs defaultValue="add-products" className="space-y-4">
+                <Tabs
+                  value={materialsSubTab}
+                  onValueChange={(v) => {
+                    if (v === "add-products" || v === "my-products" || v === "view-inventory") {
+                      setMaterialsSubTab(v);
+                    }
+                  }}
+                  className="space-y-4"
+                >
                   <div
                     className={`rounded-xl border-2 shadow-md p-3 sm:p-4 ${
                       isDarkMode
@@ -2940,7 +2963,7 @@ const SupplierDashboard = () => {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <EtimsTestPanel enforceSupplierId={supplierRecordId} />
+                <EtimsTestPanel enforceSupplierId={supplierRecordId} onOpenCatalogForEtims={openCatalogForEtimsProduct} />
               </CardContent>
             </Card>
           </TabsContent>

@@ -175,9 +175,11 @@ function EtimsListPicker({
 export type EtimsTestPanelProps = {
   /** Supplier row id: restricts PO submit to that supplier’s orders */
   enforceSupplierId?: string | null;
+  /** Supplier dashboard: open My Materials for the catalog id from a failed submit */
+  onOpenCatalogForEtims?: (catalogMaterialId: string) => void;
 };
 
-export const EtimsTestPanel: React.FC<EtimsTestPanelProps> = ({ enforceSupplierId }) => {
+export const EtimsTestPanel: React.FC<EtimsTestPanelProps> = ({ enforceSupplierId, onOpenCatalogForEtims }) => {
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [lastLabel, setLastLabel] = useState<string | null>(null);
@@ -413,6 +415,7 @@ export const EtimsTestPanel: React.FC<EtimsTestPanelProps> = ({ enforceSupplierI
           invoiceCurrency={invoiceCurrencyForSubmit}
           invoiceExchangeRate={exchangeRateNum}
           invoiceCountryCode={invoiceCountryForSubmit}
+          onOpenCatalogForEtims={onOpenCatalogForEtims}
         />
       </div>
     </div>

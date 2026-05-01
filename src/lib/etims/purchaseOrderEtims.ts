@@ -145,6 +145,18 @@ function str(v: unknown): string {
   return typeof v === "string" ? v.trim() : "";
 }
 
+/** Thrown when a PO line is linked to catalog id but has no integrator item code (for UI deep-link). */
+export class EtimsMissingItemCodeError extends Error {
+  override readonly name = "EtimsMissingItemCodeError";
+  constructor(
+    message: string,
+    public readonly focusCatalogId: string,
+  ) {
+    super(message);
+    Object.setPrototypeOf(this, new.target.prototype);
+  }
+}
+
 /**
  * Build integrator POST /invoices body from a PO row + buyer PIN.
  * Throws if any line is missing `etims_item_code`.
@@ -179,6 +191,7 @@ export function buildEtimsInvoiceBodyFromPurchaseOrder(
       const who = catId
         ? `No integrator item code on file for catalog id ${catId}${label ? ` (${label})` : ""}. Add eTIMS item code on that product in your supplier catalog (or admin catalog), or put etims_item_code on this line in the PO items JSON.`
         : `This line has no material/product id and no etims_item_code (line ${i + 1}${label ? `: ${label}` : ""}). Fix the PO items JSON so each row includes material_id (or product_id) plus etims_item_code, or only etims_item_code.`;
+      if (catId) throw new EtimsMissingItemCodeError(who, catId);
       throw new Error(who);
     }
     const qty = num(line.quantity ?? line.qty, 1);
@@ -256,7 +269,7 @@ export function pickEtimsPersistFields(data: unknown): {
 
 export type SubmitEtimsInvoiceResult =
   | { ok: true; data: unknown }
-  | { ok: false; message: string; status?: number };
+  | { ok: false; message: string; status?: number; focusCatalogId?: string };
 
 /**
  * POST /invoices via etims-proxy and persist outcome on purchase_orders.
@@ -309,11 +322,12 @@ export async function submitEtimsInvoiceForPurchaseOrder(
     );
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
+    const focusCatalogId = e instanceof EtimsMissingItemCodeError ? e.focusCatalogId : undefined;
     await supabase
       .from("purchase_orders")
       .update({ etims_error: msg, etims_submitted_at: new Date().toISOString() })
       .eq("id", purchaseOrderId);
-    return { ok: false, message: msg };
+    return { ok: false, message: msg, focusCatalogId };
   }
 
   const res = await invokeEtimsProxy<Record<string, unknown>>({
