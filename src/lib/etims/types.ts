@@ -16,6 +16,18 @@ export type SalesStatusCode = "01" | "02" | "03" | "04" | "05" | "06";
 
 export interface EtimsSalesItem {
   itemCode: string;
+  /** Duplicate for integrators that deserialize snake_case only */
+  item_code?: string;
+  /**
+   * Some VFD/integrator bridges resolve the seller item register by `name` using the same
+   * string as the KRA item code (errors like "No Item with name: KE1UCT…").
+   */
+  name?: string;
+  itemName?: string;
+  item_name?: string;
+  /** OSCU-style line description (itemNm); optional but helps dual-schema gateways */
+  itemNm?: string;
+  item_nm?: string;
   qty: number;
   pkg?: number;
   unitPrice: number;

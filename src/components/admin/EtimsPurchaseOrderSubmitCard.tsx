@@ -186,7 +186,11 @@ export const EtimsPurchaseOrderSubmitCard: React.FC<EtimsPurchaseOrderSubmitCard
         countryCode: invoiceCountryCode?.trim() || undefined,
       });
       if (!r.ok) {
-        toast({ variant: "destructive", title: "eTIMS submit failed", description: r.message });
+        const hint =
+          /no item with name/i.test(r.message) || /item.*not found/i.test(r.message)
+            ? " The integrator has no item registered with that identifier for this environment. Confirm the code exists on your OSCU/VFD item master, or register the SKU with KRA before invoicing."
+            : "";
+        toast({ variant: "destructive", title: "eTIMS submit failed", description: `${r.message}${hint}` });
         return;
       }
       toast({ title: "Submitted", description: "Invoice sent to integrator; order row updated." });
@@ -231,7 +235,9 @@ export const EtimsPurchaseOrderSubmitCard: React.FC<EtimsPurchaseOrderSubmitCard
           <code className="rounded bg-muted px-1">materials</code> for the same{" "}
           <code className="rounded bg-muted px-1">material_id</code> (the app fills missing codes at submit). Suppliers can
           set the code when adding or editing a product in their catalog; admins can set it from Product Submissions (edit on
-          any tab). Optional per line: <code className="rounded bg-muted px-1">taxCode</code> (A–E).
+          any tab).           Optional per line: <code className="rounded bg-muted px-1">taxCode</code> (A–E). If submission fails with
+          &quot;No item with name: …&quot;, that code is not on the linked eTIMS item register for this sandbox or
+          production tenant—register the item with KRA or use a code your integrator has already provisioned.
         </AlertDescription>
       </Alert>
 
