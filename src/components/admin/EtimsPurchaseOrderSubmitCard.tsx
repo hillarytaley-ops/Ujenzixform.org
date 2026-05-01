@@ -19,7 +19,11 @@ import {
 } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useToast } from "@/hooks/use-toast";
-import { pushEtimsItemStockLevel, submitEtimsInvoiceForPurchaseOrder } from "@/lib/etims/purchaseOrderEtims";
+import {
+  isDiscouragedEtimsItemCode,
+  pushEtimsItemStockLevel,
+  submitEtimsInvoiceForPurchaseOrder,
+} from "@/lib/etims/purchaseOrderEtims";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
 
@@ -122,7 +126,7 @@ export const EtimsPurchaseOrderSubmitCard: React.FC<EtimsPurchaseOrderSubmitCard
         const code = typeof (row as { etims_item_code?: string | null }).etims_item_code === "string"
           ? (row as { etims_item_code: string }).etims_item_code.trim()
           : "";
-        if (!code) continue;
+        if (!code || isDiscouragedEtimsItemCode(code)) continue;
         const name = typeof (row as { name?: string | null }).name === "string" ? (row as { name: string }).name.trim() : "";
         if (!byCode.has(code)) byCode.set(code, name || code);
       }
@@ -139,7 +143,7 @@ export const EtimsPurchaseOrderSubmitCard: React.FC<EtimsPurchaseOrderSubmitCard
               typeof (row as { etims_item_code?: string | null }).etims_item_code === "string"
                 ? (row as { etims_item_code: string }).etims_item_code.trim()
                 : "";
-            if (code && !byCode.has(code)) byCode.set(code, code);
+            if (code && !isDiscouragedEtimsItemCode(code) && !byCode.has(code)) byCode.set(code, code);
           }
         }
       }

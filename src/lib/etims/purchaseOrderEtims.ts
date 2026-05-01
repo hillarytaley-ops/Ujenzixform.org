@@ -12,6 +12,14 @@ import { supabase } from "@/integrations/supabase/client";
 
 export type PoItemJson = Record<string, unknown>;
 
+/** Legacy demo / tutorial values — never valid on a real integrator tenant; ignore everywhere. */
+const DISCOURAGED_ETIMS_ITEM_CODES = new Set(["KE1UCT0000014"]);
+
+export function isDiscouragedEtimsItemCode(code: string): boolean {
+  const t = code.trim();
+  return t.length > 0 && DISCOURAGED_ETIMS_ITEM_CODES.has(t);
+}
+
 export function parsePurchaseOrderItems(items: unknown): PoItemJson[] {
   if (!Array.isArray(items)) return [];
   return items.filter((x): x is PoItemJson => typeof x === "object" && x !== null);
@@ -19,9 +27,14 @@ export function parsePurchaseOrderItems(items: unknown): PoItemJson[] {
 
 /** Non-empty KRA/integrator code from a PO line (explicit JSON or common aliases). */
 export function lineEtimsItemCode(line: PoItemJson): string {
-  const v =
-    line.etims_item_code ?? line.itemCode ?? line.item_code ?? line.kra_item_code ?? line.kraItemCode;
-  return typeof v === "string" ? v.trim() : "";
+  const keys = ["etims_item_code", "itemCode", "item_code", "kra_item_code", "kraItemCode"] as const;
+  for (const k of keys) {
+    const raw = line[k];
+    const v = typeof raw === "string" ? raw.trim() : "";
+    if (!v || isDiscouragedEtimsItemCode(v)) continue;
+    return v;
+  }
+  return "";
 }
 
 function chunkIds(ids: string[], size: number): string[][] {
@@ -62,7 +75,7 @@ export async function enrichPurchaseOrderItemsWithEtimsCatalogCodes(
     for (const row of sppRows ?? []) {
       const r = row as { product_id?: string; etims_item_code?: string | null };
       const code = typeof r.etims_item_code === "string" ? r.etims_item_code.trim() : "";
-      if (r.product_id && code) codeByProduct.set(String(r.product_id), code);
+      if (r.product_id && code && !isDiscouragedEtimsItemCode(code)) codeByProduct.set(String(r.product_id), code);
     }
   }
 
@@ -72,7 +85,7 @@ export async function enrichPurchaseOrderItemsWithEtimsCatalogCodes(
     for (const row of matRows ?? []) {
       const r = row as { id?: string; etims_item_code?: string | null };
       const code = typeof r.etims_item_code === "string" ? r.etims_item_code.trim() : "";
-      if (r.id && code) codeByProduct.set(String(r.id), code);
+      if (r.id && code && !isDiscouragedEtimsItemCode(code)) codeByProduct.set(String(r.id), code);
     }
   }
 
@@ -82,7 +95,7 @@ export async function enrichPurchaseOrderItemsWithEtimsCatalogCodes(
     for (const row of amiRows ?? []) {
       const r = row as { id?: string; etims_item_code?: string | null };
       const code = typeof r.etims_item_code === "string" ? r.etims_item_code.trim() : "";
-      if (r.id && code) codeByProduct.set(String(r.id), code);
+      if (r.id && code && !isDiscouragedEtimsItemCode(code)) codeByProduct.set(String(r.id), code);
     }
   }
 
