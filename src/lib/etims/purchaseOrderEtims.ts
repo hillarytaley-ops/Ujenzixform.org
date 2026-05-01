@@ -135,14 +135,16 @@ export function buildEtimsInvoiceBodyFromPurchaseOrder(
     const discountAmount = num(line.discountAmount ?? line.discount_amount, 0);
     const pkg = num(line.pkg, 0);
     const amount = num(line.amount, unitPrice * qty - discountAmount);
-    const row: EtimsSalesItem = {
+    // Some integrator stacks bind snake_case only; Postman uses camelCase `itemCode`.
+    const row = {
       itemCode,
+      item_code: itemCode,
       qty,
       pkg,
       unitPrice,
       amount: amount > 0 ? amount : unitPrice * qty - discountAmount,
       discountAmount,
-    };
+    } as EtimsSalesItem;
     const taxCode = str(line.taxCode ?? line.tax_code);
     if (taxCode) row.taxCode = taxCode;
     salesItems.push(row);
