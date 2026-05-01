@@ -17,6 +17,77 @@ export function parsePurchaseOrderItems(items: unknown): PoItemJson[] {
   return items.filter((x): x is PoItemJson => typeof x === "object" && x !== null);
 }
 
+/** Non-empty KRA/integrator code from a PO line (explicit JSON or common aliases). */
+export function lineEtimsItemCode(line: PoItemJson): string {
+  const v =
+    line.etims_item_code ?? line.itemCode ?? line.item_code ?? line.kra_item_code ?? line.kraItemCode;
+  return typeof v === "string" ? v.trim() : "";
+}
+
+function chunkIds(ids: string[], size: number): string[][] {
+  const out: string[][] = [];
+  for (let i = 0; i < ids.length; i += size) out.push(ids.slice(i, i + size));
+  return out;
+}
+
+/**
+ * Fills missing line codes from `supplier_product_prices` (same supplier + product_id)
+ * then `materials` (by id), so legacy PO rows work once catalog codes are stored in DB.
+ */
+export async function enrichPurchaseOrderItemsWithEtimsCatalogCodes(
+  supplierId: string,
+  items: unknown,
+): Promise<unknown> {
+  const lines = parsePurchaseOrderItems(items);
+  if (lines.length === 0) return items;
+
+  const productIdsNeedingLookup = new Set<string>();
+  for (const line of lines) {
+    if (lineEtimsItemCode(line)) continue;
+    const raw = line.material_id ?? line.product_id;
+    const pid = typeof raw === "string" ? raw.trim() : typeof raw === "number" && Number.isFinite(raw) ? String(raw) : "";
+    if (pid) productIdsNeedingLookup.add(pid);
+  }
+  if (productIdsNeedingLookup.size === 0) return items;
+
+  const codeByProduct = new Map<string, string>();
+  const ids = [...productIdsNeedingLookup];
+
+  for (const part of chunkIds(ids, 80)) {
+    const { data: sppRows } = await supabase
+      .from("supplier_product_prices")
+      .select("product_id,etims_item_code")
+      .eq("supplier_id", supplierId)
+      .in("product_id", part);
+    for (const row of sppRows ?? []) {
+      const r = row as { product_id?: string; etims_item_code?: string | null };
+      const code = typeof r.etims_item_code === "string" ? r.etims_item_code.trim() : "";
+      if (r.product_id && code) codeByProduct.set(String(r.product_id), code);
+    }
+  }
+
+  const still = ids.filter((id) => !codeByProduct.has(id));
+  for (const part of chunkIds(still, 80)) {
+    const { data: matRows } = await supabase.from("materials").select("id,etims_item_code").in("id", part);
+    for (const row of matRows ?? []) {
+      const r = row as { id?: string; etims_item_code?: string | null };
+      const code = typeof r.etims_item_code === "string" ? r.etims_item_code.trim() : "";
+      if (r.id && code) codeByProduct.set(String(r.id), code);
+    }
+  }
+
+  const enriched = lines.map((line) => {
+    if (lineEtimsItemCode(line)) return line;
+    const raw = line.material_id ?? line.product_id;
+    const pid = typeof raw === "string" ? raw.trim() : typeof raw === "number" && Number.isFinite(raw) ? String(raw) : "";
+    const code = pid ? codeByProduct.get(pid) : undefined;
+    if (!code) return line;
+    return { ...line, etims_item_code: code };
+  });
+
+  return enriched;
+}
+
 function num(v: unknown, fallback = 0): number {
   if (typeof v === "number" && Number.isFinite(v)) return v;
   if (typeof v === "string" && v.trim() !== "" && Number.isFinite(Number(v))) return Number(v);
@@ -53,7 +124,7 @@ export function buildEtimsInvoiceBodyFromPurchaseOrder(
   const salesItems: EtimsSalesItem[] = [];
 
   for (const line of lines) {
-    const itemCode = str(line.etims_item_code);
+    const itemCode = lineEtimsItemCode(line);
     if (!itemCode) {
       throw new Error(
         'Each PO line must include etims_item_code (KRA item code). Edit items JSON or extend your materials flow to set it.',
@@ -163,6 +234,8 @@ export async function submitEtimsInvoiceForPurchaseOrder(
     return { ok: false, message: "This order does not belong to your supplier account." };
   }
 
+  const itemsForInvoice = await enrichPurchaseOrderItemsWithEtimsCatalogCodes(String(po.supplier_id), po.items);
+
   let body: EtimsGenerateInvoiceRequest;
   try {
     body = buildEtimsInvoiceBodyFromPurchaseOrder(
@@ -170,7 +243,7 @@ export async function submitEtimsInvoiceForPurchaseOrder(
         id: po.id,
         po_number: po.po_number,
         total_amount: Number(po.total_amount),
-        items: po.items,
+        items: itemsForInvoice,
       },
       {
         customerPin: options.customerPin,

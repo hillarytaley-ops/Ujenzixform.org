@@ -135,6 +135,8 @@ function getVariantByKey(variants: PriceVariant[], key: string | undefined): Pri
 interface Material {
   id: string;
   supplier_id?: string; // Optional - admin materials don't have supplier_id
+  /** KRA/integrator item code when set on supplier_product_prices or materials row */
+  etims_item_code?: string;
   name: string;
   description: string;
   category: string;
@@ -1034,7 +1036,17 @@ export const MaterialsGrid: React.FC<MaterialsGridProps> = ({ embeddedInDashboar
       
       // STEP 1: Fetch supplier prices from supplier_product_prices table
       // This is where suppliers set their actual selling prices, variant prices, and optional descriptions
-      let supplierPrices: Record<string, { price: number; in_stock: boolean; supplier_id: string; description?: string; variant_prices?: any[] }> = {};
+      let supplierPrices: Record<
+        string,
+        {
+          price: number;
+          in_stock: boolean;
+          supplier_id: string;
+          description?: string;
+          variant_prices?: any[];
+          etims_item_code?: string;
+        }
+      > = {};
       
       try {
         const pricesResponse = await fetch(
@@ -1069,12 +1081,17 @@ export const MaterialsGrid: React.FC<MaterialsGridProps> = ({ embeddedInDashboar
             
             sortedPrices.forEach((item: any) => {
               if (!supplierPrices[item.product_id]) {
+                const etims =
+                  typeof item.etims_item_code === 'string' && item.etims_item_code.trim()
+                    ? item.etims_item_code.trim()
+                    : '';
                 supplierPrices[item.product_id] = {
                   price: item.price,
                   in_stock: item.in_stock,
                   supplier_id: item.supplier_id,
                   description: item.description || '',
-                  variant_prices: item.variant_prices || []
+                  variant_prices: item.variant_prices || [],
+                  ...(etims ? { etims_item_code: etims } : {}),
                 };
               }
             });
@@ -1197,6 +1214,9 @@ export const MaterialsGrid: React.FC<MaterialsGridProps> = ({ embeddedInDashboar
                 id: item.id,
                 // Use actual supplier_id from pricing if available, otherwise mark as admin-catalog
                 supplier_id: supplierPrice?.supplier_id || 'admin-catalog',
+                ...(supplierPrice?.etims_item_code
+                  ? { etims_item_code: supplierPrice.etims_item_code }
+                  : {}),
                 name: item.name || 'Unnamed Material',
                 category: item.category || 'Uncategorized',
                 description: supplierPrice?.description || item.description || '',
@@ -1260,6 +1280,9 @@ export const MaterialsGrid: React.FC<MaterialsGridProps> = ({ embeddedInDashboar
                 id: item.id,
                 // Use actual supplier_id from pricing if available, otherwise mark as admin-catalog
                 supplier_id: supplierPrice?.supplier_id || 'admin-catalog',
+                ...(supplierPrice?.etims_item_code
+                  ? { etims_item_code: supplierPrice.etims_item_code }
+                  : {}),
                 name: item.name || 'Unnamed Material',
                 category: item.category || 'Uncategorized',
                 description: supplierPrice?.description || item.description || '',
@@ -1533,7 +1556,10 @@ export const MaterialsGrid: React.FC<MaterialsGridProps> = ({ embeddedInDashboar
             category: material.category,
             quantity: qty,
             unit: material.unit,
-            unit_price: material.unit_price
+            unit_price: material.unit_price,
+            ...(material.etims_item_code?.trim()
+              ? { etims_item_code: material.etims_item_code.trim() }
+              : {}),
           }]
       };
 
@@ -1612,7 +1638,10 @@ export const MaterialsGrid: React.FC<MaterialsGridProps> = ({ embeddedInDashboar
             category: material.category,
             quantity: qty,
             unit: material.unit,
-            unit_price: material.unit_price
+            unit_price: material.unit_price,
+            ...(material.etims_item_code?.trim()
+              ? { etims_item_code: material.etims_item_code.trim() }
+              : {}),
           }]
         })
         .select()

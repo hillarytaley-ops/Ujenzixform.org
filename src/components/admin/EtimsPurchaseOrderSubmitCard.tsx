@@ -1,6 +1,6 @@
 /**
  * Beta: submit a UjenziXform purchase order to the integrator as an eTIMS/VFD invoice.
- * Lines in purchase_orders.items must include `etims_item_code` per row (see purchaseOrderEtims.ts).
+ * eTIMS lines need a KRA item code per row (JSON, catalog DB, or aliases — see purchaseOrderEtims.ts).
  */
 
 import React, { useEffect, useState } from "react";
@@ -165,10 +165,12 @@ export const EtimsPurchaseOrderSubmitCard: React.FC<EtimsPurchaseOrderSubmitCard
         <Package className="h-4 w-4" />
         <AlertTitle className="text-foreground">Line mapping (step 1)</AlertTitle>
         <AlertDescription className="text-muted-foreground text-xs leading-relaxed">
-          Each object in <code className="rounded bg-muted px-1">purchase_orders.items</code> must include{" "}
-          <code className="rounded bg-muted px-1">etims_item_code</code> (KRA item code). Use your integrator catalog or{" "}
-          <code className="rounded bg-muted px-1">POST /items</code> first. Optional per line:{" "}
-          <code className="rounded bg-muted px-1">taxCode</code> (A–E).
+          Each line needs a KRA item code for the integrator: set{" "}
+          <code className="rounded bg-muted px-1">etims_item_code</code> on the PO JSON, or store it on{" "}
+          <code className="rounded bg-muted px-1">supplier_product_prices</code> /{" "}
+          <code className="rounded bg-muted px-1">materials</code> for the same{" "}
+          <code className="rounded bg-muted px-1">material_id</code> (the app fills missing codes at submit). Optional per
+          line: <code className="rounded bg-muted px-1">taxCode</code> (A–E).
         </AlertDescription>
       </Alert>
 
