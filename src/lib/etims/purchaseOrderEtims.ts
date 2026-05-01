@@ -37,6 +37,32 @@ export function lineEtimsItemCode(line: PoItemJson): string {
   return "";
 }
 
+/** Catalog row id on PO lines (materials / admin_material_images / supplier_product_prices.product_id). */
+const UUID_LIKE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+export function catalogIdFromPoLine(line: PoItemJson): string {
+  const keyOrder = ["material_id", "product_id", "materialId", "productId"] as const;
+  for (const k of keyOrder) {
+    const raw = line[k];
+    const v =
+      typeof raw === "string"
+        ? raw.trim()
+        : typeof raw === "number" && Number.isFinite(raw)
+          ? String(raw)
+          : "";
+    if (v) return v;
+  }
+  const idRaw = line.id;
+  const idStr =
+    typeof idRaw === "string"
+      ? idRaw.trim()
+      : typeof idRaw === "number" && Number.isFinite(idRaw)
+        ? String(idRaw)
+        : "";
+  if (idStr && UUID_LIKE.test(idStr)) return idStr;
+  return "";
+}
+
 function chunkIds(ids: string[], size: number): string[][] {
   const out: string[][] = [];
   for (let i = 0; i < ids.length; i += size) out.push(ids.slice(i, i + size));
@@ -57,8 +83,7 @@ export async function enrichPurchaseOrderItemsWithEtimsCatalogCodes(
   const productIdsNeedingLookup = new Set<string>();
   for (const line of lines) {
     if (lineEtimsItemCode(line)) continue;
-    const raw = line.material_id ?? line.product_id;
-    const pid = typeof raw === "string" ? raw.trim() : typeof raw === "number" && Number.isFinite(raw) ? String(raw) : "";
+    const pid = catalogIdFromPoLine(line);
     if (pid) productIdsNeedingLookup.add(pid);
   }
   if (productIdsNeedingLookup.size === 0) return items;
@@ -101,8 +126,7 @@ export async function enrichPurchaseOrderItemsWithEtimsCatalogCodes(
 
   const enriched = lines.map((line) => {
     if (lineEtimsItemCode(line)) return line;
-    const raw = line.material_id ?? line.product_id;
-    const pid = typeof raw === "string" ? raw.trim() : typeof raw === "number" && Number.isFinite(raw) ? String(raw) : "";
+    const pid = catalogIdFromPoLine(line);
     const code = pid ? codeByProduct.get(pid) : undefined;
     if (!code) return line;
     return { ...line, etims_item_code: code };
@@ -146,12 +170,16 @@ export function buildEtimsInvoiceBodyFromPurchaseOrder(
   const lines = parsePurchaseOrderItems(po.items);
   const salesItems: EtimsSalesItem[] = [];
 
-  for (const line of lines) {
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
     const itemCode = lineEtimsItemCode(line);
     if (!itemCode) {
-      throw new Error(
-        'Each PO line must include etims_item_code (KRA item code). Edit items JSON or extend your materials flow to set it.',
-      );
+      const catId = catalogIdFromPoLine(line);
+      const label = str(line.material_name ?? line.name ?? line.item_name ?? line.description);
+      const who = catId
+        ? `No integrator item code on file for catalog id ${catId}${label ? ` (${label})` : ""}. Add eTIMS item code on that product in your supplier catalog (or admin catalog), or put etims_item_code on this line in the PO items JSON.`
+        : `This line has no material/product id and no etims_item_code (line ${i + 1}${label ? `: ${label}` : ""}). Fix the PO items JSON so each row includes material_id (or product_id) plus etims_item_code, or only etims_item_code.`;
+      throw new Error(who);
     }
     const qty = num(line.quantity ?? line.qty, 1);
     const unitPrice = num(line.unit_price ?? line.unitPrice ?? line.price, 0);
