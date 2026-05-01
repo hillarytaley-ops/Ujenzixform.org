@@ -84,6 +84,8 @@ interface PendingProduct {
   rejection_reason?: string;
   created_at: string;
   updated_at: string;
+  /** KRA / eTIMS integrator item code on the materials row */
+  etims_item_code?: string | null;
   supplier?: {
     company_name: string;
     email?: string;
@@ -184,7 +186,8 @@ export const PendingProductsManager: React.FC = () => {
     description: '',
     unit_price: '',
     category: '',
-    unit: ''
+    unit: '',
+    etims_item_code: '',
   });
   const [processing, setProcessing] = useState(false);
   const { toast } = useToast();
@@ -559,6 +562,7 @@ export const PendingProductsManager: React.FC = () => {
 
     setProcessing(true);
     try {
+      const etimsTrim = editForm.etims_item_code.trim();
       const { error } = await (supabase as any)
         .from('materials')
         .update({
@@ -567,6 +571,7 @@ export const PendingProductsManager: React.FC = () => {
           unit_price: parseFloat(editForm.unit_price),
           category: editForm.category,
           unit: editForm.unit,
+          etims_item_code: etimsTrim || null,
           updated_at: new Date().toISOString()
         })
         .eq('id', selectedProduct.id);
@@ -630,7 +635,8 @@ export const PendingProductsManager: React.FC = () => {
       description: product.description || '',
       unit_price: product.unit_price.toString(),
       category: product.category,
-      unit: product.unit
+      unit: product.unit,
+      etims_item_code: typeof product.etims_item_code === 'string' ? product.etims_item_code : '',
     });
     setShowEditDialog(true);
   };
@@ -765,16 +771,17 @@ export const PendingProductsManager: React.FC = () => {
                     >
                       <Eye className="h-4 w-4" />
                     </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => openEditDialog(product)}
+                      className="text-blue-400 hover:bg-blue-500/20"
+                      title="Edit catalog / eTIMS code"
+                    >
+                      <Edit className="h-4 w-4" />
+                    </Button>
                     {tab === 'pending' && (
                       <>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => openEditDialog(product)}
-                          className="text-blue-400 hover:bg-blue-500/20"
-                        >
-                          <Edit className="h-4 w-4" />
-                        </Button>
                         <Button
                           size="sm"
                           variant="ghost"
@@ -1250,7 +1257,7 @@ export const PendingProductsManager: React.FC = () => {
               Edit Product
             </DialogTitle>
             <DialogDescription className="text-slate-400">
-              Edit product details before approval
+              Update catalog fields or the KRA eTIMS item code (pending, approved, or rejected rows).
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
@@ -1310,6 +1317,20 @@ export const PendingProductsManager: React.FC = () => {
                 </SelectContent>
               </Select>
             </div>
+            <div>
+              <Label htmlFor="edit-etims-code">KRA eTIMS item code (optional)</Label>
+              <Input
+                id="edit-etims-code"
+                value={editForm.etims_item_code}
+                onChange={(e) => setEditForm({ ...editForm, etims_item_code: e.target.value })}
+                placeholder="e.g. KE1UCT…"
+                className="bg-slate-800 border-slate-600 text-white mt-1 font-mono text-sm"
+                autoComplete="off"
+              />
+              <p className="text-xs text-slate-500 mt-1">
+                Stored on this materials row; purchase orders pick it up for eTIMS invoice lines when missing from the PO JSON.
+              </p>
+            </div>
           </div>
           <DialogFooter>
             <Button
@@ -1320,7 +1341,7 @@ export const PendingProductsManager: React.FC = () => {
               Cancel
             </Button>
             <Button
-              onClick={handleEditSave}
+              onClick={() => void handleEditSave()}
               disabled={processing}
               className="bg-blue-600 hover:bg-blue-700"
             >

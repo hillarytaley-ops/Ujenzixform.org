@@ -169,8 +169,9 @@ export const EtimsPurchaseOrderSubmitCard: React.FC<EtimsPurchaseOrderSubmitCard
           <code className="rounded bg-muted px-1">etims_item_code</code> on the PO JSON, or store it on{" "}
           <code className="rounded bg-muted px-1">supplier_product_prices</code> /{" "}
           <code className="rounded bg-muted px-1">materials</code> for the same{" "}
-          <code className="rounded bg-muted px-1">material_id</code> (the app fills missing codes at submit). Optional per
-          line: <code className="rounded bg-muted px-1">taxCode</code> (A–E).
+          <code className="rounded bg-muted px-1">material_id</code> (the app fills missing codes at submit). Suppliers can
+          set the code when adding or editing a product in their catalog; admins can set it from Product Submissions (edit on
+          any tab). Optional per line: <code className="rounded bg-muted px-1">taxCode</code> (A–E).
         </AlertDescription>
       </Alert>
 

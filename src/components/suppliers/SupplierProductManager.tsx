@@ -62,6 +62,8 @@ interface Product {
   // Variant support
   pricing_type?: 'single' | 'variants';
   variants?: ProductVariant[];
+  /** KRA / eTIMS integrator item code (optional; required on PO lines at eTIMS submit) */
+  etims_item_code?: string | null;
 }
 
 interface SupplierProductManagerProps {
@@ -167,7 +169,8 @@ export const SupplierProductManager: React.FC<SupplierProductManagerProps> = ({ 
     in_stock: true,
     // Variant pricing support
     pricing_type: 'single' as 'single' | 'variants',
-    variants: [] as ProductVariant[]
+    variants: [] as ProductVariant[],
+    etims_item_code: '',
   });
   
   // New variant form state
@@ -259,6 +262,7 @@ export const SupplierProductManager: React.FC<SupplierProductManagerProps> = ({ 
         ? formData.variants[0].price
         : parseFloat(formData.unit_price);
       
+      const etimsTrim = formData.etims_item_code.trim();
       const productData = {
         supplier_id: supplierId,
         name: formData.name,
@@ -271,6 +275,7 @@ export const SupplierProductManager: React.FC<SupplierProductManagerProps> = ({ 
         in_stock: formData.in_stock,
         pricing_type: formData.pricing_type,
         variants: formData.pricing_type === 'variants' ? formData.variants : [],
+        etims_item_code: etimsTrim || null,
         updated_at: new Date().toISOString()
       };
 
@@ -319,7 +324,10 @@ export const SupplierProductManager: React.FC<SupplierProductManagerProps> = ({ 
         unit_price: '',
         image_url: '',
         additional_images: [],
-        in_stock: true
+        in_stock: true,
+        pricing_type: 'single',
+        variants: [],
+        etims_item_code: '',
       });
       setShowAddDialog(false);
       setEditingProduct(null);
@@ -346,7 +354,8 @@ export const SupplierProductManager: React.FC<SupplierProductManagerProps> = ({ 
       additional_images: product.additional_images || [],
       in_stock: product.in_stock,
       pricing_type: product.pricing_type || 'single',
-      variants: product.variants || []
+      variants: product.variants || [],
+      etims_item_code: typeof product.etims_item_code === 'string' ? product.etims_item_code : '',
     });
     setNewVariantLabel('');
     setNewVariantPrice('');
@@ -472,7 +481,8 @@ export const SupplierProductManager: React.FC<SupplierProductManagerProps> = ({ 
       additional_images: [],
       in_stock: true,
       pricing_type: 'single',
-      variants: []
+      variants: [],
+      etims_item_code: '',
     });
     setNewVariantLabel('');
     setNewVariantPrice('');
@@ -853,6 +863,21 @@ export const SupplierProductManager: React.FC<SupplierProductManagerProps> = ({ 
                   />
                 </div>
 
+                <div className="space-y-2">
+                  <Label htmlFor="etims-item-code">KRA eTIMS item code (optional)</Label>
+                  <Input
+                    id="etims-item-code"
+                    placeholder="e.g. KE1UCT… from your integrator / OSCU catalog"
+                    value={formData.etims_item_code}
+                    onChange={(e) => setFormData({ ...formData, etims_item_code: e.target.value })}
+                    className="font-mono text-sm"
+                    autoComplete="off"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Used when this material is invoiced through eTIMS. Leave blank if you do not use eTIMS for this SKU.
+                  </p>
+                </div>
+
                 {/* Stock Status */}
                 <div className="flex items-center gap-2">
                   <input
@@ -1005,6 +1030,11 @@ export const SupplierProductManager: React.FC<SupplierProductManagerProps> = ({ 
                 <CardDescription className="line-clamp-2">
                   {product.description || 'No description'}
                 </CardDescription>
+                {product.etims_item_code?.trim() ? (
+                  <p className="text-xs font-mono text-muted-foreground mt-1 truncate" title={product.etims_item_code.trim()}>
+                    eTIMS: {product.etims_item_code.trim()}
+                  </p>
+                ) : null}
                 {/* Show rejection reason if rejected */}
                 {product.approval_status === 'rejected' && product.rejection_reason && (
                   <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded-md">
