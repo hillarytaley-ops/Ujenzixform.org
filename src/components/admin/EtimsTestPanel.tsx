@@ -4,20 +4,24 @@
  */
 
 import React, { useMemo, useState } from "react";
-import { Loader2, Landmark, Play } from "lucide-react";
+import { Check, ChevronsUpDown, Loader2, Landmark, Play } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useToast } from "@/hooks/use-toast";
 import { invokeEtimsProxy } from "@/lib/etims/invokeEtimsProxy";
 import { EtimsPurchaseOrderSubmitCard } from "@/components/admin/EtimsPurchaseOrderSubmitCard";
+import { cn } from "@/lib/utils";
 
 function secretsDashboardUrl(): string | null {
   const raw = import.meta.env.VITE_SUPABASE_URL;
@@ -73,6 +77,101 @@ function extractIntegratorPayload(root: unknown): {
   return { httpStatus, statusCode, message, rows, raw: root };
 }
 
+function EtimsListPicker({
+  id,
+  label,
+  placeholder,
+  rows,
+  value,
+  onChange,
+  optionalClear,
+  disabled,
+}: {
+  id: string;
+  label: string;
+  placeholder: string;
+  rows: NameCodeRow[] | null;
+  value: string;
+  onChange: (code: string) => void;
+  optionalClear?: boolean;
+  disabled?: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const ready = Boolean(rows && rows.length > 0);
+  const selected = rows?.find((r) => r.code === value);
+
+  return (
+    <div className="space-y-1.5">
+      <Label htmlFor={id}>{label}</Label>
+      <Popover open={open} onOpenChange={setOpen}>
+        <PopoverTrigger asChild>
+          <Button
+            id={id}
+            type="button"
+            variant="outline"
+            role="combobox"
+            aria-expanded={open}
+            disabled={disabled || !ready}
+            className="h-10 w-full justify-between font-normal"
+          >
+            <span className="truncate text-left">
+              {!ready
+                ? placeholder
+                : optionalClear && !value
+                  ? "— None —"
+                  : selected
+                    ? `${selected.code} — ${selected.name}`
+                    : placeholder}
+            </span>
+            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className="w-[min(calc(100vw-2rem),24rem)] p-0" align="start">
+          <Command>
+            <CommandInput placeholder="Search code or name…" className="h-10" />
+            <CommandList>
+              <CommandEmpty>No matches.</CommandEmpty>
+              <CommandGroup>
+                {optionalClear ? (
+                  <CommandItem
+                    value="__clear__ none"
+                    onSelect={() => {
+                      onChange("");
+                      setOpen(false);
+                    }}
+                  >
+                    <Check className={cn("mr-2 h-4 w-4", !value ? "opacity-100" : "opacity-0")} />
+                    None
+                  </CommandItem>
+                ) : null}
+                {rows?.map((row) => (
+                  <CommandItem
+                    key={row.code}
+                    value={`${row.code} ${row.name} ${row.description ?? ""}`}
+                    onSelect={() => {
+                      onChange(row.code);
+                      setOpen(false);
+                    }}
+                  >
+                    <Check className={cn("mr-2 h-4 w-4", value === row.code ? "opacity-100" : "opacity-0")} />
+                    <span className="font-mono text-xs">{row.code}</span>
+                    <span className="ml-2 min-w-0 flex-1 truncate">{row.name}</span>
+                  </CommandItem>
+                ))}
+              </CommandGroup>
+            </CommandList>
+          </Command>
+        </PopoverContent>
+      </Popover>
+      {ready ? (
+        <p className="text-xs text-muted-foreground">
+          {rows!.length} option{rows!.length === 1 ? "" : "s"} loaded — search in the list above.
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
 export type EtimsTestPanelProps = {
   /** Supplier row id: restricts PO submit to that supplier’s orders */
   enforceSupplierId?: string | null;
@@ -83,6 +182,13 @@ export const EtimsTestPanel: React.FC<EtimsTestPanelProps> = ({ enforceSupplierI
   const [loading, setLoading] = useState(false);
   const [lastLabel, setLastLabel] = useState<string | null>(null);
   const [lastPayload, setLastPayload] = useState<unknown>(null);
+
+  const [currencyRows, setCurrencyRows] = useState<NameCodeRow[] | null>(null);
+  const [countryRows, setCountryRows] = useState<NameCodeRow[] | null>(null);
+  const [selectedCurrencyCode, setSelectedCurrencyCode] = useState("");
+  const [selectedCountryCode, setSelectedCountryCode] = useState("");
+  const [exchangeRateStr, setExchangeRateStr] = useState("1");
+
   const secretsUrl = secretsDashboardUrl();
 
   const parsed = useMemo(() => extractIntegratorPayload(lastPayload), [lastPayload]);
@@ -94,6 +200,11 @@ export const EtimsTestPanel: React.FC<EtimsTestPanelProps> = ({ enforceSupplierI
     parsed.rows !== null &&
     parsed.rows.length > 0;
   const hasDescriptionCol = showTable && parsed.rows!.some((r) => r.description);
+
+  const exchangeRateNum = useMemo(() => {
+    const n = Number(exchangeRateStr.trim());
+    return Number.isFinite(n) && n > 0 ? n : 1;
+  }, [exchangeRateStr]);
 
   const run = async (label: string, path: string) => {
     setLoading(true);
@@ -112,6 +223,26 @@ export const EtimsTestPanel: React.FC<EtimsTestPanelProps> = ({ enforceSupplierI
       }
       toast({ title: "OK", description: `${label} loaded successfully.` });
       setLastPayload(res.data);
+
+      const ex = extractIntegratorPayload(res.data);
+      if (ex.httpStatus === 200 && ex.rows && ex.rows.length > 0) {
+        if (label === "Currencies") {
+          setCurrencyRows(ex.rows);
+          setSelectedCurrencyCode((prev) => {
+            if (prev && ex.rows!.some((r) => r.code === prev)) return prev;
+            const kes = ex.rows!.find((r) => r.code === "KES");
+            return kes ? "KES" : ex.rows![0].code;
+          });
+        }
+        if (label === "Countries") {
+          setCountryRows(ex.rows);
+          setSelectedCountryCode((prev) => {
+            if (prev && ex.rows!.some((r) => r.code === prev)) return prev;
+            const ke = ex.rows!.find((r) => r.code === "KE");
+            return ke ? "KE" : ex.rows![0].code;
+          });
+        }
+      }
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       toast({ variant: "destructive", title: "Request error", description: msg });
@@ -122,6 +253,9 @@ export const EtimsTestPanel: React.FC<EtimsTestPanelProps> = ({ enforceSupplierI
   };
 
   const rawJson = lastPayload !== null ? JSON.stringify(lastPayload, null, 2) : "";
+
+  const invoiceCurrencyForSubmit = selectedCurrencyCode.trim() || undefined;
+  const invoiceCountryForSubmit = selectedCountryCode.trim() || undefined;
 
   return (
     <div className="space-y-4">
@@ -164,54 +298,91 @@ export const EtimsTestPanel: React.FC<EtimsTestPanelProps> = ({ enforceSupplierI
         </Button>
       </div>
 
+      <div className="rounded-md border border-border bg-card p-4 space-y-4">
+        <p className="text-sm font-medium text-foreground">Selections for invoice test</p>
+        <p className="text-xs text-muted-foreground leading-relaxed">
+          Load each list once. Use the searchable dropdowns to pick currency and (optionally) country. These values are
+          passed into <span className="font-mono text-foreground">POST /invoices</span> when you submit a purchase order
+          below (currency and exchange rate always; country only if selected — omit if your integrator rejects extra
+          fields).
+        </p>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <EtimsListPicker
+            id="etims-pick-currency"
+            label="Invoice currency"
+            placeholder="Load currencies first…"
+            rows={currencyRows}
+            value={selectedCurrencyCode}
+            onChange={setSelectedCurrencyCode}
+            disabled={loading}
+          />
+          <div className="space-y-1.5">
+            <Label htmlFor="etims-ex-rate">Exchange rate</Label>
+            <Input
+              id="etims-ex-rate"
+              type="number"
+              min={0.000001}
+              step="any"
+              value={exchangeRateStr}
+              onChange={(e) => setExchangeRateStr(e.target.value)}
+              disabled={!currencyRows?.length}
+              className="font-mono text-sm"
+            />
+            <p className="text-xs text-muted-foreground">Usually 1 when invoice currency matches your books.</p>
+          </div>
+          <div className="sm:col-span-2">
+            <EtimsListPicker
+              id="etims-pick-country"
+              label="Country code (optional)"
+              placeholder="Load countries first…"
+              rows={countryRows}
+              value={selectedCountryCode}
+              onChange={setSelectedCountryCode}
+              optionalClear
+              disabled={loading}
+            />
+          </div>
+        </div>
+      </div>
+
       {lastPayload !== null && (
         <div className="space-y-3">
           {lastLabel && (
             <p className="text-sm font-medium text-foreground">
-              Last: <span className="text-muted-foreground">{lastLabel}</span>
+              Last request: <span className="text-muted-foreground">{lastLabel}</span>
             </p>
           )}
 
           {showTable ? (
-            <div className="rounded-md border border-border bg-card">
-              {(parsed.message || parsed.statusCode) && (
-                <p className="border-b border-border px-3 py-2 text-sm text-muted-foreground">
-                  {parsed.message}
-                  {parsed.statusCode ? (
-                    <span className="ml-2 rounded bg-muted px-1.5 py-0.5 text-xs text-foreground">
-                      {parsed.statusCode}
-                    </span>
-                  ) : null}
-                </p>
-              )}
-              <div className="max-h-[min(24rem,55vh)] overflow-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="w-[100px]">Code</TableHead>
-                      <TableHead>Name</TableHead>
-                      {hasDescriptionCol ? <TableHead>Description</TableHead> : null}
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
+            <details className="rounded-md border border-border bg-card">
+              <summary className="cursor-pointer select-none px-3 py-2 text-sm font-medium text-foreground hover:bg-muted/40">
+                Table preview (last request only, {parsed.rows!.length} rows)
+              </summary>
+              <div className="max-h-[min(24rem,55vh)] overflow-auto border-t border-border">
+                <table className="w-full text-sm">
+                  <thead className="border-b border-border bg-muted/30">
+                    <tr>
+                      <th className="px-3 py-2 text-left font-medium w-[100px]">Code</th>
+                      <th className="px-3 py-2 text-left font-medium">Name</th>
+                      {hasDescriptionCol ? (
+                        <th className="px-3 py-2 text-left font-medium">Description</th>
+                      ) : null}
+                    </tr>
+                  </thead>
+                  <tbody>
                     {parsed.rows!.map((row, i) => (
-                      <TableRow key={`${row.code}-${i}`}>
-                        <TableCell className="font-mono text-sm">{row.code}</TableCell>
-                        <TableCell className="text-sm">{row.name}</TableCell>
+                      <tr key={`${row.code}-${i}`} className="border-b border-border/60">
+                        <td className="px-3 py-2 font-mono">{row.code}</td>
+                        <td className="px-3 py-2">{row.name}</td>
                         {hasDescriptionCol ? (
-                          <TableCell className="text-sm text-muted-foreground">
-                            {row.description ?? "—"}
-                          </TableCell>
+                          <td className="px-3 py-2 text-muted-foreground">{row.description ?? "—"}</td>
                         ) : null}
-                      </TableRow>
+                      </tr>
                     ))}
-                  </TableBody>
-                </Table>
+                  </tbody>
+                </table>
               </div>
-              <p className="border-t border-border px-3 py-2 text-xs text-muted-foreground">
-                {parsed.rows!.length} row{parsed.rows!.length === 1 ? "" : "s"}
-              </p>
-            </div>
+            </details>
           ) : emptyList ? (
             <div className="rounded-md border border-border bg-muted/30 px-3 py-4 text-center text-sm text-muted-foreground">
               {parsed.message ?? "Request succeeded"} — no rows in this list.
@@ -237,7 +408,12 @@ export const EtimsTestPanel: React.FC<EtimsTestPanelProps> = ({ enforceSupplierI
       )}
 
       <div className="border-t border-border pt-6">
-        <EtimsPurchaseOrderSubmitCard enforceSupplierId={enforceSupplierId} />
+        <EtimsPurchaseOrderSubmitCard
+          enforceSupplierId={enforceSupplierId}
+          invoiceCurrency={invoiceCurrencyForSubmit}
+          invoiceExchangeRate={exchangeRateNum}
+          invoiceCountryCode={invoiceCountryForSubmit}
+        />
       </div>
     </div>
   );

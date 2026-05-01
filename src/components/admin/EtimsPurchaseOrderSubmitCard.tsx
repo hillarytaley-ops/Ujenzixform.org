@@ -15,10 +15,18 @@ import { pushEtimsItemStockLevel, submitEtimsInvoiceForPurchaseOrder } from "@/l
 export type EtimsPurchaseOrderSubmitCardProps = {
   /** When set, PO must belong to this supplier row id */
   enforceSupplierId?: string | null;
+  /** From integrator GET currencies; defaults to KES in builder if omitted */
+  invoiceCurrency?: string | null;
+  invoiceExchangeRate?: number | null;
+  /** Optional; only sent if non-empty (integrator may ignore or reject) */
+  invoiceCountryCode?: string | null;
 };
 
 export const EtimsPurchaseOrderSubmitCard: React.FC<EtimsPurchaseOrderSubmitCardProps> = ({
   enforceSupplierId,
+  invoiceCurrency,
+  invoiceExchangeRate,
+  invoiceCountryCode,
 }) => {
   const { toast } = useToast();
   const [poId, setPoId] = useState("");
@@ -41,6 +49,9 @@ export const EtimsPurchaseOrderSubmitCard: React.FC<EtimsPurchaseOrderSubmitCard
         enforceSupplierId: enforceSupplierId ?? undefined,
         customerPin: customerPin.trim() || undefined,
         customerName: customerName.trim() || undefined,
+        currency: invoiceCurrency?.trim() || undefined,
+        exchangeRate: invoiceExchangeRate ?? undefined,
+        countryCode: invoiceCountryCode?.trim() || undefined,
       });
       if (!r.ok) {
         toast({ variant: "destructive", title: "eTIMS submit failed", description: r.message });
@@ -88,6 +99,23 @@ export const EtimsPurchaseOrderSubmitCard: React.FC<EtimsPurchaseOrderSubmitCard
           <code className="rounded bg-muted px-1">taxCode</code> (A–E).
         </AlertDescription>
       </Alert>
+
+      {(invoiceCurrency || invoiceCountryCode || (invoiceExchangeRate != null && invoiceExchangeRate !== 1)) && (
+        <p className="text-xs text-muted-foreground">
+          Invoice payload: currency{" "}
+          <span className="font-mono text-foreground">{invoiceCurrency?.trim() || "KES (default)"}</span>
+          {invoiceExchangeRate != null && invoiceExchangeRate !== 1 ? (
+            <>
+              , rate <span className="font-mono text-foreground">{invoiceExchangeRate}</span>
+            </>
+          ) : null}
+          {invoiceCountryCode?.trim() ? (
+            <>
+              , country <span className="font-mono text-foreground">{invoiceCountryCode.trim()}</span>
+            </>
+          ) : null}
+        </p>
+      )}
 
       <div className="grid gap-3 sm:grid-cols-2">
         <div className="sm:col-span-2 space-y-1.5">

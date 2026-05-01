@@ -38,6 +38,8 @@ export interface EtimsGenerateInvoiceRequest {
   salesDate: string;
   currency: string;
   exchangeRate?: number;
+  /** When integrator expects a country code on the sales payload (optional). */
+  countryCode?: string;
   salesItems: EtimsSalesItem[];
   customerPin?: string;
   customerName?: string;

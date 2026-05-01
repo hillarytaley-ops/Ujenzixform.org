@@ -44,6 +44,9 @@ export function buildEtimsInvoiceBodyFromPurchaseOrder(
     paymentType?: EtimsGenerateInvoiceRequest["paymentType"];
     /** Override trader invoice ref (default: po_number) */
     traderInvoiceNo?: string;
+    currency?: string;
+    exchangeRate?: number;
+    countryCode?: string;
   } = {},
 ): EtimsGenerateInvoiceRequest {
   const lines = parsePurchaseOrderItems(po.items);
@@ -80,6 +83,13 @@ export function buildEtimsInvoiceBodyFromPurchaseOrder(
 
   const totalAmount = Number.isFinite(po.total_amount) ? po.total_amount : salesItems.reduce((s, i) => s + i.amount, 0);
 
+  const currency = (options.currency ?? "KES").trim().slice(0, 16) || "KES";
+  const exchangeRate =
+    typeof options.exchangeRate === "number" && Number.isFinite(options.exchangeRate) && options.exchangeRate > 0
+      ? options.exchangeRate
+      : 1;
+  const countryCode = options.countryCode?.trim().slice(0, 8);
+
   return {
     traderInvoiceNo: (options.traderInvoiceNo ?? po.po_number).slice(0, 200),
     totalAmount,
@@ -88,8 +98,9 @@ export function buildEtimsInvoiceBodyFromPurchaseOrder(
     receiptTypeCode: "S",
     salesStatusCode: "01",
     salesDate: formatEtimsSalesDate(),
-    currency: "KES",
-    exchangeRate: 1,
+    currency,
+    exchangeRate,
+    ...(countryCode ? { countryCode } : {}),
     salesItems,
     customerPin: options.customerPin || undefined,
     customerName: options.customerName || undefined,
@@ -133,6 +144,9 @@ export async function submitEtimsInvoiceForPurchaseOrder(
     customerPin?: string;
     customerName?: string;
     paymentType?: EtimsGenerateInvoiceRequest["paymentType"];
+    currency?: string;
+    exchangeRate?: number;
+    countryCode?: string;
   } = {},
 ): Promise<SubmitEtimsInvoiceResult> {
   const { data: po, error: poErr } = await supabase
@@ -158,7 +172,14 @@ export async function submitEtimsInvoiceForPurchaseOrder(
         total_amount: Number(po.total_amount),
         items: po.items,
       },
-      { customerPin: options.customerPin, customerName: options.customerName, paymentType: options.paymentType },
+      {
+        customerPin: options.customerPin,
+        customerName: options.customerName,
+        paymentType: options.paymentType,
+        currency: options.currency,
+        exchangeRate: options.exchangeRate,
+        countryCode: options.countryCode,
+      },
     );
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
