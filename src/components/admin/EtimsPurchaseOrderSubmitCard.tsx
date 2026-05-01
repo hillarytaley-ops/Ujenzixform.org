@@ -3,14 +3,48 @@
  * Lines in purchase_orders.items must include `etims_item_code` per row (see purchaseOrderEtims.ts).
  */
 
-import React, { useState } from "react";
-import { Loader2, Send, Package } from "lucide-react";
+import React, { useEffect, useState } from "react";
+import { Check, ChevronsUpDown, Loader2, Package, RefreshCw, Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useToast } from "@/hooks/use-toast";
 import { pushEtimsItemStockLevel, submitEtimsInvoiceForPurchaseOrder } from "@/lib/etims/purchaseOrderEtims";
+import { supabase } from "@/integrations/supabase/client";
+import { cn } from "@/lib/utils";
+
+type PoPickRow = {
+  id: string;
+  po_number: string;
+  status: string;
+  total_amount: number;
+  created_at: string;
+};
+
+function formatPoDate(iso: string): string {
+  try {
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return "";
+    return d.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
+  } catch {
+    return "";
+  }
+}
+
+function formatKesAmount(n: number): string {
+  const x = Number.isFinite(n) ? n : 0;
+  return `KES ${x.toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
+}
 
 export type EtimsPurchaseOrderSubmitCardProps = {
   /** When set, PO must belong to this supplier row id */
@@ -36,6 +70,44 @@ export const EtimsPurchaseOrderSubmitCard: React.FC<EtimsPurchaseOrderSubmitCard
   const [stockItemCode, setStockItemCode] = useState("");
   const [stockQty, setStockQty] = useState("");
   const [stockBusy, setStockBusy] = useState(false);
+
+  const [orders, setOrders] = useState<PoPickRow[] | null>(null);
+  const [ordersLoading, setOrdersLoading] = useState(false);
+  const [poPickerOpen, setPoPickerOpen] = useState(false);
+
+  const loadRecentOrders = async () => {
+    setOrdersLoading(true);
+    try {
+      let q = supabase
+        .from("purchase_orders")
+        .select("id, po_number, status, total_amount, created_at")
+        .order("created_at", { ascending: false })
+        .limit(75);
+      if (enforceSupplierId?.trim()) {
+        q = q.eq("supplier_id", enforceSupplierId.trim());
+      }
+      const { data, error } = await q;
+      if (error) {
+        toast({ variant: "destructive", title: "Could not load orders", description: error.message });
+        setOrders([]);
+        return;
+      }
+      setOrders((data ?? []) as PoPickRow[]);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      toast({ variant: "destructive", title: "Could not load orders", description: msg });
+      setOrders([]);
+    } finally {
+      setOrdersLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    void loadRecentOrders();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- reload when supplier scope changes; toast stable enough
+  }, [enforceSupplierId]);
+
+  const selectedOrder = orders?.find((o) => o.id === poId.trim());
 
   const onSubmitInvoice = async () => {
     const id = poId.trim();
@@ -118,11 +190,87 @@ export const EtimsPurchaseOrderSubmitCard: React.FC<EtimsPurchaseOrderSubmitCard
       )}
 
       <div className="grid gap-3 sm:grid-cols-2">
+        <div className="sm:col-span-2 space-y-2">
+          <div className="flex flex-wrap items-end justify-between gap-2">
+            <Label className="text-foreground">Purchase order</Label>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-8 shrink-0 gap-1 text-xs"
+              disabled={ordersLoading}
+              onClick={() => void loadRecentOrders()}
+            >
+              {ordersLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
+              Refresh list
+            </Button>
+          </div>
+          <Popover open={poPickerOpen} onOpenChange={setPoPickerOpen}>
+            <PopoverTrigger asChild>
+              <Button
+                type="button"
+                variant="outline"
+                role="combobox"
+                aria-expanded={poPickerOpen}
+                disabled={ordersLoading || orders === null}
+                className="h-10 w-full justify-between font-normal"
+              >
+                <span className="truncate text-left">
+                  {ordersLoading
+                    ? "Loading orders…"
+                    : orders && orders.length === 0
+                      ? enforceSupplierId
+                        ? "No purchase orders for this supplier yet"
+                        : "No purchase orders visible to your account"
+                      : selectedOrder
+                        ? `${selectedOrder.po_number} · ${selectedOrder.status} · ${formatPoDate(selectedOrder.created_at)} · ${formatKesAmount(selectedOrder.total_amount)}`
+                        : "Select an order from the system…"}
+                </span>
+                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-[min(calc(100vw-2rem),28rem)] p-0" align="start">
+              <Command>
+                <CommandInput placeholder="Search by PO number, status, or id…" className="h-10" />
+                <CommandList>
+                  <CommandEmpty>No matching orders.</CommandEmpty>
+                  <CommandGroup>
+                    {(orders ?? []).map((row) => (
+                      <CommandItem
+                        key={row.id}
+                        value={`${row.po_number} ${row.status} ${row.id} ${formatPoDate(row.created_at)}`}
+                        onSelect={() => {
+                          setPoId(row.id);
+                          setPoPickerOpen(false);
+                        }}
+                      >
+                        <Check className={cn("mr-2 h-4 w-4 shrink-0", poId.trim() === row.id ? "opacity-100" : "opacity-0")} />
+                        <div className="min-w-0 flex-1">
+                          <div className="font-medium text-foreground">{row.po_number}</div>
+                          <div className="truncate text-xs text-muted-foreground">
+                            {row.status} · {formatPoDate(row.created_at)} · {formatKesAmount(row.total_amount)}
+                          </div>
+                          <div className="font-mono text-[10px] text-muted-foreground/80 truncate">{row.id}</div>
+                        </div>
+                      </CommandItem>
+                    ))}
+                  </CommandGroup>
+                </CommandList>
+              </Command>
+            </PopoverContent>
+          </Popover>
+          <p className="text-xs text-muted-foreground">
+            {enforceSupplierId
+              ? "Showing recent orders for this supplier (same list as your dashboard access)."
+              : "Showing recent orders you can read (admin: broader access; others: per RLS)."}
+          </p>
+        </div>
+
         <div className="sm:col-span-2 space-y-1.5">
-          <Label htmlFor="etims-po-id">Purchase order UUID</Label>
+          <Label htmlFor="etims-po-id">Order UUID (optional manual entry)</Label>
           <Input
             id="etims-po-id"
-            placeholder="e.g. 8b2c…-…-…"
+            placeholder="Filled when you pick above — or paste UUID"
             value={poId}
             onChange={(e) => setPoId(e.target.value)}
             className="font-mono text-sm"
