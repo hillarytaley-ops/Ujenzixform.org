@@ -2088,7 +2088,7 @@ export const MaterialImagesManager: React.FC = () => {
               <Label htmlFor="upload-etims-code" className="text-xs">KRA eTIMS item code (optional)</Label>
               <Input
                 id="upload-etims-code"
-                placeholder="e.g. KE1UCT… from KRA / OSCU"
+                placeholder="From integrator or OSCU export"
                 value={uploadForm.etims_item_code}
                 onChange={(e) => setUploadForm(prev => ({ ...prev, etims_item_code: e.target.value }))}
                 className="bg-slate-800 border-slate-600 h-8 text-sm font-mono"
@@ -3283,7 +3283,7 @@ export const MaterialImagesManager: React.FC = () => {
                 <Label htmlFor="edit-etims-ami" className="text-xs">KRA eTIMS item code (optional)</Label>
                 <Input
                   id="edit-etims-ami"
-                  placeholder="e.g. KE1UCT…"
+                  placeholder="Integrator item code"
                   value={editForm.etims_item_code}
                   onChange={(e) => setEditForm(prev => ({ ...prev, etims_item_code: e.target.value }))}
                   className="bg-slate-800 border-slate-600 h-8 text-sm font-mono"

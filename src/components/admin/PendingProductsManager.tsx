@@ -1323,7 +1323,7 @@ export const PendingProductsManager: React.FC = () => {
                 id="edit-etims-code"
                 value={editForm.etims_item_code}
                 onChange={(e) => setEditForm({ ...editForm, etims_item_code: e.target.value })}
-                placeholder="e.g. KE1UCT…"
+                placeholder="Integrator item code"
                 className="bg-slate-800 border-slate-600 text-white mt-1 font-mono text-sm"
                 autoComplete="off"
               />

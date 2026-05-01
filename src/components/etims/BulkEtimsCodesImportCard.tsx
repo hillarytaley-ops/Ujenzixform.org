@@ -212,7 +212,7 @@ export const BulkEtimsCodesImportCard: React.FC<BulkEtimsCodesImportCardProps> =
           <Textarea
             value={materialsCsv}
             onChange={(e) => setMaterialsCsv(e.target.value)}
-            placeholder={'e.g.\nid,etims_item_code\n550e8400-e29b-41d4-a716-446655440000,KE1UCT0000001'}
+            placeholder={'id,etims_item_code\n<uuid>,<code from integrator>'}
             className="min-h-[120px] font-mono text-xs"
             spellCheck={false}
           />

@@ -2,7 +2,7 @@
  * Map UjenziXform purchase_orders → integrator sales invoice payload.
  *
  * Convention: each element in `purchase_orders.items` JSON array may include:
- *   `etims_item_code` (string, required for submission) — KRA/integrator item code (e.g. KE1UCT…).
+ *   `etims_item_code` (string, required for submission) — item code from your integrator/OSCU catalog.
  *   `quantity` or `qty`, `unit_price` or `unitPrice`, optional `discountAmount`, `pkg` (default 0).
  */
 import { formatEtimsSalesDate } from "./salesDate";
@@ -108,17 +108,6 @@ function str(v: unknown): string {
   return typeof v === "string" ? v.trim() : "";
 }
 
-/** Human-readable line label from PO JSON (for integrators that want itemNm + itemCd). */
-function lineMaterialDisplayName(line: PoItemJson): string {
-  const s =
-    str(line.material_name) ||
-    str(line.name) ||
-    str(line.item_name) ||
-    str(line.title) ||
-    str(line.description);
-  return s.slice(0, 240) || "Item";
-}
-
 /**
  * Build integrator POST /invoices body from a PO row + buyer PIN.
  * Throws if any line is missing `etims_item_code`.
@@ -156,17 +145,10 @@ export function buildEtimsInvoiceBodyFromPurchaseOrder(
     const discountAmount = num(line.discountAmount ?? line.discount_amount, 0);
     const pkg = num(line.pkg, 0);
     const amount = num(line.amount, unitPrice * qty - discountAmount);
-    const displayName = lineMaterialDisplayName(line);
-    // Some integrator stacks bind snake_case only; Postman uses camelCase `itemCode`.
-    // Several bridges look up the item register by `name` using the KRA code string, not only `itemCode`.
+    // Integrator payload: itemCode + item_code only (no extra non-schema fields).
     const row: EtimsSalesItem = {
       itemCode,
       item_code: itemCode,
-      name: itemCode,
-      itemName: itemCode,
-      item_name: itemCode,
-      itemNm: displayName,
-      item_nm: displayName,
       qty,
       pkg,
       unitPrice,

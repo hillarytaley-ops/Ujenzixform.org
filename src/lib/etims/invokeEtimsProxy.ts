@@ -4,7 +4,7 @@ export type EtimsProxyMethod = "GET" | "POST" | "PUT" | "DELETE";
 
 export type EtimsProxyInput = {
   method: EtimsProxyMethod;
-  /** Path under integrator base URL, e.g. `invoices` or `items/KE1UCT0000014` */
+  /** Path under integrator base URL, e.g. `invoices` or `items/{itemCode}/stocks` */
   path: string;
   query?: Record<string, string>;
   body?: unknown;

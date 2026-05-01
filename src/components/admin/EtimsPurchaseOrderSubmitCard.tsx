@@ -391,7 +391,7 @@ export const EtimsPurchaseOrderSubmitCard: React.FC<EtimsPurchaseOrderSubmitCard
             <Input
               id="etims-stock-code"
               list="etims-stock-code-datalist"
-              placeholder="Pick from suggestions or type KE1UCT…"
+              placeholder="Integrator item code (from your OSCU / integrator list)"
               value={stockItemCode}
               onChange={(e) => setStockItemCode(e.target.value)}
               className="font-mono text-sm"

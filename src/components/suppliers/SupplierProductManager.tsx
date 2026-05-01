@@ -868,7 +868,7 @@ export const SupplierProductManager: React.FC<SupplierProductManagerProps> = ({ 
                   <Label htmlFor="etims-item-code">KRA eTIMS item code (optional)</Label>
                   <Input
                     id="etims-item-code"
-                    placeholder="e.g. KE1UCT… from your integrator / OSCU catalog"
+                    placeholder="Paste the item code from your integrator or OSCU export"
                     value={formData.etims_item_code}
                     onChange={(e) => setFormData({ ...formData, etims_item_code: e.target.value })}
                     className="font-mono text-sm"
