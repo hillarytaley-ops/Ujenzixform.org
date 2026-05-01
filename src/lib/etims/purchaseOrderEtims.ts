@@ -12,11 +12,18 @@ import { supabase } from "@/integrations/supabase/client";
 
 export type PoItemJson = Record<string, unknown>;
 
-/** Legacy demo / tutorial values — never valid on a real integrator tenant; ignore everywhere. */
+/** Legacy demo / tutorial values — never valid on a real integrator tenant; ignore everywhere (compare uppercase). */
 const DISCOURAGED_ETIMS_ITEM_CODES = new Set(["KE1UCT0000014"]);
 
+function normalizeForDiscouragedCheck(code: string): string {
+  return code
+    .replace(/[\u200B-\u200D\uFEFF]/g, "")
+    .trim()
+    .toUpperCase();
+}
+
 export function isDiscouragedEtimsItemCode(code: string): boolean {
-  const t = code.trim();
+  const t = normalizeForDiscouragedCheck(code);
   return t.length > 0 && DISCOURAGED_ETIMS_ITEM_CODES.has(t);
 }
 
