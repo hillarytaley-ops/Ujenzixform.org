@@ -60,6 +60,33 @@ function asNameCodeRows(data: unknown): NameCodeRow[] | null {
   return rows;
 }
 
+/** VFD `GET /items` — each row uses `itemCode` + `name` (not `code`). */
+function asIntegratorItemCatalogRows(root: unknown): NameCodeRow[] {
+  const rec = isRecord(root) ? root : null;
+  const arr =
+    rec && Array.isArray(rec.data)
+      ? rec.data
+      : Array.isArray(root)
+        ? root
+        : null;
+  if (!arr) return [];
+  const rows: NameCodeRow[] = [];
+  for (const item of arr) {
+    if (!isRecord(item)) continue;
+    const code =
+      typeof item.itemCode === "string"
+        ? item.itemCode.trim()
+        : typeof item.item_code === "string"
+          ? item.item_code.trim()
+          : "";
+    if (!code) continue;
+    const name =
+      typeof item.name === "string" && item.name.trim() ? item.name.trim() : code;
+    rows.push({ code, name });
+  }
+  return rows;
+}
+
 function extractIntegratorPayload(root: unknown): {
   httpStatus: number | null;
   statusCode: string | null;
@@ -187,6 +214,7 @@ export const EtimsTestPanel: React.FC<EtimsTestPanelProps> = ({ enforceSupplierI
 
   const [currencyRows, setCurrencyRows] = useState<NameCodeRow[] | null>(null);
   const [countryRows, setCountryRows] = useState<NameCodeRow[] | null>(null);
+  const [itemCatalogRows, setItemCatalogRows] = useState<NameCodeRow[] | null>(null);
   const [selectedCurrencyCode, setSelectedCurrencyCode] = useState("");
   const [selectedCountryCode, setSelectedCountryCode] = useState("");
   const [exchangeRateStr, setExchangeRateStr] = useState("1");
@@ -254,6 +282,45 @@ export const EtimsTestPanel: React.FC<EtimsTestPanelProps> = ({ enforceSupplierI
     }
   };
 
+  const loadIntegratorItems = async () => {
+    setLoading(true);
+    setLastLabel("Items");
+    setLastPayload(null);
+    try {
+      const res = await invokeEtimsProxy({
+        method: "GET",
+        path: "items",
+        query: { page: "0", limit: "100" },
+      });
+      if (!res.ok) {
+        toast({
+          variant: "destructive",
+          title: "eTIMS proxy failed",
+          description: `${res.status}: ${res.message}`,
+        });
+        setLastPayload({ status: res.status, message: res.message, data: res.data });
+        return;
+      }
+      toast({ title: "OK", description: "Integrator items loaded." });
+      setLastPayload(res.data);
+      const items = asIntegratorItemCatalogRows(res.data);
+      setItemCatalogRows(items.length ? items : []);
+      if (items.length === 0) {
+        toast({
+          title: "No items returned",
+          description:
+            "The integrator catalog may be empty. Register products with POST /items (Postman) or ask your OSCU vendor.",
+        });
+      }
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      toast({ variant: "destructive", title: "Request error", description: msg });
+      setLastPayload({ error: msg });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const rawJson = lastPayload !== null ? JSON.stringify(lastPayload, null, 2) : "";
 
   const invoiceCurrencyForSubmit = selectedCurrencyCode.trim() || undefined;
@@ -277,7 +344,11 @@ export const EtimsTestPanel: React.FC<EtimsTestPanelProps> = ({ enforceSupplierI
             </>
           ) : (
             " (Edge secrets)."
-          )}
+          )}{" "}
+          Invoice lines need an <span className="font-mono text-foreground">itemCode</span> that already exists on the
+          integrator. Use <strong>Load integrator items</strong> to list codes from <span className="font-mono">GET /items</span>
+          , then paste each code into <strong>My Materials</strong> for the matching product (or register new items via{" "}
+          <span className="font-mono">POST /items</span> in Postman if the list is empty).
         </AlertDescription>
       </Alert>
 
@@ -298,7 +369,47 @@ export const EtimsTestPanel: React.FC<EtimsTestPanelProps> = ({ enforceSupplierI
           )}
           Load countries
         </Button>
+        <Button type="button" variant="outline" disabled={loading} onClick={() => void loadIntegratorItems()}>
+          {loading && lastLabel === "Items" ? (
+            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+          ) : (
+            <Play className="h-4 w-4 mr-2" />
+          )}
+          Load integrator items
+        </Button>
       </div>
+
+      {itemCatalogRows !== null ? (
+        <div className="rounded-md border border-border bg-card p-4 space-y-2">
+          <p className="text-sm font-medium text-foreground">Integrator item codes</p>
+          <p className="text-xs text-muted-foreground leading-relaxed">
+            Copy the <span className="font-mono">itemCode</span> for each product into{" "}
+            <strong>My Materials → eTIMS item code</strong> so purchase-order invoice submit can map lines automatically.
+          </p>
+          {itemCatalogRows.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No rows — try registering items on the integrator first.</p>
+          ) : (
+            <div className="max-h-[min(20rem,45vh)] overflow-auto rounded border border-border">
+              <table className="w-full text-sm">
+                <thead className="sticky top-0 border-b border-border bg-muted/30">
+                  <tr>
+                    <th className="px-3 py-2 text-left font-medium">itemCode</th>
+                    <th className="px-3 py-2 text-left font-medium">Name</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {itemCatalogRows.map((row) => (
+                    <tr key={row.code} className="border-b border-border/60">
+                      <td className="px-3 py-2 font-mono text-xs">{row.code}</td>
+                      <td className="px-3 py-2">{row.name}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      ) : null}
 
       <div className="rounded-md border border-border bg-card p-4 space-y-4">
         <p className="text-sm font-medium text-foreground">Selections for invoice test</p>
