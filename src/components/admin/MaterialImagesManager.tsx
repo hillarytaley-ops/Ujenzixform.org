@@ -357,7 +357,9 @@ export const MaterialImagesManager: React.FC = () => {
       const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
       
       const response = await fetch(
-        `${SUPABASE_URL}/rest/v1/admin_material_images?select=id,name,category,is_featured,is_approved,created_at,description,unit,suggested_price,pricing_type,variants,etims_item_code&order=created_at.desc`,
+        // Omit etims_item_code here so this screen still loads if that column is not migrated yet
+        // (selecting a missing column makes PostgREST fail and clears the grid). Codes load in Edit dialog.
+        `${SUPABASE_URL}/rest/v1/admin_material_images?select=id,name,category,is_featured,is_approved,created_at,description,unit,suggested_price,pricing_type,variants&order=created_at.desc`,
         { headers, signal: controller.signal }
       );
       
