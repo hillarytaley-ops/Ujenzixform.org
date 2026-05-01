@@ -76,6 +76,16 @@ export async function enrichPurchaseOrderItemsWithEtimsCatalogCodes(
     }
   }
 
+  const stillAmi = ids.filter((id) => !codeByProduct.has(id));
+  for (const part of chunkIds(stillAmi, 80)) {
+    const { data: amiRows } = await supabase.from("admin_material_images").select("id,etims_item_code").in("id", part);
+    for (const row of amiRows ?? []) {
+      const r = row as { id?: string; etims_item_code?: string | null };
+      const code = typeof r.etims_item_code === "string" ? r.etims_item_code.trim() : "";
+      if (r.id && code) codeByProduct.set(String(r.id), code);
+    }
+  }
+
   const enriched = lines.map((line) => {
     if (lineEtimsItemCode(line)) return line;
     const raw = line.material_id ?? line.product_id;

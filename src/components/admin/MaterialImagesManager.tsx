@@ -104,6 +104,8 @@ interface MaterialImage {
   is_approved: boolean;
   created_at: string;
   material_id?: string;
+  /** KRA / eTIMS integrator item code (admin catalog + PO enrichment) */
+  etims_item_code?: string | null;
 }
 
 // Image angle labels for multi-angle gallery
@@ -266,7 +268,8 @@ export const MaterialImagesManager: React.FC = () => {
     imageFile: null as File | null,
     previewUrl: '',
     pricingType: 'single' as 'single' | 'variants',
-    variants: [] as PriceVariant[]
+    variants: [] as PriceVariant[],
+    etims_item_code: '',
   });
 
   // Edit form state
@@ -277,7 +280,8 @@ export const MaterialImagesManager: React.FC = () => {
     unit: 'unit',
     suggestedPrice: 0,
     pricingType: 'single' as 'single' | 'variants',
-    variants: [] as PriceVariant[]
+    variants: [] as PriceVariant[],
+    etims_item_code: '',
   });
 
   // Bulk upload state
@@ -352,7 +356,7 @@ export const MaterialImagesManager: React.FC = () => {
       const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
       
       const response = await fetch(
-        `${SUPABASE_URL}/rest/v1/admin_material_images?select=id,name,category,is_featured,is_approved,created_at,description,unit,suggested_price,pricing_type,variants&order=created_at.desc`,
+        `${SUPABASE_URL}/rest/v1/admin_material_images?select=id,name,category,is_featured,is_approved,created_at,description,unit,suggested_price,pricing_type,variants,etims_item_code&order=created_at.desc`,
         { headers, signal: controller.signal }
       );
       
@@ -690,7 +694,18 @@ export const MaterialImagesManager: React.FC = () => {
       });
 
       // Reset form and close dialog
-      setUploadForm({ name: '', category: 'Cement', description: '', unit: 'unit', suggestedPrice: 0, imageFile: null, previewUrl: '', pricingType: 'single', variants: [] });
+      setUploadForm({
+        name: '',
+        category: 'Cement',
+        description: '',
+        unit: 'unit',
+        suggestedPrice: 0,
+        imageFile: null,
+        previewUrl: '',
+        pricingType: 'single',
+        variants: [],
+        etims_item_code: '',
+      });
       setShowUploadDialog(false);
       fetchAdminImages();
     } catch (err: any) {
@@ -725,6 +740,7 @@ export const MaterialImagesManager: React.FC = () => {
       throw new Error('Not authenticated - please sign in again');
     }
 
+    const etimsUpload = uploadForm.etims_item_code.trim();
     const payload = {
       name: uploadForm.name,
       category: uploadForm.category,
@@ -735,7 +751,8 @@ export const MaterialImagesManager: React.FC = () => {
       variants: uploadForm.variants || [],
       image_url: imageUrl,
       is_featured: false,
-      is_approved: true
+      is_approved: true,
+      ...(etimsUpload ? { etims_item_code: etimsUpload } : { etims_item_code: null }),
     };
 
     // Use fetch API with timeout (30 seconds for large images)
@@ -1236,7 +1253,7 @@ export const MaterialImagesManager: React.FC = () => {
   };
 
   // Open edit dialog with image data
-  const openEditDialog = (image: MaterialImage) => {
+  const openEditDialog = async (image: MaterialImage) => {
     setEditingImage(image);
     // Parse variants from database (stored as JSON)
     let variants: PriceVariant[] = [];
@@ -1250,7 +1267,23 @@ export const MaterialImagesManager: React.FC = () => {
     } catch (e) {
       variants = [];
     }
-    
+
+    let etimsCode = '';
+    const fromAmi = (image as MaterialImage).etims_item_code;
+    if (typeof fromAmi === 'string' && fromAmi.trim()) {
+      etimsCode = fromAmi.trim();
+    } else {
+      try {
+        const { data: mat } = await supabase.from('materials').select('etims_item_code').eq('id', image.id).maybeSingle();
+        const c = mat && typeof (mat as { etims_item_code?: string | null }).etims_item_code === 'string'
+          ? (mat as { etims_item_code: string }).etims_item_code.trim()
+          : '';
+        if (c) etimsCode = c;
+      } catch {
+        /* ignore */
+      }
+    }
+
     setEditForm({
       name: image.name || '',
       category: image.category || 'Cement',
@@ -1258,7 +1291,8 @@ export const MaterialImagesManager: React.FC = () => {
       unit: (image as any).unit || 'unit',
       suggestedPrice: (image as any).suggested_price || 0,
       pricingType: ((image as any).pricing_type || 'single') as 'single' | 'variants',
-      variants: variants
+      variants: variants,
+      etims_item_code: etimsCode,
     });
     setShowEditDialog(true);
   };
@@ -1296,6 +1330,7 @@ export const MaterialImagesManager: React.FC = () => {
         throw new Error('Not authenticated - please sign in again');
       }
       
+      const etimsTrim = editForm.etims_item_code.trim();
       const payload = {
         name: editForm.name.trim(),
         category: editForm.category,
@@ -1304,6 +1339,7 @@ export const MaterialImagesManager: React.FC = () => {
         suggested_price: editForm.suggestedPrice || 0,
         pricing_type: editForm.pricingType || 'single',
         variants: editForm.variants || [],
+        etims_item_code: etimsTrim || null,
         updated_at: new Date().toISOString()
       };
       
@@ -1336,7 +1372,18 @@ export const MaterialImagesManager: React.FC = () => {
       
       const data = await response.json();
       console.log('✅ Product updated:', data);
-      
+
+      const { error: matSyncErr } = await supabase
+        .from('materials')
+        .update({
+          etims_item_code: etimsTrim || null,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', editingImage.id);
+      if (matSyncErr) {
+        console.warn('MaterialImagesManager: materials etims sync skipped:', matSyncErr.message);
+      }
+
       toast({
         title: 'Image updated',
         description: `${editForm.name} has been updated successfully`,
@@ -1810,7 +1857,7 @@ export const MaterialImagesManager: React.FC = () => {
                       <Button
                         size="sm"
                         variant="ghost"
-                        onClick={() => openEditDialog(image)}
+                        onClick={() => void openEditDialog(image)}
                         className="text-white hover:bg-white/20"
                         title="Edit details"
                       >
@@ -2022,6 +2069,19 @@ export const MaterialImagesManager: React.FC = () => {
                 onChange={(e) => setUploadForm(prev => ({ ...prev, description: e.target.value }))}
                 className="w-full h-16 px-2 py-1 text-sm rounded-md bg-slate-800 border border-slate-600 text-white placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-orange-500 resize-none"
               />
+            </div>
+
+            <div>
+              <Label htmlFor="upload-etims-code" className="text-xs">KRA eTIMS item code (optional)</Label>
+              <Input
+                id="upload-etims-code"
+                placeholder="e.g. KE1UCT… from KRA / OSCU"
+                value={uploadForm.etims_item_code}
+                onChange={(e) => setUploadForm(prev => ({ ...prev, etims_item_code: e.target.value }))}
+                className="bg-slate-800 border-slate-600 h-8 text-sm font-mono"
+                autoComplete="off"
+              />
+              <p className="text-[10px] text-slate-500 mt-1">Stored on this catalog row for purchase orders and eTIMS invoice lines.</p>
             </div>
 
             {/* Unit Selection */}
@@ -2408,7 +2468,18 @@ export const MaterialImagesManager: React.FC = () => {
               size="sm"
               onClick={() => {
                 setShowUploadDialog(false);
-                setUploadForm({ name: '', category: 'Cement', description: '', unit: 'unit', suggestedPrice: 0, imageFile: null, previewUrl: '', pricingType: 'single', variants: [] });
+                setUploadForm({
+                  name: '',
+                  category: 'Cement',
+                  description: '',
+                  unit: 'unit',
+                  suggestedPrice: 0,
+                  imageFile: null,
+                  previewUrl: '',
+                  pricingType: 'single',
+                  variants: [],
+                  etims_item_code: '',
+                });
               }}
               className="border-slate-600"
             >
@@ -3193,6 +3264,21 @@ export const MaterialImagesManager: React.FC = () => {
                   onChange={(e) => setEditForm(prev => ({ ...prev, description: e.target.value }))}
                   className="w-full h-16 px-2 py-1 text-sm rounded-md bg-slate-800 border border-slate-600 text-white placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-orange-500 resize-none"
                 />
+              </div>
+
+              <div>
+                <Label htmlFor="edit-etims-ami" className="text-xs">KRA eTIMS item code (optional)</Label>
+                <Input
+                  id="edit-etims-ami"
+                  placeholder="e.g. KE1UCT…"
+                  value={editForm.etims_item_code}
+                  onChange={(e) => setEditForm(prev => ({ ...prev, etims_item_code: e.target.value }))}
+                  className="bg-slate-800 border-slate-600 h-8 text-sm font-mono"
+                  autoComplete="off"
+                />
+                <p className="text-[10px] text-slate-500 mt-1">
+                  Saved on admin catalog and synced to <span className="font-mono">materials</span> when a row shares this id.
+                </p>
               </div>
 
               {/* Unit Selection */}
