@@ -46,6 +46,7 @@ import { MobileBookView } from './MobileBookView';
 import { FileText, BookOpen } from 'lucide-react';
 import { ProductModal, materialToProduct, Product } from '@/components/products';
 import { PostOrderPaystackModal } from '@/components/payment/PostOrderPaystackModal';
+import { BulkEtimsCodesImportCard } from '@/components/etims/BulkEtimsCodesImportCard';
 import { useAuth } from '@/contexts/AuthContext';
 import { sendEmailViaEdgeFunction, emailTemplates } from '@/lib/email';
 import {
@@ -415,7 +416,9 @@ export const MaterialsGrid: React.FC<MaterialsGridProps> = ({ embeddedInDashboar
   
   // Derive auth state from AuthContext with localStorage fallback
   const userRole = authUserRole || localStorage.getItem('user_role');
-  const isSupplierRole = String(userRole || '').trim().toLowerCase() === 'supplier';
+  const roleLower = String(userRole || '').trim().toLowerCase();
+  const isSupplierRole = roleLower === 'supplier';
+  const isStaffAdminRole = roleLower === 'admin' || roleLower === 'super_admin';
   
   // Check authentication from multiple sources for reliability
   const isAuthenticated = !!authUser || !!localStorage.getItem('user_id') || (() => {
@@ -2047,6 +2050,15 @@ export const MaterialsGrid: React.FC<MaterialsGridProps> = ({ embeddedInDashboar
           )}
         </div>
       </div>
+
+      {isStaffAdminRole && (
+        <BulkEtimsCodesImportCard
+          mode="admin"
+          onApplied={() => {
+            void loadMaterials();
+          }}
+        />
+      )}
 
       {/* Filters - All in one row on large screens */}
       <Card className="overflow-visible">

@@ -36,6 +36,7 @@
 import { readPersistedAuthRawStringSync } from '@/utils/supabaseAccessToken';
 import { resolveSupplierCompanyNames } from '@/lib/resolveSupplierCompanyNames';
 import { getDefaultCategoryImage } from '@/config/defaultCategoryImages';
+import { BulkEtimsCodesImportCard } from '@/components/etims/BulkEtimsCodesImportCard';
 import React, { useState, useEffect, useRef } from 'react';
 import { SUPABASE_ANON_KEY, SUPABASE_URL, supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -1527,6 +1528,16 @@ export const MaterialImagesManager: React.FC = () => {
             Upload Single
           </Button>
         </div>
+      </div>
+
+      <div className="rounded-lg border border-slate-600 bg-slate-800/50 p-3 text-slate-100 [&_h3]:text-white [&_p]:text-slate-300 [&_label]:text-slate-200 [&_textarea]:border-slate-600 [&_textarea]:bg-slate-950 [&_textarea]:text-white">
+        <BulkEtimsCodesImportCard
+          mode="admin"
+          className="border-0 bg-transparent shadow-none text-inherit"
+          onApplied={() => {
+            void fetchAdminImages();
+          }}
+        />
       </div>
 
       {/* 🎯 UPLOAD TARGET PROGRESS - Main Progress Card */}

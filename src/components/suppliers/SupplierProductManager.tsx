@@ -26,6 +26,7 @@ import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { Plus, Edit, Trash2, Package, Image as ImageIcon, Clock, CheckCircle, XCircle, AlertCircle, Upload, X, Camera, Loader2, DollarSign } from 'lucide-react';
+import { BulkEtimsCodesImportCard } from '@/components/etims/BulkEtimsCodesImportCard';
 import { CategoryImageSelector } from './CategoryImageSelector';
 import { getDefaultCategoryImage } from '@/config/defaultCategoryImages';
 import {
@@ -944,6 +945,14 @@ export const SupplierProductManager: React.FC<SupplierProductManagerProps> = ({ 
           </DialogContent>
         </Dialog>
       </div>
+
+      <BulkEtimsCodesImportCard
+        mode="supplier"
+        supplierId={supplierId}
+        onApplied={() => {
+          void fetchProducts();
+        }}
+      />
 
       {/* Products List */}
       {loading ? (
