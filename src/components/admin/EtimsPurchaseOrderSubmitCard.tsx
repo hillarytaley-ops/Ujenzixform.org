@@ -70,6 +70,9 @@ export const EtimsPurchaseOrderSubmitCard: React.FC<EtimsPurchaseOrderSubmitCard
   const [stockItemCode, setStockItemCode] = useState("");
   const [stockQty, setStockQty] = useState("");
   const [stockBusy, setStockBusy] = useState(false);
+  /** Suggestions for stock item code (materials / supplier prices with etims_item_code set) */
+  const [stockCodeSuggestions, setStockCodeSuggestions] = useState<{ code: string; label: string }[]>([]);
+  const [stockCodesLoading, setStockCodesLoading] = useState(false);
 
   const [orders, setOrders] = useState<PoPickRow[] | null>(null);
   const [ordersLoading, setOrdersLoading] = useState(false);
@@ -102,9 +105,66 @@ export const EtimsPurchaseOrderSubmitCard: React.FC<EtimsPurchaseOrderSubmitCard
     }
   };
 
+  const loadStockItemCodeSuggestions = async () => {
+    setStockCodesLoading(true);
+    try {
+      const byCode = new Map<string, string>();
+      let matQ = supabase
+        .from("materials")
+        .select("etims_item_code, name")
+        .not("etims_item_code", "is", null)
+        .limit(200);
+      const sid = enforceSupplierId?.trim();
+      if (sid) matQ = matQ.eq("supplier_id", sid);
+      const { data: mats, error: matErr } = await matQ;
+      if (matErr) throw matErr;
+      for (const row of mats ?? []) {
+        const code = typeof (row as { etims_item_code?: string | null }).etims_item_code === "string"
+          ? (row as { etims_item_code: string }).etims_item_code.trim()
+          : "";
+        if (!code) continue;
+        const name = typeof (row as { name?: string | null }).name === "string" ? (row as { name: string }).name.trim() : "";
+        if (!byCode.has(code)) byCode.set(code, name || code);
+      }
+      if (sid) {
+        const { data: prices, error: priceErr } = await supabase
+          .from("supplier_product_prices")
+          .select("etims_item_code")
+          .eq("supplier_id", sid)
+          .not("etims_item_code", "is", null)
+          .limit(200);
+        if (!priceErr) {
+          for (const row of prices ?? []) {
+            const code =
+              typeof (row as { etims_item_code?: string | null }).etims_item_code === "string"
+                ? (row as { etims_item_code: string }).etims_item_code.trim()
+                : "";
+            if (code && !byCode.has(code)) byCode.set(code, code);
+          }
+        }
+      }
+      setStockCodeSuggestions(
+        [...byCode.entries()].map(([code, label]) => ({
+          code,
+          label: label === code ? code : `${label} (${code})`,
+        }))
+      );
+    } catch (e) {
+      console.warn("eTIMS stock code suggestions:", e);
+      setStockCodeSuggestions([]);
+    } finally {
+      setStockCodesLoading(false);
+    }
+  };
+
   useEffect(() => {
     void loadRecentOrders();
     // eslint-disable-next-line react-hooks/exhaustive-deps -- reload when supplier scope changes; toast stable enough
+  }, [enforceSupplierId]);
+
+  useEffect(() => {
+    void loadStockItemCodeSuggestions();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [enforceSupplierId]);
 
   const selectedOrder = orders?.find((o) => o.id === poId.trim());
@@ -301,14 +361,41 @@ export const EtimsPurchaseOrderSubmitCard: React.FC<EtimsPurchaseOrderSubmitCard
         </p>
         <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
           <div className="min-w-0 flex-1 space-y-1.5">
-            <Label htmlFor="etims-stock-code">Item code</Label>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <Label htmlFor="etims-stock-code">Item code</Label>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-7 shrink-0 gap-1 text-xs"
+                disabled={stockCodesLoading}
+                onClick={() => void loadStockItemCodeSuggestions()}
+              >
+                {stockCodesLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
+                Refresh catalog codes
+              </Button>
+            </div>
+            <datalist id="etims-stock-code-datalist">
+              {stockCodeSuggestions.map((s) => (
+                <option key={s.code} value={s.code}>
+                  {s.label}
+                </option>
+              ))}
+            </datalist>
             <Input
               id="etims-stock-code"
-              placeholder="KE1UCT…"
+              list="etims-stock-code-datalist"
+              placeholder="Pick from suggestions or type KE1UCT…"
               value={stockItemCode}
               onChange={(e) => setStockItemCode(e.target.value)}
               className="font-mono text-sm"
+              autoComplete="off"
             />
+            <p className="text-xs text-muted-foreground">
+              {enforceSupplierId?.trim()
+                ? "Dropdown lists materials and supplier price rows that have an eTIMS code for this supplier. You can still paste any integrator code."
+                : "Dropdown lists catalog rows with codes (recent materials). Narrow codes by using this card on a supplier-scoped page when possible."}
+            </p>
           </div>
           <div className="w-full space-y-1.5 sm:w-32">
             <Label htmlFor="etims-stock-n">Stock</Label>
