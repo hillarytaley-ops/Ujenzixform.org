@@ -24,6 +24,7 @@ import {
   Send,
   Download,
   AlertTriangle,
+  ExternalLink,
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { sortSupplyChainDocsNewestFirst } from '@/utils/sortSupplyChainDocs';
@@ -146,6 +147,11 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
   const payInvoiceUrlHandledRef = useRef<string | null>(null);
   /** First fetch per user shows skeleton; later fetches (e.g. profile id resolved) refresh without blanking. */
   const invoiceFetchGenerationRef = useRef(0);
+
+  /** Builder: POs with an integrator receipt URL (KRA eTIMS) — shown inside this tab with Pay now when an unpaid invoice exists. */
+  type BuilderEtimsReceiptPo = { id: string; po_number: string; etims_verification_url: string | null };
+  const [builderEtimsReceipts, setBuilderEtimsReceipts] = useState<BuilderEtimsReceiptPo[]>([]);
+  const [builderEtimsReceiptsLoading, setBuilderEtimsReceiptsLoading] = useState(false);
 
   useLayoutEffect(() => {
     if (userRole !== 'builder') return;
@@ -343,6 +349,35 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
     invoiceFetchGenerationRef.current += 1;
     void fetchInvoices({ silent });
   }, [userId, userRole, supplierRecordId, builderProfileId]);
+
+  useEffect(() => {
+    if (userRole !== 'builder' || !userId) {
+      setBuilderEtimsReceipts([]);
+      return;
+    }
+    let cancelled = false;
+    setBuilderEtimsReceiptsLoading(true);
+    void (async () => {
+      const { data, error } = await supabase
+        .from('purchase_orders')
+        .select('id, po_number, etims_verification_url')
+        .eq('buyer_id', userId)
+        .not('etims_verification_url', 'is', null)
+        .order('updated_at', { ascending: false })
+        .limit(20);
+      if (cancelled) return;
+      if (error) {
+        console.warn('[eTIMS] Builder receipt list:', error.message);
+        setBuilderEtimsReceipts([]);
+      } else {
+        setBuilderEtimsReceipts((data ?? []) as BuilderEtimsReceiptPo[]);
+      }
+      setBuilderEtimsReceiptsLoading(false);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [userRole, userId, invoices.length]);
 
   const showBuilderSupplierPaymentTabs = userRole === 'builder' || userRole === 'supplier';
 
@@ -680,6 +715,71 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
           )}
         </Button>
       </div>
+
+      {userRole === 'builder' && (builderEtimsReceiptsLoading || builderEtimsReceipts.length > 0) && (
+        <Alert className="border-sky-200 bg-sky-50/70 dark:border-sky-900 dark:bg-sky-950/35">
+          <Receipt className="h-4 w-4 text-sky-700 dark:text-sky-300" />
+          <AlertTitle className="text-foreground">KRA eTIMS receipt (integrator)</AlertTitle>
+          <AlertDescription className="space-y-3 text-xs text-muted-foreground">
+            <p>
+              After a successful tax submission, your integrator may return a verification link for each purchase order.
+              Use <strong className="text-foreground">Pay supplier now</strong> for the same order when your supplier
+              invoice appears below (payment is separate from KRA eTIMS).
+            </p>
+            {builderEtimsReceiptsLoading ? (
+              <p>Loading receipt links…</p>
+            ) : (
+              <ul className="list-none space-y-2 pl-0">
+                {builderEtimsReceipts.map((po) => {
+                  const url = po.etims_verification_url?.trim();
+                  if (!url) return null;
+                  const inv = invoices.find(
+                    (i) =>
+                      i.purchase_order_id === po.id &&
+                      !invoiceIsPaid(i) &&
+                      String(i.status || '').toLowerCase() !== 'cancelled',
+                  );
+                  return (
+                    <li
+                      key={po.id}
+                      className="flex flex-col gap-2 rounded-md border border-sky-200/80 bg-background/80 p-3 dark:border-sky-800/80 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between"
+                    >
+                      <div className="flex min-w-0 flex-col gap-1 sm:flex-row sm:items-center sm:gap-3">
+                        <span className="font-semibold text-foreground">{po.po_number}</span>
+                        <a
+                          href={url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex w-fit items-center gap-1 font-medium text-primary underline-offset-2 hover:underline"
+                        >
+                          Open verification / receipt
+                          <ExternalLink className="h-3.5 w-3.5 shrink-0 opacity-80" aria-hidden />
+                        </a>
+                      </div>
+                      {inv ? (
+                        <Button
+                          type="button"
+                          size="sm"
+                          disabled={!!payNowBusyId || acknowledging}
+                          className="w-full shrink-0 bg-emerald-600 font-semibold text-white hover:bg-emerald-700 sm:w-auto"
+                          onClick={() => void handlePayNowClick(inv)}
+                        >
+                          Pay supplier now
+                        </Button>
+                      ) : (
+                        <p className="text-[11px] text-muted-foreground sm:max-w-xs sm:text-right">
+                          No unpaid supplier invoice linked yet for this PO. Pull to refresh after the supplier sends the
+                          invoice, or use <strong>Refresh</strong> above.
+                        </p>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </AlertDescription>
+        </Alert>
+      )}
 
       {showBuilderSupplierPaymentTabs && (
         <Tabs

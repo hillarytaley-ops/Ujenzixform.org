@@ -47,8 +47,10 @@ import {
   Building2,
   Store,
   Search,
+  Trash2,
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { chunkArray } from '@/utils/performance';
 
 // Types
 interface FinancialDocument {
@@ -112,8 +114,12 @@ interface DeliveryPayoutRow {
   bank_branch: string | null;
 }
 
+const INVOICE_PURGE_CONFIRM = 'DELETE ALL INVOICES';
+
 export const FinancialTab: React.FC = () => {
   const { toast } = useToast();
+  const [invoicePurgePhrase, setInvoicePurgePhrase] = useState('');
+  const [invoicePurgeBusy, setInvoicePurgeBusy] = useState(false);
   const [loading, setLoading] = useState(true);
   const [documents, setDocuments] = useState<FinancialDocument[]>([]);
   const [stats, setStats] = useState<FinancialStats>({
@@ -402,6 +408,48 @@ export const FinancialTab: React.FC = () => {
       setLoading(false);
     }
   }, [toast]);
+
+  const handlePurgeAllInvoices = useCallback(async () => {
+    if (invoicePurgePhrase.trim() !== INVOICE_PURGE_CONFIRM) {
+      toast({
+        variant: 'destructive',
+        title: 'Confirmation required',
+        description: `Type exactly: ${INVOICE_PURGE_CONFIRM}`,
+      });
+      return;
+    }
+    setInvoicePurgeBusy(true);
+    try {
+      const { data: rows, error: selErr } = await supabase.from('invoices').select('id').limit(8000);
+      if (selErr) throw selErr;
+      const ids = (rows ?? []).map((r) => (r as { id: string }).id).filter(Boolean);
+      if (ids.length === 0) {
+        toast({ title: 'Nothing to delete', description: 'No rows in public.invoices.' });
+        setInvoicePurgePhrase('');
+        return;
+      }
+      let deleted = 0;
+      for (const part of chunkArray(ids, 80)) {
+        const { error: delErr } = await supabase.from('invoices').delete().in('id', part);
+        if (delErr) throw delErr;
+        deleted += part.length;
+      }
+      toast({
+        title: 'Invoices deleted',
+        description: `Removed ${deleted} row(s). Refresh builder/supplier dashboards.`,
+      });
+      setInvoicePurgePhrase('');
+      await loadFinancialData();
+    } catch (e: unknown) {
+      toast({
+        variant: 'destructive',
+        title: 'Purge failed',
+        description: e instanceof Error ? e.message : String(e),
+      });
+    } finally {
+      setInvoicePurgeBusy(false);
+    }
+  }, [invoicePurgePhrase, toast, loadFinancialData]);
 
   useEffect(() => {
     loadFinancialData();
@@ -947,6 +995,56 @@ export const FinancialTab: React.FC = () => {
                 <p className="text-gray-400">No financial documents found</p>
               </div>
             )}
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card className="border-red-900/60 bg-red-950/30">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-red-200">
+            <Trash2 className="h-5 w-5" />
+            Danger zone — supplier invoices
+          </CardTitle>
+          <CardDescription className="text-red-200/80">
+            Permanently deletes <strong>all</strong> rows in <code className="rounded bg-black/30 px-1">public.invoices</code>{" "}
+            (admin / super_admin only). Use for clearing test data. Related rows that reference invoices may CASCADE;
+            confirm backups before running in production.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
+            <div className="flex-1 space-y-1">
+              <label className="text-xs font-medium text-red-100" htmlFor="admin-invoice-purge-confirm">
+                Type <span className="font-mono">{INVOICE_PURGE_CONFIRM}</span> to enable delete
+              </label>
+              <Input
+                id="admin-invoice-purge-confirm"
+                value={invoicePurgePhrase}
+                onChange={(e) => setInvoicePurgePhrase(e.target.value)}
+                placeholder={INVOICE_PURGE_CONFIRM}
+                className="border-red-800 bg-slate-950 text-white placeholder:text-red-300/50"
+                autoComplete="off"
+              />
+            </div>
+            <Button
+              type="button"
+              variant="destructive"
+              disabled={invoicePurgeBusy || invoicePurgePhrase.trim() !== INVOICE_PURGE_CONFIRM}
+              onClick={() => void handlePurgeAllInvoices()}
+              className="shrink-0"
+            >
+              {invoicePurgeBusy ? (
+                <>
+                  <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                  Deleting…
+                </>
+              ) : (
+                <>
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  Delete all invoices
+                </>
+              )}
+            </Button>
           </div>
         </CardContent>
       </Card>

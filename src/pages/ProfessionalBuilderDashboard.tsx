@@ -59,6 +59,7 @@ import {
   Receipt,
   Volume2,
   FolderOpen,
+  Bell,
 } from "lucide-react";
 import { BuilderProfileEdit } from "@/components/builders/BuilderProfileEdit";
 import { BuilderOrdersTracker } from "@/components/builders/BuilderOrdersTracker";
@@ -112,7 +113,6 @@ import {
 } from "@/utils/myMonitoringServiceRequests";
 import { ProfessionalBuilderDashboardNavCards } from "@/components/builders/ProfessionalBuilderDashboardNavCards";
 import { InvoiceManagement } from "@/components/invoices/InvoiceManagement";
-import { BuilderEtimsReceiptsCard } from "@/components/builders/BuilderEtimsReceiptsCard";
 import { DeliveryNoteWorkflow } from "@/components/delivery/DeliveryNoteWorkflow";
 import { GRNView } from "@/components/delivery/GRNView";
 import { SUPPORT_PHONE_PRIMARY, SUPPORT_EMAIL } from "@/config/appIdentity";
@@ -751,12 +751,13 @@ const ProfessionalBuilderDashboardPage = () => {
         .eq('status', 'generated');
       if (grnErr) devWarn('Invoice hub badge (GRN):', grnErr.message);
 
+      /** Unpaid supplier invoices (any status except cancelled) — includes acknowledged-waiting-payment. */
       const { data: invByBuilder, error: ibErr } = await supabase
         .from('invoices')
         .select('id')
         .in('builder_id', builders)
-        .in('status', ['sent', 'draft'])
-        .is('acknowledged_at', null);
+        .neq('payment_status', 'paid')
+        .neq('status', 'cancelled');
       if (ibErr) devWarn('Invoice hub badge (inv builder_id):', ibErr.message);
 
       const { data: poRows, error: poErr } = await supabase
@@ -772,8 +773,8 @@ const ProfessionalBuilderDashboardPage = () => {
           .from('invoices')
           .select('id')
           .in('purchase_order_id', poIds)
-          .in('status', ['sent', 'draft'])
-          .is('acknowledged_at', null);
+          .neq('payment_status', 'paid')
+          .neq('status', 'cancelled');
         if (ipErr) devWarn('Invoice hub badge (inv PO):', ipErr.message);
         invByPo = data || [];
       }
@@ -3562,7 +3563,6 @@ const ProfessionalBuilderDashboardPage = () => {
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                {user?.id ? <BuilderEtimsReceiptsCard buyerUserId={user.id} /> : null}
                 <Tabs value={invoiceDocsSubTab} onValueChange={setInvoiceDocsSubTab} className="space-y-4">
                   <TabsList className="grid h-auto w-full grid-cols-3 gap-1 p-1 sm:gap-2 bg-muted">
                     <TabsTrigger value="delivery-notes" className="relative min-w-0 gap-1 px-2 py-2 pr-7 text-xs sm:gap-2 sm:pr-8 sm:px-3 sm:text-sm">
@@ -3593,9 +3593,15 @@ const ProfessionalBuilderDashboardPage = () => {
                     <TabsTrigger
                       value="supplier-invoices"
                       title="Supplier invoices — Pay now"
-                      className="relative min-w-0 gap-1 px-2 py-2 pr-7 text-xs sm:gap-2 sm:pr-8 sm:px-3 sm:text-sm"
+                      className="relative min-w-0 gap-1 px-2 py-2 pr-8 text-xs sm:gap-2 sm:pr-10 sm:px-3 sm:text-sm"
                     >
                       <CreditCard className="h-3.5 w-3.5 shrink-0 text-emerald-600 sm:h-4 sm:w-4" aria-hidden />
+                      {invoiceSubBadgeInv > 0 ? (
+                        <Bell
+                          className="h-3.5 w-3.5 shrink-0 text-amber-600 animate-pulse sm:h-4 sm:w-4"
+                          aria-hidden
+                        />
+                      ) : null}
                       <span className="truncate">
                         <span className="sm:hidden">Inv.</span>
                         <span className="hidden sm:inline">Invoice</span>
@@ -3645,10 +3651,10 @@ const ProfessionalBuilderDashboardPage = () => {
                           Pay suppliers for materials you ordered
                         </CardTitle>
                         <CardDescription className="text-base text-muted-foreground">
-                          When your supplier sends an invoice for a purchase order, it appears below. Each unpaid row has
-                          a green <strong className="text-emerald-800 dark:text-emerald-200">Pay now</strong> button
-                          (Paystack card / M-Pesa / bank, depending on your Paystack setup) or you can record a payment
-                          you already made to the supplier.
+                          KRA eTIMS verification links and <strong>Pay supplier now</strong> for the same order appear at
+                          the top of the list below. When your supplier sends an invoice, each unpaid row has a green{' '}
+                          <strong className="text-emerald-800 dark:text-emerald-200">Pay now</strong> button (Paystack /
+                          M-Pesa / bank, depending on your setup) or you can record a payment you already made.
                         </CardDescription>
                         {invoiceSubBadgeInv > 0 && (
                           <p className="pt-1 text-sm font-medium text-amber-800 dark:text-amber-200">
