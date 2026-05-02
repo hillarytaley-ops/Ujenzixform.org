@@ -6,6 +6,8 @@
  *   `etims_item_code` (or `itemCode` / `item_code`) — integrator **itemCode** (must exist on OSCU item master).
  *   `quantity` or `qty`, `unit_price` or `unitPrice`, optional `discountAmount`, `pkg`.
  *   Optional line fields accepted by many deployments: `taxCode` / `tax_code` (A–E), `insuranceCompanyCode`.
+ *
+ * Valid JSON example (integrator “tax code change” body, no stray quotes): `samples/integrator-invoice-tax-code-d.json`.
  */
 import { formatEtimsSalesDate } from "./salesDate";
 import type { EtimsGenerateInvoiceRequest, EtimsSalesItem } from "./types";
