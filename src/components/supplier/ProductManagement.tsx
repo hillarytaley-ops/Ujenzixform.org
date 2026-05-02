@@ -250,7 +250,19 @@ const CATEGORIES = [
 
 export const ProductManagement: React.FC<ProductManagementProps> = ({ supplierId, isDarkMode = false }) => {
   const [adminProducts, setAdminProducts] = useState<any[]>([]);
-  const [supplierPrices, setSupplierPrices] = useState<Record<string, { price: number; in_stock: boolean; description?: string; variant_prices?: any[] }>>({});
+  const [supplierPrices, setSupplierPrices] = useState<
+    Record<
+      string,
+      {
+        price: number;
+        market_price?: number;
+        in_stock: boolean;
+        description?: string;
+        variant_prices?: any[];
+        etims_item_code?: string | null;
+      }
+    >
+  >({});
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
@@ -518,14 +530,28 @@ export const ProductManagement: React.FC<ProductManagementProps> = ({ supplierId
       
       if (response.ok) {
         const data = await response.json();
-        const priceMap: Record<string, { price: number; market_price: number; in_stock: boolean; description?: string; variant_prices?: any[] }> = {};
+        const priceMap: Record<
+          string,
+          {
+            price: number;
+            market_price: number;
+            in_stock: boolean;
+            description?: string;
+            variant_prices?: any[];
+            etims_item_code?: string | null;
+          }
+        > = {};
         data.forEach((item: any) => {
-          priceMap[item.product_id] = { 
-            price: item.price, 
+          priceMap[item.product_id] = {
+            price: item.price,
             market_price: item.market_price || 0,
             in_stock: item.in_stock,
             description: item.description || '',
-            variant_prices: item.variant_prices || []
+            variant_prices: item.variant_prices || [],
+            etims_item_code:
+              typeof item.etims_item_code === 'string' && item.etims_item_code.trim()
+                ? item.etims_item_code.trim()
+                : null,
           };
         });
         setSupplierPrices(priceMap);
@@ -538,7 +564,15 @@ export const ProductManagement: React.FC<ProductManagementProps> = ({ supplierId
 
   // Set price for an admin-uploaded product (single price or variant prices)
   // Using fetch API to avoid Supabase client hanging
-  const handleSetPrice = async (productId: string, price: number, inStock: boolean, description?: string, variantPrices?: any[], marketPrice?: number) => {
+  const handleSetPrice = async (
+    productId: string,
+    price: number,
+    inStock: boolean,
+    description?: string,
+    variantPrices?: any[],
+    marketPrice?: number,
+    etimsItemCode?: string | null,
+  ) => {
     const effectiveSupplierId = getEffectiveSupplierId();
     
     if (!effectiveSupplierId) {
@@ -564,6 +598,9 @@ export const ProductManagement: React.FC<ProductManagementProps> = ({ supplierId
         }
       } catch (e) {}
       
+      const etimsPayload =
+        typeof etimsItemCode === 'string' && etimsItemCode.trim() ? etimsItemCode.trim() : null;
+
       const payload = {
         supplier_id: effectiveSupplierId,
         product_id: productId,
@@ -572,7 +609,8 @@ export const ProductManagement: React.FC<ProductManagementProps> = ({ supplierId
         in_stock: inStock,
         description: description || null,
         variant_prices: variantPrices || [],
-        updated_at: new Date().toISOString()
+        etims_item_code: etimsPayload,
+        updated_at: new Date().toISOString(),
       };
       
       // Check if price already exists for this supplier+product
@@ -602,7 +640,8 @@ export const ProductManagement: React.FC<ProductManagementProps> = ({ supplierId
               in_stock: inStock,
               description: description || null,
               variant_prices: variantPrices || [],
-              updated_at: new Date().toISOString()
+              etims_item_code: etimsPayload,
+              updated_at: new Date().toISOString(),
             }),
             signal: controller.signal
           }
@@ -636,21 +675,25 @@ export const ProductManagement: React.FC<ProductManagementProps> = ({ supplierId
           console.log('💡 market_price column not found, retrying without it...');
           
           // Retry without market_price
-          const retryPayload = existingPrice ? {
-            price: price,
-            in_stock: inStock,
-            description: description || null,
-            variant_prices: variantPrices || [],
-            updated_at: new Date().toISOString()
-          } : {
-            supplier_id: effectiveSupplierId,
-            product_id: productId,
-            price: price,
-            in_stock: inStock,
-            description: description || null,
-            variant_prices: variantPrices || [],
-            updated_at: new Date().toISOString()
-          };
+          const retryPayload = existingPrice
+            ? {
+                price: price,
+                in_stock: inStock,
+                description: description || null,
+                variant_prices: variantPrices || [],
+                etims_item_code: etimsPayload,
+                updated_at: new Date().toISOString(),
+              }
+            : {
+                supplier_id: effectiveSupplierId,
+                product_id: productId,
+                price: price,
+                in_stock: inStock,
+                description: description || null,
+                variant_prices: variantPrices || [],
+                etims_item_code: etimsPayload,
+                updated_at: new Date().toISOString(),
+              };
           
           const retryResponse = await fetch(
             existingPrice 
@@ -684,19 +727,102 @@ export const ProductManagement: React.FC<ProductManagementProps> = ({ supplierId
           
           setSupplierPrices(prev => ({
             ...prev,
-            [productId]: { price, market_price: 0, in_stock: inStock, description: description || '', variant_prices: variantPrices || [] }
+            [productId]: {
+              price,
+              market_price: 0,
+              in_stock: inStock,
+              description: description || '',
+              variant_prices: variantPrices || [],
+              etims_item_code: etimsPayload,
+            },
           }));
-          
+
           setPricingProduct(null);
           setEditingVariantPrices({});
-          
+
           toast({
             title: 'Price Updated',
-            description: 'Selling price saved. Note: Market price tracking requires a database update.'
+            description: 'Selling price saved. Note: Market price tracking requires a database update.',
           });
           return;
         }
-        
+
+        if (
+          errorText.includes('etims_item_code') &&
+          (errorText.includes('could not find') || errorText.includes('does not exist'))
+        ) {
+          console.log('💡 etims_item_code column not found, retrying without it...');
+          const retryPayloadNoEtims = existingPrice
+            ? {
+                price,
+                market_price: marketPrice || 0,
+                in_stock: inStock,
+                description: description || null,
+                variant_prices: variantPrices || [],
+                updated_at: new Date().toISOString(),
+              }
+            : {
+                supplier_id: effectiveSupplierId,
+                product_id: productId,
+                price,
+                market_price: marketPrice || 0,
+                in_stock: inStock,
+                description: description || null,
+                variant_prices: variantPrices || [],
+                updated_at: new Date().toISOString(),
+              };
+
+          const retryEtimsResponse = await fetch(
+            existingPrice
+              ? `https://wuuyjjpgzgeimiptuuws.supabase.co/rest/v1/supplier_product_prices?supplier_id=eq.${effectiveSupplierId}&product_id=eq.${productId}`
+              : 'https://wuuyjjpgzgeimiptuuws.supabase.co/rest/v1/supplier_product_prices',
+            {
+              method: existingPrice ? 'PATCH' : 'POST',
+              headers: {
+                apikey: SUPABASE_ANON_KEY,
+                Authorization: `Bearer ${accessToken}`,
+                'Content-Type': 'application/json',
+                Prefer: 'return=representation',
+              },
+              body: JSON.stringify(retryPayloadNoEtims),
+            },
+          );
+
+          if (!retryEtimsResponse.ok) {
+            const retryEtimsErr = await retryEtimsResponse.text();
+            console.error('❌ Retry without etims_item_code failed:', retryEtimsResponse.status, retryEtimsErr);
+            toast({
+              title: 'Error Saving Price',
+              description: `Database error: ${retryEtimsResponse.status}. Please try again.`,
+              variant: 'destructive',
+            });
+            return;
+          }
+
+          await retryEtimsResponse.json();
+          setSupplierPrices(prev => ({
+            ...prev,
+            [productId]: {
+              price,
+              market_price: marketPrice || 0,
+              in_stock: inStock,
+              description: description || '',
+              variant_prices: variantPrices || [],
+              etims_item_code: null,
+            },
+          }));
+
+          setPricingProduct(null);
+          setEditingVariantPrices({});
+
+          toast({
+            title: 'Price Updated',
+            description:
+              'Selling price saved. eTIMS item code requires a database migration; your code was not stored.',
+          });
+          return;
+        }
+
         console.error('❌ Database save failed:', response.status, errorText);
         toast({
           title: 'Error Saving Price',
@@ -711,7 +837,14 @@ export const ProductManagement: React.FC<ProductManagementProps> = ({ supplierId
       
       setSupplierPrices(prev => ({
         ...prev,
-        [productId]: { price, market_price: marketPrice || 0, in_stock: inStock, description: description || '', variant_prices: variantPrices || [] }
+        [productId]: {
+          price,
+          market_price: marketPrice || 0,
+          in_stock: inStock,
+          description: description || '',
+          variant_prices: variantPrices || [],
+          etims_item_code: etimsPayload,
+        },
       }));
       
       setPricingProduct(null);
@@ -2027,6 +2160,25 @@ export const ProductManagement: React.FC<ProductManagementProps> = ({ supplierId
                 </p>
               </div>
               
+              {/* KRA eTIMS / item code — stored on supplier_product_prices */}
+              <div className="space-y-2">
+                <Label htmlFor="etims-item-code-input" className="flex items-center gap-2">
+                  Item code (KRA eTIMS)
+                  <span className="text-xs text-muted-foreground font-normal">Optional</span>
+                </Label>
+                <Input
+                  id="etims-item-code-input"
+                  key={`etims-${pricingProduct.id}-${supplierPrices[pricingProduct.id]?.etims_item_code ?? 'empty'}`}
+                  defaultValue={supplierPrices[pricingProduct.id]?.etims_item_code ?? ''}
+                  placeholder="e.g. KE1UCT0000001"
+                  className="h-10 font-mono text-sm"
+                  autoComplete="off"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Use your integrator catalog item code for this SKU so invoice lines can map correctly.
+                </p>
+              </div>
+
               {/* Description Field - Optional */}
               <div className="space-y-2">
                 <Label className="flex items-center gap-2">
@@ -2066,6 +2218,8 @@ export const ProductManagement: React.FC<ProductManagementProps> = ({ supplierId
               onClick={async () => {
                 const stockCheckbox = document.getElementById('in-stock-checkbox') as HTMLInputElement;
                 const descriptionInput = document.getElementById('description-input') as HTMLTextAreaElement;
+                const etimsInput = document.getElementById('etims-item-code-input') as HTMLInputElement;
+                const etimsTrim = etimsInput?.value?.trim() || '';
                 
                 // Collect all variant prices (admin variants + custom variants)
                 let allVariantPrices: any[] = [];
@@ -2116,7 +2270,8 @@ export const ProductManagement: React.FC<ProductManagementProps> = ({ supplierId
                   stockCheckbox.checked,
                   descriptionInput.value.trim() || undefined,
                   allVariantPrices.length > 0 ? allVariantPrices : undefined,
-                  marketPrice
+                  marketPrice,
+                  etimsTrim || null,
                 );
                 
                 // If custom images were uploaded, save them to supplier_product_prices
