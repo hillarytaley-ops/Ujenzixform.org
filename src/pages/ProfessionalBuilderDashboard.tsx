@@ -112,6 +112,7 @@ import {
 } from "@/utils/myMonitoringServiceRequests";
 import { ProfessionalBuilderDashboardNavCards } from "@/components/builders/ProfessionalBuilderDashboardNavCards";
 import { InvoiceManagement } from "@/components/invoices/InvoiceManagement";
+import { BuilderEtimsReceiptsCard } from "@/components/builders/BuilderEtimsReceiptsCard";
 import { DeliveryNoteWorkflow } from "@/components/delivery/DeliveryNoteWorkflow";
 import { GRNView } from "@/components/delivery/GRNView";
 import { SUPPORT_PHONE_PRIMARY, SUPPORT_EMAIL } from "@/config/appIdentity";
@@ -3534,9 +3535,13 @@ const ProfessionalBuilderDashboardPage = () => {
                 </CardTitle>
                 <CardDescription className="space-y-3">
                   <p>
-                    Use the row below in order: <strong className="font-medium">DN</strong> (delivery notes), then{' '}
-                    <strong className="font-medium">GRN</strong>, then <strong className="font-medium">Invoice</strong>{' '}
-                    (pay the supplier). Everything stays on one horizontal tab bar.
+                    <strong className="font-medium">KRA eTIMS (tax)</strong> is submitted to your integrator when you{' '}
+                    <strong className="text-foreground">accept a supplier quote</strong> — it does not wait for delivery or
+                    GRN. <strong className="font-medium">GRN</strong> is only to confirm goods arrived in good condition and
+                    notify the supplier; it is not used to trigger eTIMS.{' '}
+                    <strong className="font-medium">Supplier invoices</strong> (payment) appear when the supplier sends
+                    them; pay from the <strong className="font-medium">Invoice</strong> sub-tab when ready. Use{' '}
+                    <strong className="font-medium">DN</strong> for delivery notes as needed.
                   </p>
                   <div className="flex flex-wrap items-center gap-2 rounded-md border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
                     <Volume2 className="h-3.5 w-3.5 shrink-0" aria-hidden />
@@ -3556,7 +3561,8 @@ const ProfessionalBuilderDashboardPage = () => {
                   </div>
                 </CardDescription>
               </CardHeader>
-              <CardContent>
+              <CardContent className="space-y-4">
+                {user?.id ? <BuilderEtimsReceiptsCard buyerUserId={user.id} /> : null}
                 <Tabs value={invoiceDocsSubTab} onValueChange={setInvoiceDocsSubTab} className="space-y-4">
                   <TabsList className="grid h-auto w-full grid-cols-3 gap-1 p-1 sm:gap-2 bg-muted">
                     <TabsTrigger value="delivery-notes" className="relative min-w-0 gap-1 px-2 py-2 pr-7 text-xs sm:gap-2 sm:pr-8 sm:px-3 sm:text-sm">
@@ -3619,7 +3625,8 @@ const ProfessionalBuilderDashboardPage = () => {
 
                   <TabsContent value="grn" forceMount className="mt-0 space-y-2">
                     <p className="text-sm text-muted-foreground">
-                      View all GRNs for accepted deliveries.
+                      Goods received notes (GRN) confirm delivery condition and notify your supplier — they do not trigger
+                      KRA eTIMS; tax invoicing runs on quote acceptance.
                     </p>
                     {user?.id && (
                       <GRNView

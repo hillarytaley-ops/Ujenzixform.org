@@ -21,6 +21,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { ToastAction } from "@/components/ui/toast";
 import { useToast } from "@/hooks/use-toast";
 import {
+  enrichPurchaseOrderItemsWithEtimsCatalogCodes,
   lineEtimsItemCode,
   parsePurchaseOrderItems,
   pushEtimsItemStockLevel,
@@ -34,6 +35,7 @@ import { Badge } from "@/components/ui/badge";
 type PoPickRow = {
   id: string;
   po_number: string;
+  supplier_id?: string;
   total_amount: number;
   created_at: string;
   items?: unknown;
@@ -168,7 +170,7 @@ export const EtimsPurchaseOrderSubmitCard: React.FC<EtimsPurchaseOrderSubmitCard
       let q = supabase
         .from("purchase_orders")
         .select(
-          "id, po_number, total_amount, created_at, items, etims_submitted_at, etims_error, etims_trader_invoice_no",
+          "id, po_number, supplier_id, total_amount, created_at, items, etims_submitted_at, etims_error, etims_trader_invoice_no",
         )
         .order("created_at", { ascending: false })
         .limit(75);
@@ -181,7 +183,22 @@ export const EtimsPurchaseOrderSubmitCard: React.FC<EtimsPurchaseOrderSubmitCard
         setOrders([]);
         return;
       }
-      setOrders((data ?? []) as PoPickRow[]);
+      const raw = (data ?? []) as PoPickRow[];
+      const enriched: PoPickRow[] = [];
+      for (const row of raw) {
+        const sid = typeof row.supplier_id === "string" ? row.supplier_id.trim() : "";
+        if (sid && row.items != null) {
+          try {
+            const items = await enrichPurchaseOrderItemsWithEtimsCatalogCodes(sid, row.items);
+            enriched.push({ ...row, items });
+          } catch {
+            enriched.push(row);
+          }
+        } else {
+          enriched.push(row);
+        }
+      }
+      setOrders(enriched);
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       toast({ variant: "destructive", title: "Could not load orders", description: msg });

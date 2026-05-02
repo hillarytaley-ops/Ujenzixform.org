@@ -349,6 +349,14 @@ export const EtimsTestPanel: React.FC<EtimsTestPanelProps> = ({ enforceSupplierI
           integrator. Use <strong>Load integrator items</strong> to list codes from <span className="font-mono">GET /items</span>
           , then paste each code into <strong>My Materials</strong> for the matching product (or register new items via{" "}
           <span className="font-mono">POST /items</span> in Postman if the list is empty).
+          <span className="mt-2 block text-xs leading-relaxed">
+            <strong className="text-foreground">Where tax invoices go:</strong> the app calls your integrator via{" "}
+            <span className="font-mono text-foreground">etims-proxy</span> (<span className="font-mono">POST /invoices</span>
+            ). Results are stored on <span className="font-mono text-foreground">purchase_orders</span> (
+            <span className="font-mono">etims_*</span>). Builders also get a best-effort auto-submit when they{" "}
+            <strong>accept a quote</strong> (same API); GRN does not gate this. If the integrator returns a receipt URL, it
+            can appear on the builder <strong>Invoices</strong> tab.
+          </span>
         </AlertDescription>
       </Alert>
 
