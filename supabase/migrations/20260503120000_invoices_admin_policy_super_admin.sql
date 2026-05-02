@@ -1,4 +1,5 @@
--- Allow super_admin same full access on invoices as admin (purge / support tools use client DELETE).
+-- Allow staff with admin-like roles full access on invoices (purge / support tools use client DELETE).
+-- Use role::text so we never cast a literal to app_role (enum may not include super_admin, etc.).
 
 DROP POLICY IF EXISTS "invoices_admin_full_access" ON public.invoices;
 
@@ -11,7 +12,7 @@ USING (
     SELECT 1
     FROM public.user_roles ur
     WHERE ur.user_id = auth.uid()
-      AND ur.role IN ('admin', 'super_admin')
+      AND ur.role::text IN ('admin', 'super_admin')
   )
 )
 WITH CHECK (
@@ -19,6 +20,6 @@ WITH CHECK (
     SELECT 1
     FROM public.user_roles ur
     WHERE ur.user_id = auth.uid()
-      AND ur.role IN ('admin', 'super_admin')
+      AND ur.role::text IN ('admin', 'super_admin')
   )
 );
