@@ -348,6 +348,8 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
     etims_response: unknown | null;
     etims_trader_invoice_no: string | null;
     etims_submitted_at: string | null;
+    builder_etims_paystack_paid_at: string | null;
+    builder_etims_paystack_reference: string | null;
   };
   const [builderEtimsReceipts, setBuilderEtimsReceipts] = useState<BuilderEtimsReceiptPo[]>([]);
   const [builderEtimsReceiptsLoading, setBuilderEtimsReceiptsLoading] = useState(false);
@@ -545,6 +547,33 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
     }
   };
 
+  const loadBuilderEtimsReceipts = useCallback(async () => {
+    if (userRole !== 'builder' || !userId) {
+      setBuilderEtimsReceipts([]);
+      setBuilderEtimsReceiptsLoading(false);
+      return;
+    }
+    setBuilderEtimsReceiptsLoading(true);
+    const { data, error } = await supabase
+      .from('purchase_orders')
+      .select(
+        'id, po_number, total_amount, etims_verification_url, etims_response, etims_trader_invoice_no, etims_submitted_at, builder_etims_paystack_paid_at, builder_etims_paystack_reference'
+      )
+      .eq('buyer_id', userId)
+      .or(
+        'etims_verification_url.not.is.null,etims_response.not.is.null,etims_submitted_at.not.is.null,builder_etims_paystack_paid_at.not.is.null'
+      )
+      .order('updated_at', { ascending: false })
+      .limit(30);
+    if (error) {
+      console.warn('[eTIMS] Builder receipt list:', error.message);
+      setBuilderEtimsReceipts([]);
+    } else {
+      setBuilderEtimsReceipts((data ?? []) as BuilderEtimsReceiptPo[]);
+    }
+    setBuilderEtimsReceiptsLoading(false);
+  }, [userRole, userId]);
+
   useEffect(() => {
     invoiceFetchGenerationRef.current = 0;
   }, [userId, userRole, supplierRecordId, builderProfileId]);
@@ -557,37 +586,26 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
   }, [userId, userRole, supplierRecordId, builderProfileId]);
 
   useEffect(() => {
-    if (userRole !== 'builder' || !userId) {
-      setBuilderEtimsReceipts([]);
-      return;
-    }
-    let cancelled = false;
-    setBuilderEtimsReceiptsLoading(true);
-    void (async () => {
-      const { data, error } = await supabase
-        .from('purchase_orders')
-        .select(
-          'id, po_number, total_amount, etims_verification_url, etims_response, etims_trader_invoice_no, etims_submitted_at'
-        )
-        .eq('buyer_id', userId)
-        .or(
-          'etims_verification_url.not.is.null,etims_response.not.is.null,etims_submitted_at.not.is.null'
-        )
-        .order('updated_at', { ascending: false })
-        .limit(20);
-      if (cancelled) return;
-      if (error) {
-        console.warn('[eTIMS] Builder receipt list:', error.message);
-        setBuilderEtimsReceipts([]);
-      } else {
-        setBuilderEtimsReceipts((data ?? []) as BuilderEtimsReceiptPo[]);
-      }
-      setBuilderEtimsReceiptsLoading(false);
-    })();
+    void loadBuilderEtimsReceipts();
+  }, [loadBuilderEtimsReceipts]);
+
+  useEffect(() => {
+    if (userRole !== 'builder' || !userId) return;
+    const channel = supabase
+      .channel(`builder-etims-pos-${userId}`)
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'purchase_orders' },
+        (payload) => {
+          const bid = (payload.new as { buyer_id?: string } | undefined)?.buyer_id;
+          if (bid === userId) void loadBuilderEtimsReceipts();
+        }
+      )
+      .subscribe();
     return () => {
-      cancelled = true;
+      void supabase.removeChannel(channel);
     };
-  }, [userRole, userId, invoices.length]);
+  }, [userRole, userId, loadBuilderEtimsReceipts]);
 
   const showBuilderSupplierPaymentTabs = userRole === 'builder' || userRole === 'supplier';
 
@@ -612,6 +630,7 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
   const builderUnpaidEtimsStandalone = useMemo(() => {
     if (userRole !== 'builder' || invoicePaymentListTab !== 'unpaid') return [];
     return builderEtimsReceipts.filter((po) => {
+      if (po.builder_etims_paystack_paid_at) return false;
       const url = po.etims_verification_url?.trim();
       const hasResp =
         po.etims_response != null &&
@@ -628,6 +647,12 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
       return !inv;
     });
   }, [userRole, invoicePaymentListTab, builderEtimsReceipts, invoices]);
+
+  /** eTIMS-only POs where builder completed Paystack (test) — shown under Paid tab */
+  const builderEtimsPaidStandalone = useMemo(() => {
+    if (userRole !== 'builder') return [];
+    return builderEtimsReceipts.filter((po) => Boolean(po.builder_etims_paystack_paid_at));
+  }, [userRole, builderEtimsReceipts]);
 
   const displayInvoicesTotalAmount = useMemo(
     () =>
@@ -943,7 +968,10 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
           disabled={
             userRole === 'builder' ? refreshing && invoices.length > 0 : loading && invoices.length > 0
           }
-          onClick={() => void fetchInvoices({ silent: true })}
+          onClick={() => {
+            void fetchInvoices({ silent: true });
+            void loadBuilderEtimsReceipts();
+          }}
         >
           {userRole === 'builder' ? (
             refreshing && invoices.length > 0 ? (
@@ -1050,6 +1078,11 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
             userRole === 'builder' &&
             invoicePaymentListTab === 'unpaid' &&
             (builderUnpaidEtimsStandalone.length > 0 || builderEtimsReceiptsLoading)
+          ) &&
+          !(
+            userRole === 'builder' &&
+            invoicePaymentListTab === 'paid' &&
+            builderEtimsPaidStandalone.length > 0
           ) ? (
             <Card>
               <CardContent className="py-10 text-center text-muted-foreground text-sm">
@@ -1069,6 +1102,52 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
               </CardContent>
             </Card>
           ) : null}
+
+          {userRole === 'builder' &&
+            invoicePaymentListTab === 'paid' &&
+            builderEtimsPaidStandalone.length > 0 && (
+              <div className="mb-4 space-y-3">
+                {builderEtimsPaidStandalone.map((po) => {
+                  const url = (po.etims_verification_url || '').trim();
+                  return (
+                    <Card key={`etims-paid-${po.id}`} className="border-emerald-200/70 dark:border-emerald-900/45">
+                      <CardHeader>
+                        <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                          <div>
+                            <CardTitle className="text-base">KRA eTIMS receipt</CardTitle>
+                            <p className="text-sm text-muted-foreground">PO {po.po_number}</p>
+                            {po.builder_etims_paystack_paid_at ? (
+                              <p className="mt-1 text-xs text-muted-foreground">
+                                Paid{' '}
+                                {new Date(po.builder_etims_paystack_paid_at).toLocaleString(undefined, {
+                                  dateStyle: 'medium',
+                                  timeStyle: 'short',
+                                })}
+                                {po.builder_etims_paystack_reference
+                                  ? ` · Paystack ref ${po.builder_etims_paystack_reference}`
+                                  : ''}
+                              </p>
+                            ) : null}
+                          </div>
+                          <Badge className="h-fit w-fit shrink-0 bg-green-600 text-white hover:bg-green-600">
+                            Paid (Paystack)
+                          </Badge>
+                        </div>
+                      </CardHeader>
+                      <CardContent>
+                        <KraEtimsReceiptPanel
+                          poNumber={po.po_number}
+                          verificationUrl={url || null}
+                          etimsResponse={po.etims_response}
+                          traderInvoiceNoDb={po.etims_trader_invoice_no}
+                          etimsSubmittedAt={po.etims_submitted_at}
+                        />
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+              </div>
+            )}
 
           {userRole === 'builder' &&
             invoicePaymentListTab === 'unpaid' &&

@@ -90,6 +90,8 @@ interface Order {
   builder_fulfillment_choice?: string | null;
   /** When the PO looks like a monitoring quote, human-readable package tier */
   monitoring_package_summary?: string | null;
+  /** Builder completed Paystack for eTIMS-only PO (sandbox / receipt test); suppliers see this for visibility */
+  builder_etims_paystack_paid_at?: string | null;
 }
 
 interface OrderManagementProps {
@@ -163,6 +165,7 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, in
         delivery_required: po.delivery_required || false,
         builder_fulfillment_choice: po.builder_fulfillment_choice ?? null,
         monitoring_package_summary,
+        builder_etims_paystack_paid_at: po.builder_etims_paystack_paid_at ?? null,
       };
     });
   };
@@ -1049,6 +1052,7 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, in
           delivery_required: po.delivery_required || false,
           builder_fulfillment_choice: po.builder_fulfillment_choice ?? null,
           monitoring_package_summary,
+          builder_etims_paystack_paid_at: po.builder_etims_paystack_paid_at ?? null,
         };
       });
       } catch (mapErr) {
@@ -1084,6 +1088,7 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, in
             delivery_required: po.delivery_required || false,
             builder_fulfillment_choice: po.builder_fulfillment_choice ?? null,
             monitoring_package_summary,
+            builder_etims_paystack_paid_at: po.builder_etims_paystack_paid_at ?? null,
           };
         });
       }
@@ -1407,6 +1412,11 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, in
                       {order.delivery_provider_id && order.delivery_status === 'accepted' && (
                         <p className="text-[10px] text-green-600 mt-1">✓ Delivery Provider Accepted</p>
                       )}
+                      {order.builder_etims_paystack_paid_at ? (
+                        <p className="text-[10px] mt-1 font-medium text-emerald-700 dark:text-emerald-400">
+                          ✓ Builder paid (KRA eTIMS / Paystack receipt)
+                        </p>
+                      ) : null}
                     </div>
                   </TableCell>
                   <TableCell className={`text-sm ${mutedText}`}>

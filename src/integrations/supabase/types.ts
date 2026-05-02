@@ -3153,6 +3153,8 @@ export type Database = {
       purchase_orders: {
         Row: {
           buyer_id: string
+          builder_etims_paystack_paid_at: string | null
+          builder_etims_paystack_reference: string | null
           builder_fulfillment_choice?: string
           created_at: string
           delivery_address: string
@@ -3184,6 +3186,8 @@ export type Database = {
         }
         Insert: {
           buyer_id: string
+          builder_etims_paystack_paid_at?: string | null
+          builder_etims_paystack_reference?: string | null
           builder_fulfillment_choice?: string
           created_at?: string
           delivery_address: string
@@ -3215,6 +3219,8 @@ export type Database = {
         }
         Update: {
           buyer_id?: string
+          builder_etims_paystack_paid_at?: string | null
+          builder_etims_paystack_reference?: string | null
           builder_fulfillment_choice?: string
           created_at?: string
           delivery_address?: string

@@ -319,6 +319,52 @@ serve(async (req) => {
           msrId,
         );
       }
+    } else if (orderId.startsWith("etims_po_") && metaUser) {
+      const rawId = orderId.slice("etims_po_".length);
+      if (!UUID_RE.test(rawId)) {
+        console.warn("[paystack-webhook] invalid etims_po order id:", orderId);
+      } else {
+        const poId = rawId;
+        const { data: po, error: poErr } = await admin
+          .from("purchase_orders")
+          .select(
+            "id, buyer_id, po_number, builder_etims_paystack_paid_at, builder_etims_paystack_reference",
+          )
+          .eq("id", poId)
+          .maybeSingle();
+
+        if (poErr) {
+          console.error("[paystack-webhook] etims_po purchase_orders lookup:", poErr.message);
+        } else if (!po) {
+          console.warn("[paystack-webhook] etims_po purchase_order not found:", poId);
+        } else {
+          const belongs = await poBuyerMatchesUser(admin, po.buyer_id as string, metaUser);
+          if (!belongs) {
+            console.warn("[paystack-webhook] etims_po buyer does not match metadata user; skip", poId);
+          } else if (po.builder_etims_paystack_paid_at) {
+            if (reference && String(po.builder_etims_paystack_reference ?? "") === reference) {
+              console.log("[paystack-webhook] etims_po duplicate webhook for same reference; skip", poId);
+            } else {
+              console.log("[paystack-webhook] etims_po already marked paid; skip", poId);
+            }
+          } else {
+            const stamp = new Date().toISOString();
+            const { error: upErr } = await admin
+              .from("purchase_orders")
+              .update({
+                builder_etims_paystack_paid_at: stamp,
+                builder_etims_paystack_reference: reference || null,
+                updated_at: stamp,
+              })
+              .eq("id", poId);
+            if (upErr) {
+              console.error("[paystack-webhook] etims_po purchase_orders update:", upErr.message);
+            } else {
+              console.log("[paystack-webhook] etims_po builder eTIMS receipt marked paid:", poId);
+            }
+          }
+        }
+      }
     } else if (UUID_RE.test(orderId) && metaUser) {
       const { data: po, error: poErr } = await admin
         .from("purchase_orders")
