@@ -166,10 +166,14 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
     if (userRole !== 'builder') return;
     return subscribeBuilderHubCache(() => {
       const raw = peekHubInvoices(userId, builderProfileId ?? undefined);
-      if (raw === null) return;
+      if (raw === null) {
+        void fetchInvoices({ silent: true });
+        return;
+      }
       setInvoices((raw as Invoice[]) ?? []);
       setListReady(true);
     });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- fetchInvoices identity changes; hub event should refetch
   }, [userRole, userId, builderProfileId]);
 
   // Form state for editing

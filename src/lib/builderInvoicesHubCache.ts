@@ -115,6 +115,12 @@ export function invalidateBuilderInvoicesHub(authUserId: string, profileId: stri
   if (slots?.key === k) slots = null;
 }
 
+/** Drop cached hub lists entirely (e.g. after admin bulk invoice delete). Notifies subscribers to refetch. */
+export function resetBuilderInvoicesHubCache(): void {
+  slots = null;
+  emitHubCacheUpdated();
+}
+
 export function peekHubDeliveryNotes(
   authUserId: string | undefined,
   profileId: string | null | undefined

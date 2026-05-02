@@ -51,6 +51,7 @@ import {
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { chunkArray } from '@/utils/performance';
+import { resetBuilderInvoicesHubCache } from '@/lib/builderInvoicesHubCache';
 
 // Types
 interface FinancialDocument {
@@ -434,9 +435,10 @@ export const FinancialTab: React.FC = () => {
         if (delErr) throw delErr;
         deleted += part.length;
       }
+      resetBuilderInvoicesHubCache();
       toast({
         title: 'Invoices deleted',
-        description: `Removed ${deleted} row(s). Refresh builder/supplier dashboards.`,
+        description: `Removed ${deleted} row(s). Open the builder Invoices tab and tap Refresh if the list still shows old rows.`,
       });
       setInvoicePurgePhrase('');
       await loadFinancialData();
