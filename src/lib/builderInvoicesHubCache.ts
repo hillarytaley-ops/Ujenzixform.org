@@ -74,7 +74,7 @@ const INVOICE_HUB_LIST_SELECT = `
     notes,
     created_at,
     updated_at,
-    purchase_order:purchase_orders(po_number),
+    purchase_order:purchase_orders(po_number, etims_verification_url),
     supplier:suppliers(company_name)
   `;
 

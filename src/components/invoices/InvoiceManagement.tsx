@@ -63,6 +63,7 @@ interface Invoice {
   notes?: string | null;
   purchase_order?: {
     po_number?: string;
+    etims_verification_url?: string | null;
   };
   supplier?: {
     company_name?: string;
@@ -200,7 +201,7 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
 
       const invoiceSelect = `
           *,
-          purchase_order:purchase_orders(po_number),
+          purchase_order:purchase_orders(po_number, etims_verification_url),
           supplier:suppliers(company_name)
         `;
 
@@ -248,7 +249,7 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
             const [poChunkRows, supChunkRows] = await Promise.all([
               Promise.all(
                 chunkArray(poIds, 80).map((chunk) =>
-                  supabase.from('purchase_orders').select('id, po_number').in('id', chunk)
+                  supabase.from('purchase_orders').select('id, po_number, etims_verification_url').in('id', chunk)
                 )
               ),
               Promise.all(
@@ -257,7 +258,7 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
                 )
               ),
             ]);
-            const poMerged: { id: string; po_number?: string }[] = [];
+            const poMerged: { id: string; po_number?: string; etims_verification_url?: string | null }[] = [];
             for (const poRes of poChunkRows) {
               if (poRes.error) throw poRes.error;
               if (poRes.data?.length) poMerged.push(...poRes.data);
@@ -272,7 +273,10 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
             const enriched = base.map((inv) => ({
               ...inv,
               purchase_order: poById[inv.purchase_order_id]
-                ? { po_number: poById[inv.purchase_order_id].po_number }
+                ? {
+                    po_number: poById[inv.purchase_order_id].po_number,
+                    etims_verification_url: poById[inv.purchase_order_id].etims_verification_url ?? null,
+                  }
                 : undefined,
               supplier: supById[inv.supplier_id]
                 ? { company_name: supById[inv.supplier_id].company_name }
@@ -390,6 +394,33 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
     if (invoicePaymentListTab === 'paid') return invoices.filter(invoiceIsPaid);
     return invoices.filter((i) => !invoiceIsPaid(i));
   }, [invoices, showBuilderSupplierPaymentTabs, invoicePaymentListTab]);
+
+  /** KRA link from embedded PO row (hub fetch) or builder receipt list fallback */
+  const etimsUrlForInvoice = useCallback(
+    (inv: Invoice) => {
+      const fromEmbed = inv.purchase_order?.etims_verification_url?.trim();
+      if (fromEmbed) return fromEmbed;
+      const row = builderEtimsReceipts.find((p) => p.id === inv.purchase_order_id);
+      return row?.etims_verification_url?.trim() || null;
+    },
+    [builderEtimsReceipts]
+  );
+
+  /** Receipt exists but no unpaid supplier invoice for this PO yet — show its own row under Unpaid */
+  const builderUnpaidEtimsStandalone = useMemo(() => {
+    if (userRole !== 'builder' || invoicePaymentListTab !== 'unpaid') return [];
+    return builderEtimsReceipts.filter((po) => {
+      const url = po.etims_verification_url?.trim();
+      if (!url) return false;
+      const inv = invoices.find(
+        (i) =>
+          i.purchase_order_id === po.id &&
+          !invoiceIsPaid(i) &&
+          String(i.status || '').toLowerCase() !== 'cancelled'
+      );
+      return !inv;
+    });
+  }, [userRole, invoicePaymentListTab, builderEtimsReceipts, invoices]);
 
   const displayInvoicesTotalAmount = useMemo(
     () =>
@@ -724,63 +755,13 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
         <Alert className="border-sky-200 bg-sky-50/70 dark:border-sky-900 dark:bg-sky-950/35">
           <Receipt className="h-4 w-4 text-sky-700 dark:text-sky-300" />
           <AlertTitle className="text-foreground">KRA eTIMS receipt (integrator)</AlertTitle>
-          <AlertDescription className="space-y-3 text-xs text-muted-foreground">
+          <AlertDescription className="text-xs text-muted-foreground">
             <p>
-              After a successful tax submission, your integrator may return a verification link for each purchase order.
-              Use <strong className="text-foreground">Pay supplier now</strong> for the same order when your supplier
-              invoice appears below (payment is separate from KRA eTIMS).
+              Verification links for each PO now appear <strong className="text-foreground">in the Unpaid / Paid lists</strong>{' '}
+              below with <strong className="text-foreground">Pay now</strong> when your supplier invoice is ready. KRA
+              eTIMS and supplier payment are separate steps.
             </p>
-            {builderEtimsReceiptsLoading ? (
-              <p>Loading receipt links…</p>
-            ) : (
-              <ul className="list-none space-y-2 pl-0">
-                {builderEtimsReceipts.map((po) => {
-                  const url = po.etims_verification_url?.trim();
-                  if (!url) return null;
-                  const inv = invoices.find(
-                    (i) =>
-                      i.purchase_order_id === po.id &&
-                      !invoiceIsPaid(i) &&
-                      String(i.status || '').toLowerCase() !== 'cancelled',
-                  );
-                  return (
-                    <li
-                      key={po.id}
-                      className="flex flex-col gap-2 rounded-md border border-sky-200/80 bg-background/80 p-3 dark:border-sky-800/80 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between"
-                    >
-                      <div className="flex min-w-0 flex-col gap-1 sm:flex-row sm:items-center sm:gap-3">
-                        <span className="font-semibold text-foreground">{po.po_number}</span>
-                        <a
-                          href={url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex w-fit items-center gap-1 font-medium text-primary underline-offset-2 hover:underline"
-                        >
-                          Open verification / receipt
-                          <ExternalLink className="h-3.5 w-3.5 shrink-0 opacity-80" aria-hidden />
-                        </a>
-                      </div>
-                      {inv ? (
-                        <Button
-                          type="button"
-                          size="sm"
-                          disabled={!!payNowBusyId || acknowledging}
-                          className="w-full shrink-0 bg-emerald-600 font-semibold text-white hover:bg-emerald-700 sm:w-auto"
-                          onClick={() => void handlePayNowClick(inv)}
-                        >
-                          Pay supplier now
-                        </Button>
-                      ) : (
-                        <p className="text-[11px] text-muted-foreground sm:max-w-xs sm:text-right">
-                          No unpaid supplier invoice linked yet for this PO. Pull to refresh after the supplier sends the
-                          invoice, or use <strong>Refresh</strong> above.
-                        </p>
-                      )}
-                    </li>
-                  );
-                })}
-              </ul>
-            )}
+            {builderEtimsReceiptsLoading ? <p className="mt-1">Loading receipt links…</p> : null}
           </AlertDescription>
         </Alert>
       )}
@@ -855,7 +836,13 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
               </Alert>
             )}
 
-          {listReady && displayInvoices.length === 0 ? (
+          {listReady &&
+          displayInvoices.length === 0 &&
+          !(
+            userRole === 'builder' &&
+            invoicePaymentListTab === 'unpaid' &&
+            (builderUnpaidEtimsStandalone.length > 0 || builderEtimsReceiptsLoading)
+          ) ? (
             <Card>
               <CardContent className="py-10 text-center text-muted-foreground text-sm">
                 {invoices.length > 0 && showBuilderSupplierPaymentTabs ? (
@@ -875,8 +862,53 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
             </Card>
           ) : null}
 
+          {userRole === 'builder' &&
+            invoicePaymentListTab === 'unpaid' &&
+            (builderEtimsReceiptsLoading || builderUnpaidEtimsStandalone.length > 0) && (
+              <div className="space-y-3">
+                {builderEtimsReceiptsLoading && builderUnpaidEtimsStandalone.length === 0 ? (
+                  <Card>
+                    <CardContent className="flex items-center gap-2 py-6 text-sm text-muted-foreground">
+                      <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
+                      Loading KRA receipt links…
+                    </CardContent>
+                  </Card>
+                ) : null}
+                {builderUnpaidEtimsStandalone.map((po) => {
+                  const url = po.etims_verification_url!.trim();
+                  return (
+                    <Card key={`etims-${po.id}`} className="border-sky-200/60 dark:border-sky-900/50">
+                      <CardHeader>
+                        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                          <div>
+                            <CardTitle className="text-base">KRA eTIMS receipt</CardTitle>
+                            <p className="text-sm text-muted-foreground">PO {po.po_number}</p>
+                            <a
+                              href={url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="mt-2 inline-flex w-fit items-center gap-1 text-sm font-medium text-primary underline-offset-2 hover:underline"
+                            >
+                              Open verification / receipt
+                              <ExternalLink className="h-3.5 w-3.5 shrink-0 opacity-80" aria-hidden />
+                            </a>
+                          </div>
+                          <p className="max-w-md text-xs text-muted-foreground sm:text-right">
+                            No unpaid supplier invoice is linked to this PO yet. After the supplier sends the invoice, it
+                            will appear in this tab with <strong className="text-foreground">Pay now</strong>. Use{' '}
+                            <strong className="text-foreground">Refresh</strong> above.
+                          </p>
+                        </div>
+                      </CardHeader>
+                    </Card>
+                  );
+                })}
+              </div>
+            )}
+
           {displayInvoices.map((invoice) => {
             const rowStatus = String(invoice.status || '').toLowerCase();
+            const kraEtimsUrl = etimsUrlForInvoice(invoice);
             const showBuilderPayNow =
               userRole === 'builder' &&
               !invoiceIsPaid(invoice) &&
@@ -893,6 +925,19 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
                         PO: {invoice.purchase_order?.po_number || 'N/A'} •{' '}
                         {invoice.supplier?.company_name || 'Supplier'}
                       </p>
+                      {kraEtimsUrl ? (
+                        <p className="mt-1.5">
+                          <a
+                            href={kraEtimsUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 text-sm font-medium text-sky-700 underline-offset-2 hover:underline dark:text-sky-300"
+                          >
+                            Open KRA eTIMS verification / receipt
+                            <ExternalLink className="h-3.5 w-3.5 shrink-0 opacity-80" aria-hidden />
+                          </a>
+                        </p>
+                      ) : null}
                       {userRole === 'builder' && !invoiceIsPaid(invoice) && (
                         <p className="mt-2 text-sm font-medium text-amber-800 dark:text-amber-200">
                           {rowStatus === 'draft' ? (
