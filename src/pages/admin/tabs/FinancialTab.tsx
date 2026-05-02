@@ -4,6 +4,15 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { Checkbox } from '@/components/ui/checkbox';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import {
   Table,
   TableBody,
@@ -117,10 +126,17 @@ interface DeliveryPayoutRow {
 
 const INVOICE_PURGE_CONFIRM = 'DELETE ALL INVOICES';
 
+const DOCUMENTS_TABLE_LIMIT = 200;
+
 export const FinancialTab: React.FC = () => {
   const { toast } = useToast();
   const [invoicePurgePhrase, setInvoicePurgePhrase] = useState('');
   const [invoicePurgeBusy, setInvoicePurgeBusy] = useState(false);
+  /** Admin or super_admin: row checkboxes + delete selected */
+  const [staffMayDeleteInvoices, setStaffMayDeleteInvoices] = useState(false);
+  const [selectedInvoiceIds, setSelectedInvoiceIds] = useState<Set<string>>(() => new Set());
+  const [deleteSelectedOpen, setDeleteSelectedOpen] = useState(false);
+  const [deleteSelectedBusy, setDeleteSelectedBusy] = useState(false);
   const [loading, setLoading] = useState(true);
   const [documents, setDocuments] = useState<FinancialDocument[]>([]);
   const [stats, setStats] = useState<FinancialStats>({
@@ -454,6 +470,71 @@ export const FinancialTab: React.FC = () => {
   }, [invoicePurgePhrase, toast, loadFinancialData]);
 
   useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      const { data: auth } = await supabase.auth.getUser();
+      const user = auth.user;
+      if (!user || cancelled) return;
+      const { data: rows, error } = await supabase.from('user_roles').select('role').eq('user_id', user.id);
+      if (cancelled) return;
+      if (error) {
+        console.error('FinancialTab: user_roles', error);
+        setStaffMayDeleteInvoices(false);
+        return;
+      }
+      const texts = (rows ?? []).map((r: { role: unknown }) => String(r.role));
+      setStaffMayDeleteInvoices(texts.some((t) => t === 'admin' || t === 'super_admin'));
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!staffMayDeleteInvoices) setSelectedInvoiceIds(new Set());
+  }, [staffMayDeleteInvoices]);
+
+  useEffect(() => {
+    const invoiceIds = new Set(documents.filter((d) => d.type === 'invoice').map((d) => d.id));
+    setSelectedInvoiceIds((prev) => {
+      const next = new Set([...prev].filter((id) => invoiceIds.has(id)));
+      if (next.size === prev.size && [...prev].every((id) => next.has(id))) return prev;
+      return next;
+    });
+  }, [documents]);
+
+  const handleConfirmDeleteSelectedInvoices = useCallback(async () => {
+    const ids = Array.from(selectedInvoiceIds);
+    if (ids.length === 0) {
+      setDeleteSelectedOpen(false);
+      return;
+    }
+    setDeleteSelectedBusy(true);
+    try {
+      for (const part of chunkArray(ids, 80)) {
+        const { error } = await supabase.from('invoices').delete().in('id', part);
+        if (error) throw error;
+      }
+      resetBuilderInvoicesHubCache();
+      setSelectedInvoiceIds(new Set());
+      setDeleteSelectedOpen(false);
+      toast({
+        title: 'Invoices deleted',
+        description: `Removed ${ids.length} invoice(s).`,
+      });
+      await loadFinancialData();
+    } catch (e: unknown) {
+      toast({
+        variant: 'destructive',
+        title: 'Delete failed',
+        description: e instanceof Error ? e.message : String(e),
+      });
+    } finally {
+      setDeleteSelectedBusy(false);
+    }
+  }, [selectedInvoiceIds, toast, loadFinancialData]);
+
+  useEffect(() => {
     loadFinancialData();
   }, [loadFinancialData]);
 
@@ -559,9 +640,26 @@ export const FinancialTab: React.FC = () => {
     toast({ title: 'Exported', description: `${filteredDeliveryPayout.length} delivery rows` });
   };
 
-  const filteredDocuments = filter === 'all' 
-    ? documents 
-    : documents.filter(d => d.type === filter);
+  const filteredDocuments = useMemo(
+    () => (filter === 'all' ? documents : documents.filter((d) => d.type === filter)),
+    [documents, filter]
+  );
+
+  const visibleDocuments = useMemo(
+    () => filteredDocuments.slice(0, DOCUMENTS_TABLE_LIMIT),
+    [filteredDocuments]
+  );
+
+  const visibleInvoiceIdsInTable = useMemo(
+    () => visibleDocuments.filter((d) => d.type === 'invoice').map((d) => d.id),
+    [visibleDocuments]
+  );
+
+  const allVisibleInvoicesSelected =
+    visibleInvoiceIdsInTable.length > 0 &&
+    visibleInvoiceIdsInTable.every((id) => selectedInvoiceIds.has(id));
+
+  const someVisibleInvoicesSelected = visibleInvoiceIdsInTable.some((id) => selectedInvoiceIds.has(id));
 
   const getTypeColor = (type: string) => {
     switch (type) {
@@ -911,12 +1009,63 @@ export const FinancialTab: React.FC = () => {
               </Button>
             </div>
           </div>
+          {staffMayDeleteInvoices && selectedInvoiceIds.size > 0 && (
+            <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-red-900/50 bg-red-950/20 px-3 py-2">
+              <p className="text-sm text-red-100">
+                {selectedInvoiceIds.size} invoice{selectedInvoiceIds.size === 1 ? '' : 's'} selected
+              </p>
+              <Button
+                type="button"
+                variant="destructive"
+                size="sm"
+                onClick={() => setDeleteSelectedOpen(true)}
+              >
+                <Trash2 className="mr-2 h-4 w-4" />
+                Delete selected
+              </Button>
+            </div>
+          )}
         </CardHeader>
         <CardContent>
+          {staffMayDeleteInvoices && filteredDocuments.length > DOCUMENTS_TABLE_LIMIT && (
+            <p className="mb-2 text-xs text-amber-200/90">
+              Showing the first {DOCUMENTS_TABLE_LIMIT} of {filteredDocuments.length} documents in this view. Filter to
+              Invoices or use Refresh after deletes; use &quot;Delete all invoices&quot; in the danger zone to clear the
+              full table.
+            </p>
+          )}
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow className="border-slate-700">
+                  {staffMayDeleteInvoices && (
+                    <TableHead className="w-10 text-gray-400">
+                      {visibleInvoiceIdsInTable.length > 0 ? (
+                        <Checkbox
+                          checked={
+                            allVisibleInvoicesSelected
+                              ? true
+                              : someVisibleInvoicesSelected
+                                ? 'indeterminate'
+                                : false
+                          }
+                          onCheckedChange={(c) => {
+                            const on = c === true;
+                            setSelectedInvoiceIds((prev) => {
+                              const next = new Set(prev);
+                              if (on) {
+                                visibleInvoiceIdsInTable.forEach((id) => next.add(id));
+                              } else {
+                                visibleInvoiceIdsInTable.forEach((id) => next.delete(id));
+                              }
+                              return next;
+                            });
+                          }}
+                          aria-label="Select all invoices in this table page"
+                        />
+                      ) : null}
+                    </TableHead>
+                  )}
                   <TableHead className="text-gray-400">Type</TableHead>
                   <TableHead className="text-gray-400">Reference</TableHead>
                   <TableHead className="text-gray-400">Amount</TableHead>
@@ -927,8 +1076,27 @@ export const FinancialTab: React.FC = () => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredDocuments.slice(0, 50).map((doc) => (
-                  <TableRow key={doc.id} className="border-slate-700 hover:bg-slate-800/50">
+                {visibleDocuments.map((doc) => (
+                  <TableRow key={`${doc.type}-${doc.id}`} className="border-slate-700 hover:bg-slate-800/50">
+                    {staffMayDeleteInvoices && (
+                      <TableCell className="w-10 align-middle">
+                        {doc.type === 'invoice' ? (
+                          <Checkbox
+                            checked={selectedInvoiceIds.has(doc.id)}
+                            onCheckedChange={(c) => {
+                              const on = c === true;
+                              setSelectedInvoiceIds((prev) => {
+                                const next = new Set(prev);
+                                if (on) next.add(doc.id);
+                                else next.delete(doc.id);
+                                return next;
+                              });
+                            }}
+                            aria-label={`Select invoice ${doc.reference}`}
+                          />
+                        ) : null}
+                      </TableCell>
+                    )}
                     <TableCell>
                       <Badge className={getTypeColor(doc.type)}>
                         <div className="flex items-center gap-1">
@@ -1000,6 +1168,37 @@ export const FinancialTab: React.FC = () => {
           </div>
         </CardContent>
       </Card>
+
+      <Dialog open={deleteSelectedOpen} onOpenChange={setDeleteSelectedOpen}>
+        <DialogContent className="border-slate-700 bg-slate-900 text-white sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Delete selected invoices?</DialogTitle>
+            <DialogDescription className="text-slate-300">
+              This permanently removes {selectedInvoiceIds.size} row(s) from{' '}
+              <span className="font-mono text-slate-200">public.invoices</span>. This cannot be undone. Related data may
+              be affected by foreign keys.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button type="button" variant="outline" onClick={() => setDeleteSelectedOpen(false)} disabled={deleteSelectedBusy}>
+              Cancel
+            </Button>
+            <Button type="button" variant="destructive" onClick={() => void handleConfirmDeleteSelectedInvoices()} disabled={deleteSelectedBusy}>
+              {deleteSelectedBusy ? (
+                <>
+                  <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                  Deleting…
+                </>
+              ) : (
+                <>
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  Delete {selectedInvoiceIds.size}
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Card className="border-red-900/60 bg-red-950/30">
         <CardHeader>
