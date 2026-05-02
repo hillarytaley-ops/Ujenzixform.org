@@ -34,6 +34,7 @@ import {
   lineAmount,
   lineItemCode,
   lineQty,
+  pickEtimsTotalAmountKes,
 } from '@/lib/etims/formatEtimsReceiptForUi';
 import { PaystackCheckout, isPaystackTestModeBanner } from '@/components/payment/PaystackCheckout';
 import { Separator } from '@/components/ui/separator';
@@ -161,6 +162,18 @@ function KraEtimsReceiptEmbed({ url }: { url: string }) {
 }
 
 /** Stored integrator JSON + optional KRA page button; iframe only under optional details (often blocked). */
+/** KES amount for Paystack test checkout when there is no supplier invoice yet. */
+function resolvePoSandboxPayAmountKes(po: {
+  total_amount?: number | null;
+  etims_response: unknown | null;
+}): number | null {
+  const fromDb = po.total_amount != null ? Number(po.total_amount) : NaN;
+  if (Number.isFinite(fromDb) && fromDb > 0) return Math.round(fromDb * 100) / 100;
+  const fromJson = pickEtimsTotalAmountKes(po.etims_response);
+  if (fromJson != null && fromJson > 0) return Math.round(fromJson * 100) / 100;
+  return null;
+}
+
 function KraEtimsReceiptPanel({
   poNumber,
   verificationUrl,
@@ -309,6 +322,12 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
   /** Which invoice row is running the async “acknowledge then open pay” flow */
   const [payNowBusyId, setPayNowBusyId] = useState<string | null>(null);
   const [payInvoice, setPayInvoice] = useState<Invoice | null>(null);
+  /** Paystack sandbox: pay for PO with eTIMS only (no supplier invoice row yet). */
+  const [paystackEtimsPo, setPaystackEtimsPo] = useState<{
+    poId: string;
+    poNumber: string;
+    amount: number;
+  } | null>(null);
   const [paymentReference, setPaymentReference] = useState('');
   const [recordingPayment, setRecordingPayment] = useState(false);
   const { toast } = useToast();
@@ -324,6 +343,7 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
   type BuilderEtimsReceiptPo = {
     id: string;
     po_number: string;
+    total_amount: number | null;
     etims_verification_url: string | null;
     etims_response: unknown | null;
     etims_trader_invoice_no: string | null;
@@ -546,7 +566,9 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
     void (async () => {
       const { data, error } = await supabase
         .from('purchase_orders')
-        .select('id, po_number, etims_verification_url, etims_response, etims_trader_invoice_no, etims_submitted_at')
+        .select(
+          'id, po_number, total_amount, etims_verification_url, etims_response, etims_trader_invoice_no, etims_submitted_at'
+        )
         .eq('buyer_id', userId)
         .or(
           'etims_verification_url.not.is.null,etims_response.not.is.null,etims_submitted_at.not.is.null'
@@ -776,6 +798,7 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
     try {
       setAcknowledging(true);
       setPayNowBusyId(invoice.id);
+      setPaystackEtimsPo(null);
 
       let next = { ...invoice };
 
@@ -1061,6 +1084,9 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
                 ) : null}
                 {builderUnpaidEtimsStandalone.map((po) => {
                   const url = (po.etims_verification_url || '').trim();
+                  const sandboxAmt = resolvePoSandboxPayAmountKes(po);
+                  const canSandboxPayNow =
+                    userRole === 'builder' && paystackSandbox && sandboxAmt != null && sandboxAmt > 0;
                   return (
                     <Card key={`etims-${po.id}`} className="border-sky-200/60 dark:border-sky-900/50">
                       <CardHeader>
@@ -1072,11 +1098,25 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
                           <Button
                             type="button"
                             size="lg"
-                            disabled
-                            className="shrink-0 bg-emerald-600/40 font-bold text-white"
-                            title="Available after your supplier sends an invoice for this purchase order."
+                            disabled={!canSandboxPayNow}
+                            className={`shrink-0 font-bold text-white ${
+                              canSandboxPayNow
+                                ? 'bg-emerald-600 hover:bg-emerald-700'
+                                : 'cursor-not-allowed bg-emerald-600/40'
+                            }`}
+                            title={
+                              canSandboxPayNow
+                                ? 'Open Paystack sandbox checkout for this PO (test mode).'
+                                : paystackSandbox
+                                  ? 'Need a positive total on the purchase order or in the eTIMS receipt JSON.'
+                                  : 'Set VITE_PAYSTACK_TEST_MODE=true and Paystack sk_test in Supabase to use Pay Now here without a supplier invoice.'
+                            }
+                            onClick={() => {
+                              if (!canSandboxPayNow || sandboxAmt == null) return;
+                              setPaystackEtimsPo({ poId: po.id, poNumber: po.po_number, amount: sandboxAmt });
+                            }}
                           >
-                            <CreditCard className="mr-2 h-5 w-5 opacity-80" />
+                            <CreditCard className="mr-2 h-5 w-5 shrink-0 opacity-90" />
                             Pay Now
                           </Button>
                         </div>
@@ -1090,9 +1130,22 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
                           etimsSubmittedAt={po.etims_submitted_at}
                         />
                         <p className="text-xs text-muted-foreground">
-                          <strong className="text-foreground">Pay Now</strong> will unlock when an unpaid supplier invoice
-                          is linked to this PO. Tap <strong className="text-foreground">Refresh</strong> above after they
-                          send it — the same receipt appears on that invoice row.
+                          {canSandboxPayNow ? (
+                            <>
+                              <strong className="text-foreground">Paystack test mode:</strong> use{' '}
+                              <strong className="text-foreground">Pay Now</strong> to run sandbox checkout for{' '}
+                              <strong className="text-foreground">KES {sandboxAmt!.toLocaleString()}</strong> (PO / eTIMS
+                              total). When your supplier sends an invoice, use <strong className="text-foreground">Pay Now</strong>{' '}
+                              on that row for the real supplier payment flow.
+                            </>
+                          ) : (
+                            <>
+                              With <strong className="text-foreground">VITE_PAYSTACK_TEST_MODE=true</strong> and test
+                              keys, <strong className="text-foreground">Pay Now</strong> runs Paystack for this PO. Otherwise
+                              it unlocks when an unpaid supplier invoice is linked — tap{' '}
+                              <strong className="text-foreground">Refresh</strong> after they send it.
+                            </>
+                          )}
                         </p>
                       </CardContent>
                     </Card>
@@ -1345,6 +1398,49 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
                   I've paid — record payment
                 </>
               )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={!!paystackEtimsPo}
+        onOpenChange={(open) => {
+          if (!open) setPaystackEtimsPo(null);
+        }}
+      >
+        <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Paystack sandbox — purchase order</DialogTitle>
+            <DialogDescription>
+              Test Paystack checkout only. There is no supplier invoice row yet, so this payment does{' '}
+              <strong>not</strong> mark any invoice paid — use it to verify your Paystack test integration.
+            </DialogDescription>
+          </DialogHeader>
+          {paystackEtimsPo ? (
+            <div className="space-y-4 py-2">
+              <div className="rounded-md border bg-muted/50 px-3 py-2 text-sm">
+                <p className="font-mono font-medium">{paystackEtimsPo.poNumber}</p>
+                <p className="text-muted-foreground">
+                  Amount:{' '}
+                  <span className="font-semibold text-foreground">
+                    KES {paystackEtimsPo.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                  </span>
+                </p>
+              </div>
+              <PaystackCheckout
+                amount={paystackEtimsPo.amount}
+                currency="KES"
+                description={`Sandbox PO ${paystackEtimsPo.poNumber} (eTIMS — no supplier invoice)`}
+                orderId={`etims_po_${paystackEtimsPo.poId}`}
+                successNavigateTo="/professional-builder-dashboard?tab=invoices"
+                onCancel={() => setPaystackEtimsPo(null)}
+              />
+            </div>
+          ) : null}
+          <DialogFooter>
+            <Button variant="outline" type="button" onClick={() => setPaystackEtimsPo(null)}>
+              Close
             </Button>
           </DialogFooter>
         </DialogContent>

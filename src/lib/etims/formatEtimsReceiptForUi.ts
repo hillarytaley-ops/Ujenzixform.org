@@ -92,6 +92,23 @@ export function buildEtimsReceiptKvRows(raw: unknown): EtimsReceiptKv[] {
   return rows;
 }
 
+/** Total in major currency units (e.g. KES) from stored integrator JSON, for Paystack sandbox amount. */
+export function pickEtimsTotalAmountKes(raw: unknown): number | null {
+  const roots = scalarRoots(raw);
+  for (const o of roots) {
+    for (const k of ['totalAmount', 'total_amount'] as const) {
+      if (!(k in o)) continue;
+      const v = o[k];
+      if (typeof v === 'number' && Number.isFinite(v) && v > 0) return v;
+      if (v != null && typeof v !== 'object') {
+        const n = parseFloat(String(v).replace(/,/g, ''));
+        if (Number.isFinite(n) && n > 0) return n;
+      }
+    }
+  }
+  return null;
+}
+
 export function extractEtimsSalesItems(raw: unknown): Array<Record<string, unknown>> {
   const roots = scalarRoots(raw);
   for (const o of roots) {
