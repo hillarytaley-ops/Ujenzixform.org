@@ -28,6 +28,13 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { sortSupplyChainDocsNewestFirst } from '@/utils/sortSupplyChainDocs';
 import { chunkArray } from '@/utils/performance';
+import {
+  buildEtimsReceiptKvRows,
+  extractEtimsSalesItems,
+  lineAmount,
+  lineItemCode,
+  lineQty,
+} from '@/lib/etims/formatEtimsReceiptForUi';
 import { PaystackCheckout, isPaystackTestModeBanner } from '@/components/payment/PaystackCheckout';
 import { Separator } from '@/components/ui/separator';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -153,6 +160,129 @@ function KraEtimsReceiptEmbed({ url }: { url: string }) {
   );
 }
 
+/** Stored integrator JSON + optional KRA page button; iframe only under optional details (often blocked). */
+function KraEtimsReceiptPanel({
+  poNumber,
+  verificationUrl,
+  etimsResponse,
+  traderInvoiceNoDb,
+  etimsSubmittedAt,
+}: {
+  poNumber: string;
+  verificationUrl: string | null | undefined;
+  etimsResponse: unknown;
+  traderInvoiceNoDb?: string | null;
+  etimsSubmittedAt?: string | null;
+}) {
+  const url = (verificationUrl || '').trim();
+  const kv = useMemo(() => buildEtimsReceiptKvRows(etimsResponse), [etimsResponse]);
+  const salesLines = useMemo(() => extractEtimsSalesItems(etimsResponse), [etimsResponse]);
+  const hasStoredPayload =
+    etimsResponse != null &&
+    typeof etimsResponse === 'object' &&
+    Object.keys(etimsResponse as Record<string, unknown>).length > 0;
+
+  return (
+    <div className="space-y-3 rounded-lg border border-sky-200/70 bg-white/95 p-3 text-slate-900 shadow-sm dark:border-sky-900/50 dark:bg-slate-950/80 dark:text-slate-100">
+      <div>
+        <p className="text-xs font-semibold uppercase tracking-wide text-sky-800 dark:text-sky-200">
+          eTIMS receipt (stored from integrator)
+        </p>
+        <p className="text-xs text-muted-foreground dark:text-slate-400">PO {poNumber}</p>
+      </div>
+      {etimsSubmittedAt ? (
+        <p className="text-xs text-muted-foreground dark:text-slate-400">
+          Submitted{' '}
+          {new Date(etimsSubmittedAt).toLocaleString(undefined, {
+            dateStyle: 'medium',
+            timeStyle: 'short',
+          })}
+        </p>
+      ) : null}
+      {traderInvoiceNoDb?.trim() ? (
+        <p className="text-sm">
+          <span className="text-muted-foreground dark:text-slate-400">Trader invoice no. </span>
+          <span className="font-mono font-medium text-foreground">{traderInvoiceNoDb.trim()}</span>
+        </p>
+      ) : null}
+
+      {!hasStoredPayload ? (
+        <p className="text-sm text-amber-900 dark:text-amber-200">
+          Receipt details were not found on this order in the database. If you have a verification link, open the KRA
+          / OSCU page below.
+        </p>
+      ) : (
+        <>
+          <dl className="space-y-2 text-sm">
+            {kv.map(({ label, value }, idx) => (
+              <div key={`${label}-${idx}`}>
+                <dt className="text-muted-foreground dark:text-slate-400">{label}</dt>
+                <dd className="mt-0.5 min-w-0 break-all font-mono text-xs text-foreground">{value}</dd>
+              </div>
+            ))}
+          </dl>
+          {salesLines.length > 0 ? (
+            <div className="overflow-x-auto rounded-md border border-border">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-muted/60 dark:bg-muted/30">
+                  <tr>
+                    <th className="px-2 py-1.5 font-medium">Item code</th>
+                    <th className="px-2 py-1.5 font-medium">Qty</th>
+                    <th className="px-2 py-1.5 font-medium">Amount</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {salesLines.map((row, i) => (
+                    <tr key={i} className="border-t border-border">
+                      <td className="px-2 py-1 font-mono">{lineItemCode(row)}</td>
+                      <td className="px-2 py-1">{lineQty(row)}</td>
+                      <td className="px-2 py-1">{lineAmount(row)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : null}
+          <details className="rounded-md border border-border bg-muted/20 p-2 text-xs dark:bg-muted/10">
+            <summary className="cursor-pointer font-medium text-foreground">Full integrator response (JSON)</summary>
+            <pre className="mt-2 max-h-48 overflow-auto whitespace-pre-wrap break-all rounded bg-muted/50 p-2 font-mono text-[10px] leading-relaxed dark:bg-muted/20">
+              {JSON.stringify(etimsResponse, null, 2)}
+            </pre>
+          </details>
+        </>
+      )}
+
+      {url && isHttpsOrHttpUrl(url) ? (
+        <div className="flex flex-col gap-2 border-t border-border pt-3 sm:flex-row sm:flex-wrap sm:items-center">
+          <Button
+            type="button"
+            variant="default"
+            size="sm"
+            className="w-fit bg-sky-700 text-white hover:bg-sky-800 dark:bg-sky-600 dark:hover:bg-sky-500"
+            onClick={() => window.open(url, '_blank', 'noopener,noreferrer')}
+          >
+            Open KRA verification page
+          </Button>
+          <p className="text-[11px] text-muted-foreground dark:text-slate-400">
+            Official tax portal view (new tab). In-app iframe is often blocked by KRA.
+          </p>
+        </div>
+      ) : null}
+
+      {url && isHttpsOrHttpUrl(url) ? (
+        <details className="text-xs text-muted-foreground dark:text-slate-400">
+          <summary className="cursor-pointer select-none text-foreground/90 dark:text-slate-300">
+            Try embedded preview (optional — may be blank)
+          </summary>
+          <div className="mt-2">
+            <KraEtimsReceiptEmbed url={url} />
+          </div>
+        </details>
+      ) : null}
+    </div>
+  );
+}
+
 export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
   userId,
   userRole,
@@ -190,8 +320,15 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
   /** First fetch per user shows skeleton; later fetches (e.g. profile id resolved) refresh without blanking. */
   const invoiceFetchGenerationRef = useRef(0);
 
-  /** Builder: POs with an integrator receipt URL (KRA eTIMS) — shown inside this tab with Pay now when an unpaid invoice exists. */
-  type BuilderEtimsReceiptPo = { id: string; po_number: string; etims_verification_url: string | null };
+  /** Builder: POs with eTIMS data — includes stored integrator JSON for on-screen receipt. */
+  type BuilderEtimsReceiptPo = {
+    id: string;
+    po_number: string;
+    etims_verification_url: string | null;
+    etims_response: unknown | null;
+    etims_trader_invoice_no: string | null;
+    etims_submitted_at: string | null;
+  };
   const [builderEtimsReceipts, setBuilderEtimsReceipts] = useState<BuilderEtimsReceiptPo[]>([]);
   const [builderEtimsReceiptsLoading, setBuilderEtimsReceiptsLoading] = useState(false);
 
@@ -409,9 +546,11 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
     void (async () => {
       const { data, error } = await supabase
         .from('purchase_orders')
-        .select('id, po_number, etims_verification_url')
+        .select('id, po_number, etims_verification_url, etims_response, etims_trader_invoice_no, etims_submitted_at')
         .eq('buyer_id', userId)
-        .not('etims_verification_url', 'is', null)
+        .or(
+          'etims_verification_url.not.is.null,etims_response.not.is.null,etims_submitted_at.not.is.null'
+        )
         .order('updated_at', { ascending: false })
         .limit(20);
       if (cancelled) return;
@@ -452,7 +591,12 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
     if (userRole !== 'builder' || invoicePaymentListTab !== 'unpaid') return [];
     return builderEtimsReceipts.filter((po) => {
       const url = po.etims_verification_url?.trim();
-      if (!url) return false;
+      const hasResp =
+        po.etims_response != null &&
+        typeof po.etims_response === 'object' &&
+        Object.keys(po.etims_response as Record<string, unknown>).length > 0;
+      const hasEvidence = Boolean(url || hasResp || po.etims_submitted_at);
+      if (!hasEvidence) return false;
       const inv = invoices.find(
         (i) =>
           i.purchase_order_id === po.id &&
@@ -916,7 +1060,7 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
                   </Card>
                 ) : null}
                 {builderUnpaidEtimsStandalone.map((po) => {
-                  const url = po.etims_verification_url!.trim();
+                  const url = (po.etims_verification_url || '').trim();
                   return (
                     <Card key={`etims-${po.id}`} className="border-sky-200/60 dark:border-sky-900/50">
                       <CardHeader>
@@ -938,11 +1082,17 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
                         </div>
                       </CardHeader>
                       <CardContent className="space-y-3">
-                        <KraEtimsReceiptEmbed url={url} />
+                        <KraEtimsReceiptPanel
+                          poNumber={po.po_number}
+                          verificationUrl={url || null}
+                          etimsResponse={po.etims_response}
+                          traderInvoiceNoDb={po.etims_trader_invoice_no}
+                          etimsSubmittedAt={po.etims_submitted_at}
+                        />
                         <p className="text-xs text-muted-foreground">
                           <strong className="text-foreground">Pay Now</strong> will unlock when an unpaid supplier invoice
                           is linked to this PO. Tap <strong className="text-foreground">Refresh</strong> above after they
-                          send it — the same receipt preview will appear on that invoice row.
+                          send it — the same receipt appears on that invoice row.
                         </p>
                       </CardContent>
                     </Card>
@@ -954,6 +1104,15 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
           {displayInvoices.map((invoice) => {
             const rowStatus = String(invoice.status || '').toLowerCase();
             const kraEtimsUrl = etimsUrlForInvoice(invoice);
+            const poEtimsRow =
+              userRole === 'builder' ? builderEtimsReceipts.find((p) => p.id === invoice.purchase_order_id) : undefined;
+            const etimsStoredObj = poEtimsRow?.etims_response;
+            const hasEtimsStoredPayload =
+              etimsStoredObj != null &&
+              typeof etimsStoredObj === 'object' &&
+              Object.keys(etimsStoredObj as Record<string, unknown>).length > 0;
+            const showBuilderEtimsReceiptPanel =
+              userRole === 'builder' && (Boolean(kraEtimsUrl?.trim()) || hasEtimsStoredPayload);
             const showBuilderPayNow =
               userRole === 'builder' &&
               !invoiceIsPaid(invoice) &&
@@ -997,13 +1156,14 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
-                    {kraEtimsUrl ? (
-                      <div className="rounded-lg border border-sky-200/70 bg-sky-50/40 p-3 dark:border-sky-900/50 dark:bg-sky-950/20">
-                        <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-sky-900/80 dark:text-sky-200/90">
-                          KRA eTIMS receipt
-                        </p>
-                        <KraEtimsReceiptEmbed url={kraEtimsUrl} />
-                      </div>
+                    {showBuilderEtimsReceiptPanel ? (
+                      <KraEtimsReceiptPanel
+                        poNumber={invoice.purchase_order?.po_number || invoice.purchase_order_id}
+                        verificationUrl={kraEtimsUrl || poEtimsRow?.etims_verification_url}
+                        etimsResponse={poEtimsRow?.etims_response ?? null}
+                        traderInvoiceNoDb={poEtimsRow?.etims_trader_invoice_no}
+                        etimsSubmittedAt={poEtimsRow?.etims_submitted_at}
+                      />
                     ) : null}
                     <div className="grid grid-cols-2 gap-4 text-sm">
                       <div>
