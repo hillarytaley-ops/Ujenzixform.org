@@ -24,7 +24,6 @@ import {
   Send,
   Download,
   AlertTriangle,
-  ExternalLink,
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { sortSupplyChainDocsNewestFirst } from '@/utils/sortSupplyChainDocs';
@@ -110,6 +109,48 @@ function invoiceLineLabel(line: Record<string, unknown>, index: number): string 
     line.description ?? line.material_name ?? line.name ?? line.material_type ?? line.item_name;
   if (typeof d === 'string' && d.trim()) return d.trim();
   return `Line ${index + 1}`;
+}
+
+function isHttpsOrHttpUrl(s: string): boolean {
+  try {
+    const u = new URL(s.trim());
+    return u.protocol === 'https:' || u.protocol === 'http:';
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Shows the integrator/KRA verification page inside the app (iframe).
+ * We cannot "extract" HTML into our DOM from third-party URLs without their API; embedding is the supported pattern.
+ */
+function KraEtimsReceiptEmbed({ url }: { url: string }) {
+  const trimmed = url.trim();
+  if (!trimmed || !isHttpsOrHttpUrl(trimmed)) {
+    return (
+      <p className="text-sm text-muted-foreground">
+        This receipt address cannot be previewed here. If it is not a normal web link, open it from your integrator or
+        KRA portal directly.
+      </p>
+    );
+  }
+  return (
+    <div className="space-y-2">
+      <div className="relative w-full overflow-hidden rounded-md border border-border bg-white shadow-inner dark:bg-slate-950">
+        <iframe
+          title="KRA eTIMS verification receipt"
+          src={trimmed}
+          className="h-[min(70vh,560px)] min-h-[320px] w-full border-0 sm:min-h-[380px]"
+          referrerPolicy="no-referrer-when-downgrade"
+          allow="clipboard-write"
+        />
+      </div>
+      <p className="text-xs text-muted-foreground">
+        In-app preview. If the frame stays blank, the tax site may block embedding; your eTIMS submission is still valid on
+        KRA or your OSCU.
+      </p>
+    </div>
+  );
 }
 
 export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
@@ -883,23 +924,27 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
                           <div>
                             <CardTitle className="text-base">KRA eTIMS receipt</CardTitle>
                             <p className="text-sm text-muted-foreground">PO {po.po_number}</p>
-                            <a
-                              href={url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="mt-2 inline-flex w-fit items-center gap-1 text-sm font-medium text-primary underline-offset-2 hover:underline"
-                            >
-                              Open verification / receipt
-                              <ExternalLink className="h-3.5 w-3.5 shrink-0 opacity-80" aria-hidden />
-                            </a>
                           </div>
-                          <p className="max-w-md text-xs text-muted-foreground sm:text-right">
-                            No unpaid supplier invoice is linked to this PO yet. After the supplier sends the invoice, it
-                            will appear in this tab with <strong className="text-foreground">Pay now</strong>. Use{' '}
-                            <strong className="text-foreground">Refresh</strong> above.
-                          </p>
+                          <Button
+                            type="button"
+                            size="lg"
+                            disabled
+                            className="shrink-0 bg-emerald-600/40 font-bold text-white"
+                            title="Available after your supplier sends an invoice for this purchase order."
+                          >
+                            <CreditCard className="mr-2 h-5 w-5 opacity-80" />
+                            Pay Now
+                          </Button>
                         </div>
                       </CardHeader>
+                      <CardContent className="space-y-3">
+                        <KraEtimsReceiptEmbed url={url} />
+                        <p className="text-xs text-muted-foreground">
+                          <strong className="text-foreground">Pay Now</strong> will unlock when an unpaid supplier invoice
+                          is linked to this PO. Tap <strong className="text-foreground">Refresh</strong> above after they
+                          send it — the same receipt preview will appear on that invoice row.
+                        </p>
+                      </CardContent>
                     </Card>
                   );
                 })}
@@ -925,19 +970,6 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
                         PO: {invoice.purchase_order?.po_number || 'N/A'} •{' '}
                         {invoice.supplier?.company_name || 'Supplier'}
                       </p>
-                      {kraEtimsUrl ? (
-                        <p className="mt-1.5">
-                          <a
-                            href={kraEtimsUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1 text-sm font-medium text-sky-700 underline-offset-2 hover:underline dark:text-sky-300"
-                          >
-                            Open KRA eTIMS verification / receipt
-                            <ExternalLink className="h-3.5 w-3.5 shrink-0 opacity-80" aria-hidden />
-                          </a>
-                        </p>
-                      ) : null}
                       {userRole === 'builder' && !invoiceIsPaid(invoice) && (
                         <p className="mt-2 text-sm font-medium text-amber-800 dark:text-amber-200">
                           {rowStatus === 'draft' ? (
@@ -965,6 +997,14 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
+                    {kraEtimsUrl ? (
+                      <div className="rounded-lg border border-sky-200/70 bg-sky-50/40 p-3 dark:border-sky-900/50 dark:bg-sky-950/20">
+                        <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-sky-900/80 dark:text-sky-200/90">
+                          KRA eTIMS receipt
+                        </p>
+                        <KraEtimsReceiptEmbed url={kraEtimsUrl} />
+                      </div>
+                    ) : null}
                     <div className="grid grid-cols-2 gap-4 text-sm">
                       <div>
                         <p className="text-gray-500">Invoice Date</p>
@@ -1007,7 +1047,7 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
                           ) : (
                             <>
                               <CreditCard className="h-5 w-5 mr-2" />
-                              Pay now
+                              Pay Now
                             </>
                           )}
                         </Button>
