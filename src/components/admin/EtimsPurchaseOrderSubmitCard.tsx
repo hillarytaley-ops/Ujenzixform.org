@@ -20,17 +20,88 @@ import {
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ToastAction } from "@/components/ui/toast";
 import { useToast } from "@/hooks/use-toast";
-import { pushEtimsItemStockLevel, submitEtimsInvoiceForPurchaseOrder } from "@/lib/etims/purchaseOrderEtims";
+import {
+  lineEtimsItemCode,
+  parsePurchaseOrderItems,
+  pushEtimsItemStockLevel,
+  submitEtimsInvoiceForPurchaseOrder,
+  type PoItemJson,
+} from "@/lib/etims/purchaseOrderEtims";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
+import { Badge } from "@/components/ui/badge";
 
 type PoPickRow = {
   id: string;
   po_number: string;
-  status: string;
   total_amount: number;
   created_at: string;
+  items?: unknown;
+  etims_submitted_at?: string | null;
+  etims_error?: string | null;
+  etims_trader_invoice_no?: string | null;
 };
+
+function lineMaterialLabel(line: PoItemJson): string {
+  for (const k of ["material_name", "name", "description", "title", "material_type"] as const) {
+    const v = line[k];
+    if (typeof v === "string" && v.trim()) return v.trim();
+  }
+  return "";
+}
+
+/** Lines for PO picker: material names, codes, and search text (no order workflow / delivery status). */
+function poLinesSummary(items: unknown): {
+  materialLine: string;
+  codesLine: string;
+  searchText: string;
+} {
+  const lines = parsePurchaseOrderItems(items);
+  const names: string[] = [];
+  const codes: string[] = [];
+  for (const line of lines) {
+    const name = lineMaterialLabel(line);
+    const code = lineEtimsItemCode(line);
+    if (name) names.push(name);
+    if (code) codes.push(code);
+  }
+  const materialLine =
+    names.length > 0
+      ? names.join(" · ")
+      : lines.length > 0
+        ? `${lines.length} line(s) — no material name on PO JSON`
+        : "No line items on PO";
+  const codesLine =
+    codes.length > 0
+      ? codes.join(", ")
+      : "No item code on PO lines (catalog may fill at submit)";
+  const searchText = [...names, ...codes].join(" ");
+  return { materialLine, codesLine, searchText };
+}
+
+/** One row per PO line: material label + item code (from PO JSON; catalog may add codes at submit). */
+function poLineRows(items: unknown): { material: string; code: string }[] {
+  return parsePurchaseOrderItems(items).map((line) => ({
+    material: lineMaterialLabel(line) || "(no material name on PO)",
+    code: lineEtimsItemCode(line) || "—",
+  }));
+}
+
+function etimsStatusBadge(row: Pick<PoPickRow, "etims_submitted_at" | "etims_error">): {
+  label: string;
+  variant: "destructive" | "outline";
+  className?: string;
+} | null {
+  if (!row.etims_submitted_at) return null;
+  const err = row.etims_error && String(row.etims_error).trim();
+  if (err) return { label: "eTIMS: failed", variant: "destructive" };
+  return {
+    label: "eTIMS: invoiced",
+    variant: "outline",
+    className:
+      "border-emerald-600/55 bg-emerald-50/90 font-medium text-emerald-900 dark:border-emerald-500/45 dark:bg-emerald-950/45 dark:text-emerald-100",
+  };
+}
 
 function formatPoDate(iso: string): string {
   try {
@@ -87,7 +158,9 @@ export const EtimsPurchaseOrderSubmitCard: React.FC<EtimsPurchaseOrderSubmitCard
     try {
       let q = supabase
         .from("purchase_orders")
-        .select("id, po_number, status, total_amount, created_at")
+        .select(
+          "id, po_number, total_amount, created_at, items, etims_submitted_at, etims_error, etims_trader_invoice_no",
+        )
         .order("created_at", { ascending: false })
         .limit(75);
       if (enforceSupplierId?.trim()) {
@@ -133,25 +206,55 @@ export const EtimsPurchaseOrderSubmitCard: React.FC<EtimsPurchaseOrderSubmitCard
       if (sid) {
         const { data: prices, error: priceErr } = await supabase
           .from("supplier_product_prices")
-          .select("etims_item_code")
+          .select("etims_item_code, product_id")
           .eq("supplier_id", sid)
           .not("etims_item_code", "is", null)
           .limit(200);
         if (!priceErr) {
+          const productIds = [
+            ...new Set(
+              (prices ?? [])
+                .map((r) => (r as { product_id?: string | null }).product_id)
+                .filter((id): id is string => typeof id === "string" && id.length > 0),
+            ),
+          ];
+          const nameByProduct = new Map<string, string>();
+          if (productIds.length > 0) {
+            const { data: matNames } = await supabase
+              .from("materials")
+              .select("id, name")
+              .in("id", productIds.slice(0, 100));
+            for (const m of matNames ?? []) {
+              const id = (m as { id?: string }).id;
+              const nm = typeof (m as { name?: string | null }).name === "string" ? (m as { name: string }).name.trim() : "";
+              if (id && nm) nameByProduct.set(id, nm);
+            }
+          }
           for (const row of prices ?? []) {
             const code =
               typeof (row as { etims_item_code?: string | null }).etims_item_code === "string"
                 ? (row as { etims_item_code: string }).etims_item_code.trim()
                 : "";
-            if (code && !byCode.has(code)) byCode.set(code, code);
+            if (!code || byCode.has(code)) continue;
+            const pid = typeof (row as { product_id?: string | null }).product_id === "string"
+              ? (row as { product_id: string }).product_id.trim()
+              : "";
+            const matName = pid ? nameByProduct.get(pid) : undefined;
+            byCode.set(code, matName && matName.length > 0 ? `${matName} — ${code}` : code);
           }
         }
       }
       setStockCodeSuggestions(
-        [...byCode.entries()].map(([code, label]) => ({
-          code,
-          label: label === code ? code : `${label} (${code})`,
-        }))
+        [...byCode.entries()].map(([code, label]) => {
+          const trimmed = label.trim();
+          const same = trimmed === code;
+          const suffix =
+            code.length >= 4 && trimmed.toLowerCase().endsWith(code.toLowerCase());
+          return {
+            code,
+            label: same || suffix ? trimmed : `${trimmed} (${code})`,
+          };
+        }),
       );
     } catch (e) {
       console.warn("eTIMS stock code suggestions:", e);
@@ -224,6 +327,7 @@ export const EtimsPurchaseOrderSubmitCard: React.FC<EtimsPurchaseOrderSubmitCard
         return;
       }
       toast({ title: "Submitted", description: "Invoice sent to integrator; order row updated." });
+      void loadRecentOrders();
     } finally {
       setBusy(false);
     }
@@ -312,47 +416,145 @@ export const EtimsPurchaseOrderSubmitCard: React.FC<EtimsPurchaseOrderSubmitCard
                 role="combobox"
                 aria-expanded={poPickerOpen}
                 disabled={ordersLoading || orders === null}
-                className="h-10 w-full justify-between font-normal"
+                className="h-auto min-h-10 w-full justify-between py-2 font-normal"
               >
-                <span className="truncate text-left">
-                  {ordersLoading
-                    ? "Loading orders…"
-                    : orders && orders.length === 0
-                      ? enforceSupplierId
-                        ? "No purchase orders for this supplier yet"
-                        : "No purchase orders visible to your account"
-                      : selectedOrder
-                        ? `${selectedOrder.po_number} · ${selectedOrder.status} · ${formatPoDate(selectedOrder.created_at)} · ${formatKesAmount(selectedOrder.total_amount)}`
-                        : "Select an order from the system…"}
+                <span className="min-w-0 flex-1 text-left">
+                  {ordersLoading ? (
+                    "Loading orders…"
+                  ) : orders && orders.length === 0 ? (
+                    enforceSupplierId
+                      ? "No purchase orders for this supplier yet"
+                      : "No purchase orders visible to your account"
+                  ) : selectedOrder ? (
+                    (() => {
+                      const sum = poLinesSummary(selectedOrder.items);
+                      const badge = etimsStatusBadge(selectedOrder);
+                      return (
+                        <span className="flex min-w-0 flex-col gap-0.5">
+                          <span className="flex min-w-0 flex-wrap items-center gap-2">
+                            <span className="truncate font-medium">{selectedOrder.po_number}</span>
+                            {badge ? (
+                              <Badge
+                                variant={badge.variant}
+                                className={cn("shrink-0 text-[10px] font-normal", badge.className)}
+                              >
+                                {badge.label}
+                              </Badge>
+                            ) : null}
+                          </span>
+                          {selectedOrder.etims_submitted_at &&
+                          !String(selectedOrder.etims_error || "").trim() &&
+                          selectedOrder.etims_trader_invoice_no?.trim() ? (
+                            <span className="text-[10px] text-muted-foreground">
+                              Integrator ref:{" "}
+                              <span className="font-mono text-foreground">
+                                {selectedOrder.etims_trader_invoice_no.trim()}
+                              </span>
+                            </span>
+                          ) : null}
+                          <span className="truncate text-xs text-muted-foreground" title={sum.materialLine}>
+                            {sum.materialLine}
+                          </span>
+                          <span
+                            className="truncate font-mono text-[10px] text-muted-foreground"
+                            title={`${sum.codesLine} · ${formatPoDate(selectedOrder.created_at)} · ${formatKesAmount(selectedOrder.total_amount)}`}
+                          >
+                            {sum.codesLine} · {formatPoDate(selectedOrder.created_at)} ·{" "}
+                            {formatKesAmount(selectedOrder.total_amount)}
+                          </span>
+                        </span>
+                      );
+                    })()
+                  ) : (
+                    "Select an order from the system…"
+                  )}
                 </span>
-                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 self-center opacity-50" />
               </Button>
             </PopoverTrigger>
             <PopoverContent className="w-[min(calc(100vw-2rem),28rem)] p-0" align="start">
               <Command>
-                <CommandInput placeholder="Search by PO number, status, or id…" className="h-10" />
+                <CommandInput placeholder="Search PO #, materials, item codes, or UUID…" className="h-10" />
                 <CommandList>
                   <CommandEmpty>No matching orders.</CommandEmpty>
                   <CommandGroup>
-                    {(orders ?? []).map((row) => (
-                      <CommandItem
-                        key={row.id}
-                        value={`${row.po_number} ${row.status} ${row.id} ${formatPoDate(row.created_at)}`}
-                        onSelect={() => {
-                          setPoId(row.id);
-                          setPoPickerOpen(false);
-                        }}
-                      >
-                        <Check className={cn("mr-2 h-4 w-4 shrink-0", poId.trim() === row.id ? "opacity-100" : "opacity-0")} />
-                        <div className="min-w-0 flex-1">
-                          <div className="font-medium text-foreground">{row.po_number}</div>
-                          <div className="truncate text-xs text-muted-foreground">
-                            {row.status} · {formatPoDate(row.created_at)} · {formatKesAmount(row.total_amount)}
+                    {(orders ?? []).map((row) => {
+                      const sum = poLinesSummary(row.items);
+                      const lineRows = poLineRows(row.items);
+                      const badge = etimsStatusBadge(row);
+                      const value = `${row.po_number} ${row.id} ${formatPoDate(row.created_at)} ${formatKesAmount(row.total_amount)} ${sum.searchText}`;
+                      return (
+                        <CommandItem
+                          key={row.id}
+                          value={value}
+                          onSelect={() => {
+                            setPoId(row.id);
+                            setPoPickerOpen(false);
+                          }}
+                        >
+                          <Check
+                            className={cn("mr-2 h-4 w-4 shrink-0", poId.trim() === row.id ? "opacity-100" : "opacity-0")}
+                          />
+                          <div className="min-w-0 flex-1 space-y-1.5">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className="font-medium text-foreground">{row.po_number}</span>
+                              {badge ? (
+                                <Badge
+                                  variant={badge.variant}
+                                  className={cn("text-[10px] font-normal", badge.className)}
+                                >
+                                  {badge.label}
+                                </Badge>
+                              ) : null}
+                            </div>
+                            {row.etims_submitted_at &&
+                            !String(row.etims_error || "").trim() &&
+                            row.etims_trader_invoice_no?.trim() ? (
+                              <div className="text-[10px] text-muted-foreground">
+                                Integrator ref:{" "}
+                                <span className="font-mono text-foreground">{row.etims_trader_invoice_no.trim()}</span>
+                              </div>
+                            ) : null}
+                            {lineRows.length > 0 ? (
+                              <div className="space-y-1 rounded-md border border-border/70 bg-muted/25 px-2 py-1.5">
+                                <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                                  Lines (material · item code)
+                                </div>
+                                {lineRows.slice(0, 12).map((lr, i) => (
+                                  <div
+                                    key={i}
+                                    className="grid gap-x-2 gap-y-0.5 border-b border-border/40 pb-1 text-[11px] last:border-0 last:pb-0 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-baseline"
+                                  >
+                                    <span className="min-w-0 text-foreground" title={lr.material}>
+                                      <span className="text-muted-foreground">#{i + 1}</span> {lr.material}
+                                    </span>
+                                    <span
+                                      className="shrink-0 font-mono text-xs text-foreground sm:text-right"
+                                      title={lr.code}
+                                    >
+                                      {lr.code}
+                                    </span>
+                                  </div>
+                                ))}
+                                {lineRows.length > 12 ? (
+                                  <div className="text-[10px] text-muted-foreground">
+                                    +{lineRows.length - 12} more line(s)…
+                                  </div>
+                                ) : null}
+                              </div>
+                            ) : (
+                              <div className="text-xs text-muted-foreground">{sum.materialLine}</div>
+                            )}
+                            <div className="text-[10px] text-muted-foreground">
+                              {formatPoDate(row.created_at)} · {formatKesAmount(row.total_amount)}
+                              <span className="ml-1 font-mono opacity-80" title={row.id}>
+                                · id {row.id.slice(0, 8)}…
+                              </span>
+                            </div>
                           </div>
-                          <div className="font-mono text-[10px] text-muted-foreground/80 truncate">{row.id}</div>
-                        </div>
-                      </CommandItem>
-                    ))}
+                        </CommandItem>
+                      );
+                    })}
                   </CommandGroup>
                 </CommandList>
               </Command>
@@ -361,7 +563,10 @@ export const EtimsPurchaseOrderSubmitCard: React.FC<EtimsPurchaseOrderSubmitCard
           <p className="text-xs text-muted-foreground">
             {enforceSupplierId
               ? "Showing recent orders for this supplier (same list as your dashboard access)."
-              : "Showing recent orders you can read (admin: broader access; others: per RLS)."}
+              : "Showing recent orders you can read (admin: broader access; others: per RLS)."}{" "}
+            Delivery / workflow status is omitted here; use View Orders for logistics. Invoiced POs show an{" "}
+            <span className="whitespace-nowrap font-medium text-foreground">eTIMS: invoiced</span> badge when submission
+            succeeded.
           </p>
         </div>
 
@@ -427,6 +632,15 @@ export const EtimsPurchaseOrderSubmitCard: React.FC<EtimsPurchaseOrderSubmitCard
               className="font-mono text-sm"
               autoComplete="off"
             />
+            {(() => {
+              const hit = stockCodeSuggestions.find((s) => s.code === stockItemCode.trim());
+              return hit ? (
+                <p className="text-xs text-foreground">
+                  <span className="font-medium text-muted-foreground">Catalog match: </span>
+                  {hit.label}
+                </p>
+              ) : null;
+            })()}
             <p className="text-xs text-muted-foreground">
               {enforceSupplierId?.trim()
                 ? "Dropdown lists materials and supplier price rows that have an eTIMS code for this supplier. You can still paste any integrator code."
