@@ -1,0 +1,25 @@
+# Deploy Edge Function from GitHub (Linux) — no Windows Supabase CLI required.
+# 1. Repo → Settings → Secrets → Actions: add SUPABASE_ACCESS_TOKEN and SUPABASE_PROJECT_REF.
+# 2. Actions → "Deploy paystack-webhook (Supabase)" → Run workflow.
+#
+# Token: https://supabase.com/dashboard/account/tokens (personal access token, not anon key)
+# Project ref: Dashboard → Project Settings → General → Reference ID
+name: Deploy paystack-webhook (Supabase)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Deploy paystack-webhook
+        run: supabase functions deploy paystack-webhook --project-ref ${{ secrets.SUPABASE_PROJECT_REF }}
