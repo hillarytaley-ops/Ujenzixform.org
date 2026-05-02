@@ -42,10 +42,18 @@ type PoPickRow = {
   etims_trader_invoice_no?: string | null;
 };
 
+const PO_LINE_DESC_MAX = 80;
+
+/** Prefer short product fields; use `description` last and cap length (PO JSON often embeds pricing/revision blobs). */
 function lineMaterialLabel(line: PoItemJson): string {
-  for (const k of ["material_name", "name", "description", "title", "material_type"] as const) {
+  for (const k of ["material_name", "name", "title", "material_type", "description"] as const) {
     const v = line[k];
-    if (typeof v === "string" && v.trim()) return v.trim();
+    if (typeof v !== "string" || !v.trim()) continue;
+    let t = v.trim();
+    if (k === "description" && t.length > PO_LINE_DESC_MAX) {
+      t = `${t.slice(0, Math.max(0, PO_LINE_DESC_MAX - 1))}…`;
+    }
+    return t;
   }
   return "";
 }
@@ -72,9 +80,7 @@ function poLinesSummary(items: unknown): {
         ? `${lines.length} line(s) — no material name on PO JSON`
         : "No line items on PO";
   const codesLine =
-    codes.length > 0
-      ? codes.join(", ")
-      : "No item code on PO lines (catalog may fill at submit)";
+    codes.length > 0 ? codes.join(", ") : "No line codes (filled from catalog at submit if set)";
   const searchText = [...names, ...codes].join(" ");
   return { materialLine, codesLine, searchText };
 }
@@ -148,6 +154,9 @@ export const EtimsPurchaseOrderSubmitCard: React.FC<EtimsPurchaseOrderSubmitCard
   /** Suggestions for stock item code (materials / supplier prices with etims_item_code set) */
   const [stockCodeSuggestions, setStockCodeSuggestions] = useState<{ code: string; label: string }[]>([]);
   const [stockCodesLoading, setStockCodesLoading] = useState(false);
+  /** Resolved material name for typed code when datalist only had the bare integrator code */
+  const [stockResolvedCatalogLabel, setStockResolvedCatalogLabel] = useState<string | null>(null);
+  const [stockResolveBusy, setStockResolveBusy] = useState(false);
 
   const [orders, setOrders] = useState<PoPickRow[] | null>(null);
   const [ordersLoading, setOrdersLoading] = useState(false);
@@ -273,6 +282,58 @@ export const EtimsPurchaseOrderSubmitCard: React.FC<EtimsPurchaseOrderSubmitCard
     void loadStockItemCodeSuggestions();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [enforceSupplierId]);
+
+  /** When the user types an item code, look up a material row by `etims_item_code` so "Catalog match" shows a name. */
+  useEffect(() => {
+    const code = stockItemCode.trim();
+    if (!code || code.length < 4) {
+      setStockResolvedCatalogLabel(null);
+      setStockResolveBusy(false);
+      return;
+    }
+    const fromList = stockCodeSuggestions.find((s) => s.code === code);
+    if (fromList && fromList.label.trim() !== fromList.code) {
+      setStockResolvedCatalogLabel(fromList.label);
+      setStockResolveBusy(false);
+      return;
+    }
+
+    let cancelled = false;
+    setStockResolveBusy(true);
+    (async () => {
+      try {
+        const sid = enforceSupplierId?.trim();
+        let rows: { name?: string | null }[] | null = null;
+        if (sid) {
+          const scoped = await supabase
+            .from("materials")
+            .select("name")
+            .eq("etims_item_code", code)
+            .eq("supplier_id", sid)
+            .limit(5);
+          if (!cancelled) rows = scoped.data as { name?: string | null }[] | null;
+        }
+        if ((!rows || rows.length === 0) && !cancelled) {
+          const broad = await supabase.from("materials").select("name").eq("etims_item_code", code).limit(5);
+          if (!cancelled) rows = broad.data as { name?: string | null }[] | null;
+        }
+        if (cancelled) return;
+        const nm =
+          (rows ?? [])
+            .map((r) => (typeof r.name === "string" ? r.name.trim() : ""))
+            .find((x) => x.length > 0) ?? "";
+        setStockResolvedCatalogLabel(nm ? `${nm} — ${code}` : null);
+      } catch {
+        if (!cancelled) setStockResolvedCatalogLabel(null);
+      } finally {
+        if (!cancelled) setStockResolveBusy(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [stockItemCode, stockCodeSuggestions, enforceSupplierId]);
 
   const selectedOrder = orders?.find((o) => o.id === poId.trim());
 
@@ -455,12 +516,15 @@ export const EtimsPurchaseOrderSubmitCard: React.FC<EtimsPurchaseOrderSubmitCard
                           <span className="truncate text-xs text-muted-foreground" title={sum.materialLine}>
                             {sum.materialLine}
                           </span>
-                          <span
-                            className="truncate font-mono text-[10px] text-muted-foreground"
-                            title={`${sum.codesLine} · ${formatPoDate(selectedOrder.created_at)} · ${formatKesAmount(selectedOrder.total_amount)}`}
-                          >
-                            {sum.codesLine} · {formatPoDate(selectedOrder.created_at)} ·{" "}
-                            {formatKesAmount(selectedOrder.total_amount)}
+                          <span className="grid grid-cols-1 gap-0.5 text-[10px] text-muted-foreground sm:grid-cols-[auto_1fr] sm:gap-x-2">
+                            <span className="shrink-0 font-sans font-medium text-muted-foreground/90">Item codes</span>
+                            <span className="min-w-0 truncate font-mono text-foreground/90" title={sum.codesLine}>
+                              {sum.codesLine}
+                            </span>
+                            <span className="shrink-0 font-sans font-medium text-muted-foreground/90">Date / total</span>
+                            <span className="min-w-0 truncate font-mono">
+                              {formatPoDate(selectedOrder.created_at)} · {formatKesAmount(selectedOrder.total_amount)}
+                            </span>
                           </span>
                         </span>
                       );
@@ -633,13 +697,33 @@ export const EtimsPurchaseOrderSubmitCard: React.FC<EtimsPurchaseOrderSubmitCard
               autoComplete="off"
             />
             {(() => {
-              const hit = stockCodeSuggestions.find((s) => s.code === stockItemCode.trim());
-              return hit ? (
-                <p className="text-xs text-foreground">
-                  <span className="font-medium text-muted-foreground">Catalog match: </span>
-                  {hit.label}
-                </p>
-              ) : null;
+              const trimmed = stockItemCode.trim();
+              if (!trimmed) return null;
+              const hit = stockCodeSuggestions.find((s) => s.code === trimmed);
+              const label =
+                stockResolvedCatalogLabel ||
+                (hit && hit.label.trim() !== hit.code ? hit.label : null);
+              if (label) {
+                return (
+                  <p className="text-xs text-foreground">
+                    <span className="font-medium text-muted-foreground">Catalog match: </span>
+                    {label}
+                  </p>
+                );
+              }
+              if (stockResolveBusy && trimmed.length >= 4) {
+                return <p className="text-xs text-muted-foreground">Looking up material for this code…</p>;
+              }
+              if (hit) {
+                return (
+                  <p className="text-xs text-muted-foreground">
+                    Code <span className="font-mono text-foreground">{hit.code}</span> — no material name in catalog yet.
+                    Add <span className="font-mono">etims_item_code</span> on the product in My Materials, then refresh
+                    catalog codes.
+                  </p>
+                );
+              }
+              return null;
             })()}
             <p className="text-xs text-muted-foreground">
               {enforceSupplierId?.trim()
