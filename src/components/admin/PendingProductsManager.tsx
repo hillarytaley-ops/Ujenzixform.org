@@ -63,7 +63,8 @@ import {
   AlertTriangle,
   DollarSign,
   Image as ImageIcon,
-  Trash2
+  Trash2,
+  LayoutGrid,
 } from 'lucide-react';
 
 /** 1×1 transparent PNG — approved_material_images.image_url is NOT NULL */
@@ -165,7 +166,12 @@ const PRODUCT_CATEGORIES = [
   'Geotextiles', 'Polythene', 'Tarpaulins', 'Signage', 'Other'
 ];
 
-export const PendingProductsManager: React.FC = () => {
+export type PendingProductsManagerProps = {
+  /** Opens admin Material Images → Supplier Images for this `materials.id` (eTIMS / marketplace). */
+  onOpenMaterialImages?: (materialId: string) => void;
+};
+
+export const PendingProductsManager: React.FC<PendingProductsManagerProps> = ({ onOpenMaterialImages }) => {
   const [activeTab, setActiveTab] = useState<'requests' | 'pending' | 'approved' | 'rejected'>('pending');
   const [products, setProducts] = useState<PendingProduct[]>([]);
   const [productRequests, setProductRequests] = useState<ProductRequest[]>([]);
@@ -760,6 +766,18 @@ export const PendingProductsManager: React.FC = () => {
                 </TableCell>
                 <TableCell>
                   <div className="flex items-center justify-end gap-2">
+                    {onOpenMaterialImages ? (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        type="button"
+                        title="Open Material Images grid (supplier catalog)"
+                        onClick={() => onOpenMaterialImages(product.id)}
+                        className="text-violet-400 hover:bg-violet-500/20"
+                      >
+                        <LayoutGrid className="h-4 w-4" />
+                      </Button>
+                    ) : null}
                     <Button
                       size="sm"
                       variant="ghost"

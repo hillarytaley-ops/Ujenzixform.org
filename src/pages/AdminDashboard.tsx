@@ -108,7 +108,10 @@ import { DeliveryAnalytics } from "@/components/admin/DeliveryAnalytics";
 import { DeliveryPayAdminTab } from "@/components/admin/DeliveryPayAdminTab";
 import { MonitoringRequestsManager } from "@/components/admin/MonitoringRequestsManager";
 import { PendingProductsManager } from "@/components/admin/PendingProductsManager";
-import { MaterialImagesManager } from "@/components/admin/MaterialImagesManager";
+import {
+  ADMIN_MATERIAL_IMAGES_FOCUS_MATERIAL_ID,
+  MaterialImagesManager,
+} from "@/components/admin/MaterialImagesManager";
 import { AdminOrdersManager } from "@/components/admin/AdminOrdersManager";
 import { AdminVideoApproval } from "@/components/admin/AdminVideoApproval";
 import { BuilderModerationTab } from "@/components/admin/BuilderModerationTab";
@@ -452,7 +455,9 @@ const AdminDashboard = () => {
     "supply-chain-docs"
   ] as const;
   const [activeTab, setActiveTab] = useUrlTabSync([...ADMIN_TABS], "overview");
-  
+  /** Bumped when opening Material Images from Product Submissions so focus runs if data was already loaded. */
+  const [materialImagesFocusNonce, setMaterialImagesFocusNonce] = useState(0);
+
   // Chat/Communication Stats for badges
   const [chatStats, setChatStats] = useState({
     unreadChats: 0,
@@ -2874,7 +2879,17 @@ const AdminDashboard = () => {
 
           {/* Pending Products Tab - Admin Product Approval */}
           <TabsContent value="pending-products" className="space-y-6">
-            <PendingProductsManager />
+            <PendingProductsManager
+              onOpenMaterialImages={(materialId) => {
+                try {
+                  sessionStorage.setItem(ADMIN_MATERIAL_IMAGES_FOCUS_MATERIAL_ID, materialId);
+                } catch {
+                  /* ignore */
+                }
+                setMaterialImagesFocusNonce((n) => n + 1);
+                setActiveTab("material-images");
+              }}
+            />
           </TabsContent>
 
           {/* Video Approvals Tab - Admin approves builder videos */}
@@ -2884,7 +2899,7 @@ const AdminDashboard = () => {
 
           {/* Material Images Tab - Admin uploads and approves supplier images */}
           <TabsContent value="material-images" className="space-y-6">
-            <MaterialImagesManager />
+            <MaterialImagesManager focusNonce={materialImagesFocusNonce} />
           </TabsContent>
 
           {/* Delivery Applications Tab */}

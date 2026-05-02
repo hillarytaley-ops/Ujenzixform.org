@@ -200,7 +200,15 @@ const SUPPORTED_IMAGE_TYPES = [
   'image/heif'
 ];
 
-export const MaterialImagesManager: React.FC = () => {
+/** Written by Product Submissions before switching admin tab to Material Images. */
+export const ADMIN_MATERIAL_IMAGES_FOCUS_MATERIAL_ID = 'admin_material_images_focus_material_id';
+
+export type MaterialImagesManagerProps = {
+  /** Increment when navigating from Product Submissions so focus runs even if data was already loaded. */
+  focusNonce?: number;
+};
+
+export const MaterialImagesManager: React.FC<MaterialImagesManagerProps> = ({ focusNonce = 0 }) => {
   const [activeTab, setActiveTab] = useState<'admin-upload' | 'supplier-images'>('admin-upload');
   const [adminImages, setAdminImages] = useState<MaterialImage[]>([]);
   const [supplierMaterials, setSupplierMaterials] = useState<SupplierMaterial[]>([]);
@@ -630,6 +638,42 @@ export const MaterialImagesManager: React.FC = () => {
     };
     loadData();
   }, []);
+
+  // Deep-link from Product Submissions → Supplier Images grid + focus material row
+  useEffect(() => {
+    if (supplierMaterials.length === 0 || focusNonce === 0) return;
+    let focusId: string | null = null;
+    try {
+      focusId = sessionStorage.getItem(ADMIN_MATERIAL_IMAGES_FOCUS_MATERIAL_ID);
+    } catch {
+      return;
+    }
+    if (!focusId) return;
+
+    try {
+      sessionStorage.removeItem(ADMIN_MATERIAL_IMAGES_FOCUS_MATERIAL_ID);
+    } catch {
+      /* ignore */
+    }
+
+    const mat = supplierMaterials.find((m) => m.id === focusId);
+    setActiveTab('supplier-images');
+    if (mat) {
+      setSearchTerm(mat.name);
+      window.setTimeout(() => {
+        document.querySelector(`[data-admin-material-card="${focusId}"]`)?.scrollIntoView({
+          behavior: 'smooth',
+          block: 'center',
+        });
+      }, 250);
+    } else {
+      toast({
+        title: 'Material not in supplier grid',
+        description:
+          'This product is not in the Supplier Images list yet, or filters hide it. Try Refresh on Material Images or search by name.',
+      });
+    }
+  }, [supplierMaterials, focusNonce, toast]);
 
   // Handle file selection
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -1928,7 +1972,11 @@ export const MaterialImagesManager: React.FC = () => {
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
               {filteredSupplierMaterials.map(material => (
-                <Card key={material.id} className="bg-slate-800/50 border-slate-700 overflow-hidden group">
+                <Card
+                  key={material.id}
+                  data-admin-material-card={material.id}
+                  className="bg-slate-800/50 border-slate-700 overflow-hidden group scroll-mt-24"
+                >
                   <div className="relative aspect-square">
                     <img
                       src={
