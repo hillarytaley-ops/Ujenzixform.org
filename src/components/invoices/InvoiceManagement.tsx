@@ -81,6 +81,35 @@ function invoiceIsPaid(i: Invoice): boolean {
   return String(i.payment_status || '').toLowerCase() === 'paid';
 }
 
+/** Merge integrator-style keys into `etims_item_code` for a single editable field. */
+function normalizeInvoiceItemForEdit(raw: unknown): Record<string, unknown> {
+  const it =
+    raw && typeof raw === 'object' && raw !== null ? ({ ...(raw as Record<string, unknown>) }) : {};
+  const c1 = it.etims_item_code;
+  const c2 = it.itemCode;
+  const c3 = it.item_code;
+  const pick =
+    typeof c1 === 'string' && c1.trim()
+      ? c1.trim()
+      : typeof c2 === 'string' && c2.trim()
+        ? c2.trim()
+        : typeof c3 === 'string' && c3.trim()
+          ? c3.trim()
+          : '';
+  if (pick) it.etims_item_code = pick;
+  else delete it.etims_item_code;
+  delete it.itemCode;
+  delete it.item_code;
+  return it;
+}
+
+function invoiceLineLabel(line: Record<string, unknown>, index: number): string {
+  const d =
+    line.description ?? line.material_name ?? line.name ?? line.material_type ?? line.item_name;
+  if (typeof d === 'string' && d.trim()) return d.trim();
+  return `Line ${index + 1}`;
+}
+
 export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
   userId,
   userRole,
@@ -359,7 +388,9 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
     }
 
     setEditingInvoice(invoice);
-    setEditedItems(Array.isArray(invoice.items) ? [...invoice.items] : []);
+    setEditedItems(
+      Array.isArray(invoice.items) ? invoice.items.map((row) => normalizeInvoiceItemForEdit(row)) : [],
+    );
     setEditedSubtotal(invoice.subtotal);
     setEditedTax(invoice.tax_amount);
     setEditedDiscount(invoice.discount_amount);
@@ -383,10 +414,22 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
     try {
       setSaving(true);
 
+      const itemsToSave = editedItems.map((row) => {
+        if (!row || typeof row !== 'object') return row;
+        const o = { ...(row as Record<string, unknown>) };
+        const e = o.etims_item_code;
+        if (typeof e === 'string' && !e.trim()) {
+          delete o.etims_item_code;
+          delete o.itemCode;
+          delete o.item_code;
+        }
+        return o;
+      });
+
       const { error } = await supabase
         .from('invoices')
         .update({
-          items: editedItems,
+          items: itemsToSave,
           subtotal: editedSubtotal,
           tax_amount: editedTax,
           discount_amount: editedDiscount,
@@ -968,6 +1011,88 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
+            {userRole === 'supplier' && editedItems.length > 0 ? (
+              <div className="space-y-3 rounded-lg border border-orange-200 bg-orange-50/40 p-3 dark:border-orange-900/50 dark:bg-orange-950/20">
+                <div>
+                  <Label className="text-base font-semibold text-foreground">Line items</Label>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Add or edit the KRA / eTIMS integrator <span className="font-mono">itemCode</span> per line (saved on
+                    this invoice as <span className="font-mono">etims_item_code</span>). Helps match catalog codes when
+                    you reconcile with eTIMS.
+                  </p>
+                </div>
+                <div className="max-h-[min(50vh,24rem)] space-y-3 overflow-y-auto pr-1">
+                  {editedItems.map((raw, index) => {
+                    const line = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>;
+                    const code =
+                      typeof line.etims_item_code === 'string'
+                        ? line.etims_item_code
+                        : typeof line.itemCode === 'string'
+                          ? line.itemCode
+                          : typeof line.item_code === 'string'
+                            ? line.item_code
+                            : '';
+                    const qty = line.quantity ?? line.qty;
+                    const unit = typeof line.unit === 'string' ? line.unit : '';
+                    const up = line.unit_price ?? line.price;
+                    const qtyStr = qty !== undefined && qty !== null ? String(qty) : '—';
+                    const upNum = typeof up === 'number' ? up : Number(up);
+                    const upStr = Number.isFinite(upNum) ? `KES ${upNum.toLocaleString()}` : '—';
+                    return (
+                      <div
+                        key={index}
+                        className="space-y-2 rounded-md border border-border bg-card p-3 shadow-sm"
+                      >
+                        <p className="text-sm font-medium leading-snug text-foreground">
+                          {invoiceLineLabel(line, index)}
+                        </p>
+                        <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                          <span>
+                            Qty: <span className="font-medium text-foreground">{qtyStr}</span>
+                            {unit ? ` ${unit}` : ''}
+                          </span>
+                          <span>
+                            Unit price: <span className="font-medium text-foreground">{upStr}</span>
+                          </span>
+                        </div>
+                        <div className="space-y-1">
+                          <Label htmlFor={`inv-line-etims-${index}`} className="text-xs">
+                            eTIMS item code (optional)
+                          </Label>
+                          <Input
+                            id={`inv-line-etims-${index}`}
+                            className="font-mono text-sm"
+                            placeholder="e.g. KE1UCT0000001"
+                            value={typeof code === 'string' ? code : ''}
+                            autoComplete="off"
+                            onChange={(e) => {
+                              const v = e.target.value;
+                              setEditedItems((prev) =>
+                                prev.map((row, i) => {
+                                  if (i !== index) return row;
+                                  const o = {
+                                    ...(row && typeof row === 'object' ? (row as Record<string, unknown>) : {}),
+                                  };
+                                  const t = v.trim();
+                                  if (t) o.etims_item_code = t;
+                                  else {
+                                    delete o.etims_item_code;
+                                    delete o.itemCode;
+                                    delete o.item_code;
+                                  }
+                                  return o;
+                                }),
+                              );
+                            }}
+                          />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            ) : null}
+
             <div>
               <Label>Subtotal (KES)</Label>
               <Input
