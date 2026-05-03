@@ -340,6 +340,8 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
   const payInvoiceUrlHandledRef = useRef<string | null>(null);
   /** First fetch per user shows skeleton; later fetches (e.g. profile id resolved) refresh without blanking. */
   const invoiceFetchGenerationRef = useRef(0);
+  /** Latest fetcher for Realtime / visibility handlers (avoid stale closures). */
+  const fetchInvoicesRef = useRef<(opts?: { silent?: boolean }) => Promise<void>>(async () => {});
 
   /** Builder: POs with eTIMS data — includes stored integrator JSON for on-screen receipt. */
   type BuilderEtimsReceiptPo = {
@@ -549,6 +551,8 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
     }
   };
 
+  fetchInvoicesRef.current = fetchInvoices;
+
   const loadBuilderEtimsReceipts = useCallback(async () => {
     if (userRole !== 'builder' || !userId) {
       setBuilderEtimsReceipts([]);
@@ -619,6 +623,35 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
       void supabase.removeChannel(channel);
     };
   }, [userRole, userId, loadBuilderEtimsReceipts]);
+
+  /** Supplier: keep Unpaid / Paid in sync when the builder pays or invoices change (RLS scopes events). */
+  useEffect(() => {
+    if (userRole !== 'supplier' || !userId) return;
+    const channel = supabase
+      .channel(`supplier-invoice-sync-${userId}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'invoices' },
+        () => {
+          void fetchInvoicesRef.current({ silent: true });
+        }
+      )
+      .subscribe();
+    return () => {
+      void supabase.removeChannel(channel);
+    };
+  }, [userRole, userId]);
+
+  useEffect(() => {
+    if (userRole !== 'supplier') return;
+    const onVis = () => {
+      if (document.visibilityState === 'visible') {
+        void fetchInvoicesRef.current({ silent: true });
+      }
+    };
+    document.addEventListener('visibilitychange', onVis);
+    return () => document.removeEventListener('visibilitychange', onVis);
+  }, [userRole]);
 
   const showBuilderSupplierPaymentTabs = userRole === 'builder' || userRole === 'supplier';
 
