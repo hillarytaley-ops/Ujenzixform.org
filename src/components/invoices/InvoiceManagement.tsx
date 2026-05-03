@@ -620,11 +620,23 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
     [builderEtimsReceipts]
   );
 
+  /** POs that already have a paid supplier invoice — eTIMS standalone must not duplicate those rows on Unpaid/Paid. */
+  const builderPoIdsWithPaidInvoice = useMemo(() => {
+    const ids = new Set<string>();
+    for (const inv of invoices) {
+      if (!invoiceIsPaid(inv)) continue;
+      const poId = inv.purchase_order_id;
+      if (poId) ids.add(String(poId));
+    }
+    return ids;
+  }, [invoices]);
+
   /** Receipt exists but no unpaid supplier invoice for this PO yet — show its own row under Unpaid */
   const builderUnpaidEtimsStandalone = useMemo(() => {
     if (userRole !== 'builder' || invoicePaymentListTab !== 'unpaid') return [];
     return builderEtimsReceipts.filter((po) => {
       if (po.builder_etims_paystack_paid_at) return false;
+      if (builderPoIdsWithPaidInvoice.has(po.id)) return false;
       const url = po.etims_verification_url?.trim();
       const hasResp =
         po.etims_response != null &&
@@ -640,13 +652,15 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
       );
       return !inv;
     });
-  }, [userRole, invoicePaymentListTab, builderEtimsReceipts, invoices]);
+  }, [userRole, invoicePaymentListTab, builderEtimsReceipts, invoices, builderPoIdsWithPaidInvoice]);
 
-  /** eTIMS-only POs where builder completed Paystack (test) — shown under Paid tab */
+  /** eTIMS-only POs where builder completed Paystack (test) — shown under Paid tab when no paid invoice row covers this PO */
   const builderEtimsPaidStandalone = useMemo(() => {
     if (userRole !== 'builder') return [];
-    return builderEtimsReceipts.filter((po) => Boolean(po.builder_etims_paystack_paid_at));
-  }, [userRole, builderEtimsReceipts]);
+    return builderEtimsReceipts.filter(
+      (po) => Boolean(po.builder_etims_paystack_paid_at) && !builderPoIdsWithPaidInvoice.has(po.id)
+    );
+  }, [userRole, builderEtimsReceipts, builderPoIdsWithPaidInvoice]);
 
   const displayInvoicesTotalAmount = useMemo(
     () =>
@@ -1128,14 +1142,18 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
                           </Badge>
                         </div>
                       </CardHeader>
-                      <CardContent>
-                        <KraEtimsReceiptPanel
-                          poNumber={po.po_number}
-                          verificationUrl={url || null}
-                          etimsResponse={po.etims_response}
-                          traderInvoiceNoDb={po.etims_trader_invoice_no}
-                          etimsSubmittedAt={po.etims_submitted_at}
-                        />
+                      <CardContent className="pt-0">
+                        {url ? (
+                          <Button variant="outline" size="sm" asChild>
+                            <a href={url} target="_blank" rel="noopener noreferrer">
+                              Open KRA verification page
+                            </a>
+                          </Button>
+                        ) : (
+                          <p className="text-xs text-muted-foreground">
+                            Full receipt details stay on the supplier invoice row for this order when one exists.
+                          </p>
+                        )}
                       </CardContent>
                     </Card>
                   );
