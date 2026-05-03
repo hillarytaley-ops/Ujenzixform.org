@@ -620,39 +620,28 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
     [builderEtimsReceipts]
   );
 
-  /** POs that already have a paid supplier invoice — hide eTIMS-only duplicate row on Unpaid only (full receipt stays on Paid invoice row). */
-  const builderPoIdsWithPaidInvoice = useMemo(() => {
-    const ids = new Set<string>();
-    for (const inv of invoices) {
-      if (!invoiceIsPaid(inv)) continue;
-      const poId = inv.purchase_order_id;
-      if (poId) ids.add(String(poId));
-    }
-    return ids;
-  }, [invoices]);
-
-  /** Receipt exists but no unpaid supplier invoice for this PO yet — show its own row under Unpaid */
+  /** Receipt exists but no supplier invoice row for this PO yet — show its own row under Unpaid only.
+   *  If *any* non-cancelled invoice exists for the PO, hide this card: eTIMS belongs on that invoice row (avoids Unpaid duplicate after pay). */
   const builderUnpaidEtimsStandalone = useMemo(() => {
     if (userRole !== 'builder' || invoicePaymentListTab !== 'unpaid') return [];
     return builderEtimsReceipts.filter((po) => {
       if (po.builder_etims_paystack_paid_at) return false;
-      if (builderPoIdsWithPaidInvoice.has(po.id)) return false;
+      const poKey = String(po.id);
+      const hasInvoiceRowForPo = invoices.some(
+        (i) =>
+          String(i.purchase_order_id || '') === poKey &&
+          String(i.status || '').toLowerCase() !== 'cancelled'
+      );
+      if (hasInvoiceRowForPo) return false;
       const url = po.etims_verification_url?.trim();
       const hasResp =
         po.etims_response != null &&
         typeof po.etims_response === 'object' &&
         Object.keys(po.etims_response as Record<string, unknown>).length > 0;
       const hasEvidence = Boolean(url || hasResp || po.etims_submitted_at);
-      if (!hasEvidence) return false;
-      const inv = invoices.find(
-        (i) =>
-          i.purchase_order_id === po.id &&
-          !invoiceIsPaid(i) &&
-          String(i.status || '').toLowerCase() !== 'cancelled'
-      );
-      return !inv;
+      return hasEvidence;
     });
-  }, [userRole, invoicePaymentListTab, builderEtimsReceipts, invoices, builderPoIdsWithPaidInvoice]);
+  }, [userRole, invoicePaymentListTab, builderEtimsReceipts, invoices]);
 
   /** eTIMS-only POs where builder completed Paystack (test) — full receipt under Paid tab */
   const builderEtimsPaidStandalone = useMemo(() => {
