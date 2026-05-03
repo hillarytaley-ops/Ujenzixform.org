@@ -438,7 +438,18 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
                 .order('created_at', { ascending: false })
                 .limit(500);
               if (supplierRecordId) {
-                invQ = invQ.eq('supplier_id', supplierRecordId);
+                const { data: srow } = await supabase
+                  .from('suppliers')
+                  .select('user_id')
+                  .eq('id', supplierRecordId)
+                  .maybeSingle();
+                const su = (srow?.user_id as string | undefined)?.trim();
+                const sidOr = [...new Set([supplierRecordId, userId, su].filter(Boolean))] as string[];
+                if (sidOr.length === 1) {
+                  invQ = invQ.eq('supplier_id', sidOr[0]);
+                } else {
+                  invQ = invQ.or(sidOr.map((id) => `supplier_id.eq.${id}`).join(','));
+                }
               }
               const { data, error } = await invQ;
               if (error) throw error;
