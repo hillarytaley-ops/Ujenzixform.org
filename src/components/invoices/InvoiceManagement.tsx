@@ -34,6 +34,7 @@ import {
   lineAmount,
   lineItemCode,
   lineQty,
+  pickEtimsTotalAmountKes,
 } from '@/lib/etims/formatEtimsReceiptForUi';
 import { PaystackCheckout, isPaystackTestModeBanner } from '@/components/payment/PaystackCheckout';
 import { Separator } from '@/components/ui/separator';
@@ -159,6 +160,18 @@ function KraEtimsReceiptEmbed({ url }: { url: string }) {
       </p>
     </div>
   );
+}
+
+/** KES amount for Paystack when there is no supplier invoice row yet (PO total or eTIMS JSON). */
+function resolvePoStandalonePayAmountKes(po: {
+  total_amount?: number | null;
+  etims_response: unknown | null;
+}): number | null {
+  const fromDb = po.total_amount != null ? Number(po.total_amount) : NaN;
+  if (Number.isFinite(fromDb) && fromDb > 0) return Math.round(fromDb * 100) / 100;
+  const fromJson = pickEtimsTotalAmountKes(po.etims_response);
+  if (fromJson != null && fromJson > 0) return Math.round(fromJson * 100) / 100;
+  return null;
 }
 
 /** Stored integrator JSON + optional KRA page button; iframe only under optional details (often blocked). */
@@ -310,6 +323,12 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
   /** Which invoice row is running the async “acknowledge then open pay” flow */
   const [payNowBusyId, setPayNowBusyId] = useState<string | null>(null);
   const [payInvoice, setPayInvoice] = useState<Invoice | null>(null);
+  /** Paystack checkout for PO with eTIMS but no supplier invoice yet (`order_id` = `etims_po_<uuid>`). */
+  const [paystackEtimsPo, setPaystackEtimsPo] = useState<{
+    poId: string;
+    poNumber: string;
+    amount: number;
+  } | null>(null);
   const [paymentReference, setPaymentReference] = useState('');
   const [recordingPayment, setRecordingPayment] = useState(false);
   const { toast } = useToast();
@@ -818,6 +837,7 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
     try {
       setAcknowledging(true);
       setPayNowBusyId(invoice.id);
+      setPaystackEtimsPo(null);
 
       let next = { ...invoice };
 
@@ -987,10 +1007,10 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
           <AlertTitle className="text-foreground">KRA eTIMS receipt (integrator)</AlertTitle>
           <AlertDescription className="text-xs text-muted-foreground">
             <p>
-              Verification links for each PO appear <strong className="text-foreground">in the Unpaid / Paid lists</strong>{' '}
-              on the <strong className="text-foreground">supplier invoice</strong> row when applicable. KRA eTIMS is for
-              receipt / tax reference; use <strong className="text-foreground">Pay now</strong> only on the invoice row to
-              pay your supplier.
+              eTIMS appears on the <strong className="text-foreground">supplier invoice</strong> row when you have one.
+              If you only have a KRA receipt card (no invoice yet), use <strong className="text-foreground">Pay now</strong>{' '}
+              there to pay the PO / eTIMS total; once an invoice row exists, use <strong className="text-foreground">Pay now</strong>{' '}
+              on that row so the supplier invoice is marked paid.
             </p>
             {builderEtimsReceiptsLoading ? <p className="mt-1">Loading receipt links…</p> : null}
           </AlertDescription>
@@ -1158,17 +1178,45 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
                 ) : null}
                 {builderUnpaidEtimsStandalone.map((po) => {
                   const url = (po.etims_verification_url || '').trim();
+                  const payAmt = resolvePoStandalonePayAmountKes(po);
+                  const canPayStandalone =
+                    userRole === 'builder' && payAmt != null && payAmt > 0;
                   return (
                     <Card key={`etims-${po.id}`} className="border-sky-200/60 dark:border-sky-900/50">
                       <CardHeader>
-                        <div>
-                          <CardTitle className="text-base">KRA eTIMS receipt</CardTitle>
-                          <p className="text-sm text-muted-foreground">PO {po.po_number}</p>
-                          <p className="mt-2 text-xs text-muted-foreground">
-                            Tax / receipt reference only. When your supplier sends an invoice for this order, it appears
-                            as a row below — use <strong className="text-foreground">Pay now</strong> there to pay the
-                            supplier (one payment flow per invoice).
-                          </p>
+                        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                          <div>
+                            <CardTitle className="text-base">KRA eTIMS receipt</CardTitle>
+                            <p className="text-sm text-muted-foreground">PO {po.po_number}</p>
+                            <p className="mt-2 text-xs text-muted-foreground">
+                              No supplier invoice row yet for this order. Use <strong className="text-foreground">Pay now</strong>{' '}
+                              to pay the PO / eTIMS total via Paystack. When your supplier sends an invoice, use{' '}
+                              <strong className="text-foreground">Pay now</strong> on that row instead (that flow marks
+                              the supplier invoice paid).
+                            </p>
+                          </div>
+                          <Button
+                            type="button"
+                            size="lg"
+                            disabled={!canPayStandalone}
+                            className={`shrink-0 font-bold text-white ${
+                              canPayStandalone
+                                ? 'bg-emerald-600 hover:bg-emerald-700'
+                                : 'cursor-not-allowed bg-emerald-600/40'
+                            }`}
+                            title={
+                              canPayStandalone
+                                ? 'Open Paystack checkout for this purchase order (no supplier invoice row yet).'
+                                : 'Need a positive total on the purchase order or in the eTIMS receipt JSON to pay here.'
+                            }
+                            onClick={() => {
+                              if (!canPayStandalone || payAmt == null) return;
+                              setPaystackEtimsPo({ poId: po.id, poNumber: po.po_number, amount: payAmt });
+                            }}
+                          >
+                            <CreditCard className="mr-2 h-5 w-5 shrink-0 opacity-90" />
+                            Pay now
+                          </Button>
                         </div>
                       </CardHeader>
                       <CardContent className="space-y-3">
@@ -1180,8 +1228,21 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
                           etimsSubmittedAt={po.etims_submitted_at}
                         />
                         <p className="text-xs text-muted-foreground">
-                          No supplier invoice is linked to this PO yet. Tap <strong className="text-foreground">Refresh</strong>{' '}
-                          after your supplier sends it.
+                          {canPayStandalone ? (
+                            <>
+                              Amount: <strong className="text-foreground">KES {payAmt!.toLocaleString()}</strong>
+                              {paystackSandbox ? (
+                                <> · Paystack test mode (sandbox keys).</>
+                              ) : null}
+                            </>
+                          ) : (
+                            <>
+                              Set a positive total on the PO or ensure the eTIMS JSON includes a total so{' '}
+                              <strong className="text-foreground">Pay now</strong> can run. Tap{' '}
+                              <strong className="text-foreground">Refresh</strong> after your supplier sends an invoice
+                              to pay on that row.
+                            </>
+                          )}
                         </p>
                       </CardContent>
                     </Card>
@@ -1434,6 +1495,50 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
                   I've paid — record payment
                 </>
               )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={!!paystackEtimsPo}
+        onOpenChange={(open) => {
+          if (!open) setPaystackEtimsPo(null);
+        }}
+      >
+        <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Pay purchase order (eTIMS)</DialogTitle>
+            <DialogDescription>
+              There is no supplier invoice row for this PO yet. This checkout charges the PO / eTIMS total and records
+              payment on the order for your test or integrator flow. When a supplier invoice appears in the list, use{' '}
+              <strong>Pay now</strong> on that row to mark the invoice paid.
+            </DialogDescription>
+          </DialogHeader>
+          {paystackEtimsPo ? (
+            <div className="space-y-4 py-2">
+              <div className="rounded-md border bg-muted/50 px-3 py-2 text-sm">
+                <p className="font-mono font-medium">{paystackEtimsPo.poNumber}</p>
+                <p className="text-muted-foreground">
+                  Amount:{' '}
+                  <span className="font-semibold text-foreground">
+                    KES {paystackEtimsPo.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                  </span>
+                </p>
+              </div>
+              <PaystackCheckout
+                amount={paystackEtimsPo.amount}
+                currency="KES"
+                description={`PO ${paystackEtimsPo.poNumber} (eTIMS — no supplier invoice yet)`}
+                orderId={`etims_po_${paystackEtimsPo.poId}`}
+                successNavigateTo="/professional-builder-dashboard?tab=invoices"
+                onCancel={() => setPaystackEtimsPo(null)}
+              />
+            </div>
+          ) : null}
+          <DialogFooter>
+            <Button variant="outline" type="button" onClick={() => setPaystackEtimsPo(null)}>
+              Close
             </Button>
           </DialogFooter>
         </DialogContent>
