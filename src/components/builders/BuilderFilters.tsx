@@ -194,7 +194,7 @@ export const BuilderFilters = ({ filters, onFiltersChange }: BuilderFiltersProps
                     }
                   />
                   <Label htmlFor="professional-only" className="text-sm font-normal">
-                    Professional Builders Only
+                    COs/Contractors Only
                   </Label>
                 </div>
                 <div className="flex items-center space-x-2">

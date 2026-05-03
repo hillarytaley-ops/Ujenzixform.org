@@ -110,12 +110,12 @@ export const BuilderFacebookLayout: React.FC<BuilderFacebookLayoutProps> = ({
     });
   };
 
-  // Fetch registered professional builders from database
+  // Fetch registered COs/contractors from database
   useEffect(() => {
     const fetchRegisteredBuilders = async () => {
       setLoadingBuilders(true);
       try {
-        console.log('🏗️ Fetching registered professional builders...');
+        console.log('🏗️ Fetching registered COs/contractors...');
         
         // Get access token if available
         let accessToken = '';
@@ -127,7 +127,7 @@ export const BuilderFacebookLayout: React.FC<BuilderFacebookLayoutProps> = ({
           }
         } catch (e) {}
         
-        // First get all professional builder user IDs using REST API
+        // First get all CO/contractor user IDs using REST API
         const rolesRes = await fetch(
           `${SUPABASE_URL}/rest/v1/user_roles?role=eq.professional_builder&select=user_id`,
           {
@@ -139,10 +139,10 @@ export const BuilderFacebookLayout: React.FC<BuilderFacebookLayoutProps> = ({
         );
         
         const roleData = await rolesRes.json();
-        console.log('🏗️ Professional builder roles found:', roleData?.length || 0);
+        console.log('🏗️ CO/Contractor roles found:', roleData?.length || 0);
 
         if (!rolesRes.ok || !roleData || roleData.length === 0) {
-          console.log('🏗️ No professional builders found in user_roles');
+          console.log('🏗️ No COs/contractors found in user_roles');
           
           // Fallback: Try fetching profiles with role = 'professional_builder' directly
           const profilesRes = await fetch(
@@ -590,7 +590,7 @@ export const BuilderFacebookLayout: React.FC<BuilderFacebookLayoutProps> = ({
                   Builder Project Showcase
                 </h3>
                 <p className="text-xs text-gray-500 dark:text-gray-400 leading-snug mt-0.5">
-                  Completed projects from professional builders across Kenya
+                  Completed projects from COs/contractors across Kenya
                 </p>
             </div>
             <div className="p-2 sm:p-3 min-h-0">
@@ -634,7 +634,7 @@ export const BuilderFacebookLayout: React.FC<BuilderFacebookLayoutProps> = ({
                           <CheckCircle2 className="h-3.5 w-3.5 text-blue-500" fill="currentColor" />
                         )}
                       </div>
-                      <p className="text-xs text-gray-500 truncate">{builder.specialties?.[0] || 'Professional Builder'}</p>
+                      <p className="text-xs text-gray-500 truncate">{builder.specialties?.[0] || 'CO/Contractor'}</p>
                       <div className="flex items-center gap-1 text-xs text-gray-400">
                         <Star className="h-3 w-3 fill-yellow-400 text-yellow-400" />
                         {builder.rating?.toFixed(1)} • {builder.location || 'Kenya'}
@@ -668,7 +668,7 @@ export const BuilderFacebookLayout: React.FC<BuilderFacebookLayoutProps> = ({
                   <div className="flex items-start gap-2 text-sm">
                     <div className="w-2 h-2 rounded-full bg-orange-500 mt-1.5 flex-shrink-0"></div>
                     <p className="text-gray-600 dark:text-gray-400">
-                      <span className="font-medium text-gray-900 dark:text-white">{allBuilders.length} professional builder{allBuilders.length !== 1 ? 's' : ''}</span> registered
+                      <span className="font-medium text-gray-900 dark:text-white">{allBuilders.length} CO/contractor{allBuilders.length !== 1 ? 's' : ''}</span> registered
                     </p>
                   </div>
                 </>
@@ -676,7 +676,7 @@ export const BuilderFacebookLayout: React.FC<BuilderFacebookLayoutProps> = ({
                 <div className="flex items-start gap-2 text-sm">
                   <div className="w-2 h-2 rounded-full bg-orange-500 mt-1.5 flex-shrink-0"></div>
                   <p className="text-gray-600 dark:text-gray-400">
-                    <span className="font-medium text-gray-900 dark:text-white">Be the first</span> professional builder to register!
+                    <span className="font-medium text-gray-900 dark:text-white">Be the first</span> CO/contractor to register!
                   </p>
                 </div>
               )}

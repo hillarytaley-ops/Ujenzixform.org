@@ -131,7 +131,7 @@ const DashboardSuspenseWrapper: React.FC<{ children: React.ReactNode }> = ({ chi
   </React.Suspense>
 );
 
-/** `/builder-dashboard` is a legacy shared URL; private clients must not be sent to the professional builder route. */
+/** `/builder-dashboard` is a legacy shared URL; private clients must not be sent to the CO/contractor route. */
 const BuilderDashboardEntryRedirect = () => {
   const role = typeof window !== "undefined" ? localStorage.getItem("user_role") : null;
   if (role === "private_client") {

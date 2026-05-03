@@ -73,7 +73,7 @@ export function QuoteCart({
   const { toast } = useToast();
 
   const totalItems = items.reduce((sum, item) => sum + item.quantity, 0);
-  // Note: We don't show estimated prices to Professional Builders - they get pricing via supplier quotes
+  // Note: We don't show estimated prices to COs/Contractors - they get pricing via supplier quotes
 
   // Fetch user's projects when dialog opens
   useEffect(() => {
@@ -121,7 +121,7 @@ export function QuoteCart({
 
   const handleSubmitQuoteRequest = async () => {
     // ═══════════════════════════════════════════════════════════════════════════════
-    // SECURITY: ONLY Professional Builders can request quotes
+    // SECURITY: ONLY COs/Contractors can request quotes
     // Private Clients must use Buy Now instead
     // ═══════════════════════════════════════════════════════════════════════════════
     const currentRole = localStorage.getItem('user_role');
@@ -137,8 +137,8 @@ export function QuoteCart({
     
     if (currentRole !== 'professional_builder' && currentRole !== 'admin') {
       toast({
-        title: '⚠️ Professional Builder Required',
-        description: 'Only Professional Builders can request quotes. Please register as a Professional Builder or Private Client.',
+        title: '⚠️ CO/Contractor Required',
+        description: 'Only COs/Contractors can request quotes. Please register as a CO/Contractor or Private Client.',
         variant: 'destructive',
       });
       return;
@@ -522,7 +522,7 @@ export function QuoteCart({
             </ScrollArea>
 
             <div className="border-t pt-4 space-y-3">
-              {/* Summary - No price shown for Professional Builders */}
+              {/* Summary - No price shown for COs/Contractors */}
               <div className="bg-blue-50 rounded-lg p-3">
                 <div className="flex justify-between items-center text-sm">
                   <span className="text-blue-700 font-medium">Total Items:</span>
@@ -568,7 +568,7 @@ export function QuoteCart({
   );
 }
 
-// Floating Quote Cart Button - Always visible for Professional Builders
+// Floating Quote Cart Button - Always visible for COs/Contractors
 export function QuoteCartButton({ 
   itemCount, 
   onClick 

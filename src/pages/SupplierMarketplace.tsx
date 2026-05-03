@@ -35,7 +35,6 @@ import { useToast } from "@/hooks/use-toast";
 import Navigation from "@/components/Navigation";
 import Footer from "@/components/Footer";
 import { MaterialsGrid } from "@/components/suppliers/MaterialsGrid";
-import { MaterialsListDownloadButton } from "@/components/suppliers/MaterialsListDownloadButton";
 import { CartSidebar } from "@/components/cart/CartSidebar";
 import { FloatingCartButton } from "@/components/cart/FloatingCartButton";
 // FloatingSocialSidebar moved to App.tsx for global availability
@@ -341,7 +340,7 @@ const SupplierMarketplace = () => {
                     onClick={() => navigate('/professional-builder-registration')}
                   >
                     <Building2 className="h-4 w-4 mr-2" />
-                    Professional Builder
+                    CO/Contractor
                   </Button>
                   <Button 
                     variant="outline" 
@@ -467,7 +466,6 @@ const SupplierMarketplace = () => {
                   ))}
                 </SelectContent>
               </Select>
-              <MaterialsListDownloadButton />
             </div>
           </div>
         </div>
@@ -517,7 +515,7 @@ const SupplierMarketplace = () => {
                   <h3 className="font-bold text-amber-800">Builders Only Marketplace</h3>
                 </div>
                 <p className="text-amber-700 text-sm">
-                  This marketplace is exclusively for registered builders (Professional Builders and Private Builders) to purchase construction materials. 
+                  This marketplace is exclusively for registered builders (COs/Contractors and Private Builders) to purchase construction materials. 
                   Register as a builder to unlock full access.
                 </p>
               </div>
@@ -531,7 +529,7 @@ const SupplierMarketplace = () => {
                     </div>
                     <h3 className="font-semibold mb-2">Register as Builder</h3>
                     <p className="text-sm text-gray-500">
-                      Create a free account as a Professional Builder or Private Builder
+                      Create a free account as a CO/Contractor or Private Builder
                     </p>
                   </CardContent>
                 </Card>
@@ -642,7 +640,7 @@ const SupplierMarketplace = () => {
                     <p className="text-emerald-700 mb-4">
                       {userRole === 'private_client' 
                         ? "As a Private Builder, you can buy materials directly from suppliers."
-                        : "As a Professional Builder, you can request quotes and purchase in bulk."
+                        : "As a CO/Contractor, you can request quotes and purchase in bulk."
                       }
                     </p>
                     <div className="flex flex-wrap gap-3 justify-center md:justify-start">

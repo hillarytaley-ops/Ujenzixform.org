@@ -799,7 +799,7 @@ export const AdminScanDashboard: React.FC = () => {
                                     ? 'bg-purple-50 text-purple-700 border-purple-200' 
                                     : 'bg-cyan-50 text-cyan-700 border-cyan-200'
                                 }`}>
-                                  {item.buyer_role === 'professional_builder' ? 'Professional Builder' : 'Private Client'}
+                                  {item.buyer_role === 'professional_builder' ? 'CO/Contractor' : 'Private Client'}
                                 </Badge>
                               )}
                               <p className="text-xs text-slate-500 dark:text-slate-400">{item.buyer_email}</p>

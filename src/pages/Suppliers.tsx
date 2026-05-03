@@ -356,10 +356,10 @@ const Suppliers = () => {
                   features={["Buy materials", "Track deliveries"]}
                 />
 
-                {/* Professional Builder Portal */}
+                {/* CO/Contractor Portal */}
                 <PortalCard
                   icon={<FileText className="h-6 w-6 md:h-7 md:w-7 text-white" />}
-                  title="Professional Builder"
+                  title="CO/Contractor"
                   description="Request quotes for bulk orders"
                   gradient="from-blue-600 to-blue-700"
                   borderColor="blue"
@@ -401,7 +401,7 @@ const Suppliers = () => {
                     <ShoppingCart className="h-5 w-5 text-emerald-400" />
                   </div>
                   <h3 className="text-xl font-bold text-white">
-                    Welcome back, {userRole === 'professional_builder' ? 'Professional Builder' : userRole === 'private_client' ? 'Builder' : 'there'}!
+                    Welcome back, {userRole === 'professional_builder' ? 'CO/Contractor' : userRole === 'private_client' ? 'Builder' : 'there'}!
                   </h3>
                 </div>
                 <p className="text-white/70 text-sm mb-4">

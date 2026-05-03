@@ -262,8 +262,8 @@ export const MaterialsGridSafe = () => {
       });
     } else {
       toast({
-        title: 'Professional Builders Only',
-        description: 'Request Quote is available for professional builders. Please use Buy Now instead.',
+        title: 'COs/Contractors Only',
+        description: 'Request Quote is available for COs/contractors. Please use Buy Now instead.',
         variant: 'destructive'
       });
     }

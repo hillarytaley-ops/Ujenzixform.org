@@ -30,7 +30,7 @@ const translations = {
     'nav.signOut': 'Sign Out',
     
     // Builders Page
-    'builders.title': 'Professional Builders Directory',
+    'builders.title': 'COs/Contractors Directory',
     'builders.subtitle': 'Find certified construction professionals across Kenya',
     'builders.search.placeholder': 'Search builders, companies, or specialties...',
     'builders.filter.counties': 'All Counties',
@@ -46,7 +46,7 @@ const translations = {
     'builders.noResults': 'No builders found matching your criteria. Try adjusting your filters.',
     'builders.showing': 'Showing',
     'builders.of': 'of',
-    'builders.professionals': 'professional builders',
+    'builders.professionals': 'COs/Contractors',
     
     // Builder Card
     'builder.rating': 'Rating',

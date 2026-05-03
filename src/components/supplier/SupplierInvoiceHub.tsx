@@ -564,7 +564,8 @@ export const SupplierInvoiceHub: React.FC<SupplierInvoiceHubProps> = ({
       }
       toast({
         title: 'Marked as viewed',
-        description: 'GRN status updated. An invoice may be generated for the builder.',
+        description:
+          'GRN status updated. Supplier invoices are created when the builder accepts the quote; GRN confirms delivery receipt.',
       });
       await loadGrns();
     } catch (e: any) {
@@ -653,7 +654,7 @@ export const SupplierInvoiceHub: React.FC<SupplierInvoiceHubProps> = ({
           <TabsContent value="delivery-notes" forceMount className="mt-0">
             <div className="mb-3 flex items-center justify-between gap-2">
               <p className={`text-sm ${mutedText}`}>
-                Grouped by builder progress: pending signature vs accepted. Professional builder names come from their
+                Grouped by builder progress: pending signature vs accepted. CO/Contractor names come from their
                 profile; use PDF for the full signed note.
               </p>
               <Button variant="outline" size="sm" onClick={() => loadDeliveryNotes()} disabled={dnLoading}>
@@ -687,7 +688,7 @@ export const SupplierInvoiceHub: React.FC<SupplierInvoiceHubProps> = ({
                             <TableRow className={isDarkMode ? 'border-slate-600' : ''}>
                               <TableHead>DN</TableHead>
                               <TableHead>PO</TableHead>
-                              <TableHead>Professional builder</TableHead>
+                              <TableHead>CO/Contractor</TableHead>
                               <TableHead>Status</TableHead>
                               <TableHead>Delivery date</TableHead>
                               <TableHead>Updated</TableHead>

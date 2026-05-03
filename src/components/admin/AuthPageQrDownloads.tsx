@@ -44,10 +44,10 @@ const QR_ENTRIES: QrEntry[] = [
   },
   {
     id: "professional-builder-registration",
-    title: "Professional builder registration",
+    title: "CO/Contractor registration",
     path: "/register/scan/professional-builder",
     filename: "ujenzixform-qr-professional-builder-registration.png",
-    blurb: "Not signed in → auth first; signed in → professional builder form.",
+    blurb: "Not signed in → auth first; signed in → CO/contractor form.",
   },
 ];
 

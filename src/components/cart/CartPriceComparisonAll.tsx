@@ -9,7 +9,7 @@ import { edgeGetSuppliersForPriceCompare } from '@/utils/edgeGuestPublic';
  * ║   - Better layout for long lists of materials                                       ║
  * ║   - Suppliers displayed horizontally at top                                         ║
  * ║   - Materials listed vertically with totals at bottom                               ║
- * ║   - Professional Builders: Select suppliers → Request Quotes                        ║
+ * ║   - COs/Contractors: Select suppliers → Request Quotes                        ║
  * ║   - Private Clients: Select supplier → Update cart with their prices                ║
  * ║                                                                                      ║
  * ╚══════════════════════════════════════════════════════════════════════════════════════╝
@@ -222,7 +222,7 @@ export const CartPriceComparisonAll: React.FC<CartPriceComparisonAllProps> = ({
         if (item.supplier_id) uniqueSupplierIds.add(item.supplier_id);
       });
       
-      // For professional builders, also show all suppliers (even without prices)
+      // For COs/contractors, also show all suppliers (even without prices)
       if (isProfessionalBuilder) {
         suppliersData.forEach(s => uniqueSupplierIds.add(s.id));
       }
@@ -469,7 +469,7 @@ export const CartPriceComparisonAll: React.FC<CartPriceComparisonAllProps> = ({
     onClose();
   };
 
-  // Send quote requests (for Professional Builders)
+  // Send quote requests (for COs/Contractors)
   const handleSendQuotes = async () => {
     if (selectedSuppliers.size === 0) {
       toast({
@@ -712,7 +712,7 @@ export const CartPriceComparisonAll: React.FC<CartPriceComparisonAllProps> = ({
                           className={`text-center p-2 border-b border-r min-w-[140px] max-w-[180px] ${isCheapest ? 'bg-green-100' : 'bg-gray-50'} ${isSelected ? 'bg-blue-100' : ''}`}
                         >
                           <div className="flex flex-col items-center gap-1">
-                            {/* Checkbox for Professional Builders */}
+                            {/* Checkbox for COs/Contractors */}
                             {isProfessionalBuilder && (
                               <Checkbox 
                                 checked={isSelected}
@@ -865,7 +865,7 @@ export const CartPriceComparisonAll: React.FC<CartPriceComparisonAllProps> = ({
             <div className="border-t p-4 bg-gray-50">
               {isProfessionalBuilder ? (
                 <div className="space-y-3">
-                  {/* Notes for Professional Builders */}
+                  {/* Notes for COs/Contractors */}
                   <div>
                     <label className="text-sm font-medium text-gray-700 mb-1 block">
                       Additional Notes (Optional)

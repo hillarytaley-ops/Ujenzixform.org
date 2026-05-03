@@ -407,7 +407,7 @@ export const BuilderVideoGallery = ({
             No Project Videos Yet
           </h3>
           <p className="text-gray-600 text-sm">
-            Professional builders will share their project videos here soon!
+            CO/Contractors will share their project videos here soon!
           </p>
         </Card>
       ) : (

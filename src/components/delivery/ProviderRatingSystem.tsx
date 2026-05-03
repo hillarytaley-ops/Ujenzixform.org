@@ -163,7 +163,7 @@ export const ProviderRatingSystem: React.FC<ProviderRatingSystemProps> = ({
           },
           user_info: {
             name: 'John Builder',
-            user_type: 'Professional Builder'
+            user_type: 'CO/Contractor'
           }
         },
         {

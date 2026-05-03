@@ -55,7 +55,7 @@ interface MonitoringServicePromptProps {
   onDeclined?: () => void;
 }
 
-// Professional Builder Packages – includes drone, AI cameras, site visits, and full monitoring services
+// CO/Contractor Packages – includes drone, AI cameras, site visits, and full monitoring services
 const PROFESSIONAL_PACKAGES = [
   {
     id: 'pro-starter',
@@ -714,7 +714,7 @@ export const MonitoringServicePrompt: React.FC<MonitoringServicePromptProps> = (
                 </p>
                 {isProfessional ? (
                   <span className="flex items-center gap-1">
-                    <Badge className="bg-blue-600">Professional Builder</Badge>
+                    <Badge className="bg-blue-600">CO/Contractor</Badge>
                     Full-featured packages for commercial projects
                   </span>
                 ) : (
@@ -787,7 +787,7 @@ export const MonitoringServicePrompt: React.FC<MonitoringServicePromptProps> = (
               <Alert className="bg-gray-50 border-gray-200">
                 <AlertDescription className="text-xs text-gray-600">
                   {isProfessional ? (
-                    <>💼 Professional Builder packages include drone surveys, AI cameras, site visits, and full monitoring—reduced rates for all tiers.</>
+                    <>💼 CO/Contractor packages include drone surveys, AI cameras, site visits, and full monitoring—reduced rates for all tiers.</>
                   ) : (
                     <>🏠 Private Builder packages include the same monitoring services (drone, AI cameras, site visits) at lower rates—perfect for home construction.</>
                   )}

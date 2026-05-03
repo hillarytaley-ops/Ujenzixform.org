@@ -547,7 +547,7 @@ export function AdminMessaging() {
               >
                 <option value="all">All Users</option>
                 <option value="private_client">Private Builders</option>
-                <option value="professional_builder">Professional Builders</option>
+                <option value="professional_builder">COs/Contractors</option>
                 <option value="supplier">Suppliers</option>
                 <option value="delivery">Delivery Providers</option>
               </select>

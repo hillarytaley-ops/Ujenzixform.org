@@ -49,10 +49,10 @@ const professionalRegistrationSchema = z.object({
   license_number: z.string().min(1, "Professional license number is required"),
   location: z.string().min(1, "Please select your location"),
   specialties: z.array(z.string()).min(1, "Please select at least one specialty"),
-  years_experience: z.number().min(1, "Professional builders must have at least 1 year of experience"),
-  description: z.string().min(100, "Description must be at least 100 characters for professional builders"),
+  years_experience: z.number().min(1, "CO/Contractors must have at least 1 year of experience"),
+  description: z.string().min(100, "Description must be at least 100 characters for COs/contractors"),
   portfolio_url: z.string().url("Please enter a valid portfolio URL").optional().or(z.literal("")),
-  insurance_details: z.string().min(10, "Insurance details are required for professional builders"),
+  insurance_details: z.string().min(10, "Insurance details are required for COs/contractors"),
   terms_accepted: z.boolean().refine(val => val === true, {
     message: "You must accept the terms and conditions"
   }),
@@ -204,7 +204,7 @@ const ProfessionalBuilderRegistration = () => {
           <div className="max-w-4xl mx-auto text-center">
             <div className="flex items-center justify-center mb-4">
               <Building2 className="h-12 w-12 mr-3" />
-              <h1 className="text-4xl font-bold drop-shadow-lg">Professional Builder Registration</h1>
+              <h1 className="text-4xl font-bold drop-shadow-lg">CO/Contractor Registration</h1>
             </div>
             <p className="text-xl mb-8 opacity-95 drop-shadow-md">
               Join our network of certified contractors and construction companies across Kenya
@@ -229,7 +229,7 @@ const ProfessionalBuilderRegistration = () => {
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-blue-800">
                 <Building2 className="h-5 w-5" />
-                Professional Builder Requirements
+                CO/Contractor Requirements
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
@@ -264,9 +264,9 @@ const ProfessionalBuilderRegistration = () => {
         <div className="max-w-4xl mx-auto">
           <Card>
             <CardHeader>
-              <CardTitle className="text-2xl">Professional Builder Application</CardTitle>
+              <CardTitle className="text-2xl">CO/Contractor Application</CardTitle>
               <p className="text-muted-foreground">
-                Complete the form below to register as a certified professional builder or contractor
+                Complete the form below to register as a certified CO/contractor or contractor
               </p>
             </CardHeader>
             <CardContent>
@@ -535,10 +535,10 @@ const ProfessionalBuilderRegistration = () => {
                           </FormControl>
                           <div className="space-y-1 leading-none">
                             <FormLabel className="text-sm font-normal">
-                              I accept the Terms and Conditions for Professional Builders *
+                              I accept the Terms and Conditions for COs/Contractors *
                             </FormLabel>
                             <p className="text-xs text-muted-foreground">
-                              By checking this box, you agree to our professional builder terms of service and certification requirements
+                              By checking this box, you agree to our CO/contractor terms of service and certification requirements
                             </p>
                           </div>
                           <FormMessage />
@@ -600,7 +600,7 @@ const ProfessionalBuilderRegistration = () => {
                           {progress < 30 ? "Checking..." : progress < 80 ? "Saving..." : "Finishing..."}
                         </span>
                       ) : (
-                        "Submit Professional Builder Registration"
+                        "Submit CO/Contractor Registration"
                       )}
                     </Button>
                   </div>

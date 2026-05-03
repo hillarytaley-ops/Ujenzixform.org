@@ -250,7 +250,7 @@ const About: React.FC = () => {
                     <div className="text-3xl md:text-4xl font-bold text-blue-400 mb-1 tabular-nums">
                       {formatHomeStatCount(publicStats.professionalBuilders, publicStats.loading)}
                     </div>
-                    <div className="text-sm text-gray-400">Professional builders</div>
+                    <div className="text-sm text-gray-400">CO/Contractors</div>
                   </div>
                   <div className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl p-4 md:p-6">
                     <div className="text-3xl md:text-4xl font-bold text-yellow-400 mb-1 tabular-nums">

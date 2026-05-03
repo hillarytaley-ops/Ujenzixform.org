@@ -490,7 +490,7 @@ export const MaterialsGrid: React.FC<MaterialsGridProps> = ({ embeddedInDashboar
   const { toast } = useToast();
   const { addToCart, isInCart, getItemQuantity, setIsCartOpen, items: cartItems, getTotalItems } = useCart();
 
-  // Quote Cart functions for Professional Builders
+  // Quote Cart functions for COs/Contractors
   const addToQuoteCart = (material: Material) => {
     const qty = getQuantity(material.id) || 1;
     const imageUrl = material.image_url || getDefaultCategoryImage(material.category);
@@ -1490,11 +1490,11 @@ export const MaterialsGrid: React.FC<MaterialsGridProps> = ({ embeddedInDashboar
         window.location.href = '/home';
         return;
       }
-      // Only Professional Builders can request quotes
+      // Only COs/Contractors can request quotes
       if (userRole !== 'professional_builder' && userRole !== 'admin') {
         toast({
-          title: '📋 Professional Builder Required',
-          description: 'Only Professional Builders can request quotes. Private Builders can buy directly.',
+          title: '📋 CO/Contractor Required',
+          description: 'Only COs/Contractors can request quotes. Private Builders can buy directly.',
           variant: 'destructive',
         });
         return;
@@ -1605,7 +1605,7 @@ export const MaterialsGrid: React.FC<MaterialsGridProps> = ({ embeddedInDashboar
       if (userRole !== 'private_client' && userRole !== 'admin') {
         toast({
           title: '🛒 Private Builder Required',
-          description: 'Only Private Builders can purchase directly. Professional Builders should request quotes.',
+          description: 'Only Private Builders can purchase directly. COs/Contractors should request quotes.',
           variant: 'destructive',
         });
         return;
@@ -1849,7 +1849,7 @@ export const MaterialsGrid: React.FC<MaterialsGridProps> = ({ embeddedInDashboar
                 <strong className="text-orange-800 text-lg">🏗️ Want to Buy or Request Quotes?</strong>
               </div>
               <p className="text-sm text-orange-700">
-                <strong>Private Builders</strong> can buy directly | <strong>Professional Builders</strong> can request quotes
+                <strong>Private Builders</strong> can buy directly | <strong>COs/Contractors</strong> can request quotes
               </p>
               <div className="flex gap-3">
                 <a href="/home">
@@ -1870,7 +1870,7 @@ export const MaterialsGrid: React.FC<MaterialsGridProps> = ({ embeddedInDashboar
 
       {/* ═══════════════════════════════════════════════════════════════════════════════
           ROLE-SPECIFIC GUIDANCE BANNER - STRICT ENFORCEMENT
-          - Professional Builder: ONLY Request Quote
+          - CO/Contractor: ONLY Request Quote
           - Private Client: ONLY Buy Now
           ═══════════════════════════════════════════════════════════════════════════════ */}
       {isAuthenticated && userRole === 'professional_builder' && (
@@ -1879,7 +1879,7 @@ export const MaterialsGrid: React.FC<MaterialsGridProps> = ({ embeddedInDashboar
         >
           <FileText className="h-5 w-5 text-blue-600 shrink-0" />
           <AlertDescription className="ml-2 min-w-0">
-            <strong className="text-blue-800 text-sm sm:text-base">Professional builder mode</strong>
+            <strong className="text-blue-800 text-sm sm:text-base">CO/Contractor mode</strong>
             <p className="text-xs sm:text-sm text-blue-700 mt-1 leading-relaxed">
               Add to cart, then{' '}
               <strong className="text-blue-600">request quotes from multiple suppliers</strong> to compare prices.
@@ -1917,7 +1917,7 @@ export const MaterialsGrid: React.FC<MaterialsGridProps> = ({ embeddedInDashboar
           <AlertDescription className="ml-2">
             <strong className="text-red-800">⚠️ Purchasing Not Available</strong>
             <p className="text-sm text-red-700 mt-1">
-              Your account type ({userRole}) cannot purchase materials. Please register as a <strong>Private Builder</strong> or <strong>Professional Builder</strong>.
+              Your account type ({userRole}) cannot purchase materials. Please register as a <strong>Private Builder</strong> or <strong>CO/Contractor</strong>.
             </p>
           </AlertDescription>
         </Alert>
@@ -2277,7 +2277,7 @@ export const MaterialsGrid: React.FC<MaterialsGridProps> = ({ embeddedInDashboar
                     }
                     
                     // Allow cart additions for:
-                    // 1. Private Clients, Professional Builders, Admins (explicit roles)
+                    // 1. Private Clients, COs/Contractors, Admins (explicit roles)
                     // 2. Users with null role (role not yet loaded or not assigned - let them shop, check at checkout)
                     const allowedRoles = ['private_client', 'professional_builder', 'admin', 'builder'];
                     const canAddToCart = userRole === null || allowedRoles.includes(userRole);
@@ -2285,7 +2285,7 @@ export const MaterialsGrid: React.FC<MaterialsGridProps> = ({ embeddedInDashboar
                     if (!canAddToCart) {
                       toast({
                         title: '⚠️ Builder Account Required',
-                        description: `Your role (${userRole}) cannot purchase materials. Please register as a Private Client or Professional Builder.`,
+                        description: `Your role (${userRole}) cannot purchase materials. Please register as a Private Client or CO/Contractor.`,
                         variant: 'destructive',
                       });
                       return;
@@ -2564,7 +2564,7 @@ export const MaterialsGrid: React.FC<MaterialsGridProps> = ({ embeddedInDashboar
                         </div>
                       )}
                       
-                      {/* Price - Hidden for Professional Builders who get pricing via quotes */}
+                      {/* Price - Hidden for COs/Contractors who get pricing via quotes */}
                       {userRole === 'professional_builder' ? (
                         <div className="flex items-center gap-1 bg-blue-50 rounded-lg px-2 py-1">
                           <FileText className="h-3 w-3 text-blue-600" />
@@ -2589,7 +2589,7 @@ export const MaterialsGrid: React.FC<MaterialsGridProps> = ({ embeddedInDashboar
                         </div>
                       )}
                       
-                      {/* Compare Price Checkbox - Hidden for Professional Builders and Suppliers */}
+                      {/* Compare Price Checkbox - Hidden for COs/Contractors and Suppliers */}
                       {!isSupplierRole && userRole !== 'professional_builder' && (
                         <button
                           onClick={(e) => {
@@ -2646,7 +2646,7 @@ export const MaterialsGrid: React.FC<MaterialsGridProps> = ({ embeddedInDashboar
                             <Plus className="h-3 w-3" />
                           </Button>
                         </div>
-                        {/* Hide subtotal for Professional Builders - they get pricing via quotes */}
+                        {/* Hide subtotal for COs/Contractors - they get pricing via quotes */}
                         {userRole === 'professional_builder' ? (
                           <span className="text-xs text-blue-600 min-w-[50px] text-right">
                             {currentQty} {material.unit}

@@ -34,7 +34,7 @@ const ABTestCTAButtons: React.FC = () => {
         };
       default:
         return {
-          professional: 'Join as Professional Builder',
+          professional: 'Join as CO/Contractor',
           client: 'I Need Construction Services',
           supplier: 'I\'m a Supplier'
         };

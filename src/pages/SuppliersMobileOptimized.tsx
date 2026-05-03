@@ -162,12 +162,12 @@ const SuppliersMobileOptimized = () => {
                 </div>
               </div>
 
-              {/* Professional Builder Portal */}
+              {/* CO/Contractor Portal */}
               <div className="group bg-gradient-to-br from-blue-600 to-blue-700 rounded-2xl p-6 border border-blue-500/30 hover:border-blue-400 transition-all duration-300 hover:scale-[1.03] hover:shadow-xl hover:shadow-blue-500/20">
                 <div className="w-14 h-14 bg-white/20 rounded-2xl flex items-center justify-center mb-4 mx-auto group-hover:scale-110 transition-transform">
                   <Building className="h-7 w-7 text-white" />
                 </div>
-                <h3 className="text-white font-bold text-xl mb-2">Professional Builder</h3>
+                <h3 className="text-white font-bold text-xl mb-2">CO/Contractor</h3>
                 <p className="text-blue-100/70 text-sm mb-5">Contractors & construction companies</p>
                 <div className="flex gap-2">
                   <Link to="/professional-builder-signin" className="flex-1">
@@ -420,13 +420,13 @@ const SuppliersMobileOptimized = () => {
                     </CardContent>
                   </Card>
 
-                  {/* Professional Builder Portal - Blue */}
+                  {/* CO/Contractor Portal - Blue */}
                   <Card className="border-2 border-blue-500 shadow-lg hover:shadow-xl transition-shadow">
                     <CardHeader className="text-center bg-gradient-to-br from-blue-500 to-indigo-600 text-white rounded-t-lg">
                       <div className="mx-auto w-12 h-12 bg-white/20 rounded-full flex items-center justify-center mb-2">
                         <Building className="h-6 w-6 text-white" />
                       </div>
-                      <CardTitle className="text-xl">Professional Builder</CardTitle>
+                      <CardTitle className="text-xl">CO/Contractor</CardTitle>
                       <CardDescription className="text-blue-100">
                         Contractors & construction companies
                       </CardDescription>

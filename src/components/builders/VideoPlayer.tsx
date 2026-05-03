@@ -526,7 +526,7 @@ export const VideoPlayer = ({ video, isOpen, onClose, onVideoUpdate }: VideoPlay
                     <p className="font-bold text-gray-900">
                       {video.builder_profile?.company_name || video.builder_profile?.full_name || video.title?.split(' ')[0] || 'UjenziXform'}
                     </p>
-                    <p className="text-xs text-gray-600">Professional Builder</p>
+                    <p className="text-xs text-gray-600">CO/Contractor</p>
                   </div>
                 </div>
                 <div className="space-y-1 text-sm">

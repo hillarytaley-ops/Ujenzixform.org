@@ -99,7 +99,7 @@ interface ServiceRequest {
 // Pricing discount for Private Builders (50% lower due to smaller project sizes)
 const PRIVATE_CLIENT_DISCOUNT = 0.5; // 50% discount
 
-// Base prices for professional builders (companies)
+// Base prices for COs/contractors (companies)
 const PROFESSIONAL_BASE_PRICES = {
   'ai-cameras': 15000,
   'drone-surveillance': 25000,
@@ -597,7 +597,7 @@ export const MonitoringServiceRequest: React.FC = () => {
                   </div>
                 </div>
                 
-                {/* Professional Builder Option */}
+                {/* CO/Contractor Option */}
                 <div 
                   className={`p-4 border-2 rounded-lg cursor-pointer transition-all ${
                     formData.builderType === 'professional' 
@@ -612,7 +612,7 @@ export const MonitoringServiceRequest: React.FC = () => {
                     </div>
                     <div className="flex-1">
                       <h4 className="font-semibold flex items-center gap-2">
-                        Professional Builder / Company
+                        CO/Contractor / Company
                         <Badge className="bg-blue-100 text-blue-800 text-xs">Full Features</Badge>
                       </h4>
                       <p className="text-sm text-muted-foreground mt-1">

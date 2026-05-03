@@ -49,7 +49,7 @@ const IndexHomeBelowFold = ({ userRole }: Props) => {
         icon: Building2,
         title: "Find Certified Builders",
         description:
-          "Browse the professional builder directory, posts, and video updates in one place.",
+          "Browse the CO/contractor directory, posts, and video updates in one place.",
         color: "from-blue-500 to-cyan-600",
         link: "/builders",
       },
@@ -183,7 +183,7 @@ const IndexHomeBelowFold = ({ userRole }: Props) => {
                 <div className="w-14 h-14 bg-white/20 rounded-xl flex items-center justify-center mx-auto mb-4">
                   <Building2 className="h-7 w-7 text-white" />
                 </div>
-                <h3 className="text-white font-bold text-lg mb-1">Professional Builder</h3>
+                <h3 className="text-white font-bold text-lg mb-1">CO/Contractor</h3>
                 <p className="text-blue-100/80 text-sm mb-4">Request bulk quotes & manage projects</p>
                 <ul className="text-left text-blue-100/70 text-xs space-y-1 mb-4">
                   <li className="flex items-center gap-2">

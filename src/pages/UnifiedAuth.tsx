@@ -31,7 +31,7 @@ const ROLE_CONFIG = {
     features: ['Buy materials for home projects', 'Track deliveries', 'Compare prices from suppliers']
   },
   professional_builder: {
-    title: 'Professional Builder',
+    title: 'CO/Contractor',
     subtitle: 'Request bulk quotes & manage projects',
     icon: Building2,
     gradient: 'from-blue-500 to-blue-600',

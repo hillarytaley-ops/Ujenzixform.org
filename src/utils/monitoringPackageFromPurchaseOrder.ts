@@ -4,11 +4,11 @@
  */
 
 const PACKAGE_LABELS: Record<string, string> = {
-  'pro-starter': 'Starter — Professional builder (1 month)',
-  'pro-basic': 'Basic — Professional builder (1 month)',
-  'pro-standard': 'Standard — Professional builder (3 months)',
-  'pro-premium': 'Premium — Professional builder (6 months)',
-  'pro-enterprise': 'Enterprise — Professional builder',
+  'pro-starter': 'Starter — CO/Contractor (1 month)',
+  'pro-basic': 'Basic — CO/Contractor (1 month)',
+  'pro-standard': 'Standard — CO/Contractor (3 months)',
+  'pro-premium': 'Premium — CO/Contractor (6 months)',
+  'pro-enterprise': 'Enterprise — CO/Contractor',
   'pvt-starter': 'Starter — Private builder (1 month)',
   'pvt-basic': 'Basic — Private builder (1 month)',
   'pvt-standard': 'Standard — Private builder (3 months)',

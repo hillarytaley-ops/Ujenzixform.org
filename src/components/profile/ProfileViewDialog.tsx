@@ -213,7 +213,7 @@ export const ProfileViewDialog: React.FC<ProfileViewDialogProps> = ({
   const getRoleBadge = (role: string | null) => {
     switch (role) {
       case 'professional_builder':
-        return <Badge className="bg-blue-500">Professional Builder</Badge>;
+        return <Badge className="bg-blue-500">CO/Contractor</Badge>;
       case 'private_client':
         return <Badge className="bg-green-500">Private Client</Badge>;
       case 'supplier':

@@ -227,7 +227,7 @@ const PrivateBuilderRegistration = () => {
               <h1 className="text-4xl font-bold drop-shadow-lg">Private Builder Registration</h1>
             </div>
             <p className="text-xl mb-8 opacity-95 drop-shadow-md">
-              Connect with professional builders and suppliers for your construction project
+              Connect with COs/contractors and suppliers for your construction project
             </p>
             
             <div className="flex gap-4 justify-center">

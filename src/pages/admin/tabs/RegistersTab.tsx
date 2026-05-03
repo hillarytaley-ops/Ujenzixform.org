@@ -925,7 +925,7 @@ export const RegistersTab: React.FC = () => {
             User Registrations
           </h2>
           <p className="text-gray-400 mt-1">
-            Manage Suppliers, Professional Builders, and Private Builders
+            Manage Suppliers, COs/Contractors, and Private Builders
           </p>
         </div>
         <Button
@@ -973,7 +973,7 @@ export const RegistersTab: React.FC = () => {
                   <Building2 className="h-6 w-6 text-blue-400" />
                 </div>
                 <div>
-                  <p className="text-white font-medium">Professional Builders</p>
+                  <p className="text-white font-medium">COs/Contractors</p>
                   <p className="text-xs text-gray-400">
                     {totals.pending.professionalBuilders} pending review
                   </p>

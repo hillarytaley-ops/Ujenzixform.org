@@ -1829,7 +1829,7 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
     return normalized;
   };
 
-  // FINAL RENDER-LEVEL DEDUPLICATION: ONE notification per request (single Accept per professional builder request)
+  // FINAL RENDER-LEVEL DEDUPLICATION: ONE notification per request (single Accept per CO/contractor request)
   // ABSOLUTE GUARANTEE: Only ONE notification per po_number (if available), then purchase_order_id, NO EXCEPTIONS
   // CRITICAL: Use po_number as PRIMARY key since multiple purchase_order_ids can have same po_number
   const uniqueNotifications = useMemo(() => {
@@ -2645,7 +2645,7 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
                             setCheckingAddress(deliveryRequestId);
                             
                             try {
-                              // Prompt the builder: notify them to add the address in their Professional Builder Dashboard (Deliveries tab)
+                              // Prompt the builder: notify them to add the address in their CO/Contractor Dashboard (Deliveries tab)
                               const { data: rpcData, error: rpcError } = await (supabase as any).rpc('request_builder_to_add_delivery_address', {
                                 p_delivery_request_id: deliveryRequestId
                               });
@@ -2656,7 +2656,7 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
                               if (success) {
                                 toast({
                                   title: '✅ Builder prompted',
-                                  description: "We've asked the builder to add the delivery address. They'll see a prompt in their Professional Builder Dashboard under the Deliveries tab. Refresh this page after they add it.",
+                                  description: "We've asked the builder to add the delivery address. They'll see a prompt in their CO/Contractor Dashboard under the Deliveries tab. Refresh this page after they add it.",
                                   variant: 'default',
                                   duration: 10000
                                 });
@@ -2664,7 +2664,7 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
                                 // RPC not deployed or failed: show instructions without backend notification
                                 toast({
                                   title: 'Ask builder to add address',
-                                  description: "The address must be added by the builder. Ask them to open their Professional Builder Dashboard → Deliveries tab. They'll see 'Action Required: Missing Delivery Addresses' and can add the address there. Then refresh this page.",
+                                  description: "The address must be added by the builder. Ask them to open their CO/Contractor Dashboard → Deliveries tab. They'll see 'Action Required: Missing Delivery Addresses' and can add the address there. Then refresh this page.",
                                   variant: 'default',
                                   duration: 12000
                                 });
@@ -2687,7 +2687,7 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
                             } catch (err: any) {
                               toast({
                                 title: 'Ask builder to add address',
-                                description: "The address must be added by the builder in their Professional Builder Dashboard under the Deliveries tab. Refresh this page after they add it.",
+                                description: "The address must be added by the builder in their CO/Contractor Dashboard under the Deliveries tab. Refresh this page after they add it.",
                                 variant: 'default',
                                 duration: 10000
                               });

@@ -370,7 +370,7 @@ const QuotesManagementContent: React.FC<QuotesManagementContentProps> = ({
                       <Building2 className="h-6 w-6 text-blue-500" />
                     </div>
                     <div className="min-w-0 flex-1">
-                      <h4 className={`font-semibold ${textColor} break-words`}>{quote.builder_name || 'Professional Builder'}</h4>
+                      <h4 className={`font-semibold ${textColor} break-words`}>{quote.builder_name || 'CO/Contractor'}</h4>
                       <p className={`text-sm font-medium text-blue-600 break-words mt-0.5`}>{quote.material_name}</p>
                       {quote.monitoring_package_line ? (
                         <p className={`text-sm mt-1 ${textColor}`}>
@@ -461,7 +461,7 @@ const QuotesManagementContent: React.FC<QuotesManagementContentProps> = ({
           ) : (
             <>
               <p className={`text-lg font-medium ${textColor}`}>No Quote Requests Yet</p>
-              <p className={mutedText}>Quote requests from professional builders will appear here</p>
+              <p className={mutedText}>Quote requests from COs/contractors will appear here</p>
             </>
           )}
         </div>

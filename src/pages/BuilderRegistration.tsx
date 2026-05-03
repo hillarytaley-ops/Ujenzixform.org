@@ -24,7 +24,7 @@ const BuilderRegistration = () => {
           <div className="max-w-4xl mx-auto text-center">
             <h1 className="text-4xl font-bold mb-4 drop-shadow-lg">Join UjenziXform Platform</h1>
             <p className="text-xl mb-8 opacity-95 drop-shadow-md">
-              Are you a professional builder or a client needing construction services?
+              Are you a CO/contractor or a client needing construction services?
             </p>
             
             <Link to="/builders">
@@ -48,13 +48,13 @@ const BuilderRegistration = () => {
           </div>
 
           <div className="grid md:grid-cols-2 gap-8 mb-12">
-            {/* Professional Builder Card */}
+            {/* CO/Contractor Card */}
             <Card className="border-2 border-blue-200 hover:border-blue-400 transition-colors">
               <CardHeader className="text-center">
                 <div className="mx-auto mb-4 p-3 bg-blue-100 rounded-full w-fit">
                   <Building2 className="h-8 w-8 text-blue-600" />
                 </div>
-                <CardTitle className="text-2xl text-blue-800">Professional Builder</CardTitle>
+                <CardTitle className="text-2xl text-blue-800">CO/Contractor</CardTitle>
                 <p className="text-blue-600 font-medium">Contractors & Construction Companies</p>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -80,7 +80,7 @@ const BuilderRegistration = () => {
                 <div className="pt-4">
                   <Link to="/professional-builder-registration">
                     <Button className="w-full bg-blue-600 hover:bg-blue-700">
-                      Register as Professional Builder
+                      Register as CO/Contractor
                       <ArrowRight className="h-4 w-4 ml-2" />
                     </Button>
                   </Link>
@@ -105,7 +105,7 @@ const BuilderRegistration = () => {
                   </div>
                   <div className="flex items-start gap-2">
                     <CheckCircle className="h-4 w-4 text-green-600 mt-0.5 shrink-0" />
-                    <span className="text-sm">Connect with professional builders and suppliers</span>
+                    <span className="text-sm">Connect with COs/contractors and suppliers</span>
                   </div>
                   <div className="flex items-start gap-2">
                     <CheckCircle className="h-4 w-4 text-green-600 mt-0.5 shrink-0" />

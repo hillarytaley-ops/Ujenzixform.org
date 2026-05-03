@@ -2338,7 +2338,7 @@ const ProfessionalBuilderDashboardPage = () => {
                 <h1 className="text-2xl font-bold break-normal md:text-3xl">
                   Welcome, {profile?.full_name || profile?.company_name || 'Builder'}!
                 </h1>
-                <p className="text-blue-100">Professional Builder Dashboard</p>
+                <p className="text-blue-100">CO/Contractor Dashboard</p>
               </div>
             </div>
             <div className="hidden w-full flex-none flex-wrap items-center gap-2 md:flex md:w-auto md:justify-end">
@@ -4386,7 +4386,7 @@ const ProfessionalBuilderDashboardPage = () => {
           <CardContent className="p-6">
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
               <div className="space-y-3 min-w-0">
-                <h3 className="text-xl font-bold">Ordering as a professional builder</h3>
+                <h3 className="text-xl font-bold">Ordering as a CO/contractor</h3>
                 <p className="text-sm text-white/90 max-w-2xl leading-relaxed">
                   Volume pricing, payment terms, delivery speed, and support levels depend on each supplier and your
                   relationship with them — not something we guarantee site-wide. Ask when you quote or order, or see{" "}

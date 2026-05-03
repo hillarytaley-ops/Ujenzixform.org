@@ -220,7 +220,7 @@ export const DeliveryPayTab: React.FC<{ isDarkMode?: boolean }> = ({ isDarkMode 
         <CardHeader>
           <CardTitle className={`flex items-center gap-2 ${textColor}`}>
             <FileText className="h-5 w-5 text-red-500 shrink-0" />
-            Pay the professional builder now
+            Pay the CO/contractor now
           </CardTitle>
           <CardDescription className={mutedText}>
             These invoices were forwarded to the builder for orders you delivered. Pay the builder immediately (per your

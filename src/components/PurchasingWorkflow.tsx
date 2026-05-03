@@ -172,14 +172,14 @@ const PurchasingWorkflow = () => {
       </Card>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Professional Builder - Tender Process */}
+        {/* CO/Contractor - Tender Process */}
         <Card className={`cursor-pointer transition-all duration-200 hover:shadow-lg ${
           builderState.isProfessionalBuilder ? 'border-primary shadow-sm' : 'opacity-60'
         }`}>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Building2 className="h-5 w-5" />
-              Professional Builder / Company
+              CO/Contractor / Company
               {builderState.isProfessionalBuilder && (
                 <Badge variant="default" className="ml-auto">Your Type</Badge>
               )}
@@ -216,7 +216,7 @@ const PurchasingWorkflow = () => {
             
             {!builderState.isProfessionalBuilder && (
               <div className="text-xs text-muted-foreground p-3 bg-muted/50 rounded-lg">
-                Available for professional builders and companies only
+                Available for COs/contractors and companies only
               </div>
             )}
           </CardContent>
@@ -281,7 +281,7 @@ const PurchasingWorkflow = () => {
         <CardContent className="space-y-3">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <h4 className="font-semibold text-sm mb-2">Professional Builders</h4>
+              <h4 className="font-semibold text-sm mb-2">COs/Contractors</h4>
               <p className="text-xs text-muted-foreground">
                 Must follow formal procurement processes with purchase orders, supplier responses, 
                 and approval workflows for compliance and audit trails.

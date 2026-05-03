@@ -391,7 +391,7 @@ const InvoiceManager = () => {
         <CardContent className="pt-6">
           <div className="text-center py-8 text-muted-foreground">
             <Shield className="h-12 w-12 mx-auto mb-4 opacity-50" />
-            <p>Access restricted to professional builders and companies only.</p>
+            <p>Access restricted to COs/contractors and companies only.</p>
           </div>
         </CardContent>
       </Card>

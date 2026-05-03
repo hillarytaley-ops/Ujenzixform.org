@@ -53,7 +53,7 @@ const Index = () => {
     () => [
       {
         value: formatHomeStatCount(homeStats.professionalBuilders, homeStats.loading),
-        label: "Professional builders",
+        label: "CO/Contractors",
         icon: Building2,
       },
       {

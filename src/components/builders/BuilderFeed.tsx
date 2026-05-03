@@ -190,7 +190,7 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
   const { toast } = useToast();
   
   // FAST PATH: Check localStorage for role if not passed via props
-  // This ensures we detect professional builders even if the prop wasn't set correctly
+  // This ensures we detect COs/contractors even if the prop wasn't set correctly
   const storedRole = typeof window !== 'undefined' ? localStorage.getItem('user_role') : null;
   const storedUserId = typeof window !== 'undefined' ? localStorage.getItem('user_id') : null;
   const storedUserName = typeof window !== 'undefined' ? localStorage.getItem('user_name') : null;
@@ -210,7 +210,7 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
   const effectiveUserName = currentUserName !== 'Guest' ? currentUserName : (storedUserName || 'Guest');
   
   // Check if user can post (must be a registered builder)
-  // Only professional builders can post on the Builders page (not private clients)
+  // Only COs/contractors can post on the Builders page (not private clients)
   const canPost = isBuilder || 
     effectiveRole === 'professional_builder' || 
     effectiveRole === 'admin' ||
@@ -1443,7 +1443,7 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
                 <Video className="h-5 w-5 text-green-600" />
               </div>
               <div className="flex-1 text-center sm:text-left min-w-0">
-                <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Welcome, Professional Builder!</h3>
+                <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Welcome, CO/Contractor!</h3>
                 <p className="text-xs text-gray-600 dark:text-gray-400">
                   Post from your dashboard or expand below when available.
                 </p>

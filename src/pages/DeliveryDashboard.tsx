@@ -2440,7 +2440,7 @@ const DeliveryDashboard = () => {
           playNewRequestAlarm();
           toast({
             variant: 'destructive',
-            title: row.title || 'Pay the professional builder now',
+            title: row.title || 'Pay the CO/contractor now',
             description:
               row.message ||
               'An invoice was forwarded to the builder. Complete your payment to the builder immediately.',
@@ -2887,7 +2887,7 @@ const DeliveryDashboard = () => {
             <AlertCircle className="h-5 w-5 text-red-600" />
             <AlertDescription className={`${isDarkMode ? 'text-red-100' : 'text-red-900'} space-y-3`}>
               <div>
-                <p className="font-semibold">Action required: pay the professional builder</p>
+                <p className="font-semibold">Action required: pay the CO/contractor</p>
                 <p className="text-sm mt-1 opacity-95">
                   {builderInvoicePayPrompts[0]?.message}
                   {builderInvoicePayPrompts.length > 1

@@ -27,7 +27,7 @@ export interface Builder {
   latitude?: number;
   longitude?: number;
   
-  // Professional details (for professional builders)
+  // Professional details (for COs/contractors)
   license_number?: string;
   specializations?: string[];
   years_experience?: number;

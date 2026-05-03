@@ -232,10 +232,10 @@ const UJENZIXFORM_KB = {
         howTo: 'Click "Register as Builder" → Select "Private Client" → Fill details → Verify email'
       },
       {
-        type: 'Professional Builder',
+        type: 'CO/Contractor',
         description: 'Contractors and construction companies',
         benefits: ['Request quotes for bulk orders', 'Project management', 'Client management', 'Monitoring service'],
-        howTo: 'Click "Register as Builder" → Select "Professional Builder" → Provide company details → Verify'
+        howTo: 'Click "Register as Builder" → Select "CO/Contractor" → Provide company details → Verify'
       },
       {
         type: 'Supplier',
@@ -350,7 +350,7 @@ const UJENZIXFORM_KB = {
     },
     {
       question: 'Do you offer bulk discounts?',
-      answer: 'Yes! Professional builders can request quotes for bulk orders with special pricing.'
+      answer: 'Yes! CO/Contractors can request quotes for bulk orders with special pricing.'
     },
     {
       question: 'How does the monitoring service work?',
@@ -1312,7 +1312,7 @@ ${monitoringInfo.packages.map(p => `• **${p.name}**: ${p.cameras} cameras - ${
 **How to Get Started:**
 ${monitoringInfo.process.join('\n')}
 
-This service is available for Professional Builders. Register as a builder to access!`,
+This service is available for COs/Contractors. Register as a builder to access!`,
         suggestions: ['Monitoring pricing', 'How to register as builder', 'Talk to staff about monitoring'],
         sources: ['UjenziXform Monitoring']
       };
@@ -1340,7 +1340,7 @@ Benefits: ${ut.benefits.slice(0, 2).join(', ')}
 • Verify your email
 
 Which type of account do you need?`,
-        suggestions: ['Register as Private Client', 'Register as Professional Builder', 'Register as Supplier', 'Register as Delivery'],
+        suggestions: ['Register as Private Client', 'Register as CO/Contractor', 'Register as Supplier', 'Register as Delivery'],
         sources: ['UjenziXform Registration']
       };
     }
@@ -1365,15 +1365,19 @@ ${info.howTo}
 • Rate suppliers
 
 Ready to register? Visit our home page and click "Register as Builder"!`,
-        suggestions: ['Go to registration', 'Professional Builder info', 'Browse products'],
+        suggestions: ['Go to registration', 'CO/Contractor info', 'Browse products'],
         sources: ['UjenziXform Registration']
       };
     }
 
-    if (query.includes('professional builder') || query.includes('contractor')) {
+    if (
+      query.includes('professional builder') ||
+      query.includes('CO/contractor') ||
+      query.includes('contractor')
+    ) {
       const info = UJENZIXFORM_KB.registration.userTypes[1];
       return {
-        response: `👷 **Professional Builder Registration**
+        response: `👷 **CO/Contractor Registration**
 
 ${info.description}
 

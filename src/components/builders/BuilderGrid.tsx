@@ -163,7 +163,7 @@ export const BuilderGrid = ({ onBuilderContact, onBuilderProfile, isAdmin = fals
   const fetchRegisteredBuilders = async () => {
     setLoadingBuilders(true);
     try {
-      // Fetch profiles that are professional builders
+      // Fetch profiles that are COs/contractors
       // Join with user_roles to get only professional_builder roles
       const { data: roleData, error: roleError } = await supabase
         .from('user_roles')
@@ -179,7 +179,7 @@ export const BuilderGrid = ({ onBuilderContact, onBuilderProfile, isAdmin = fals
       const builderUserIds = (roleData || []).map(r => r.user_id);
 
       if (builderUserIds.length === 0) {
-        console.log('No professional builders found');
+        console.log('No COs/contractors found');
         setLoadingBuilders(false);
         return;
       }
@@ -237,7 +237,7 @@ export const BuilderGrid = ({ onBuilderContact, onBuilderProfile, isAdmin = fals
 
   // ONLY show registered builders from the database - no demo/fake data
   const allBuilders = useMemo(() => {
-    // Only show real registered professional builders
+    // Only show real registered COs/contractors
     return registeredBuilders;
   }, [registeredBuilders]);
   
@@ -385,7 +385,7 @@ export const BuilderGrid = ({ onBuilderContact, onBuilderProfile, isAdmin = fals
       <div className="space-y-4">
         <div className="flex items-center justify-between flex-wrap gap-2">
           <p className="text-sm text-muted-foreground">
-            Showing {builders.length} of {currentTotalCount} professional builders
+            Showing {builders.length} of {currentTotalCount} COs/contractors
             {registeredBuilders.length > 0 && (
               <span className="text-green-600 ml-1">
                 ({registeredBuilders.length} verified)

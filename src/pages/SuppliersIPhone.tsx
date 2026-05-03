@@ -125,7 +125,7 @@ const SuppliersIPhone = () => {
                     onClick={() => navigate('/professional-builder-registration')}
                   >
                     <Building className="h-4 w-4 mr-2" />
-                    Professional Builder
+                    CO/Contractor
                   </Button>
                   <Button 
                     variant="outline" 

@@ -78,7 +78,7 @@ const tours: Record<string, TourStep[]> = {
     {
       id: 'welcome',
       title: 'Welcome to UjenziPro! 🏗️',
-      description: 'As a professional builder, you can order materials, track deliveries, and request monitoring services.',
+      description: 'As a CO/contractor, you can order materials, track deliveries, and request monitoring services.',
       icon: <Sparkles className="h-8 w-8 text-yellow-500" />,
       position: 'center'
     },

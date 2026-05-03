@@ -919,7 +919,7 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
           const { error: nErr } = await supabase.from('notifications').insert({
             user_id: providerUid,
             type: 'invoice_pay_builder_prompt',
-            title: 'Pay the professional builder now',
+            title: 'Pay the CO/contractor now',
             message: `Invoice ${editingInvoice.invoice_number} was forwarded to the builder for order${poLabel}. Complete payment to the builder immediately (per your delivery agreement).`,
             priority: 'urgent',
             data: {
@@ -1169,7 +1169,7 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
           <AlertTitle className="text-foreground">KRA eTIMS on your purchase orders</AlertTitle>
           <AlertDescription className="text-xs text-muted-foreground">
             <p>
-              When a professional builder submits eTIMS for an order tied to your supplier account, the receipt appears
+              When a CO/contractor submits eTIMS for an order tied to your supplier account, the receipt appears
               here until a <strong className="text-foreground">supplier invoice</strong> row exists for that PO. The
               builder pays from their dashboard; you can issue and send your invoice when ready.
             </p>
@@ -1403,7 +1403,7 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
                             <CardTitle className="text-base">KRA eTIMS receipt</CardTitle>
                             <p className="text-sm text-muted-foreground">PO {po.po_number}</p>
                             <p className="mt-2 text-xs text-muted-foreground">
-                              The professional builder has eTIMS data on file for this order. Payment is completed from
+                              The CO/contractor has eTIMS data on file for this order. Payment is completed from
                               their dashboard. When you are ready, create and send your supplier invoice for this PO so
                               it appears in the list above and links payment to your invoice.
                             </p>

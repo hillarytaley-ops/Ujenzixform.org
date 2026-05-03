@@ -278,7 +278,7 @@ const ProfessionalBuilderSignIn = () => {
             <HardHat className="h-8 w-8 text-white" />
           </div>
           <div>
-            <CardTitle className="text-2xl font-bold text-gray-900">Professional Builder Sign In</CardTitle>
+            <CardTitle className="text-2xl font-bold text-gray-900">CO/Contractor Sign In</CardTitle>
             <CardDescription className="text-gray-600">
               Access your professional construction dashboard
             </CardDescription>
@@ -351,7 +351,7 @@ const ProfessionalBuilderSignIn = () => {
 
           {/* Benefits */}
           <div className="mt-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
-            <h4 className="font-semibold text-blue-900 mb-2">Professional Builder Benefits:</h4>
+            <h4 className="font-semibold text-blue-900 mb-2">CO/Contractor Benefits:</h4>
             <ul className="space-y-1 text-sm text-blue-800">
               <li className="flex items-center gap-2">
                 <span className="text-blue-600">✓</span>

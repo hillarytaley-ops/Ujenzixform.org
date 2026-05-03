@@ -104,12 +104,12 @@ const BuilderPortal = () => {
                   Welcome back, {profile?.full_name || 'Builder'}!
                 </h1>
                 <p className="text-blue-100 text-lg">
-                  {isPrivateClient ? 'Private Client Portal' : 'Professional Builder Portal'}
+                  {isPrivateClient ? 'Private Client Portal' : 'CO/Contractor Portal'}
                 </p>
               </div>
             </div>
             <Badge className="bg-white/20 text-white border-white/30">
-              {isPrivateClient ? '🏠 Private Client' : '👔 Professional Builder'}
+              {isPrivateClient ? '🏠 Private Client' : '👔 CO/Contractor'}
             </Badge>
           </div>
         </div>

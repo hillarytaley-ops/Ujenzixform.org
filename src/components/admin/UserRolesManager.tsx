@@ -61,7 +61,7 @@ const AVAILABLE_ROLES = [
   { value: 'supplier', label: 'Supplier', icon: Store, color: 'bg-amber-500' },
   { value: 'delivery_provider', label: 'Delivery Provider', icon: Truck, color: 'bg-purple-500' },
   { value: 'private_client', label: 'Private Builder', icon: ShoppingBag, color: 'bg-green-500' },
-  { value: 'professional_builder', label: 'Professional Builder', icon: HardHat, color: 'bg-blue-500' },
+  { value: 'professional_builder', label: 'CO/Contractor', icon: HardHat, color: 'bg-blue-500' },
 ];
 
 /** user_roles.role is often `delivery`; UI and some code use `delivery_provider` */

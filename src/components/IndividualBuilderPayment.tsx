@@ -289,7 +289,7 @@ const IndividualBuilderPayment = () => {
           <div className="text-center py-8 text-muted-foreground">
             <CreditCard className="h-12 w-12 mx-auto mb-4 opacity-50" />
             <p>This section is for individual builders only.</p>
-            <p className="text-sm mt-2">Professional builders and companies use the "Acknowledge & Pay" tab.</p>
+            <p className="text-sm mt-2">CO/Contractors and companies use the "Acknowledge & Pay" tab.</p>
           </div>
         </CardContent>
       </Card>

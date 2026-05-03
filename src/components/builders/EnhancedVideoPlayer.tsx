@@ -536,7 +536,7 @@ export const EnhancedVideoPlayer = ({ video, isOpen, onClose, onVideoUpdate }: E
                       <span className="text-sm font-medium block">
                         {video.builder_profile.company_name || video.builder_profile.full_name}
                       </span>
-                      <span className="text-xs text-gray-500">Professional Builder</span>
+                      <span className="text-xs text-gray-500">CO/Contractor</span>
                     </div>
                   </div>
                   <Button variant="outline" size="sm" className="text-blue-600 border-blue-200">

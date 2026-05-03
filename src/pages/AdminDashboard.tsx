@@ -543,7 +543,7 @@ const AdminDashboard = () => {
     { name: 'Privacy Policy', path: '/privacy', icon: Shield, status: 'active', visits: 0, description: 'Privacy information', category: 'public' },
     { name: 'Admin Login', path: '/admin-login', icon: Shield, status: 'active', visits: 0, description: 'Admin authentication', category: 'admin' },
     { name: 'Admin Dashboard', path: '/admin-dashboard', icon: Shield, status: 'active', visits: 0, description: 'Admin control panel', category: 'admin' },
-    { name: 'Builder — Invoices / DN / GRN', path: '/professional-builder-dashboard?tab=invoices', icon: FileText, status: 'active', visits: 0, description: 'Builder hub: delivery notes, GRN, invoices (role: professional builder)', category: 'protected' },
+    { name: 'Builder — Invoices / DN / GRN', path: '/professional-builder-dashboard?tab=invoices', icon: FileText, status: 'active', visits: 0, description: 'Builder hub: delivery notes, GRN, invoices (role: CO/contractor)', category: 'protected' },
     { name: 'Supplier — Invoice hub', path: '/supplier-dashboard?tab=invoice', icon: FileText, status: 'active', visits: 0, description: 'Supplier delivery docs & invoices (role: supplier)', category: 'protected' },
   ];
 
@@ -2097,7 +2097,7 @@ const AdminDashboard = () => {
     switch (type) {
       case 'builder':
       case 'professional_builder':
-        return <Badge className="bg-blue-600"><Building2 className="h-3 w-3 mr-1" /> Professional Builder</Badge>;
+        return <Badge className="bg-blue-600"><Building2 className="h-3 w-3 mr-1" /> CO/Contractor</Badge>;
       case 'private_client':
         return <Badge className="bg-green-600"><ShoppingBag className="h-3 w-3 mr-1" /> Private Builder</Badge>;
       case 'supplier':
@@ -2872,7 +2872,7 @@ const AdminDashboard = () => {
             </Card>
           </TabsContent>
 
-          {/* User Registrations Tab - Suppliers, Professional Builders, Private Builders */}
+          {/* User Registrations Tab - Suppliers, COs/Contractors, Private Builders */}
           <TabsContent value="registrations" className="space-y-6">
             <RegistersTab />
           </TabsContent>
@@ -4084,7 +4084,7 @@ const AdminDashboard = () => {
                               doc.userRole === 'delivery_provider' || doc.userRole === 'delivery' ? 'bg-teal-600' :
                               'bg-gray-600'
                             }>
-                              {doc.userRole === 'professional_builder' ? 'Professional Builder' :
+                              {doc.userRole === 'professional_builder' ? 'CO/Contractor' :
                                doc.userRole === 'private_client' ? 'Private Builder' :
                                doc.userRole === 'delivery_provider' ? 'Delivery Provider' :
                                doc.userRole}
@@ -4538,7 +4538,7 @@ const AdminDashboard = () => {
                 <div className="bg-teal-900/20 border border-teal-700/50 rounded-lg p-4 mb-6">
                   <h4 className="text-teal-300 font-medium mb-2">📋 QR Code Workflow</h4>
                   <ul className="text-sm text-gray-300 space-y-1">
-                    <li>• QR codes are <strong className="text-teal-400">auto-generated</strong> when a professional builder accepts a supplier's quote</li>
+                    <li>• QR codes are <strong className="text-teal-400">auto-generated</strong> when a CO/contractor accepts a supplier's quote</li>
                     <li>• Suppliers download QR codes and attach them to materials before dispatch</li>
                     <li>• Delivery providers scan at pickup and delivery for verification</li>
                     <li>• Builders scan to confirm receipt and verify materials</li>

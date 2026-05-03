@@ -1,5 +1,5 @@
 /**
- * MultiSupplierQuoteDialog - Allows Professional Builders to request quotes from multiple suppliers
+ * MultiSupplierQuoteDialog - Allows COs/Contractors to request quotes from multiple suppliers
  * 
  * Flow:
  * 1. Builder selects products in cart
@@ -181,7 +181,7 @@ export const MultiSupplierQuoteDialog: React.FC<MultiSupplierQuoteDialogProps> =
 
   const handleSendQuotes = async () => {
     // ═══════════════════════════════════════════════════════════════════════════════
-    // SECURITY: ONLY Professional Builders can request quotes
+    // SECURITY: ONLY COs/Contractors can request quotes
     // Private Clients must use Buy Now instead
     // ═══════════════════════════════════════════════════════════════════════════════
     const currentRole = localStorage.getItem('user_role');
@@ -197,8 +197,8 @@ export const MultiSupplierQuoteDialog: React.FC<MultiSupplierQuoteDialogProps> =
     
     if (currentRole !== 'professional_builder' && currentRole !== 'admin') {
       toast({
-        title: '⚠️ Professional Builder Required',
-        description: 'Only Professional Builders can request quotes. Please register as a Professional Builder.',
+        title: '⚠️ CO/Contractor Required',
+        description: 'Only COs/Contractors can request quotes. Please register as a CO/Contractor.',
         variant: 'destructive',
       });
       return;

@@ -120,7 +120,7 @@ const SupplierPurchaseOrderManager: React.FC = () => {
           return {
             ...order,
             items: Array.isArray(order.items) ? order.items : [],
-            buyer_name: profile?.full_name || 'Professional Builder'
+            buyer_name: profile?.full_name || 'CO/Contractor'
           };
         })
       );

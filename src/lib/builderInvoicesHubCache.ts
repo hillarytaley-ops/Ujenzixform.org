@@ -1,5 +1,5 @@
 /**
- * In-memory cache + parallel prefetch for Professional Builder "Invoices" hub
+ * In-memory cache + parallel prefetch for CO/Contractor "Invoices" hub
  * (Delivery notes, GRN, Supplier invoices). Lets subtabs paint data immediately
  * when prefetch finished (hover / idle / warm) before the user switches tabs.
  */

@@ -86,14 +86,14 @@ const ProfessionalBuilderDashboard = () => {
       if (!roleData || (!profile.is_professional && profile.user_type !== 'company')) {
         toast({
           title: "Access Restricted",
-          description: "This dashboard is restricted to professional builders and companies only.",
+          description: "This dashboard is restricted to COs/contractors and companies only.",
           variant: "destructive"
         });
         return;
       }
 
       setUserProfile(profile);
-      logSecurityEvent("access_verified", "Professional builder access verified");
+      logSecurityEvent("access_verified", "CO/Contractor access verified");
     } catch (error) {
       console.error('Error checking user access:', error);
       toast({
@@ -140,7 +140,7 @@ const ProfessionalBuilderDashboard = () => {
             <Shield className="h-12 w-12 mx-auto mb-4 text-destructive" />
             <h3 className="text-lg font-semibold text-destructive mb-2">Access Restricted</h3>
             <p className="text-muted-foreground">
-              This dashboard is exclusively for professional builders and companies.
+              This dashboard is exclusively for COs/contractors and companies.
             </p>
           </div>
         </CardContent>
@@ -157,7 +157,7 @@ const ProfessionalBuilderDashboard = () => {
             <div>
               <CardTitle className="flex items-center gap-2 text-primary">
                 <Shield className="h-5 w-5" />
-                Secure Professional Builder Dashboard
+                Secure CO/Contractor Dashboard
               </CardTitle>
               <CardDescription>
                 All data is encrypted and secured with role-based access control. 
@@ -196,7 +196,7 @@ const ProfessionalBuilderDashboard = () => {
               <UserCheck className="h-8 w-8 text-primary" />
               <div>
                 <p className="font-semibold">{userProfile.full_name || userProfile.company_name}</p>
-                <p className="text-sm text-muted-foreground">Professional Builder Verified</p>
+                <p className="text-sm text-muted-foreground">CO/Contractor Verified</p>
               </div>
             </div>
           </CardContent>

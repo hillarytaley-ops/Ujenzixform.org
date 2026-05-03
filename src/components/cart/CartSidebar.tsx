@@ -241,7 +241,7 @@ export const CartSidebar: React.FC = () => {
     console.log('📝 RequestQuote: Starting quote request...');
     
     // ═══════════════════════════════════════════════════════════════════════════════
-    // SECURITY: ONLY Professional Builders can request quotes
+    // SECURITY: ONLY COs/Contractors can request quotes
     // Private Clients must use Buy Now instead
     // ═══════════════════════════════════════════════════════════════════════════════
     const currentRole = userRole || localStorage.getItem('user_role');
@@ -259,8 +259,8 @@ export const CartSidebar: React.FC = () => {
     if (currentRole !== 'professional_builder' && currentRole !== 'admin') {
       console.log('🚫 Non-builder attempted quote request - blocked');
       toast({
-        title: '⚠️ Professional Builder Required',
-        description: 'Only Professional Builders can request quotes. Please register as a Professional Builder or Private Client to purchase.',
+        title: '⚠️ CO/Contractor Required',
+        description: 'Only COs/Contractors can request quotes. Please register as a CO/Contractor or Private Client to purchase.',
         variant: 'destructive'
       });
       return;
@@ -435,16 +435,16 @@ export const CartSidebar: React.FC = () => {
     
     // ═══════════════════════════════════════════════════════════════════════════════
     // SECURITY: ONLY Private Clients can buy directly
-    // Professional Builders must use Request Quote instead
+    // COs/Contractors must use Request Quote instead
     // Other users (visitors, suppliers, delivery) cannot purchase
     // ═══════════════════════════════════════════════════════════════════════════════
     const currentRole = userRole || localStorage.getItem('user_role');
     
     if (currentRole === 'professional_builder') {
-      console.log('🚫 Professional Builder attempted direct purchase - blocked');
+      console.log('🚫 CO/Contractor attempted direct purchase - blocked');
       toast({
         title: '📋 Request a Quote Instead',
-        description: 'As a Professional Builder, you need to request quotes from suppliers. Use the "Request Quotes from Multiple Suppliers" button above.',
+        description: 'As a CO/Contractor, you need to request quotes from suppliers. Use the "Request Quotes from Multiple Suppliers" button above.',
         variant: 'destructive'
       });
       return;
@@ -463,7 +463,7 @@ export const CartSidebar: React.FC = () => {
       console.log('🚫 Non-private-client attempted direct purchase - blocked');
       toast({
         title: '⚠️ Private Client Required',
-        description: 'Only Private Clients can purchase directly. Please register as a Private Client or Professional Builder to request quotes.',
+        description: 'Only Private Clients can purchase directly. Please register as a Private Client or CO/Contractor to request quotes.',
         variant: 'destructive'
       });
       return;
@@ -960,7 +960,7 @@ export const CartSidebar: React.FC = () => {
 
               {/* ═══════════════════════════════════════════════════════════════════════════════
                   ACTION BUTTONS - STRICT ROLE ENFORCEMENT
-                  - Professional Builder: ONLY Request Quote (no Buy Now)
+                  - CO/Contractor: ONLY Request Quote (no Buy Now)
                   - Private Client: ONLY Buy Now (no Request Quote)
                   - Other roles: Show message to register
                   ═══════════════════════════════════════════════════════════════════════════════ */}
@@ -989,7 +989,7 @@ export const CartSidebar: React.FC = () => {
                         </div>
                       </Button>
                       <p className="text-[10px] text-center text-blue-600 font-medium">
-                        Professional Builder: use the comparison table to review suppliers, locations, and pricing before requesting quotes.
+                        CO/Contractor: use the comparison table to review suppliers, locations, and pricing before requesting quotes.
                       </p>
                     </>
                   );
@@ -1094,7 +1094,7 @@ export const CartSidebar: React.FC = () => {
                     <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-center">
                       <p className="text-amber-800 font-medium text-sm">⚠️ Registration Required</p>
                       <p className="text-amber-700 text-xs mt-1">
-                        Please register as a <strong>Professional Builder</strong> (for quotes) or <strong>Private Client</strong> (for direct purchase) to continue.
+                        Please register as a <strong>CO/Contractor</strong> (for quotes) or <strong>Private Client</strong> (for direct purchase) to continue.
                       </p>
                     </div>
                     <div className="grid grid-cols-2 gap-2">
@@ -1118,7 +1118,7 @@ export const CartSidebar: React.FC = () => {
               })()}
               
               <p className="text-[10px] text-center text-gray-500">
-                Professional Builders: request quotes after comparing suppliers and locations. Private Clients: buy directly once you have picked a supplier and price.
+                COs/Contractors: request quotes after comparing suppliers and locations. Private Clients: buy directly once you have picked a supplier and price.
               </p>
             </div>
           </>
@@ -1140,7 +1140,7 @@ export const CartSidebar: React.FC = () => {
           );
         })()}
 
-        {/* Multi-Supplier Quote Dialog (for Professional Builders) */}
+        {/* Multi-Supplier Quote Dialog (for COs/Contractors) */}
         <MultiSupplierQuoteDialog
           isOpen={showMultiSupplierQuote}
           onClose={() => setShowMultiSupplierQuote(false)}

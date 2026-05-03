@@ -11,7 +11,7 @@ export interface TabConfig {
 }
 
 export const builderTabConfigs: TabConfig[] = [
-  // Professional Builder tabs
+  // CO/Contractor tabs
   {
     id: 'purchase-orders',
     label: 'Purchase Orders',

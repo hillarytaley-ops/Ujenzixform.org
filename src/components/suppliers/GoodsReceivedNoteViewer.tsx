@@ -110,7 +110,7 @@ const GoodsReceivedNoteViewer: React.FC = () => {
           return {
             ...grn,
             items: Array.isArray(grn.items) ? grn.items : [],
-            builder_name: profile?.full_name || 'Professional Builder'
+            builder_name: profile?.full_name || 'CO/Contractor'
           };
         })
       );

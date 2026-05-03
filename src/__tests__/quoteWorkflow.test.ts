@@ -405,7 +405,7 @@ describe('Quote Workflow', () => {
   });
 
   describe('Role Permissions', () => {
-    it('should only allow professional builders to request quotes', () => {
+    it('should only allow COs/contractors to request quotes', () => {
       const canRequestQuote = (role: string): boolean => {
         return role === 'professional_builder';
       };

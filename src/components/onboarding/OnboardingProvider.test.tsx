@@ -95,7 +95,7 @@ describe('OnboardingProvider', () => {
     fireEvent.click(screen.getByText('Start Builder Tour'));
 
     await waitFor(() => {
-      // Professional builder tour has 5 steps
+      // CO/Contractor tour has 5 steps
       expect(screen.getByTestId('total-steps')).toHaveTextContent('5');
     });
   });

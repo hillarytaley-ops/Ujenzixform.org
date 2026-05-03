@@ -1665,7 +1665,7 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, in
                   {selectedOrder.buyer_role && (
                     <span className="ml-2">
                       by {selectedOrder.buyer_role === 'private_client' ? 'Private Client' : 
-                          selectedOrder.buyer_role === 'professional_builder' ? 'Professional Builder' : selectedOrder.buyer_role}
+                          selectedOrder.buyer_role === 'professional_builder' ? 'CO/Contractor' : selectedOrder.buyer_role}
                     </span>
                   )}
                 </DialogDescription>

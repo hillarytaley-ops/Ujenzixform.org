@@ -184,7 +184,7 @@ const GoodsReceivedNote = () => {
   const onSubmit = async (data: GRNFormData) => {
     setIsSubmitting(true);
     try {
-      // Check if user is a professional builder or company
+      // Check if user is a CO/contractor or company
       const { data: profile, error: profileError } = await supabase
         .from('profiles')
         .select('*, user_id')
@@ -204,7 +204,7 @@ const GoodsReceivedNote = () => {
       if (!roleData || (!profile.is_professional && profile.user_type !== 'company')) {
         toast({
           title: "Access Denied",
-          description: "Only professional builders and companies can create GRNs.",
+          description: "Only COs/contractors and companies can create GRNs.",
           variant: "destructive"
         });
         return;

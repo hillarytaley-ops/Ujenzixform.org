@@ -16,7 +16,7 @@ import { SUPABASE_URL, SUPABASE_ANON_KEY } from '@/integrations/supabase/client'
 
 const ROLE = 'professional_builder';
 const DASHBOARD = '/professional-builder-dashboard';
-const TITLE = 'Professional Builder';
+const TITLE = 'CO/Contractor';
 
 const ROLE_DASHBOARDS: Record<string, string> = {
   'private_client': '/private-client-dashboard',
@@ -99,7 +99,7 @@ const ProfessionalBuilderAuth: React.FC = () => {
         redirecting.current = false;
         toast({ 
           title: '❌ Account Not Registered', 
-          description: 'You must register as a Professional Builder first. Please use the Sign Up tab.',
+          description: 'You must register as a CO/Contractor first. Please use the Sign Up tab.',
           variant: 'destructive',
           duration: 6000
         });

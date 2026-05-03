@@ -221,14 +221,14 @@ const ScannersAccessGuard = ({ children }: { children: React.ReactNode }) => {
     );
   }
   
-  // Builders, Private Clients, and Professional Builders are NOT allowed to access scanner camera views
+  // Builders, Private Clients, and COs/Contractors are NOT allowed to access scanner camera views
   // Only suppliers (dispatch scanners) and delivery providers (receiving scanners) can use this feature
   const restrictedRoles = ['builder', 'private_client', 'professional_builder'];
   
   if (restrictedRoles.includes(dbRole)) {
     const roleDisplayName = dbRole === 'builder' ? 'Builder' 
       : dbRole === 'private_client' ? 'Private Builder' 
-      : 'Professional Builder';
+      : 'CO/Contractor';
     
     const dashboardLink = dbRole === 'builder' ? '/builder-dashboard'
       : dbRole === 'private_client' ? '/private-client-dashboard'

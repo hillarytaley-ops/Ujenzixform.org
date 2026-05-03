@@ -171,7 +171,7 @@ const Builders = () => {
               id="builders-hero-heading"
               className="text-xl sm:text-2xl md:text-3xl font-bold mb-1 leading-tight"
             >
-              <span className="text-white">Professional Builders</span>{" "}
+              <span className="text-white">COs/Contractors</span>{" "}
               <span className="text-blue-400">Directory</span>
             </h1>
 
@@ -319,7 +319,7 @@ const Builders = () => {
                       <Building2 className="h-4 w-4 text-blue-600" />
                     </div>
                     <div className="flex-1 min-w-0 text-left">
-                      <h3 className="text-sm font-bold text-gray-900 leading-none">Professional Builder</h3>
+                      <h3 className="text-sm font-bold text-gray-900 leading-none">CO/Contractor</h3>
                       <p className="text-[10px] sm:text-[11px] text-gray-500 mt-0.5 leading-tight">
                         Contractors & companies
                       </p>
@@ -409,7 +409,7 @@ const Builders = () => {
               Building Kenya&apos;s Future
             </h2>
             <p className="text-lg sm:text-2xl text-white/90 max-w-4xl mx-auto drop-shadow-lg leading-relaxed">
-              Our network of professional builders and contractors is transforming Kenya&apos;s
+              Our network of COs/contractors and contractors is transforming Kenya&apos;s
               construction landscape, one project at a time across all 47 counties.
             </p>
           </div>
@@ -419,7 +419,7 @@ const Builders = () => {
               <div className="text-4xl sm:text-5xl font-bold text-blue-400 mb-3 sm:mb-4 drop-shadow-lg">
                 {formatBuildersStatCount(publicStats.professionalBuilders, publicStats.loading)}
               </div>
-              <div className="text-xl sm:text-2xl font-semibold text-white mb-2">Professional builders</div>
+              <div className="text-xl sm:text-2xl font-semibold text-white mb-2">CO/Contractors</div>
               <div className="text-white/80 text-sm">Registered on the directory</div>
             </div>
             <div className="bg-white/15 backdrop-blur-sm rounded-2xl p-6 sm:p-8 border border-white/20 hover:bg-white/20 transition-all duration-300 shadow-xl">

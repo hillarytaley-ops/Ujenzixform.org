@@ -164,7 +164,7 @@ const PublicBuilderProfile = () => {
     if (navigator.share) {
       try {
         await navigator.share({
-          title: `${profile?.company_name || profile?.full_name} - Professional Builder`,
+          title: `${profile?.company_name || profile?.full_name} - CO/Contractor`,
           text: `Check out ${profile?.company_name || profile?.full_name} on UjenziXform`,
           url: shareUrl,
         });

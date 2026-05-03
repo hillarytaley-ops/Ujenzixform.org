@@ -206,7 +206,7 @@ export function BuilderModerationTab() {
   const fetchBuilders = async () => {
     setLoading(true);
     try {
-      // Get professional builder user IDs
+      // Get CO/contractor user IDs
       const { data: roleData } = await supabase
         .from('user_roles')
         .select('user_id')
@@ -902,7 +902,7 @@ export function BuilderModerationTab() {
             <DialogDescription className="text-gray-400">
               {selectedBuilder?.is_verified 
                 ? `Are you sure you want to remove verification from ${selectedBuilder?.company_name || selectedBuilder?.full_name}?`
-                : `Verify ${selectedBuilder?.company_name || selectedBuilder?.full_name} as a trusted professional builder?`
+                : `Verify ${selectedBuilder?.company_name || selectedBuilder?.full_name} as a trusted CO/contractor?`
               }
             </DialogDescription>
           </DialogHeader>

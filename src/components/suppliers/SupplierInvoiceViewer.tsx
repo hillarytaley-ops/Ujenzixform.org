@@ -112,7 +112,7 @@ const SupplierInvoiceViewer: React.FC = () => {
           return {
             ...invoice,
             items: Array.isArray(invoice.items) ? invoice.items : [],
-            issuer_name: profile?.full_name || 'Professional Builder'
+            issuer_name: profile?.full_name || 'CO/Contractor'
           };
         })
       );
