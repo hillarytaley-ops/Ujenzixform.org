@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useLayoutEffect, useMemo, useRef, useCallback } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useLocation, useSearchParams } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -42,6 +42,7 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   builderHubListFetchWithTimeout,
   fetchBuilderHubInvoices,
+  invalidateBuilderInvoicesHub,
   patchHubInvoices,
   peekHubInvoices,
   subscribeBuilderHubCache,
@@ -331,6 +332,7 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
   const [paymentReference, setPaymentReference] = useState('');
   const [recordingPayment, setRecordingPayment] = useState(false);
   const { toast } = useToast();
+  const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
   /** When true (VITE_PAYSTACK_TEST_MODE), builders can open Paystack on draft rows for sandbox testing. */
   const paystackSandbox = useMemo(() => isPaystackTestModeBanner(), []);
@@ -588,6 +590,17 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
   useEffect(() => {
     void loadBuilderEtimsReceipts();
   }, [loadBuilderEtimsReceipts]);
+
+  /** After Paystack redirect, bust hub cache and reload so Unpaid / Paid tabs reflect `payment_status` immediately. */
+  useEffect(() => {
+    if (userRole !== 'builder' || !userId) return;
+    const st = location.state as { paystackVerified?: boolean } | null | undefined;
+    if (!st?.paystackVerified) return;
+    invalidateBuilderInvoicesHub(userId, builderProfileId ?? undefined);
+    void fetchInvoices({ silent: true });
+    void loadBuilderEtimsReceipts();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- one-shot refresh when returning from /payment/paystack-callback
+  }, [userRole, userId, builderProfileId, location.state]);
 
   useEffect(() => {
     if (userRole !== 'builder' || !userId) return;

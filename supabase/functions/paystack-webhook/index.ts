@@ -64,6 +64,27 @@ async function poBuyerMatchesUser(
   return data?.id === buyerId;
 }
 
+/** True if the paying user (auth.users.id from Paystack metadata) owns this invoice for settlement. */
+async function invoicePayerMatchesUser(
+  admin: ReturnType<typeof createClient>,
+  inv: { builder_id?: unknown; purchase_order_id?: unknown },
+  authUserId: string,
+): Promise<boolean> {
+  const builderId = typeof inv.builder_id === "string" ? inv.builder_id : "";
+  if (builderId && builderId === authUserId) return true;
+  const { data: prof } = await admin.from("profiles").select("id").eq("user_id", authUserId).maybeSingle();
+  if (prof?.id && builderId === prof.id) return true;
+  const poId = typeof inv.purchase_order_id === "string" ? inv.purchase_order_id : "";
+  if (!poId) return false;
+  const { data: po, error } = await admin
+    .from("purchase_orders")
+    .select("buyer_id")
+    .eq("id", poId)
+    .maybeSingle();
+  if (error || !po?.buyer_id) return false;
+  return poBuyerMatchesUser(admin, po.buyer_id as string, authUserId);
+}
+
 async function hmacSha512Hex(secret: string, message: string): Promise<string> {
   const enc = new TextEncoder();
   const key = await crypto.subtle.importKey(
@@ -134,55 +155,58 @@ serve(async (req) => {
 
       const { data: inv, error: invErr } = await admin
         .from("invoices")
-        .select("id, builder_id, payment_status, notes, total_amount")
+        .select("id, builder_id, purchase_order_id, payment_status, notes, total_amount")
         .eq("id", invoiceId)
         .maybeSingle();
 
       if (invErr) {
         console.error("[paystack-webhook] invoice lookup:", invErr.message);
-      } else if (inv && inv.builder_id === metaUser && inv.payment_status !== "paid") {
-        const stamp = new Date().toISOString();
-        const line = reference
-          ? `\n[${stamp}] Paystack charge.success — ref: ${reference}`
-          : `\n[${stamp}] Paystack charge.success`;
-        const prevNotes = typeof inv.notes === "string" ? inv.notes : "";
-        const invTotal = Number((inv as { total_amount?: unknown }).total_amount);
-        const amountFromGateway =
-          paidMajor != null && Number.isFinite(paidMajor) ? paidMajor : null;
-        const amountPaid =
-          amountFromGateway != null && amountFromGateway > 0
-            ? amountFromGateway
-            : Number.isFinite(invTotal) && invTotal > 0
-            ? invTotal
-            : 0;
-        const { error: upErr } = await admin
-          .from("invoices")
-          .update({
-            payment_status: "paid",
-            amount_paid: amountPaid,
-            paid_at: stamp,
-            updated_at: stamp,
-            notes: `${prevNotes}${line}`.trim(),
-          })
-          .eq("id", invoiceId);
-        if (upErr) {
-          console.error("[paystack-webhook] invoice update:", upErr.message);
-        } else {
-          console.log("[paystack-webhook] marked invoice paid:", invoiceId);
-          const who = await authNameEmail(admin, metaUser);
-          if (who) {
-            const { subject, html } = shell.htmlInvoicePaid({
-              name: who.name,
-              invoiceId,
-              reference,
-            });
-            await resendSend(who.email, subject, html);
+      } else if (inv && inv.payment_status !== "paid") {
+        const allowed = await invoicePayerMatchesUser(admin, inv, metaUser);
+        if (allowed) {
+          const stamp = new Date().toISOString();
+          const line = reference
+            ? `\n[${stamp}] Paystack charge.success — ref: ${reference}`
+            : `\n[${stamp}] Paystack charge.success`;
+          const prevNotes = typeof inv.notes === "string" ? inv.notes : "";
+          const invTotal = Number((inv as { total_amount?: unknown }).total_amount);
+          const amountFromGateway =
+            paidMajor != null && Number.isFinite(paidMajor) ? paidMajor : null;
+          const amountPaid =
+            amountFromGateway != null && amountFromGateway > 0
+              ? amountFromGateway
+              : Number.isFinite(invTotal) && invTotal > 0
+              ? invTotal
+              : 0;
+          const { error: upErr } = await admin
+            .from("invoices")
+            .update({
+              payment_status: "paid",
+              amount_paid: amountPaid,
+              paid_at: stamp,
+              updated_at: stamp,
+              notes: `${prevNotes}${line}`.trim(),
+            })
+            .eq("id", invoiceId);
+          if (upErr) {
+            console.error("[paystack-webhook] invoice update:", upErr.message);
           } else {
-            console.warn("[paystack-webhook] invoice paid email: no auth user", invoiceId);
+            console.log("[paystack-webhook] marked invoice paid:", invoiceId);
+            const who = await authNameEmail(admin, metaUser);
+            if (who) {
+              const { subject, html } = shell.htmlInvoicePaid({
+                name: who.name,
+                invoiceId,
+                reference,
+              });
+              await resendSend(who.email, subject, html);
+            } else {
+              console.warn("[paystack-webhook] invoice paid email: no auth user", invoiceId);
+            }
           }
+        } else {
+          console.warn("[paystack-webhook] invoice payer not authorized for this charge; skip", invoiceId);
         }
-      } else if (inv && inv.builder_id !== metaUser) {
-        console.warn("[paystack-webhook] metadata user_id does not match invoice.builder_id; skip", invoiceId);
       }
     } else if (orderId.startsWith("drq_") && metaUser) {
       const drId = orderId.slice(4);

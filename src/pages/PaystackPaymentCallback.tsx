@@ -125,6 +125,45 @@ export default function PaystackPaymentCallback() {
               console.warn("[paystack-callback] notify_delivery_providers_quote_paid:", e);
             }
           }
+        } else if (orderId.startsWith("inv_")) {
+          /** Mirrors paystack-webhook so the UI moves Unpaid → Paid even if the webhook is delayed. */
+          const invoiceId = orderId.slice(4);
+          const stamp = new Date().toISOString();
+          const ref = typeof data.reference === "string" ? data.reference.trim() : "";
+          const line = ref
+            ? `\n[${stamp}] Paystack verify (callback) — ref: ${ref}`
+            : `\n[${stamp}] Paystack verify (callback)`;
+          const { data: invRow, error: selErr } = await supabase
+            .from("invoices")
+            .select("notes, total_amount, payment_status")
+            .eq("id", invoiceId)
+            .maybeSingle();
+          if (selErr || !invRow) {
+            console.warn("[paystack-callback] invoice select:", selErr?.message);
+          } else if (String(invRow.payment_status || "").toLowerCase() !== "paid") {
+            const prevNotes = typeof invRow.notes === "string" ? invRow.notes : "";
+            const invTotal = Number(invRow.total_amount);
+            const paidFromVerify = typeof data.amount === "number" && Number.isFinite(data.amount) ? data.amount : NaN;
+            const amountPaid =
+              Number.isFinite(paidFromVerify) && paidFromVerify > 0
+                ? paidFromVerify
+                : Number.isFinite(invTotal) && invTotal > 0
+                  ? invTotal
+                  : 0;
+            const { error: invUpErr } = await supabase
+              .from("invoices")
+              .update({
+                payment_status: "paid",
+                amount_paid: amountPaid,
+                paid_at: stamp,
+                updated_at: stamp,
+                notes: `${prevNotes}${line}`.trim(),
+              })
+              .eq("id", invoiceId);
+            if (invUpErr) {
+              console.warn("[paystack-callback] invoice update:", invUpErr.message);
+            }
+          }
         }
 
         let navTo = "/home";
