@@ -343,7 +343,7 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
   /** Latest fetcher for Realtime / visibility handlers (avoid stale closures). */
   const fetchInvoicesRef = useRef<(opts?: { silent?: boolean }) => Promise<void>>(async () => {});
 
-  /** Builder: POs with eTIMS data — includes stored integrator JSON for on-screen receipt. */
+  /** PO rows with eTIMS / Paystack fields — builder (by buyer_id) or supplier (by supplier_id). */
   type BuilderEtimsReceiptPo = {
     id: string;
     po_number: string;
@@ -357,6 +357,10 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
   };
   const [builderEtimsReceipts, setBuilderEtimsReceipts] = useState<BuilderEtimsReceiptPo[]>([]);
   const [builderEtimsReceiptsLoading, setBuilderEtimsReceiptsLoading] = useState(false);
+  const [supplierEtimsReceipts, setSupplierEtimsReceipts] = useState<BuilderEtimsReceiptPo[]>([]);
+  const [supplierEtimsReceiptsLoading, setSupplierEtimsReceiptsLoading] = useState(false);
+  /** supplier_id values that belong to this dashboard — for Realtime PO filter */
+  const supplierEtimsSupplierIdsRef = useRef<Set<string>>(new Set());
 
   useLayoutEffect(() => {
     if (userRole !== 'builder') return;
@@ -591,6 +595,50 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
     setBuilderEtimsReceiptsLoading(false);
   }, [userRole, userId]);
 
+  const loadSupplierEtimsReceipts = useCallback(async () => {
+    if (userRole !== 'supplier' || !userId || !supplierRecordId) {
+      supplierEtimsSupplierIdsRef.current = new Set();
+      setSupplierEtimsReceipts([]);
+      setSupplierEtimsReceiptsLoading(false);
+      return;
+    }
+    setSupplierEtimsReceiptsLoading(true);
+    const { data: srow } = await supabase
+      .from('suppliers')
+      .select('user_id')
+      .eq('id', supplierRecordId)
+      .maybeSingle();
+    const su = (srow?.user_id as string | undefined)?.trim();
+    const sidOr = [...new Set([supplierRecordId, userId, su].filter(Boolean))] as string[];
+    supplierEtimsSupplierIdsRef.current = new Set(sidOr);
+
+    let poQ = supabase
+      .from('purchase_orders')
+      .select(
+        'id, po_number, total_amount, etims_verification_url, etims_response, etims_trader_invoice_no, etims_submitted_at, builder_etims_paystack_paid_at, builder_etims_paystack_reference'
+      )
+      .or(
+        'etims_verification_url.not.is.null,etims_response.not.is.null,etims_submitted_at.not.is.null,builder_etims_paystack_paid_at.not.is.null'
+      )
+      .order('updated_at', { ascending: false })
+      .limit(40);
+
+    if (sidOr.length === 1) {
+      poQ = poQ.eq('supplier_id', sidOr[0]);
+    } else {
+      poQ = poQ.or(sidOr.map((id) => `supplier_id.eq.${id}`).join(','));
+    }
+
+    const { data, error } = await poQ;
+    if (error) {
+      console.warn('[eTIMS] Supplier receipt list:', error.message);
+      setSupplierEtimsReceipts([]);
+    } else {
+      setSupplierEtimsReceipts((data ?? []) as BuilderEtimsReceiptPo[]);
+    }
+    setSupplierEtimsReceiptsLoading(false);
+  }, [userRole, userId, supplierRecordId]);
+
   useEffect(() => {
     invoiceFetchGenerationRef.current = 0;
   }, [userId, userRole, supplierRecordId, builderProfileId]);
@@ -605,6 +653,10 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
   useEffect(() => {
     void loadBuilderEtimsReceipts();
   }, [loadBuilderEtimsReceipts]);
+
+  useEffect(() => {
+    void loadSupplierEtimsReceipts();
+  }, [loadSupplierEtimsReceipts]);
 
   /** After Paystack redirect, bust hub cache and reload so Unpaid / Paid tabs reflect `payment_status` immediately. */
   useEffect(() => {
@@ -658,11 +710,33 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
     const onVis = () => {
       if (document.visibilityState === 'visible') {
         void fetchInvoicesRef.current({ silent: true });
+        void loadSupplierEtimsReceipts();
       }
     };
     document.addEventListener('visibilitychange', onVis);
     return () => document.removeEventListener('visibilitychange', onVis);
-  }, [userRole]);
+  }, [userRole, loadSupplierEtimsReceipts]);
+
+  /** Supplier: refetch eTIMS PO slice when linked orders change (RLS limits events). */
+  useEffect(() => {
+    if (userRole !== 'supplier' || !userId || !supplierRecordId) return;
+    const channel = supabase
+      .channel(`supplier-etims-pos-${userId}-${supplierRecordId}`)
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'purchase_orders' },
+        (payload) => {
+          const sid = (payload.new as { supplier_id?: string } | undefined)?.supplier_id;
+          if (sid && supplierEtimsSupplierIdsRef.current.has(sid)) {
+            void loadSupplierEtimsReceipts();
+          }
+        }
+      )
+      .subscribe();
+    return () => {
+      void supabase.removeChannel(channel);
+    };
+  }, [userRole, userId, supplierRecordId, loadSupplierEtimsReceipts]);
 
   const showBuilderSupplierPaymentTabs = userRole === 'builder' || userRole === 'supplier';
 
@@ -711,6 +785,33 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
     if (userRole !== 'builder') return [];
     return builderEtimsReceipts.filter((po) => Boolean(po.builder_etims_paystack_paid_at));
   }, [userRole, builderEtimsReceipts]);
+
+  /** Supplier: same PO-level eTIMS as builder sees for this supplier’s orders (read-only mirror). */
+  const supplierUnpaidEtimsStandalone = useMemo(() => {
+    if (userRole !== 'supplier' || invoicePaymentListTab !== 'unpaid') return [];
+    return supplierEtimsReceipts.filter((po) => {
+      if (po.builder_etims_paystack_paid_at) return false;
+      const poKey = String(po.id);
+      const hasInvoiceRowForPo = invoices.some(
+        (i) =>
+          String(i.purchase_order_id || '') === poKey &&
+          String(i.status || '').toLowerCase() !== 'cancelled'
+      );
+      if (hasInvoiceRowForPo) return false;
+      const url = po.etims_verification_url?.trim();
+      const hasResp =
+        po.etims_response != null &&
+        typeof po.etims_response === 'object' &&
+        Object.keys(po.etims_response as Record<string, unknown>).length > 0;
+      const hasEvidence = Boolean(url || hasResp || po.etims_submitted_at);
+      return hasEvidence;
+    });
+  }, [userRole, invoicePaymentListTab, supplierEtimsReceipts, invoices]);
+
+  const supplierEtimsPaidStandalone = useMemo(() => {
+    if (userRole !== 'supplier') return [];
+    return supplierEtimsReceipts.filter((po) => Boolean(po.builder_etims_paystack_paid_at));
+  }, [userRole, supplierEtimsReceipts]);
 
   const displayInvoicesTotalAmount = useMemo(
     () =>
@@ -1029,6 +1130,7 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
           onClick={() => {
             void fetchInvoices({ silent: true });
             void loadBuilderEtimsReceipts();
+            void loadSupplierEtimsReceipts();
           }}
         >
           {userRole === 'builder' ? (
@@ -1057,6 +1159,21 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
               on that row so the supplier invoice is marked paid.
             </p>
             {builderEtimsReceiptsLoading ? <p className="mt-1">Loading receipt links…</p> : null}
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {userRole === 'supplier' && (supplierEtimsReceiptsLoading || supplierEtimsReceipts.length > 0) && (
+        <Alert className="border-sky-200 bg-sky-50/70 dark:border-sky-900 dark:bg-sky-950/35">
+          <Receipt className="h-4 w-4 text-sky-700 dark:text-sky-300" />
+          <AlertTitle className="text-foreground">KRA eTIMS on your purchase orders</AlertTitle>
+          <AlertDescription className="text-xs text-muted-foreground">
+            <p>
+              When a professional builder submits eTIMS for an order tied to your supplier account, the receipt appears
+              here until a <strong className="text-foreground">supplier invoice</strong> row exists for that PO. The
+              builder pays from their dashboard; you can issue and send your invoice when ready.
+            </p>
+            {supplierEtimsReceiptsLoading ? <p className="mt-1">Loading receipt links…</p> : null}
           </AlertDescription>
         </Alert>
       )}
@@ -1142,6 +1259,16 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
             userRole === 'builder' &&
             invoicePaymentListTab === 'paid' &&
             builderEtimsPaidStandalone.length > 0
+          ) &&
+          !(
+            userRole === 'supplier' &&
+            invoicePaymentListTab === 'unpaid' &&
+            (supplierUnpaidEtimsStandalone.length > 0 || supplierEtimsReceiptsLoading)
+          ) &&
+          !(
+            userRole === 'supplier' &&
+            invoicePaymentListTab === 'paid' &&
+            supplierEtimsPaidStandalone.length > 0
           ) ? (
             <Card>
               <CardContent className="py-10 text-center text-muted-foreground text-sm">
@@ -1194,6 +1321,96 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
                         </div>
                       </CardHeader>
                       <CardContent>
+                        <KraEtimsReceiptPanel
+                          poNumber={po.po_number}
+                          verificationUrl={url || null}
+                          etimsResponse={po.etims_response}
+                          traderInvoiceNoDb={po.etims_trader_invoice_no}
+                          etimsSubmittedAt={po.etims_submitted_at}
+                        />
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+              </div>
+            )}
+
+          {userRole === 'supplier' &&
+            invoicePaymentListTab === 'paid' &&
+            supplierEtimsPaidStandalone.length > 0 && (
+              <div className="mb-4 space-y-3">
+                {supplierEtimsPaidStandalone.map((po) => {
+                  const url = (po.etims_verification_url || '').trim();
+                  return (
+                    <Card key={`supplier-etims-paid-${po.id}`} className="border-emerald-200/70 dark:border-emerald-900/45">
+                      <CardHeader>
+                        <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                          <div>
+                            <CardTitle className="text-base">KRA eTIMS receipt</CardTitle>
+                            <p className="text-sm text-muted-foreground">PO {po.po_number}</p>
+                            {po.builder_etims_paystack_paid_at ? (
+                              <p className="mt-1 text-xs text-muted-foreground">
+                                Builder paid (Paystack){' '}
+                                {new Date(po.builder_etims_paystack_paid_at).toLocaleString(undefined, {
+                                  dateStyle: 'medium',
+                                  timeStyle: 'short',
+                                })}
+                                {po.builder_etims_paystack_reference
+                                  ? ` · ref ${po.builder_etims_paystack_reference}`
+                                  : ''}
+                              </p>
+                            ) : null}
+                          </div>
+                          <Badge className="h-fit w-fit shrink-0 bg-green-600 text-white hover:bg-green-600">
+                            Paid (Paystack)
+                          </Badge>
+                        </div>
+                      </CardHeader>
+                      <CardContent>
+                        <KraEtimsReceiptPanel
+                          poNumber={po.po_number}
+                          verificationUrl={url || null}
+                          etimsResponse={po.etims_response}
+                          traderInvoiceNoDb={po.etims_trader_invoice_no}
+                          etimsSubmittedAt={po.etims_submitted_at}
+                        />
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+              </div>
+            )}
+
+          {userRole === 'supplier' &&
+            invoicePaymentListTab === 'unpaid' &&
+            (supplierEtimsReceiptsLoading || supplierUnpaidEtimsStandalone.length > 0) && (
+              <div className="space-y-3">
+                {supplierEtimsReceiptsLoading && supplierUnpaidEtimsStandalone.length === 0 ? (
+                  <Card>
+                    <CardContent className="flex items-center gap-2 py-6 text-sm text-muted-foreground">
+                      <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
+                      Loading KRA receipt links…
+                    </CardContent>
+                  </Card>
+                ) : null}
+                {supplierUnpaidEtimsStandalone.map((po) => {
+                  const url = (po.etims_verification_url || '').trim();
+                  return (
+                    <Card key={`supplier-etims-${po.id}`} className="border-sky-200/60 dark:border-sky-900/50">
+                      <CardHeader>
+                        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                          <div>
+                            <CardTitle className="text-base">KRA eTIMS receipt</CardTitle>
+                            <p className="text-sm text-muted-foreground">PO {po.po_number}</p>
+                            <p className="mt-2 text-xs text-muted-foreground">
+                              The professional builder has eTIMS data on file for this order. Payment is completed from
+                              their dashboard. When you are ready, create and send your supplier invoice for this PO so
+                              it appears in the list above and links payment to your invoice.
+                            </p>
+                          </div>
+                        </div>
+                      </CardHeader>
+                      <CardContent className="space-y-3">
                         <KraEtimsReceiptPanel
                           poNumber={po.po_number}
                           verificationUrl={url || null}
