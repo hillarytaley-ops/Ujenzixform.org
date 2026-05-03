@@ -3631,8 +3631,10 @@ const ProfessionalBuilderDashboardPage = () => {
 
                   <TabsContent value="grn" forceMount className="mt-0 space-y-2">
                     <p className="text-sm text-muted-foreground">
-                      Goods received notes (GRN) confirm delivery condition and notify your supplier — they do not trigger
-                      KRA eTIMS; tax invoicing runs on quote acceptance.
+                      Goods received notes (GRN) confirm delivery condition and notify your supplier. When they mark the
+                      GRN viewed, that completes their receipt step — no system invoice row is created from the GRN. Use
+                      KRA eTIMS for the official tax receipt; supplier invoices (if any) are created and sent by the
+                      supplier when they choose.
                     </p>
                     {user?.id && (
                       <GRNView

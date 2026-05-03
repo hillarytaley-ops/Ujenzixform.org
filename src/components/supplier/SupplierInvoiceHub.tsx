@@ -565,7 +565,7 @@ export const SupplierInvoiceHub: React.FC<SupplierInvoiceHubProps> = ({
       toast({
         title: 'Marked as viewed',
         description:
-          'GRN status updated. Supplier invoices are created when the builder accepts the quote; GRN confirms delivery receipt.',
+          'GRN status updated. Delivery confirmation is complete on your side; tax receipts use KRA eTIMS. Create and send a supplier invoice from your workflow when you need a payable invoice row.',
       });
       await loadGrns();
     } catch (e: any) {
