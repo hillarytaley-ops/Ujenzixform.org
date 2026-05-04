@@ -137,6 +137,41 @@ function num(v: unknown, fallback = 0): number {
   return fallback;
 }
 
+function roundMoney(n: number): number {
+  return Math.round(n * 100) / 100;
+}
+
+/**
+ * Suppliers often set `quote_amount` / accepted `total_amount` without rewriting each
+ * `items[].unit_price` (cart/catalog prices stay on lines). The integrator receipt is
+ * driven by line amounts, so we align lines to the PO header total before POST /invoices.
+ */
+function reconcileSalesItemsWithHeaderTotal(salesItems: EtimsSalesItem[], headerTotal: number): void {
+  if (!salesItems.length) return;
+  if (!Number.isFinite(headerTotal) || headerTotal <= 0) return;
+
+  const lineSum = salesItems.reduce((s, it) => s + (Number.isFinite(it.amount) ? it.amount : 0), 0);
+  if (!Number.isFinite(lineSum) || lineSum <= 0) return;
+  if (Math.abs(lineSum - headerTotal) < 0.005) return;
+
+  const factor = headerTotal / lineSum;
+  for (const it of salesItems) {
+    const qty = Number.isFinite(it.qty) && it.qty > 0 ? it.qty : 1;
+    const scaled = roundMoney((Number.isFinite(it.amount) ? it.amount : 0) * factor);
+    it.amount = scaled;
+    it.unitPrice = roundMoney(scaled / qty);
+  }
+
+  const newSum = salesItems.reduce((s, it) => s + it.amount, 0);
+  const drift = roundMoney(headerTotal - newSum);
+  if (Math.abs(drift) >= 0.001) {
+    const last = salesItems[salesItems.length - 1];
+    const qty = Number.isFinite(last.qty) && last.qty > 0 ? last.qty : 1;
+    last.amount = roundMoney(last.amount + drift);
+    last.unitPrice = roundMoney(last.amount / qty);
+  }
+}
+
 function str(v: unknown): string {
   return typeof v === "string" ? v.trim() : "";
 }
@@ -194,7 +229,7 @@ export function buildEtimsInvoiceBodyFromPurchaseOrder(
     const unitPrice = num(line.unit_price ?? line.unitPrice ?? line.price, 0);
     const discountAmount = num(line.discountAmount ?? line.discount_amount, 0);
     const pkg = num(line.pkg, 0);
-    const amount = num(line.amount, unitPrice * qty - discountAmount);
+    const amount = num(line.amount ?? line.lineTotal ?? line.total, unitPrice * qty - discountAmount);
     // SalesItem: itemCode (+ item_code duplicate for some deserializers). Optional taxCode, insuranceCompanyCode.
     const row: EtimsSalesItem = {
       itemCode,
@@ -216,7 +251,11 @@ export function buildEtimsInvoiceBodyFromPurchaseOrder(
     throw new Error("Purchase order has no line items.");
   }
 
-  const totalAmount = Number.isFinite(po.total_amount) ? po.total_amount : salesItems.reduce((s, i) => s + i.amount, 0);
+  const preSum = salesItems.reduce((s, i) => s + i.amount, 0);
+  const headerTotal =
+    Number.isFinite(po.total_amount) && po.total_amount > 0 ? po.total_amount : preSum;
+  reconcileSalesItemsWithHeaderTotal(salesItems, headerTotal);
+  const totalAmount = salesItems.reduce((s, i) => s + i.amount, 0);
 
   const currency = (options.currency ?? "KES").trim().slice(0, 16) || "KES";
   const exchangeRate =
