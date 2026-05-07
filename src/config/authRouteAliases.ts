@@ -20,7 +20,7 @@ export const AUTH_ROUTE_ALIASES: readonly AuthRouteAlias[] = [
   { path: "/delivery/login", to: AUTH_ENTRY_ROUTES.deliverySignIn },
 ];
 
-/** Paths that all render the same `Suppliers` page (keeps old links working). */
+/** Paths that all render the same material marketplace page (`Suppliers` component; keeps old links working). */
 export const SUPPLIERS_PAGE_PATHS = [
   "/suppliers",
   "/suppliers-mobile",

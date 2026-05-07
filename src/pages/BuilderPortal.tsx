@@ -131,7 +131,7 @@ const BuilderPortal = () => {
                 <p className="text-sm text-muted-foreground">
                   {isPrivateClient 
                     ? 'Shop for construction materials' 
-                    : 'Find suppliers and request quotes'}
+                    : 'Browse materials and request quotes'}
                 </p>
                 <Button className="w-full mt-4 bg-blue-600">
                   Go to Marketplace
@@ -282,7 +282,7 @@ const BuilderPortal = () => {
           <CardContent className="p-8 text-center">
             <h3 className="text-2xl font-bold mb-4">Ready to Start Building?</h3>
             <p className="text-muted-foreground mb-6">
-              Browse our marketplace of verified suppliers and quality construction materials
+              Browse verified material listings and quality construction products
             </p>
             <Button 
               size="lg" 

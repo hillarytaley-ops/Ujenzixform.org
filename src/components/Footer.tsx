@@ -67,7 +67,7 @@ const Footer = () => {
                   <Link to="/supplier-registration" className="hover:text-white transition-colors leading-snug">List Products</Link>
                 </li>
                 <li className="min-h-[1.375rem] flex items-center justify-center md:justify-start">
-                  <Link to="/suppliers" className="hover:text-white transition-colors leading-snug">Supplier Portal</Link>
+                  <Link to="/suppliers" className="hover:text-white transition-colors leading-snug">Material</Link>
                 </li>
                 <li className="min-h-[1.375rem] flex items-center justify-center md:justify-start">
                   <Link to="/delivery" className="hover:text-white transition-colors leading-snug">Delivery Services</Link>

@@ -180,7 +180,7 @@ const Suppliers = () => {
               </div>
               <h1 className="text-3xl font-bold mb-4">Marketplace Access Restricted</h1>
               <p className="text-lg text-teal-100 mb-6">
-                The Suppliers Marketplace is exclusively for registered builders and suppliers. 
+                The material marketplace is exclusively for registered builders and suppliers.
                 As a delivery provider, you have access to delivery management features instead.
               </p>
               <Button 
@@ -289,7 +289,7 @@ const Suppliers = () => {
           {/* Badge */}
           <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-sm border border-white/20 rounded-full px-4 py-2 mb-6 md:mb-8">
             <span className="text-xl md:text-2xl">🇰🇪</span>
-            <span className="text-white font-medium text-sm md:text-base">Kenya · materials & supplier marketplace</span>
+            <span className="text-white font-medium text-sm md:text-base">Kenya · material marketplace</span>
           </div>
           
           {/* Title - Responsive sizing */}

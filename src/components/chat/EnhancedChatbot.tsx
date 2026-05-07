@@ -1083,7 +1083,7 @@ We connect you with verified suppliers for all construction materials:
 ${categoryList}
 
 **How to Buy:**
-1. Browse our marketplace at /suppliers
+1. Browse materials at /suppliers
 2. Select materials and add to cart
 3. Request quotes or buy directly
 4. Choose delivery option

@@ -4406,7 +4406,7 @@ const ProfessionalBuilderDashboardPage = () => {
               </div>
               <Link to="/suppliers?from=dashboard" className="shrink-0">
                 <Button className="bg-white text-blue-700 hover:bg-blue-50 w-full md:w-auto">
-                  Browse suppliers
+                  Material
                 </Button>
               </Link>
             </div>

@@ -23,7 +23,7 @@ const translations = {
   en: {
     // Navigation
     'nav.builders': 'Builders',
-    'nav.suppliers': 'Suppliers',
+    'nav.suppliers': 'Material',
     'nav.about': 'About',
     'nav.contact': 'Contact',
     'nav.signIn': 'Sign In',
@@ -126,7 +126,7 @@ const translations = {
   sw: {
     // Navigation
     'nav.builders': 'Wajenzi',
-    'nav.suppliers': 'Wasambazaji',
+    'nav.suppliers': 'Nyenzo',
     'nav.about': 'Kuhusu',
     'nav.contact': 'Wasiliana',
     'nav.signIn': 'Ingia',

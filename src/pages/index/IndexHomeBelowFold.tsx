@@ -55,9 +55,9 @@ const IndexHomeBelowFold = ({ userRole }: Props) => {
       },
       {
         icon: Store,
-        title: "Browse Suppliers",
+        title: "Browse materials",
         description:
-          "Compare supplier listings, request quotes, and manage orders from your dashboard.",
+          "Compare listings, request quotes, and manage orders from your dashboard.",
         color: "from-green-500 to-emerald-600",
         link: "/suppliers",
       },
@@ -127,7 +127,7 @@ const IndexHomeBelowFold = ({ userRole }: Props) => {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 max-w-4xl mx-auto">
             {[
               { icon: "🚚", label: "Request Delivery", link: "/delivery" },
-              { icon: "🏪", label: "Find Suppliers", link: "/suppliers" },
+              { icon: "🏪", label: "Material", link: "/suppliers" },
               { icon: "🎥", label: "Site Monitoring", link: "/monitoring" },
               { icon: "📦", label: "QR Scanner", link: getScannerLink },
             ].map((item, index) => (

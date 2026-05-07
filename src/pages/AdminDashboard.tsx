@@ -527,7 +527,7 @@ const AdminDashboard = () => {
     { name: 'Supplier Dashboard', path: '/supplier-dashboard', icon: Store, status: 'active', visits: 0, description: 'Supplier management panel', category: 'protected' },
     { name: 'Delivery Dashboard', path: '/delivery-dashboard', icon: Truck, status: 'active', visits: 0, description: 'Delivery management panel', category: 'protected' },
     { name: 'Supplier Marketplace', path: '/supplier-marketplace', icon: ShoppingCart, status: 'active', visits: 0, description: 'Material marketplace for builders', category: 'protected' },
-    { name: 'Suppliers Page', path: '/suppliers', icon: Store, status: 'active', visits: 0, description: 'Browse all suppliers', category: 'protected' },
+    { name: 'Material Page', path: '/suppliers', icon: Store, status: 'active', visits: 0, description: 'Browse materials catalog', category: 'protected' },
     { name: 'Builders Page', path: '/builders', icon: Building2, status: 'active', visits: 0, description: 'Browse all builders', category: 'protected' },
     { name: 'Delivery Page', path: '/delivery', icon: Truck, status: 'active', visits: 0, description: 'Delivery services info', category: 'protected' },
     { name: 'Tracking', path: '/tracking', icon: MapPin, status: 'active', visits: 0, description: 'Order tracking system (Admin Access ✓)', category: 'protected' },

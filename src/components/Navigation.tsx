@@ -102,7 +102,7 @@ const Navigation = () => {
   const publicNavItems = [
     { path: "/home", label: "Home" },
     { path: "/builders", label: "Builders" },
-    { path: "/suppliers", label: "Suppliers" },
+    { path: "/suppliers", label: "Material" },
     { path: "/delivery", label: "Delivery" },
     { path: "/scanners", label: "Scanners" },
     { path: "/monitoring", label: "Monitoring" },
@@ -320,14 +320,6 @@ const Navigation = () => {
                   >
                     Register
                   </Button>
-                  <Link to="/admin-login">
-                    <Button
-                      variant="ghost"
-                      className="w-full text-xs text-gray-600 hover:text-red-600 hover:bg-red-50 font-medium"
-                    >
-                      🔒 Staff Portal
-                    </Button>
-                  </Link>
                 </>
               )}
             </div>
