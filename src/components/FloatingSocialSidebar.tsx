@@ -48,8 +48,8 @@ import {
  * ⚠️ PROTECTED: Pages where the floating social button should NOT appear
  * Do not remove any pages from this list without authorization
  */
+/** Auth and sign-in only — public marketing home (`/`) and registration flows must keep social links visible. */
 const HIDDEN_ON_PAGES = [
-  '/',
   '/auth',
   '/admin-auth',
   '/admin-login',

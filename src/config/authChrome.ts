@@ -19,12 +19,11 @@ const EXACT_AUTH_ENTRY_PATHS = new Set<string>([
 ]);
 
 /**
- * True for sign-in, registration, and role-specific auth screens.
+ * True for sign-in and role-specific auth screens (not public registration URLs — social/chat stay available there).
  */
 export function shouldHideFloatingChrome(pathname: string): boolean {
   if (EXACT_AUTH_ENTRY_PATHS.has(pathname)) return true;
   if (pathname.startsWith("/register/scan")) return true;
-  if (pathname.includes('-registration')) return true;
   if (pathname.includes('-signin')) return true;
   // e.g. /private-client-auth, /supplier-auth, /delivery-auth
   if (pathname.endsWith('-auth')) return true;
