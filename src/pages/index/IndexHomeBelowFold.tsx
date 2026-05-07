@@ -246,7 +246,7 @@ const IndexHomeBelowFold = ({ userRole }: Props) => {
                   </li>
                 </ul>
                 <div className="mt-auto">
-                  <Link to="/delivery">
+                  <Link to="/delivery-registration">
                     <Button size="sm" className="w-full bg-white text-purple-700 hover:bg-white/90 font-semibold">
                       Explore
                       <ChevronRight className="h-4 w-4 ml-1" />

@@ -39,7 +39,7 @@ const SuppliersMobileOptimized = () => {
     checkAuth();
     
     // Prefetch likely next pages for instant navigation
-    prefetchRoutes(['/delivery', '/tracking', '/feedback'], 3000, 1000);
+    prefetchRoutes(['/delivery-registration', '/tracking', '/feedback'], 3000, 1000);
   }, []);
 
   const checkAuth = async () => {
@@ -212,7 +212,7 @@ const SuppliersMobileOptimized = () => {
                 <h3 className="text-white font-bold text-xl mb-2">Delivery</h3>
                 <p className="text-purple-100/70 text-sm mb-5">Apply to haul jobs; sign in when approved</p>
                 <div className="flex flex-col gap-2">
-                  <Link to="/delivery" className="w-full">
+                  <Link to="/delivery-registration" className="w-full">
                     <Button className="w-full bg-white text-purple-700 hover:bg-purple-50 font-semibold h-11">
                       Explore
                     </Button>
@@ -529,7 +529,7 @@ const SuppliersMobileOptimized = () => {
                         </li>
                       </ul>
                       <div className="space-y-2">
-                        <Link to="/delivery" className="block">
+                        <Link to="/delivery-registration" className="block">
                           <Button className="w-full bg-purple-600 hover:bg-purple-700">
                             Explore and apply
                           </Button>
