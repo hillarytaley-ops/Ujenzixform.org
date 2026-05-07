@@ -1,5 +1,7 @@
 /**
  * Admin-only: permanently delete a Supabase Auth user (cascaded public rows follow DB FK rules).
+ * PLATFORM RULE: only hillarytaley@gmail.com may call this (JWT email must match;
+ * override with secret CANONICAL_SUPER_ADMIN_EMAIL if you ever clone for another environment).
  * Deploy: supabase functions deploy admin-delete-user
  */
 
@@ -90,6 +92,7 @@ serve(async (req) => {
     });
   }
 
+  // Sole super admin — must match src/config/staffPermissions.ts CANONICAL_SUPER_ADMIN_EMAIL
   const canonical = (Deno.env.get("CANONICAL_SUPER_ADMIN_EMAIL") ?? "hillarytaley@gmail.com")
     .trim()
     .toLowerCase();

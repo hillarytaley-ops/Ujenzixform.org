@@ -7,6 +7,9 @@
  * 
  * ROLES:
  * - super_admin: Full access (staff, security, settings, global user roles, etc.)
+ *   PLATFORM RULE — THERE IS EXACTLY ONE SUPER ADMIN: hillarytaley@gmail.com only.
+ *   Any other account with super_admin in admin_staff is treated as Administrator for ACL.
+ *   See CANONICAL_SUPER_ADMIN_EMAIL, isCanonicalSuperAdminSession(), effectiveStaffRoleForPermissions().
  * - admin: Operational access only — excludes super-admin-only dashboard areas
  * - it_helpdesk: Technical support, user issues, system health
  * - logistics_officer: Delivery management, GPS tracking, routes
@@ -63,7 +66,11 @@ export const ALL_ADMIN_TABS = [
 
 export type AdminTab = typeof ALL_ADMIN_TABS[number];
 
-/** Sole email that may receive super_admin capabilities (must match auth / staff session email). */
+/**
+ * The ONLY account that may exercise super_admin power in this codebase (dashboard + Edge).
+ * Must match the signed-in user's email (case-insensitive). Do not add a second email here;
+ * use a different staff role (e.g. admin) for other trusted operators.
+ */
 export const CANONICAL_SUPER_ADMIN_EMAIL = "hillarytaley@gmail.com";
 
 export function normalizeStaffEmail(email: string | null | undefined): string {
@@ -134,7 +141,10 @@ export function getAllDashboardTabIdsForSuperAdmin(): AdminTab[] {
   return [...ids] as AdminTab[];
 }
 
-/** True when this session is the designated platform super administrator (full dashboard). */
+/**
+ * True only for the single platform super admin: role super_admin AND email hillarytaley@gmail.com.
+ * Used for full-dashboard bypass and governance UI; keep in sync with Edge CANONICAL_SUPER_ADMIN_EMAIL.
+ */
 export function isCanonicalSuperAdminSession(
   staffRole: string | null | undefined,
   staffEmail: string | null | undefined,
