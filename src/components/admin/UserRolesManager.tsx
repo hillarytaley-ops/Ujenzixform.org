@@ -1,4 +1,4 @@
-import { readPersistedAuthRawStringSync } from '@/utils/supabaseAccessToken';
+import { readAuthUserIdSync, readPersistedAuthRawStringSync } from '@/utils/supabaseAccessToken';
 import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -29,6 +29,15 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { 
@@ -40,6 +49,7 @@ import {
   CheckCircle,
   XCircle,
   Edit,
+  Trash2,
   Users,
   Building2,
   Store,
@@ -97,7 +107,10 @@ export const UserRolesManager = () => {
   const [editingUser, setEditingUser] = useState<UserWithRole | null>(null);
   const [newRole, setNewRole] = useState<string>("");
   const [updating, setUpdating] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<UserWithRole | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const { toast } = useToast();
+  const currentUserId = readAuthUserIdSync();
 
   const getAuthHeaders = (): Record<string, string> => {
     const headers: Record<string, string> = {
@@ -211,6 +224,48 @@ export const UserRolesManager = () => {
     }
   };
 
+  const handleConfirmDeleteUser = async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    try {
+      const headers = { ...getAuthHeaders(), apikey: SUPABASE_ANON_KEY };
+      const res = await fetch(`${SUPABASE_URL}/functions/v1/admin-delete-user`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ user_id: deleteTarget.id }),
+      });
+      const payload = (await res.json().catch(() => ({}))) as { error?: string; ok?: boolean };
+      if (res.status === 404) {
+        toast({
+          title: "Delete service unavailable",
+          description:
+            "Deploy the admin-delete-user Edge Function: supabase functions deploy admin-delete-user",
+          variant: "destructive",
+        });
+        return;
+      }
+      if (!res.ok) {
+        throw new Error(payload?.error || `HTTP ${res.status}`);
+      }
+      toast({
+        title: "User deleted",
+        description: `${deleteTarget.email} has been permanently removed.`,
+      });
+      setDeleteTarget(null);
+      await fetchUsers();
+    } catch (error: unknown) {
+      console.error("Error deleting user:", error);
+      const msg = (error as { message?: string })?.message ?? "Failed to delete user";
+      toast({
+        title: "Error",
+        description: msg,
+        variant: "destructive",
+      });
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   const filteredUsers = users.filter(user => {
     const matchesSearch = 
       user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -269,7 +324,7 @@ export const UserRolesManager = () => {
             User Role Management
           </CardTitle>
           <CardDescription>
-            View and edit user roles. Changes take effect immediately.
+            View and edit user roles, or permanently delete a user account. Changes take effect immediately.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -339,6 +394,7 @@ export const UserRolesManager = () => {
                           {new Date(user.created_at).toLocaleDateString()}
                         </TableCell>
                         <TableCell className="text-right">
+                          <div className="flex justify-end gap-2 flex-wrap">
                           <Dialog>
                             <DialogTrigger asChild>
                               <Button 
@@ -399,6 +455,23 @@ export const UserRolesManager = () => {
                               </DialogFooter>
                             </DialogContent>
                           </Dialog>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="text-destructive border-destructive/40 hover:bg-destructive/10"
+                            disabled={!currentUserId || user.id === currentUserId}
+                            title={
+                              user.id === currentUserId
+                                ? "You cannot delete your own account here"
+                                : "Permanently delete this user"
+                            }
+                            onClick={() => setDeleteTarget(user)}
+                          >
+                            <Trash2 className="h-4 w-4 mr-1" />
+                            Delete
+                          </Button>
+                          </div>
                         </TableCell>
                       </TableRow>
                     ))
@@ -413,6 +486,43 @@ export const UserRolesManager = () => {
           </p>
         </CardContent>
       </Card>
+
+      <AlertDialog
+        open={deleteTarget !== null}
+        onOpenChange={(open) => {
+          if (!open && !deleting) setDeleteTarget(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete user permanently?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {deleteTarget ? (
+                <>
+                  This removes <strong>{deleteTarget.full_name || deleteTarget.email}</strong> (
+                  {deleteTarget.email}) including their login and associated data subject to database rules.
+                  This cannot be undone.
+                </>
+              ) : null}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
+            <Button
+              variant="destructive"
+              disabled={deleting}
+              onClick={() => void handleConfirmDeleteUser()}
+            >
+              {deleting ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <Trash2 className="h-4 w-4 mr-2" />
+              )}
+              Delete account
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

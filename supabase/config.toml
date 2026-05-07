@@ -16,6 +16,10 @@ verify_jwt = false
 [functions.verify-admin-staff-login]
 verify_jwt = false
 
+# Admin dashboard: validates caller JWT inside (CORS preflight has no JWT).
+[functions.admin-delete-user]
+verify_jwt = false
+
 # Pre-auth staff tab on /auth (replaces anon EXECUTE on SECURITY DEFINER RPC).
 [functions.is-admin-staff-portal-email]
 verify_jwt = false
