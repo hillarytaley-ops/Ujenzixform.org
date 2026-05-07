@@ -76,6 +76,7 @@ const PaystackPaymentCallback = lazyImport(() => import("./pages/PaystackPayment
 // Auth Guard
 import { AuthRequired } from "@/components/security/AuthRequired";
 import { RoleProtectedRoute } from "@/components/security/RoleProtectedRoute";
+import { MonitoringRouteShell } from "@/components/security/MonitoringRouteShell";
 import { Navigate, useSearchParams, useLocation } from "react-router-dom";
 
 // Simple Live Chat Widget for staff support
@@ -91,6 +92,27 @@ import { OfflineIndicator } from "@/components/OfflineIndicator";
 import { PWAInstallPrompt } from "@/components/pwa/PWAInstallPrompt";
 import { shouldHideFloatingChrome } from "@/config/authChrome";
 import { ALL_PUBLIC_AUTH_REDIRECTS, SUPPLIERS_PAGE_PATHS } from "@/config/authRouteAliases";
+
+/** Signed-in roles that may use supplier marketplace, delivery hub, and related tools (not dashboards). */
+const MARKETPLACE_AND_LOGISTICS_ROLES = [
+  "private_client",
+  "professional_builder",
+  "builder",
+  "supplier",
+  "delivery",
+  "delivery_provider",
+  "admin",
+  "super_admin",
+] as const;
+
+/** Field / QR scanner landing (role checks also run inside Scanners.tsx). */
+const SCANNER_PORTAL_ROLES = [
+  "supplier",
+  "delivery",
+  "delivery_provider",
+  "admin",
+  "super_admin",
+] as const;
 
 // Optimized loading component with skeleton animation
 const PageLoader = () => (
@@ -256,8 +278,8 @@ const App = () => {
                 <EnhancedErrorBoundary>
                 {/* Route / guard inventory: docs/AUTH_AND_ROUTES_MATRIX.md */}
                 <Routes>
-                    {/* Public Routes - Accessible to everyone after single sign in */}
-                    <Route path="/" element={<Auth />} />
+                    {/* Public marketing & info (no account required). Sign-in: /auth, /unified-auth, role sign-ins. */}
+                    <Route path="/" element={<Index />} />
                     <Route path="/auth" element={<Auth />} />
                     <Route path="/author" element={<Auth />} />
                     <Route path="/register/scan/:kind" element={<RegistrationScanEntry />} />
@@ -275,20 +297,57 @@ const App = () => {
                     <Route path="/admin-login" element={<AdminAuth />} />
                     <Route path="/reset-password" element={<SuspenseWrapper><ResetPassword /></SuspenseWrapper>} />
                     
-                    {/* All pages accessible after sign in - no repeated auth required */}
+                    {/* Public home (same Index as /); ?browse=1 skips auto-redirect to role dashboard */}
                     <Route path="/home" element={<Index />} />
                     <Route path="/payment/paystack-callback" element={<SuspenseWrapper><PaystackPaymentCallback /></SuspenseWrapper>} />
                     {SUPPLIERS_PAGE_PATHS.map((p) => (
-                      <Route key={p} path={p} element={<SuspenseWrapper><Suppliers /></SuspenseWrapper>} />
+                      <Route
+                        key={p}
+                        path={p}
+                        element={
+                          <RoleProtectedRoute allowedRoles={[...MARKETPLACE_AND_LOGISTICS_ROLES]}>
+                            <SuspenseWrapper>
+                              <Suppliers />
+                            </SuspenseWrapper>
+                          </RoleProtectedRoute>
+                        }
+                      />
                     ))}
                     <Route path="/builders" element={<SuspenseWrapper><Builders /></SuspenseWrapper>} />
                     <Route path="/builder/:builderId" element={<SuspenseWrapper><PublicBuilderProfile /></SuspenseWrapper>} />
                     <Route path="/about" element={<SuspenseWrapper><About /></SuspenseWrapper>} />
                     <Route path="/contact" element={<SuspenseWrapper><Contact /></SuspenseWrapper>} />
-                    <Route path="/monitoring" element={<SuspenseWrapper><Monitoring /></SuspenseWrapper>} />
+                    <Route
+                      path="/monitoring"
+                      element={
+                        <SuspenseWrapper>
+                          <MonitoringRouteShell>
+                            <Monitoring />
+                          </MonitoringRouteShell>
+                        </SuspenseWrapper>
+                      }
+                    />
                     <Route path="/tracking" element={<SuspenseWrapper><Tracking /></SuspenseWrapper>} />
-                    <Route path="/delivery" element={<SuspenseWrapper><Delivery /></SuspenseWrapper>} />
-                    <Route path="/scanners" element={<SuspenseWrapper><Scanners /></SuspenseWrapper>} />
+                    <Route
+                      path="/delivery"
+                      element={
+                        <RoleProtectedRoute allowedRoles={[...MARKETPLACE_AND_LOGISTICS_ROLES]}>
+                          <SuspenseWrapper>
+                            <Delivery />
+                          </SuspenseWrapper>
+                        </RoleProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/scanners"
+                      element={
+                        <RoleProtectedRoute allowedRoles={[...SCANNER_PORTAL_ROLES]}>
+                          <SuspenseWrapper>
+                            <Scanners />
+                          </SuspenseWrapper>
+                        </RoleProtectedRoute>
+                      }
+                    />
                     <Route path="/feedback" element={<SuspenseWrapper><Feedback /></SuspenseWrapper>} />
                     <Route path="/careers" element={<SuspenseWrapper><Careers /></SuspenseWrapper>} />
                     
