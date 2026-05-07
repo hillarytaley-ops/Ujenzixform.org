@@ -84,7 +84,7 @@ interface StaffMember {
   custom_tabs?: string[]; // Custom tab permissions (overrides role defaults)
 }
 
-import { STAFF_ROLES as ROLE_CONFIG, getAllStaffRoles, TAB_METADATA, AdminTab } from '@/config/staffPermissions';
+import { STAFF_ROLES as ROLE_CONFIG, getAllStaffRoles, TAB_METADATA, AdminTab, isCanonicalSuperAdminEmail } from '@/config/staffPermissions';
 
 // Get all roles for selection
 const STAFF_ROLES = getAllStaffRoles().map(role => ({
@@ -99,9 +99,15 @@ export const StaffManagement = () => {
   const { toast } = useToast();
   const [staffMembers, setStaffMembers] = useState<StaffMember[]>([]);
   const [currentUserRole, setCurrentUserRole] = useState<string>('');
+  const [viewerEmail, setViewerEmail] = useState<string>('');
   
-  /** Staff governance UI: super_admin role in admin_staff only (not regular admin). */
-  const isSuperAdmin = currentUserRole === "super_admin";
+  /** Only the canonical platform email may use super_admin governance UI, even if DB role is wrong. */
+  const isSuperAdmin =
+    currentUserRole === "super_admin" && isCanonicalSuperAdminEmail(viewerEmail);
+
+  const assignableStaffRoles = STAFF_ROLES.filter(
+    (role) => isSuperAdmin || role.value !== "super_admin",
+  );
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
@@ -254,6 +260,7 @@ export const StaffManagement = () => {
           const userEmail = parsed.user?.email;
           
           if (userEmail) {
+            setViewerEmail(String(userEmail).trim().toLowerCase());
             // Check if this user is in admin_staff and get their role
             const response = await fetch(
               `${SUPABASE_URL}/rest/v1/admin_staff?email=eq.${encodeURIComponent(userEmail)}&select=role`,
@@ -792,7 +799,7 @@ export const StaffManagement = () => {
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent className="bg-slate-800 border-slate-600">
-                            {STAFF_ROLES.map((role) => (
+                            {assignableStaffRoles.map((role) => (
                               <SelectItem key={role.value} value={role.value}>
                                 <div>
                                   <div className="font-medium">{role.label}</div>
@@ -1081,7 +1088,7 @@ export const StaffManagement = () => {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent className="bg-slate-800 border-slate-600 max-h-[300px]">
-                  {STAFF_ROLES.map((role) => (
+                  {assignableStaffRoles.map((role) => (
                     <SelectItem key={role.value} value={role.value}>
                       <div className="flex items-center gap-2">
                         <Badge className={`${role.color} text-xs`}>{role.label}</Badge>

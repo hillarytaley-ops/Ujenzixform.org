@@ -14,13 +14,13 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { 
   STAFF_ROLES, 
-  getStaffRole, 
-  getAccessibleTabs,
-  hasPermission,
   canStaffAccessDashboardTab,
+  buildStaffPermissionView,
+  CANONICAL_SUPER_ADMIN_EMAIL,
   AdminTab,
   StaffRole
 } from '@/config/staffPermissions';
+import { readPersistedAuthUserSync } from "@/utils/supabaseAccessToken";
 
 // Module-level flags to only log once across all hook instances
 let hasLoggedInit = false;
@@ -66,23 +66,26 @@ export function useStaffPermissions(): StaffPermissionsReturn {
   
   if (testRole && STAFF_ROLES[testRole]) {
     const simulatedRole = STAFF_ROLES[testRole];
-    console.log('🧪 TEST MODE: Simulating role:', testRole, '- Tabs:', simulatedRole.allowedTabs.length);
+    const testEmail =
+      testRole === "super_admin" ? CANONICAL_SUPER_ADMIN_EMAIL : "test@example.com";
+    const v = buildStaffPermissionView(testRole, testEmail);
+    console.log('🧪 TEST MODE: Simulating role:', testRole, '- Tabs:', v.accessibleTabs.length);
     
     const [state] = useState<StaffPermissionsState>({
       loading: false,
       staffId: 'test-user',
-      staffEmail: 'test@example.com',
+      staffEmail: testEmail,
       staffName: simulatedRole.name,
       staffRole: testRole,
-      roleDetails: simulatedRole,
-      isAdmin: ['admin', 'super_admin'].includes(testRole),
-      isSuperAdmin: testRole === 'super_admin',
-      accessibleTabs: simulatedRole.allowedTabs as AdminTab[],
+      roleDetails: v.roleDetails,
+      isAdmin: v.isAdmin,
+      isSuperAdmin: v.isSuperAdmin,
+      accessibleTabs: v.accessibleTabs,
       error: null
     });
     
     const checkTabAccess = (tab: AdminTab): boolean =>
-      canStaffAccessDashboardTab(testRole, tab);
+      canStaffAccessDashboardTab(testRole, tab, testEmail);
     
     return {
       ...state,
@@ -103,20 +106,19 @@ export function useStaffPermissions(): StaffPermissionsReturn {
   
   // Get the staff role from localStorage - this determines their permissions
   // If no specific role is stored, default to 'admin' for backwards compatibility
-  const effectiveRole = storedStaffRole || 'admin';
-  const roleDetails = getStaffRole(effectiveRole) || STAFF_ROLES.admin;
-  const isFullAdmin = ['admin', 'super_admin', 'administrator'].includes(effectiveRole);
+  const rawStoredRole = storedStaffRole || 'admin';
+  const initView = buildStaffPermissionView(rawStoredRole, adminEmail);
   
   const initialState: StaffPermissionsState = hasValidAdminSession ? {
     loading: false, // Don't show loading for admin
     staffId: null,
     staffEmail: adminEmail,
     staffName: storedStaffName || 'Staff Member',
-    staffRole: effectiveRole,
-    roleDetails: roleDetails,
-    isAdmin: isFullAdmin,
-    isSuperAdmin: effectiveRole === 'super_admin',
-    accessibleTabs: roleDetails.allowedTabs as AdminTab[],
+    staffRole: rawStoredRole,
+    roleDetails: initView.roleDetails,
+    isAdmin: initView.isAdmin,
+    isSuperAdmin: initView.isSuperAdmin,
+    accessibleTabs: initView.accessibleTabs,
     error: null
   } : {
     loading: true,
@@ -155,9 +157,7 @@ export function useStaffPermissions(): StaffPermissionsReturn {
             hasLoggedStoredRole = true;
           }
           
-          // Get role details from config
-          const roleDetails = getStaffRole(storedRole) || STAFF_ROLES.admin;
-          const isFullAdmin = ['admin', 'super_admin', 'administrator'].includes(storedRole);
+          const v = buildStaffPermissionView(storedRole, adminEmail);
           
           // FAST PATH: Set state immediately with localStorage data
           // Don't wait for Supabase - this prevents the loading screen from hanging
@@ -167,10 +167,10 @@ export function useStaffPermissions(): StaffPermissionsReturn {
             staffEmail: adminEmail,
             staffName: storedName,
             staffRole: storedRole,
-            roleDetails: roleDetails,
-            isAdmin: isFullAdmin,
-            isSuperAdmin: storedRole === 'super_admin',
-            accessibleTabs: roleDetails.allowedTabs as AdminTab[],
+            roleDetails: v.roleDetails,
+            isAdmin: v.isAdmin,
+            isSuperAdmin: v.isSuperAdmin,
+            accessibleTabs: v.accessibleTabs,
             error: null
           });
           
@@ -193,8 +193,7 @@ export function useStaffPermissions(): StaffPermissionsReturn {
               .maybeSingle();
             
             if (staffData) {
-              const dbRole = getStaffRole(staffData.role) || STAFF_ROLES.admin;
-              const dbIsAdmin = ['admin', 'super_admin', 'administrator'].includes(staffData.role);
+              const v = buildStaffPermissionView(staffData.role, staffData.email);
               
               if (!hasLoggedDbRole) {
                 console.log('🔐 Found staff in DB:', staffData.full_name, 'Role:', staffData.role);
@@ -207,10 +206,10 @@ export function useStaffPermissions(): StaffPermissionsReturn {
                 staffEmail: staffData.email,
                 staffName: staffData.full_name,
                 staffRole: staffData.role,
-                roleDetails: dbRole,
-                isAdmin: dbIsAdmin,
-                isSuperAdmin: staffData.role === 'super_admin',
-                accessibleTabs: dbRole.allowedTabs as AdminTab[],
+                roleDetails: v.roleDetails,
+                isAdmin: v.isAdmin,
+                isSuperAdmin: v.isSuperAdmin,
+                accessibleTabs: v.accessibleTabs,
                 error: null
               });
               return;
@@ -218,16 +217,17 @@ export function useStaffPermissions(): StaffPermissionsReturn {
           }
           
           // Use localStorage role if no DB record found
+          const vLs = buildStaffPermissionView(storedRole, adminEmail);
           setState({
             loading: false,
             staffId: null,
             staffEmail: adminEmail,
             staffName: storedName,
             staffRole: storedRole,
-            roleDetails: roleDetails,
-            isAdmin: isFullAdmin,
-            isSuperAdmin: storedRole === 'super_admin',
-            accessibleTabs: roleDetails.allowedTabs as AdminTab[],
+            roleDetails: vLs.roleDetails,
+            isAdmin: vLs.isAdmin,
+            isSuperAdmin: vLs.isSuperAdmin,
+            accessibleTabs: vLs.accessibleTabs,
             error: null
           });
           return;
@@ -304,17 +304,18 @@ export function useStaffPermissions(): StaffPermissionsReturn {
         }
         const r = roleData?.role;
         if (r !== 'admin' && r !== 'super_admin' && r !== 'administrator') return false;
-        const cfg = r === 'super_admin' ? STAFF_ROLES.super_admin : STAFF_ROLES.admin;
+        const raw = r === 'administrator' ? 'admin' : r;
+        const v = buildStaffPermissionView(raw, user.email ?? null);
         setState({
           loading: false,
           staffId: user.id,
           staffEmail: user.email || null,
-          staffName: cfg.name,
-          staffRole: r === 'administrator' ? 'admin' : r,
-          roleDetails: cfg,
-          isAdmin: true,
-          isSuperAdmin: r === 'super_admin',
-          accessibleTabs: cfg.allowedTabs as AdminTab[],
+          staffName: v.roleDetails.name,
+          staffRole: raw,
+          roleDetails: v.roleDetails,
+          isAdmin: v.isAdmin,
+          isSuperAdmin: v.isSuperAdmin,
+          accessibleTabs: v.accessibleTabs,
           error: null,
         });
         return true;
@@ -338,17 +339,17 @@ export function useStaffPermissions(): StaffPermissionsReturn {
       }
       
       // Staff found - set permissions
-      const role = getStaffRole(staffData.role) || STAFF_ROLES.viewer;
+      const v = buildStaffPermissionView(staffData.role, staffData.email);
       setState({
         loading: false,
         staffId: staffData.id,
         staffEmail: staffData.email,
         staffName: staffData.full_name || staffData.email || 'Staff',
         staffRole: staffData.role,
-        roleDetails: role,
-        isAdmin: ['admin', 'super_admin', 'administrator'].includes(staffData.role),
-        isSuperAdmin: staffData.role === 'super_admin',
-        accessibleTabs: role.allowedTabs as AdminTab[],
+        roleDetails: v.roleDetails,
+        isAdmin: v.isAdmin,
+        isSuperAdmin: v.isSuperAdmin,
+        accessibleTabs: v.accessibleTabs,
         error: null
       });
       
@@ -366,10 +367,10 @@ export function useStaffPermissions(): StaffPermissionsReturn {
     // Log only once across ALL hook instances (module-level flag)
     if (!hasLoggedInit) {
       console.log('🔐 Staff permissions init:', { 
-        effectiveRole, 
+        rawStoredRole, 
         storedStaffRole, 
-        isFullAdmin,
-        allowedTabs: roleDetails.allowedTabs.length 
+        isAdmin: initView.isAdmin,
+        allowedTabs: initView.roleDetails.allowedTabs.length 
       });
       hasLoggedInit = true;
     }
@@ -382,18 +383,20 @@ export function useStaffPermissions(): StaffPermissionsReturn {
     (tab: AdminTab): boolean => {
       if (state.loading) {
         const storedRole = localStorage.getItem("admin_staff_role");
+        const adminEm = localStorage.getItem("admin_email");
         if (storedRole) {
-          return canStaffAccessDashboardTab(storedRole, tab);
+          return canStaffAccessDashboardTab(storedRole, tab, adminEm);
         }
         const userRole = localStorage.getItem("user_role");
         if (userRole === "admin" || userRole === "super_admin") {
-          return canStaffAccessDashboardTab(userRole, tab);
+          const uEm = readPersistedAuthUserSync().email ?? null;
+          return canStaffAccessDashboardTab(userRole, tab, uEm);
         }
         return false;
       }
-      return canStaffAccessDashboardTab(state.staffRole, tab);
+      return canStaffAccessDashboardTab(state.staffRole, tab, state.staffEmail);
     },
-    [state.loading, state.staffRole],
+    [state.loading, state.staffRole, state.staffEmail],
   );
 
   const canManageStaff = state.roleDetails?.canManageStaff ?? false;

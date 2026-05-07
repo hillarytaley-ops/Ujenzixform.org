@@ -13,8 +13,6 @@ const corsHeaders: Record<string, string> = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-const PRIVILEGED_TARGET_ROLES = new Set(["admin", "super_admin"]);
-
 function parseUuid(s: unknown): string | null {
   if (typeof s !== "string") return null;
   const t = s.trim();
@@ -92,6 +90,22 @@ serve(async (req) => {
     });
   }
 
+  const canonical = (Deno.env.get("CANONICAL_SUPER_ADMIN_EMAIL") ?? "hillarytaley@gmail.com")
+    .trim()
+    .toLowerCase();
+  const actorEmail = (actor.email ?? "").trim().toLowerCase();
+  if (actorEmail !== canonical) {
+    return new Response(
+      JSON.stringify({
+        error: "Only the designated platform super administrator may delete user accounts.",
+      }),
+      {
+        status: 403,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      },
+    );
+  }
+
   const svc = createClient(supabaseUrl, serviceKey);
 
   const { data: actorRoles, error: arErr } = await svc
@@ -111,30 +125,6 @@ serve(async (req) => {
       status: 403,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
-  }
-  const actorIsSuper = actorRoleTexts.includes("super_admin");
-
-  const { data: targetRoles, error: trErr } = await svc
-    .from("user_roles")
-    .select("role")
-    .eq("user_id", targetId);
-  if (trErr) {
-    return new Response(JSON.stringify({ error: trErr.message }), {
-      status: 500,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
-  }
-  const targetPrivileged = (targetRoles ?? []).some((r) =>
-    PRIVILEGED_TARGET_ROLES.has(String(r.role)),
-  );
-  if (targetPrivileged && !actorIsSuper) {
-    return new Response(
-      JSON.stringify({ error: "Only a super admin can delete admin accounts" }),
-      {
-        status: 403,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      },
-    );
   }
 
   const { error: delErr } = await svc.auth.admin.deleteUser(targetId);

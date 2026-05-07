@@ -21,6 +21,7 @@ interface PermissionGateProps {
   children: React.ReactNode;
   requiredTab: AdminTab;
   staffRole: string | null;
+  staffEmail?: string | null;
   accessibleTabs: AdminTab[];
   isAdmin?: boolean;
   onNavigateBack?: () => void;
@@ -30,11 +31,12 @@ export const PermissionGate: React.FC<PermissionGateProps> = ({
   children,
   requiredTab,
   staffRole,
+  staffEmail = null,
   accessibleTabs,
   isAdmin: _isAdmin = false,
   onNavigateBack
 }) => {
-  const hasAccess = !!staffRole && canStaffAccessDashboardTab(staffRole, requiredTab);
+  const hasAccess = !!staffRole && canStaffAccessDashboardTab(staffRole, requiredTab, staffEmail);
 
   if (hasAccess) {
     return <>{children}</>;
@@ -137,16 +139,18 @@ export function withPermissionGate<P extends object>(
 ) {
   return function PermissionGatedComponent(props: P & {
     staffRole: string | null;
+    staffEmail?: string | null;
     accessibleTabs: AdminTab[];
     isAdmin?: boolean;
     onNavigateBack?: () => void;
   }) {
-    const { staffRole, accessibleTabs, isAdmin, onNavigateBack, ...rest } = props;
+    const { staffRole, staffEmail, accessibleTabs, isAdmin, onNavigateBack, ...rest } = props;
     
     return (
       <PermissionGate
         requiredTab={requiredTab}
         staffRole={staffRole}
+        staffEmail={staffEmail}
         accessibleTabs={accessibleTabs}
         isAdmin={isAdmin}
         onNavigateBack={onNavigateBack}

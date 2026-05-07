@@ -63,6 +63,34 @@ export const ALL_ADMIN_TABS = [
 
 export type AdminTab = typeof ALL_ADMIN_TABS[number];
 
+/** Sole email that may receive super_admin capabilities (must match auth / staff session email). */
+export const CANONICAL_SUPER_ADMIN_EMAIL = "hillarytaley@gmail.com";
+
+export function normalizeStaffEmail(email: string | null | undefined): string {
+  return (email ?? "").trim().toLowerCase();
+}
+
+export function isCanonicalSuperAdminEmail(email: string | null | undefined): boolean {
+  return normalizeStaffEmail(email) === CANONICAL_SUPER_ADMIN_EMAIL;
+}
+
+/**
+ * Maps raw admin_staff / session role + email to the role used for tab and feature ACL.
+ * Prevents super_admin privileges when the account is not the canonical super admin.
+ */
+export function effectiveStaffRoleForPermissions(
+  staffRole: string | null | undefined,
+  staffEmail: string | null | undefined,
+): string | null {
+  const raw = (staffRole ?? "").trim();
+  if (!raw) return null;
+  const mapped = raw === "administrator" ? "admin" : raw;
+  if (mapped === "super_admin" && !isCanonicalSuperAdminEmail(staffEmail)) {
+    return "admin";
+  }
+  return mapped;
+}
+
 /** Core dashboard tabs reserved for super_admin only (platform governance). */
 export const SUPER_ADMIN_EXCLUSIVE_CORE_TABS: readonly AdminTab[] = [
   "staff",
@@ -420,14 +448,40 @@ export function getStaffRole(roleId: string): StaffRole | null {
   return STAFF_ROLES[roleId] || null;
 }
 
+export function buildStaffPermissionView(
+  rawRole: string | null | undefined,
+  email: string | null | undefined,
+): {
+  effectiveRole: string;
+  roleDetails: StaffRole;
+  accessibleTabs: AdminTab[];
+  isSuperAdmin: boolean;
+  isAdmin: boolean;
+} {
+  const rawTrim = (rawRole ?? "").trim() || "admin";
+  const effective = effectiveStaffRoleForPermissions(rawTrim, email) || "admin";
+  const roleDetails = getStaffRole(effective) || STAFF_ROLES.viewer;
+  const isSuperAdmin = rawTrim === "super_admin" && isCanonicalSuperAdminEmail(email);
+  const isAdmin = ["admin", "super_admin", "administrator"].includes(rawTrim);
+  return {
+    effectiveRole: effective,
+    roleDetails,
+    accessibleTabs: roleDetails.allowedTabs as AdminTab[],
+    isSuperAdmin,
+    isAdmin,
+  };
+}
+
 /**
  * Single source of truth for whether a staff role may open a dashboard tab (core or extra).
+ * @param staffEmail Session / staff row email — required to enforce {@link CANONICAL_SUPER_ADMIN_EMAIL} for super_admin.
  */
 export function canStaffAccessDashboardTab(
   staffRole: string | null | undefined,
   tab: string,
+  staffEmail?: string | null,
 ): boolean {
-  const r = staffRole?.trim() || null;
+  const r = effectiveStaffRoleForPermissions(staffRole, staffEmail);
   if (!r) return false;
 
   if (SUPER_ADMIN_ONLY_EXTRA_TABS.has(tab)) {

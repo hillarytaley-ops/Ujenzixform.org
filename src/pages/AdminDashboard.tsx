@@ -483,6 +483,7 @@ const AdminDashboard = () => {
   const {
     loading: permissionsLoading,
     staffRole,
+    staffEmail,
     roleDetails,
     accessibleTabs,
     staffName
@@ -2108,22 +2109,22 @@ const AdminDashboard = () => {
   };
 
   const shouldShowTab = useCallback(
-    (tab: string) => canStaffAccessDashboardTab(staffRole, tab),
-    [staffRole],
+    (tab: string) => canStaffAccessDashboardTab(staffRole, tab, staffEmail),
+    [staffRole, staffEmail],
   );
 
   // If URL/active tab is not allowed for this staff role, jump to the first allowed tab
   useEffect(() => {
     if (permissionsLoading) return;
     if (!staffRole) return;
-    if (canStaffAccessDashboardTab(staffRole, activeTab)) return;
+    if (canStaffAccessDashboardTab(staffRole, activeTab, staffEmail)) return;
     for (const t of ADMIN_TABS) {
-      if (canStaffAccessDashboardTab(staffRole, t)) {
+      if (canStaffAccessDashboardTab(staffRole, t, staffEmail)) {
         setActiveTab(t);
         break;
       }
     }
-  }, [permissionsLoading, staffRole, activeTab, setActiveTab]);
+  }, [permissionsLoading, staffRole, staffEmail, activeTab, setActiveTab]);
 
   // FAST PATH: If we have valid localStorage auth, skip the loading screen entirely
   // This prevents the dashboard from hanging on slow Supabase auth
