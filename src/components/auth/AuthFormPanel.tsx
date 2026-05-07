@@ -4,7 +4,6 @@ import { PRIVACY_POLICY_URL, TERMS_OF_SERVICE_URL } from "@/config/appIdentity";
 import { sanitizeRegistrationNextPath } from "@/utils/authRegistrationNext";
 import type { Session } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
-import { edgeIsAdminStaffPortalEmail } from "@/utils/edgeGuestPublic";
 import { fetchUserRolesViaRest } from "@/lib/userRolesRest";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,7 +13,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
 import { Separator } from "@/components/ui/separator";
-import { KeyRound, CheckCircle, Loader2, Shield } from "lucide-react";
+import { KeyRound, CheckCircle, Loader2 } from "lucide-react";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { SimplePasswordReset } from "@/components/SimplePasswordReset";
 import { cn } from "@/lib/utils";
@@ -107,8 +106,6 @@ function rejectAfter(ms: number, message: string): Promise<never> {
   return new Promise((_, rej) => setTimeout(() => rej(new Error(message)), ms));
 }
 
-const EMAIL_LIKE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
 export type AuthFormPanelProps = {
   variant?: "full" | "compact";
   /** Prefix for input ids (avoid duplicates when compact + full on same route). */
@@ -143,7 +140,6 @@ export function AuthFormPanel({
   const [signInPassword, setSignInPassword] = useState("");
   const [signUpEmail, setSignUpEmail] = useState("");
   const [signUpPassword, setSignUpPassword] = useState("");
-  const [staffPortalEligible, setStaffPortalEligible] = useState(false);
   const isSubmitting = useRef(false);
   const passwordSignInFlowRef = useRef(false);
   const { toast } = useToast();
@@ -236,30 +232,6 @@ export function AuthFormPanel({
 
     return () => subscription.unsubscribe();
   }, [toast, completeSignInNavigation]);
-
-  useEffect(() => {
-    if (authTab !== "signin") {
-      setStaffPortalEligible(false);
-      return;
-    }
-    const raw = signInEmail.trim();
-    if (!EMAIL_LIKE.test(raw)) {
-      setStaffPortalEligible(false);
-      return;
-    }
-    let cancelled = false;
-    const timer = window.setTimeout(() => {
-      void (async () => {
-        const ok = await edgeIsAdminStaffPortalEmail(raw);
-        if (cancelled) return;
-        setStaffPortalEligible(ok);
-      })();
-    }, 450);
-    return () => {
-      cancelled = true;
-      window.clearTimeout(timer);
-    };
-  }, [authTab, signInEmail]);
 
   useEffect(() => {
     if (!syncTabToUrl) return;
@@ -589,17 +561,6 @@ export function AuthFormPanel({
               Privacy Policy
             </a>
           </div>
-
-          {staffPortalEligible ? (
-            <div className="mt-4 pt-4 border-t">
-              <Link to="/admin-login">
-                <Button variant="outline" className="w-full bg-slate-800 text-white hover:bg-slate-700 border-slate-700">
-                  <Shield className="mr-2 h-4 w-4" />
-                  Staff portal
-                </Button>
-              </Link>
-            </div>
-          ) : null}
 
           {compact ? (
             <p className="mt-4 text-center text-xs text-muted-foreground">
