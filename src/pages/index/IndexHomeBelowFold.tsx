@@ -533,15 +533,18 @@ const IndexHomeBelowFold = ({ userRole }: Props) => {
               Join builders, suppliers, and delivery partners already coordinating on UjenziXform.
             </p>
             <div className="flex flex-wrap justify-center gap-4">
-              <Link to="/builder-registration">
+              <Link to="/builders/register">
                 <Button size="lg" className="bg-white text-primary hover:bg-gray-100 font-semibold px-8 py-6 text-lg shadow-xl">
                   <Building2 className="h-5 w-5 mr-2" />
                   Register as Builder
                 </Button>
               </Link>
               <Link to="/supplier-registration">
-                <Button size="lg" variant="outline" className="border-2 border-white text-white hover:bg-white/10 font-semibold px-8 py-6 text-lg">
-                  <Store className="h-5 w-5 mr-2" />
+                <Button
+                  size="lg"
+                  className="bg-white text-amber-800 hover:bg-amber-50 font-semibold px-8 py-6 text-lg shadow-xl border-2 border-white"
+                >
+                  <Store className="h-5 w-5 mr-2 shrink-0 text-amber-700" />
                   Register as Supplier
                 </Button>
               </Link>

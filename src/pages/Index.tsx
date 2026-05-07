@@ -154,7 +154,7 @@ const Index = () => {
 
             <AnimatedSection animation="fadeInUp" delay={300}>
               <div className="flex flex-wrap gap-4 mb-8 justify-center">
-                <Link to="/builder-registration">
+                <Link to="/builders/register">
                   <Button
                     size="lg"
                     className="bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-600 hover:to-red-700 text-white font-semibold px-8 py-6 text-lg shadow-xl"

@@ -352,7 +352,7 @@ const SuppliersMobileOptimized = () => {
                 </CardHeader>
                 <CardContent>
                   <div className="grid md:grid-cols-2 gap-4">
-                    <Link to="/builder-registration" className="block">
+                    <Link to="/builders/register" className="block">
                       <Button size="lg" className="w-full bg-blue-600 hover:bg-blue-700 h-14">
                         <Building className="h-5 w-5 mr-2" />
                         Register as Builder

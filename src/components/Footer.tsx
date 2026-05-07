@@ -55,7 +55,7 @@ const Footer = () => {
                   <Link to="/tracking" className="hover:text-white transition-colors leading-snug">Track Deliveries</Link>
                 </li>
                 <li className="min-h-[1.375rem] flex items-center justify-center md:justify-start">
-                  <Link to="/builder-registration" className="hover:text-white transition-colors leading-snug">Register as Builder</Link>
+                  <Link to="/builders/register" className="hover:text-white transition-colors leading-snug">Register as Builder</Link>
                 </li>
               </ul>
             </div>

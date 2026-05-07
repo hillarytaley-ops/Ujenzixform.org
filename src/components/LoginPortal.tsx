@@ -35,7 +35,7 @@ export const LoginPortal: React.FC<LoginPortalProps> = ({
           loginText: isDashboardRedirect ? 'Sign In to Dashboard' : 'Sign In to Purchase',
           registerText: 'Register as Builder',
           loginLink: redirectTo ? `/builder-signin?redirect=${encodeURIComponent(redirectTo)}` : '/builder-signin',
-          registerLink: '/builder-registration',
+          registerLink: '/builders/register',
           iconColor: 'text-blue-600',
           gradientFrom: 'from-blue-600',
           gradientTo: 'to-blue-700'
