@@ -1,15 +1,20 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Menu, X, BookOpen } from "lucide-react";
 import { useLocation, Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { UserGuideMenu } from "@/components/ui/user-guide-menu";
 import { useAuth } from "@/contexts/AuthContext";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { AuthFormPanel } from "@/components/auth/AuthFormPanel";
 
 const Navigation = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isSigningOut, setIsSigningOut] = useState(false);
   const [userDisplayName, setUserDisplayName] = useState<string | null>(null);
+  const [authDialogOpen, setAuthDialogOpen] = useState(false);
+  const [authDialogTab, setAuthDialogTab] = useState<"signin" | "signup">("signin");
+  const [authDialogKey, setAuthDialogKey] = useState(0);
   const location = useLocation();
 
   const { user: authUser, session, userRole: authRole, loading: authLoading } = useAuth();
@@ -84,6 +89,16 @@ const Navigation = () => {
   const displayName = userDisplayName || displayEmail;
   const displayRole = authRole;
 
+  /** Browse-first marketing links only (no account). Logged-in users see full app links. */
+  const guestMarketingNavItems = [
+    { path: "/", label: "Home" },
+    { path: "/builders", label: "Builders" },
+    { path: "/about", label: "About" },
+    { path: "/careers", label: "Careers" },
+    { path: "/feedback", label: "Feedback" },
+    { path: "/contact", label: "Contact" },
+  ];
+
   const publicNavItems = [
     { path: "/home", label: "Home" },
     { path: "/builders", label: "Builders" },
@@ -99,16 +114,26 @@ const Navigation = () => {
 
   const adminNavItems = [{ path: "/analytics", label: "Analytics" }];
 
-  const navItems =
-    displayRole === "admin"
+  const navItems = !isLoggedIn
+    ? guestMarketingNavItems
+    : displayRole === "admin"
       ? [...publicNavItems, ...adminNavItems]
       : publicNavItems;
 
-  const isActive = (path: string) => location.pathname === path;
+  const isNavItemActive = (path: string) => {
+    if (path === "/") return location.pathname === "/" || location.pathname === "/home";
+    return location.pathname === path;
+  };
+
+  const openGuestAuthDialog = useCallback((tab: "signin" | "signup") => {
+    setAuthDialogTab(tab);
+    setAuthDialogKey((k) => k + 1);
+    setAuthDialogOpen(true);
+  }, []);
 
   const handleSignOut = async () => {
     setIsSigningOut(true);
-    window.location.href = "/auth";
+    window.location.href = "/";
     localStorage.clear();
     sessionStorage.clear();
     await supabase.auth.signOut();
@@ -128,7 +153,7 @@ const Navigation = () => {
   return (
     <header className="shadow-sm border-b sticky top-0 z-50 bg-gradient-primary relative">
       <div className="w-full px-4 py-3 flex items-center justify-between gap-2">
-        <Link to="/home" className="flex items-center group flex-shrink-0">
+        <Link to={isLoggedIn ? "/home" : "/"} className="flex items-center group flex-shrink-0">
           <div className="relative flex-shrink-0" style={{ width: "48px", height: "48px" }}>
             <img
               src="/ujenzixform-logo.png"
@@ -158,7 +183,7 @@ const Navigation = () => {
               key={item.path}
               to={item.path}
               className={`text-xs xl:text-sm font-semibold transition-colors hover:text-construction-orange whitespace-nowrap py-2 px-1 ${
-                isActive(item.path)
+                isNavItemActive(item.path)
                   ? "text-construction-orange font-bold border-b-2 border-construction-orange"
                   : "text-text-on-dark"
               }`}
@@ -204,23 +229,23 @@ const Navigation = () => {
             </div>
           ) : (
             <div className="flex items-center gap-2">
-              <Link to="/auth">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="bg-white text-gray-900 border-2 border-white hover:bg-gray-100 hover:text-gray-900 font-bold shadow-lg text-xs px-4"
-                >
-                  Sign In
-                </Button>
-              </Link>
-              <Link to="/auth">
-                <Button
-                  size="sm"
-                  className="bg-orange-500 text-white border-2 border-orange-400 hover:bg-orange-600 font-bold shadow-lg text-xs px-4"
-                >
-                  Register
-                </Button>
-              </Link>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="bg-white text-gray-900 border-2 border-white hover:bg-gray-100 hover:text-gray-900 font-bold shadow-lg text-xs px-4"
+                onClick={() => openGuestAuthDialog("signin")}
+              >
+                Sign In
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                className="bg-orange-500 text-white border-2 border-orange-400 hover:bg-orange-600 font-bold shadow-lg text-xs px-4"
+                onClick={() => openGuestAuthDialog("signup")}
+              >
+                Register
+              </Button>
             </div>
           )}
         </div>
@@ -245,7 +270,7 @@ const Navigation = () => {
                 key={item.path}
                 to={item.path}
                 className={`block text-base font-semibold py-3 px-3 rounded-lg transition-colors hover:bg-primary/10 hover:text-primary ${
-                  isActive(item.path)
+                  isNavItemActive(item.path)
                     ? "text-primary bg-primary/10"
                     : "text-foreground"
                 }`}
@@ -274,19 +299,27 @@ const Navigation = () => {
                 </div>
               ) : (
                 <>
-                  <Link to="/auth">
-                    <Button
-                      variant="outline"
-                      className="w-full bg-white text-gray-900 border-2 border-gray-300 hover:bg-gray-100 font-bold"
-                    >
-                      Sign In
-                    </Button>
-                  </Link>
-                  <Link to="/auth">
-                    <Button className="w-full bg-orange-500 text-white border-2 border-orange-400 hover:bg-orange-600 font-bold">
-                      Register
-                    </Button>
-                  </Link>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full bg-white text-gray-900 border-2 border-gray-300 hover:bg-gray-100 font-bold"
+                    onClick={() => {
+                      openGuestAuthDialog("signin");
+                      setIsMenuOpen(false);
+                    }}
+                  >
+                    Sign In
+                  </Button>
+                  <Button
+                    type="button"
+                    className="w-full bg-orange-500 text-white border-2 border-orange-400 hover:bg-orange-600 font-bold"
+                    onClick={() => {
+                      openGuestAuthDialog("signup");
+                      setIsMenuOpen(false);
+                    }}
+                  >
+                    Register
+                  </Button>
                   <Link to="/admin-login">
                     <Button
                       variant="ghost"
@@ -300,6 +333,24 @@ const Navigation = () => {
             </div>
           </nav>
         </div>
+      )}
+
+      {!isLoggedIn && (
+        <Dialog open={authDialogOpen} onOpenChange={setAuthDialogOpen}>
+          <DialogContent className="max-w-[calc(100vw-1.5rem)] sm:max-w-md max-h-[min(90vh,720px)] overflow-y-auto p-4 sm:p-5 gap-0 border-border/80 bg-background/95 backdrop-blur-md">
+            <DialogHeader className="sr-only">
+              <DialogTitle>Sign in or create an account</DialogTitle>
+            </DialogHeader>
+            <AuthFormPanel
+              key={authDialogKey}
+              variant="compact"
+              idPrefix="nav"
+              forcedInitialTab={authDialogTab}
+              syncTabToUrl={false}
+              onAwaitingEmailConfirmation={() => setAuthDialogOpen(false)}
+            />
+          </DialogContent>
+        </Dialog>
       )}
     </header>
   );
