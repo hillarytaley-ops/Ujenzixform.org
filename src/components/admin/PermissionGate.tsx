@@ -15,7 +15,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Lock, Shield, ArrowLeft } from 'lucide-react';
-import { AdminTab, TAB_METADATA, getStaffRole } from '@/config/staffPermissions';
+import { AdminTab, TAB_METADATA, getStaffRole, canStaffAccessDashboardTab } from '@/config/staffPermissions';
 
 interface PermissionGateProps {
   children: React.ReactNode;
@@ -31,16 +31,10 @@ export const PermissionGate: React.FC<PermissionGateProps> = ({
   requiredTab,
   staffRole,
   accessibleTabs,
-  isAdmin = false,
+  isAdmin: _isAdmin = false,
   onNavigateBack
 }) => {
-  // Admins and super admins have full access
-  if (isAdmin) {
-    return <>{children}</>;
-  }
-
-  // Check if staff has access to this tab
-  const hasAccess = accessibleTabs.includes(requiredTab);
+  const hasAccess = !!staffRole && canStaffAccessDashboardTab(staffRole, requiredTab);
 
   if (hasAccess) {
     return <>{children}</>;

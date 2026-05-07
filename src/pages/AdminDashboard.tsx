@@ -169,7 +169,7 @@ import {
 } from "@/utils/adminStaffSession";
 import { useStaffPermissions } from "@/hooks/useStaffPermissions";
 import { PermissionGate } from "@/components/admin/PermissionGate";
-import { AdminTab } from "@/config/staffPermissions";
+import { AdminTab, canStaffAccessDashboardTab } from "@/config/staffPermissions";
 
 // New Modular Admin Components
 import { 
@@ -484,10 +484,7 @@ const AdminDashboard = () => {
     loading: permissionsLoading,
     staffRole,
     roleDetails,
-    isAdmin: isAdminStaff,
-    isSuperAdmin: isSuperAdminStaff,
     accessibleTabs,
-    canAccessTab,
     staffName
   } = useStaffPermissions();
 
@@ -2110,28 +2107,23 @@ const AdminDashboard = () => {
     }
   };
 
-  // Helper function to check if a tab should be shown
-  const shouldShowTab = (tab: string): boolean => {
-    // Admin-only tabs (not in permissions config)
-    const adminOnlyTabs = ['pending-products', 'qr-codes', 'videos', 'user-roles', 'messaging', 'careers', 'analytics', 'reviews', 'sms-test', 'etims-test'];
-    if (adminOnlyTabs.includes(tab)) {
-      return isAdminStaff || isSuperAdminStaff;
-    }
-    // Standard tabs - check permissions
-    if (isAdminStaff || isSuperAdminStaff) {
-      return true; // Admins see all tabs
-    }
-    return canAccessTab(tab as AdminTab);
-  };
+  const shouldShowTab = useCallback(
+    (tab: string) => canStaffAccessDashboardTab(staffRole, tab),
+    [staffRole],
+  );
 
-  // Auto-switch to first accessible tab if current tab is not accessible (for non-admin staff)
+  // If URL/active tab is not allowed for this staff role, jump to the first allowed tab
   useEffect(() => {
-    if (!permissionsLoading && accessibleTabs.length > 0 && !isAdminStaff && !isSuperAdminStaff) {
-      if (!accessibleTabs.includes(activeTab as AdminTab) && !['pending-products', 'material-images', 'qr-codes', 'videos', 'user-roles', 'messaging'].includes(activeTab)) {
-        setActiveTab(accessibleTabs[0]);
+    if (permissionsLoading) return;
+    if (!staffRole) return;
+    if (canStaffAccessDashboardTab(staffRole, activeTab)) return;
+    for (const t of ADMIN_TABS) {
+      if (canStaffAccessDashboardTab(staffRole, t)) {
+        setActiveTab(t);
+        break;
       }
     }
-  }, [permissionsLoading, accessibleTabs, activeTab, isAdminStaff, isSuperAdminStaff]);
+  }, [permissionsLoading, staffRole, activeTab, setActiveTab]);
 
   // FAST PATH: If we have valid localStorage auth, skip the loading screen entirely
   // This prevents the dashboard from hanging on slow Supabase auth
@@ -2206,8 +2198,8 @@ const AdminDashboard = () => {
                 <span className="text-sm text-gray-300 truncate max-w-[150px]">{adminEmail}</span>
               </div>
               
-              {/* Staff Role Badge for Non-Admin Staff */}
-              {!isAdminStaff && !isSuperAdminStaff && roleDetails && (
+              {/* Staff role + tab count (all roles, including Administrator vs Super Administrator) */}
+              {roleDetails && (
                 <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-lg border" style={{ backgroundColor: roleDetails.color.replace('bg-', '') + '20', borderColor: roleDetails.color.replace('bg-', '') + '40' }}>
                   <Shield className="h-4 w-4" style={{ color: roleDetails.color.replace('bg-', '#') }} />
                   <span className="text-sm text-gray-300">

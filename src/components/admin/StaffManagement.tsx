@@ -95,17 +95,13 @@ const STAFF_ROLES = getAllStaffRoles().map(role => ({
   allowedTabs: role.allowedTabs
 }));
 
-// Super Admin email - only this user can manage staff
-const SUPER_ADMIN_EMAIL = 'hillarytaley@gmail.com';
-
 export const StaffManagement = () => {
   const { toast } = useToast();
   const [staffMembers, setStaffMembers] = useState<StaffMember[]>([]);
   const [currentUserRole, setCurrentUserRole] = useState<string>('');
-  const [currentUserEmail, setCurrentUserEmail] = useState<string>('');
   
-  // Check if current user is super admin (by role OR by email)
-  const isSuperAdmin = currentUserRole === 'super_admin' || currentUserEmail === SUPER_ADMIN_EMAIL;
+  /** Staff governance UI: super_admin role in admin_staff only (not regular admin). */
+  const isSuperAdmin = currentUserRole === "super_admin";
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
@@ -276,10 +272,7 @@ export const StaffManagement = () => {
                 setCurrentUserRole(data[0].role);
               }
             }
-            
-            // Also set the email for super admin check
             console.log('👥 Current user email:', userEmail);
-            setCurrentUserEmail(userEmail);
           }
         }
       } catch (e) {

@@ -6,8 +6,8 @@
  * This configuration defines which dashboard tabs each staff role can access.
  * 
  * ROLES:
- * - super_admin: Full access to everything
- * - admin: Full access to everything
+ * - super_admin: Full access (staff, security, settings, global user roles, etc.)
+ * - admin: Operational access only — excludes super-admin-only dashboard areas
  * - it_helpdesk: Technical support, user issues, system health
  * - logistics_officer: Delivery management, GPS tracking, routes
  * - registrations_officer: User registrations, document verification
@@ -63,6 +63,45 @@ export const ALL_ADMIN_TABS = [
 
 export type AdminTab = typeof ALL_ADMIN_TABS[number];
 
+/** Core dashboard tabs reserved for super_admin only (platform governance). */
+export const SUPER_ADMIN_EXCLUSIVE_CORE_TABS: readonly AdminTab[] = [
+  "staff",
+  "security",
+  "settings",
+];
+
+/**
+ * Extra tab ids used in GroupedTabNav / AdminDashboard that are not in ALL_ADMIN_TABS,
+ * or are sensitive — only super_admin.
+ */
+export const SUPER_ADMIN_ONLY_EXTRA_TABS: ReadonlySet<string> = new Set([
+  "user-roles",
+  "etims-test",
+  "sms-test",
+]);
+
+/**
+ * Operational tabs outside ALL_ADMIN_TABS granted to admin + super_admin (not logistics, etc.).
+ */
+export const ELEVATED_ADMIN_EXTRA_TABS: ReadonlySet<string> = new Set([
+  "pending-products",
+  "qr-codes",
+  "videos",
+  "messaging",
+  "careers",
+  "analytics",
+  "reviews",
+  "material-images",
+  "camera-assignment",
+  "builder-moderation",
+  "tracking",
+  "voice-calls",
+]);
+
+const ADMIN_ALLOWED_TABS: AdminTab[] = ALL_ADMIN_TABS.filter(
+  (t) => !SUPER_ADMIN_EXCLUSIVE_CORE_TABS.includes(t),
+);
+
 // Staff roles with their permissions
 export const STAFF_ROLES: Record<string, StaffRole> = {
   super_admin: {
@@ -80,10 +119,10 @@ export const STAFF_ROLES: Record<string, StaffRole> = {
   admin: {
     id: 'admin',
     name: 'Administrator',
-    description: 'Full access to all dashboard features',
+    description: 'Full operational access except super-admin governance (staff, security, settings, global role tools)',
     color: 'bg-purple-600',
-    allowedTabs: [...ALL_ADMIN_TABS],
-    canManageStaff: true,
+    allowedTabs: [...ADMIN_ALLOWED_TABS],
+    canManageStaff: false,
     canExportData: true,
     canDeleteRecords: true,
     canApproveRegistrations: true,
@@ -376,7 +415,40 @@ export const TAB_METADATA: Record<AdminTab, { name: string; icon: string; descri
 
 // Helper functions
 export function getStaffRole(roleId: string): StaffRole | null {
+  if (!roleId) return null;
+  if (roleId === "administrator") return STAFF_ROLES.admin;
   return STAFF_ROLES[roleId] || null;
+}
+
+/**
+ * Single source of truth for whether a staff role may open a dashboard tab (core or extra).
+ */
+export function canStaffAccessDashboardTab(
+  staffRole: string | null | undefined,
+  tab: string,
+): boolean {
+  const r = staffRole?.trim() || null;
+  if (!r) return false;
+
+  if (SUPER_ADMIN_ONLY_EXTRA_TABS.has(tab)) {
+    return r === "super_admin";
+  }
+
+  const role = getStaffRole(r);
+  if (!role) return false;
+
+  const allowed = role.allowedTabs as string[];
+  if (allowed.includes(tab)) return true;
+
+  if ((ALL_ADMIN_TABS as readonly string[]).includes(tab)) {
+    return false;
+  }
+
+  if (ELEVATED_ADMIN_EXTRA_TABS.has(tab)) {
+    return r === "admin" || r === "super_admin" || r === "administrator";
+  }
+
+  return false;
 }
 
 export function canAccessTab(roleId: string, tab: AdminTab): boolean {

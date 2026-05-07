@@ -15,9 +15,9 @@ import { supabase } from '@/integrations/supabase/client';
 import { 
   STAFF_ROLES, 
   getStaffRole, 
-  canAccessTab, 
   getAccessibleTabs,
   hasPermission,
+  canStaffAccessDashboardTab,
   AdminTab,
   StaffRole
 } from '@/config/staffPermissions';
@@ -81,10 +81,8 @@ export function useStaffPermissions(): StaffPermissionsReturn {
       error: null
     });
     
-    const checkTabAccess = (tab: AdminTab): boolean => {
-      if (['admin', 'super_admin'].includes(testRole)) return true;
-      return simulatedRole.allowedTabs.includes(tab);
-    };
+    const checkTabAccess = (tab: AdminTab): boolean =>
+      canStaffAccessDashboardTab(testRole, tab);
     
     return {
       ...state,
@@ -380,29 +378,23 @@ export function useStaffPermissions(): StaffPermissionsReturn {
   }, []); // Empty deps - only run once on mount
 
   // Permission check functions
-  const checkTabAccess = useCallback((tab: AdminTab): boolean => {
-    // If still loading, infer from localStorage so tab bar does not disappear on first paint
-    if (state.loading) {
-      const storedRole = localStorage.getItem('admin_staff_role');
-      if (storedRole) {
-        if (['admin', 'super_admin', 'administrator'].includes(storedRole)) {
-          return true;
+  const checkTabAccess = useCallback(
+    (tab: AdminTab): boolean => {
+      if (state.loading) {
+        const storedRole = localStorage.getItem("admin_staff_role");
+        if (storedRole) {
+          return canStaffAccessDashboardTab(storedRole, tab);
         }
-        const roleConfig = STAFF_ROLES[storedRole];
-        if (roleConfig) {
-          return roleConfig.allowedTabs.includes(tab);
+        const userRole = localStorage.getItem("user_role");
+        if (userRole === "admin" || userRole === "super_admin") {
+          return canStaffAccessDashboardTab(userRole, tab);
         }
+        return false;
       }
-      const userRole = localStorage.getItem('user_role');
-      if (userRole === 'admin' || userRole === 'super_admin') {
-        return true;
-      }
-      return false;
-    }
-    if (state.isAdmin || state.isSuperAdmin) return true;
-    if (!state.staffRole) return false;
-    return state.accessibleTabs.includes(tab);
-  }, [state.loading, state.isAdmin, state.isSuperAdmin, state.staffRole, state.accessibleTabs]);
+      return canStaffAccessDashboardTab(state.staffRole, tab);
+    },
+    [state.loading, state.staffRole],
+  );
 
   const canManageStaff = state.roleDetails?.canManageStaff ?? false;
   const canExportData = state.roleDetails?.canExportData ?? false;
