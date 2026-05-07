@@ -126,6 +126,22 @@ export const ELEVATED_ADMIN_EXTRA_TABS: ReadonlySet<string> = new Set([
   "voice-calls",
 ]);
 
+/** Core RBAC tabs plus every extra nav tab — canonical super admin is never blocked by a missing id here. */
+export function getAllDashboardTabIdsForSuperAdmin(): AdminTab[] {
+  const ids = new Set<string>([...ALL_ADMIN_TABS]);
+  for (const x of SUPER_ADMIN_ONLY_EXTRA_TABS) ids.add(x);
+  for (const x of ELEVATED_ADMIN_EXTRA_TABS) ids.add(x);
+  return [...ids] as AdminTab[];
+}
+
+/** True when this session is the designated platform super administrator (full dashboard). */
+export function isCanonicalSuperAdminSession(
+  staffRole: string | null | undefined,
+  staffEmail: string | null | undefined,
+): boolean {
+  return (staffRole ?? "").trim() === "super_admin" && isCanonicalSuperAdminEmail(staffEmail);
+}
+
 const ADMIN_ALLOWED_TABS: AdminTab[] = ALL_ADMIN_TABS.filter(
   (t) => !SUPER_ADMIN_EXCLUSIVE_CORE_TABS.includes(t),
 );
@@ -459,9 +475,18 @@ export function buildStaffPermissionView(
   isAdmin: boolean;
 } {
   const rawTrim = (rawRole ?? "").trim() || "admin";
+  if (isCanonicalSuperAdminSession(rawTrim, email)) {
+    return {
+      effectiveRole: "super_admin",
+      roleDetails: STAFF_ROLES.super_admin,
+      accessibleTabs: getAllDashboardTabIdsForSuperAdmin(),
+      isSuperAdmin: true,
+      isAdmin: true,
+    };
+  }
   const effective = effectiveStaffRoleForPermissions(rawTrim, email) || "admin";
   const roleDetails = getStaffRole(effective) || STAFF_ROLES.viewer;
-  const isSuperAdmin = rawTrim === "super_admin" && isCanonicalSuperAdminEmail(email);
+  const isSuperAdmin = false;
   const isAdmin = ["admin", "super_admin", "administrator"].includes(rawTrim);
   return {
     effectiveRole: effective,
@@ -481,6 +506,9 @@ export function canStaffAccessDashboardTab(
   tab: string,
   staffEmail?: string | null,
 ): boolean {
+  if (isCanonicalSuperAdminSession(staffRole, staffEmail)) {
+    return true;
+  }
   const r = effectiveStaffRoleForPermissions(staffRole, staffEmail);
   if (!r) return false;
 
