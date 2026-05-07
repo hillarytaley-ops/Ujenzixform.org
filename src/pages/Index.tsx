@@ -19,6 +19,10 @@ import Navigation from "@/components/Navigation";
 import Footer from "@/components/Footer";
 import AnimatedSection from "@/components/AnimatedSection";
 import { useHomePagePublicStats, formatHomeStatCount } from "@/hooks/useHomePagePublicStats";
+import {
+  hasMarketplaceLogisticsAccess,
+  hasScannerPortalAccess,
+} from "@/config/roleRouteAccess";
 
 const IndexHomeBelowFold = lazy(() => import("./index/IndexHomeBelowFold"));
 
@@ -39,6 +43,15 @@ const Index = () => {
   const [searchParams] = useSearchParams();
   const skipDashboardRedirect = searchParams.get("browse") === "1";
   const homeStats = useHomePagePublicStats();
+
+  const homeToolAccess = useMemo(
+    () => ({
+      marketplace: !loading && !!userRole && hasMarketplaceLogisticsAccess(userRole),
+      scanner: !loading && !!userRole && hasScannerPortalAccess(userRole),
+      monitoring: !loading && !!userRole && hasMarketplaceLogisticsAccess(userRole),
+    }),
+    [loading, userRole]
+  );
 
   // AUTO-REDIRECT: Users with roles go to their dashboards (unless explicitly browsing public home)
   useEffect(() => {
@@ -227,7 +240,7 @@ const Index = () => {
           </div>
         }
       >
-        <IndexHomeBelowFold userRole={userRole} />
+        <IndexHomeBelowFold userRole={userRole} toolAccess={homeToolAccess} />
       </Suspense>
 
       <Footer />

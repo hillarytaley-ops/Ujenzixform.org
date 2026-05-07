@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Menu, X, BookOpen } from "lucide-react";
 import { useLocation, Link } from "react-router-dom";
@@ -7,6 +7,28 @@ import { UserGuideMenu } from "@/components/ui/user-guide-menu";
 import { useAuth } from "@/contexts/AuthContext";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AuthFormPanel } from "@/components/auth/AuthFormPanel";
+import {
+  hasMarketplaceLogisticsAccess,
+  hasScannerPortalAccess,
+} from "@/config/roleRouteAccess";
+
+const GUEST_MARKETING_NAV = [
+  { path: "/", label: "Home" },
+  { path: "/builders", label: "Builders" },
+  { path: "/about", label: "About" },
+  { path: "/careers", label: "Careers" },
+  { path: "/feedback", label: "Feedback" },
+  { path: "/contact", label: "Contact" },
+] as const;
+
+const MARKETING_TAIL_NAV = [
+  { path: "/about", label: "About" },
+  { path: "/contact", label: "Contact" },
+  { path: "/careers", label: "Careers" },
+  { path: "/feedback", label: "Feedback" },
+] as const;
+
+const ADMIN_EXTRA_NAV = [{ path: "/analytics", label: "Analytics" }] as const;
 
 const Navigation = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -89,36 +111,30 @@ const Navigation = () => {
   const displayName = userDisplayName || displayEmail;
   const displayRole = authRole;
 
-  /** Browse-first marketing links only (no account). Logged-in users see full app links. */
-  const guestMarketingNavItems = [
-    { path: "/", label: "Home" },
-    { path: "/builders", label: "Builders" },
-    { path: "/about", label: "About" },
-    { path: "/careers", label: "Careers" },
-    { path: "/feedback", label: "Feedback" },
-    { path: "/contact", label: "Contact" },
-  ];
-
-  const publicNavItems = [
-    { path: "/home", label: "Home" },
-    { path: "/builders", label: "Builders" },
-    { path: "/suppliers", label: "Material" },
-    { path: "/delivery", label: "Delivery" },
-    { path: "/scanners", label: "Scanners" },
-    { path: "/monitoring", label: "Monitoring" },
-    { path: "/about", label: "About" },
-    { path: "/contact", label: "Contact" },
-    { path: "/careers", label: "Careers" },
-    { path: "/feedback", label: "Feedback" },
-  ];
-
-  const adminNavItems = [{ path: "/analytics", label: "Analytics" }];
-
-  const navItems = !isLoggedIn
-    ? guestMarketingNavItems
-    : displayRole === "admin"
-      ? [...publicNavItems, ...adminNavItems]
-      : publicNavItems;
+  /** Guests: marketing only. Signed-in: operational links only when `user_roles` allows that route. */
+  const navItems = useMemo(() => {
+    if (!isLoggedIn) return [...GUEST_MARKETING_NAV];
+    const r = displayRole;
+    const ops: { path: string; label: string }[] = [];
+    if (r && hasMarketplaceLogisticsAccess(r)) {
+      ops.push({ path: "/suppliers", label: "Material" }, { path: "/delivery", label: "Delivery" });
+    }
+    if (r && hasScannerPortalAccess(r)) {
+      ops.push({ path: "/scanners", label: "Scanners" });
+    }
+    if (r && hasMarketplaceLogisticsAccess(r)) {
+      ops.push({ path: "/monitoring", label: "Monitoring" });
+    }
+    const adminExtra =
+      r === "admin" || r === "super_admin" ? [...ADMIN_EXTRA_NAV] : [];
+    return [
+      { path: "/home", label: "Home" },
+      { path: "/builders", label: "Builders" },
+      ...ops,
+      ...MARKETING_TAIL_NAV,
+      ...adminExtra,
+    ];
+  }, [isLoggedIn, displayRole]);
 
   const isNavItemActive = (path: string) => {
     if (path === "/") return location.pathname === "/" || location.pathname === "/home";

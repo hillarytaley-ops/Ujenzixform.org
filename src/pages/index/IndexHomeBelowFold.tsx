@@ -29,46 +29,58 @@ import {
 import AnimatedSection from "@/components/AnimatedSection";
 import VideoSection from "@/components/VideoSection";
 
+export type HomeToolAccess = {
+  marketplace: boolean;
+  scanner: boolean;
+  monitoring: boolean;
+};
+
 type Props = {
   userRole: string | null;
+  toolAccess: HomeToolAccess;
 };
 
 const testimonialAvatar = (seed: string) =>
   `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(seed)}`;
 
-const IndexHomeBelowFold = ({ userRole }: Props) => {
-  const getScannerLink = useMemo(() => {
+const IndexHomeBelowFold = ({ userRole, toolAccess }: Props) => {
+  const scannerPath = useMemo(() => {
     if (userRole === "supplier") return "/supplier-dispatch-scanner";
-    if (userRole === "delivery") return "/delivery-receiving-scanner";
+    if (userRole === "delivery" || userRole === "delivery_provider") return "/delivery-receiving-scanner";
     return "/scanners";
   }, [userRole]);
 
-  const platformFeatures = useMemo(
-    () => [
-      {
-        icon: Building2,
-        title: "Find Certified Builders",
-        description:
-          "Browse the CO/contractor directory, posts, and video updates in one place.",
-        color: "from-blue-500 to-cyan-600",
-        link: "/builders",
-      },
-      {
-        icon: Store,
-        title: "Browse materials",
-        description:
-          "Compare listings, request quotes, and manage orders from your dashboard.",
-        color: "from-green-500 to-emerald-600",
-        link: "/suppliers",
-      },
-      {
-        icon: Truck,
-        title: "GPS Delivery Tracking",
-        description: "Real-time delivery tracking with live driver location updates",
-        color: "from-orange-500 to-red-600",
-        link: "/delivery",
-      },
-      {
+  const platformFeatures = useMemo(() => {
+    const builders = {
+      icon: Building2,
+      title: "Find Certified Builders",
+      description:
+        "Browse the CO/contractor directory, posts, and video updates in one place.",
+      color: "from-blue-500 to-cyan-600",
+      link: "/builders",
+    };
+    const rows = [builders];
+    if (toolAccess.marketplace) {
+      rows.push(
+        {
+          icon: Store,
+          title: "Browse materials",
+          description:
+            "Compare listings, request quotes, and manage orders from your dashboard.",
+          color: "from-green-500 to-emerald-600",
+          link: "/suppliers",
+        },
+        {
+          icon: Truck,
+          title: "GPS Delivery Tracking",
+          description: "Real-time delivery tracking with live driver location updates",
+          color: "from-orange-500 to-red-600",
+          link: "/delivery",
+        }
+      );
+    }
+    if (toolAccess.scanner) {
+      rows.push({
         icon: QrCode,
         title: "QR Material Scanning",
         description:
@@ -76,18 +88,43 @@ const IndexHomeBelowFold = ({ userRole }: Props) => {
             ? "Track your material deliveries in real-time"
             : "Scan and verify materials with our smart QR code system",
         color: "from-purple-500 to-pink-600",
-        link: getScannerLink,
-      },
-      {
+        link: scannerPath,
+      });
+    }
+    if (toolAccess.monitoring) {
+      rows.push({
         icon: Camera,
         title: "Site Monitoring",
         description: "Live camera feeds and drone surveillance for your construction sites",
         color: "from-indigo-500 to-blue-600",
         link: "/monitoring",
-      },
-    ],
-    [userRole, getScannerLink]
-  );
+      });
+    }
+    return rows;
+  }, [userRole, toolAccess, scannerPath]);
+
+  const quickAccessTiles = useMemo(() => {
+    const tiles: { icon: string; label: string; link: string }[] = [];
+    if (toolAccess.marketplace) {
+      tiles.push(
+        { icon: "🚚", label: "Request Delivery", link: "/delivery" },
+        { icon: "🏪", label: "Material", link: "/suppliers" },
+        { icon: "🎥", label: "Site Monitoring", link: "/monitoring" }
+      );
+    }
+    if (toolAccess.scanner) {
+      tiles.push({ icon: "📦", label: "QR Scanner", link: scannerPath });
+    }
+    if (tiles.length === 0) {
+      return [
+        { icon: "👷", label: "Builders", link: "/builders" },
+        { icon: "💼", label: "Careers", link: "/careers" },
+        { icon: "💬", label: "Feedback", link: "/feedback" },
+        { icon: "📞", label: "Contact", link: "/contact" },
+      ];
+    }
+    return tiles;
+  }, [toolAccess, scannerPath]);
 
   const testimonials = [
     {
@@ -125,13 +162,8 @@ const IndexHomeBelowFold = ({ userRole }: Props) => {
       <section className="py-8 bg-background -mt-4 relative z-10">
         <div className="container mx-auto px-4">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 max-w-4xl mx-auto">
-            {[
-              { icon: "🚚", label: "Request Delivery", link: "/delivery" },
-              { icon: "🏪", label: "Material", link: "/suppliers" },
-              { icon: "🎥", label: "Site Monitoring", link: "/monitoring" },
-              { icon: "📦", label: "QR Scanner", link: getScannerLink },
-            ].map((item, index) => (
-              <Link to={item.link} key={index}>
+            {quickAccessTiles.map((item, index) => (
+              <Link to={item.link} key={`${item.link}-${index}`}>
                 <Card className="hover:shadow-lg hover:-translate-y-1 transition-all duration-300 cursor-pointer border-2 border-transparent hover:border-primary/20">
                   <CardContent className="p-4 text-center">
                     <span className="text-3xl block mb-2">{item.icon}</span>

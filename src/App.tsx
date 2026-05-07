@@ -76,7 +76,6 @@ const PaystackPaymentCallback = lazyImport(() => import("./pages/PaystackPayment
 // Auth Guard
 import { AuthRequired } from "@/components/security/AuthRequired";
 import { RoleProtectedRoute } from "@/components/security/RoleProtectedRoute";
-import { MonitoringRouteShell } from "@/components/security/MonitoringRouteShell";
 import { Navigate, useSearchParams, useLocation } from "react-router-dom";
 
 // Simple Live Chat Widget for staff support
@@ -92,27 +91,11 @@ import { OfflineIndicator } from "@/components/OfflineIndicator";
 import { PWAInstallPrompt } from "@/components/pwa/PWAInstallPrompt";
 import { shouldHideFloatingChrome } from "@/config/authChrome";
 import { ALL_PUBLIC_AUTH_REDIRECTS, SUPPLIERS_PAGE_PATHS } from "@/config/authRouteAliases";
-
-/** Signed-in roles that may use supplier marketplace, delivery hub, and related tools (not dashboards). */
-const MARKETPLACE_AND_LOGISTICS_ROLES = [
-  "private_client",
-  "professional_builder",
-  "builder",
-  "supplier",
-  "delivery",
-  "delivery_provider",
-  "admin",
-  "super_admin",
-] as const;
-
-/** Field / QR scanner landing (role checks also run inside Scanners.tsx). */
-const SCANNER_PORTAL_ROLES = [
-  "supplier",
-  "delivery",
-  "delivery_provider",
-  "admin",
-  "super_admin",
-] as const;
+import {
+  MARKETPLACE_AND_LOGISTICS_ROLES,
+  MONITORING_PORTAL_ROLES,
+  SCANNER_PORTAL_ROLES,
+} from "@/config/roleRouteAccess";
 
 // Optimized loading component with skeleton animation
 const PageLoader = () => (
@@ -320,11 +303,11 @@ const App = () => {
                     <Route
                       path="/monitoring"
                       element={
-                        <SuspenseWrapper>
-                          <MonitoringRouteShell>
+                        <RoleProtectedRoute allowedRoles={[...MONITORING_PORTAL_ROLES]}>
+                          <SuspenseWrapper>
                             <Monitoring />
-                          </MonitoringRouteShell>
-                        </SuspenseWrapper>
+                          </SuspenseWrapper>
+                        </RoleProtectedRoute>
                       }
                     />
                     <Route path="/tracking" element={<SuspenseWrapper><Tracking /></SuspenseWrapper>} />
