@@ -84,7 +84,7 @@ interface StaffMember {
   custom_tabs?: string[]; // Custom tab permissions (overrides role defaults)
 }
 
-import { STAFF_ROLES as ROLE_CONFIG, getAllStaffRoles, TAB_METADATA, AdminTab, isCanonicalSuperAdminEmail } from '@/config/staffPermissions';
+import { STAFF_ROLES as ROLE_CONFIG, getAllStaffRoles, TAB_METADATA, AdminTab, isCanonicalSuperAdminSession } from '@/config/staffPermissions';
 
 // Get all roles for selection
 const STAFF_ROLES = getAllStaffRoles().map(role => ({
@@ -101,9 +101,8 @@ export const StaffManagement = () => {
   const [currentUserRole, setCurrentUserRole] = useState<string>('');
   const [viewerEmail, setViewerEmail] = useState<string>('');
   
-  /** Only the canonical platform email may use super_admin governance UI, even if DB role is wrong. */
-  const isSuperAdmin =
-    currentUserRole === "super_admin" && isCanonicalSuperAdminEmail(viewerEmail);
+  /** Canonical super admin (hillarytaley@gmail.com) with admin/super_admin/administrator in admin_staff. */
+  const isSuperAdmin = isCanonicalSuperAdminSession(currentUserRole, viewerEmail);
 
   const assignableStaffRoles = STAFF_ROLES.filter(
     (role) => isSuperAdmin || role.value !== "super_admin",
@@ -253,6 +252,10 @@ export const StaffManagement = () => {
     // Get current user's role from localStorage or admin_staff table
     const getCurrentUserRole = async () => {
       try {
+        const fromLs = typeof localStorage !== "undefined"
+          ? localStorage.getItem("admin_email")?.trim().toLowerCase() ?? ""
+          : "";
+        if (fromLs) setViewerEmail(fromLs);
         // First check localStorage for staff role
         const storedSession = readPersistedAuthRawStringSync();
         if (storedSession) {

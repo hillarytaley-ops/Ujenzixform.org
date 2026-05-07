@@ -8,6 +8,7 @@
  * ROLES:
  * - super_admin: Full access (staff, security, settings, global user roles, etc.)
  *   PLATFORM RULE — THERE IS EXACTLY ONE SUPER ADMIN: hillarytaley@gmail.com only.
+ *   That account gets full governance tabs even if admin_staff.role is admin (not only super_admin).
  *   Any other account with super_admin in admin_staff is treated as Administrator for ACL.
  *   See CANONICAL_SUPER_ADMIN_EMAIL, isCanonicalSuperAdminSession(), effectiveStaffRoleForPermissions().
  * - admin: Operational access only — excludes super-admin-only dashboard areas
@@ -83,7 +84,8 @@ export function isCanonicalSuperAdminEmail(email: string | null | undefined): bo
 
 /**
  * Maps raw admin_staff / session role + email to the role used for tab and feature ACL.
- * Prevents super_admin privileges when the account is not the canonical super admin.
+ * Canonical super admin email + admin/super_admin/administrator → full super_admin ACL (Staff tab, etc.).
+ * Non-canonical email + super_admin in DB → downgraded to admin.
  */
 export function effectiveStaffRoleForPermissions(
   staffRole: string | null | undefined,
@@ -92,6 +94,12 @@ export function effectiveStaffRoleForPermissions(
   const raw = (staffRole ?? "").trim();
   if (!raw) return null;
   const mapped = raw === "administrator" ? "admin" : raw;
+  const elevatedForCanonical =
+    isCanonicalSuperAdminEmail(staffEmail) &&
+    (mapped === "admin" || mapped === "super_admin" || raw === "administrator");
+  if (elevatedForCanonical) {
+    return "super_admin";
+  }
   if (mapped === "super_admin" && !isCanonicalSuperAdminEmail(staffEmail)) {
     return "admin";
   }
@@ -142,14 +150,23 @@ export function getAllDashboardTabIdsForSuperAdmin(): AdminTab[] {
 }
 
 /**
- * True only for the single platform super admin: role super_admin AND email hillarytaley@gmail.com.
- * Used for full-dashboard bypass and governance UI; keep in sync with Edge CANONICAL_SUPER_ADMIN_EMAIL.
+ * True for the sole platform super admin (hillarytaley@gmail.com): canonical email plus an
+ * elevated staff role (admin, super_admin, or administrator). DB may store admin; they still get Staff.
+ * Keep in sync with effectiveStaffRoleForPermissions() and Edge CANONICAL_SUPER_ADMIN_EMAIL.
  */
 export function isCanonicalSuperAdminSession(
   staffRole: string | null | undefined,
   staffEmail: string | null | undefined,
 ): boolean {
-  return (staffRole ?? "").trim() === "super_admin" && isCanonicalSuperAdminEmail(staffEmail);
+  if (!isCanonicalSuperAdminEmail(staffEmail)) return false;
+  const raw = (staffRole ?? "").trim();
+  if (!raw) return false;
+  const mapped = raw === "administrator" ? "admin" : raw;
+  return (
+    mapped === "admin" ||
+    mapped === "super_admin" ||
+    raw === "administrator"
+  );
 }
 
 const ADMIN_ALLOWED_TABS: AdminTab[] = ALL_ADMIN_TABS.filter(
