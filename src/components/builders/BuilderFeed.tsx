@@ -1208,6 +1208,8 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
   /** Same numbers as hero (anon-visible counts from useBuildersPagePublicStats)—never use definer-only RPC here */
   const emptyFeedTimeline = directoryTimelinePostCount ?? 0;
   const emptyFeedVideos = directoryShowcaseVideoCount ?? 0;
+  const showStatsLoadingEmpty =
+    !loadingPosts && filteredPosts.length === 0 && directoryStatsLoading;
 
   const feedBody = (
     <>
@@ -1639,6 +1641,11 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
               <Loader2 className="h-7 w-7 animate-spin text-blue-600 mb-2" />
               <p className="text-sm text-muted-foreground">Loading posts…</p>
           </div>
+        ) : showStatsLoadingEmpty ? (
+          <div className="py-10 px-4 flex flex-col items-center justify-center text-center max-w-md mx-auto">
+            <Loader2 className="h-7 w-7 animate-spin text-blue-600 mb-2" />
+            <p className="text-sm text-muted-foreground">Loading public feed numbers…</p>
+          </div>
         ) : filteredPosts.length === 0 ? (
           <div className="py-10 px-4 flex flex-col items-center justify-center text-center max-w-md mx-auto">
               <Video className="h-10 w-10 text-gray-400 mb-2" />
@@ -1658,13 +1665,13 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
                 </>
               ) : emptyFeedTimeline > 0 ? (
                 <>
-                  <h3 className="font-semibold text-base mb-1">Couldn&apos;t load posts</h3>
+                  <h3 className="font-semibold text-base mb-1">Timeline didn&apos;t load in this browser</h3>
                   <p className="text-sm text-muted-foreground">
-                    The site reports {emptyFeedTimeline}+ public timeline posts, but none loaded here. Apply the latest
-                    Supabase migrations (stats RPC must return{' '}
-                    <code className="text-xs bg-muted px-1 rounded">timeline_page</code>, or expose{' '}
-                    <code className="text-xs bg-muted px-1 rounded">get_public_builder_feed_posts</code>), deploy this
-                    frontend build, then hard-refresh.
+                    Marketing totals can include database rows that anonymous visitors are not allowed to read under
+                    Supabase Row Level Security. Fix <code className="text-xs bg-muted px-1 rounded">SELECT</code> on{' '}
+                    <code className="text-xs bg-muted px-1 rounded">public.builder_posts</code> for the{' '}
+                    <code className="text-xs bg-muted px-1 rounded">anon</code> role (see repo migrations around
+                    builder feed RLS), or apply migrations that expose a <code className="text-xs bg-muted px-1 rounded">SECURITY DEFINER</code> feed read. Deploy the latest frontend and hard-refresh.
                   </p>
                 </>
               ) : (
