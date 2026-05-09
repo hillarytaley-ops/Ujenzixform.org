@@ -100,7 +100,8 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
   const effectiveRole = currentUserRole || storedRole;
   
   // Get effective user name from props or localStorage
-  const effectiveUserName = currentUserName !== 'Guest' ? currentUserName : (storedUserName || 'Guest');
+  const effectiveUserName =
+    (currentUserName !== 'Guest' ? currentUserName : storedUserName || 'Guest') || 'Guest';
   
   const isSupplierRole =
     effectiveRole === 'supplier' || storedRole === 'supplier';
@@ -490,8 +491,8 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
                 userId: c.user_id || '',
                 userName: commenter?.full_name || c.commenter_name || 'Visitor',
                 userAvatar: commenter?.avatar_url,
-                content: c.content,
-                timestamp: new Date(c.created_at),
+                content: c.content != null ? String(c.content) : '',
+                timestamp: c.created_at ? new Date(c.created_at) : new Date(),
                 likes: c.likes_count || 0,
                 isLiked: false
               };

@@ -815,17 +815,17 @@ export const BuilderVideoPost: React.FC<BuilderVideoPostProps> = ({
                 <Avatar className="h-8 w-8">
                   <AvatarImage src={comment.userAvatar} />
                   <AvatarFallback className="bg-gray-200 text-gray-600 text-xs">
-                    {comment.userName.charAt(0).toUpperCase()}
+                    {(comment.userName || 'V').charAt(0).toUpperCase()}
                   </AvatarFallback>
                 </Avatar>
                 <div className="flex-1">
                   <div className="bg-gray-100 dark:bg-gray-800 rounded-2xl px-3 py-2">
                     <span className="font-semibold text-sm text-gray-900 dark:text-white">
-                      {comment.userName}
+                      {comment.userName || 'Visitor'}
                     </span>
                     <p className="text-sm text-gray-700 dark:text-gray-300">
                       {/* Highlight @mentions */}
-                      {comment.content.split(/(@\w+)/g).map((part, i) => 
+                      {String(comment.content ?? '').split(/(@\w+)/g).map((part, i) =>
                         part.startsWith('@') ? (
                           <span key={i} className="text-blue-500 font-medium">{part}</span>
                         ) : (
@@ -845,7 +845,7 @@ export const BuilderVideoPost: React.FC<BuilderVideoPostProps> = ({
                       {likedComments.has(comment.id) ? '❤️ Liked' : 'Like'}
                     </button>
                     <button 
-                      onClick={() => handleReply(comment.id, comment.userName)}
+                      onClick={() => handleReply(comment.id, comment.userName || 'Visitor')}
                       className="font-semibold hover:underline"
                     >
                       Reply
