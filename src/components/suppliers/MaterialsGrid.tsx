@@ -2261,6 +2261,8 @@ export const MaterialsGrid: React.FC<MaterialsGridProps> = ({
               </button>
             )}
           </div>
+        </div>
+      </div>
         </CardContent>
       </Card>
 
