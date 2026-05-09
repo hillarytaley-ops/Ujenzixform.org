@@ -15,7 +15,11 @@ import { useToast } from "@/hooks/use-toast";
 import { Separator } from "@/components/ui/separator";
 import { KeyRound, CheckCircle, Loader2, Shield } from "lucide-react";
 import { canAccessAdminDashboardStorage } from "@/utils/adminStaffSession";
-import { isStaffEmailIdentifier } from "@/utils/staffEmailGate";
+import {
+  isStaffEmailIdentifier,
+  fetchIsAdminStaffPortalEmail,
+  emailLooksCompleteForStaffCheck,
+} from "@/utils/staffEmailGate";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { SimplePasswordReset } from "@/components/SimplePasswordReset";
 import { cn } from "@/lib/utils";
@@ -158,7 +162,29 @@ export function AuthFormPanel({
   const [signUpPassword, setSignUpPassword] = useState("");
 
   const typedEmailForStaffGate = authTab === "signin" ? signInEmail : signUpEmail;
-  const staffEmailMatches = isStaffEmailIdentifier(typedEmailForStaffGate);
+  const staffEnvMatches = isStaffEmailIdentifier(typedEmailForStaffGate);
+  const [staffDbMatches, setStaffDbMatches] = useState(false);
+
+  useEffect(() => {
+    const email = typedEmailForStaffGate.trim();
+    if (!emailLooksCompleteForStaffCheck(email)) {
+      setStaffDbMatches(false);
+      return;
+    }
+    let cancelled = false;
+    const timer = window.setTimeout(() => {
+      void (async () => {
+        const ok = await fetchIsAdminStaffPortalEmail(supabase, email);
+        if (!cancelled) setStaffDbMatches(ok);
+      })();
+    }, 450);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [typedEmailForStaffGate]);
+
+  const staffEmailMatches = staffEnvMatches || staffDbMatches;
   const showStaffAccess = staffEmailMatches || hasExistingStaffSession;
   const staffAccessHref = useMemo(
     () => (hasExistingStaffSession ? "/admin-dashboard" : "/admin-login"),
@@ -596,9 +622,9 @@ export function AuthFormPanel({
               <p className={cn("mt-1 text-[11px] text-muted-foreground leading-snug", compact && "text-[10px]")}>
                 {hasExistingStaffSession
                   ? "Continue to the operations dashboard."
-                  : staffEmailMatches
-                    ? "This address matches your team’s staff rules — open the staff portal when you’re ready."
-                    : "For UjenziXform team & operations — use staff credentials on the next screen."}
+                  : staffDbMatches
+                    ? "This email is on your staff list (Admin → Staff). Use staff portal credentials next."
+                    : "Matched optional hosting env staff rule — use staff credentials on the next screen."}
               </p>
             </div>
           ) : null}

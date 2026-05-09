@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
   Table,
   TableBody,
@@ -622,6 +623,19 @@ export const StaffManagement = () => {
 
   return (
     <div className="space-y-6">
+      <Alert className="border-indigo-500/40 bg-indigo-950/35 text-indigo-50">
+        <Mail className="h-4 w-4 text-indigo-300" />
+        <AlertTitle className="text-indigo-100">Public /auth — “Staff access”</AlertTitle>
+        <AlertDescription className="text-indigo-100/85 text-sm leading-relaxed">
+          Active <strong>email addresses</strong> in the table below are checked automatically on the public sign-in page
+          (via <code className="rounded bg-black/30 px-1 py-0.5 text-xs">is_admin_staff_portal_email</code>). Add or
+          deactivate staff here to control who sees the staff portal link. Optional extras: set{" "}
+          <code className="rounded bg-black/30 px-1 py-0.5 text-xs">VITE_STAFF_EMAIL_ALLOWLIST</code> or{" "}
+          <code className="rounded bg-black/30 px-1 py-0.5 text-xs">VITE_STAFF_EMAIL_DOMAINS</code> in your hosting
+          environment.
+        </AlertDescription>
+      </Alert>
+
       {/* Header */}
       <Card className="bg-gradient-to-r from-indigo-900/30 to-purple-900/30 border-indigo-800/50">
         <CardHeader>

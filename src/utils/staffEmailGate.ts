@@ -1,9 +1,11 @@
 /**
- * Gates “Staff access” on /auth by email shape. Configure in Vercel / .env:
+ * Gates “Staff access” on /auth.
  *
- * - `VITE_STAFF_EMAIL_DOMAINS` — comma-separated domains (`ujenzixform.org` or `@ujenzixform.org`).
- *   If **unset**, defaults to `ujenzixform.org`. If set to **empty string**, no domain rules (allowlist / session only).
- * - `VITE_STAFF_EMAIL_ALLOWLIST` — optional comma-separated full emails for non-domain staff addresses.
+ * **Primary:** `admin_staff` emails (active) via Supabase RPC `is_admin_staff_portal_email` — managed in Admin → Staff.
+ *
+ * **Optional env (Vercel / .hosting):**
+ * - `VITE_STAFF_EMAIL_DOMAINS` — comma-separated domains. If **unset**, no domain shortcut (DB + allowlist only). If **empty string**, same.
+ * - `VITE_STAFF_EMAIL_ALLOWLIST` — comma-separated full emails (extras not in `admin_staff`).
  */
 
 function normalizeDomain(entry: string): string {
@@ -14,10 +16,7 @@ function normalizeDomain(entry: string): string {
 
 function staffDomainsFromEnv(): string[] {
   const raw = import.meta.env.VITE_STAFF_EMAIL_DOMAINS as string | undefined;
-  if (raw === undefined) {
-    return ["ujenzixform.org"];
-  }
-  if (raw.trim() === "") {
+  if (raw === undefined || raw.trim() === "") {
     return [];
   }
   return raw
@@ -35,8 +34,14 @@ function staffAllowlistFromEnv(): string[] {
     .filter(Boolean);
 }
 
+/** Basic shape check before calling `is_admin_staff_portal_email`. */
+export function emailLooksCompleteForStaffCheck(email: string): boolean {
+  const e = email.trim();
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e);
+}
+
 /**
- * True when `email` looks like a staff identifier (domain or allowlist). Does not verify the password.
+ * True when `email` matches optional env domain / allowlist (supplements DB staff list). Does not verify the password.
  */
 export function isStaffEmailIdentifier(email: string): boolean {
   const e = email.trim().toLowerCase();
@@ -54,4 +59,23 @@ export function isStaffEmailIdentifier(email: string): boolean {
     if (host === d) return true;
   }
   return false;
+}
+
+type RpcClient = { rpc: (fn: string, args?: Record<string, unknown>) => Promise<{ data: unknown; error: { message: string } | null }> };
+
+/**
+ * True when `email` matches an **active** row in `admin_staff` (same list as Admin → Staff).
+ */
+export async function fetchIsAdminStaffPortalEmail(
+  client: RpcClient,
+  email: string
+): Promise<boolean> {
+  const e = email.trim();
+  if (!emailLooksCompleteForStaffCheck(e)) return false;
+  const { data, error } = await client.rpc("is_admin_staff_portal_email", { p_email: e });
+  if (error) {
+    console.warn("[staffEmailGate] is_admin_staff_portal_email:", error.message);
+    return false;
+  }
+  return data === true;
 }
