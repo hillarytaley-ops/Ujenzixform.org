@@ -114,6 +114,8 @@ import {
 } from "@/utils/myMonitoringServiceRequests";
 import { ProfessionalBuilderDashboardNavCards } from "@/components/builders/ProfessionalBuilderDashboardNavCards";
 import { MaterialsGrid } from "@/components/suppliers/MaterialsGrid";
+import { CartSidebar } from "@/components/cart/CartSidebar";
+import { FloatingCartButton } from "@/components/cart/FloatingCartButton";
 import { InvoiceManagement } from "@/components/invoices/InvoiceManagement";
 import { DeliveryNoteWorkflow } from "@/components/delivery/DeliveryNoteWorkflow";
 import { GRNView } from "@/components/delivery/GRNView";
@@ -2260,6 +2262,9 @@ const ProfessionalBuilderDashboardPage = () => {
 
   return (
     <div className="min-h-screen w-full min-w-0 max-w-[100vw] overflow-x-hidden bg-gradient-to-br from-blue-50 via-indigo-50 to-slate-50">
+      {/* MaterialsGrid toggles cart via CartContext; sidebar must mount here (not only on /suppliers). */}
+      <CartSidebar />
+      <FloatingCartButton />
       {/* Navigation hidden in dashboard - use Exit Dashboard to access main navigation */}
       
       {/* Header — hamburger is position:absolute on small screens so it never steals flex width from the title */}

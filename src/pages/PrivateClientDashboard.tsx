@@ -67,6 +67,8 @@ import { DashboardMobileActionSheet } from "@/components/dashboard/DashboardMobi
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { PrivateClientDashboardNavCards } from "@/components/builders/PrivateClientDashboardNavCards";
 import { MaterialsGrid } from "@/components/suppliers/MaterialsGrid";
+import { CartSidebar } from "@/components/cart/CartSidebar";
+import { FloatingCartButton } from "@/components/cart/FloatingCartButton";
 import { BuilderDeliveryQuotePanel } from "@/components/delivery/BuilderDeliveryQuotePanel";
 import { SUPPORT_PHONE_PRIMARY, SUPPORT_EMAIL } from "@/config/appIdentity";
 
@@ -781,6 +783,8 @@ const PrivateClientDashboard = () => {
 
   return (
     <div className="min-h-screen w-full min-w-0 max-w-[100vw] overflow-x-hidden bg-gradient-to-br from-green-50 via-emerald-50 to-teal-50">
+      <CartSidebar />
+      <FloatingCartButton />
       {/* Navigation hidden in dashboard - use Exit Dashboard to access main navigation */}
       
       {/* Header — mobile menu trigger out of flex flow so title keeps full width */}
