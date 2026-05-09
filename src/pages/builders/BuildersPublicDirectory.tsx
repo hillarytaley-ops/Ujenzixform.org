@@ -14,6 +14,7 @@ export interface BuildersPublicDirectoryProps {
   directoryTimelinePostCount: number;
   directoryShowcaseVideoCount: number;
   directoryStatsLoading: boolean;
+  seedTimelinePosts: Record<string, unknown>[] | null;
 }
 
 export default function BuildersPublicDirectory({
@@ -26,6 +27,7 @@ export default function BuildersPublicDirectory({
   directoryTimelinePostCount,
   directoryShowcaseVideoCount,
   directoryStatsLoading,
+  seedTimelinePosts,
 }: BuildersPublicDirectoryProps) {
   return (
     <div className="space-y-3">
@@ -65,6 +67,7 @@ export default function BuildersPublicDirectory({
           directoryTimelinePostCount={directoryTimelinePostCount}
           directoryShowcaseVideoCount={directoryShowcaseVideoCount}
           directoryStatsLoading={directoryStatsLoading}
+          seedTimelinePosts={seedTimelinePosts}
           onBuilderContact={onBuilderContact}
           onBuilderProfile={onBuilderProfile}
           onEditProfile={onEditProfile}

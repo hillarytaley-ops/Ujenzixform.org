@@ -49,6 +49,8 @@ interface BuilderFeedProps {
   directoryTimelinePostCount?: number;
   directoryShowcaseVideoCount?: number;
   directoryStatsLoading?: boolean;
+  /** Rows from get_builders_page_public_stats.timeline_page (same RPC as hero); bypasses separate feed RPC */
+  seedTimelinePosts?: Record<string, unknown>[] | null;
 }
 
 // Location options for filtering
@@ -68,6 +70,7 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
   directoryTimelinePostCount,
   directoryShowcaseVideoCount,
   directoryStatsLoading = false,
+  seedTimelinePosts = null,
 }) => {
   const { toast } = useToast();
   
@@ -122,10 +125,14 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
     showcaseVideos: number;
   } | null>(null);
 
-  // Fetch posts from database on mount
+  const timelineSeedKey =
+    Array.isArray(seedTimelinePosts) && seedTimelinePosts.length > 0
+      ? `${seedTimelinePosts.length}:${String((seedTimelinePosts[0] as { id?: string })?.id ?? '')}`
+      : 'none';
+
   useEffect(() => {
-    fetchPosts(0, true);
-  }, []);
+    void fetchPosts(0, true);
+  }, [timelineSeedKey]);
 
   const fetchPosts = async (offset: number = 0, isInitialLoad: boolean = false) => {
     if (isInitialLoad) {
@@ -176,18 +183,33 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
       let postsData: unknown;
       let rpcOk = false;
 
-      // 1) Official client (same session + URL as rest of app; avoids subtle fetch/header issues)
-      const { data: rpcSdkData, error: rpcSdkError } = await (supabase as any).rpc(
-        'get_public_builder_feed_posts',
-        { p_limit: limitPlusOne, p_offset: offset }
-      );
-      if (!rpcSdkError && Array.isArray(rpcSdkData)) {
-        postsData = rpcSdkData;
+      const useSeed =
+        isInitialLoad &&
+        offset === 0 &&
+        Array.isArray(seedTimelinePosts) &&
+        seedTimelinePosts.length > 0;
+
+      if (useSeed) {
+        postsData = seedTimelinePosts;
         postsRes = new Response(null, { status: 200 });
         rpcOk = true;
-        console.log('📥 Posts via supabase.rpc(get_public_builder_feed_posts):', rpcSdkData.length);
-      } else if (rpcSdkError) {
-        console.warn('📥 supabase.rpc get_public_builder_feed_posts:', rpcSdkError.code, rpcSdkError.message);
+        console.log('📥 Posts from get_builders_page_public_stats.timeline_page:', seedTimelinePosts.length);
+      }
+
+      // 1) Dedicated feed RPC (when no bundled seed or load-more)
+      if (!rpcOk) {
+        const { data: rpcSdkData, error: rpcSdkError } = await (supabase as any).rpc(
+          'get_public_builder_feed_posts',
+          { p_limit: limitPlusOne, p_offset: offset }
+        );
+        if (!rpcSdkError && Array.isArray(rpcSdkData)) {
+          postsData = rpcSdkData;
+          postsRes = new Response(null, { status: 200 });
+          rpcOk = true;
+          console.log('📥 Posts via supabase.rpc(get_public_builder_feed_posts):', rpcSdkData.length);
+        } else if (rpcSdkError) {
+          console.warn('📥 supabase.rpc get_public_builder_feed_posts:', rpcSdkError.code, rpcSdkError.message);
+        }
       }
 
       // 2) Raw PostgREST (explicit Accept; some stacks differ from default)
@@ -1674,10 +1696,11 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
                 <>
                   <h3 className="font-semibold text-base mb-1">Couldn&apos;t load posts</h3>
                   <p className="text-sm text-muted-foreground">
-                    The site reports {emptyFeedTimeline}+ public timeline posts, but none loaded here. Run Supabase
-                    migrations (including{' '}
-                    <code className="text-xs bg-muted px-1 rounded">get_public_builder_feed_posts</code>) and deploy
-                    the latest frontend, then hard-refresh.
+                    The site reports {emptyFeedTimeline}+ public timeline posts, but none loaded here. Apply the latest
+                    Supabase migrations (stats RPC must return{' '}
+                    <code className="text-xs bg-muted px-1 rounded">timeline_page</code>, or expose{' '}
+                    <code className="text-xs bg-muted px-1 rounded">get_public_builder_feed_posts</code>), deploy this
+                    frontend build, then hard-refresh.
                   </p>
                 </>
               ) : (

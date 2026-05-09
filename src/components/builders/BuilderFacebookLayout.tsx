@@ -63,6 +63,7 @@ interface BuilderFacebookLayoutProps {
   directoryTimelinePostCount: number;
   directoryShowcaseVideoCount: number;
   directoryStatsLoading: boolean;
+  seedTimelinePosts: Record<string, unknown>[] | null;
   onBuilderContact?: (builder: any) => void;
   onBuilderProfile?: (builder: any) => void;
   onEditProfile?: () => void;
@@ -77,6 +78,7 @@ export const BuilderFacebookLayout: React.FC<BuilderFacebookLayoutProps> = ({
   directoryTimelinePostCount,
   directoryShowcaseVideoCount,
   directoryStatsLoading,
+  seedTimelinePosts,
   onBuilderContact,
   onBuilderProfile,
   onEditProfile
@@ -617,6 +619,7 @@ export const BuilderFacebookLayout: React.FC<BuilderFacebookLayoutProps> = ({
               directoryTimelinePostCount={directoryTimelinePostCount}
               directoryShowcaseVideoCount={directoryShowcaseVideoCount}
               directoryStatsLoading={directoryStatsLoading}
+              seedTimelinePosts={seedTimelinePosts}
               onOpenProjectShowcase={() => setFeedShowcaseTab('portfolio')}
               onContactBuilder={(builderId) => {
                 const builder = allBuilders.find(b => b.id === builderId || b.user_id === builderId);

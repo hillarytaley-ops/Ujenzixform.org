@@ -5,6 +5,8 @@ export type BuildersPagePublicStats = {
   professionalBuilders: number;
   activePosts: number;
   publishedVideos: number;
+  /** First page of builder_posts from same SECURITY DEFINER RPC (when supported). */
+  timelinePage: Record<string, unknown>[] | null;
   loading: boolean;
   error: boolean;
 };
@@ -13,6 +15,7 @@ const ZERO: Omit<BuildersPagePublicStats, 'loading' | 'error'> = {
   professionalBuilders: 0,
   activePosts: 0,
   publishedVideos: 0,
+  timelinePage: null,
 };
 
 /**
@@ -30,16 +33,35 @@ export function useBuildersPagePublicStats(): BuildersPagePublicStats {
 
     const load = async () => {
       try {
-        const { data, error } = await supabase.rpc('get_builders_page_public_stats');
+        const FEED_PAGE = 11;
+        let data: unknown = null;
+        let rpcError: unknown = null;
+
+        const withFeed = await (supabase as any).rpc('get_builders_page_public_stats', {
+          p_feed_limit: FEED_PAGE,
+          p_feed_offset: 0,
+        });
+        if (!withFeed.error && withFeed.data && typeof withFeed.data === 'object') {
+          data = withFeed.data;
+        } else {
+          const noFeed = await (supabase as any).rpc('get_builders_page_public_stats');
+          data = noFeed.data;
+          rpcError = noFeed.error;
+        }
 
         if (cancelled) return;
 
-        if (!error && data && typeof data === 'object') {
+        if (!rpcError && data && typeof data === 'object' && !Array.isArray(data)) {
           const row = data as Record<string, unknown>;
+          const tp = row.timeline_page;
+          const timelinePage = Array.isArray(tp)
+            ? (tp as Record<string, unknown>[])
+            : null;
           setState({
             professionalBuilders: Number(row.professional_builders) || 0,
             activePosts: Number(row.active_posts) || 0,
             publishedVideos: Number(row.published_videos) || 0,
+            timelinePage,
             loading: false,
             error: false,
           });
@@ -57,8 +79,9 @@ export function useBuildersPagePublicStats(): BuildersPagePublicStats {
           professionalBuilders: 0,
           activePosts: postCount ?? 0,
           publishedVideos: 0,
+          timelinePage: null,
           loading: false,
-          error: !!error,
+          error: !!rpcError,
         });
       } catch {
         if (!cancelled) {

@@ -376,6 +376,7 @@ const Builders = () => {
               directoryTimelinePostCount={publicStats.activePosts}
               directoryShowcaseVideoCount={publicStats.publishedVideos}
               directoryStatsLoading={publicStats.loading}
+              seedTimelinePosts={publicStats.timelinePage}
               onBuilderContact={handleContactBuilderDialog}
               onBuilderProfile={handleBuilderProfile}
               onEditProfile={() => setShowProfileEdit(true)}
