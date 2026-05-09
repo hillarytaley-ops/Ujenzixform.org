@@ -11,15 +11,18 @@ import {
   hasMarketplaceLogisticsAccess,
   hasScannerPortalAccess,
 } from "@/config/roleRouteAccess";
+import { SUPPLIERS_PAGE_PATHS } from "@/config/authRouteAliases";
+
+const SUPPLIERS_PATH_SET = new Set<string>(SUPPLIERS_PAGE_PATHS);
 
 const GUEST_MARKETING_NAV = [
   { path: "/", label: "Home" },
   { path: "/builders", label: "Builders" },
-  { path: "/suppliers", label: "Material" },
+  { path: "/suppliers", label: "Materials" },
   { path: "/about", label: "About" },
+  { path: "/contact", label: "Contact" },
   { path: "/careers", label: "Careers" },
   { path: "/feedback", label: "Feedback" },
-  { path: "/contact", label: "Contact" },
 ] as const;
 
 const MARKETING_TAIL_NAV = [
@@ -118,7 +121,7 @@ const Navigation = () => {
     const r = displayRole;
     const ops: { path: string; label: string }[] = [];
     if (r && hasMarketplaceLogisticsAccess(r)) {
-      ops.push({ path: "/suppliers", label: "Material" }, { path: "/delivery", label: "Delivery" });
+      ops.push({ path: "/suppliers", label: "Materials" }, { path: "/delivery", label: "Delivery" });
     }
     if (r && hasScannerPortalAccess(r)) {
       ops.push({ path: "/scanners", label: "Scanners" });
@@ -139,6 +142,7 @@ const Navigation = () => {
 
   const isNavItemActive = (path: string) => {
     if (path === "/") return location.pathname === "/" || location.pathname === "/home";
+    if (path === "/suppliers") return SUPPLIERS_PATH_SET.has(location.pathname);
     return location.pathname === path;
   };
 
