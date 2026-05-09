@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useLayoutEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useLayoutEffect, useCallback, useMemo } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { PRIVACY_POLICY_URL, TERMS_OF_SERVICE_URL } from "@/config/appIdentity";
 import { sanitizeRegistrationNextPath } from "@/utils/authRegistrationNext";
@@ -13,7 +13,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
 import { Separator } from "@/components/ui/separator";
-import { KeyRound, CheckCircle, Loader2 } from "lucide-react";
+import { KeyRound, CheckCircle, Loader2, Shield } from "lucide-react";
+import { canAccessAdminDashboardStorage } from "@/utils/adminStaffSession";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { SimplePasswordReset } from "@/components/SimplePasswordReset";
 import { cn } from "@/lib/utils";
@@ -129,6 +130,24 @@ export function AuthFormPanel({
 }: AuthFormPanelProps) {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
+
+  /** Not shown to the general public: reveal with `?staff=1` or `?internal=1`, or existing staff/admin browser session. */
+  const staffPortalReveal =
+    searchParams.get("staff") === "1" || searchParams.get("internal") === "1";
+  const [hasExistingStaffSession, setHasExistingStaffSession] = useState(false);
+  useEffect(() => {
+    const sync = () => setHasExistingStaffSession(canAccessAdminDashboardStorage());
+    sync();
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(() => {
+      sync();
+    });
+    return () => subscription.unsubscribe();
+  }, []);
+  const showStaffAccess = staffPortalReveal || hasExistingStaffSession;
+  const staffAccessHref = useMemo(
+    () => (hasExistingStaffSession ? "/admin-dashboard" : "/admin-login"),
+    [hasExistingStaffSession]
+  );
   const [formLoading, setFormLoading] = useState(false);
   const [showResetDialog, setShowResetDialog] = useState(false);
   const [authTab, setAuthTab] = useState(() => {
@@ -550,6 +569,31 @@ export function AuthFormPanel({
               </div>
             </TabsContent>
           </Tabs>
+
+          {showStaffAccess ? (
+            <div
+              className={cn(
+                "mt-5 rounded-lg border border-slate-200 bg-slate-50/90 px-3 py-3 text-center",
+                compact && "mt-4 px-2 py-2"
+              )}
+            >
+              <Link
+                to={staffAccessHref}
+                className={cn(
+                  "inline-flex items-center justify-center gap-1.5 text-sm font-medium text-slate-700 hover:text-primary hover:underline",
+                  compact && "text-xs"
+                )}
+              >
+                <Shield className="h-3.5 w-3.5 shrink-0 opacity-80" aria-hidden />
+                Staff access
+              </Link>
+              <p className={cn("mt-1 text-[11px] text-muted-foreground leading-snug", compact && "text-[10px]")}>
+                {hasExistingStaffSession
+                  ? "Continue to the operations dashboard."
+                  : "Team sign-in (separate from builder accounts)."}
+              </p>
+            </div>
+          ) : null}
 
           <div className={cn("mt-6 text-center text-sm text-muted-foreground", compact && "mt-4 text-xs")}>
             By continuing, you agree to our{" "}
