@@ -1083,8 +1083,29 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
           body: JSON.stringify(body),
         });
         if (!ins.ok) {
-          const err = await ins.text();
-          console.error('post_likes insert:', ins.status, err);
+          const errText = await ins.text();
+          let errJson: { code?: string; message?: string } | null = null;
+          try {
+            errJson = errText ? JSON.parse(errText) : null;
+          } catch {
+            /* ignore */
+          }
+          const dup =
+            ins.status === 409 ||
+            errJson?.code === '23505' ||
+            (typeof errJson?.message === 'string' &&
+              errJson.message.toLowerCase().includes('duplicate'));
+          if (dup) {
+            // Row already exists (e.g. UI missed it on load, or double-submit). Match DB: liked, no extra count bump.
+            console.warn('post_likes insert: duplicate key, treating as already liked');
+            setPosts((prev) =>
+              prev.map((p) =>
+                p.id === postId ? { ...p, isLiked: true, likes: post.likes } : p
+              )
+            );
+            return;
+          }
+          console.error('post_likes insert:', ins.status, errText);
           throw new Error('Like not saved');
         }
       } else if (userId) {
