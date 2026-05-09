@@ -159,9 +159,31 @@ export const BuilderVideoPost: React.FC<BuilderVideoPostProps> = ({
   const commentInputRef = useRef<HTMLInputElement>(null);
   const longPressTimerRef = useRef<number | null>(null);
   const longPressTriggeredRef = useRef(false);
+  /** Delay closing the reaction strip so the pointer can cross the gap above Like (hover UX). */
+  const reactionHideTimerRef = useRef<number | null>(null);
   const { toast } = useToast();
 
   const anchorForShare = shareAnchorId ?? `market-hub-post-${id}`;
+
+  const clearReactionHideTimer = () => {
+    if (reactionHideTimerRef.current != null) {
+      window.clearTimeout(reactionHideTimerRef.current);
+      reactionHideTimerRef.current = null;
+    }
+  };
+
+  const scheduleReactionHide = () => {
+    clearReactionHideTimer();
+    reactionHideTimerRef.current = window.setTimeout(() => {
+      reactionHideTimerRef.current = null;
+      setShowReactions(false);
+    }, 550);
+  };
+
+  const openReactionsBar = () => {
+    clearReactionHideTimer();
+    setShowReactions(true);
+  };
 
   useEffect(() => {
     if (!reactionMode) {
@@ -173,6 +195,13 @@ export const BuilderVideoPost: React.FC<BuilderVideoPostProps> = ({
   useEffect(() => {
     setLocalComments(comments);
   }, [comments]);
+
+  useEffect(() => {
+    return () => {
+      clearLongPressTimer();
+      clearReactionHideTimer();
+    };
+  }, []);
 
   const displayLikes = reactionMode ? likes : likeCount;
   const displayLiked = reactionMode ? !!(userReaction && userReaction.length > 0) : liked;
@@ -226,6 +255,7 @@ export const BuilderVideoPost: React.FC<BuilderVideoPostProps> = ({
 
   const handleReactionPick = (emoji: string) => {
     longPressTriggeredRef.current = false;
+    clearReactionHideTimer();
     if (reactionMode && onReact) {
       onReact(id, emoji);
       setShowReactions(false);
@@ -644,12 +674,12 @@ export const BuilderVideoPost: React.FC<BuilderVideoPostProps> = ({
       {/* Action Buttons - Facebook Style */}
       <div className="px-2 py-1">
         <div className="flex items-center justify-around">
-          {/* Like + reactions: hover on desktop; long-press on touch */}
+          {/* Like + reactions: hover opens bar; delayed hide + overlap so pointer can reach emojis */}
           <div
             className="relative flex-1"
-            onMouseEnter={() => setShowReactions(true)}
+            onMouseEnter={openReactionsBar}
             onMouseLeave={() => {
-              setShowReactions(false);
+              scheduleReactionHide();
               clearLongPressTimer();
             }}
             onPointerDown={startReactionLongPress}
@@ -658,14 +688,20 @@ export const BuilderVideoPost: React.FC<BuilderVideoPostProps> = ({
             }}
             onPointerCancel={clearLongPressTimer}
           >
-            {/* Reaction Popup */}
             {showReactions && (
-              <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 bg-white dark:bg-gray-800 rounded-full shadow-lg border border-gray-200 dark:border-gray-700 px-2 py-1 flex gap-1 z-50 animate-in fade-in slide-in-from-bottom-2 duration-200">
+              <div
+                role="listbox"
+                aria-label="Choose a reaction"
+                className="absolute bottom-full left-1/2 z-[60] flex -translate-x-1/2 translate-y-2 gap-0.5 rounded-full border border-gray-200 bg-white px-1.5 py-1.5 shadow-lg animate-in fade-in slide-in-from-bottom-2 duration-200 dark:border-gray-700 dark:bg-gray-800"
+                onMouseEnter={clearReactionHideTimer}
+                onMouseLeave={scheduleReactionHide}
+              >
                 {reactions.map((reaction) => (
                   <button
                     key={reaction.name}
+                    type="button"
                     onClick={() => handleReactionPick(reaction.emoji)}
-                    className="text-2xl hover:scale-125 transition-transform p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full"
+                    className="flex h-11 min-h-11 w-11 min-w-11 shrink-0 items-center justify-center rounded-full text-2xl transition-transform hover:scale-110 hover:bg-gray-100 active:scale-95 dark:hover:bg-gray-700"
                     title={reaction.name}
                   >
                     {reaction.emoji}
