@@ -152,6 +152,8 @@ export const BuilderVideoPost: React.FC<BuilderVideoPostProps> = ({
   const [isMuted, setIsMuted] = useState(true);
   const [showControls, setShowControls] = useState(false);
   const [showReactions, setShowReactions] = useState(false);
+  /** CO feed has no per-emoji in DB — we only show which emoji the visitor picked (cosmetic). */
+  const [binaryReactionEmoji, setBinaryReactionEmoji] = useState<string | null>(null);
   const [emojiPopoverOpen, setEmojiPopoverOpen] = useState(false);
   const [replyingTo, setReplyingTo] = useState<{ id: string; name: string } | null>(null);
   const [likedComments, setLikedComments] = useState<Set<string>>(new Set());
@@ -189,6 +191,9 @@ export const BuilderVideoPost: React.FC<BuilderVideoPostProps> = ({
     if (!reactionMode) {
       setLiked(isLiked);
       setLikeCount(likes);
+      if (!isLiked) {
+        setBinaryReactionEmoji(null);
+      }
     }
   }, [isLiked, likes, reactionMode]);
 
@@ -248,6 +253,9 @@ export const BuilderVideoPost: React.FC<BuilderVideoPostProps> = ({
       onReact(id, userReaction ? '' : '👍');
       return;
     }
+    if (liked) {
+      setBinaryReactionEmoji(null);
+    }
     setLiked(!liked);
     setLikeCount(prev => liked ? prev - 1 : prev + 1);
     onLike?.(id);
@@ -261,10 +269,14 @@ export const BuilderVideoPost: React.FC<BuilderVideoPostProps> = ({
       setShowReactions(false);
       return;
     }
-    setLiked(!liked);
-    setLikeCount(prev => liked ? prev - 1 : prev + 1);
-    onLike?.(id);
+    // Binary like feed: any emoji = "like" once; do not toggle off when already liked (was breaking UX).
     setShowReactions(false);
+    setBinaryReactionEmoji(emoji);
+    if (!liked) {
+      setLiked(true);
+      setLikeCount((prev) => prev + 1);
+      onLike?.(id);
+    }
   };
 
   const handleComment = () => {
@@ -700,7 +712,12 @@ export const BuilderVideoPost: React.FC<BuilderVideoPostProps> = ({
                   <button
                     key={reaction.name}
                     type="button"
-                    onClick={() => handleReactionPick(reaction.emoji)}
+                    onPointerDown={(e) => e.stopPropagation()}
+                    onMouseDown={(e) => e.stopPropagation()}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleReactionPick(reaction.emoji);
+                    }}
                     className="flex h-11 min-h-11 w-11 min-w-11 shrink-0 items-center justify-center rounded-full text-2xl transition-transform hover:scale-110 hover:bg-gray-100 active:scale-95 dark:hover:bg-gray-700"
                     title={reaction.name}
                   >
@@ -722,7 +739,9 @@ export const BuilderVideoPost: React.FC<BuilderVideoPostProps> = ({
               }}
             >
               {displayLiked ? (
-                <span className="text-lg">{reactionMode && userReaction ? userReaction : '👍'}</span>
+                <span className="text-lg">
+                  {reactionMode && userReaction ? userReaction : binaryReactionEmoji || '👍'}
+                </span>
               ) : (
                 <ThumbsUp className="h-5 w-5" />
               )}
