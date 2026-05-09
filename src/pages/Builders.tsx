@@ -24,8 +24,9 @@ import {
   getPublicVisitorDisplayName,
   hasPublicVisitorDisplayName,
 } from "@/utils/publicVisitorDisplayName";
+import type { PublicSupplierDirectoryRow } from "@/utils/fetchPublicSupplierDirectory";
 
-const BuildersPublicDirectory = lazy(() => import("@/pages/builders/BuildersPublicDirectory"));
+const MarketHubPublicDirectory = lazy(() => import("@/pages/market-hub/MarketHubPublicDirectory"));
 
 const MAIN_BG = `url('https://images.unsplash.com/photo-1541888946425-d81bb19240f5?ixlib=rb-4.0.3&auto=format&fit=crop&w=2070&q=80')`;
 const STATS_BG = `url('https://images.unsplash.com/photo-1504307651254-35680f356dfd?w=1920&q=80')`;
@@ -58,6 +59,7 @@ const Builders = () => {
 
   /** Only CO/contractors may post on the public builders feed (not admins or other roles). */
   const isBuilder = userRoleState === "professional_builder";
+  const isSupplier = userRoleState === "supplier";
 
   useEffect(() => {
     checkUserProfile();
@@ -135,6 +137,37 @@ const Builders = () => {
     setShowContactDialog(true);
   };
 
+  const handleSupplierContact = (supplier: PublicSupplierDirectoryRow) => {
+    setContactBuilder({
+      id: supplier.id,
+      user_id: supplier.user_id,
+      full_name: supplier.company_name || "Supplier",
+      company_name: supplier.company_name,
+      phone: supplier.phone,
+      email: supplier.email,
+      location: supplier.location,
+      avatar_url: supplier.logo_url,
+      verified: supplier.is_verified,
+      is_verified: supplier.is_verified,
+    });
+    setShowContactDialog(true);
+  };
+
+  const handleSupplierProfile = (supplier: PublicSupplierDirectoryRow) => {
+    setSelectedBuilder({
+      user_id: supplier.user_id,
+      full_name: supplier.company_name || "Supplier",
+      company_name: supplier.company_name,
+      phone: supplier.phone,
+      email: supplier.email,
+      location: supplier.location,
+      avatar_url: supplier.logo_url,
+      is_verified: supplier.is_verified,
+      verified: supplier.is_verified,
+    } as any);
+    setShowProfileModal(true);
+  };
+
   const handleBuilderProfile = (
     builder: UserProfile & {
       company_name?: string;
@@ -163,7 +196,7 @@ const Builders = () => {
           aria-label="Loading"
         >
           <Loader2 className="h-10 w-10 animate-spin text-primary" />
-          <p className="text-sm text-muted-foreground">Loading directory…</p>
+          <p className="text-sm text-muted-foreground">Loading market hub…</p>
         </div>
       )}
 
@@ -186,6 +219,7 @@ const Builders = () => {
         className="text-white py-4 md:py-5 relative overflow-hidden"
         role="banner"
         aria-labelledby="builders-hero-heading"
+        id="construction-market-hub-hero"
       >
         <div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `url('/builders-hero-bg.jpg')` }} />
         <div className="absolute inset-0 bg-gradient-to-r from-gray-900/90 via-gray-900/75 to-gray-900/85" />
@@ -196,12 +230,13 @@ const Builders = () => {
               id="builders-hero-heading"
               className="text-xl sm:text-2xl md:text-3xl font-bold mb-1 leading-tight"
             >
-              <span className="text-white">COs/Contractors</span>{" "}
-              <span className="text-blue-400">Directory</span>
+              <span className="text-white">Construction</span>{" "}
+              <span className="text-blue-400">Market Hub</span>
             </h1>
 
             <p className="text-xs sm:text-sm text-white/80 mb-2 max-w-xl mx-auto leading-snug">
-              Browse certified builders, compare quotes, and hire trusted professionals across Kenya.
+              COs, contractors, and suppliers in one place — directory, social feed, project showcase, and supplier
+              marketing.
             </p>
 
             <div className="flex flex-wrap gap-1.5 justify-center mb-2">
@@ -231,7 +266,9 @@ const Builders = () => {
 
               {!loading &&
                 userProfile &&
-                (userRoleState === "professional_builder" || userRoleState === "private_client") && (
+                (userRoleState === "professional_builder" ||
+                  userRoleState === "supplier" ||
+                  userRoleState === "private_client") && (
                   <Link to="/professional-builder-dashboard">
                     <Button
                       size="sm"
@@ -396,16 +433,19 @@ const Builders = () => {
               </div>
             }
           >
-            <BuildersPublicDirectory
+            <MarketHubPublicDirectory
               userProfile={userProfile}
               userRoleState={userRoleState}
               isBuilder={isBuilder}
+              isSupplier={isSupplier}
               directoryTimelinePostCount={publicStats.activePosts}
               directoryShowcaseVideoCount={publicStats.publishedVideos}
               directoryStatsLoading={publicStats.loading}
               seedTimelinePosts={publicStats.timelinePage}
               onBuilderContact={handleContactBuilderDialog}
               onBuilderProfile={handleBuilderProfile}
+              onSupplierContact={handleSupplierContact}
+              onSupplierProfile={handleSupplierProfile}
               onEditProfile={() => setShowProfileEdit(true)}
             />
           </Suspense>

@@ -17,7 +17,7 @@ const SUPPLIERS_PATH_SET = new Set<string>(SUPPLIERS_PAGE_PATHS);
 
 const GUEST_MARKETING_NAV = [
   { path: "/", label: "Home" },
-  { path: "/builders", label: "Builders" },
+  { path: "/builders", label: "Market hub" },
   { path: "/suppliers", label: "Materials" },
   { path: "/about", label: "About" },
   { path: "/contact", label: "Contact" },
@@ -133,7 +133,7 @@ const Navigation = () => {
       r === "admin" || r === "super_admin" ? [...ADMIN_EXTRA_NAV] : [];
     return [
       { path: "/home", label: "Home" },
-      { path: "/builders", label: "Builders" },
+      { path: "/builders", label: "Market hub" },
       ...ops,
       ...MARKETING_TAIL_NAV,
       ...adminExtra,

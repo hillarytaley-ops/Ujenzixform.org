@@ -14,6 +14,8 @@ import {
 interface MobileBottomNavProps {
   activeTab: 'feed' | 'builders' | 'create' | 'notifications' | 'menu';
   onTabChange: (tab: 'feed' | 'builders' | 'create' | 'notifications' | 'menu') => void;
+  /** Middle-left tab label (directory list). Default: Builders */
+  peopleTabLabel?: string;
   notificationCount?: number;
   messageCount?: number;
 }
@@ -21,6 +23,7 @@ interface MobileBottomNavProps {
 export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
   activeTab,
   onTabChange,
+  peopleTabLabel = 'Builders',
   notificationCount = 0,
   messageCount = 0
 }) => {
@@ -31,7 +34,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
 
   const tabs = [
     { id: 'feed' as const, icon: Home, label: 'Feed' },
-    { id: 'builders' as const, icon: Users, label: 'Builders' },
+    { id: 'builders' as const, icon: Users, label: peopleTabLabel },
     { id: 'create' as const, icon: Plus, label: 'Create', isSpecial: true },
     { id: 'notifications' as const, icon: Bell, label: 'Alerts', badge: notificationCount },
     { id: 'menu' as const, icon: Menu, label: 'Menu' },
@@ -42,7 +45,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
       className="fixed bottom-0 left-0 right-0 z-[10060] lg:hidden pointer-events-auto"
       style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
       role="navigation"
-      aria-label="Builders mobile navigation"
+      aria-label="Market hub mobile navigation"
     >
       <div className="bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-800 shadow-[0_-4px_20px_rgba(0,0,0,0.08)] dark:shadow-[0_-4px_20px_rgba(0,0,0,0.35)]">
         <div className="flex items-end justify-around pt-1 px-1 sm:px-2">

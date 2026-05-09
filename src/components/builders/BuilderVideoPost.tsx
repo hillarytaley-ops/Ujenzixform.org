@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
@@ -66,6 +66,9 @@ export interface BuilderVideoPostProps {
   comments: VideoComment[];
   shares: number;
   isLiked?: boolean;
+  /** When set with onReact, parent owns reactions (e.g. supplier_marketing_posts). Empty string from main button = unlike. */
+  userReaction?: string | null;
+  onReact?: (postId: string, reaction: string) => void;
   /** Stream layout inside one parent card (no extra shadow / radius) */
   embedded?: boolean;
   onLike?: (postId: string) => void;
@@ -73,6 +76,8 @@ export interface BuilderVideoPostProps {
   onShare?: (postId: string) => void;
   onViewProfile?: (builderId: string) => void;
   onContactBuilder?: (builderId: string) => void;
+  /** Default: "Contact Builder" */
+  contactActorLabel?: string;
 }
 
 export const BuilderVideoPost: React.FC<BuilderVideoPostProps> = ({
@@ -92,13 +97,17 @@ export const BuilderVideoPost: React.FC<BuilderVideoPostProps> = ({
   comments,
   shares,
   isLiked = false,
+  userReaction = null,
+  onReact,
   embedded = false,
   onLike,
   onComment,
   onShare,
   onViewProfile,
-  onContactBuilder
+  onContactBuilder,
+  contactActorLabel = 'Contact Builder',
 }) => {
+  const reactionMode = typeof onReact === 'function';
   const [liked, setLiked] = useState(isLiked);
   const [likeCount, setLikeCount] = useState(likes);
   const [showComments, setShowComments] = useState(false);
@@ -113,6 +122,20 @@ export const BuilderVideoPost: React.FC<BuilderVideoPostProps> = ({
   const videoRef = useRef<HTMLVideoElement>(null);
   const commentInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
+
+  useEffect(() => {
+    if (!reactionMode) {
+      setLiked(isLiked);
+      setLikeCount(likes);
+    }
+  }, [isLiked, likes, reactionMode]);
+
+  useEffect(() => {
+    setLocalComments(comments);
+  }, [comments]);
+
+  const displayLikes = reactionMode ? likes : likeCount;
+  const displayLiked = reactionMode ? !!(userReaction && userReaction.length > 0) : liked;
 
   // Reaction emojis
   const reactions = [
@@ -152,9 +175,25 @@ export const BuilderVideoPost: React.FC<BuilderVideoPostProps> = ({
   };
 
   const handleLike = () => {
+    if (reactionMode && onReact) {
+      onReact(id, userReaction ? '' : '👍');
+      return;
+    }
     setLiked(!liked);
     setLikeCount(prev => liked ? prev - 1 : prev + 1);
     onLike?.(id);
+  };
+
+  const handleReactionPick = (emoji: string) => {
+    if (reactionMode && onReact) {
+      onReact(id, emoji);
+      setShowReactions(false);
+      return;
+    }
+    setLiked(!liked);
+    setLikeCount(prev => liked ? prev - 1 : prev + 1);
+    onLike?.(id);
+    setShowReactions(false);
   };
 
   const handleComment = () => {
@@ -310,7 +349,7 @@ export const BuilderVideoPost: React.FC<BuilderVideoPostProps> = ({
             <DropdownMenuContent align="end" className="w-48">
               <DropdownMenuItem onClick={() => onContactBuilder?.(builderId)}>
                 <Phone className="h-4 w-4 mr-2" />
-                Contact Builder
+                {contactActorLabel}
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => onViewProfile?.(builderId)}>
                 <Mail className="h-4 w-4 mr-2" />
@@ -468,7 +507,7 @@ export const BuilderVideoPost: React.FC<BuilderVideoPostProps> = ({
       {/* Engagement Stats */}
       <div className="px-4 py-2 flex items-center justify-between text-sm text-gray-500 dark:text-gray-400">
         <div className="flex items-center gap-1">
-          {likeCount > 0 && (
+          {displayLikes > 0 && (
             <>
               <div className="flex -space-x-1">
                 <div className="w-5 h-5 rounded-full bg-blue-500 flex items-center justify-center">
@@ -478,7 +517,7 @@ export const BuilderVideoPost: React.FC<BuilderVideoPostProps> = ({
                   <Heart className="h-3 w-3 text-white" fill="white" />
                 </div>
               </div>
-              <span className="ml-1 hover:underline cursor-pointer">{formatNumber(likeCount)}</span>
+              <span className="ml-1 hover:underline cursor-pointer">{formatNumber(displayLikes)}</span>
             </>
           )}
         </div>
@@ -514,10 +553,7 @@ export const BuilderVideoPost: React.FC<BuilderVideoPostProps> = ({
                 {reactions.map((reaction) => (
                   <button
                     key={reaction.name}
-                    onClick={() => {
-                      handleLike();
-                      setShowReactions(false);
-                    }}
+                    onClick={() => handleReactionPick(reaction.emoji)}
                     className="text-2xl hover:scale-125 transition-transform p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full"
                     title={reaction.name}
                   >
@@ -528,11 +564,11 @@ export const BuilderVideoPost: React.FC<BuilderVideoPostProps> = ({
             )}
             <Button
               variant="ghost"
-              className={`w-full h-10 gap-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors ${liked ? 'text-blue-500' : 'text-gray-600 dark:text-gray-400'}`}
+              className={`w-full h-10 gap-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors ${displayLiked ? 'text-blue-500' : 'text-gray-600 dark:text-gray-400'}`}
               onClick={handleLike}
             >
-              {liked ? (
-                <span className="text-lg">👍</span>
+              {displayLiked ? (
+                <span className="text-lg">{reactionMode && userReaction ? userReaction : '👍'}</span>
               ) : (
                 <ThumbsUp className="h-5 w-5" />
               )}

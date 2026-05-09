@@ -1,5 +1,5 @@
 import { readPersistedAuthRawStringSync } from '@/utils/supabaseAccessToken';
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
@@ -23,15 +23,21 @@ import {
   Briefcase,
   X,
   ArrowLeft,
-  Loader2
+  Loader2,
+  Truck
 } from 'lucide-react';
 import { BuilderFeed } from './BuilderFeed';
+import { SupplierMarketingFeed } from './SupplierMarketingFeed';
 import { BuilderGrid } from './BuilderGrid';
 import { BuilderVideoGallery } from './BuilderVideoGallery';
 import { MobileBottomNav, MobileHeader } from './MobileBottomNav';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { SUPABASE_ANON_KEY, SUPABASE_URL, supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import {
+  fetchPublicSupplierDirectory,
+  type PublicSupplierDirectoryRow,
+} from '@/utils/fetchPublicSupplierDirectory';
 
 // Builder type for registered builders
 interface RegisteredBuilder {
@@ -60,12 +66,15 @@ interface BuilderFacebookLayoutProps {
   currentUserAvatar?: string;
   currentUserRole?: string;
   isBuilder?: boolean;
+  isSupplier?: boolean;
   directoryTimelinePostCount: number;
   directoryShowcaseVideoCount: number;
   directoryStatsLoading: boolean;
   seedTimelinePosts: Record<string, unknown>[] | null;
   onBuilderContact?: (builder: any) => void;
   onBuilderProfile?: (builder: any) => void;
+  onSupplierContact?: (supplier: PublicSupplierDirectoryRow) => void;
+  onSupplierProfile?: (supplier: PublicSupplierDirectoryRow) => void;
   onEditProfile?: () => void;
 }
 
@@ -75,19 +84,36 @@ export const BuilderFacebookLayout: React.FC<BuilderFacebookLayoutProps> = ({
   currentUserAvatar,
   currentUserRole,
   isBuilder = false,
+  isSupplier = false,
   directoryTimelinePostCount,
   directoryShowcaseVideoCount,
   directoryStatsLoading,
   seedTimelinePosts,
   onBuilderContact,
   onBuilderProfile,
+  onSupplierContact,
+  onSupplierProfile,
   onEditProfile
 }) => {
+  const [marketAudience, setMarketAudience] = useState<'contractors' | 'suppliers'>('contractors');
   const [searchQuery, setSearchQuery] = useState('');
+  const [supplierSearchQuery, setSupplierSearchQuery] = useState('');
   const [expandedBuilder, setExpandedBuilder] = useState<string | null>(null);
+  const [expandedSupplierId, setExpandedSupplierId] = useState<string | null>(null);
   const [showAllBuilders, setShowAllBuilders] = useState(false);
+  const [showAllSuppliers, setShowAllSuppliers] = useState(false);
   const [registeredBuilders, setRegisteredBuilders] = useState<RegisteredBuilder[]>([]);
   const [loadingBuilders, setLoadingBuilders] = useState(true);
+  const [supplierRows, setSupplierRows] = useState<PublicSupplierDirectoryRow[]>([]);
+  const [loadingSuppliers, setLoadingSuppliers] = useState(true);
+
+  const supplierByUserId = useMemo(() => {
+    const m = new Map<string, PublicSupplierDirectoryRow>();
+    supplierRows.forEach((r) => {
+      if (r.user_id) m.set(r.user_id, r);
+    });
+    return m;
+  }, [supplierRows]);
   
   // Mobile navigation state
   const [mobileTab, setMobileTab] = useState<'feed' | 'builders' | 'create' | 'notifications' | 'menu'>('feed');
@@ -247,6 +273,21 @@ export const BuilderFacebookLayout: React.FC<BuilderFacebookLayoutProps> = ({
     fetchRegisteredBuilders();
   }, []);
 
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      setLoadingSuppliers(true);
+      const rows = await fetchPublicSupplierDirectory();
+      if (!cancelled) {
+        setSupplierRows(rows);
+        setLoadingSuppliers(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   // Only show real registered builders - no demo data
   const allBuilders = registeredBuilders;
   
@@ -263,6 +304,19 @@ export const BuilderFacebookLayout: React.FC<BuilderFacebookLayoutProps> = ({
   });
 
   const displayedBuilders = showAllBuilders ? filteredBuilders : filteredBuilders.slice(0, 8);
+
+  const filteredSuppliers = supplierRows.filter((s) => {
+    if (!supplierSearchQuery) return true;
+    const q = supplierSearchQuery.toLowerCase();
+    return (
+      (s.company_name || '').toLowerCase().includes(q) ||
+      (s.location || '').toLowerCase().includes(q) ||
+      (s.description || '').toLowerCase().includes(q)
+    );
+  });
+  const displayedSuppliers = showAllSuppliers
+    ? filteredSuppliers
+    : filteredSuppliers.slice(0, 8);
 
   const getInitials = (name: string) => {
     return name
@@ -287,7 +341,7 @@ export const BuilderFacebookLayout: React.FC<BuilderFacebookLayoutProps> = ({
       {/* Mobile Header */}
       <div className="lg:hidden">
         <MobileHeader
-          title="CO/Contractors"
+          title={marketAudience === 'contractors' ? 'CO/Contractors' : 'Suppliers'}
           onSearch={() => setShowMobileSearch(true)}
           onMessages={() => console.log('Open messages')}
           messageCount={3}
@@ -309,9 +363,17 @@ export const BuilderFacebookLayout: React.FC<BuilderFacebookLayoutProps> = ({
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
               <Input
-                placeholder="Search CO/contractors..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder={
+                  marketAudience === 'contractors'
+                    ? 'Search CO/contractors...'
+                    : 'Search suppliers...'
+                }
+                value={marketAudience === 'contractors' ? searchQuery : supplierSearchQuery}
+                onChange={(e) =>
+                  marketAudience === 'contractors'
+                    ? setSearchQuery(e.target.value)
+                    : setSupplierSearchQuery(e.target.value)
+                }
                 className="pl-9 bg-gray-100 dark:bg-gray-800 border-0 rounded-full"
                 autoFocus
               />
@@ -319,42 +381,105 @@ export const BuilderFacebookLayout: React.FC<BuilderFacebookLayoutProps> = ({
           </div>
           <ScrollArea className="h-[calc(100vh-80px)]">
             <div className="p-4 space-y-2">
-              {filteredBuilders.map((builder) => (
-                <div
-                  key={builder.id}
-                  className="flex items-center gap-3 p-3 rounded-xl bg-gray-50 dark:bg-gray-800 cursor-pointer"
-                  onClick={() => {
-                    onBuilderProfile?.(builder);
-                    setShowMobileSearch(false);
-                  }}
-                >
-                  <Avatar className="h-12 w-12">
-                    <AvatarFallback className="bg-gradient-to-br from-blue-500 to-blue-600 text-white font-semibold">
-                      {getInitials(builder.company_name || builder.full_name)}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="flex-1">
-                    <div className="flex items-center gap-1">
-                      <span className="font-semibold">{builder.company_name || builder.full_name}</span>
-                      {(builder as any).verified && (
-                        <CheckCircle2 className="h-4 w-4 text-blue-500" fill="currentColor" />
-                      )}
+              {marketAudience === 'contractors'
+                ? filteredBuilders.map((builder) => (
+                    <div
+                      key={builder.id}
+                      className="flex items-center gap-3 p-3 rounded-xl bg-gray-50 dark:bg-gray-800 cursor-pointer"
+                      onClick={() => {
+                        onBuilderProfile?.(builder);
+                        setShowMobileSearch(false);
+                      }}
+                    >
+                      <Avatar className="h-12 w-12">
+                        <AvatarFallback className="bg-gradient-to-br from-blue-500 to-blue-600 text-white font-semibold">
+                          {getInitials(builder.company_name || builder.full_name)}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="flex-1">
+                        <div className="flex items-center gap-1">
+                          <span className="font-semibold">
+                            {builder.company_name || builder.full_name}
+                          </span>
+                          {(builder as any).verified && (
+                            <CheckCircle2 className="h-4 w-4 text-blue-500" fill="currentColor" />
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2 text-sm text-gray-500">
+                          <Star className="h-3 w-3 fill-yellow-400 text-yellow-400" />
+                          {builder.rating?.toFixed(1)} • {builder.location}
+                        </div>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-2 text-sm text-gray-500">
-                      <Star className="h-3 w-3 fill-yellow-400 text-yellow-400" />
-                      {builder.rating?.toFixed(1)} • {builder.location}
+                  ))
+                : filteredSuppliers.map((s) => (
+                    <div
+                      key={s.id}
+                      className="flex items-center gap-3 p-3 rounded-xl bg-gray-50 dark:bg-gray-800 cursor-pointer"
+                      onClick={() => {
+                        onSupplierProfile?.(s);
+                        setShowMobileSearch(false);
+                      }}
+                    >
+                      <Avatar className="h-12 w-12">
+                        {s.logo_url ? <AvatarImage src={s.logo_url} alt="" /> : null}
+                        <AvatarFallback className="bg-gradient-to-br from-amber-600 to-orange-600 text-white font-semibold">
+                          {getInitials(s.company_name || 'S')}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-1">
+                          <span className="font-semibold truncate">{s.company_name || 'Supplier'}</span>
+                          {s.is_verified && (
+                            <CheckCircle2 className="h-4 w-4 text-amber-600 shrink-0" fill="currentColor" />
+                          )}
+                        </div>
+                        <div className="text-sm text-gray-500 truncate">{s.location || 'Kenya'}</div>
+                      </div>
                     </div>
-                  </div>
-                </div>
-              ))}
+                  ))}
             </div>
           </ScrollArea>
         </div>
       )}
 
-      {/* Single frame: builders list + social feed / project showcase (+ featured on xl) */}
+      {/* Single frame: directory + feed / showcase (+ featured on xl) */}
       <div className="w-full max-w-[1280px] mx-auto pb-28 lg:pb-6 px-2 sm:px-3">
+        <div className="flex flex-wrap justify-center gap-2 mb-3">
+          <Button
+            type="button"
+            size="sm"
+            variant={marketAudience === 'contractors' ? 'default' : 'outline'}
+            onClick={() => {
+              setMarketAudience('contractors');
+              setExpandedSupplierId(null);
+            }}
+            className={marketAudience === 'contractors' ? 'bg-blue-600 hover:bg-blue-700' : ''}
+          >
+            <Users className="h-3.5 w-3.5 mr-1" />
+            CO/Contractors
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant={marketAudience === 'suppliers' ? 'default' : 'outline'}
+            onClick={() => {
+              setMarketAudience('suppliers');
+              setExpandedBuilder(null);
+            }}
+            className={
+              marketAudience === 'suppliers'
+                ? 'bg-amber-600 hover:bg-amber-700 text-white border-amber-600'
+                : ''
+            }
+          >
+            <Truck className="h-3.5 w-3.5 mr-1" />
+            Suppliers
+          </Button>
+        </div>
+
         <Card className="overflow-hidden rounded-xl border border-slate-200/90 dark:border-slate-800 bg-white dark:bg-gray-900 shadow-sm flex flex-col lg:flex-row items-stretch">
+        {marketAudience === 'contractors' ? (
         <aside className="hidden lg:block w-56 xl:w-60 shrink-0 border-b lg:border-b-0 lg:border-r border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-900/30">
           <div className="lg:sticky lg:top-20 p-3 space-y-3 max-h-[calc(100vh-5rem)] overflow-y-auto">
           <div>
@@ -578,8 +703,170 @@ export const BuilderFacebookLayout: React.FC<BuilderFacebookLayoutProps> = ({
           </div>
         </div>
         </aside>
+        ) : (
+        <aside className="hidden lg:block w-56 xl:w-60 shrink-0 border-b lg:border-b-0 lg:border-r border-slate-200 dark:border-slate-800 bg-amber-50/40 dark:bg-slate-900/30">
+          <div className="lg:sticky lg:top-20 p-3 space-y-3 max-h-[calc(100vh-5rem)] overflow-y-auto">
+            <div>
+              <h3 className="text-base font-semibold flex items-center gap-2 text-gray-900 dark:text-white mb-2">
+                <Truck className="h-5 w-5 text-amber-700 dark:text-amber-400" />
+                Suppliers
+              </h3>
+              <div className="relative mb-2">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <Input
+                  placeholder="Search suppliers..."
+                  value={supplierSearchQuery}
+                  onChange={(e) => setSupplierSearchQuery(e.target.value)}
+                  className="pl-9 bg-gray-100 dark:bg-gray-800 border-0 rounded-full"
+                />
+              </div>
+              <ScrollArea className="h-[calc(100vh-280px)] min-h-[200px] pr-2">
+                <div className="space-y-2">
+                  {loadingSuppliers ? (
+                    <div className="flex items-center justify-center py-6 text-sm text-muted-foreground gap-2">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Loading suppliers…
+                    </div>
+                  ) : (
+                    displayedSuppliers.map((s) => (
+                      <div key={s.id} className="rounded-lg overflow-hidden">
+                        <div
+                          className={`flex items-center gap-3 p-2 rounded-lg cursor-pointer transition-all duration-200 ${
+                            expandedSupplierId === s.id
+                              ? 'bg-amber-100/80 dark:bg-amber-900/25'
+                              : 'hover:bg-gray-100 dark:hover:bg-gray-800'
+                          }`}
+                          onClick={() =>
+                            setExpandedSupplierId(expandedSupplierId === s.id ? null : s.id)
+                          }
+                        >
+                          <Avatar className="h-10 w-10 ring-2 ring-offset-1 ring-amber-600/40">
+                            {s.logo_url ? <AvatarImage src={s.logo_url} alt="" /> : null}
+                            <AvatarFallback className="bg-gradient-to-br from-amber-600 to-orange-600 text-white text-sm font-semibold">
+                              {getInitials(s.company_name || 'S')}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-1">
+                              <span className="font-medium text-sm text-gray-900 dark:text-white truncate">
+                                {s.company_name || 'Supplier'}
+                              </span>
+                              {s.is_verified && (
+                                <CheckCircle2 className="h-3.5 w-3.5 text-amber-600 shrink-0" fill="currentColor" />
+                              )}
+                            </div>
+                            <div className="text-xs text-gray-500 truncate">{s.location || 'Kenya'}</div>
+                          </div>
+                          {expandedSupplierId === s.id ? (
+                            <ChevronUp className="h-4 w-4 text-gray-400 shrink-0" />
+                          ) : (
+                            <ChevronDown className="h-4 w-4 text-gray-400 shrink-0" />
+                          )}
+                        </div>
+                        {expandedSupplierId === s.id && (
+                          <div className="bg-gray-50 dark:bg-gray-800/50 p-3 space-y-2 border-t border-gray-100 dark:border-gray-700 text-xs text-gray-600 dark:text-gray-400">
+                            {s.description ? <p className="leading-snug">{s.description}</p> : null}
+                            {s.phone && (
+                              <div className="flex items-center gap-2">
+                                <Phone className="h-3 w-3 shrink-0" />
+                                {telHref(s.phone) ? (
+                                  <a
+                                    href={telHref(s.phone)}
+                                    className="text-amber-700 hover:underline truncate"
+                                    onClick={(e) => e.stopPropagation()}
+                                  >
+                                    {s.phone}
+                                  </a>
+                                ) : (
+                                  <span>{s.phone}</span>
+                                )}
+                              </div>
+                            )}
+                            {s.email && (
+                              <div className="flex items-center gap-2 min-w-0">
+                                <Mail className="h-3 w-3 shrink-0" />
+                                <a
+                                  href={`mailto:${s.email}`}
+                                  className="text-amber-700 hover:underline truncate"
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  {s.email}
+                                </a>
+                              </div>
+                            )}
+                            <div className="flex flex-col gap-2 pt-1">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-8 text-xs"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  onSupplierContact?.(s);
+                                }}
+                              >
+                                <MessageCircle className="h-3 w-3 mr-1" />
+                                Contact
+                              </Button>
+                              <Button
+                                size="sm"
+                                className="h-8 text-xs bg-amber-600 hover:bg-amber-700"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  onSupplierProfile?.(s);
+                                }}
+                              >
+                                View details
+                              </Button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    ))
+                  )}
+                </div>
+                {filteredSuppliers.length > 8 && (
+                  <Button
+                    variant="ghost"
+                    className="w-full mt-2 text-amber-700 hover:text-amber-800 hover:bg-amber-50"
+                    onClick={() => setShowAllSuppliers(!showAllSuppliers)}
+                  >
+                    {showAllSuppliers ? (
+                      <>
+                        <ChevronUp className="h-4 w-4 mr-1" />
+                        Show Less
+                      </>
+                    ) : (
+                      <>
+                        <ChevronDown className="h-4 w-4 mr-1" />
+                        See All ({filteredSuppliers.length})
+                      </>
+                    )}
+                  </Button>
+                )}
+              </ScrollArea>
+            </div>
+            <div className="rounded-xl bg-gradient-to-br from-amber-600 to-orange-700 text-white p-3 shadow-inner">
+              <h3 className="font-semibold text-sm mb-2 flex items-center gap-2">
+                <Truck className="h-4 w-4" />
+                Supply network
+              </h3>
+              <div className="grid grid-cols-2 gap-2 text-center">
+                <div className="bg-white/20 rounded-lg p-2">
+                  <div className="text-lg font-bold">{supplierRows.length}+</div>
+                  <div className="text-xs opacity-90">Suppliers</div>
+                </div>
+                <div className="bg-white/20 rounded-lg p-2">
+                  <div className="text-lg font-bold">47</div>
+                  <div className="text-xs opacity-90">Counties</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </aside>
+        )}
 
       <div className="flex-1 min-w-0 flex flex-col order-1 lg:order-2">
+        {marketAudience === 'contractors' ? (
         <Tabs
           value={feedShowcaseTab}
           onValueChange={(v) => setFeedShowcaseTab(v === 'portfolio' ? 'portfolio' : 'feed')}
@@ -655,55 +942,118 @@ export const BuilderFacebookLayout: React.FC<BuilderFacebookLayoutProps> = ({
             </div>
           </TabsContent>
         </Tabs>
+        ) : (
+          <div className="flex flex-col flex-1 min-h-0 min-w-0">
+            <div className="shrink-0 border-b border-slate-200 dark:border-slate-700 bg-amber-50/60 dark:bg-slate-800/40 px-3 py-2.5">
+              <h2 className="text-sm font-bold text-amber-900 dark:text-amber-100">Supplier marketing</h2>
+              <p className="text-[11px] text-muted-foreground leading-snug mt-0.5">
+                Products, photos, and videos from suppliers — visitors can react and comment.
+              </p>
+            </div>
+            <div className="flex-1 min-h-0 overflow-y-auto p-2 sm:p-3">
+              <SupplierMarketingFeed
+                omitOuterCard
+                currentUserId={currentUserId}
+                currentUserName={currentUserName}
+                currentUserAvatar={currentUserAvatar}
+                currentUserRole={currentUserRole}
+                isSupplier={isSupplier}
+                supplierByUserId={supplierByUserId}
+              />
+            </div>
+          </div>
+        )}
       </div>
 
       <aside className="hidden xl:block w-56 shrink-0 border-t xl:border-t-0 xl:border-l border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/25 order-3">
         <div className="xl:sticky xl:top-20 p-3 space-y-3 max-h-[calc(100vh-5rem)] overflow-y-auto">
           <div>
-            <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-2">Featured CO/Contractors</h3>
+            <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-2">
+              {marketAudience === 'contractors' ? 'Featured CO/Contractors' : 'Featured suppliers'}
+            </h3>
             <div className="space-y-2">
-              {loadingBuilders ? (
-                <div className="flex items-center justify-center py-4">
-                  <Loader2 className="h-5 w-5 animate-spin text-orange-500" />
-                  <span className="ml-2 text-sm text-gray-500">Loading directory...</span>
+              {marketAudience === 'contractors' ? (
+                loadingBuilders ? (
+                  <div className="flex items-center justify-center py-4">
+                    <Loader2 className="h-5 w-5 animate-spin text-orange-500" />
+                    <span className="ml-2 text-sm text-gray-500">Loading directory...</span>
+                  </div>
+                ) : allBuilders.length > 0 ? (
+                  allBuilders.slice(0, 3).map((builder) => (
+                    <div
+                      key={builder.id}
+                      className="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer transition-colors"
+                      onClick={() => onBuilderProfile?.(builder)}
+                    >
+                      <Avatar className="h-12 w-12">
+                        {builder.avatar_url ? (
+                          <AvatarImage src={builder.avatar_url} alt={builder.full_name} />
+                        ) : null}
+                        <AvatarFallback className="bg-gradient-to-br from-orange-500 to-orange-600 text-white font-semibold">
+                          {getInitials(builder.company_name || builder.full_name)}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-1">
+                          <span className="font-medium text-sm text-gray-900 dark:text-white truncate">
+                            {builder.company_name || builder.full_name}
+                          </span>
+                          {builder.verified && (
+                            <CheckCircle2 className="h-3.5 w-3.5 text-blue-500" fill="currentColor" />
+                          )}
+                        </div>
+                        <p className="text-xs text-gray-500 truncate">
+                          {builder.specialties?.[0] || 'CO/Contractor'}
+                        </p>
+                        <div className="flex items-center gap-1 text-xs text-gray-400">
+                          <Star className="h-3 w-3 fill-yellow-400 text-yellow-400" />
+                          {builder.rating?.toFixed(1)} • {builder.location || 'Kenya'}
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="text-center py-4 text-sm text-gray-500">
+                    <Users className="h-8 w-8 mx-auto mb-2 text-gray-300" />
+                    <p>No builders registered yet</p>
+                    <p className="text-xs mt-1">Be the first to join!</p>
+                  </div>
+                )
+              ) : loadingSuppliers ? (
+                <div className="flex items-center justify-center py-4 text-sm text-muted-foreground gap-2">
+                  <Loader2 className="h-5 w-5 animate-spin text-amber-600" />
+                  Loading suppliers…
                 </div>
-              ) : allBuilders.length > 0 ? (
-                allBuilders.slice(0, 3).map((builder) => (
-                  <div 
-                    key={builder.id}
+              ) : supplierRows.length > 0 ? (
+                supplierRows.slice(0, 3).map((s) => (
+                  <div
+                    key={s.id}
                     className="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer transition-colors"
-                    onClick={() => onBuilderProfile?.(builder)}
+                    onClick={() => onSupplierProfile?.(s)}
                   >
                     <Avatar className="h-12 w-12">
-                      {builder.avatar_url ? (
-                        <AvatarImage src={builder.avatar_url} alt={builder.full_name} />
-                      ) : null}
-                      <AvatarFallback className="bg-gradient-to-br from-orange-500 to-orange-600 text-white font-semibold">
-                        {getInitials(builder.company_name || builder.full_name)}
+                      {s.logo_url ? <AvatarImage src={s.logo_url} alt="" /> : null}
+                      <AvatarFallback className="bg-gradient-to-br from-amber-600 to-orange-600 text-white font-semibold">
+                        {getInitials(s.company_name || 'S')}
                       </AvatarFallback>
                     </Avatar>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-1">
                         <span className="font-medium text-sm text-gray-900 dark:text-white truncate">
-                          {builder.company_name || builder.full_name}
+                          {s.company_name || 'Supplier'}
                         </span>
-                        {builder.verified && (
-                          <CheckCircle2 className="h-3.5 w-3.5 text-blue-500" fill="currentColor" />
+                        {s.is_verified && (
+                          <CheckCircle2 className="h-3.5 w-3.5 text-amber-600 shrink-0" fill="currentColor" />
                         )}
                       </div>
-                      <p className="text-xs text-gray-500 truncate">{builder.specialties?.[0] || 'CO/Contractor'}</p>
-                      <div className="flex items-center gap-1 text-xs text-gray-400">
-                        <Star className="h-3 w-3 fill-yellow-400 text-yellow-400" />
-                        {builder.rating?.toFixed(1)} • {builder.location || 'Kenya'}
-                      </div>
+                      <p className="text-xs text-gray-500 truncate">{s.location || 'Kenya'}</p>
                     </div>
                   </div>
                 ))
               ) : (
                 <div className="text-center py-4 text-sm text-gray-500">
-                  <Users className="h-8 w-8 mx-auto mb-2 text-gray-300" />
-                  <p>No builders registered yet</p>
-                  <p className="text-xs mt-1">Be the first to join!</p>
+                  <Truck className="h-8 w-8 mx-auto mb-2 text-gray-300" />
+                  <p>No suppliers listed yet</p>
                 </div>
               )}
             </div>
@@ -712,28 +1062,74 @@ export const BuilderFacebookLayout: React.FC<BuilderFacebookLayoutProps> = ({
           <div className="pt-3 border-t border-slate-200 dark:border-slate-700">
             <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-2">Recent Activity</h3>
             <div className="space-y-3">
-              {allBuilders.length > 0 ? (
-                <>
-                  {allBuilders.slice(0, 2).map((builder, idx) => (
-                    <div key={builder.id} className="flex items-start gap-2 text-sm">
-                      <div className={`w-2 h-2 rounded-full ${idx === 0 ? 'bg-green-500' : 'bg-blue-500'} mt-1.5 flex-shrink-0`}></div>
+              {marketAudience === 'contractors' ? (
+                allBuilders.length > 0 ? (
+                  <>
+                    {allBuilders.slice(0, 2).map((builder, idx) => (
+                      <div key={builder.id} className="flex items-start gap-2 text-sm">
+                        <div
+                          className={`w-2 h-2 rounded-full ${idx === 0 ? 'bg-green-500' : 'bg-blue-500'} mt-1.5 flex-shrink-0`}
+                        />
+                        <p className="text-gray-600 dark:text-gray-400">
+                          <span className="font-medium text-gray-900 dark:text-white">
+                            {builder.company_name || builder.full_name}
+                          </span>{' '}
+                          {idx === 0
+                            ? 'posted a new project update'
+                            : `is available in ${builder.location || 'Kenya'}`}
+                        </p>
+                      </div>
+                    ))}
+                    <div className="flex items-start gap-2 text-sm">
+                      <div className="w-2 h-2 rounded-full bg-orange-500 mt-1.5 flex-shrink-0" />
                       <p className="text-gray-600 dark:text-gray-400">
-                        <span className="font-medium text-gray-900 dark:text-white">{builder.company_name || builder.full_name}</span> {idx === 0 ? 'posted a new project update' : `is available in ${builder.location || 'Kenya'}`}
+                        <span className="font-medium text-gray-900 dark:text-white">
+                          {allBuilders.length} CO/contractor{allBuilders.length !== 1 ? 's' : ''}
+                        </span>{' '}
+                        registered
+                      </p>
+                    </div>
+                  </>
+                ) : (
+                  <div className="flex items-start gap-2 text-sm">
+                    <div className="w-2 h-2 rounded-full bg-orange-500 mt-1.5 flex-shrink-0" />
+                    <p className="text-gray-600 dark:text-gray-400">
+                      <span className="font-medium text-gray-900 dark:text-white">Be the first</span> CO/contractor
+                      to register!
+                    </p>
+                  </div>
+                )
+              ) : supplierRows.length > 0 ? (
+                <>
+                  {supplierRows.slice(0, 2).map((s, idx) => (
+                    <div key={s.id} className="flex items-start gap-2 text-sm">
+                      <div
+                        className={`w-2 h-2 rounded-full ${idx === 0 ? 'bg-amber-500' : 'bg-orange-500'} mt-1.5 flex-shrink-0`}
+                      />
+                      <p className="text-gray-600 dark:text-gray-400">
+                        <span className="font-medium text-gray-900 dark:text-white">
+                          {s.company_name || 'Supplier'}
+                        </span>{' '}
+                        {idx === 0 ? 'can be reached from the directory' : `based in ${s.location || 'Kenya'}`}
                       </p>
                     </div>
                   ))}
                   <div className="flex items-start gap-2 text-sm">
-                    <div className="w-2 h-2 rounded-full bg-orange-500 mt-1.5 flex-shrink-0"></div>
+                    <div className="w-2 h-2 rounded-full bg-amber-500 mt-1.5 flex-shrink-0" />
                     <p className="text-gray-600 dark:text-gray-400">
-                      <span className="font-medium text-gray-900 dark:text-white">{allBuilders.length} CO/contractor{allBuilders.length !== 1 ? 's' : ''}</span> registered
+                      <span className="font-medium text-gray-900 dark:text-white">
+                        {supplierRows.length} supplier{supplierRows.length !== 1 ? 's' : ''}
+                      </span>{' '}
+                      on the hub
                     </p>
                   </div>
                 </>
               ) : (
                 <div className="flex items-start gap-2 text-sm">
-                  <div className="w-2 h-2 rounded-full bg-orange-500 mt-1.5 flex-shrink-0"></div>
+                  <div className="w-2 h-2 rounded-full bg-amber-500 mt-1.5 flex-shrink-0" />
                   <p className="text-gray-600 dark:text-gray-400">
-                    <span className="font-medium text-gray-900 dark:text-white">Be the first</span> CO/contractor to register!
+                    <span className="font-medium text-gray-900 dark:text-white">Supplier listings</span> will appear
+                    here.
                   </p>
                 </div>
               )}
@@ -762,6 +1158,7 @@ export const BuilderFacebookLayout: React.FC<BuilderFacebookLayoutProps> = ({
       {/* Mobile Bottom Navigation */}
       <MobileBottomNav
         activeTab={mobileTab}
+        peopleTabLabel={marketAudience === 'contractors' ? 'COs' : 'Suppliers'}
         onTabChange={(tab) => {
           setMobileTab(tab);
           if (tab === 'feed') {
@@ -771,7 +1168,11 @@ export const BuilderFacebookLayout: React.FC<BuilderFacebookLayoutProps> = ({
           } else if (tab === 'create') {
             focusSocialFeedTabs();
             window.setTimeout(() => {
-              document.getElementById('builder-feed-composer-anchor')?.scrollIntoView({
+              const anchor =
+                marketAudience === 'contractors'
+                  ? document.getElementById('builder-feed-composer-anchor')
+                  : document.getElementById('supplier-feed-composer-anchor');
+              anchor?.scrollIntoView({
                 behavior: 'smooth',
                 block: 'center',
               });
