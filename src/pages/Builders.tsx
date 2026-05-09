@@ -5,7 +5,7 @@ import Navigation from "@/components/Navigation";
 import Footer from "@/components/Footer";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Settings, ShoppingCart, Building2, Lock, ChevronDown } from "lucide-react";
+import { Settings, ShoppingCart, Building2, Lock, ChevronDown, Loader2 } from "lucide-react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { cn } from "@/lib/utils";
 import { ContactBuilderModal } from "@/components/modals/ContactBuilderModal";
@@ -19,6 +19,11 @@ import {
   useBuildersPagePublicStats,
   formatBuildersStatCount,
 } from "@/hooks/useBuildersPagePublicStats";
+import { PublicVisitorNameGate } from "@/components/builders/PublicVisitorNameGate";
+import {
+  getPublicVisitorDisplayName,
+  hasPublicVisitorDisplayName,
+} from "@/utils/publicVisitorDisplayName";
 
 const BuildersPublicDirectory = lazy(() => import("@/pages/builders/BuildersPublicDirectory"));
 
@@ -46,6 +51,10 @@ const Builders = () => {
   const [builderPortalOpen, setBuilderPortalOpen] = useState(false);
   const { toast } = useToast();
   const publicStats = useBuildersPagePublicStats();
+  /** pending: resolving session; require: anon without stored display name; allow: proceed */
+  const [visitorGateStatus, setVisitorGateStatus] = useState<
+    "pending" | "require" | "allow"
+  >("pending");
 
   /** Only CO/contractors may post on the public builders feed (not admins or other roles). */
   const isBuilder = userRoleState === "professional_builder";
@@ -87,10 +96,12 @@ const Builders = () => {
       } = await supabase.auth.getUser();
 
       if (authError || !user) {
+        setVisitorGateStatus(hasPublicVisitorDisplayName() ? "allow" : "require");
         return;
       }
 
       localStorage.setItem("user_id", user.id);
+      setVisitorGateStatus("allow");
 
       const { data: profile } = await supabase
         .from("profiles")
@@ -115,6 +126,7 @@ const Builders = () => {
       }
     } catch (error) {
       console.error("Error checking user profile:", error);
+      setVisitorGateStatus(hasPublicVisitorDisplayName() ? "allow" : "require");
     }
   };
 
@@ -140,21 +152,36 @@ const Builders = () => {
     setShowContactModal(true);
   };
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="text-center space-y-4">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
-          <p className="text-muted-foreground">Loading builders directory...</p>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="min-h-screen bg-background overflow-x-hidden pb-[env(safe-area-inset-bottom,0px)]">
       <Navigation />
 
+      {visitorGateStatus === "pending" && (
+        <div
+          className="fixed inset-0 z-[19990] flex flex-col items-center justify-center gap-3 bg-background/90 backdrop-blur-sm"
+          aria-busy="true"
+          aria-label="Loading"
+        >
+          <Loader2 className="h-10 w-10 animate-spin text-primary" />
+          <p className="text-sm text-muted-foreground">Loading directory…</p>
+        </div>
+      )}
+
+      {visitorGateStatus === "require" && (
+        <PublicVisitorNameGate
+          onSaved={() => {
+            setVisitorGateStatus("allow");
+            const n = getPublicVisitorDisplayName();
+            toast({
+              title: n ? `Thanks, ${n}` : "You are set",
+              description: "You can browse, like, and comment on the directory.",
+            });
+          }}
+        />
+      )}
+
+      {visitorGateStatus === "allow" && (
+        <>
       <section
         className="text-white py-4 md:py-5 relative overflow-hidden"
         role="banner"
@@ -521,6 +548,8 @@ const Builders = () => {
       />
 
       <Footer />
+        </>
+      )}
     </div>
   );
 };

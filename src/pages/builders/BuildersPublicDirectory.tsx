@@ -2,6 +2,7 @@ import React from 'react';
 import { BuilderFacebookLayout } from '@/components/builders/BuilderFacebookLayout';
 import { ErrorBoundary } from '@/components/ui/error-boundary';
 import { UserProfile } from '@/types/userProfile';
+import { getPublicVisitorDisplayName } from '@/utils/publicVisitorDisplayName';
 
 export interface BuildersPublicDirectoryProps {
   userProfile: UserProfile | null;
@@ -60,7 +61,11 @@ export default function BuildersPublicDirectory({
       >
         <BuilderFacebookLayout
           currentUserId={userProfile?.user_id}
-          currentUserName={userProfile?.full_name || 'Guest'}
+          currentUserName={
+            userProfile?.full_name?.trim() ||
+            getPublicVisitorDisplayName() ||
+            'Guest'
+          }
           currentUserAvatar={userProfile?.avatar_url}
           currentUserRole={userRoleState}
           isBuilder={isBuilder}
