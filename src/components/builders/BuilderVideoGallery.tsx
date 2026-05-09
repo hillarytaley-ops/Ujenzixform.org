@@ -26,6 +26,7 @@ import {
 import { VideoPlayer } from "./VideoPlayer";
 import { formatDistanceToNow } from "date-fns";
 import { SUPPORT_PHONE_PRIMARY } from "@/config/appIdentity";
+import { fetchPublicBuilderShowcaseVideos } from "@/utils/fetchPublicBuilderShowcaseVideos";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -155,27 +156,18 @@ export const BuilderVideoGallery = ({
     try {
       setLoading(true);
 
-      let q = supabase.from('builder_videos').select('*').order('created_at', { ascending: false });
+      const { data: fetched } = await fetchPublicBuilderShowcaseVideos({
+        builderId: builderId ?? null,
+        limit: 200,
+        offset: 0,
+      });
 
-      if (builderId) {
-        q = q.eq('builder_id', builderId);
-      }
-      if (filterType !== 'all' && filterType !== 'featured') {
-        q = q.eq('project_type', filterType);
-      }
+      let rows = fetched || [];
       if (filterType === 'featured') {
-        q = q.eq('is_featured', true);
+        rows = rows.filter((v) => v.is_featured === true);
+      } else if (filterType !== 'all') {
+        rows = rows.filter((v) => String(v.project_type ?? '') === filterType);
       }
-
-      const { data, error } = await q;
-
-      if (error) {
-        console.warn('Builder videos fetch:', error.message);
-        setVideos([]);
-        return;
-      }
-
-      const rows = data || [];
       const builderIds = [...new Set(rows.map((v) => v.builder_id).filter(Boolean))] as string[];
 
       let profilesMap: Record<string, NonNullable<BuilderVideo['builder_profile']>> = {};

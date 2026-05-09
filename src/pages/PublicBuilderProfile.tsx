@@ -34,6 +34,7 @@ import {
   ArrowLeft
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
+import { fetchPublicBuilderShowcaseVideos } from "@/utils/fetchPublicBuilderShowcaseVideos";
 
 interface BuilderProfile {
   id: string;
@@ -128,19 +129,13 @@ const PublicBuilderProfile = () => {
 
   const fetchBuilderVideos = async () => {
     try {
-      const { data, error } = await supabase
-        .from('builder_videos')
-        .select('*')
-        .eq('builder_id', builderId)
-        .eq('is_published', true)
-        .order('created_at', { ascending: false });
+      const { data } = await fetchPublicBuilderShowcaseVideos({
+        builderId,
+        limit: 100,
+        offset: 0,
+      });
 
-      if (error) {
-        console.warn('Videos not available:', error.message);
-        return;
-      }
-
-      setVideos(data || []);
+      setVideos((data || []) as BuilderVideo[]);
 
       // Calculate stats
       if (data && data.length > 0) {
