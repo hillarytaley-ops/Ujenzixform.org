@@ -141,26 +141,43 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
         }
       } catch (e) {}
 
-      // Public feed: active or legacy null status (RLS matches); pending stays moderation-only.
+      // Public feed: active or legacy null status. Retry simpler filters if PostgREST rejects `or`.
       const limitPlusOne = POSTS_PER_PAGE + 1;
+      const authHeaders = {
+        apikey: SUPABASE_ANON_KEY,
+        Authorization: `Bearer ${accessToken || SUPABASE_ANON_KEY}`,
+      } as const;
+
+      const tryFetchPosts = async (query: string) => {
+        const url = `${SUPABASE_URL}/rest/v1/builder_posts?${query}`;
+        const res = await fetch(url, { headers: authHeaders });
+        const json = await res.json();
+        return { res, json };
+      };
+
       const feedFilter = encodeURIComponent('(status.eq.active,status.is.null)');
-      let postsUrl = `${SUPABASE_URL}/rest/v1/builder_posts?or=${feedFilter}&order=created_at.desc&limit=${limitPlusOne}&offset=${offset}`;
-      
-      const postsRes = await fetch(
-        postsUrl,
-        {
-          headers: {
-            'apikey': SUPABASE_ANON_KEY,
-            'Authorization': `Bearer ${accessToken || SUPABASE_ANON_KEY}`,
-          }
-        }
+      let { res: postsRes, json: postsData } = await tryFetchPosts(
+        `or=${feedFilter}&order=created_at.desc&limit=${limitPlusOne}&offset=${offset}`
       );
-      
-      const postsData = await postsRes.json();
-      console.log('📥 Posts fetched:', postsData?.length || 0, 'posts');
-      
+
       if (!postsRes.ok || postsData?.error) {
-        console.log('📥 Error fetching posts:', postsData?.message || postsData?.error);
+        console.warn('📥 builder_posts fetch (or=active|null) failed, retrying status=eq.active:', postsData?.message || postsData?.error);
+        ({ res: postsRes, json: postsData } = await tryFetchPosts(
+          `status=eq.active&order=created_at.desc&limit=${limitPlusOne}&offset=${offset}`
+        ));
+      }
+
+      if (!postsRes.ok || postsData?.error) {
+        console.warn('📥 builder_posts fetch (active only) failed, retrying RLS-only:', postsData?.message || postsData?.error);
+        ({ res: postsRes, json: postsData } = await tryFetchPosts(
+          `order=created_at.desc&limit=${limitPlusOne}&offset=${offset}`
+        ));
+      }
+
+      console.log('📥 Posts fetched:', Array.isArray(postsData) ? postsData.length : 0, 'posts');
+      
+      if (!postsRes.ok || postsData?.error || !Array.isArray(postsData)) {
+        console.log('📥 Error fetching posts:', postsData?.message || postsData?.error || 'invalid response');
         // Don't show demo posts - only show real builder posts
         if (isInitialLoad) {
           setPosts([]);
@@ -172,7 +189,7 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
       }
 
       // Check if there are more posts
-      const hasMore = postsData && postsData.length > POSTS_PER_PAGE;
+      const hasMore = postsData.length > POSTS_PER_PAGE;
       setHasMorePosts(hasMore);
       
       // Only use POSTS_PER_PAGE posts (remove the extra one we fetched to check)
