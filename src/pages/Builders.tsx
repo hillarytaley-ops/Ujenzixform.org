@@ -47,9 +47,6 @@ const Builders = () => {
   const { toast } = useToast();
   const publicStats = useBuildersPagePublicStats();
 
-  const sharedUpdates =
-    publicStats.activePosts + publicStats.publishedVideos;
-
   /** Only CO/contractors may post on the public builders feed (not admins or other roles). */
   const isBuilder = userRoleState === "professional_builder";
 
@@ -244,9 +241,16 @@ const Builders = () => {
               </span>
               <span className="text-white/70">
                 <strong className="text-gray-300">
-                  {formatBuildersStatCount(sharedUpdates, publicStats.loading)}
+                  {formatBuildersStatCount(publicStats.activePosts, publicStats.loading)}
                 </strong>{" "}
-                Feed updates
+                feed posts
+                <span className="text-white/50 mx-1" aria-hidden>
+                  ·
+                </span>
+                <strong className="text-gray-300">
+                  {formatBuildersStatCount(publicStats.publishedVideos, publicStats.loading)}
+                </strong>{" "}
+                videos
               </span>
               <span className="text-white/50 hidden sm:inline" aria-hidden>
                 ·
@@ -424,11 +428,24 @@ const Builders = () => {
               <div className="text-white/80 text-sm">Registered on the directory</div>
             </div>
             <div className="bg-white/15 backdrop-blur-sm rounded-2xl p-6 sm:p-8 border border-white/20 hover:bg-white/20 transition-all duration-300 shadow-xl">
-              <div className="text-4xl sm:text-5xl font-bold text-blue-400 mb-3 sm:mb-4 drop-shadow-lg">
-                {formatBuildersStatCount(sharedUpdates, publicStats.loading)}
+              <div className="text-xl sm:text-2xl font-semibold text-white mb-4">Feed &amp; showcase</div>
+              <div className="flex flex-col sm:flex-row items-center justify-center gap-4 sm:gap-10">
+                <div className="text-center">
+                  <div className="text-4xl sm:text-5xl font-bold text-blue-400 drop-shadow-lg">
+                    {formatBuildersStatCount(publicStats.activePosts, publicStats.loading)}
+                  </div>
+                  <div className="text-white/85 text-sm mt-1">Social feed posts</div>
+                </div>
+                <div className="text-2xl text-white/40 hidden sm:block" aria-hidden>
+                  +
+                </div>
+                <div className="text-center">
+                  <div className="text-4xl sm:text-5xl font-bold text-purple-300 drop-shadow-lg">
+                    {formatBuildersStatCount(publicStats.publishedVideos, publicStats.loading)}
+                  </div>
+                  <div className="text-white/85 text-sm mt-1">Project showcase videos</div>
+                </div>
               </div>
-              <div className="text-xl sm:text-2xl font-semibold text-white mb-2">Feed &amp; showcase</div>
-              <div className="text-white/80 text-sm">Public posts and project videos</div>
             </div>
             <div className="bg-white/15 backdrop-blur-sm rounded-2xl p-6 sm:p-8 border border-white/20 hover:bg-white/20 transition-all duration-300 shadow-xl">
               <div className="text-4xl sm:text-5xl font-bold text-yellow-400 mb-3 sm:mb-4 drop-shadow-lg">

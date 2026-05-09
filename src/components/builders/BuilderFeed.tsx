@@ -43,6 +43,8 @@ interface BuilderFeedProps {
   onContactBuilder?: (builderId: string) => void;
   /** Parent supplies outer chrome (e.g. unified builders + feed card) */
   omitOuterCard?: boolean;
+  /** Switch to Project Showcase tab when timeline is empty but videos exist */
+  onOpenProjectShowcase?: () => void;
 }
 
 // Location options for filtering
@@ -58,6 +60,7 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
   onUploadVideo,
   onContactBuilder,
   omitOuterCard = false,
+  onOpenProjectShowcase,
 }) => {
   const { toast } = useToast();
   
@@ -106,6 +109,11 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
   const [sortBy, setSortBy] = useState<'recent' | 'popular' | 'trending'>('recent');
   const [savedPosts, setSavedPosts] = useState<Set<string>>(new Set());
   const [feedType, setFeedType] = useState<'all' | 'following' | 'live'>('all');
+  /** When timeline is empty, explains split vs showcase (stats combine posts + videos). */
+  const [feedEmptyInsight, setFeedEmptyInsight] = useState<{
+    timelinePosts: number;
+    showcaseVideos: number;
+  } | null>(null);
 
   // Fetch posts from database on mount
   useEffect(() => {
@@ -117,6 +125,7 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
       setLoadingPosts(true);
       setPostsOffset(0);
       setHasMorePosts(true);
+      setFeedEmptyInsight(null);
     } else {
       setLoadingMore(true);
     }
@@ -386,10 +395,33 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
         
         // Update offset for next load
         setPostsOffset(offset + transformedPosts.length);
+        setFeedEmptyInsight(null);
       } else {
-        // No posts from registered builders yet
+        // No timeline posts (videos may still live under Project Showcase only)
         if (isInitialLoad) {
           setPosts([]);
+          try {
+            const statsRes = await fetch(`${SUPABASE_URL}/rest/v1/rpc/get_builders_page_public_stats`, {
+              method: 'POST',
+              headers: {
+                apikey: SUPABASE_ANON_KEY,
+                Authorization: `Bearer ${accessToken || SUPABASE_ANON_KEY}`,
+                'Content-Type': 'application/json',
+              },
+              body: '{}',
+            });
+            const statsJson = (await statsRes.json()) as Record<string, unknown>;
+            if (statsRes.ok && statsJson && typeof statsJson === 'object' && !Array.isArray(statsJson)) {
+              setFeedEmptyInsight({
+                timelinePosts: Number(statsJson.active_posts) || 0,
+                showcaseVideos: Number(statsJson.published_videos) || 0,
+              });
+            } else {
+              setFeedEmptyInsight(null);
+            }
+          } catch {
+            setFeedEmptyInsight(null);
+          }
         }
         setHasMorePosts(false);
       }
@@ -398,6 +430,7 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
       // Don't show demo posts - only real builder content
       if (isInitialLoad) {
         setPosts([]);
+        setFeedEmptyInsight(null);
       }
     } finally {
       setLoadingPosts(false);
@@ -1583,12 +1616,40 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
               <p className="text-sm text-muted-foreground">Loading posts…</p>
           </div>
         ) : filteredPosts.length === 0 ? (
-          <div className="py-10 px-4 flex flex-col items-center justify-center text-center">
+          <div className="py-10 px-4 flex flex-col items-center justify-center text-center max-w-md mx-auto">
               <Video className="h-10 w-10 text-gray-400 mb-2" />
-              <h3 className="font-semibold text-base mb-1">No posts yet</h3>
-              <p className="text-sm text-muted-foreground">
-                Be the first to share your construction projects!
-              </p>
+              {feedEmptyInsight &&
+              feedEmptyInsight.timelinePosts === 0 &&
+              feedEmptyInsight.showcaseVideos > 0 ? (
+                <>
+                  <h3 className="font-semibold text-base mb-1">No timeline posts yet</h3>
+                  <p className="text-sm text-muted-foreground mb-4">
+                    There are public project videos in{' '}
+                    <strong className="text-foreground">Project Showcase</strong>—this tab only lists social feed
+                    posts. Open the showcase tab to watch and react.
+                  </p>
+                  {onOpenProjectShowcase && (
+                    <Button type="button" className="rounded-full" onClick={onOpenProjectShowcase}>
+                      Open Project Showcase
+                    </Button>
+                  )}
+                </>
+              ) : feedEmptyInsight && feedEmptyInsight.timelinePosts > 0 ? (
+                <>
+                  <h3 className="font-semibold text-base mb-1">Couldn&apos;t load posts</h3>
+                  <p className="text-sm text-muted-foreground">
+                    The directory reports {feedEmptyInsight.timelinePosts}+ active feed posts, but they did not load.
+                    Refresh the page or confirm the latest site and database updates are deployed.
+                  </p>
+                </>
+              ) : (
+                <>
+                  <h3 className="font-semibold text-base mb-1">No posts yet</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Be the first to share your construction projects!
+                  </p>
+                </>
+              )}
           </div>
         ) : filteredPosts.map((post) => (
           <div key={post.id} className="relative">

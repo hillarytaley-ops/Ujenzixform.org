@@ -608,6 +608,7 @@ export const BuilderFacebookLayout: React.FC<BuilderFacebookLayoutProps> = ({
               currentUserAvatar={currentUserAvatar}
               currentUserRole={currentUserRole}
               isBuilder={isBuilder}
+              onOpenProjectShowcase={() => setFeedShowcaseTab('portfolio')}
               onContactBuilder={(builderId) => {
                 const builder = allBuilders.find(b => b.id === builderId || b.user_id === builderId);
                 if (builder) onBuilderContact?.(builder);
