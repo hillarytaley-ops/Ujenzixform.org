@@ -60,6 +60,9 @@ interface BuilderFacebookLayoutProps {
   currentUserAvatar?: string;
   currentUserRole?: string;
   isBuilder?: boolean;
+  directoryTimelinePostCount: number;
+  directoryShowcaseVideoCount: number;
+  directoryStatsLoading: boolean;
   onBuilderContact?: (builder: any) => void;
   onBuilderProfile?: (builder: any) => void;
   onEditProfile?: () => void;
@@ -71,6 +74,9 @@ export const BuilderFacebookLayout: React.FC<BuilderFacebookLayoutProps> = ({
   currentUserAvatar,
   currentUserRole,
   isBuilder = false,
+  directoryTimelinePostCount,
+  directoryShowcaseVideoCount,
+  directoryStatsLoading,
   onBuilderContact,
   onBuilderProfile,
   onEditProfile
@@ -608,6 +614,9 @@ export const BuilderFacebookLayout: React.FC<BuilderFacebookLayoutProps> = ({
               currentUserAvatar={currentUserAvatar}
               currentUserRole={currentUserRole}
               isBuilder={isBuilder}
+              directoryTimelinePostCount={directoryTimelinePostCount}
+              directoryShowcaseVideoCount={directoryShowcaseVideoCount}
+              directoryStatsLoading={directoryStatsLoading}
               onOpenProjectShowcase={() => setFeedShowcaseTab('portfolio')}
               onContactBuilder={(builderId) => {
                 const builder = allBuilders.find(b => b.id === builderId || b.user_id === builderId);

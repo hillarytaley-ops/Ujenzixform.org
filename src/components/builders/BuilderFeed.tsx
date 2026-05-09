@@ -45,6 +45,10 @@ interface BuilderFeedProps {
   omitOuterCard?: boolean;
   /** Switch to Project Showcase tab when timeline is empty but videos exist */
   onOpenProjectShowcase?: () => void;
+  /** Same source as /builders hero stats; drives empty-state copy when it disagrees with loaded rows */
+  directoryTimelinePostCount?: number;
+  directoryShowcaseVideoCount?: number;
+  directoryStatsLoading?: boolean;
 }
 
 // Location options for filtering
@@ -61,6 +65,9 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
   onContactBuilder,
   omitOuterCard = false,
   onOpenProjectShowcase,
+  directoryTimelinePostCount,
+  directoryShowcaseVideoCount,
+  directoryStatsLoading = false,
 }) => {
   const { toast } = useToast();
   
@@ -1185,6 +1192,15 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
     return b.timestamp.getTime() - a.timestamp.getTime();
   });
 
+  /** Hero uses same RPC; prefer these when feed rows are empty so copy never contradicts the band stats */
+  const statsReady = directoryStatsLoading !== true;
+  const emptyFeedTimeline = statsReady
+    ? (directoryTimelinePostCount ?? 0)
+    : (feedEmptyInsight?.timelinePosts ?? 0);
+  const emptyFeedVideos = statsReady
+    ? (directoryShowcaseVideoCount ?? 0)
+    : (feedEmptyInsight?.showcaseVideos ?? 0);
+
   const feedBody = (
     <>
       <div id="builder-feed-composer-anchor" className="scroll-mt-24">
@@ -1618,9 +1634,7 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
         ) : filteredPosts.length === 0 ? (
           <div className="py-10 px-4 flex flex-col items-center justify-center text-center max-w-md mx-auto">
               <Video className="h-10 w-10 text-gray-400 mb-2" />
-              {feedEmptyInsight &&
-              feedEmptyInsight.timelinePosts === 0 &&
-              feedEmptyInsight.showcaseVideos > 0 ? (
+              {emptyFeedTimeline === 0 && emptyFeedVideos > 0 ? (
                 <>
                   <h3 className="font-semibold text-base mb-1">No timeline posts yet</h3>
                   <p className="text-sm text-muted-foreground mb-4">
@@ -1634,12 +1648,14 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
                     </Button>
                   )}
                 </>
-              ) : feedEmptyInsight && feedEmptyInsight.timelinePosts > 0 ? (
+              ) : emptyFeedTimeline > 0 ? (
                 <>
                   <h3 className="font-semibold text-base mb-1">Couldn&apos;t load posts</h3>
                   <p className="text-sm text-muted-foreground">
-                    The directory reports {feedEmptyInsight.timelinePosts}+ active feed posts, but they did not load.
-                    Refresh the page or confirm the latest site and database updates are deployed.
+                    The site reports {emptyFeedTimeline}+ public timeline posts, but none loaded here. Run Supabase
+                    migrations (including{' '}
+                    <code className="text-xs bg-muted px-1 rounded">get_public_builder_feed_posts</code>) and deploy
+                    the latest frontend, then hard-refresh.
                   </p>
                 </>
               ) : (

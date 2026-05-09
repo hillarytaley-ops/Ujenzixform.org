@@ -10,6 +10,10 @@ export interface BuildersPublicDirectoryProps {
   onBuilderContact: (builder: any) => void;
   onBuilderProfile: (builder: any) => void;
   onEditProfile: () => void;
+  /** Same counts as hero stats — used so empty feed copy matches live public stats */
+  directoryTimelinePostCount: number;
+  directoryShowcaseVideoCount: number;
+  directoryStatsLoading: boolean;
 }
 
 export default function BuildersPublicDirectory({
@@ -19,6 +23,9 @@ export default function BuildersPublicDirectory({
   onBuilderContact,
   onBuilderProfile,
   onEditProfile,
+  directoryTimelinePostCount,
+  directoryShowcaseVideoCount,
+  directoryStatsLoading,
 }: BuildersPublicDirectoryProps) {
   return (
     <div className="space-y-3">
@@ -55,6 +62,9 @@ export default function BuildersPublicDirectory({
           currentUserAvatar={userProfile?.avatar_url}
           currentUserRole={userRoleState}
           isBuilder={isBuilder}
+          directoryTimelinePostCount={directoryTimelinePostCount}
+          directoryShowcaseVideoCount={directoryShowcaseVideoCount}
+          directoryStatsLoading={directoryStatsLoading}
           onBuilderContact={onBuilderContact}
           onBuilderProfile={onBuilderProfile}
           onEditProfile={onEditProfile}

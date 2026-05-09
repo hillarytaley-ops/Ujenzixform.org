@@ -373,6 +373,9 @@ const Builders = () => {
               userProfile={userProfile}
               userRoleState={userRoleState}
               isBuilder={isBuilder}
+              directoryTimelinePostCount={publicStats.activePosts}
+              directoryShowcaseVideoCount={publicStats.publishedVideos}
+              directoryStatsLoading={publicStats.loading}
               onBuilderContact={handleContactBuilderDialog}
               onBuilderProfile={handleBuilderProfile}
               onEditProfile={() => setShowProfileEdit(true)}
