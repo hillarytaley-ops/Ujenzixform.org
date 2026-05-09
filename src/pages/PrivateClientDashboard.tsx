@@ -66,6 +66,7 @@ import { Navigation as NavigationIcon, QrCode } from "lucide-react";
 import { DashboardMobileActionSheet } from "@/components/dashboard/DashboardMobileActionSheet";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { PrivateClientDashboardNavCards } from "@/components/builders/PrivateClientDashboardNavCards";
+import { MaterialsGrid } from "@/components/suppliers/MaterialsGrid";
 import { BuilderDeliveryQuotePanel } from "@/components/delivery/BuilderDeliveryQuotePanel";
 import { SUPPORT_PHONE_PRIMARY, SUPPORT_EMAIL } from "@/config/appIdentity";
 
@@ -176,7 +177,18 @@ const PrivateClientDashboard = () => {
   const [deliveries, setDeliveries] = useState<DeliveryRequest[]>([]);
   const [showProfileEdit, setShowProfileEdit] = useState(false);
   const [showProfileView, setShowProfileView] = useState(false);
-  const PRIVATE_CLIENT_TABS = ['orders', 'order-tracking', 'deliveries', 'tracking', 'request-delivery', 'payments', 'wishlist', 'monitoring', 'support'];
+  const PRIVATE_CLIENT_TABS = [
+    'orders',
+    'materials',
+    'order-tracking',
+    'deliveries',
+    'tracking',
+    'request-delivery',
+    'payments',
+    'wishlist',
+    'monitoring',
+    'support',
+  ];
   const [activeTab, setActiveTab] = useUrlTabSync(PRIVATE_CLIENT_TABS, 'orders');
   const [stats, setStats] = useState({
     totalOrders: 0,
@@ -787,12 +799,13 @@ const PrivateClientDashboard = () => {
                   <User className="mr-2 h-4 w-4" />
                   Profile
                 </Button>
-                <Link to="/suppliers?from=dashboard" className="block w-full">
-                  <Button className="w-full justify-start bg-white text-green-700 hover:bg-green-50">
-                    <ShoppingCart className="mr-2 h-4 w-4" />
-                    Shop Materials
-                  </Button>
-                </Link>
+                <Button
+                  className="w-full justify-start bg-white text-green-700 hover:bg-green-50"
+                  onClick={() => setActiveTab("materials")}
+                >
+                  <ShoppingCart className="mr-2 h-4 w-4" />
+                  Shop Materials
+                </Button>
                 <Link to="/delivery" className="block w-full">
                   <Button className="w-full justify-start bg-green-50 text-green-800 hover:bg-green-100">
                     <Truck className="mr-2 h-4 w-4" />
@@ -855,12 +868,10 @@ const PrivateClientDashboard = () => {
               </div>
             </div>
             <div className="hidden w-full flex-none flex-wrap gap-2 md:flex md:w-auto md:justify-end">
-              <Link to="/suppliers?from=dashboard">
-                <Button className="bg-white text-green-700 hover:bg-green-50">
-                  <ShoppingCart className="mr-2 h-4 w-4" />
-                  Shop Materials
-                </Button>
-              </Link>
+              <Button className="bg-white text-green-700 hover:bg-green-50" onClick={() => setActiveTab("materials")}>
+                <ShoppingCart className="mr-2 h-4 w-4" />
+                Shop Materials
+              </Button>
               <Link to="/delivery">
                 <Button className="bg-white/90 text-green-700 hover:bg-white">
                   <Truck className="mr-2 h-4 w-4" />
@@ -991,6 +1002,7 @@ const PrivateClientDashboard = () => {
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
           <TabsList className="hidden">
             <TabsTrigger value="orders">Orders</TabsTrigger>
+            <TabsTrigger value="materials">Materials</TabsTrigger>
             <TabsTrigger value="order-tracking">QR Status</TabsTrigger>
             <TabsTrigger value="deliveries">Deliveries</TabsTrigger>
             <TabsTrigger value="tracking">Tracking</TabsTrigger>
@@ -1016,12 +1028,10 @@ const PrivateClientDashboard = () => {
                     <ShoppingBag className="h-16 w-16 mx-auto mb-4 text-gray-300" />
                     <p className="text-lg font-medium">No orders yet</p>
                     <p className="text-sm mb-4">Start shopping for construction materials</p>
-                    <Link to="/suppliers?from=dashboard">
-                      <Button className="bg-green-600 hover:bg-green-700">
-                        <ShoppingCart className="h-4 w-4 mr-2" />
-                        Browse Materials
-                      </Button>
-                    </Link>
+                    <Button className="bg-green-600 hover:bg-green-700" onClick={() => setActiveTab("materials")}>
+                      <ShoppingCart className="h-4 w-4 mr-2" />
+                      Browse Materials
+                    </Button>
                   </div>
                 ) : (
                   <div className="space-y-4">
@@ -1293,6 +1303,24 @@ const PrivateClientDashboard = () => {
             </Card>
           </TabsContent>
 
+          <TabsContent value="materials">
+            <Card className="border-0 shadow-none bg-transparent">
+              <CardHeader className="pb-2">
+                <CardTitle className="flex flex-wrap items-center gap-2 text-gray-900">
+                  <ShoppingCart className="h-5 w-5 text-green-600" />
+                  Materials catalog
+                </CardTitle>
+                <CardDescription>
+                  Browse approved materials and buy at listed prices — same catalog as the Material page, inside your
+                  dashboard.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="px-0 sm:px-1">
+                <MaterialsGrid embeddedInDashboard />
+              </CardContent>
+            </Card>
+          </TabsContent>
+
           {/* QR Scan Status Tab - Shows dispatch and receive scan status */}
           <TabsContent value="order-tracking">
             <Card>
@@ -1551,12 +1579,10 @@ const PrivateClientDashboard = () => {
                   <Heart className="h-16 w-16 mx-auto mb-4 text-gray-300" />
                   <p className="text-lg font-medium">Your wishlist is empty</p>
                   <p className="text-sm mb-4">Save products you're interested in</p>
-                  <Link to="/suppliers?from=dashboard">
-                    <Button className="bg-green-600 hover:bg-green-700">
-                      <ShoppingCart className="h-4 w-4 mr-2" />
-                      Explore Products
-                    </Button>
-                  </Link>
+                  <Button className="bg-green-600 hover:bg-green-700" onClick={() => setActiveTab("materials")}>
+                    <ShoppingCart className="h-4 w-4 mr-2" />
+                    Explore Products
+                  </Button>
                 </div>
               </CardContent>
             </Card>

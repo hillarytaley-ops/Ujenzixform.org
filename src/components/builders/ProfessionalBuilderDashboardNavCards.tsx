@@ -12,6 +12,7 @@ import {
   BarChart3,
   History,
   Navigation as NavigationIcon,
+  Store,
 } from "lucide-react";
 
 type NavStats = { pendingOrders: number };
@@ -62,6 +63,20 @@ export function ProfessionalBuilderDashboardNavCards({
       >
         <Building2 className="h-5 w-5 shrink-0" aria-hidden />
         <span className={navLabelClass}>Projects</span>
+      </Button>
+      <Button
+        type="button"
+        role="tab"
+        aria-selected={activeTab === "materials"}
+        className={`${navBtnBase} ${
+          activeTab === "materials"
+            ? "bg-gradient-to-r from-emerald-500 to-teal-600 ring-2 ring-emerald-300 shadow-lg text-white"
+            : "bg-white hover:bg-emerald-50 text-gray-700 border shadow-sm"
+        }`}
+        onClick={() => setActiveTab("materials")}
+      >
+        <Store className="h-5 w-5 shrink-0" aria-hidden />
+        <span className={navLabelClass}>Materials</span>
       </Button>
       <Button
         type="button"

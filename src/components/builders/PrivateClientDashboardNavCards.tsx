@@ -9,6 +9,7 @@ import {
   Heart,
   Video,
   Headphones,
+  Store,
 } from "lucide-react";
 
 const navBtnBase =
@@ -41,6 +42,20 @@ export function PrivateClientDashboardNavCards({ activeTab, setActiveTab }: Prop
       >
         <Package className="h-5 w-5 shrink-0" aria-hidden />
         <span className={navLabelClass}>Orders</span>
+      </Button>
+      <Button
+        type="button"
+        role="tab"
+        aria-selected={activeTab === "materials"}
+        className={`${navBtnBase} ${
+          activeTab === "materials"
+            ? "bg-gradient-to-r from-emerald-500 to-teal-600 ring-2 ring-emerald-300 shadow-lg text-white"
+            : "bg-white hover:bg-emerald-50 text-gray-700 border shadow-sm"
+        }`}
+        onClick={() => setActiveTab("materials")}
+      >
+        <Store className="h-5 w-5 shrink-0" aria-hidden />
+        <span className={navLabelClass}>Materials</span>
       </Button>
       <Button
         type="button"

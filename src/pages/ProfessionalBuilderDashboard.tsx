@@ -112,6 +112,7 @@ import {
   monitoringRestOpts,
 } from "@/utils/myMonitoringServiceRequests";
 import { ProfessionalBuilderDashboardNavCards } from "@/components/builders/ProfessionalBuilderDashboardNavCards";
+import { MaterialsGrid } from "@/components/suppliers/MaterialsGrid";
 import { InvoiceManagement } from "@/components/invoices/InvoiceManagement";
 import { DeliveryNoteWorkflow } from "@/components/delivery/DeliveryNoteWorkflow";
 import { GRNView } from "@/components/delivery/GRNView";
@@ -543,7 +544,22 @@ const ProfessionalBuilderDashboardPage = () => {
   const { toast } = useToast();
 
   // Active tab state - syncs with URL so refresh keeps current tab
-  const BUILDER_TABS = ['projects', 'quotes', 'orders', 'deliveries', 'tracking', 'invoices', 'extras', 'monitoring', 'portfolio', 'team', 'support', 'order-history', 'my-analytics'];
+  const BUILDER_TABS = [
+    'projects',
+    'materials',
+    'quotes',
+    'orders',
+    'deliveries',
+    'tracking',
+    'invoices',
+    'extras',
+    'monitoring',
+    'portfolio',
+    'team',
+    'support',
+    'order-history',
+    'my-analytics',
+  ];
   const [activeTab, setActiveTab] = useUrlTabSync(BUILDER_TABS, 'projects');
   const [extrasSubTab, setExtrasSubTab] = useState('team'); // Sub-tab for Extras (team or support)
   const [deliveriesSubTab, setDeliveriesSubTab] = useState('request'); // Sub-tab for Deliveries (request, schedule, history)
@@ -2297,19 +2313,23 @@ const ProfessionalBuilderDashboardPage = () => {
                   <User className="mr-2 h-4 w-4" />
                   Profile
                 </Button>
-                <Link
-                  className="block w-full"
-                  to={
-                    selectedProjectForOrder && selectedProjectForOrder !== 'none'
-                      ? `/suppliers?from=dashboard&project_id=${selectedProjectForOrder}`
-                      : '/suppliers?from=dashboard'
-                  }
+                <Button
+                  className="w-full justify-start bg-blue-600 text-white hover:bg-blue-700"
+                  onClick={() => {
+                    if (selectedProjectForOrder && selectedProjectForOrder !== "none") {
+                      const proj = projects.find((p) => p.id === selectedProjectForOrder);
+                      setCartProjectContext(
+                        selectedProjectForOrder,
+                        proj?.name ?? null,
+                        proj?.location ?? null
+                      );
+                    }
+                    setActiveTab("materials");
+                  }}
                 >
-                  <Button className="w-full justify-start bg-blue-600 text-white hover:bg-blue-700">
-                    <ShoppingCart className="mr-2 h-4 w-4" />
-                    Order Materials
-                  </Button>
-                </Link>
+                  <ShoppingCart className="mr-2 h-4 w-4" />
+                  Order Materials
+                </Button>
                 <Button
                   variant="outline"
                   className="w-full justify-start border-blue-200 bg-blue-50/80 text-blue-800 hover:bg-blue-100"
@@ -2383,18 +2403,23 @@ const ProfessionalBuilderDashboardPage = () => {
                 <User className="mr-2 h-4 w-4" />
                 Profile
               </Button>
-              <Link
-                to={
-                  selectedProjectForOrder && selectedProjectForOrder !== 'none'
-                    ? `/suppliers?from=dashboard&project_id=${selectedProjectForOrder}`
-                    : '/suppliers?from=dashboard'
-                }
+              <Button
+                className="bg-white text-blue-700 hover:bg-blue-50"
+                onClick={() => {
+                  if (selectedProjectForOrder && selectedProjectForOrder !== "none") {
+                    const proj = projects.find((p) => p.id === selectedProjectForOrder);
+                    setCartProjectContext(
+                      selectedProjectForOrder,
+                      proj?.name ?? null,
+                      proj?.location ?? null
+                    );
+                  }
+                  setActiveTab("materials");
+                }}
               >
-                <Button className="bg-white text-blue-700 hover:bg-blue-50">
-                  <ShoppingCart className="mr-2 h-4 w-4" />
-                  Order Materials
-                </Button>
-              </Link>
+                <ShoppingCart className="mr-2 h-4 w-4" />
+                Order Materials
+              </Button>
               <Button
                 variant="outline"
                 className="border-white/30 bg-white/90 text-blue-700 hover:bg-white"
@@ -2475,6 +2500,7 @@ const ProfessionalBuilderDashboardPage = () => {
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
           <TabsList className="hidden">
             <TabsTrigger value="projects">Projects</TabsTrigger>
+            <TabsTrigger value="materials">Materials</TabsTrigger>
             <TabsTrigger value="quotes">Quotes</TabsTrigger>
             <TabsTrigger value="orders">Orders</TabsTrigger>
             <TabsTrigger value="deliveries">Deliveries</TabsTrigger>
@@ -2986,9 +3012,9 @@ const ProfessionalBuilderDashboardPage = () => {
                                   <Eye className="h-4 w-4 mr-2 shrink-0" />
                                   View Details
                                 </Button>
-                                <Link 
-                                  className="block w-full min-w-0 sm:flex-1"
-                                  to={`/suppliers?from=dashboard&project_id=${project.id}`}
+                                <Button
+                                  type="button"
+                                  className="w-full min-w-0 sm:flex-1 bg-blue-600 hover:bg-blue-700 text-white"
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     setCartProjectContext(
@@ -2996,15 +3022,12 @@ const ProfessionalBuilderDashboardPage = () => {
                                       project.name,
                                       project.location ?? null
                                     );
+                                    setActiveTab("materials");
                                   }}
                                 >
-                                  <Button 
-                                    className="w-full min-w-0 bg-blue-600 hover:bg-blue-700 text-white"
-                                  >
-                                    <ShoppingCart className="h-4 w-4 mr-2 shrink-0" />
-                                    Order Materials
-                                  </Button>
-                                </Link>
+                                  <ShoppingCart className="h-4 w-4 mr-2 shrink-0" />
+                                  Order Materials
+                                </Button>
                               </div>
                             </CardContent>
                           </Card>
@@ -3035,6 +3058,24 @@ const ProfessionalBuilderDashboardPage = () => {
                 </CardContent>
               </Card>
             )}
+          </TabsContent>
+
+          <TabsContent value="materials" className="mt-4">
+            <Card className="border-0 shadow-none bg-transparent">
+              <CardHeader className="pb-2">
+                <CardTitle className="flex flex-wrap items-center gap-2 text-gray-900">
+                  <ShoppingCart className="h-5 w-5 text-emerald-600" />
+                  Materials catalog
+                </CardTitle>
+                <CardDescription>
+                  Browse approved listings, quotes, and cart — same experience as the Material page, without leaving your
+                  dashboard.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="px-0 sm:px-1">
+                <MaterialsGrid embeddedInDashboard />
+              </CardContent>
+            </Card>
           </TabsContent>
 
           {/* Quotes Tab - Review supplier pricing */}
@@ -4404,11 +4445,13 @@ const ProfessionalBuilderDashboardPage = () => {
                   <Badge className="bg-white/20 text-white border-0">Support via Contact & in-app</Badge>
                 </div>
               </div>
-              <Link to="/suppliers?from=dashboard" className="shrink-0">
-                <Button className="bg-white text-blue-700 hover:bg-blue-50 w-full md:w-auto">
-                  Material
-                </Button>
-              </Link>
+              <Button
+                type="button"
+                className="shrink-0 bg-white text-blue-700 hover:bg-blue-50 w-full md:w-auto"
+                onClick={() => setActiveTab("materials")}
+              >
+                Material
+              </Button>
             </div>
           </CardContent>
         </Card>
