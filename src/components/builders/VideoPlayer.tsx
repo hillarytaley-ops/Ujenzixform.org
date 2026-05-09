@@ -120,35 +120,48 @@ export const VideoPlayer = ({ video, isOpen, onClose, onVideoUpdate }: VideoPlay
   const fetchComments = async () => {
     try {
       console.log('💬 Fetching comments for video:', video.id);
-      
-      // Use REST API to bypass RLS issues
-      const response = await fetch(
-        `${SUPABASE_URL}/rest/v1/video_comments?video_id=eq.${video.id}&is_approved=eq.true&order=created_at.desc`,
-        {
-          headers: {
-            'apikey': SUPABASE_ANON_KEY,
-            'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
-          }
-        }
+
+      const approvedOrLegacy =
+        `video_id=eq.${video.id}&or=(is_approved.eq.true,is_approved.is.null)&order=created_at.desc`;
+      const restHeaders = {
+        apikey: SUPABASE_ANON_KEY,
+        Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+        Accept: 'application/json',
+      } as const;
+
+      let response = await fetch(
+        `${SUPABASE_URL}/rest/v1/video_comments?${approvedOrLegacy}`,
+        { headers: restHeaders }
       );
+
+      if (!response.ok) {
+        response = await fetch(
+          `${SUPABASE_URL}/rest/v1/video_comments?video_id=eq.${video.id}&order=created_at.desc`,
+          { headers: restHeaders }
+        );
+      }
 
       if (!response.ok) {
         console.error('💬 Failed to fetch comments:', response.status);
         return;
       }
 
-      const data = await response.json();
-      console.log('💬 Fetched', data?.length || 0, 'comments');
+      const raw = await response.json();
+      const data = Array.isArray(raw) ? raw : [];
+      const visible = data.filter(
+        (c: { is_approved?: boolean | null }) => c.is_approved !== false
+      );
+      console.log('💬 Fetched', visible.length, 'comments');
 
       // Organize comments with replies
       const commentMap = new Map<string, Comment>();
       const rootComments: Comment[] = [];
 
-      data?.forEach((comment: any) => {
+      visible.forEach((comment: any) => {
         commentMap.set(comment.id, { ...comment, replies: [] });
       });
 
-      data?.forEach((comment: any) => {
+      visible.forEach((comment: any) => {
         if (comment.parent_comment_id) {
           const parent = commentMap.get(comment.parent_comment_id);
           if (parent) {
