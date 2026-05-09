@@ -11,8 +11,8 @@ type Props = {
 };
 
 /**
- * First-time anonymous visitors on /builders must enter a display name before
- * browsing the directory (stored in localStorage only).
+ * First-time anonymous visitors on the Market Hub (/builders) enter a display name
+ * before browsing; stored in localStorage on this device only.
  */
 export function PublicVisitorNameGate({ onSaved }: Props) {
   const [value, setValue] = useState('');
@@ -52,7 +52,7 @@ export function PublicVisitorNameGate({ onSaved }: Props) {
           <div className="mx-auto sm:mx-0 mb-2 flex h-12 w-12 items-center justify-center rounded-full bg-blue-100 text-blue-700">
             <User className="h-6 w-6" aria-hidden />
           </div>
-          <CardTitle id="public-visitor-name-title">Welcome to the builders directory</CardTitle>
+          <CardTitle id="public-visitor-name-title">Welcome to Market Hub</CardTitle>
           <CardDescription>
             Enter how you&apos;d like your name to appear when you like or comment. This is saved only on this device.
           </CardDescription>

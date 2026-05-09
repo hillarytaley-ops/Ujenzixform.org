@@ -144,6 +144,17 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
     void fetchPosts(0, true);
   }, [timelineSeedKey, includeAuthorPendingVideos]);
 
+  /** Deep link e.g. /builders#market-hub-post-{uuid} after share or refresh */
+  useEffect(() => {
+    if (loadingPosts) return;
+    const raw = window.location.hash.replace(/^#/, '');
+    if (!raw.startsWith('market-hub-post-')) return;
+    const t = window.setTimeout(() => {
+      document.getElementById(raw)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 150);
+    return () => window.clearTimeout(t);
+  }, [loadingPosts]);
+
   const fetchPosts = async (offset: number = 0, isInitialLoad: boolean = false) => {
     if (isInitialLoad) {
       setLoadingPosts(true);
@@ -1035,17 +1046,13 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
     const newLikedState = !post.isLiked;
     const newLikeCount = newLikedState ? post.likes + 1 : post.likes - 1;
     
-    // Optimistic update
-    setPosts(posts.map(p => {
-      if (p.id === postId) {
-        return {
-          ...p,
-          isLiked: newLikedState,
-          likes: newLikeCount
-        };
-      }
-      return p;
-    }));
+    setPosts((prev) =>
+      prev.map((p) =>
+        p.id === postId
+          ? { ...p, isLiked: newLikedState, likes: newLikeCount }
+          : p
+      )
+    );
 
     // Persist to database
     try {
@@ -1111,17 +1118,13 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
       console.log('👍 Like persisted (counts updated by database triggers)');
     } catch (error) {
       console.error('Error saving like:', error);
-      // Revert optimistic update on error
-      setPosts(posts.map(p => {
-        if (p.id === postId) {
-          return {
-            ...p,
-            isLiked: !newLikedState,
-            likes: post.likes
-          };
-        }
-        return p;
-      }));
+      setPosts((prev) =>
+        prev.map((p) =>
+          p.id === postId
+            ? { ...p, isLiked: !newLikedState, likes: post.likes }
+            : p
+        )
+      );
     }
   };
 
@@ -1168,16 +1171,13 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
       isLiked: false
     };
 
-    // Optimistic update
-    setPosts(posts.map(post => {
-      if (post.id === postId) {
-        return {
-          ...post,
-          comments: [newComment, ...post.comments]
-        };
-      }
-      return post;
-    }));
+    setPosts((prev) =>
+      prev.map((post) =>
+        post.id === postId
+          ? { ...post, comments: [newComment, ...post.comments] }
+          : post
+      )
+    );
 
     // Persist to database
     try {
@@ -1211,36 +1211,54 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
         body: JSON.stringify(commentPayload),
       });
 
-      const result = await response.json();
-      
-      if (response.ok && result?.[0]) {
-        // Update the temp comment with the real ID
-        setPosts(posts.map(post => {
-          if (post.id === postId) {
+      const raw = await response.text();
+      let parsed: unknown = null;
+      try {
+        parsed = raw ? JSON.parse(raw) : null;
+      } catch {
+        parsed = null;
+      }
+      const row = Array.isArray(parsed) ? (parsed as { id: string }[])[0] : null;
+
+      if (response.ok && row?.id) {
+        setPosts((prev) =>
+          prev.map((post) => {
+            if (post.id !== postId) return post;
             return {
               ...post,
-              comments: post.comments.map(c => 
-                c.id === tempId ? { ...c, id: result[0].id } : c
-              )
+              comments: post.comments.map((c) =>
+                c.id === tempId ? { ...c, id: row.id } : c
+              ),
             };
-          }
-          return post;
-        }));
-
-        console.log('💬 Comment saved (counts updated by database triggers)');
+          })
+        );
+      } else {
+        const msg =
+          typeof parsed === 'object' && parsed !== null && 'message' in parsed
+            ? String((parsed as { message?: string }).message)
+            : raw?.slice(0, 200) || response.statusText;
+        setPosts((prev) =>
+          prev.map((post) =>
+            post.id === postId
+              ? { ...post, comments: post.comments.filter((c) => c.id !== tempId) }
+              : post
+          )
+        );
+        toast({
+          title: 'Comment not saved',
+          description: msg || `Server returned ${response.status}`,
+          variant: 'destructive',
+        });
       }
     } catch (error) {
       console.error('Error saving comment:', error);
-      // Remove optimistic comment on error
-      setPosts(posts.map(post => {
-        if (post.id === postId) {
-          return {
-            ...post,
-            comments: post.comments.filter(c => c.id !== tempId)
-          };
-        }
-        return post;
-      }));
+      setPosts((prev) =>
+        prev.map((post) =>
+          post.id === postId
+            ? { ...post, comments: post.comments.filter((c) => c.id !== tempId) }
+            : post
+        )
+      );
       toast({
         title: 'Error',
         description: 'Failed to save comment',
@@ -1250,8 +1268,9 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
   };
 
   const handleShare = (postId: string) => {
-    // In a real app, this would open a share dialog
-    console.log('Sharing post:', postId);
+    setPosts((prev) =>
+      prev.map((p) => (p.id === postId ? { ...p, shares: (p.shares || 0) + 1 } : p))
+    );
   };
 
   const handleViewProfile = (builderId: string) => {
@@ -1777,7 +1796,7 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
               )}
           </div>
         ) : filteredPosts.map((post) => (
-          <div key={post.id} className="relative">
+          <div key={post.id} id={`market-hub-post-${post.id}`} className="relative scroll-mt-24">
             <BuilderVideoPost
               {...post}
               embedded

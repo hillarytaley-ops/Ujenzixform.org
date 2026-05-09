@@ -291,6 +291,16 @@ export const SupplierMarketingFeed: React.FC<SupplierMarketingFeedProps> = ({
   }, [includeAuthorPendingVideos]);
 
   useEffect(() => {
+    if (loadingPosts) return;
+    const raw = window.location.hash.replace(/^#/, '');
+    if (!raw.startsWith('supplier-market-hub-post-')) return;
+    const t = window.setTimeout(() => {
+      document.getElementById(raw)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 150);
+    return () => window.clearTimeout(t);
+  }, [loadingPosts]);
+
+  useEffect(() => {
     setPosts((prev) =>
       prev.map((p) => {
         const sup = supplierByUserId.get(p.builderId);
@@ -513,6 +523,12 @@ export const SupplierMarketingFeed: React.FC<SupplierMarketingFeedProps> = ({
       );
       toast({ title: 'Comment not saved', variant: 'destructive' });
     }
+  };
+
+  const handleShare = (postId: string) => {
+    setPosts((prev) =>
+      prev.map((p) => (p.id === postId ? { ...p, shares: (p.shares || 0) + 1 } : p))
+    );
   };
 
   const handlePost = async () => {
@@ -760,17 +776,19 @@ export const SupplierMarketingFeed: React.FC<SupplierMarketingFeedProps> = ({
         </Card>
       ) : (
         posts.map((p) => (
-          <BuilderVideoPost
-            key={p.id}
-            {...p}
-            userReaction={p.userReaction}
-            onReact={(id, r) => void handleReact(id, r)}
-            onComment={(id, c) => void handleComment(id, c)}
-            onShare={() => {}}
-            onViewProfile={() => {}}
-            onContactBuilder={() => {}}
-            contactActorLabel="Contact supplier"
-          />
+          <div key={p.id} id={`supplier-market-hub-post-${p.id}`} className="scroll-mt-24">
+            <BuilderVideoPost
+              {...p}
+              userReaction={p.userReaction}
+              shareAnchorId={`supplier-market-hub-post-${p.id}`}
+              onReact={(id, r) => void handleReact(id, r)}
+              onComment={(id, c) => void handleComment(id, c)}
+              onShare={handleShare}
+              onViewProfile={() => {}}
+              onContactBuilder={() => {}}
+              contactActorLabel="Contact supplier"
+            />
+          </div>
         ))
       )}
 

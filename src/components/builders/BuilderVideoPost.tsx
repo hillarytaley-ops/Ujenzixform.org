@@ -9,7 +9,6 @@ import { Separator } from '@/components/ui/separator';
 import { 
   ThumbsUp, 
   MessageCircle, 
-  Share2, 
   MoreHorizontal, 
   Play, 
   Pause,
@@ -36,6 +35,39 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
+
+async function copyTextToClipboard(text: string): Promise<boolean> {
+  try {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(text);
+      return true;
+    }
+  } catch {
+    /* fall through */
+  }
+  try {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.setAttribute('readonly', '');
+    ta.style.position = 'fixed';
+    ta.style.left = '-9999px';
+    document.body.appendChild(ta);
+    ta.focus();
+    ta.select();
+    const ok = document.execCommand('copy');
+    document.body.removeChild(ta);
+    return ok;
+  } catch {
+    return false;
+  }
+}
+
+const COMMENT_QUICK_EMOJIS = ['👍', '❤️', '😂', '😮', '🙏', '🔥', '💪', '🏗️', '👏', '🎉', '✅', '⭐'];
 
 export interface VideoComment {
   id: string;
@@ -78,6 +110,8 @@ export interface BuilderVideoPostProps {
   onContactBuilder?: (builderId: string) => void;
   /** Default: "Contact Builder" */
   contactActorLabel?: string;
+  /** DOM id without # for share deep links (parent wrapper should use the same id). */
+  shareAnchorId?: string;
 }
 
 export const BuilderVideoPost: React.FC<BuilderVideoPostProps> = ({
@@ -106,6 +140,7 @@ export const BuilderVideoPost: React.FC<BuilderVideoPostProps> = ({
   onViewProfile,
   onContactBuilder,
   contactActorLabel = 'Contact Builder',
+  shareAnchorId,
 }) => {
   const reactionMode = typeof onReact === 'function';
   const [liked, setLiked] = useState(isLiked);
@@ -117,11 +152,16 @@ export const BuilderVideoPost: React.FC<BuilderVideoPostProps> = ({
   const [isMuted, setIsMuted] = useState(true);
   const [showControls, setShowControls] = useState(false);
   const [showReactions, setShowReactions] = useState(false);
+  const [emojiPopoverOpen, setEmojiPopoverOpen] = useState(false);
   const [replyingTo, setReplyingTo] = useState<{ id: string; name: string } | null>(null);
   const [likedComments, setLikedComments] = useState<Set<string>>(new Set());
   const videoRef = useRef<HTMLVideoElement>(null);
   const commentInputRef = useRef<HTMLInputElement>(null);
+  const longPressTimerRef = useRef<number | null>(null);
+  const longPressTriggeredRef = useRef(false);
   const { toast } = useToast();
+
+  const anchorForShare = shareAnchorId ?? `market-hub-post-${id}`;
 
   useEffect(() => {
     if (!reactionMode) {
@@ -185,6 +225,7 @@ export const BuilderVideoPost: React.FC<BuilderVideoPostProps> = ({
   };
 
   const handleReactionPick = (emoji: string) => {
+    longPressTriggeredRef.current = false;
     if (reactionMode && onReact) {
       onReact(id, emoji);
       setShowReactions(false);
@@ -197,28 +238,58 @@ export const BuilderVideoPost: React.FC<BuilderVideoPostProps> = ({
   };
 
   const handleComment = () => {
-    if (!commentText.trim()) return;
-    
-    // Check if this is a reply
+    const trimmed = commentText.trim();
+    if (!trimmed) return;
+
     const isReply = replyingTo !== null;
-    const content = isReply 
-      ? commentText.replace(`@${replyingTo?.name} `, '') 
-      : commentText;
-    
-    const newComment: VideoComment = {
-      id: `comment-${Date.now()}`,
-      userId: 'current-user',
-      userName: 'You',
-      content: isReply ? `@${replyingTo?.name} ${content}` : content,
-      timestamp: new Date(),
-      likes: 0,
-      isLiked: false
-    };
-    
-    setLocalComments(prev => [newComment, ...prev]);
-    onComment?.(id, commentText);
+    const content = isReply
+      ? `@${replyingTo.name} ${trimmed.replace(new RegExp(`^@${replyingTo.name}\\s*`), '')}`
+      : trimmed;
+
+    if (!onComment) {
+      const newComment: VideoComment = {
+        id: `comment-${Date.now()}`,
+        userId: 'current-user',
+        userName: 'You',
+        content,
+        timestamp: new Date(),
+        likes: 0,
+        isLiked: false,
+      };
+      setLocalComments((prev) => [newComment, ...prev]);
+    } else {
+      onComment(id, content);
+    }
     setCommentText('');
     setReplyingTo(null);
+  };
+
+  const insertCommentEmoji = (emoji: string) => {
+    setCommentText((prev) => `${prev}${emoji}`);
+    setEmojiPopoverOpen(false);
+    setTimeout(() => commentInputRef.current?.focus(), 0);
+  };
+
+  const openCommentsAndFocus = () => {
+    setShowComments(true);
+    setTimeout(() => commentInputRef.current?.focus(), 0);
+  };
+
+  const clearLongPressTimer = () => {
+    if (longPressTimerRef.current != null) {
+      window.clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+  };
+
+  const startReactionLongPress = () => {
+    longPressTriggeredRef.current = false;
+    clearLongPressTimer();
+    longPressTimerRef.current = window.setTimeout(() => {
+      longPressTriggeredRef.current = true;
+      setShowReactions(true);
+      longPressTimerRef.current = null;
+    }, 480);
   };
 
   const handleCommentLike = (commentId: string) => {
@@ -255,14 +326,43 @@ export const BuilderVideoPost: React.FC<BuilderVideoPostProps> = ({
     }, 100);
   };
 
-  const handleShare = () => {
-    const url = window.location.href;
-    navigator.clipboard.writeText(url);
-    toast({
-      title: "Link copied!",
-      description: "Post link has been copied to clipboard",
-    });
-    onShare?.(id);
+  const handleShare = async () => {
+    const shareUrl = `${window.location.origin}${window.location.pathname}${window.location.search}#${anchorForShare}`;
+    const title = `${builderCompany || builderName} — UjenziXform`;
+
+    try {
+      if (typeof navigator.share === 'function') {
+        try {
+          await navigator.share({
+            title,
+            text: caption?.slice(0, 200) || title,
+            url: shareUrl,
+          });
+          onShare?.(id);
+          toast({ title: 'Shared', description: 'Thanks for spreading the word.' });
+          return;
+        } catch (err: unknown) {
+          if ((err as Error)?.name === 'AbortError') return;
+        }
+      }
+    } catch {
+      /* fall through to clipboard */
+    }
+
+    const copied = await copyTextToClipboard(shareUrl);
+    if (copied) {
+      toast({
+        title: 'Link copied',
+        description: 'Paste it anywhere to share this post.',
+      });
+      onShare?.(id);
+    } else {
+      toast({
+        title: 'Could not copy',
+        description: shareUrl,
+        variant: 'destructive',
+      });
+    }
   };
 
   const togglePlay = () => {
@@ -523,9 +623,12 @@ export const BuilderVideoPost: React.FC<BuilderVideoPostProps> = ({
         </div>
         <div className="flex items-center gap-4">
           {localComments.length > 0 && (
-            <span 
+            <span
               className="hover:underline cursor-pointer"
-              onClick={() => setShowComments(!showComments)}
+              onClick={() => {
+                if (showComments) setShowComments(false);
+                else openCommentsAndFocus();
+              }}
             >
               {formatNumber(localComments.length)} comments
             </span>
@@ -541,11 +644,19 @@ export const BuilderVideoPost: React.FC<BuilderVideoPostProps> = ({
       {/* Action Buttons - Facebook Style */}
       <div className="px-2 py-1">
         <div className="flex items-center justify-around">
-          {/* Like Button with Reactions */}
-          <div 
+          {/* Like + reactions: hover on desktop; long-press on touch */}
+          <div
             className="relative flex-1"
             onMouseEnter={() => setShowReactions(true)}
-            onMouseLeave={() => setShowReactions(false)}
+            onMouseLeave={() => {
+              setShowReactions(false);
+              clearLongPressTimer();
+            }}
+            onPointerDown={startReactionLongPress}
+            onPointerUp={() => {
+              clearLongPressTimer();
+            }}
+            onPointerCancel={clearLongPressTimer}
           >
             {/* Reaction Popup */}
             {showReactions && (
@@ -565,7 +676,14 @@ export const BuilderVideoPost: React.FC<BuilderVideoPostProps> = ({
             <Button
               variant="ghost"
               className={`w-full h-10 gap-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors ${displayLiked ? 'text-blue-500' : 'text-gray-600 dark:text-gray-400'}`}
-              onClick={handleLike}
+              onClick={(e) => {
+                if (longPressTriggeredRef.current) {
+                  e.preventDefault();
+                  longPressTriggeredRef.current = false;
+                  return;
+                }
+                handleLike();
+              }}
             >
               {displayLiked ? (
                 <span className="text-lg">{reactionMode && userReaction ? userReaction : '👍'}</span>
@@ -578,7 +696,14 @@ export const BuilderVideoPost: React.FC<BuilderVideoPostProps> = ({
           <Button
             variant="ghost"
             className="flex-1 h-10 gap-2 rounded-lg text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-            onClick={() => setShowComments(!showComments)}
+            type="button"
+            onClick={() => {
+              if (showComments) {
+                setShowComments(false);
+              } else {
+                openCommentsAndFocus();
+              }
+            }}
           >
             <MessageCircle className="h-5 w-5" />
             <span className="font-medium">Comment</span>
@@ -586,7 +711,8 @@ export const BuilderVideoPost: React.FC<BuilderVideoPostProps> = ({
           <Button
             variant="ghost"
             className="flex-1 h-10 gap-2 rounded-lg text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-            onClick={handleShare}
+            type="button"
+            onClick={() => void handleShare()}
           >
             <Link2 className="h-5 w-5" />
             <span className="font-medium">Share</span>
@@ -637,9 +763,34 @@ export const BuilderVideoPost: React.FC<BuilderVideoPostProps> = ({
                 className="pr-20 rounded-full bg-gray-100 dark:bg-gray-800 border-0 focus-visible:ring-1"
               />
               <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
-                <Button variant="ghost" size="sm" className="h-7 w-7 p-0 rounded-full">
-                  <Smile className="h-4 w-4 text-gray-500" />
-                </Button>
+                <Popover open={emojiPopoverOpen} onOpenChange={setEmojiPopoverOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 w-7 p-0 rounded-full"
+                      aria-label="Add emoji"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <Smile className="h-4 w-4 text-gray-500" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-2" align="end" side="top">
+                    <div className="grid grid-cols-6 gap-1 max-w-[220px]">
+                      {COMMENT_QUICK_EMOJIS.map((em) => (
+                        <button
+                          key={em}
+                          type="button"
+                          className="text-xl p-1.5 rounded-md hover:bg-muted transition-colors"
+                          onClick={() => insertCommentEmoji(em)}
+                        >
+                          {em}
+                        </button>
+                      ))}
+                    </div>
+                  </PopoverContent>
+                </Popover>
                 <Button variant="ghost" size="sm" className="h-7 w-7 p-0 rounded-full">
                   <ImageIcon className="h-4 w-4 text-gray-500" />
                 </Button>
