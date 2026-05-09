@@ -126,6 +126,20 @@ CREATE POLICY "builder_videos_public_read" ON public.builder_videos
   USING (COALESCE(is_published, true) = true);
 
 -- -----------------------------------------------------------------------------
+-- post_likes: allow NULL user_id for guest rows (fixes 23502 on insert)
+-- -----------------------------------------------------------------------------
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'post_likes'
+      AND column_name = 'user_id' AND is_nullable = 'NO'
+  ) THEN
+    ALTER TABLE public.post_likes ALTER COLUMN user_id DROP NOT NULL;
+  END IF;
+END $$;
+
+-- -----------------------------------------------------------------------------
 -- post_likes: anonymous guests (user_id null + guest_identifier)
 -- -----------------------------------------------------------------------------
 DROP POLICY IF EXISTS "post_likes_insert" ON public.post_likes;
