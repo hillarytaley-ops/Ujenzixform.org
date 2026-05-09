@@ -151,6 +151,27 @@ export const BuilderFacebookLayout: React.FC<BuilderFacebookLayoutProps> = ({
           'Content-Type': 'application/json',
         } as const;
 
+        // Prefer SECURITY DEFINER RPC: anon cannot read user_roles; profiles.role may not exist.
+        try {
+          const dirRpc = await fetch(`${SUPABASE_URL}/rest/v1/rpc/get_public_builder_directory`, {
+            method: 'POST',
+            headers: jsonHeaders,
+            body: '{}',
+          });
+          if (dirRpc.ok) {
+            const dirRows = await dirRpc.json();
+            if (Array.isArray(dirRows)) {
+              setRegisteredBuilders(dirRows.map(mapProfileToBuilder));
+              return;
+            }
+          } else {
+            const errText = await dirRpc.text().catch(() => '');
+            console.warn('🏗️ get_public_builder_directory failed:', dirRpc.status, errText?.slice(0, 200));
+          }
+        } catch (e) {
+          console.warn('🏗️ get_public_builder_directory error:', e);
+        }
+
         let builderUserIds: string[] = [];
 
         try {

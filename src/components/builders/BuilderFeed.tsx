@@ -141,9 +141,10 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
         }
       } catch (e) {}
 
-      // Public feed: active posts from CO/contractors (RLS also enforces this on the server)
+      // Public feed: active or legacy null status (RLS matches); pending stays moderation-only.
       const limitPlusOne = POSTS_PER_PAGE + 1;
-      let postsUrl = `${SUPABASE_URL}/rest/v1/builder_posts?status=eq.active&order=created_at.desc&limit=${limitPlusOne}&offset=${offset}`;
+      const feedFilter = encodeURIComponent('(status.eq.active,status.is.null)');
+      let postsUrl = `${SUPABASE_URL}/rest/v1/builder_posts?or=${feedFilter}&order=created_at.desc&limit=${limitPlusOne}&offset=${offset}`;
       
       const postsRes = await fetch(
         postsUrl,
