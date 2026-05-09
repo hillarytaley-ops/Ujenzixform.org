@@ -29,7 +29,7 @@ import {
 } from 'lucide-react';
 import { BuilderVideoPost, BuilderVideoPostProps, VideoComment } from './BuilderVideoPost';
 import { BuilderStories } from './BuilderStories';
-import { SUPABASE_ANON_KEY, SUPABASE_URL } from '@/integrations/supabase/client';
+import { SUPABASE_ANON_KEY, SUPABASE_URL, supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { getBuilderFeedGuestId } from '@/utils/builderFeedGuestId';
 
@@ -174,28 +174,50 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
 
       let postsRes: Response;
       let postsData: unknown;
+      let rpcOk = false;
 
-      const rpcRes = await fetch(`${SUPABASE_URL}/rest/v1/rpc/get_public_builder_feed_posts`, {
-        method: 'POST',
-        headers: {
-          ...authHeaders,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ p_limit: limitPlusOne, p_offset: offset }),
-      });
-      const rpcJson = await rpcRes.json();
-      const rpcOk = rpcRes.ok && Array.isArray(rpcJson);
+      // 1) Official client (same session + URL as rest of app; avoids subtle fetch/header issues)
+      const { data: rpcSdkData, error: rpcSdkError } = await (supabase as any).rpc(
+        'get_public_builder_feed_posts',
+        { p_limit: limitPlusOne, p_offset: offset }
+      );
+      if (!rpcSdkError && Array.isArray(rpcSdkData)) {
+        postsData = rpcSdkData;
+        postsRes = new Response(null, { status: 200 });
+        rpcOk = true;
+        console.log('📥 Posts via supabase.rpc(get_public_builder_feed_posts):', rpcSdkData.length);
+      } else if (rpcSdkError) {
+        console.warn('📥 supabase.rpc get_public_builder_feed_posts:', rpcSdkError.code, rpcSdkError.message);
+      }
 
-      if (rpcOk) {
-        postsRes = rpcRes;
-        postsData = rpcJson;
-        console.log('📥 Posts fetched via get_public_builder_feed_posts:', (rpcJson as unknown[]).length);
-      } else {
-        console.warn(
-          '📥 get_public_builder_feed_posts failed; falling back to builder_posts REST:',
-          rpcRes.status,
-          (rpcJson as { message?: string })?.message || rpcJson
-        );
+      // 2) Raw PostgREST (explicit Accept; some stacks differ from default)
+      if (!rpcOk) {
+        const rpcRes = await fetch(`${SUPABASE_URL}/rest/v1/rpc/get_public_builder_feed_posts`, {
+          method: 'POST',
+          headers: {
+            ...authHeaders,
+            Accept: 'application/json',
+            'Content-Type': 'application/json',
+            Prefer: 'return=representation',
+          },
+          body: JSON.stringify({ p_limit: limitPlusOne, p_offset: offset }),
+        });
+        const rpcJson = await rpcRes.json();
+        if (rpcRes.ok && Array.isArray(rpcJson)) {
+          postsRes = rpcRes;
+          postsData = rpcJson;
+          rpcOk = true;
+          console.log('📥 Posts via HTTP RPC get_public_builder_feed_posts:', rpcJson.length);
+        } else {
+          console.warn(
+            '📥 HTTP RPC get_public_builder_feed_posts failed; falling back to builder_posts REST:',
+            rpcRes.status,
+            (rpcJson as { message?: string })?.message || rpcJson
+          );
+        }
+      }
+
+      if (!rpcOk) {
         const feedFilter = encodeURIComponent('(status.eq.active,status.is.null)');
         ({ res: postsRes, json: postsData } = await tryFetchPosts(
           `or=${feedFilter}&order=created_at.desc&limit=${limitPlusOne}&offset=${offset}`
