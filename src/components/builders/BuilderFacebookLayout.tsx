@@ -18,7 +18,6 @@ import {
   Users,
   CheckCircle2,
   MessageCircle,
-  Video,
   Calendar,
   Briefcase,
   X,
@@ -31,7 +30,6 @@ import { SupplierMarketingFeed } from './SupplierMarketingFeed';
 import { BuilderGrid } from './BuilderGrid';
 import { BuilderVideoGallery } from './BuilderVideoGallery';
 import { MobileBottomNav, MobileHeader } from './MobileBottomNav';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { SUPABASE_ANON_KEY, SUPABASE_URL, supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -119,18 +117,21 @@ export const BuilderFacebookLayout: React.FC<BuilderFacebookLayoutProps> = ({
   const [mobileTab, setMobileTab] = useState<'feed' | 'builders' | 'create' | 'notifications' | 'menu'>('feed');
   const [showMobileSearch, setShowMobileSearch] = useState(false);
 
-  const [feedShowcaseTab, setFeedShowcaseTab] = useState<'feed' | 'portfolio'>('feed');
-  const feedShowcaseTabsRef = useRef<HTMLDivElement>(null);
+  const builderMarketHubMainRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
 
-  const focusSocialFeedTabs = () => {
-    setFeedShowcaseTab('feed');
+  const scrollToBuilderMarketHubTop = () => {
     requestAnimationFrame(() => {
-      feedShowcaseTabsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      builderMarketHubMainRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     });
   };
 
-  const goBackToSocialFeed = () => focusSocialFeedTabs();
+  const scrollToProjectShowcase = () => {
+    document.getElementById('builder-project-showcase-section')?.scrollIntoView({
+      behavior: 'smooth',
+      block: 'start',
+    });
+  };
 
   const openSiteMobileMenu = () => {
     const toggle = document.getElementById('site-mobile-nav-toggle');
@@ -867,35 +868,12 @@ export const BuilderFacebookLayout: React.FC<BuilderFacebookLayoutProps> = ({
 
       <div className="flex-1 min-w-0 flex flex-col order-1 lg:order-2">
         {marketAudience === 'contractors' ? (
-        <Tabs
-          value={feedShowcaseTab}
-          onValueChange={(v) => setFeedShowcaseTab(v === 'portfolio' ? 'portfolio' : 'feed')}
-          className="w-full flex flex-col min-h-0"
+        <div
+          ref={builderMarketHubMainRef}
+          id="builder-feed-showcase-tabs"
+          className="w-full flex flex-col min-h-0 flex-1 scroll-mt-20"
         >
-          <div
-            ref={feedShowcaseTabsRef}
-            id="builder-feed-showcase-tabs"
-            className="w-full shrink-0 border-b border-slate-200 dark:border-slate-700 scroll-mt-20"
-          >
-            <TabsList className="flex h-10 w-full items-stretch rounded-none border-0 bg-slate-100/80 p-0 text-muted-foreground shadow-none dark:bg-slate-800/70">
-              <TabsTrigger
-                value="feed"
-                className="flex flex-1 items-center justify-center gap-1.5 rounded-none border-r border-slate-200/90 px-2 py-0 text-xs font-semibold shadow-none data-[state=active]:bg-orange-500 data-[state=active]:text-white data-[state=active]:shadow-none data-[state=inactive]:text-gray-600 dark:border-slate-600 dark:data-[state=inactive]:text-gray-400"
-              >
-                <MessageCircle className="h-3.5 w-3.5 shrink-0" />
-                <span className="truncate">Social Feed</span>
-              </TabsTrigger>
-              <TabsTrigger
-                value="portfolio"
-                className="flex flex-1 items-center justify-center gap-1.5 rounded-none px-2 py-0 text-xs font-semibold shadow-none data-[state=active]:bg-purple-600 data-[state=active]:text-white data-[state=active]:shadow-none data-[state=inactive]:text-gray-600 dark:data-[state=inactive]:text-gray-400"
-              >
-                <Video className="h-3.5 w-3.5 shrink-0" />
-                <span className="truncate">Project Showcase</span>
-              </TabsTrigger>
-            </TabsList>
-          </div>
-          
-          <TabsContent value="feed" className="mt-0 flex-1 min-h-0">
+          <div className="flex-1 min-h-0">
             <BuilderFeed
               omitOuterCard
               showComposer={false}
@@ -908,41 +886,35 @@ export const BuilderFacebookLayout: React.FC<BuilderFacebookLayoutProps> = ({
               directoryShowcaseVideoCount={directoryShowcaseVideoCount}
               directoryStatsLoading={directoryStatsLoading}
               seedTimelinePosts={seedTimelinePosts}
-              onOpenProjectShowcase={() => setFeedShowcaseTab('portfolio')}
+              onOpenProjectShowcase={scrollToProjectShowcase}
               onContactBuilder={(builderId) => {
                 const builder = allBuilders.find(b => b.id === builderId || b.user_id === builderId);
                 if (builder) onBuilderContact?.(builder);
               }}
             />
-          </TabsContent>
-          
-          <TabsContent value="portfolio" className="mt-0 flex-1 min-h-0 border-t border-slate-100 dark:border-slate-800">
-            <div className="sticky top-0 z-20 flex items-center gap-2 border-b border-slate-200 dark:border-slate-700 bg-white/95 px-2 py-2 backdrop-blur-sm dark:bg-gray-900/95 sm:px-3">
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                className="h-9 gap-1.5 px-2 text-gray-700 hover:bg-slate-100 dark:text-gray-200 dark:hover:bg-slate-800"
-                onClick={goBackToSocialFeed}
-                aria-label="Back to Social Feed"
-              >
-                <ArrowLeft className="h-4 w-4 shrink-0" />
-                <span className="text-sm font-medium">Back to Social Feed</span>
-              </Button>
-            </div>
+          </div>
+
+          <section
+            id="builder-project-showcase-section"
+            className="border-t border-slate-200 dark:border-slate-700 scroll-mt-20"
+            aria-labelledby="builder-project-showcase-heading"
+          >
             <div className="border-b border-slate-100 dark:border-slate-800 bg-slate-50/40 dark:bg-slate-900/20 px-3 py-2.5 sm:px-4">
-                <h3 className="text-base font-bold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">
-                  Builder Project Showcase
-                </h3>
-                <p className="text-xs text-gray-500 dark:text-gray-400 leading-snug mt-0.5">
-                  Completed projects from COs/contractors across Kenya
-                </p>
+              <h3
+                id="builder-project-showcase-heading"
+                className="text-base font-bold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent"
+              >
+                Project showcase
+              </h3>
+              <p className="text-xs text-gray-500 dark:text-gray-400 leading-snug mt-0.5">
+                Completed projects from COs/contractors across Kenya — scroll up for the social timeline.
+              </p>
             </div>
             <div className="p-2 sm:p-3 min-h-0">
-                <BuilderVideoGallery />
+              <BuilderVideoGallery />
             </div>
-          </TabsContent>
-        </Tabs>
+          </section>
+        </div>
         ) : (
           <div className="flex flex-col flex-1 min-h-0 min-w-0">
             <div className="shrink-0 border-b border-slate-200 dark:border-slate-700 bg-amber-50/60 dark:bg-slate-800/40 px-3 py-2.5">
@@ -1164,11 +1136,11 @@ export const BuilderFacebookLayout: React.FC<BuilderFacebookLayoutProps> = ({
         onTabChange={(tab) => {
           setMobileTab(tab);
           if (tab === 'feed') {
-            focusSocialFeedTabs();
+            scrollToBuilderMarketHubTop();
           } else if (tab === 'builders') {
             setShowMobileSearch(true);
           } else if (tab === 'create') {
-            focusSocialFeedTabs();
+            scrollToBuilderMarketHubTop();
             window.setTimeout(() => {
               const anchor =
                 marketAudience === 'contractors'

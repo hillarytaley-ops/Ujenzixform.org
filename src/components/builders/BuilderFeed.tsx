@@ -1747,13 +1747,12 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
                 <>
                   <h3 className="font-semibold text-base mb-1">No timeline posts yet</h3>
                   <p className="text-sm text-muted-foreground mb-4">
-                    There are public project videos in{' '}
-                    <strong className="text-foreground">Project Showcase</strong>—this tab only lists social feed
-                    posts. Open the showcase tab to watch and react.
+                    There are public project videos below this timeline. Scroll down to the project showcase to watch
+                    and react, or use the button to jump there.
                   </p>
                   {onOpenProjectShowcase && (
                     <Button type="button" className="rounded-full" onClick={onOpenProjectShowcase}>
-                      Open Project Showcase
+                      Jump to project videos
                     </Button>
                   )}
                 </>

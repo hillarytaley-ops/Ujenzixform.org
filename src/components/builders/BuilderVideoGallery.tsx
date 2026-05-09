@@ -555,9 +555,9 @@ export const BuilderVideoGallery = ({
             No project showcase videos yet
           </h3>
           <p className="text-gray-600 text-sm max-w-md mx-auto leading-relaxed">
-            This tab only lists <strong>portfolio videos</strong> saved to the showcase library. Clips and posts shared from the{" "}
-            <strong>Social Feed</strong> tab stay on that tab. If you added showcase videos but they are still hidden, they may be unpublished drafts; an
-            admin can mark them published, or ensure new uploads are set to published when saving.
+            This section lists <strong>portfolio videos</strong> saved to the showcase library. Timeline clips and posts
+            live in the feed above. If you added showcase videos but they are still hidden, they may be unpublished
+            drafts; an admin can mark them published, or ensure new uploads are set to published when saving.
           </p>
         </Card>
       ) : (
