@@ -34,6 +34,11 @@ import { useToast } from '@/hooks/use-toast';
 import { getBuilderFeedGuestId } from '@/utils/builderFeedGuestId';
 import { normalizeTimelinePageFromStats } from '@/utils/normalizeTimelinePageFromStats';
 
+/** PostgREST error bodies are objects; `(x || []).map` breaks when x is a truthy non-array. */
+function asRestArray<T = Record<string, unknown>>(v: unknown): T[] {
+  return Array.isArray(v) ? (v as T[]) : [];
+}
+
 interface BuilderFeedProps {
   currentUserId?: string;
   currentUserName?: string;
@@ -325,14 +330,15 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
               }
             }
           );
-          profilesData = await profilesRes.json();
-          console.log('📥 Profiles fetched:', profilesData?.length || 0);
+          const rawProfiles = await profilesRes.json();
+          profilesData = asRestArray(rawProfiles);
+          console.log('📥 Profiles fetched:', profilesData.length);
         } catch (e) {
           console.log('📥 Profile fetch error:', e);
         }
 
         // Create a map for quick lookup
-        const profilesMap = new Map((profilesData || []).map((p: any) => [p.user_id, p]));
+        const profilesMap = new Map(profilesData.map((p: any) => [p.user_id, p]));
 
         // Fetch comments for each post (optional, don't fail if table doesn't exist)
         const postIds = postsToProcess.map((p: any) => p.id);
@@ -348,7 +354,7 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
             }
           );
           if (commentsRes.ok) {
-            commentsData = await commentsRes.json();
+            commentsData = asRestArray(await commentsRes.json());
           }
         } catch (e) {
           console.log('📥 Comments fetch skipped');
@@ -356,7 +362,7 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
 
         // Get commenter profiles
         const commenterIds = [
-          ...new Set((commentsData || []).map((c: any) => c.user_id).filter(Boolean)),
+          ...new Set(commentsData.map((c: any) => c.user_id).filter(Boolean)),
         ];
         let commenterProfiles: any[] = [];
         if (commenterIds.length > 0) {
@@ -371,12 +377,12 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
               }
             );
             if (commenterRes.ok) {
-              commenterProfiles = await commenterRes.json();
+              commenterProfiles = asRestArray(await commenterRes.json());
             }
           } catch (e) {}
         }
         
-        const commenterMap = new Map((commenterProfiles || []).map((p: any) => [p.user_id, p]));
+        const commenterMap = new Map(commenterProfiles.map((p: any) => [p.user_id, p]));
 
         // Signed-in: likes by user_id. Visitors: likes by stable guest_identifier (localStorage).
         let userLikes: Set<string> = new Set();
@@ -392,8 +398,8 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
               }
             );
             if (likesRes.ok) {
-              const likesData = await likesRes.json();
-              userLikes = new Set((likesData || []).map((l: any) => l.post_id));
+              const likesData = asRestArray(await likesRes.json());
+              userLikes = new Set(likesData.map((l: any) => l.post_id));
             }
           } else {
             const guestId = getBuilderFeedGuestId();
@@ -409,8 +415,8 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
                 }
               );
               if (likesRes.ok) {
-                const likesData = await likesRes.json();
-                userLikes = new Set((likesData || []).map((l: any) => l.post_id));
+                const likesData = asRestArray(await likesRes.json());
+                userLikes = new Set(likesData.map((l: any) => l.post_id));
               }
             }
           }
@@ -422,7 +428,7 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
         // Transform posts to match component format
         const transformedPosts = postsToProcess.map((post: any) => {
           const profile = profilesMap.get(post.builder_id);
-          const postComments = (commentsData || [])
+          const postComments = commentsData
             .filter((c: any) => c.post_id === post.id)
             .map((c: any) => {
               const commenter = c.user_id ? commenterMap.get(c.user_id) : undefined;
