@@ -8,28 +8,21 @@ STABLE
 SECURITY DEFINER
 SET search_path = public
 AS $$
+  -- Use to_jsonb(p) so we only reference columns that exist on each deployment
+  -- (some databases never added profiles.bio, rating, etc.).
   SELECT COALESCE(
     (
       SELECT jsonb_agg(row_json ORDER BY sort_key)
       FROM (
         SELECT
-          jsonb_build_object(
-            'id', p.id,
-            'user_id', p.user_id,
-            'full_name', p.full_name,
-            'company_name', p.company_name,
-            'phone', p.phone,
-            'email', p.email,
-            'location', p.location,
-            'bio', p.bio,
-            'is_verified', p.is_verified,
-            'avatar_url', p.avatar_url,
-            'rating', p.rating,
-            'total_projects', p.total_projects,
-            'total_reviews', p.total_reviews,
-            'specialties', p.specialties
-          ) AS row_json,
-          lower(coalesce(nullif(trim(p.company_name), ''), p.full_name, '')) AS sort_key
+          to_jsonb(p) AS row_json,
+          lower(
+            coalesce(
+              nullif(trim(coalesce(p.company_name, '')), ''),
+              coalesce(p.full_name, ''),
+              ''
+            )
+          ) AS sort_key
         FROM public.profiles p
         INNER JOIN public.user_roles ur
           ON ur.user_id = p.user_id
