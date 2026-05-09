@@ -29,8 +29,9 @@ import {
 } from 'lucide-react';
 import { BuilderVideoPost, BuilderVideoPostProps, VideoComment } from './BuilderVideoPost';
 import { BuilderStories } from './BuilderStories';
-import { SUPABASE_ANON_KEY, SUPABASE_URL, supabase } from '@/integrations/supabase/client';
+import { SUPABASE_ANON_KEY, SUPABASE_URL } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { getBuilderFeedGuestId } from '@/utils/builderFeedGuestId';
 
 interface BuilderFeedProps {
   currentUserId?: string;
@@ -242,7 +243,9 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
         }
 
         // Get commenter profiles
-        const commenterIds = [...new Set((commentsData || []).map((c: any) => c.user_id))];
+        const commenterIds = [
+          ...new Set((commentsData || []).map((c: any) => c.user_id).filter(Boolean)),
+        ];
         let commenterProfiles: any[] = [];
         if (commenterIds.length > 0) {
           try {
@@ -263,29 +266,45 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
         
         const commenterMap = new Map((commenterProfiles || []).map((p: any) => [p.user_id, p]));
 
-        // Fetch user's likes to show which posts they've liked
-        // Note: currentUserId was already set earlier in fetchPosts
+        // Signed-in: likes by user_id. Visitors: likes by stable guest_identifier (localStorage).
         let userLikes: Set<string> = new Set();
-
-        if (currentUserId) {
-          try {
+        try {
+          if (currentUserId) {
             const likesRes = await fetch(
               `${SUPABASE_URL}/rest/v1/post_likes?user_id=eq.${currentUserId}&post_id=in.(${postIds.join(',')})&select=post_id`,
               {
                 headers: {
-                  'apikey': SUPABASE_ANON_KEY,
-                  'Authorization': `Bearer ${accessToken || SUPABASE_ANON_KEY}`,
-                }
+                  apikey: SUPABASE_ANON_KEY,
+                  Authorization: `Bearer ${accessToken || SUPABASE_ANON_KEY}`,
+                },
               }
             );
             if (likesRes.ok) {
               const likesData = await likesRes.json();
               userLikes = new Set((likesData || []).map((l: any) => l.post_id));
-              console.log('📥 User has liked', userLikes.size, 'posts');
             }
-          } catch (e) {
-            console.log('📥 Likes fetch skipped');
+          } else {
+            const guestId = getBuilderFeedGuestId();
+            if (guestId && postIds.length > 0) {
+              const enc = encodeURIComponent(guestId);
+              const likesRes = await fetch(
+                `${SUPABASE_URL}/rest/v1/post_likes?post_id=in.(${postIds.join(',')})&user_id=is.null&guest_identifier=eq.${enc}&select=post_id`,
+                {
+                  headers: {
+                    apikey: SUPABASE_ANON_KEY,
+                    Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+                  },
+                }
+              );
+              if (likesRes.ok) {
+                const likesData = await likesRes.json();
+                userLikes = new Set((likesData || []).map((l: any) => l.post_id));
+              }
+            }
           }
+          console.log('📥 Liked posts (this session):', userLikes.size);
+        } catch (e) {
+          console.log('📥 Likes fetch skipped');
         }
 
         // Transform posts to match component format
@@ -294,11 +313,11 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
           const postComments = (commentsData || [])
             .filter((c: any) => c.post_id === post.id)
             .map((c: any) => {
-              const commenter = commenterMap.get(c.user_id);
+              const commenter = c.user_id ? commenterMap.get(c.user_id) : undefined;
               return {
                 id: c.id,
-                userId: c.user_id,
-                userName: commenter?.full_name || 'Anonymous',
+                userId: c.user_id || '',
+                userName: commenter?.full_name || c.commenter_name || 'Visitor',
                 userAvatar: commenter?.avatar_url,
                 content: c.content,
                 timestamp: new Date(c.created_at),
@@ -828,7 +847,6 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
   };
 
   const handleLike = async (postId: string) => {
-    // Get current user ID
     let userId: string | null = effectiveUserId || null;
     if (!userId) {
       try {
@@ -839,12 +857,13 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
         }
       } catch (e) {}
     }
-    
-    if (!userId) {
+
+    const guestId = !userId ? getBuilderFeedGuestId() : '';
+    if (!userId && !guestId) {
       toast({
-        title: 'Sign in to like',
-        description: 'Create a free account or sign in—any member of the public can like posts once signed in.',
-        variant: 'destructive'
+        title: 'Cannot save like',
+        description: 'Allow storage for this site so we can remember your likes, or sign in.',
+        variant: 'destructive',
       });
       return;
     }
@@ -878,47 +897,57 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
         }
       } catch (e) {}
 
+      const likeHeaders = {
+        apikey: SUPABASE_ANON_KEY,
+        Authorization: `Bearer ${accessToken || SUPABASE_ANON_KEY}`,
+        'Content-Type': 'application/json',
+        Prefer: 'return=minimal',
+      } as const;
+
       if (newLikedState) {
-        // Add like
-        await fetch(`${SUPABASE_URL}/rest/v1/post_likes`, {
+        const body = userId
+          ? { post_id: postId, user_id: userId }
+          : { post_id: postId, user_id: null, guest_identifier: guestId };
+        const ins = await fetch(`${SUPABASE_URL}/rest/v1/post_likes`, {
           method: 'POST',
-          headers: {
-            'apikey': SUPABASE_ANON_KEY,
-            'Authorization': `Bearer ${accessToken || SUPABASE_ANON_KEY}`,
-            'Content-Type': 'application/json',
-            'Prefer': 'return=minimal'
-          },
-          body: JSON.stringify({
-            post_id: postId,
-            user_id: userId
-          })
+          headers: likeHeaders,
+          body: JSON.stringify(body),
         });
-      } else {
-        // Remove like
-        await fetch(`${SUPABASE_URL}/rest/v1/post_likes?post_id=eq.${postId}&user_id=eq.${userId}`, {
-          method: 'DELETE',
-          headers: {
-            'apikey': SUPABASE_ANON_KEY,
-            'Authorization': `Bearer ${accessToken || SUPABASE_ANON_KEY}`,
+        if (!ins.ok) {
+          const err = await ins.text();
+          console.error('post_likes insert:', ins.status, err);
+          throw new Error('Like not saved');
+        }
+      } else if (userId) {
+        const del = await fetch(
+          `${SUPABASE_URL}/rest/v1/post_likes?post_id=eq.${postId}&user_id=eq.${userId}`,
+          {
+            method: 'DELETE',
+            headers: {
+              apikey: SUPABASE_ANON_KEY,
+              Authorization: `Bearer ${accessToken || SUPABASE_ANON_KEY}`,
+            },
           }
+        );
+        if (!del.ok) {
+          const err = await del.text();
+          console.error('post_likes delete:', del.status, err);
+          throw new Error('Unlike not saved');
+        }
+      } else {
+        const rpc = await fetch(`${SUPABASE_URL}/rest/v1/rpc/delete_guest_post_like`, {
+          method: 'POST',
+          headers: likeHeaders,
+          body: JSON.stringify({ p_post_id: postId, p_guest: guestId }),
         });
+        if (!rpc.ok) {
+          const err = await rpc.text();
+          console.error('delete_guest_post_like:', rpc.status, err);
+          throw new Error('Unlike not saved');
+        }
       }
 
-      // Update the post's like count in the database
-      await fetch(`${SUPABASE_URL}/rest/v1/builder_posts?id=eq.${postId}`, {
-        method: 'PATCH',
-        headers: {
-          'apikey': SUPABASE_ANON_KEY,
-          'Authorization': `Bearer ${accessToken || SUPABASE_ANON_KEY}`,
-          'Content-Type': 'application/json',
-          'Prefer': 'return=minimal'
-        },
-        body: JSON.stringify({
-          likes_count: newLikeCount
-        })
-      });
-
-      console.log('👍 Like saved to database');
+      console.log('👍 Like persisted (counts updated by database triggers)');
     } catch (error) {
       console.error('Error saving like:', error);
       // Revert optimistic update on error
@@ -937,8 +966,7 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
 
   const handleComment = async (postId: string, comment: string) => {
     if (!comment.trim()) return;
-    
-    // Get current user ID
+
     let userId: string | null = effectiveUserId || null;
     if (!userId) {
       try {
@@ -949,21 +977,29 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
         }
       } catch (e) {}
     }
-    
-    if (!userId) {
+
+    const guestId = !userId ? getBuilderFeedGuestId() : '';
+    if (!userId && !guestId) {
       toast({
-        title: 'Sign in to comment',
-        description: 'Create a free account or sign in to join the conversation.',
-        variant: 'destructive'
+        title: 'Cannot post comment',
+        description: 'Allow storage for this site, or sign in to comment.',
+        variant: 'destructive',
       });
       return;
     }
 
+    const commenterLabel =
+      userId && effectiveUserName && effectiveUserName !== 'Guest'
+        ? effectiveUserName
+        : userId
+          ? effectiveUserName
+          : 'Visitor';
+
     const tempId = `temp-${Date.now()}`;
     const newComment: VideoComment = {
       id: tempId,
-      userId: userId,
-      userName: effectiveUserName,
+      userId: userId || '',
+      userName: commenterLabel,
       userAvatar: currentUserAvatar,
       content: comment,
       timestamp: new Date(),
@@ -993,20 +1029,25 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
         }
       } catch (e) {}
 
-      // Insert comment
+      const commentPayload = userId
+        ? { post_id: postId, user_id: userId, content: comment }
+        : {
+            post_id: postId,
+            user_id: null,
+            guest_identifier: guestId,
+            commenter_name: commenterLabel,
+            content: comment,
+          };
+
       const response = await fetch(`${SUPABASE_URL}/rest/v1/post_comments`, {
         method: 'POST',
         headers: {
-          'apikey': SUPABASE_ANON_KEY,
-          'Authorization': `Bearer ${accessToken || SUPABASE_ANON_KEY}`,
+          apikey: SUPABASE_ANON_KEY,
+          Authorization: `Bearer ${accessToken || SUPABASE_ANON_KEY}`,
           'Content-Type': 'application/json',
-          'Prefer': 'return=representation'
+          Prefer: 'return=representation',
         },
-        body: JSON.stringify({
-          post_id: postId,
-          user_id: userId,
-          content: comment
-        })
+        body: JSON.stringify(commentPayload),
       });
 
       const result = await response.json();
@@ -1025,21 +1066,7 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
           return post;
         }));
 
-        // Update comment count in the post
-        await fetch(`${SUPABASE_URL}/rest/v1/builder_posts?id=eq.${postId}`, {
-          method: 'PATCH',
-          headers: {
-            'apikey': SUPABASE_ANON_KEY,
-            'Authorization': `Bearer ${accessToken || SUPABASE_ANON_KEY}`,
-            'Content-Type': 'application/json',
-            'Prefer': 'return=minimal'
-          },
-          body: JSON.stringify({
-            comments_count: posts.find(p => p.id === postId)?.comments.length || 0
-          })
-        });
-
-        console.log('💬 Comment saved to database');
+        console.log('💬 Comment saved (counts updated by database triggers)');
       }
     } catch (error) {
       console.error('Error saving comment:', error);
@@ -1202,7 +1229,7 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
                 
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:flex-wrap">
                   <p className="text-xs text-muted-foreground">
-                    Posts on this feed are public for all visitors. Likes and comments are open to anyone with a signed-in account.
+                    Posts are public. Anyone can like or comment—signed in or not.
                   </p>
                   {postLocation && (
                     <Badge variant="secondary" className="gap-1 w-fit">
@@ -1345,7 +1372,7 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
               <div className="flex-1 text-center sm:text-left min-w-0">
                 <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Want to share your projects?</h3>
                 <p className="text-xs text-gray-600 dark:text-gray-400">
-                  Register as a CO/contractor to post updates. Everyone can browse the feed; sign in to like or comment.
+                  Register as a CO/contractor to post updates. Everyone can browse, like, and comment—no account required to react.
                 </p>
               </div>
               <div className="flex flex-col sm:flex-row gap-2 shrink-0 w-full sm:w-auto">

@@ -53,6 +53,9 @@ logs/
 # Build artifacts
 buildconnectke/
 
+# Accidental nested checkout (full duplicate repo); do not commit
+Ujenzixform.org/
+
 # Lock files (keep package-lock.json, ignore bun.lockb as it's binary)
 bun.lockb
 
