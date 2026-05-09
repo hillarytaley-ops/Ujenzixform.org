@@ -13,6 +13,7 @@ import {
   History,
   Navigation as NavigationIcon,
   Store,
+  Megaphone,
 } from "lucide-react";
 
 type NavStats = { pendingOrders: number };
@@ -217,6 +218,20 @@ export function ProfessionalBuilderDashboardNavCards({
       >
         <Video className="h-5 w-5 shrink-0" aria-hidden />
         <span className={navLabelClass}>Portfolio</span>
+      </Button>
+      <Button
+        type="button"
+        role="tab"
+        aria-selected={activeTab === "market-hub"}
+        className={`${navBtnBase} ${
+          activeTab === "market-hub"
+            ? "bg-gradient-to-r from-orange-500 to-amber-600 ring-2 ring-orange-300 shadow-lg text-white"
+            : "bg-white hover:bg-orange-50 text-gray-700 border shadow-sm"
+        }`}
+        onClick={() => setActiveTab("market-hub")}
+      >
+        <Megaphone className="h-5 w-5 shrink-0" aria-hidden />
+        <span className={navLabelClass}>Market hub</span>
       </Button>
       <Button
         type="button"

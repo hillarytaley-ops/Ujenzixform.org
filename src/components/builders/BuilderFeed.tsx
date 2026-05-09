@@ -1,5 +1,6 @@
 import { readPersistedAuthRawStringSync } from '@/utils/supabaseAccessToken';
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
@@ -57,6 +58,10 @@ interface BuilderFeedProps {
   directoryStatsLoading?: boolean;
   /** Rows from get_builders_page_public_stats.timeline_page (same RPC as hero); bypasses separate feed RPC */
   seedTimelinePosts?: Record<string, unknown>[] | null;
+  /** Public market hub: false — post only from CO/contractor dashboard. */
+  showComposer?: boolean;
+  /** When true and signed in, merge own pending video timeline posts (not in public RPC). */
+  includeAuthorPendingVideos?: boolean;
 }
 
 // Location options for filtering
@@ -77,6 +82,8 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
   directoryShowcaseVideoCount,
   directoryStatsLoading = false,
   seedTimelinePosts = null,
+  showComposer = false,
+  includeAuthorPendingVideos = false,
 }) => {
   const { toast } = useToast();
   
@@ -95,12 +102,15 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
   // Get effective user name from props or localStorage
   const effectiveUserName = currentUserName !== 'Guest' ? currentUserName : (storedUserName || 'Guest');
   
-  /** Only registered CO/contractors may post; feed is public for everyone to read. */
+  const isSupplierRole =
+    effectiveRole === 'supplier' || storedRole === 'supplier';
+  /** Only registered CO/contractors may post on this feed (not suppliers/admins by role alone). */
   const isCoContractor =
     isBuilder ||
     effectiveRole === 'professional_builder' ||
     storedRole === 'professional_builder';
-  const canPost = isCoContractor;
+  const canPost =
+    showComposer && isCoContractor && !isSupplierRole;
   const effectiveIsBuilder = isCoContractor;
   const [posts, setPosts] = useState<Omit<BuilderVideoPostProps, 'onLike' | 'onComment' | 'onShare' | 'onViewProfile'>[]>([]);
   const [loadingPosts, setLoadingPosts] = useState(true);
@@ -132,7 +142,7 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
 
   useEffect(() => {
     void fetchPosts(0, true);
-  }, [timelineSeedKey]);
+  }, [timelineSeedKey, includeAuthorPendingVideos]);
 
   const fetchPosts = async (offset: number = 0, isInitialLoad: boolean = false) => {
     if (isInitialLoad) {
@@ -311,7 +321,39 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
       setHasMorePosts(hasMore);
       
       // Only use POSTS_PER_PAGE posts (remove the extra one we fetched to check)
-      const postsToProcess = hasMore ? postsData.slice(0, POSTS_PER_PAGE) : postsData;
+      const postsToProcess: any[] = hasMore
+        ? (postsData as any[]).slice(0, POSTS_PER_PAGE)
+        : [...(postsData as any[])];
+
+      if (
+        includeAuthorPendingVideos &&
+        currentUserId &&
+        isInitialLoad &&
+        offset === 0
+      ) {
+        try {
+          const pr = await fetch(
+            `${SUPABASE_URL}/rest/v1/builder_posts?builder_id=eq.${currentUserId}&status=eq.pending&video_url=not.is.null&order=created_at.desc&limit=20`,
+            { headers: authHeaders }
+          );
+          if (pr.ok) {
+            const pendingRaw = asRestArray<any>(await pr.json());
+            const seen = new Set(postsToProcess.map((p) => p.id));
+            for (const row of pendingRaw) {
+              if (row?.id && !seen.has(row.id)) {
+                postsToProcess.push(row);
+                seen.add(row.id);
+              }
+            }
+            postsToProcess.sort(
+              (a, b) =>
+                new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+            );
+          }
+        } catch {
+          /* ignore */
+        }
+      }
 
       if (postsToProcess && postsToProcess.length > 0) {
         console.log('📥 First post:', postsToProcess[0]?.id, postsToProcess[0]?.video_url ? 'has video' : 'no video');
@@ -833,8 +875,8 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
         if (videoUrl) postType = 'video';
         else if (imageUrl) postType = 'image';
         
-        // All posts are immediately visible to visitors
-        const postStatus = 'active';
+        // Video timeline posts require admin approval before they appear on the public feed.
+        const postStatus = videoUrl ? 'pending' : 'active';
         
         const postPayload = {
           builder_id: postUserId,
@@ -941,13 +983,14 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
       // All posts are now immediately visible
       if (videoUrl) {
         toast({
-          title: '🎬 Video Posted!',
-          description: 'Your video is now live and visible to all visitors!'
+          title: '🎬 Video submitted',
+          description:
+            'An admin will review your video. It goes live on the market hub only after approval.',
         });
       } else {
         toast({
-          title: '🎉 Post Published!',
-          description: 'Your post is now live on the builders feed.'
+          title: '🎉 Post published',
+          description: 'Your post is now visible on the public market hub.',
         });
       }
       
@@ -1253,7 +1296,19 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
   const feedBody = (
     <>
       <div id="builder-feed-composer-anchor" className="scroll-mt-24">
-      {canPost ? (
+      {!showComposer ? (
+        <div className="border-b border-slate-100 dark:border-slate-800 px-3 py-3 sm:px-4 bg-slate-50/80 dark:bg-slate-900/40">
+          <p className="text-sm text-muted-foreground text-center mb-2">
+            CO/contractors publish timeline posts from the dashboard. Videos are reviewed by an admin before they
+            appear publicly.
+          </p>
+          <div className="flex flex-wrap justify-center gap-2">
+            <Button size="sm" asChild className="bg-blue-600 hover:bg-blue-700">
+              <Link to="/professional-builder-dashboard?tab=market-hub">CO/Contractor dashboard</Link>
+            </Button>
+          </div>
+        </div>
+      ) : canPost ? (
         <div className="border-b border-slate-100 dark:border-slate-800 px-3 py-3 sm:px-4">
           <div className="space-y-3">
             <div className="flex items-center gap-3 mb-3">

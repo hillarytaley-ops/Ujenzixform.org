@@ -62,6 +62,7 @@ import {
   Bell,
 } from "lucide-react";
 import { BuilderProfileEdit } from "@/components/builders/BuilderProfileEdit";
+import { BuilderFeed } from "@/components/builders/BuilderFeed";
 import { BuilderOrdersTracker } from "@/components/builders/BuilderOrdersTracker";
 import { ReviewPrompt } from "@/components/reviews/ReviewSystem";
 import { Star } from "lucide-react";
@@ -555,6 +556,7 @@ const ProfessionalBuilderDashboardPage = () => {
     'extras',
     'monitoring',
     'portfolio',
+    'market-hub',
     'team',
     'support',
     'order-history',
@@ -2509,6 +2511,7 @@ const ProfessionalBuilderDashboardPage = () => {
             <TabsTrigger value="extras">Extras</TabsTrigger>
             <TabsTrigger value="monitoring">Monitoring</TabsTrigger>
             <TabsTrigger value="portfolio">Portfolio</TabsTrigger>
+            <TabsTrigger value="market-hub">Market hub</TabsTrigger>
             <TabsTrigger value="team">Team</TabsTrigger>
             <TabsTrigger value="support">Support</TabsTrigger>
             <TabsTrigger value="order-history">Order History</TabsTrigger>
@@ -4394,6 +4397,34 @@ const ProfessionalBuilderDashboardPage = () => {
             </Card>
           </TabsContent>
 
+          <TabsContent value="market-hub">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <MessageSquare className="h-5 w-5 text-orange-600" />
+                  Public market hub — timeline posts
+                </CardTitle>
+                <CardDescription>
+                  Publish updates that appear on the public Construction Market Hub. Videos require admin approval
+                  before they are visible to visitors; text and photos publish immediately.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="min-w-0 p-2 sm:p-4">
+                {user?.id ? (
+                  <BuilderFeed
+                    omitOuterCard
+                    showComposer
+                    includeAuthorPendingVideos
+                    currentUserId={user.id}
+                    currentUserName={profile?.full_name || user.email || 'Builder'}
+                    currentUserAvatar={profile?.avatar_url}
+                    currentUserRole="professional_builder"
+                    isBuilder
+                  />
+                ) : null}
+              </CardContent>
+            </Card>
+          </TabsContent>
 
           {/* Order History Tab */}
           <TabsContent value="order-history">

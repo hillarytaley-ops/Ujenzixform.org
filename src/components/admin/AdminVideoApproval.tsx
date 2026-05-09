@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
-import { Video, Check, X, Eye, Clock, RefreshCw, Play, FileVideo } from "lucide-react";
+import { Video, Check, X, Eye, Clock, RefreshCw, Play, FileVideo, Truck } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -25,16 +25,17 @@ interface VideoItem {
   created_at: string;
   builder_name?: string;
   builder_email?: string;
-  source: 'posts' | 'portfolio';
+  source: 'posts' | 'portfolio' | 'supplier_posts';
 }
 
 export function AdminVideoApproval() {
   const [posts, setPosts] = useState<VideoItem[]>([]);
   const [portfolioVideos, setPortfolioVideos] = useState<VideoItem[]>([]);
+  const [supplierPosts, setSupplierPosts] = useState<VideoItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedVideo, setSelectedVideo] = useState<VideoItem | null>(null);
   const [filter, setFilter] = useState<'all' | 'pending' | 'approved' | 'rejected'>('pending');
-  const [activeTab, setActiveTab] = useState<'posts' | 'portfolio'>('posts');
+  const [activeTab, setActiveTab] = useState<'posts' | 'portfolio' | 'supplier_posts'>('posts');
   const { toast } = useToast();
 
   const getAccessToken = () => {
@@ -110,6 +111,61 @@ export function AdminVideoApproval() {
     }
   };
 
+  const fetchSupplierPosts = async () => {
+    try {
+      const accessToken = getAccessToken();
+      let url = `${SUPABASE_URL}/rest/v1/supplier_marketing_posts?video_url=not.is.null&order=created_at.desc`;
+      if (filter !== 'all') {
+        const statusValue = filter === 'approved' ? 'active' : filter;
+        url += `&status=eq.${statusValue}`;
+      }
+      const res = await fetch(url, {
+        headers: {
+          apikey: SUPABASE_ANON_KEY,
+          Authorization: `Bearer ${accessToken || SUPABASE_ANON_KEY}`,
+        },
+      });
+      if (!res.ok) {
+        setSupplierPosts([]);
+        return;
+      }
+      const data = await res.json();
+      const userIds = [...new Set((data || []).map((p: any) => p.supplier_user_id).filter(Boolean))];
+      let profilesMap: Record<string, { name: string; email: string }> = {};
+      if (userIds.length > 0) {
+        const { data: profilesData } = await supabase
+          .from('profiles')
+          .select('id, user_id, full_name, email, company_name')
+          .in('user_id', userIds);
+        (profilesData || []).forEach((p: any) => {
+          if (p.user_id) {
+            profilesMap[p.user_id] = {
+              name: p.company_name || p.full_name || 'Supplier',
+              email: p.email || '',
+            };
+          }
+        });
+      }
+      const formatted: VideoItem[] = (data || []).map((post: any) => ({
+        id: post.id,
+        builder_id: post.supplier_user_id,
+        title: (post.content || 'Supplier video').substring(0, 80),
+        description: post.content || '',
+        video_url: post.video_url,
+        thumbnail_url: post.thumbnail_url,
+        status: post.status === 'active' ? 'approved' : post.status,
+        created_at: post.created_at,
+        builder_name: profilesMap[post.supplier_user_id]?.name || 'Supplier',
+        builder_email: profilesMap[post.supplier_user_id]?.email || '',
+        source: 'supplier_posts' as const,
+      }));
+      setSupplierPosts(formatted);
+    } catch (e) {
+      console.error('supplier marketing posts fetch:', e);
+      setSupplierPosts([]);
+    }
+  };
+
   const fetchPortfolioVideos = async () => {
     try {
       const accessToken = getAccessToken();
@@ -179,7 +235,7 @@ export function AdminVideoApproval() {
 
   const fetchAll = async () => {
     setLoading(true);
-    await Promise.all([fetchPosts(), fetchPortfolioVideos()]);
+    await Promise.all([fetchPosts(), fetchPortfolioVideos(), fetchSupplierPosts()]);
     setLoading(false);
   };
 
@@ -206,6 +262,20 @@ export function AdminVideoApproval() {
           }
         );
         if (!res.ok) throw new Error('Failed to update post');
+      } else if (video.source === 'supplier_posts') {
+        const res = await fetch(
+          `${SUPABASE_URL}/rest/v1/supplier_marketing_posts?id=eq.${video.id}`,
+          {
+            method: 'PATCH',
+            headers: {
+              apikey: SUPABASE_ANON_KEY,
+              Authorization: `Bearer ${accessToken || SUPABASE_ANON_KEY}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ status: 'active' }),
+          }
+        );
+        if (!res.ok) throw new Error('Failed to update supplier post');
       } else {
         // Update builder_videos is_published to true
         const res = await fetch(
@@ -259,6 +329,20 @@ export function AdminVideoApproval() {
           }
         );
         if (!res.ok) throw new Error('Failed to update post');
+      } else if (video.source === 'supplier_posts') {
+        const res = await fetch(
+          `${SUPABASE_URL}/rest/v1/supplier_marketing_posts?id=eq.${video.id}`,
+          {
+            method: 'PATCH',
+            headers: {
+              apikey: SUPABASE_ANON_KEY,
+              Authorization: `Bearer ${accessToken || SUPABASE_ANON_KEY}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ status: 'rejected' }),
+          }
+        );
+        if (!res.ok) throw new Error('Failed to update supplier post');
       } else {
         // Update builder_videos is_published to false
         const res = await fetch(
@@ -320,8 +404,18 @@ export function AdminVideoApproval() {
           <div className="flex flex-col items-end gap-1">
             {getStatusBadge(video.status)}
             <Badge variant="outline" className="text-xs">
-              {video.source === 'posts' ? <FileVideo className="w-3 h-3 mr-1" /> : <Video className="w-3 h-3 mr-1" />}
-              {video.source === 'posts' ? 'Feed Post' : 'Portfolio'}
+              {video.source === 'posts' ? (
+                <FileVideo className="w-3 h-3 mr-1" />
+              ) : video.source === 'supplier_posts' ? (
+                <Truck className="w-3 h-3 mr-1" />
+              ) : (
+                <Video className="w-3 h-3 mr-1" />
+              )}
+              {video.source === 'posts'
+                ? 'CO feed'
+                : video.source === 'supplier_posts'
+                  ? 'Supplier feed'
+                  : 'Portfolio'}
             </Badge>
           </div>
         </div>
@@ -386,16 +480,20 @@ export function AdminVideoApproval() {
     </Card>
   );
 
-  const currentVideos = activeTab === 'posts' ? posts : portfolioVideos;
-  const pendingPostsCount = posts.filter(v => v.status === 'pending').length;
-  const pendingPortfolioCount = portfolioVideos.filter(v => v.status === 'pending').length;
+  const currentVideos =
+    activeTab === 'posts' ? posts : activeTab === 'supplier_posts' ? supplierPosts : portfolioVideos;
+  const pendingPostsCount = posts.filter((v) => v.status === 'pending').length;
+  const pendingPortfolioCount = portfolioVideos.filter((v) => v.status === 'pending').length;
+  const pendingSupplierCount = supplierPosts.filter((v) => v.status === 'pending').length;
 
   return (
     <div className="p-6 space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Video Approvals</h2>
-          <p className="text-gray-500 dark:text-gray-400">Review and approve builder video content</p>
+          <p className="text-gray-500 dark:text-gray-400">
+            Review and approve CO/contractor feed, supplier marketing, and portfolio videos
+          </p>
         </div>
         <Button variant="outline" onClick={fetchAll} disabled={loading}>
           <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
@@ -404,18 +502,25 @@ export function AdminVideoApproval() {
       </div>
 
       {/* Tabs for Posts vs Portfolio */}
-      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'posts' | 'portfolio')}>
-        <TabsList className="grid w-full max-w-md grid-cols-2">
+      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'posts' | 'portfolio' | 'supplier_posts')}>
+        <TabsList className="grid w-full max-w-2xl grid-cols-3">
           <TabsTrigger value="posts" className="relative">
             <FileVideo className="w-4 h-4 mr-2" />
-            Feed Posts
+            CO feed
             {pendingPostsCount > 0 && (
               <Badge className="ml-2 bg-orange-500 text-white text-xs px-1.5 py-0.5">{pendingPostsCount}</Badge>
             )}
           </TabsTrigger>
+          <TabsTrigger value="supplier_posts" className="relative">
+            <Truck className="w-4 h-4 mr-2" />
+            Supplier feed
+            {pendingSupplierCount > 0 && (
+              <Badge className="ml-2 bg-orange-500 text-white text-xs px-1.5 py-0.5">{pendingSupplierCount}</Badge>
+            )}
+          </TabsTrigger>
           <TabsTrigger value="portfolio" className="relative">
             <Video className="w-4 h-4 mr-2" />
-            Portfolio Videos
+            Portfolio
             {pendingPortfolioCount > 0 && (
               <Badge className="ml-2 bg-orange-500 text-white text-xs px-1.5 py-0.5">{pendingPortfolioCount}</Badge>
             )}
@@ -461,6 +566,29 @@ export function AdminVideoApproval() {
           )}
         </TabsContent>
 
+        <TabsContent value="supplier_posts" className="mt-4">
+          {loading ? (
+            <div className="flex items-center justify-center py-12">
+              <RefreshCw className="w-8 h-8 animate-spin text-orange-500" />
+            </div>
+          ) : supplierPosts.length === 0 ? (
+            <Card className="bg-gray-50 dark:bg-gray-800/50 border-gray-200 dark:border-gray-700">
+              <CardContent className="py-12 text-center">
+                <Truck className="w-12 h-12 mx-auto text-gray-400 mb-4" />
+                <p className="text-gray-500 dark:text-gray-400">
+                  No {filter !== 'all' ? filter : ''} supplier marketing videos found
+                </p>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {supplierPosts.map((video) => (
+                <VideoCard key={video.id} video={video} />
+              ))}
+            </div>
+          )}
+        </TabsContent>
+
         <TabsContent value="portfolio" className="mt-4">
           {loading ? (
             <div className="flex items-center justify-center py-12">
@@ -489,7 +617,12 @@ export function AdminVideoApproval() {
           <DialogHeader>
             <DialogTitle>{selectedVideo?.title}</DialogTitle>
             <DialogDescription>
-              Submitted by {selectedVideo?.builder_name} • {selectedVideo?.source === 'posts' ? 'Feed Post' : 'Portfolio Video'}
+              Submitted by {selectedVideo?.builder_name} •{' '}
+              {selectedVideo?.source === 'posts'
+                ? 'CO feed post'
+                : selectedVideo?.source === 'supplier_posts'
+                  ? 'Supplier marketing post'
+                  : 'Portfolio video'}
             </DialogDescription>
           </DialogHeader>
           {selectedVideo && (

@@ -62,7 +62,7 @@ import { useSupplierData, logDataAccessAttempt } from "@/hooks/useDataIsolation"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { DashboardMobileActionSheet } from "@/components/dashboard/DashboardMobileActionSheet";
-import { MessageSquare, QrCode, Boxes, BarChart3 as BarChartIcon, User, Scan } from "lucide-react";
+import { MessageSquare, QrCode, Boxes, BarChart3 as BarChartIcon, User, Scan, Megaphone } from "lucide-react";
 import { ProfileEditDialog } from "@/components/profile/ProfileEditDialog";
 import { ProfileViewDialog } from "@/components/profile/ProfileViewDialog";
 import {
@@ -87,6 +87,7 @@ import {
 import { Navigation as NavigationIcon, Receipt, Landmark } from "lucide-react";
 import { SupplierInvoiceHub } from "@/components/supplier/SupplierInvoiceHub";
 import { SupplierFinanceTab } from "@/components/supplier/SupplierFinanceTab";
+import { SupplierMarketHubDashboardPanel } from "@/components/supplier/SupplierMarketHubDashboardPanel";
 
 const SupplierTabFallback = () => (
   <div
@@ -748,7 +749,19 @@ const SupplierDashboard = () => {
   });
   const [recentOrders, setRecentOrders] = useState<RecentOrder[]>([]);
   const [ordersForOrdersTab, setOrdersForOrdersTab] = useState<any[]>([]); // Full orders for OrderManagement (so Orders tab shows immediately)
-  const SUPPLIER_TABS = ['overview', 'materials', 'view-orders', 'scan-qr', 'tracking', 'analytics', 'finance', 'invoice', 'etims-test', 'reports'];
+  const SUPPLIER_TABS = [
+    'overview',
+    'market-hub',
+    'materials',
+    'view-orders',
+    'scan-qr',
+    'tracking',
+    'analytics',
+    'finance',
+    'invoice',
+    'etims-test',
+    'reports',
+  ];
   const [activeTab, setActiveTab] = useUrlTabSync(SUPPLIER_TABS, 'overview');
   const [viewOrdersSubTab, setViewOrdersSubTab] = useState('quotes');
   const [materialsSubTab, setMaterialsSubTab] = useState<"add-products" | "my-products" | "view-inventory">("add-products");
@@ -2257,6 +2270,21 @@ const SupplierDashboard = () => {
               <span className="text-[10px] sm:text-xs md:text-sm text-center leading-tight">Overview</span>
             </div>
           </Button>
+          <Button
+            className={`h-auto w-full min-w-0 py-3 sm:py-4 transition-all ${
+              activeTab === 'market-hub'
+                ? 'bg-gradient-to-r from-amber-600 to-orange-600 ring-2 ring-amber-300 shadow-lg'
+                : isDarkMode
+                  ? 'bg-slate-700 hover:bg-slate-600'
+                  : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
+            }`}
+            onClick={() => setActiveTab('market-hub')}
+          >
+            <div className="flex flex-col items-center gap-1.5 sm:gap-2 px-1">
+              <Megaphone className="h-5 w-5 sm:h-6 sm:w-6 shrink-0" />
+              <span className="text-[10px] sm:text-xs md:text-sm text-center leading-tight">Market hub</span>
+            </div>
+          </Button>
           <Button 
             className={`h-auto w-full min-w-0 py-3 sm:py-4 transition-all ${activeTab === 'materials' 
               ? 'bg-gradient-to-r from-orange-500 to-amber-500 ring-2 ring-orange-300 shadow-lg' 
@@ -2372,6 +2400,7 @@ const SupplierDashboard = () => {
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
           <TabsList className="hidden">
             <TabsTrigger value="overview">Overview</TabsTrigger>
+            <TabsTrigger value="market-hub">Market hub</TabsTrigger>
             <TabsTrigger value="materials">My Materials</TabsTrigger>
             <TabsTrigger value="view-orders">View Orders</TabsTrigger>
             <TabsTrigger value="scan-qr">QR Codes</TabsTrigger>
@@ -2463,6 +2492,36 @@ const SupplierDashboard = () => {
                 <LazySupplierCharts isDarkMode={isDarkMode} orderStatusData={orderStatusChartData} />
               </SupplierTabSuspense>
             </div>
+          </TabsContent>
+
+          <TabsContent value="market-hub">
+            <Card className={cardBg}>
+              <CardHeader>
+                <CardTitle className={`flex items-center gap-2 ${textColor}`}>
+                  <Megaphone className="h-5 w-5 text-amber-600" />
+                  Public market hub — your posts
+                </CardTitle>
+                <CardDescription className={mutedText}>
+                  Text and photos go live immediately. Videos stay private until an admin approves them.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="min-w-0">
+                {user?.id ? (
+                  <SupplierMarketHubDashboardPanel
+                    currentUserId={user.id}
+                    currentUserName={
+                      supplierProfile?.company_name ||
+                      isolatedProfile?.full_name ||
+                      user.email ||
+                      'Supplier'
+                    }
+                    currentUserAvatar={isolatedProfile?.avatar_url}
+                    currentUserRole={userRole}
+                    isSupplier={userRole === 'supplier'}
+                  />
+                ) : null}
+              </CardContent>
+            </Card>
           </TabsContent>
 
           {/* ═══════════════════════════════════════════════════════════════════════════════════ */}

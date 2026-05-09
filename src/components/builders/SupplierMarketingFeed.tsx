@@ -7,6 +7,7 @@ import { BuilderVideoPost, BuilderVideoPostProps, VideoComment } from './Builder
 import { SUPABASE_ANON_KEY, SUPABASE_URL, supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { getBuilderFeedGuestId } from '@/utils/builderFeedGuestId';
+import { Link } from 'react-router-dom';
 import { Loader2, Image as ImageIcon, FileVideo, X, Upload } from 'lucide-react';
 import type { PublicSupplierDirectoryRow } from '@/utils/fetchPublicSupplierDirectory';
 
@@ -23,6 +24,10 @@ interface SupplierMarketingFeedProps {
   /** Lookup supplier_user_id → directory row (company, logo, etc.) */
   supplierByUserId: Map<string, PublicSupplierDirectoryRow>;
   omitOuterCard?: boolean;
+  /** Public market hub: false — post only from supplier dashboard. */
+  showComposer?: boolean;
+  /** Dashboard: merge own pending video posts into the list. */
+  includeAuthorPendingVideos?: boolean;
 }
 
 type SupplierPostRow = Omit<
@@ -42,6 +47,8 @@ export const SupplierMarketingFeed: React.FC<SupplierMarketingFeedProps> = ({
   isSupplier = false,
   supplierByUserId,
   omitOuterCard = false,
+  showComposer = false,
+  includeAuthorPendingVideos = false,
 }) => {
   const { toast } = useToast();
   const storedRole = typeof window !== 'undefined' ? localStorage.getItem('user_role') : null;
@@ -54,7 +61,8 @@ export const SupplierMarketingFeed: React.FC<SupplierMarketingFeedProps> = ({
     currentUserName !== 'Guest' ? currentUserName : storedUserName || 'Guest';
 
   const canPost =
-    isSupplier || effectiveRole === 'supplier' || storedRole === 'supplier';
+    showComposer &&
+    (isSupplier || effectiveRole === 'supplier' || storedRole === 'supplier');
 
   const [posts, setPosts] = useState<SupplierPostRow[]>([]);
   const [loadingPosts, setLoadingPosts] = useState(true);
@@ -134,7 +142,41 @@ export const SupplierMarketingFeed: React.FC<SupplierMarketingFeedProps> = ({
 
     const hasMore = rows.length > POSTS_PER_PAGE;
     setHasMorePosts(hasMore);
-    const slice = hasMore ? rows.slice(0, POSTS_PER_PAGE) : rows;
+    const slice: Record<string, unknown>[] = hasMore
+      ? rows.slice(0, POSTS_PER_PAGE)
+      : [...rows];
+
+    if (
+      includeAuthorPendingVideos &&
+      effectiveUserId &&
+      isInitial &&
+      offset === 0
+    ) {
+      try {
+        const pr = await fetch(
+          `${SUPABASE_URL}/rest/v1/supplier_marketing_posts?supplier_user_id=eq.${effectiveUserId}&status=eq.pending&video_url=not.is.null&order=created_at.desc&limit=20`,
+          { headers: authHeaders() }
+        );
+        if (pr.ok) {
+          const pendingRaw = asRestArray<Record<string, unknown>>(await pr.json());
+          const seen = new Set(slice.map((p) => p.id as string));
+          for (const row of pendingRaw) {
+            const id = row.id as string;
+            if (id && !seen.has(id)) {
+              slice.push(row);
+              seen.add(id);
+            }
+          }
+          slice.sort(
+            (a, b) =>
+              new Date(String(b.created_at)).getTime() -
+              new Date(String(a.created_at)).getTime()
+          );
+        }
+      } catch {
+        /* ignore */
+      }
+    }
 
     let accessToken = '';
     try {
@@ -145,7 +187,7 @@ export const SupplierMarketingFeed: React.FC<SupplierMarketingFeedProps> = ({
     }
     const h = authHeaders();
 
-    const postIds = slice.map((p) => p.id as string).filter(Boolean);
+    const postIds = slice.map((p) => String(p.id || '')).filter(Boolean);
     let commentsData: any[] = [];
     if (postIds.length) {
       try {
@@ -192,11 +234,12 @@ export const SupplierMarketingFeed: React.FC<SupplierMarketingFeedProps> = ({
       }
     }
 
-    const mapped: SupplierPostRow[] = slice.map((post: any) => {
-      const uid = post.supplier_user_id as string;
+    const mapped: SupplierPostRow[] = slice.map((post: Record<string, unknown>) => {
+      const row = post as any;
+      const uid = row.supplier_user_id as string;
       const sup = supplierByUserId.get(uid);
       const postComments = commentsData
-        .filter((c: any) => c.post_id === post.id)
+        .filter((c: any) => c.post_id === row.id)
         .map((c: any) => ({
           id: c.id,
           userId: c.user_id || '',
@@ -208,26 +251,26 @@ export const SupplierMarketingFeed: React.FC<SupplierMarketingFeedProps> = ({
           isLiked: false,
         })) as VideoComment[];
 
-      const imgs = Array.isArray(post.image_urls) ? post.image_urls : [];
+      const imgs = Array.isArray(row.image_urls) ? row.image_urls : [];
       const firstImage = typeof imgs[0] === 'string' ? imgs[0] : '';
 
       return {
-        id: post.id,
+        id: row.id,
         builderId: uid,
         builderName: sup?.company_name || 'Supplier',
         builderCompany: sup?.company_name || '',
         builderAvatar: sup?.logo_url || '',
         builderVerified: !!sup?.is_verified,
-        videoUrl: post.video_url || '',
+        videoUrl: row.video_url || '',
         imageUrl: firstImage,
-        thumbnailUrl: post.thumbnail_url || '',
-        caption: post.content || '',
+        thumbnailUrl: row.thumbnail_url || '',
+        caption: row.content || '',
         location: sup?.location || '',
-        timestamp: new Date(post.created_at),
-        likes: post.likes_count || 0,
+        timestamp: new Date(row.created_at),
+        likes: row.likes_count || 0,
         shares: 0,
-        isLiked: reactionByPost.has(post.id),
-        userReaction: reactionByPost.get(post.id) || null,
+        isLiked: reactionByPost.has(row.id),
+        userReaction: reactionByPost.get(row.id) || null,
         comments: postComments,
         embedded: true,
       };
@@ -245,7 +288,7 @@ export const SupplierMarketingFeed: React.FC<SupplierMarketingFeedProps> = ({
 
   useEffect(() => {
     void fetchPosts(0, true);
-  }, []);
+  }, [includeAuthorPendingVideos]);
 
   useEffect(() => {
     setPosts((prev) =>
@@ -542,7 +585,7 @@ export const SupplierMarketingFeed: React.FC<SupplierMarketingFeedProps> = ({
         video_url: videoUrl || null,
         image_urls: imageUrls,
         thumbnail_url: null,
-        status: 'active',
+        status: videoUrl ? 'pending' : 'active',
       };
 
       const res = await fetch(`${SUPABASE_URL}/rest/v1/supplier_marketing_posts`, {
@@ -559,7 +602,14 @@ export const SupplierMarketingFeed: React.FC<SupplierMarketingFeedProps> = ({
         throw new Error(await res.text());
       }
 
-      toast({ title: 'Posted', description: 'Your update is live on the supplier feed.' });
+      if (videoUrl) {
+        toast({
+          title: 'Video submitted',
+          description: 'An admin will review it before it appears on the public market hub.',
+        });
+      } else {
+        toast({ title: 'Posted', description: 'Your update is live on the supplier feed.' });
+      }
       setNewPostText('');
       if (videoPreview) URL.revokeObjectURL(videoPreview);
       if (photoPreview) URL.revokeObjectURL(photoPreview);
@@ -581,9 +631,28 @@ export const SupplierMarketingFeed: React.FC<SupplierMarketingFeedProps> = ({
 
   const inner = (
     <div className="space-y-3">
+      {!showComposer ? (
+        <Card
+          id="supplier-feed-composer-anchor"
+          className="p-3 border border-amber-200/80 bg-amber-50/40 dark:bg-amber-950/20 scroll-mt-24"
+        >
+          <p className="text-sm text-muted-foreground text-center mb-2">
+            Suppliers publish marketing posts from the supplier dashboard. Videos require admin approval before they
+            appear publicly.
+          </p>
+          <div className="flex justify-center">
+            <Button size="sm" asChild className="bg-amber-600 hover:bg-amber-700">
+              <Link to="/supplier-dashboard?tab=market-hub">Supplier dashboard</Link>
+            </Button>
+          </div>
+        </Card>
+      ) : null}
       {canPost && (
-        <Card className="p-3 border border-amber-200/80 bg-amber-50/40 dark:bg-amber-950/20">
-          <p id="supplier-feed-composer-anchor" className="text-xs font-medium text-amber-900 dark:text-amber-100 mb-2">
+        <Card
+          id="supplier-feed-composer-anchor"
+          className="p-3 border border-amber-200/80 bg-amber-50/40 dark:bg-amber-950/20 scroll-mt-24"
+        >
+          <p className="text-xs font-medium text-amber-900 dark:text-amber-100 mb-2">
             Share products, photos, or a short video with buyers.
           </p>
           <Textarea

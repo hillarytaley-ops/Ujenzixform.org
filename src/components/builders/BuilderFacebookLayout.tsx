@@ -898,6 +898,7 @@ export const BuilderFacebookLayout: React.FC<BuilderFacebookLayoutProps> = ({
           <TabsContent value="feed" className="mt-0 flex-1 min-h-0">
             <BuilderFeed
               omitOuterCard
+              showComposer={false}
               currentUserId={currentUserId}
               currentUserName={currentUserName}
               currentUserAvatar={currentUserAvatar}
@@ -953,6 +954,7 @@ export const BuilderFacebookLayout: React.FC<BuilderFacebookLayoutProps> = ({
             <div className="flex-1 min-h-0 overflow-y-auto p-2 sm:p-3">
               <SupplierMarketingFeed
                 omitOuterCard
+                showComposer={false}
                 currentUserId={currentUserId}
                 currentUserName={currentUserName}
                 currentUserAvatar={currentUserAvatar}
