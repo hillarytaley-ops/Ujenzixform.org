@@ -38,7 +38,6 @@ const Suppliers = () => {
   const [user, setUser] = useState<any>(null);
   const [userRole, setUserRole] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [isMobile, setIsMobile] = useState(false);
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const publicStats = useHomePagePublicStats();
@@ -95,16 +94,6 @@ const Suppliers = () => {
       if (storedName) setSelectedProjectName(storedName);
     }
   }, [projectIdFromUrl, isFromDashboard]);
-
-  // Detect mobile device
-  useEffect(() => {
-    const checkMobile = () => {
-      setIsMobile(window.innerWidth < 768);
-    };
-    checkMobile();
-    window.addEventListener('resize', checkMobile);
-    return () => window.removeEventListener('resize', checkMobile);
-  }, []);
 
   // Fast auth check with caching
   useEffect(() => {
@@ -286,11 +275,7 @@ const Suppliers = () => {
 
       {/* Hero Section - Hide when coming from dashboard */}
       {!isFromDashboard && (
-      <section
-        className={`text-white relative overflow-hidden ${
-          showPurchaseAccountGuidance && isGuest ? "py-10 md:py-14" : "py-12 md:py-20"
-        }`}
-      >
+      <section className="text-white relative overflow-hidden py-6 sm:py-8 md:py-10">
         {/* Background Image */}
         <div 
           className="absolute inset-0 bg-cover bg-center"
@@ -302,25 +287,25 @@ const Suppliers = () => {
         {/* Gradient Overlay */}
         <div className="absolute inset-0 bg-gradient-to-br from-slate-900/95 via-emerald-900/90 to-slate-900/95" />
         
-        <div className="container mx-auto px-4 text-center relative z-10">
+        <div className="container mx-auto px-4 text-center relative z-10 max-w-4xl">
           {/* Badge */}
-          <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-sm border border-white/20 rounded-full px-4 py-2 mb-6 md:mb-8">
-            <span className="text-xl md:text-2xl">🇰🇪</span>
-            <span className="text-white font-medium text-sm md:text-base">Kenya · material marketplace</span>
+          <div className="inline-flex items-center gap-1.5 bg-white/10 backdrop-blur-sm border border-white/20 rounded-full px-3 py-1.5 mb-3 md:mb-4">
+            <span className="text-base md:text-lg leading-none">🇰🇪</span>
+            <span className="text-white font-medium text-xs md:text-sm">Kenya · material marketplace</span>
           </div>
           
-          {/* Title - Responsive sizing */}
-          <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold mb-4 md:mb-6 px-1 leading-tight text-balance break-words">
+          {/* Title */}
+          <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-2 md:mb-3 px-1 leading-tight text-balance break-words">
             <span className="text-white">Materials</span>
             <span className="bg-gradient-to-r from-emerald-400 to-teal-400 bg-clip-text text-transparent"> Marketplace</span>
           </h1>
           
           {/* Description — shorter on public view; detailed CTAs live above the catalog */}
           <p
-            className={`mb-6 max-w-2xl mx-auto text-white/80 px-3 sm:px-4 leading-relaxed text-balance ${
+            className={`mb-4 max-w-2xl mx-auto text-white/80 px-2 sm:px-3 leading-snug text-balance ${
               showPurchaseAccountGuidance
-                ? "text-sm sm:text-base md:text-lg"
-                : "text-sm sm:text-base md:text-lg lg:text-xl"
+                ? "text-xs sm:text-sm md:text-base"
+                : "text-xs sm:text-sm md:text-base"
             }`}
           >
             {showPurchaseAccountGuidance ? (
@@ -339,41 +324,43 @@ const Suppliers = () => {
             )}
           </p>
 
-          {/* Stats Row — live counts from public stats RPC */}
-          <div className="flex flex-wrap justify-center gap-6 md:gap-12 mb-8 md:mb-10">
-            <div className="text-center">
-              <div className="text-2xl md:text-4xl font-bold text-white">
+          {/* Stats — compact row */}
+          <div className="flex flex-wrap justify-center gap-x-6 gap-y-2 md:gap-x-10 mb-3 md:mb-4">
+            <div className="text-center min-w-[5.5rem]">
+              <div className="text-lg md:text-2xl font-bold text-white tabular-nums">
                 {formatHomeStatCount(publicStats.supplierCompanies, publicStats.loading)}
               </div>
-              <div className="text-xs md:text-sm text-white/60">Supplier listings</div>
+              <div className="text-[10px] md:text-xs text-white/60 leading-tight">Supplier listings</div>
             </div>
-            <div className="text-center">
-              <div className="text-2xl md:text-4xl font-bold text-emerald-400">
+            <div className="text-center min-w-[5.5rem]">
+              <div className="text-lg md:text-2xl font-bold text-emerald-400 tabular-nums">
                 {formatHomeStatCount(publicStats.approvedMaterials, publicStats.loading)}
               </div>
-              <div className="text-xs md:text-sm text-white/60">Approved materials</div>
+              <div className="text-[10px] md:text-xs text-white/60 leading-tight">Approved materials</div>
             </div>
-            <div className="text-center">
-              <div className="text-2xl md:text-4xl font-bold text-teal-400">47</div>
-              <div className="text-xs md:text-sm text-white/60">Counties (Kenya)</div>
+            <div className="text-center min-w-[5.5rem]">
+              <div className="text-lg md:text-2xl font-bold text-teal-400 tabular-nums">47</div>
+              <div className="text-[10px] md:text-xs text-white/60 leading-tight">Counties (Kenya)</div>
             </div>
           </div>
-          <p className="text-[11px] md:text-xs text-white/45 max-w-md mx-auto mb-6 md:mb-8 px-2">
-            Figures update from directory data; materials count matches approved rows in the catalog.
-          </p>
+          {!isLoggedInBuilder && (
+            <p className="text-[10px] md:text-[11px] text-white/40 max-w-md mx-auto mb-4 px-2 leading-snug">
+              Figures update from directory data; materials count matches approved rows in the catalog.
+            </p>
+          )}
 
           {/* Main CTA */}
-          <Button 
-            size={isMobile ? "default" : "lg"}
-            className="h-12 md:h-14 px-8 md:px-10 bg-white text-slate-900 hover:bg-gray-100 font-bold text-base md:text-lg shadow-2xl mb-8 md:mb-12"
+          <Button
+            size="default"
+            className="h-10 md:h-11 px-6 md:px-8 bg-white text-slate-900 hover:bg-gray-100 font-semibold text-sm md:text-base shadow-lg mb-4 md:mb-5"
             onClick={scrollToMaterials}
           >
-            <ShoppingCart className="h-5 w-5 mr-2" />
+            <ShoppingCart className="h-4 w-4 md:h-5 md:w-5 mr-2 shrink-0" />
             Browse Materials
           </Button>
 
           {showPurchaseAccountGuidance && isGuest && (
-            <div className="max-w-xl mx-auto mt-2 mb-4 flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-xs sm:text-sm text-white/70">
+            <div className="max-w-xl mx-auto mt-0 mb-2 flex flex-wrap items-center justify-center gap-x-3 gap-y-1.5 text-[11px] sm:text-xs text-white/70">
               <span>Also on UjenziXform:</span>
               <Link to="/supplier-auth" className="text-amber-200 hover:text-white underline underline-offset-2">
                 Supplier sign-in
@@ -389,36 +376,47 @@ const Suppliers = () => {
 
           {/* Welcome message for logged-in builders */}
           {isLoggedInBuilder && !showPurchaseAccountGuidance && (
-            <div className="max-w-2xl mx-auto text-center">
-              <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-6 border border-white/20">
-                <div className="flex items-center justify-center gap-3 mb-3">
-                  <div className="w-10 h-10 bg-emerald-500/20 rounded-full flex items-center justify-center">
-                    <ShoppingCart className="h-5 w-5 text-emerald-400" />
+            <div className="max-w-xl mx-auto text-center">
+              <div className="bg-white/10 backdrop-blur-sm rounded-xl p-3 sm:p-4 border border-white/20">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-center gap-2 sm:gap-3 mb-2">
+                  <div className="flex items-center justify-center gap-2">
+                    <div className="w-8 h-8 bg-emerald-500/20 rounded-full flex items-center justify-center shrink-0">
+                      <ShoppingCart className="h-4 w-4 text-emerald-400" />
+                    </div>
+                    <h3 className="text-base sm:text-lg font-bold text-white leading-tight">
+                      Welcome back,{' '}
+                      {userRole === 'professional_builder'
+                        ? 'CO/Contractor'
+                        : userRole === 'private_client'
+                          ? 'Builder'
+                          : 'there'}
+                      !
+                    </h3>
                   </div>
-                  <h3 className="text-xl font-bold text-white">
-                    Welcome back, {userRole === 'professional_builder' ? 'CO/Contractor' : userRole === 'private_client' ? 'Builder' : 'there'}!
-                  </h3>
                 </div>
-                <p className="text-white/70 text-sm mb-4">
-                  Browse materials below and add them to your cart. 
+                <p className="text-white/70 text-xs sm:text-sm mb-2 sm:mb-3 leading-snug">
+                  Scroll down to browse and add to cart.
                   {userRole === 'professional_builder' && ' Request quotes for bulk pricing.'}
-                  {userRole === 'private_client' && ' Buy directly at listed prices.'}
+                  {userRole === 'private_client' && ' Buy at listed prices.'}
                 </p>
-                <div className="flex flex-wrap justify-center gap-3">
-                  <Button 
-                    variant="outline"
-                    size="sm"
-                    className="bg-white/10 border-white/30 text-white hover:bg-white/20"
-                    onClick={() => navigate(
-                      userRole === 'professional_builder' ? '/professional-builder-dashboard' :
-                      userRole === 'private_client' ? '/private-client-dashboard' :
-                      userRole === 'supplier' ? '/supplier-dashboard' :
-                      '/professional-builder-dashboard'
-                    )}
-                  >
-                    ← Back to Dashboard
-                  </Button>
-                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="bg-white/10 border-white/30 text-white hover:bg-white/20 h-9 text-xs sm:text-sm"
+                  onClick={() =>
+                    navigate(
+                      userRole === 'professional_builder'
+                        ? '/professional-builder-dashboard'
+                        : userRole === 'private_client'
+                          ? '/private-client-dashboard'
+                          : userRole === 'supplier'
+                            ? '/supplier-dashboard'
+                            : '/professional-builder-dashboard'
+                    )
+                  }
+                >
+                  ← Back to Dashboard
+                </Button>
               </div>
             </div>
           )}
