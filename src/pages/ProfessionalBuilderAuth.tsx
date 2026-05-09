@@ -12,7 +12,15 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import { Building2, Eye, EyeOff, Loader2, ArrowLeft, Mail, Lock, User, Phone, MapPin, ChevronRight, Briefcase } from 'lucide-react';
-import { SUPABASE_URL, SUPABASE_ANON_KEY } from '@/integrations/supabase/client';
+import { SUPABASE_URL, SUPABASE_ANON_KEY, supabase } from '@/integrations/supabase/client';
+
+async function syncSupabaseClientSession(accessToken: string, refreshToken: string) {
+  const { error } = await supabase.auth.setSession({
+    access_token: accessToken,
+    refresh_token: refreshToken,
+  });
+  if (error) console.warn('ProfessionalBuilderAuth: setSession failed', error);
+}
 
 const ROLE = 'professional_builder';
 const DASHBOARD = '/professional-builder-dashboard';
@@ -110,10 +118,16 @@ const ProfessionalBuilderAuth: React.FC = () => {
       if (dbRole !== ROLE) {
         const correctDashboard = ROLE_DASHBOARDS[dbRole] || '/home';
         localStorage.setItem('user_role', dbRole);
+        localStorage.setItem('user_id', authData.user.id);
+        localStorage.setItem('user_role_verified', String(Date.now()));
         toast({ title: 'Wrong Portal', description: `You are registered as ${dbRole}. Redirecting to your dashboard.` });
+        await syncSupabaseClientSession(authData.access_token, authData.refresh_token);
         window.location.href = correctDashboard;
       } else {
         localStorage.setItem('user_role', ROLE);
+        localStorage.setItem('user_id', authData.user.id);
+        localStorage.setItem('user_role_verified', String(Date.now()));
+        await syncSupabaseClientSession(authData.access_token, authData.refresh_token);
         window.location.href = DASHBOARD;
       }
     } catch (err: any) {
@@ -164,8 +178,11 @@ const ProfessionalBuilderAuth: React.FC = () => {
           }));
           localStorage.setItem('user_role', ROLE);
           localStorage.setItem('user_role_id', userId);
+          localStorage.setItem('user_id', userId);
           localStorage.setItem('user_email', signInData.user.email || '');
+          localStorage.setItem('user_role_verified', String(Date.now()));
           toast({ title: 'Welcome back!', description: 'Redirecting to your dashboard...' });
+          await syncSupabaseClientSession(accessToken, signInData.refresh_token);
           window.location.href = DASHBOARD;
           return;
         }
@@ -211,9 +228,12 @@ const ProfessionalBuilderAuth: React.FC = () => {
         }));
         localStorage.setItem('user_role', ROLE);
         localStorage.setItem('user_role_id', userId);
+        localStorage.setItem('user_id', userId);
         localStorage.setItem('user_email', signInData.user.email || '');
+        localStorage.setItem('user_role_verified', String(Date.now()));
         
         toast({ title: '✅ Profile Updated!', description: 'Redirecting to your dashboard...' });
+        await syncSupabaseClientSession(accessToken, signInData.refresh_token);
         window.location.href = DASHBOARD;
         return;
       }
