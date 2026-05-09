@@ -15,6 +15,7 @@ import {
 const GUEST_MARKETING_NAV = [
   { path: "/", label: "Home" },
   { path: "/builders", label: "Builders" },
+  { path: "/suppliers", label: "Material" },
   { path: "/about", label: "About" },
   { path: "/careers", label: "Careers" },
   { path: "/feedback", label: "Feedback" },

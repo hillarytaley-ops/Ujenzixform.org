@@ -72,11 +72,22 @@ const SuppliersMobileOptimized = () => {
     }
   };
 
+  const canPurchaseMaterials = Boolean(
+    user &&
+    (userRole === 'professional_builder' ||
+      userRole === 'private_client' ||
+      userRole === 'builder')
+  );
+
   return (
     <div className="min-h-screen bg-background overflow-x-hidden">
       <FloatingSocialSidebar />
-      <CartSidebar />
-      <FloatingCartButton />
+      {canPurchaseMaterials && (
+        <>
+          <CartSidebar />
+          <FloatingCartButton />
+        </>
+      )}
       <Navigation />
 
       {/* Hero Section - Clean Professional Design with Building Materials Background */}
@@ -579,7 +590,7 @@ const SuppliersMobileOptimized = () => {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <MaterialsGrid />
+              <MaterialsGrid purchaseEnabled={canPurchaseMaterials} />
             </CardContent>
           </Card>
         </div>

@@ -64,6 +64,8 @@ interface ProductDetailPageProps {
   product: Product;
   onClose?: () => void;
   onBack?: () => void;
+  /** When false, hide quantity and add-to-cart (public browse). */
+  purchaseEnabled?: boolean;
 }
 
 // Color mapping for common colors
@@ -91,7 +93,8 @@ const KNOWN_COLOR_NAMES = new Set(['silver', 'golden', 'gold', 'yellow', 'red', 
 export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
   product,
   onClose,
-  onBack
+  onBack,
+  purchaseEnabled = true,
 }) => {
   const { addItem } = useCart();
   const { toast } = useToast();
@@ -542,58 +545,62 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
             {/* ─────────────────────────────────────────────────────────────
                 QUANTITY & ADD TO CART - Desktop
                 ───────────────────────────────────────────────────────────── */}
-            <div className="hidden lg:block space-y-4">
-              {/* Quantity Selector */}
-              <div className="flex items-center gap-4">
-                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Quantity:
-                </label>
-                <div className="flex items-center border rounded-lg">
-                  <button
-                    onClick={() => handleQuantityChange(-1)}
-                    disabled={quantity <= 1}
-                    className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    <Minus className="h-4 w-4" />
-                  </button>
-                  <span className="w-12 text-center font-medium">{quantity}</span>
-                  <button
-                    onClick={() => handleQuantityChange(1)}
-                    disabled={quantity >= selectedVariant.stock}
-                    className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    <Plus className="h-4 w-4" />
-                  </button>
-                </div>
-                <span className="text-sm text-gray-500">
-                  Total: {formatPrice(selectedVariant.price * quantity)}
-                </span>
-              </div>
-              
-              {/* Add to Cart Button */}
-              <Button
-                onClick={handleAddToCart}
-                disabled={selectedVariant.stock === 0 || isAddingToCart}
-                className="w-full h-14 text-lg bg-green-600 hover:bg-green-700"
-              >
-                {isAddingToCart ? (
-                  <span className="flex items-center gap-2">
-                    <motion.div
-                      animate={{ rotate: 360 }}
-                      transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+            {purchaseEnabled ? (
+              <div className="hidden lg:block space-y-4">
+                <div className="flex items-center gap-4">
+                  <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                    Quantity:
+                  </label>
+                  <div className="flex items-center border rounded-lg">
+                    <button
+                      onClick={() => handleQuantityChange(-1)}
+                      disabled={quantity <= 1}
+                      className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
+                      <Minus className="h-4 w-4" />
+                    </button>
+                    <span className="w-12 text-center font-medium">{quantity}</span>
+                    <button
+                      onClick={() => handleQuantityChange(1)}
+                      disabled={quantity >= selectedVariant.stock}
+                      className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <Plus className="h-4 w-4" />
+                    </button>
+                  </div>
+                  <span className="text-sm text-gray-500">
+                    Total: {formatPrice(selectedVariant.price * quantity)}
+                  </span>
+                </div>
+
+                <Button
+                  onClick={handleAddToCart}
+                  disabled={selectedVariant.stock === 0 || isAddingToCart}
+                  className="w-full h-14 text-lg bg-green-600 hover:bg-green-700"
+                >
+                  {isAddingToCart ? (
+                    <span className="flex items-center gap-2">
+                      <motion.div
+                        animate={{ rotate: 360 }}
+                        transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                      >
+                        <ShoppingCart className="h-5 w-5" />
+                      </motion.div>
+                      Adding...
+                    </span>
+                  ) : (
+                    <span className="flex items-center gap-2">
                       <ShoppingCart className="h-5 w-5" />
-                    </motion.div>
-                    Adding...
-                  </span>
-                ) : (
-                  <span className="flex items-center gap-2">
-                    <ShoppingCart className="h-5 w-5" />
-                    Add to Cart
-                  </span>
-                )}
-              </Button>
-            </div>
+                      Add to Cart
+                    </span>
+                  )}
+                </Button>
+              </div>
+            ) : (
+              <p className="hidden lg:block text-sm text-gray-600 dark:text-gray-400">
+                Sign in as a registered Private Builder or CO/Contractor to add this item to your cart.
+              </p>
+            )}
 
             {/* Trust Badges */}
             <div className="mt-8 pt-6 border-t grid grid-cols-2 gap-4">
@@ -613,41 +620,41 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
       {/* ═══════════════════════════════════════════════════════════════
           STICKY ADD TO CART - Mobile Only
           ═══════════════════════════════════════════════════════════════ */}
-      <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-white dark:bg-gray-900 border-t shadow-lg p-4 z-50">
-        <div className="flex items-center gap-4">
-          {/* Quantity */}
-          <div className="flex items-center border rounded-lg">
-            <button
-              onClick={() => handleQuantityChange(-1)}
-              disabled={quantity <= 1}
-              className="p-3 hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-50"
+      {purchaseEnabled ? (
+        <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-white dark:bg-gray-900 border-t shadow-lg p-4 z-50">
+          <div className="flex items-center gap-4">
+            <div className="flex items-center border rounded-lg">
+              <button
+                onClick={() => handleQuantityChange(-1)}
+                disabled={quantity <= 1}
+                className="p-3 hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-50"
+              >
+                <Minus className="h-4 w-4" />
+              </button>
+              <span className="w-10 text-center font-medium">{quantity}</span>
+              <button
+                onClick={() => handleQuantityChange(1)}
+                disabled={quantity >= selectedVariant.stock}
+                className="p-3 hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-50"
+              >
+                <Plus className="h-4 w-4" />
+              </button>
+            </div>
+
+            <Button
+              onClick={handleAddToCart}
+              disabled={selectedVariant.stock === 0 || isAddingToCart}
+              className="flex-1 h-12 bg-green-600 hover:bg-green-700"
             >
-              <Minus className="h-4 w-4" />
-            </button>
-            <span className="w-10 text-center font-medium">{quantity}</span>
-            <button
-              onClick={() => handleQuantityChange(1)}
-              disabled={quantity >= selectedVariant.stock}
-              className="p-3 hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-50"
-            >
-              <Plus className="h-4 w-4" />
-            </button>
+              <ShoppingCart className="h-5 w-5 mr-2" />
+              Add to Cart • {formatPrice(selectedVariant.price * quantity)}
+            </Button>
           </div>
-          
-          {/* Add to Cart */}
-          <Button
-            onClick={handleAddToCart}
-            disabled={selectedVariant.stock === 0 || isAddingToCart}
-            className="flex-1 h-12 bg-green-600 hover:bg-green-700"
-          >
-            <ShoppingCart className="h-5 w-5 mr-2" />
-            Add to Cart • {formatPrice(selectedVariant.price * quantity)}
-          </Button>
         </div>
-      </div>
-      
+      ) : null}
+
       {/* Spacer for sticky footer on mobile */}
-      <div className="lg:hidden h-24" />
+      {purchaseEnabled ? <div className="lg:hidden h-24" /> : null}
     </div>
   );
 };

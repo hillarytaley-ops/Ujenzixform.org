@@ -55,6 +55,8 @@ interface MobileBookViewProps {
   onClose: () => void;
   initialIndex?: number;
   userRole?: string;
+  /** When false, hide quantity and add-to-cart (public browse). */
+  purchaseEnabled?: boolean;
   onImageLoaded?: (id: string, imageUrl: string) => void;
 }
 
@@ -63,6 +65,7 @@ export const MobileBookView: React.FC<MobileBookViewProps> = ({
   onClose,
   initialIndex = 0,
   userRole,
+  purchaseEnabled = true,
   onImageLoaded
 }) => {
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
@@ -356,10 +359,14 @@ export const MobileBookView: React.FC<MobileBookViewProps> = ({
                 </div>
               </div>
               
-              {/* Quantity & Add to Cart */}
-              {userRole !== 'professional_builder' && (
+              {purchaseEnabled && userRole === 'professional_builder' && (
+                <p className="text-sm text-slate-400 text-center py-2">
+                  Use <strong className="text-slate-200">Order materials</strong> from a project to build quote requests.
+                </p>
+              )}
+              {purchaseEnabled &&
+                (userRole === 'private_client' || userRole === 'builder') && (
                 <div className="space-y-3">
-                  {/* Quantity Selector */}
                   <div className="flex items-center justify-between bg-slate-800/50 rounded-lg p-2">
                     <span className="text-slate-300 text-sm">Quantity:</span>
                     <div className="flex items-center gap-3">
@@ -384,8 +391,7 @@ export const MobileBookView: React.FC<MobileBookViewProps> = ({
                       </Button>
                     </div>
                   </div>
-                  
-                  {/* Add to Cart Button */}
+
                   <Button
                     className="w-full h-12 bg-green-600 hover:bg-green-700 text-white font-semibold"
                     onClick={() => handleAddToCart(currentMaterial)}
@@ -395,6 +401,11 @@ export const MobileBookView: React.FC<MobileBookViewProps> = ({
                     Add to Cart - KES {(currentMaterial.unit_price * getQuantity(currentMaterial.id)).toLocaleString()}
                   </Button>
                 </div>
+              )}
+              {!purchaseEnabled && (
+                <p className="text-sm text-slate-400 text-center py-2">
+                  Viewing only. Sign in as a Private Builder or CO/Contractor to order from this catalog.
+                </p>
               )}
             </CardContent>
           </Card>

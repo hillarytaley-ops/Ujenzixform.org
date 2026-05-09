@@ -36,10 +36,9 @@ import { Label } from '@/components/ui/label';
 import { QuickPurchaseOrder } from '@/components/builders/QuickPurchaseOrder';
 import { getDefaultCategoryImage } from '@/config/defaultCategoryImages';
 import { LazyImage } from '@/components/ui/LazyImage';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, Link } from 'react-router-dom';
 import { useCart } from '@/contexts/CartContext';
 import { supplierLocationLine } from '@/utils/supplierLocationLine';
-import { PriceComparisonModal } from './PriceComparisonModal';
 import { PriceComparisonTable } from './PriceComparisonTable';
 import { QuoteCart, QuoteCartButton, QuoteCartItem } from './QuoteCart';
 import { MobileBookView } from './MobileBookView';
@@ -386,9 +385,19 @@ const PRODUCT_CATEGORIES = [
 export type MaterialsGridProps = {
   /** When true, skip the large duplicate page title (parent page already showed marketplace context). */
   embeddedInDashboard?: boolean;
+  /**
+   * When false, catalog is view-only (no cart, checkout, quotes, multi-quote).
+   * Parent should set from registered buyer roles only. Defaults to true for embedded dashboards.
+   */
+  purchaseEnabled?: boolean;
 };
 
-export const MaterialsGrid: React.FC<MaterialsGridProps> = ({ embeddedInDashboard = false }) => {
+const MATERIALS_BUYER_ROLES = ['professional_builder', 'private_client', 'builder'] as const;
+
+export const MaterialsGrid: React.FC<MaterialsGridProps> = ({
+  embeddedInDashboard = false,
+  purchaseEnabled = true,
+}) => {
   const [searchParams] = useSearchParams();
   const [materials, setMaterials] = useState<Material[]>([]);
   const [filteredMaterials, setFilteredMaterials] = useState<Material[]>([]);
@@ -398,7 +407,7 @@ export const MaterialsGrid: React.FC<MaterialsGridProps> = ({ embeddedInDashboar
   const [totalMaterialsCount, setTotalMaterialsCount] = useState(0);
   
   // Use AuthContext for reliable auth state (instead of making separate Supabase calls)
-  const { user: authUser, userRole: authUserRole, loading: authLoading, session } = useAuth();
+  const { user: authUser, userRole: authUserRole, session } = useAuth();
 
   /** User JWT for PostgREST catalog reads (anon lost SELECT after DB hardening). */
   const postgrestAuthorization = useMemo(
@@ -419,6 +428,8 @@ export const MaterialsGrid: React.FC<MaterialsGridProps> = ({ embeddedInDashboar
   const roleLower = String(userRole || '').trim().toLowerCase();
   const isSupplierRole = roleLower === 'supplier';
   const isStaffAdminRole = roleLower === 'admin' || roleLower === 'super_admin';
+  const isMaterialsBuyerRole = (MATERIALS_BUYER_ROLES as readonly string[]).includes(roleLower);
+  const showPurchaseChrome = purchaseEnabled && !!authUser && isMaterialsBuyerRole;
   
   // Check authentication from multiple sources for reliability
   const isAuthenticated = !!authUser || !!localStorage.getItem('user_id') || (() => {
@@ -1490,11 +1501,10 @@ export const MaterialsGrid: React.FC<MaterialsGridProps> = ({ embeddedInDashboar
         window.location.href = '/home';
         return;
       }
-      // Only COs/Contractors can request quotes
-      if (userRole !== 'professional_builder' && userRole !== 'admin') {
+      if (!showPurchaseChrome || userRole !== 'professional_builder') {
         toast({
-          title: '📋 CO/Contractor Required',
-          description: 'Only COs/Contractors can request quotes. Private Builders can buy directly.',
+          title: '📋 CO/Contractor required',
+          description: 'Only registered COs/Contractors can request quotes from this catalog.',
           variant: 'destructive',
         });
         return;
@@ -1601,11 +1611,10 @@ export const MaterialsGrid: React.FC<MaterialsGridProps> = ({ embeddedInDashboar
         return;
       }
       
-      // Only Private Builders can buy directly
-      if (userRole !== 'private_client' && userRole !== 'admin') {
+      if (!showPurchaseChrome || userRole !== 'private_client') {
         toast({
-          title: '🛒 Private Builder Required',
-          description: 'Only Private Builders can purchase directly. COs/Contractors should request quotes.',
+          title: '🛒 Private builder required',
+          description: 'Only registered Private Builders can purchase directly at listed prices.',
           variant: 'destructive',
         });
         return;
@@ -1732,10 +1741,15 @@ export const MaterialsGrid: React.FC<MaterialsGridProps> = ({ embeddedInDashboar
         window.location.href = '/auth?lite=1&redirect=' + encodeURIComponent('/suppliers?tab=purchase');
         return;
       }
-      if (
-        (userRole === 'professional_builder' || userRole === 'admin') &&
-        !getCartProjectId()
-      ) {
+      if (!showPurchaseChrome || userRole !== 'professional_builder') {
+        toast({
+          title: 'CO/Contractor only',
+          description: 'Multi-supplier quote is available to registered COs/Contractors.',
+          variant: 'destructive',
+        });
+        return;
+      }
+      if (userRole === 'professional_builder' && !getCartProjectId()) {
         toast({
           title: 'Select a project first',
           description:
@@ -1839,29 +1853,28 @@ export const MaterialsGrid: React.FC<MaterialsGridProps> = ({ embeddedInDashboar
 
   return (
     <div className="space-y-6">
-      {/* Banner for Non-Registered Users */}
-      {!isAuthenticated && (
-        <Alert className="bg-gradient-to-r from-orange-50 to-amber-50 border-orange-300 border-2">
+      {/* Public / view-only: browsing is allowed; purchasing requires a buyer account */}
+      {!showPurchaseChrome && (
+        <Alert className="bg-slate-50 border-slate-200 border">
           <AlertDescription className="w-full">
-            <div className="flex flex-col items-center justify-center text-center gap-4 py-2">
-              <div className="flex items-center gap-2">
-                <ShoppingCart className="h-5 w-5 text-orange-600" />
-                <strong className="text-orange-800 text-lg">🏗️ Want to Buy or Request Quotes?</strong>
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 py-1">
+              <div className="min-w-0 space-y-1">
+                <p className="font-semibold text-slate-900 text-sm sm:text-base">Browse-only catalog</p>
+                <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
+                  You can search, filter, and compare listings. Purchasing and supplier quotes are only available to
+                  registered Private Builders and CO/Contractors after sign-in.
+                </p>
               </div>
-              <p className="text-sm text-orange-700">
-                <strong>Private Builders</strong> can buy directly | <strong>COs/Contractors</strong> can request quotes
-              </p>
-              <div className="flex gap-3">
-                <a href="/home">
-                  <Button size="sm" className="bg-orange-600 hover:bg-orange-700 text-white">
-                    Register Now
-                  </Button>
-                </a>
-                <a href="/home">
-                  <Button size="sm" variant="outline" className="border-orange-400 text-orange-700 hover:bg-orange-100">
-                    Sign In
-                  </Button>
-                </a>
+              <div className="flex flex-wrap gap-2 shrink-0">
+                <Button asChild size="sm" variant="default" className="bg-slate-900 hover:bg-slate-800">
+                  <Link to="/unified-auth">Sign in</Link>
+                </Button>
+                <Button asChild size="sm" variant="outline">
+                  <Link to="/private-client-registration">Private builder</Link>
+                </Button>
+                <Button asChild size="sm" variant="outline">
+                  <Link to="/professional-builder-registration">CO / Contractor</Link>
+                </Button>
               </div>
             </div>
           </AlertDescription>
@@ -1873,7 +1886,7 @@ export const MaterialsGrid: React.FC<MaterialsGridProps> = ({ embeddedInDashboar
           - CO/Contractor: ONLY Request Quote
           - Private Client: ONLY Buy Now
           ═══════════════════════════════════════════════════════════════════════════════ */}
-      {isAuthenticated && userRole === 'professional_builder' && (
+      {showPurchaseChrome && userRole === 'professional_builder' && (
         <Alert
           className={`bg-gradient-to-r from-blue-50 to-purple-50 border-blue-300 ${embeddedInDashboard ? 'border py-3' : 'border-2'}`}
         >
@@ -1893,7 +1906,7 @@ export const MaterialsGrid: React.FC<MaterialsGridProps> = ({ embeddedInDashboar
         </Alert>
       )}
       
-      {isAuthenticated && userRole === 'private_client' && (
+      {showPurchaseChrome && userRole === 'private_client' && (
         <Alert
           className={`bg-gradient-to-r from-green-50 to-emerald-50 border-green-300 ${embeddedInDashboard ? 'border py-3' : 'border-2'}`}
         >
@@ -1912,19 +1925,20 @@ export const MaterialsGrid: React.FC<MaterialsGridProps> = ({ embeddedInDashboar
         </Alert>
       )}
 
-      {isAuthenticated && userRole && !['professional_builder', 'private_client', 'admin'].includes(userRole) && (
-        <Alert className="bg-gradient-to-r from-red-50 to-orange-50 border-red-300 border-2">
+      {isAuthenticated && !showPurchaseChrome && userRole && (
+        <Alert className="bg-gradient-to-r from-amber-50 to-orange-50 border-amber-200 border">
           <AlertDescription className="ml-2">
-            <strong className="text-red-800">⚠️ Purchasing Not Available</strong>
-            <p className="text-sm text-red-700 mt-1">
-              Your account type ({userRole}) cannot purchase materials. Please register as a <strong>Private Builder</strong> or <strong>CO/Contractor</strong>.
+            <strong className="text-amber-900">Purchasing not available for this account</strong>
+            <p className="text-sm text-amber-900/90 mt-1">
+              Signed in as <strong>{userRole}</strong>. Materials on this page are view-only. Use a{' '}
+              <strong>Private Builder</strong> or <strong>CO/Contractor</strong> account to buy or request quotes.
             </p>
           </AlertDescription>
         </Alert>
       )}
 
       {/* Welcome Message for New Registrations */}
-      {showWelcome && (
+      {showPurchaseChrome && showWelcome && (
         <Alert className="bg-gradient-to-r from-green-50 to-blue-50 border-green-300">
           <PartyPopper className="h-5 w-5 text-green-600" />
           <AlertDescription className="ml-2">
@@ -1967,9 +1981,9 @@ export const MaterialsGrid: React.FC<MaterialsGridProps> = ({ embeddedInDashboar
         )}
         <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto sm:justify-end">
           {/* Shopping Cart Button - For all builders */}
-          {(userRole === 'professional_builder' || userRole === 'private_client' || userRole === 'admin') && (
-            <Button 
-              onClick={() => setIsCartOpen(true)} 
+          {showPurchaseChrome && (
+            <Button
+              onClick={() => setIsCartOpen(true)}
               className={`${cartItems.length > 0 ? 'bg-green-600 hover:bg-green-700' : 'bg-gray-500 hover:bg-gray-600'}`}
             >
               <ShoppingCart className="h-4 w-4 mr-2" />
@@ -1977,13 +1991,12 @@ export const MaterialsGrid: React.FC<MaterialsGridProps> = ({ embeddedInDashboar
               <Badge className="ml-2 bg-white text-green-600">{getTotalItems()}</Badge>
             </Button>
           )}
-          <Button 
-            onClick={openMultiQuote} 
-            className="bg-orange-600 hover:bg-orange-700"
-          >
-            <PartyPopper className="h-4 w-4 mr-2" />
-            Multi-quote
-          </Button>
+          {showPurchaseChrome && userRole === 'professional_builder' && (
+            <Button onClick={openMultiQuote} className="bg-orange-600 hover:bg-orange-700">
+              <PartyPopper className="h-4 w-4 mr-2" />
+              Multi-quote
+            </Button>
+          )}
           <Button onClick={loadMaterials} variant="outline">
             <Package className="h-4 w-4 mr-2" />
             Refresh
@@ -2264,29 +2277,10 @@ export const MaterialsGrid: React.FC<MaterialsGridProps> = ({ embeddedInDashboar
 
                 const handleAddToCart = () => {
                   try {
-                    // Only authenticated users can add to cart
-                    if (!isAuthenticated) {
+                    if (!showPurchaseChrome) {
                       toast({
-                        title: '🔐 Sign In Required',
-                        description: 'Please sign in to purchase materials.',
-                      });
-                      setTimeout(() => {
-                        window.location.href = '/home';
-                      }, 1500);
-                      return;
-                    }
-                    
-                    // Allow cart additions for:
-                    // 1. Private Clients, COs/Contractors, Admins (explicit roles)
-                    // 2. Users with null role (role not yet loaded or not assigned - let them shop, check at checkout)
-                    const allowedRoles = ['private_client', 'professional_builder', 'admin', 'builder'];
-                    const canAddToCart = userRole === null || allowedRoles.includes(userRole);
-                    
-                    if (!canAddToCart) {
-                      toast({
-                        title: '⚠️ Builder Account Required',
-                        description: `Your role (${userRole}) cannot purchase materials. Please register as a Private Client or CO/Contractor.`,
-                        variant: 'destructive',
+                        title: 'Browse only',
+                        description: 'Sign in as a Private Builder or CO/Contractor to add items to your cart.',
                       });
                       return;
                     }
@@ -2564,8 +2558,8 @@ export const MaterialsGrid: React.FC<MaterialsGridProps> = ({ embeddedInDashboar
                         </div>
                       )}
                       
-                      {/* Price - Hidden for COs/Contractors who get pricing via quotes */}
-                      {userRole === 'professional_builder' ? (
+                      {/* Price - Hidden for COs/Contractors (quote flow) when they can purchase */}
+                      {userRole === 'professional_builder' && showPurchaseChrome ? (
                         <div className="flex items-center gap-1 bg-blue-50 rounded-lg px-2 py-1">
                           <FileText className="h-3 w-3 text-blue-600" />
                           <span className="text-xs font-medium text-blue-700">Request quote for pricing</span>
@@ -2589,8 +2583,8 @@ export const MaterialsGrid: React.FC<MaterialsGridProps> = ({ embeddedInDashboar
                         </div>
                       )}
                       
-                      {/* Compare Price Checkbox - Hidden for COs/Contractors and Suppliers */}
-                      {!isSupplierRole && userRole !== 'professional_builder' && (
+                      {/* Compare Price Checkbox - Hidden for COs in quote mode and Suppliers */}
+                      {!isSupplierRole && !(userRole === 'professional_builder' && showPurchaseChrome) && (
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
@@ -2615,76 +2609,85 @@ export const MaterialsGrid: React.FC<MaterialsGridProps> = ({ embeddedInDashboar
                         </button>
                       )}
                       
-                      {/* Quantity Selector */}
-                      <div className="flex items-center justify-between bg-gray-50 rounded-lg p-2">
-                        <span className="text-xs text-gray-600">Qty:</span>
-                        <div className="flex items-center gap-1">
+                      {showPurchaseChrome ? (
+                        <>
+                          {/* Quantity Selector */}
+                          <div className="flex items-center justify-between bg-gray-50 rounded-lg p-2">
+                            <span className="text-xs text-gray-600">Qty:</span>
+                            <div className="flex items-center gap-1">
+                              <Button
+                                variant="outline"
+                                size="icon"
+                                className="h-7 w-7"
+                                onClick={() => updateQuantity(material.id, currentQty - 1)}
+                                disabled={currentQty <= 0 || !material.in_stock}
+                              >
+                                <Minus className="h-3 w-3" />
+                              </Button>
+                              <Input
+                                type="number"
+                                min="0"
+                                value={currentQty}
+                                onChange={(e) => updateQuantity(material.id, parseInt(e.target.value) || 0)}
+                                className="w-12 h-7 text-center text-sm px-1"
+                                disabled={!material.in_stock}
+                              />
+                              <Button
+                                variant="outline"
+                                size="icon"
+                                className="h-7 w-7"
+                                onClick={() => updateQuantity(material.id, currentQty + 1)}
+                                disabled={!material.in_stock}
+                              >
+                                <Plus className="h-3 w-3" />
+                              </Button>
+                            </div>
+                            {userRole === 'professional_builder' ? (
+                              <span className="text-xs text-blue-600 min-w-[50px] text-right">
+                                {currentQty} {material.unit}
+                              </span>
+                            ) : (
+                              <span className="text-xs font-semibold text-gray-700 min-w-[50px] text-right">
+                                {(() => {
+                                  if (
+                                    material.pricing_type === 'variants' &&
+                                    material.variants &&
+                                    material.variants.length > 0
+                                  ) {
+                                    const selectedVariant =
+                                      getVariantByKey(material.variants, selectedVariants[material.id]) ??
+                                      material.variants[0];
+                                    return `KES ${((selectedVariant?.price || 0) * currentQty).toLocaleString()}`;
+                                  }
+                                  return `KES ${(material.unit_price * currentQty).toLocaleString()}`;
+                                })()}
+                              </span>
+                            )}
+                          </div>
+
                           <Button
-                            variant="outline"
-                            size="icon"
-                            className="h-7 w-7"
-                            onClick={() => updateQuantity(material.id, currentQty - 1)}
-                            disabled={currentQty <= 0 || !material.in_stock}
-                          >
-                            <Minus className="h-3 w-3" />
-                          </Button>
-                          <Input
-                            type="number"
-                            min="0"
-                            value={currentQty}
-                            onChange={(e) => updateQuantity(material.id, parseInt(e.target.value) || 0)}
-                            className="w-12 h-7 text-center text-sm px-1"
-                            disabled={!material.in_stock}
-                          />
-                          <Button
-                            variant="outline"
-                            size="icon"
-                            className="h-7 w-7"
-                            onClick={() => updateQuantity(material.id, currentQty + 1)}
-                            disabled={!material.in_stock}
-                          >
-                            <Plus className="h-3 w-3" />
-                          </Button>
-                        </div>
-                        {/* Hide subtotal for COs/Contractors - they get pricing via quotes */}
-                        {userRole === 'professional_builder' ? (
-                          <span className="text-xs text-blue-600 min-w-[50px] text-right">
-                            {currentQty} {material.unit}
-                          </span>
-                        ) : (
-                          <span className="text-xs font-semibold text-gray-700 min-w-[50px] text-right">
-                            {(() => {
-                              // Calculate price based on variant if available
-                              if (material.pricing_type === 'variants' && material.variants && material.variants.length > 0) {
-                                const selectedVariant = getVariantByKey(material.variants, selectedVariants[material.id]) ?? material.variants[0];
-                                return `KES ${((selectedVariant?.price || 0) * currentQty).toLocaleString()}`;
+                            className="w-full h-11 text-sm font-semibold bg-green-600 hover:bg-green-700 text-white"
+                            onClick={() => {
+                              try {
+                                handleAddToCart();
+                              } catch {
+                                /* toast inside handleAddToCart */
                               }
-                              return `KES ${(material.unit_price * currentQty).toLocaleString()}`;
-                            })()}
-                          </span>
-                        )}
-                      </div>
-                      
-                      {/* ACTION BUTTON - Single Add to Cart for all builders */}
-                      <Button 
-                        className="w-full h-11 text-sm font-semibold bg-green-600 hover:bg-green-700 text-white"
-                        onClick={() => {
-                          if (!isAuthenticated) {
-                            window.location.href = '/home';
-                            return;
-                          }
-                          try {
-                            handleAddToCart();
-                            // Success toast is shown inside handleAddToCart
-                          } catch (err) {
-                            // Error toast already shown in handleAddToCart
-                          }
-                        }}
-                        disabled={!material.in_stock}
-                      >
-                        <ShoppingCart className="h-4 w-4 mr-2" />
-                        Add to Cart
-                      </Button>
+                            }}
+                            disabled={!material.in_stock}
+                          >
+                            <ShoppingCart className="h-4 w-4 mr-2" />
+                            Add to Cart
+                          </Button>
+                        </>
+                      ) : (
+                        <p className="text-xs text-center text-muted-foreground py-2 px-1">
+                          <Link to="/unified-auth" className="text-emerald-700 font-medium underline-offset-2 hover:underline">
+                            Sign in
+                          </Link>{' '}
+                          as a Private Builder or CO/Contractor to order from this catalog.
+                        </p>
+                      )}
                       
                       {/* Mobile Book View Button */}
                       {isMobile && (
@@ -2881,6 +2884,7 @@ export const MaterialsGrid: React.FC<MaterialsGridProps> = ({ embeddedInDashboar
           onClose={() => setIsCompareModalOpen(false)}
           selectedMaterials={getComparisonMaterials()}
           allMaterials={materials}
+          purchaseEnabled={showPurchaseChrome}
         />
       )}
 
@@ -2990,10 +2994,9 @@ export const MaterialsGrid: React.FC<MaterialsGridProps> = ({ embeddedInDashboar
                     <div>
                       <p className="text-slate-400 text-sm">{galleryMaterial.category}</p>
                       <p className="text-white font-semibold">
-                        {userRole === 'professional_builder' 
-                          ? 'Request quote for pricing' 
-                          : `KES ${galleryMaterial.unit_price?.toLocaleString() || '0'} / ${galleryMaterial.unit}`
-                        }
+                        {userRole === 'professional_builder' && showPurchaseChrome
+                          ? 'Request quote for pricing'
+                          : `KES ${galleryMaterial.unit_price?.toLocaleString() || '0'} / ${galleryMaterial.unit}`}
                       </p>
                     </div>
                     <Badge className={galleryMaterial.in_stock ? 'bg-green-600' : 'bg-red-600'}>
@@ -3025,6 +3028,7 @@ export const MaterialsGrid: React.FC<MaterialsGridProps> = ({ embeddedInDashboar
           onClose={() => setShowBookView(false)}
           initialIndex={bookViewStartIndex}
           userRole={userRole || undefined}
+          purchaseEnabled={showPurchaseChrome}
           onImageLoaded={(id, imageUrl) => {
             // Update materials state with newly loaded image
             setMaterials(prev => prev.map(m => 
@@ -3039,6 +3043,7 @@ export const MaterialsGrid: React.FC<MaterialsGridProps> = ({ embeddedInDashboar
         product={selectedProductDetail}
         isOpen={!!selectedProductDetail}
         onClose={() => setSelectedProductDetail(null)}
+        purchaseEnabled={showPurchaseChrome}
       />
 
       <PostOrderPaystackModal

@@ -58,6 +58,8 @@ interface PriceComparisonTableProps {
   onClose: () => void;
   selectedMaterials: Material[];
   allMaterials: Material[];
+  /** When false, matrix is compare-only (no add-to-cart). */
+  purchaseEnabled?: boolean;
 }
 
 interface SupplierData {
@@ -74,7 +76,8 @@ export const PriceComparisonTable: React.FC<PriceComparisonTableProps> = ({
   isOpen,
   onClose,
   selectedMaterials,
-  allMaterials
+  allMaterials,
+  purchaseEnabled = true,
 }) => {
   const { addToCart } = useCart();
   const { toast } = useToast();
@@ -177,6 +180,13 @@ export const PriceComparisonTable: React.FC<PriceComparisonTableProps> = ({
   }, [selectedMaterials, allMaterials]);
 
   const handleAddAllFromSupplier = (supplier: SupplierData) => {
+    if (!purchaseEnabled) {
+      toast({
+        title: 'Browse only',
+        description: 'Sign in as a Private Builder or CO/Contractor to add items to your cart.',
+      });
+      return;
+    }
     supplier.materials.forEach((material) => {
       addToCart({
         id: material.id,
@@ -199,6 +209,13 @@ export const PriceComparisonTable: React.FC<PriceComparisonTableProps> = ({
   };
 
   const handleAddSingleItem = (material: Material) => {
+    if (!purchaseEnabled) {
+      toast({
+        title: 'Browse only',
+        description: 'Sign in as a Private Builder or CO/Contractor to add items to your cart.',
+      });
+      return;
+    }
     addToCart({
       id: material.id,
       name: material.name,
@@ -283,13 +300,19 @@ export const PriceComparisonTable: React.FC<PriceComparisonTableProps> = ({
                   </p>
                 </div>
               </div>
-              <Button 
-                className="bg-green-600 hover:bg-green-700 shadow-lg"
-                onClick={() => handleAddAllFromSupplier(cheapestSupplier)}
-              >
-                <ShoppingCart className="h-4 w-4 mr-2" />
-                Buy All from {cheapestSupplier.name}
-              </Button>
+              {purchaseEnabled ? (
+                <Button
+                  className="bg-green-600 hover:bg-green-700 shadow-lg"
+                  onClick={() => handleAddAllFromSupplier(cheapestSupplier)}
+                >
+                  <ShoppingCart className="h-4 w-4 mr-2" />
+                  Buy All from {cheapestSupplier.name}
+                </Button>
+              ) : (
+                <p className="text-xs text-green-800 max-w-xs text-right">
+                  Compare only — sign in as a registered builder to purchase.
+                </p>
+              )}
             </div>
           </div>
         )}
@@ -388,17 +411,21 @@ export const PriceComparisonTable: React.FC<PriceComparisonTableProps> = ({
                               <span className="text-xs text-gray-500">
                                 per {material.unit}
                               </span>
-                              <Button
-                                size="sm"
-                                variant={isCheapestPrice ? "default" : "outline"}
-                                className={`text-xs h-7 ${
-                                  isCheapestPrice ? 'bg-green-600 hover:bg-green-700' : ''
-                                }`}
-                                onClick={() => handleAddSingleItem(material)}
-                              >
-                                <ShoppingCart className="h-3 w-3 mr-1" />
-                                Add
-                              </Button>
+                              {purchaseEnabled ? (
+                                <Button
+                                  size="sm"
+                                  variant={isCheapestPrice ? "default" : "outline"}
+                                  className={`text-xs h-7 ${
+                                    isCheapestPrice ? 'bg-green-600 hover:bg-green-700' : ''
+                                  }`}
+                                  onClick={() => handleAddSingleItem(material)}
+                                >
+                                  <ShoppingCart className="h-3 w-3 mr-1" />
+                                  Add
+                                </Button>
+                              ) : (
+                                <span className="text-[10px] text-gray-500">View only</span>
+                              )}
                             </div>
                           ) : (
                             <div className="text-gray-400 text-sm">
@@ -445,19 +472,21 @@ export const PriceComparisonTable: React.FC<PriceComparisonTableProps> = ({
                             LOWEST
                           </Badge>
                         )}
-                        <Button
-                          size="sm"
-                          variant="secondary"
-                          className={`mt-1 ${
-                            isCheapest 
-                              ? 'bg-white text-green-700 hover:bg-green-50' 
-                              : 'bg-gray-600 hover:bg-gray-500'
-                          }`}
-                          onClick={() => handleAddAllFromSupplier(supplier)}
-                        >
-                          <ShoppingCart className="h-3 w-3 mr-1" />
-                          Buy All
-                        </Button>
+                        {purchaseEnabled ? (
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            className={`mt-1 ${
+                              isCheapest
+                                ? 'bg-white text-green-700 hover:bg-green-50'
+                                : 'bg-gray-600 hover:bg-gray-500'
+                            }`}
+                            onClick={() => handleAddAllFromSupplier(supplier)}
+                          >
+                            <ShoppingCart className="h-3 w-3 mr-1" />
+                            Buy All
+                          </Button>
+                        ) : null}
                       </div>
                     </td>
                   );

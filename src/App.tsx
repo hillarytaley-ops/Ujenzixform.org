@@ -283,16 +283,15 @@ const App = () => {
                     {/* Public home (same Index as /); ?browse=1 skips auto-redirect to role dashboard */}
                     <Route path="/home" element={<Index />} />
                     <Route path="/payment/paystack-callback" element={<SuspenseWrapper><PaystackPaymentCallback /></SuspenseWrapper>} />
+                    {/* Materials marketplace: public browse; purchase UI gated inside page + MaterialsGrid */}
                     {SUPPLIERS_PAGE_PATHS.map((p) => (
                       <Route
                         key={p}
                         path={p}
                         element={
-                          <RoleProtectedRoute allowedRoles={[...MARKETPLACE_AND_LOGISTICS_ROLES]}>
-                            <SuspenseWrapper>
-                              <Suppliers />
-                            </SuspenseWrapper>
-                          </RoleProtectedRoute>
+                          <SuspenseWrapper>
+                            <Suppliers />
+                          </SuspenseWrapper>
                         }
                       />
                     ))}

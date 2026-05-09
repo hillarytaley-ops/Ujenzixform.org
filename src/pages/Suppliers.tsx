@@ -166,6 +166,14 @@ const Suppliers = () => {
     userRole === 'supplier'
   );
 
+  /** Only registered CO/contractor, private builder, or legacy builder may purchase or use cart on this page */
+  const canPurchaseMaterials = Boolean(
+    user &&
+    (userRole === 'professional_builder' ||
+      userRole === 'private_client' ||
+      userRole === 'builder')
+  );
+
   // Show restricted access message for delivery providers
   if (user && isDeliveryProvider) {
     return (
@@ -216,8 +224,12 @@ const Suppliers = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      <CartSidebar />
-      <FloatingCartButton />
+      {canPurchaseMaterials && (
+        <>
+          <CartSidebar />
+          <FloatingCartButton />
+        </>
+      )}
       <Navigation />
 
       {/* Dashboard Header - Show when coming from dashboard */}
@@ -300,8 +312,8 @@ const Suppliers = () => {
           
           {/* Description */}
           <p className="text-sm sm:text-base md:text-lg lg:text-xl mb-6 max-w-2xl mx-auto text-white/80 px-3 sm:px-4 leading-relaxed text-balance">
-            Browse approved listings, compare options, and check out with M-Pesa where enabled. Delivery depends on your area and
-            active partners.
+            Anyone can browse this catalog. Purchasing and supplier quotes are available after you sign in as a registered
+            Private Builder or CO/Contractor. Delivery depends on your area and active partners.
           </p>
 
           {/* Stats Row — live counts from public stats RPC */}
@@ -450,7 +462,7 @@ const Suppliers = () => {
             </div>
             <div className="flex items-center gap-2">
               <Star className="h-5 w-5 text-emerald-600" />
-              <span className="text-sm md:text-base">Compare prices before you buy</span>
+              <span className="text-sm md:text-base">Compare prices in the catalog</span>
             </div>
           </div>
         </div>
@@ -471,7 +483,7 @@ const Suppliers = () => {
             </div>
           )}
 
-          <MaterialsGrid embeddedInDashboard={isFromDashboard} />
+          <MaterialsGrid embeddedInDashboard={isFromDashboard} purchaseEnabled={canPurchaseMaterials} />
         </div>
       </section>
 

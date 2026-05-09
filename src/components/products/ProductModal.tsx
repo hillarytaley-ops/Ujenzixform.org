@@ -44,12 +44,15 @@ interface ProductModalProps {
   product: Product | null;
   isOpen: boolean;
   onClose: () => void;
+  /** When false, hide add-to-cart and quantity (browse-only catalog). */
+  purchaseEnabled?: boolean;
 }
 
 export const ProductModal: React.FC<ProductModalProps> = ({
   product,
   isOpen,
-  onClose
+  onClose,
+  purchaseEnabled = true,
 }) => {
   if (!product) return null;
 
@@ -70,6 +73,7 @@ export const ProductModal: React.FC<ProductModalProps> = ({
           product={product} 
           onClose={onClose}
           onBack={onClose}
+          purchaseEnabled={purchaseEnabled}
         />
       </DialogContent>
     </Dialog>
