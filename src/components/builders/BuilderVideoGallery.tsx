@@ -404,10 +404,12 @@ export const BuilderVideoGallery = ({
             <Play className="h-8 w-8 text-blue-600" />
           </div>
           <h3 className="text-xl font-bold text-gray-800 mb-2">
-            No Project Videos Yet
+            No project showcase videos yet
           </h3>
-          <p className="text-gray-600 text-sm">
-            CO/Contractors will share their project videos here soon!
+          <p className="text-gray-600 text-sm max-w-md mx-auto leading-relaxed">
+            This tab only lists <strong>portfolio videos</strong> saved to the showcase library. Clips and posts shared from the{" "}
+            <strong>Social Feed</strong> tab stay on that tab. If you added showcase videos but they are still hidden, they may be unpublished drafts; an
+            admin can mark them published, or ensure new uploads are set to published when saving.
           </p>
         </Card>
       ) : (
