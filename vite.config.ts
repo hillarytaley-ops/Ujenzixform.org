@@ -56,6 +56,44 @@ function resolveAssetBuildId(): string {
  * Production-only: emits `/ga-bootstrap.js` (same-origin) so GA loads without inline script (stricter CSP).
  * When `VITE_GA_MEASUREMENT_ID` is unset, nothing is injected.
  */
+/** Full commit SHA for deploy verification (`GET /assets/build-commit.txt` on Vercel). */
+function resolveFullGitSha(): string {
+  const fromEnv =
+    process.env.VERCEL_GIT_COMMIT_SHA ||
+    process.env.GITHUB_SHA ||
+    process.env.CF_PAGES_COMMIT_SHA;
+  if (fromEnv) return String(fromEnv).trim();
+  try {
+    return execSync("git rev-parse HEAD", { encoding: "utf-8" }).trim();
+  } catch {
+    return "unknown";
+  }
+}
+
+/** Plain text next to hashed chunks — not caught by SPA rewrite (`/assets/`). */
+function emitBuildCommitTextPlugin(): Plugin {
+  let outDir = "dist";
+  let mode = "development";
+
+  return {
+    name: "emit-build-commit-txt",
+    apply: "build",
+    configResolved(config) {
+      outDir = config.build.outDir;
+      mode = config.mode;
+    },
+    closeBundle() {
+      if (mode !== "production") return;
+      const sha = resolveFullGitSha();
+      const deploy = process.env.VERCEL_DEPLOYMENT_ID?.trim() || "";
+      const body = deploy ? `${sha}\n${deploy}\n` : `${sha}\n`;
+      const dir = path.join(outDir, "assets");
+      fs.mkdirSync(dir, { recursive: true });
+      fs.writeFileSync(path.join(dir, "build-commit.txt"), body, "utf8");
+    },
+  };
+}
+
 function gaBootstrapPlugin(): Plugin {
   let outDir = "dist";
   let mode = "development";
@@ -104,6 +142,7 @@ export default defineConfig(({ mode }) => {
     },
     plugins: [
       react(),
+      emitBuildCommitTextPlugin(),
       gaBootstrapPlugin(),
       {
         name: "inject-site-origin-meta",
