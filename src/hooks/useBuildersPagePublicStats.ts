@@ -73,15 +73,34 @@ export function useBuildersPagePublicStats(): BuildersPagePublicStats {
 
           let anonPostCount: number | null = null;
           try {
-            const { count, error: cntErr } = await supabase
+            let { count, error: cntErr } = await supabase
               .from('builder_posts')
               .select('id', { count: 'exact', head: true })
               .or('status.eq.active,status.is.null');
+            if (cntErr) {
+              const retry = await supabase
+                .from('builder_posts')
+                .select('id', { count: 'exact', head: true })
+                .eq('status', 'active');
+              count = retry.count;
+              cntErr = retry.error;
+            }
             if (!cntErr && count !== null && count !== undefined) {
               anonPostCount = count;
             }
           } catch {
             anonPostCount = null;
+          }
+
+          if (anonPostCount === null && rpcActivePosts > 0) {
+            const probe = await supabase
+              .from('builder_posts')
+              .select('id')
+              .or('status.eq.active,status.is.null')
+              .limit(1);
+            if (!probe.error && (!probe.data || probe.data.length === 0)) {
+              anonPostCount = 0;
+            }
           }
 
           const activePostsVisible =
