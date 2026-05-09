@@ -590,7 +590,7 @@ const SuppliersMobileOptimized = () => {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <MaterialsGrid purchaseEnabled={canPurchaseMaterials} />
+              <MaterialsGrid purchaseEnabled={canPurchaseMaterials} unifiedMarketplaceHeader />
             </CardContent>
           </Card>
         </div>

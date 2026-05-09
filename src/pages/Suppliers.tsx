@@ -13,20 +13,17 @@
  */
 
 import React, { useState, useEffect, useCallback } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams, Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { 
-  ShoppingCart, 
-  FileText, 
+import {
+  ShoppingCart,
   Building2,
   Shield,
-  Store,
   Truck,
   Package,
   Star,
-  ChevronRight,
-  ArrowLeft
+  ArrowLeft,
 } from "lucide-react";
 import Navigation from "@/components/Navigation";
 import Footer from "@/components/Footer";
@@ -174,6 +171,10 @@ const Suppliers = () => {
       userRole === 'builder')
   );
 
+  const isGuest = !user;
+  /** Public catalog without purchase: simplify hero and avoid duplicate titles with MaterialsGrid */
+  const showPurchaseAccountGuidance = !isFromDashboard && !canPurchaseMaterials;
+
   // Show restricted access message for delivery providers
   if (user && isDeliveryProvider) {
     return (
@@ -285,7 +286,11 @@ const Suppliers = () => {
 
       {/* Hero Section - Hide when coming from dashboard */}
       {!isFromDashboard && (
-      <section className="text-white py-12 md:py-20 relative overflow-hidden">
+      <section
+        className={`text-white relative overflow-hidden ${
+          showPurchaseAccountGuidance && isGuest ? "py-10 md:py-14" : "py-12 md:py-20"
+        }`}
+      >
         {/* Background Image */}
         <div 
           className="absolute inset-0 bg-cover bg-center"
@@ -310,10 +315,28 @@ const Suppliers = () => {
             <span className="bg-gradient-to-r from-emerald-400 to-teal-400 bg-clip-text text-transparent"> Marketplace</span>
           </h1>
           
-          {/* Description */}
-          <p className="text-sm sm:text-base md:text-lg lg:text-xl mb-6 max-w-2xl mx-auto text-white/80 px-3 sm:px-4 leading-relaxed text-balance">
-            Anyone can browse this catalog. Purchasing and supplier quotes are available after you sign in as a registered
-            Private Builder or CO/Contractor. Delivery depends on your area and active partners.
+          {/* Description — shorter on public view; detailed CTAs live above the catalog */}
+          <p
+            className={`mb-6 max-w-2xl mx-auto text-white/80 px-3 sm:px-4 leading-relaxed text-balance ${
+              showPurchaseAccountGuidance
+                ? "text-sm sm:text-base md:text-lg"
+                : "text-sm sm:text-base md:text-lg lg:text-xl"
+            }`}
+          >
+            {showPurchaseAccountGuidance ? (
+              <>
+                Browse prices, specs, and suppliers below.{' '}
+                <span className="text-white/95 font-medium">
+                  To buy or request quotes, sign in or register as a Private Builder or CO/Contractor
+                </span>{' '}
+                — the catalog explains the next steps.
+              </>
+            ) : (
+              <>
+                Anyone can browse this catalog. Purchasing and supplier quotes are available after you sign in as a
+                registered Private Builder or CO/Contractor. Delivery depends on your area and active partners.
+              </>
+            )}
           </p>
 
           {/* Stats Row — live counts from public stats RPC */}
@@ -349,63 +372,23 @@ const Suppliers = () => {
             Browse Materials
           </Button>
 
-          {/* Portal Cards - Only show for non-logged-in users or those without builder/supplier roles */}
-          {!isLoggedInBuilder && (
-            <div className="max-w-5xl mx-auto" id="portals">
-              <p className="text-white/50 text-xs md:text-sm font-medium mb-4 md:mb-6 uppercase tracking-widest">
-                Choose Your Portal
-              </p>
-              
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-5">
-                {/* Private Client Portal */}
-                <PortalCard
-                  icon={<ShoppingCart className="h-6 w-6 md:h-7 md:w-7 text-white" />}
-                  title="Private Builder"
-                  description="Home projects & personal purchases"
-                  gradient="from-emerald-600 to-emerald-700"
-                  borderColor="emerald"
-                  explorePath="/private-client-auth"
-                  features={["Buy materials", "Track deliveries"]}
-                />
-
-                {/* CO/Contractor Portal */}
-                <PortalCard
-                  icon={<FileText className="h-6 w-6 md:h-7 md:w-7 text-white" />}
-                  title="CO/Contractor"
-                  description="Request quotes for bulk orders"
-                  gradient="from-blue-600 to-blue-700"
-                  borderColor="blue"
-                  explorePath="/professional-builder-auth"
-                  features={["Bulk quotes", "Manage projects"]}
-                />
-
-                {/* Supplier Portal */}
-                <PortalCard
-                  icon={<Store className="h-6 w-6 md:h-7 md:w-7 text-white" />}
-                  title="Supplier"
-                  description="List & sell your products"
-                  gradient="from-amber-600 to-amber-700"
-                  borderColor="amber"
-                  explorePath="/supplier-auth"
-                  features={["List products", "Receive orders"]}
-                />
-
-                {/* Delivery Provider Portal */}
-                <PortalCard
-                  icon={<Truck className="h-6 w-6 md:h-7 md:w-7 text-white" />}
-                  title="Delivery Provider"
-                  description="Transport & logistics services"
-                  gradient="from-purple-600 to-purple-700"
-                  borderColor="purple"
-                  explorePath="/delivery-registration"
-                  features={["Get jobs", "Earn per delivery"]}
-                />
-              </div>
+          {showPurchaseAccountGuidance && isGuest && (
+            <div className="max-w-xl mx-auto mt-2 mb-4 flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-xs sm:text-sm text-white/70">
+              <span>Also on UjenziXform:</span>
+              <Link to="/supplier-auth" className="text-amber-200 hover:text-white underline underline-offset-2">
+                Supplier sign-in
+              </Link>
+              <span className="text-white/40" aria-hidden>
+                ·
+              </span>
+              <Link to="/delivery-registration" className="text-purple-200 hover:text-white underline underline-offset-2">
+                Delivery partner
+              </Link>
             </div>
           )}
 
           {/* Welcome message for logged-in builders */}
-          {isLoggedInBuilder && (
+          {isLoggedInBuilder && !showPurchaseAccountGuidance && (
             <div className="max-w-2xl mx-auto text-center">
               <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-6 border border-white/20">
                 <div className="flex items-center justify-center gap-3 mb-3">
@@ -443,8 +426,8 @@ const Suppliers = () => {
       </section>
       )}
 
-      {/* Trust Indicators - Hide when coming from dashboard */}
-      {!isFromDashboard && (
+      {/* Trust Indicators — skip for guests to shorten page; signed-in non-buyers still see trust */}
+      {!isFromDashboard && !isGuest && (
       <section className="py-6 md:py-8 bg-white border-b">
         <div className="container mx-auto px-4">
           <div className="flex flex-wrap justify-center items-center gap-4 md:gap-8 text-gray-600">
@@ -472,7 +455,7 @@ const Suppliers = () => {
       {/* Materials Grid Section */}
       <section id="materials-section" className="py-6 md:py-12 bg-gray-50">
         <div className="container mx-auto px-4 max-w-7xl">
-          {!isFromDashboard && (
+          {!isFromDashboard && canPurchaseMaterials && (
             <div className="text-center mb-6 md:mb-8 max-w-3xl mx-auto px-1">
               <h2 className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-900 mb-2 leading-tight text-balance break-words">
                 Browse construction materials
@@ -483,75 +466,15 @@ const Suppliers = () => {
             </div>
           )}
 
-          <MaterialsGrid embeddedInDashboard={isFromDashboard} purchaseEnabled={canPurchaseMaterials} />
+          <MaterialsGrid
+            embeddedInDashboard={isFromDashboard}
+            purchaseEnabled={canPurchaseMaterials}
+            unifiedMarketplaceHeader={!isFromDashboard}
+          />
         </div>
       </section>
 
       <Footer />
-    </div>
-  );
-};
-
-/** Explicit Tailwind classes so borders are not purged (dynamic `border-${x}` fails with JIT). */
-const PORTAL_CARD_BORDER: Record<string, string> = {
-  emerald: "border-emerald-500/30 hover:border-emerald-400/80",
-  blue: "border-blue-500/30 hover:border-blue-400/80",
-  amber: "border-amber-500/30 hover:border-amber-400/80",
-  purple: "border-purple-500/30 hover:border-purple-400/80",
-};
-
-// Reusable Portal Card Component - Single Explore button
-interface PortalCardProps {
-  icon: React.ReactNode;
-  title: string;
-  description: string;
-  gradient: string;
-  borderColor: string;
-  explorePath: string;
-  features?: string[];
-}
-
-const PortalCard: React.FC<PortalCardProps> = ({
-  icon,
-  title,
-  description,
-  gradient,
-  borderColor,
-  explorePath,
-  features,
-}) => {
-  const navigate = useNavigate();
-  
-  const borderRing = PORTAL_CARD_BORDER[borderColor] ?? "border-white/20 hover:border-white/40";
-
-  return (
-    <div
-      className={`group bg-gradient-to-br ${gradient} rounded-xl md:rounded-2xl p-4 md:p-6 border ${borderRing} transition-all duration-300 hover:scale-[1.02] hover:shadow-xl flex flex-col`}
-    >
-      <div className="w-12 h-12 md:w-14 md:h-14 bg-white/20 rounded-xl md:rounded-2xl flex items-center justify-center mb-3 md:mb-4 mx-auto group-hover:scale-110 transition-transform">
-        {icon}
-      </div>
-      <h3 className="text-white font-bold text-lg md:text-xl mb-1 md:mb-2">{title}</h3>
-      <p className="text-white/70 text-xs md:text-sm mb-3">{description}</p>
-      {features && features.length > 0 && (
-        <ul className="text-white/60 text-xs space-y-1 mb-4">
-          {features.map((feature, idx) => (
-            <li key={idx} className="flex items-center gap-1">
-              <span className="text-white/40">›</span> {feature}
-            </li>
-          ))}
-        </ul>
-      )}
-      <div className="mt-auto">
-        <Button
-          size="sm"
-          className="w-full bg-white hover:bg-gray-100 text-gray-900 border-0 text-xs md:text-sm font-bold shadow-md"
-          onClick={() => navigate(explorePath)}
-        >
-          Explore
-          <ChevronRight className="h-4 w-4 ml-1" />
-        </Button>
-      </div>
     </div>
   );
 };

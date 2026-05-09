@@ -390,6 +390,11 @@ export type MaterialsGridProps = {
    * Parent should set from registered buyer roles only. Defaults to true for embedded dashboards.
    */
   purchaseEnabled?: boolean;
+  /**
+   * With !embeddedInDashboard, hide the extra in-grid H2 so the parent section owns one main title
+   * (e.g. full-page Materials marketplace).
+   */
+  unifiedMarketplaceHeader?: boolean;
 };
 
 const MATERIALS_BUYER_ROLES = ['professional_builder', 'private_client', 'builder'] as const;
@@ -397,6 +402,7 @@ const MATERIALS_BUYER_ROLES = ['professional_builder', 'private_client', 'builde
 export const MaterialsGrid: React.FC<MaterialsGridProps> = ({
   embeddedInDashboard = false,
   purchaseEnabled = true,
+  unifiedMarketplaceHeader = false,
 }) => {
   const [searchParams] = useSearchParams();
   const [materials, setMaterials] = useState<Material[]>([]);
@@ -1852,33 +1858,34 @@ export const MaterialsGrid: React.FC<MaterialsGridProps> = ({
   }
 
   return (
-    <div className="space-y-6">
-      {/* Public / view-only: browsing is allowed; purchasing requires a buyer account */}
+    <div className={`${embeddedInDashboard ? 'space-y-6' : 'space-y-4'}`}>
+      {/* Public / view-only — compact strip so it does not compete with the page title */}
       {!showPurchaseChrome && (
-        <Alert className="bg-slate-50 border-slate-200 border">
-          <AlertDescription className="w-full">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 py-1">
-              <div className="min-w-0 space-y-1">
-                <p className="font-semibold text-slate-900 text-sm sm:text-base">Browse-only catalog</p>
-                <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
-                  You can search, filter, and compare listings. Purchasing and supplier quotes are only available to
-                  registered Private Builders and CO/Contractors after sign-in.
-                </p>
-              </div>
-              <div className="flex flex-wrap gap-2 shrink-0">
-                <Button asChild size="sm" variant="default" className="bg-slate-900 hover:bg-slate-800">
-                  <Link to="/unified-auth">Sign in</Link>
-                </Button>
-                <Button asChild size="sm" variant="outline">
-                  <Link to="/private-client-registration">Private builder</Link>
-                </Button>
-                <Button asChild size="sm" variant="outline">
-                  <Link to="/professional-builder-registration">CO / Contractor</Link>
-                </Button>
-              </div>
+        <div className="rounded-xl border-2 border-emerald-200/90 bg-gradient-to-br from-emerald-50/95 via-white to-teal-50/90 px-4 py-4 sm:px-6 sm:py-5 shadow-sm">
+          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+            <div className="min-w-0 space-y-2">
+              <p className="text-xs font-semibold uppercase tracking-wide text-emerald-800">View-only catalog</p>
+              <p className="text-base sm:text-lg font-semibold text-slate-900 leading-snug">
+                Sign in or register as a Private Builder or CO/Contractor to purchase or request supplier quotes.
+              </p>
+              <p className="text-sm text-slate-600 leading-relaxed max-w-xl">
+                You can still search, filter, and compare listings below. Checkout and quote requests stay on registered
+                builder accounts only.
+              </p>
             </div>
-          </AlertDescription>
-        </Alert>
+            <div className="flex flex-col sm:flex-row flex-wrap gap-2 shrink-0">
+              <Button asChild size="lg" className="w-full sm:w-auto bg-slate-900 hover:bg-slate-800 text-white font-semibold">
+                <Link to="/unified-auth">Sign in</Link>
+              </Button>
+              <Button asChild size="lg" variant="outline" className="w-full sm:w-auto border-emerald-600 text-emerald-900 hover:bg-emerald-50 font-semibold">
+                <Link to="/private-client-registration">Register — Private builder</Link>
+              </Button>
+              <Button asChild size="lg" variant="outline" className="w-full sm:w-auto border-blue-600 text-blue-900 hover:bg-blue-50 font-semibold">
+                <Link to="/professional-builder-registration">Register — CO / Contractor</Link>
+              </Button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* ═══════════════════════════════════════════════════════════════════════════════
@@ -1926,13 +1933,10 @@ export const MaterialsGrid: React.FC<MaterialsGridProps> = ({
       )}
 
       {isAuthenticated && !showPurchaseChrome && userRole && (
-        <Alert className="bg-gradient-to-r from-amber-50 to-orange-50 border-amber-200 border">
-          <AlertDescription className="ml-2">
-            <strong className="text-amber-900">Purchasing not available for this account</strong>
-            <p className="text-sm text-amber-900/90 mt-1">
-              Signed in as <strong>{userRole}</strong>. Materials on this page are view-only. Use a{' '}
-              <strong>Private Builder</strong> or <strong>CO/Contractor</strong> account to buy or request quotes.
-            </p>
+        <Alert className="border-amber-200/80 bg-amber-50/90 py-2.5 px-3">
+          <AlertDescription className="ml-0 sm:ml-2 text-xs sm:text-sm text-amber-950 leading-snug">
+            <span className="font-semibold">View only</span> for <span className="capitalize">{String(userRole).replace(/_/g, ' ')}</span>
+            . Purchasing is for Private Builder or CO/Contractor accounts.
           </AlertDescription>
         </Alert>
       )}
@@ -1950,8 +1954,8 @@ export const MaterialsGrid: React.FC<MaterialsGridProps> = ({
         </Alert>
       )}
       
-      {/* Header */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:justify-between sm:items-start sm:gap-4">
+      {/* Toolbar: stats + actions (no second page title when unifiedMarketplaceHeader) */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-center sm:gap-4">
         {embeddedInDashboard ? (
           <div className="min-w-0 space-y-1">
             <p className="text-sm sm:text-base text-muted-foreground leading-relaxed">
@@ -1968,6 +1972,18 @@ export const MaterialsGrid: React.FC<MaterialsGridProps> = ({
               suppliers
             </p>
           </div>
+        ) : unifiedMarketplaceHeader ? (
+          <p className="text-sm text-muted-foreground min-w-0">
+            <span className="font-semibold text-foreground tabular-nums">{computedFilteredMaterials.length}</span>
+            <span className="text-muted-foreground"> matching</span>
+            <span className="mx-1.5 text-muted-foreground/50" aria-hidden>
+              ·
+            </span>
+            <span className="font-semibold text-foreground tabular-nums">
+              {new Set(materials.map((m) => m.supplier_id)).size}
+            </span>
+            <span className="text-muted-foreground"> suppliers</span>
+          </p>
         ) : (
           <div className="min-w-0 pr-2 space-y-1.5">
             <h2 className="text-2xl sm:text-3xl font-bold tracking-tight leading-tight text-balance break-words">
@@ -1979,7 +1995,7 @@ export const MaterialsGrid: React.FC<MaterialsGridProps> = ({
             </p>
           </div>
         )}
-        <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto sm:justify-end">
+        <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto sm:justify-end sm:shrink-0">
           {/* Shopping Cart Button - For all builders */}
           {showPurchaseChrome && (
             <Button
@@ -2073,40 +2089,42 @@ export const MaterialsGrid: React.FC<MaterialsGridProps> = ({
         />
       )}
 
-      {/* Filters - All in one row on large screens */}
-      <Card className="overflow-visible">
-        <CardContent className="p-4 md:p-6">
-          {/* Search and Filters - ALL IN ONE ROW on large screens */}
-          <div className="flex flex-col lg:flex-row gap-3 lg:gap-4 lg:items-center">
-            {/* Search Bar */}
-            <div className="relative flex-1 min-w-0 lg:max-w-xs">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground pointer-events-none" />
-              <Input
-                type="search"
-                inputMode="search"
-                placeholder="Search materials..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-11 h-10 text-sm rounded-lg border-2 focus:border-emerald-500 focus:ring-emerald-500"
-                autoComplete="off"
-                autoCorrect="off"
-                spellCheck="false"
-              />
-              {searchQuery && (
-                <button
-                  onClick={() => setSearchQuery('')}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-full hover:bg-gray-200 transition-colors"
-                  aria-label="Clear search"
-                >
-                  <X className="h-4 w-4 text-muted-foreground" />
-                </button>
-              )}
-            </div>
+      {/* Filters */}
+      <Card className="overflow-visible shadow-sm border-gray-200/80">
+        <CardContent className="p-3 sm:p-4 md:p-5">
+          <div className="flex flex-col gap-2.5">
+            <div className="flex flex-col gap-2.5 xl:flex-row xl:items-center xl:gap-3">
+              {/* Search */}
+              <div className="relative flex-1 min-w-0 xl:min-w-[240px] xl:max-w-xl">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+                <Input
+                  type="search"
+                  inputMode="search"
+                  placeholder="Search materials..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-10 h-10 text-sm rounded-lg border focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/30"
+                  autoComplete="off"
+                  autoCorrect="off"
+                  spellCheck="false"
+                />
+                {searchQuery && (
+                  <button
+                    onClick={() => setSearchQuery('')}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-full hover:bg-muted transition-colors"
+                    aria-label="Clear search"
+                  >
+                    <X className="h-4 w-4 text-muted-foreground" />
+                  </button>
+                )}
+              </div>
 
+              {/* Category, price, stock — one wrap row */}
+              <div className="flex flex-wrap gap-2 items-center">
             {/* Category Filter */}
-            <div className="flex-shrink-0 w-full sm:w-auto">
+            <div className="flex-shrink-0 w-full xs:w-auto sm:min-w-0 sm:w-auto flex-1 sm:flex-none min-w-[140px]">
               <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-                <SelectTrigger className="h-10 w-full sm:w-[160px] text-sm rounded-lg border-2 focus:border-emerald-500">
+                <SelectTrigger className="h-10 w-full sm:w-[min(100%,160px)] text-sm rounded-lg border focus:border-emerald-500">
                   <SelectValue placeholder="All Categories" />
                 </SelectTrigger>
                 <SelectContent 
@@ -2680,14 +2698,7 @@ export const MaterialsGrid: React.FC<MaterialsGridProps> = ({
                             Add to Cart
                           </Button>
                         </>
-                      ) : (
-                        <p className="text-xs text-center text-muted-foreground py-2 px-1">
-                          <Link to="/unified-auth" className="text-emerald-700 font-medium underline-offset-2 hover:underline">
-                            Sign in
-                          </Link>{' '}
-                          as a Private Builder or CO/Contractor to order from this catalog.
-                        </p>
-                      )}
+                      ) : null}
                       
                       {/* Mobile Book View Button */}
                       {isMobile && (
