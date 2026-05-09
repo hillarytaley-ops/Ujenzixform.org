@@ -1,12 +1,11 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import { Menu, X, BookOpen } from "lucide-react";
 import { useLocation, Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { UserGuideMenu } from "@/components/ui/user-guide-menu";
 import { useAuth } from "@/contexts/AuthContext";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { AuthFormPanel } from "@/components/auth/AuthFormPanel";
 import {
   hasMarketplaceLogisticsAccess,
   hasScannerPortalAccess,
@@ -38,9 +37,6 @@ const Navigation = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isSigningOut, setIsSigningOut] = useState(false);
   const [userDisplayName, setUserDisplayName] = useState<string | null>(null);
-  const [authDialogOpen, setAuthDialogOpen] = useState(false);
-  const [authDialogTab, setAuthDialogTab] = useState<"signin" | "signup">("signin");
-  const [authDialogKey, setAuthDialogKey] = useState(0);
   const location = useLocation();
 
   const { user: authUser, session, userRole: authRole, loading: authLoading } = useAuth();
@@ -146,11 +142,7 @@ const Navigation = () => {
     return location.pathname === path;
   };
 
-  const openGuestAuthDialog = useCallback((tab: "signin" | "signup") => {
-    setAuthDialogTab(tab);
-    setAuthDialogKey((k) => k + 1);
-    setAuthDialogOpen(true);
-  }, []);
+  const authHref = useCallback((tab: "signin" | "signup") => `/auth?tab=${tab}`, []);
 
   const handleSignOut = async () => {
     setIsSigningOut(true);
@@ -250,23 +242,24 @@ const Navigation = () => {
             </div>
           ) : (
             <div className="flex items-center gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="bg-white text-gray-900 border-2 border-white hover:bg-gray-100 hover:text-gray-900 font-bold shadow-lg text-xs px-4"
-                onClick={() => openGuestAuthDialog("signin")}
+              <Link
+                to={authHref("signin")}
+                className={cn(
+                  buttonVariants({ variant: "outline", size: "sm" }),
+                  "bg-white text-gray-900 border-2 border-white hover:bg-gray-100 hover:text-gray-900 font-bold shadow-lg text-xs px-4 no-underline"
+                )}
               >
                 Sign In
-              </Button>
-              <Button
-                type="button"
-                size="sm"
-                className="bg-orange-500 text-white border-2 border-orange-400 hover:bg-orange-600 font-bold shadow-lg text-xs px-4"
-                onClick={() => openGuestAuthDialog("signup")}
+              </Link>
+              <Link
+                to={authHref("signup")}
+                className={cn(
+                  buttonVariants({ size: "sm" }),
+                  "bg-orange-500 text-white border-2 border-orange-400 hover:bg-orange-600 font-bold shadow-lg text-xs px-4 no-underline"
+                )}
               >
                 Register
-              </Button>
+              </Link>
             </div>
           )}
         </div>
@@ -320,50 +313,31 @@ const Navigation = () => {
                 </div>
               ) : (
                 <>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="w-full bg-white text-gray-900 border-2 border-gray-300 hover:bg-gray-100 font-bold"
-                    onClick={() => {
-                      openGuestAuthDialog("signin");
-                      setIsMenuOpen(false);
-                    }}
+                  <Link
+                    to={authHref("signin")}
+                    onClick={() => setIsMenuOpen(false)}
+                    className={cn(
+                      buttonVariants({ variant: "outline" }),
+                      "w-full bg-white text-gray-900 border-2 border-gray-300 hover:bg-gray-100 font-bold no-underline text-center"
+                    )}
                   >
                     Sign In
-                  </Button>
-                  <Button
-                    type="button"
-                    className="w-full bg-orange-500 text-white border-2 border-orange-400 hover:bg-orange-600 font-bold"
-                    onClick={() => {
-                      openGuestAuthDialog("signup");
-                      setIsMenuOpen(false);
-                    }}
+                  </Link>
+                  <Link
+                    to={authHref("signup")}
+                    onClick={() => setIsMenuOpen(false)}
+                    className={cn(
+                      buttonVariants(),
+                      "w-full bg-orange-500 text-white border-2 border-orange-400 hover:bg-orange-600 font-bold no-underline text-center"
+                    )}
                   >
                     Register
-                  </Button>
+                  </Link>
                 </>
               )}
             </div>
           </nav>
         </div>
-      )}
-
-      {!isLoggedIn && (
-        <Dialog open={authDialogOpen} onOpenChange={setAuthDialogOpen}>
-          <DialogContent className="max-w-[calc(100vw-1.5rem)] sm:max-w-md max-h-[min(90vh,720px)] overflow-y-auto p-4 sm:p-5 gap-0 border-border/80 bg-background/95 backdrop-blur-md">
-            <DialogHeader className="sr-only">
-              <DialogTitle>Sign in or create an account</DialogTitle>
-            </DialogHeader>
-            <AuthFormPanel
-              key={authDialogKey}
-              variant="compact"
-              idPrefix="nav"
-              forcedInitialTab={authDialogTab}
-              syncTabToUrl={false}
-              onAwaitingEmailConfirmation={() => setAuthDialogOpen(false)}
-            />
-          </DialogContent>
-        </Dialog>
       )}
     </header>
   );

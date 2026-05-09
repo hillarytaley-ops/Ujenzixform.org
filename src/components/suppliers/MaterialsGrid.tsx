@@ -22,7 +22,8 @@ import {
 } from '@/utils/supabaseAccessToken';
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
@@ -1874,15 +1875,33 @@ export const MaterialsGrid: React.FC<MaterialsGridProps> = ({
               </p>
             </div>
             <div className="flex flex-col sm:flex-row flex-wrap gap-2 shrink-0">
-              <Button asChild size="lg" className="w-full sm:w-auto bg-slate-900 hover:bg-slate-800 text-white font-semibold">
-                <Link to="/unified-auth">Sign in</Link>
-              </Button>
-              <Button asChild size="lg" variant="outline" className="w-full sm:w-auto border-emerald-600 text-emerald-900 hover:bg-emerald-50 font-semibold">
-                <Link to="/private-client-registration">Register — Private builder</Link>
-              </Button>
-              <Button asChild size="lg" variant="outline" className="w-full sm:w-auto border-blue-600 text-blue-900 hover:bg-blue-50 font-semibold">
-                <Link to="/professional-builder-registration">Register — CO / Contractor</Link>
-              </Button>
+              <Link
+                to="/auth?tab=signin"
+                className={cn(
+                  buttonVariants({ size: 'lg' }),
+                  'w-full sm:w-auto bg-slate-900 hover:bg-slate-800 text-white font-semibold no-underline text-center'
+                )}
+              >
+                Sign in
+              </Link>
+              <Link
+                to="/private-client-auth?tab=signup"
+                className={cn(
+                  buttonVariants({ size: 'lg', variant: 'outline' }),
+                  'w-full sm:w-auto border-emerald-600 text-emerald-900 hover:bg-emerald-50 font-semibold no-underline text-center'
+                )}
+              >
+                Register — Private builder
+              </Link>
+              <Link
+                to="/professional-builder-auth?tab=signup"
+                className={cn(
+                  buttonVariants({ size: 'lg', variant: 'outline' }),
+                  'w-full sm:w-auto border-blue-600 text-blue-900 hover:bg-blue-50 font-semibold no-underline text-center'
+                )}
+              >
+                Register — CO / Contractor
+              </Link>
             </div>
           </div>
         </div>

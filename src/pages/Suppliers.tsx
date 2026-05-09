@@ -14,7 +14,8 @@
 
 import React, { useState, useEffect, useCallback } from "react";
 import { useNavigate, useSearchParams, Link } from "react-router-dom";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import {
   ShoppingCart,
@@ -350,14 +351,39 @@ const Suppliers = () => {
           )}
 
           {/* Main CTA */}
-          <Button
-            size="default"
-            className="h-10 md:h-11 px-6 md:px-8 bg-white text-slate-900 hover:bg-gray-100 font-semibold text-sm md:text-base shadow-lg mb-4 md:mb-5"
-            onClick={scrollToMaterials}
-          >
-            <ShoppingCart className="h-4 w-4 md:h-5 md:w-5 mr-2 shrink-0" />
-            Browse Materials
-          </Button>
+          <div className="flex flex-col sm:flex-row flex-wrap items-center justify-center gap-2 sm:gap-3 mb-4 md:mb-5">
+            <Button
+              size="default"
+              type="button"
+              className="h-10 md:h-11 px-6 md:px-8 bg-white text-slate-900 hover:bg-gray-100 font-semibold text-sm md:text-base shadow-lg"
+              onClick={scrollToMaterials}
+            >
+              <ShoppingCart className="h-4 w-4 md:h-5 md:w-5 mr-2 shrink-0" />
+              Browse Materials
+            </Button>
+            {showPurchaseAccountGuidance && isGuest && (
+              <>
+                <Link
+                  to="/auth?tab=signin"
+                  className={cn(
+                    buttonVariants({ variant: "outline", size: "default" }),
+                    "h-10 md:h-11 px-6 md:px-8 border-2 border-white/80 bg-white/10 text-white hover:bg-white/20 font-semibold text-sm md:text-base shadow-lg no-underline"
+                  )}
+                >
+                  Sign In
+                </Link>
+                <Link
+                  to="/auth?tab=signup"
+                  className={cn(
+                    buttonVariants({ size: "default" }),
+                    "h-10 md:h-11 px-6 md:px-8 bg-orange-500 text-white border-2 border-orange-400 hover:bg-orange-600 font-semibold text-sm md:text-base shadow-lg no-underline"
+                  )}
+                >
+                  Register
+                </Link>
+              </>
+            )}
+          </div>
 
           {showPurchaseAccountGuidance && isGuest && (
             <div className="max-w-xl mx-auto mt-0 mb-2 flex flex-wrap items-center justify-center gap-x-3 gap-y-1.5 text-[11px] sm:text-xs text-white/70">
