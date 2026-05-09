@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 
 export type BuildersPagePublicStats = {
   professionalBuilders: number;
+  /** Timeline posts visible to the anon client (RLS); may be lower than DB total from stats RPC */
   activePosts: number;
   publishedVideos: number;
   /** First page of builder_posts from same SECURITY DEFINER RPC (when supported). */
@@ -67,10 +68,30 @@ export function useBuildersPagePublicStats(): BuildersPagePublicStats {
 
         if (!rpcError && data && typeof data === 'object' && !Array.isArray(data)) {
           const row = data as Record<string, unknown>;
-          const activePosts = Number(row.active_posts) || 0;
+          const rpcActivePosts = Number(row.active_posts) || 0;
           let timelinePage = parseTimelinePageField(row);
 
-          if (!timelinePage?.length && activePosts > 0) {
+          let anonPostCount: number | null = null;
+          try {
+            const { count, error: cntErr } = await supabase
+              .from('builder_posts')
+              .select('id', { count: 'exact', head: true })
+              .or('status.eq.active,status.is.null');
+            if (!cntErr && count !== null && count !== undefined) {
+              anonPostCount = count;
+            }
+          } catch {
+            anonPostCount = null;
+          }
+
+          const activePostsVisible =
+            anonPostCount !== null ? anonPostCount : rpcActivePosts;
+
+          const tryFillTimeline =
+            !timelinePage?.length &&
+            (anonPostCount !== null ? anonPostCount > 0 : rpcActivePosts > 0);
+
+          if (tryFillTimeline) {
             const { data: rows, error: rowsErr } = await supabase
               .from('builder_posts')
               .select('*')
@@ -84,7 +105,7 @@ export function useBuildersPagePublicStats(): BuildersPagePublicStats {
 
           setState({
             professionalBuilders: Number(row.professional_builders) || 0,
-            activePosts,
+            activePosts: activePostsVisible,
             publishedVideos: Number(row.published_videos) || 0,
             timelinePage,
             loading: false,
@@ -96,7 +117,7 @@ export function useBuildersPagePublicStats(): BuildersPagePublicStats {
         const { count: postCount } = await supabase
           .from('builder_posts')
           .select('id', { count: 'exact', head: true })
-          .eq('status', 'active');
+          .or('status.eq.active,status.is.null');
 
         if (cancelled) return;
 
