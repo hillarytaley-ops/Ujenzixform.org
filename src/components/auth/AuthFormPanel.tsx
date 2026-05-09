@@ -15,6 +15,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Separator } from "@/components/ui/separator";
 import { KeyRound, CheckCircle, Loader2, Shield } from "lucide-react";
 import { canAccessAdminDashboardStorage } from "@/utils/adminStaffSession";
+import { isStaffEmailIdentifier } from "@/utils/staffEmailGate";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { SimplePasswordReset } from "@/components/SimplePasswordReset";
 import { cn } from "@/lib/utils";
@@ -143,10 +144,7 @@ export function AuthFormPanel({
     });
     return () => subscription.unsubscribe();
   }, []);
-  const staffAccessHref = useMemo(
-    () => (hasExistingStaffSession ? "/admin-dashboard" : "/admin-login"),
-    [hasExistingStaffSession]
-  );
+
   const [formLoading, setFormLoading] = useState(false);
   const [showResetDialog, setShowResetDialog] = useState(false);
   const [authTab, setAuthTab] = useState(() => {
@@ -158,6 +156,15 @@ export function AuthFormPanel({
   const [signInPassword, setSignInPassword] = useState("");
   const [signUpEmail, setSignUpEmail] = useState("");
   const [signUpPassword, setSignUpPassword] = useState("");
+
+  const typedEmailForStaffGate = authTab === "signin" ? signInEmail : signUpEmail;
+  const staffEmailMatches = isStaffEmailIdentifier(typedEmailForStaffGate);
+  const showStaffAccess = staffEmailMatches || hasExistingStaffSession;
+  const staffAccessHref = useMemo(
+    () => (hasExistingStaffSession ? "/admin-dashboard" : "/admin-login"),
+    [hasExistingStaffSession]
+  );
+
   const isSubmitting = useRef(false);
   const passwordSignInFlowRef = useRef(false);
   const { toast } = useToast();
@@ -569,28 +576,32 @@ export function AuthFormPanel({
             </TabsContent>
           </Tabs>
 
-          <div
-            className={cn(
-              "mt-5 rounded-lg border border-slate-200 bg-slate-50/90 px-3 py-3 text-center",
-              compact && "mt-4 px-2 py-2"
-            )}
-          >
-            <Link
-              to={staffAccessHref}
+          {showStaffAccess ? (
+            <div
               className={cn(
-                "inline-flex items-center justify-center gap-1.5 text-sm font-medium text-slate-800 hover:text-primary hover:underline",
-                compact && "text-xs"
+                "mt-5 rounded-lg border border-slate-200 bg-slate-50/90 px-3 py-3 text-center",
+                compact && "mt-4 px-2 py-2"
               )}
             >
-              <Shield className="h-3.5 w-3.5 shrink-0 opacity-80" aria-hidden />
-              Staff access
-            </Link>
-            <p className={cn("mt-1 text-[11px] text-muted-foreground leading-snug", compact && "text-[10px]")}>
-              {hasExistingStaffSession
-                ? "Continue to the operations dashboard."
-                : "For UjenziXform team & operations — use staff credentials on the next screen."}
-            </p>
-          </div>
+              <Link
+                to={staffAccessHref}
+                className={cn(
+                  "inline-flex items-center justify-center gap-1.5 text-sm font-medium text-slate-800 hover:text-primary hover:underline",
+                  compact && "text-xs"
+                )}
+              >
+                <Shield className="h-3.5 w-3.5 shrink-0 opacity-80" aria-hidden />
+                Staff access
+              </Link>
+              <p className={cn("mt-1 text-[11px] text-muted-foreground leading-snug", compact && "text-[10px]")}>
+                {hasExistingStaffSession
+                  ? "Continue to the operations dashboard."
+                  : staffEmailMatches
+                    ? "This address matches your team’s staff rules — open the staff portal when you’re ready."
+                    : "For UjenziXform team & operations — use staff credentials on the next screen."}
+              </p>
+            </div>
+          ) : null}
 
           <div className={cn("mt-6 text-center text-sm text-muted-foreground", compact && "mt-4 text-xs")}>
             By continuing, you agree to our{" "}

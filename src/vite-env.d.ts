@@ -9,6 +9,10 @@ interface ImportMetaEnv {
   readonly VITE_ALLOW_SUPER_ADMIN_FALLBACK?: string;
   /** When "true", admin staff login uses Edge Function verify-admin-staff-login (extra IP/email throttling). */
   readonly VITE_ADMIN_STAFF_LOGIN_VIA_EDGE?: string;
+  /** Comma-separated staff email domains for /auth Staff access (see `staffEmailGate`). Empty = no domain rule. */
+  readonly VITE_STAFF_EMAIL_DOMAINS?: string;
+  /** Comma-separated full staff emails for /auth Staff access when not on a staff domain. */
+  readonly VITE_STAFF_EMAIL_ALLOWLIST?: string;
   /** When "true", camera stream URLs are resolved via Edge Function camera-stream-url (JWT + rate limit; URL still returned to client). */
   readonly VITE_CAMERA_STREAM_VIA_EDGE?: string;
 }
