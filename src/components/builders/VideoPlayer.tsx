@@ -1,5 +1,6 @@
 import { readPersistedAuthRawStringSync } from '@/utils/supabaseAccessToken';
 import { getBuilderFeedGuestId } from '@/utils/builderFeedGuestId';
+import { getPublicVisitorDisplayName } from '@/utils/publicVisitorDisplayName';
 import React, { useState, useEffect, useRef } from "react";
 import { supabase, SUPABASE_URL, SUPABASE_ANON_KEY } from "@/integrations/supabase/client";
 import {
@@ -83,8 +84,12 @@ export const VideoPlayer = ({
 }: VideoPlayerProps) => {
   const [comments, setComments] = useState<Comment[]>([]);
   const [newComment, setNewComment] = useState("");
-  const [commenterName, setCommenterName] = useState("");
+  const [commenterName, setCommenterName] = useState(() =>
+    typeof window !== 'undefined' ? getPublicVisitorDisplayName() : ''
+  );
   const [commenterEmail, setCommenterEmail] = useState("");
+  /** Set when modal opens so we only ask for a name if neither session nor /builders gate name exists */
+  const [hasAuthSession, setHasAuthSession] = useState(false);
   const [isLiked, setIsLiked] = useState(false);
   const [localLikesCount, setLocalLikesCount] = useState(video.likes_count);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -98,6 +103,21 @@ export const VideoPlayer = ({
       fetchComments();
       checkIfLiked();
       setLocalLikesCount(video.likes_count);
+
+      let uid: string | null = null;
+      try {
+        const raw = readPersistedAuthRawStringSync();
+        if (raw) uid = JSON.parse(raw).user?.id ?? null;
+      } catch {
+        /* ignore */
+      }
+      setHasAuthSession(!!uid);
+      if (!uid) {
+        const gate = getPublicVisitorDisplayName();
+        setCommenterName((prev) => (prev.trim() ? prev : gate));
+      } else {
+        setCommenterName('');
+      }
     }
   }, [isOpen, video.id]);
 
@@ -382,7 +402,8 @@ export const VideoPlayer = ({
       // Get user info
       let userId: string | null = null;
       let userEmail: string | null = null;
-      let userName: string = commenterName.trim() || 'Anonymous';
+      let userName =
+        commenterName.trim() || getPublicVisitorDisplayName() || 'Anonymous';
       let accessToken = '';
       
       try {
@@ -396,11 +417,13 @@ export const VideoPlayer = ({
         }
       } catch (e) {}
 
-      // If not logged in, require name
-      if (!userId && !commenterName.trim()) {
+      const guestDisplay =
+        commenterName.trim() || getPublicVisitorDisplayName();
+      if (!userId && guestDisplay.length < 2) {
         toast({
           title: 'Name required',
-          description: 'Please enter your name to comment',
+          description:
+            'Use the name you entered on the directory, or type your name below.',
           variant: 'destructive',
         });
         setIsSubmitting(false);
@@ -805,16 +828,22 @@ export const VideoPlayer = ({
                 </div>
               </div>
 
-              {/* Guest Name field - only show if not logged in */}
-              {!commenterName && (
-                <Input
-                  placeholder="Your name (optional)"
-                  value={commenterName}
-                  onChange={(e) => setCommenterName(e.target.value)}
-                  className="text-sm h-8 rounded-full bg-gray-100 border-0"
-                />
+              {!hasAuthSession && (
+                <div className="space-y-1">
+                  <label htmlFor="video-commenter-name" className="text-xs font-medium text-muted-foreground">
+                    Your name on comments
+                  </label>
+                  <Input
+                    id="video-commenter-name"
+                    placeholder="Same as directory welcome, or edit here"
+                    value={commenterName}
+                    onChange={(e) => setCommenterName(e.target.value)}
+                    className="text-sm h-9 rounded-full bg-white border border-gray-200"
+                    autoComplete="name"
+                  />
+                </div>
               )}
-              
+
               <p className="text-xs text-gray-400 text-center">
                 Press Enter to post • Shift+Enter for new line
               </p>
