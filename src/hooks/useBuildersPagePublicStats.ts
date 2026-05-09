@@ -18,6 +18,20 @@ const ZERO: Omit<BuildersPagePublicStats, 'loading' | 'error'> = {
   timelinePage: null,
 };
 
+function parseTimelinePageField(row: Record<string, unknown>): Record<string, unknown>[] | null {
+  const tp = row.timeline_page;
+  if (Array.isArray(tp)) return tp as Record<string, unknown>[];
+  if (typeof tp === 'string') {
+    try {
+      const parsed = JSON.parse(tp) as unknown;
+      return Array.isArray(parsed) ? (parsed as Record<string, unknown>[]) : null;
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
+
 /**
  * Live directory stats for /builders (hero + footer band). Falls back if RPC missing.
  */
@@ -53,13 +67,24 @@ export function useBuildersPagePublicStats(): BuildersPagePublicStats {
 
         if (!rpcError && data && typeof data === 'object' && !Array.isArray(data)) {
           const row = data as Record<string, unknown>;
-          const tp = row.timeline_page;
-          const timelinePage = Array.isArray(tp)
-            ? (tp as Record<string, unknown>[])
-            : null;
+          const activePosts = Number(row.active_posts) || 0;
+          let timelinePage = parseTimelinePageField(row);
+
+          if (!timelinePage?.length && activePosts > 0) {
+            const { data: rows, error: rowsErr } = await supabase
+              .from('builder_posts')
+              .select('*')
+              .or('status.eq.active,status.is.null')
+              .order('created_at', { ascending: false })
+              .limit(11);
+            if (!rowsErr && Array.isArray(rows) && rows.length > 0) {
+              timelinePage = rows as Record<string, unknown>[];
+            }
+          }
+
           setState({
             professionalBuilders: Number(row.professional_builders) || 0,
-            activePosts: Number(row.active_posts) || 0,
+            activePosts,
             publishedVideos: Number(row.published_videos) || 0,
             timelinePage,
             loading: false,
