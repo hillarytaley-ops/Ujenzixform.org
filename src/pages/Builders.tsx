@@ -50,7 +50,8 @@ const Builders = () => {
   const sharedUpdates =
     publicStats.activePosts + publicStats.publishedVideos;
 
-  const isBuilder = userRoleState === "professional_builder" || userRoleState === "admin";
+  /** Only CO/contractors may post on the public builders feed (not admins or other roles). */
+  const isBuilder = userRoleState === "professional_builder";
 
   useEffect(() => {
     checkUserProfile();

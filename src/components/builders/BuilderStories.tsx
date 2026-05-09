@@ -234,7 +234,7 @@ export const BuilderStories: React.FC<BuilderStoriesProps> = ({
 
   // Check if user can post stories
   const storedRole = typeof window !== 'undefined' ? localStorage.getItem('user_role') : null;
-  const canPostStory = isBuilder || storedRole === 'professional_builder' || storedRole === 'admin';
+  const canPostStory = isBuilder || storedRole === 'professional_builder';
 
   // Fetch real stories from database
   useEffect(() => {

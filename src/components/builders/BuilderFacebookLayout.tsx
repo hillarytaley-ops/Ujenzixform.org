@@ -112,12 +112,29 @@ export const BuilderFacebookLayout: React.FC<BuilderFacebookLayoutProps> = ({
 
   // Fetch registered COs/contractors from database
   useEffect(() => {
+    const mapProfileToBuilder = (profile: any): RegisteredBuilder => ({
+      id: profile.id,
+      user_id: profile.user_id,
+      full_name: profile.full_name || 'Builder',
+      company_name: profile.company_name,
+      role: 'builder' as const,
+      user_type: profile.company_name ? 'company' as const : 'individual' as const,
+      is_professional: true,
+      phone: profile.phone,
+      email: profile.email,
+      location: profile.location,
+      rating: profile.rating || 4.5,
+      total_projects: profile.total_projects || 0,
+      total_reviews: profile.total_reviews || 0,
+      specialties: profile.specialties || [],
+      description: profile.bio || '',
+      verified: profile.is_verified,
+      avatar_url: profile.avatar_url,
+    });
+
     const fetchRegisteredBuilders = async () => {
       setLoadingBuilders(true);
       try {
-        console.log('🏗️ Fetching registered COs/contractors...');
-        
-        // Get access token if available
         let accessToken = '';
         try {
           const storedSession = readPersistedAuthRawStringSync();
@@ -126,115 +143,73 @@ export const BuilderFacebookLayout: React.FC<BuilderFacebookLayoutProps> = ({
             accessToken = parsed.access_token || '';
           }
         } catch (e) {}
-        
-        // First get all CO/contractor user IDs using REST API
-        const rolesRes = await fetch(
-          `${SUPABASE_URL}/rest/v1/user_roles?role=eq.professional_builder&select=user_id`,
-          {
-            headers: {
-              'apikey': SUPABASE_ANON_KEY,
-              'Authorization': `Bearer ${accessToken || SUPABASE_ANON_KEY}`,
+
+        const authHeader = `Bearer ${accessToken || SUPABASE_ANON_KEY}`;
+        const jsonHeaders = {
+          apikey: SUPABASE_ANON_KEY,
+          Authorization: authHeader,
+          'Content-Type': 'application/json',
+        } as const;
+
+        let builderUserIds: string[] = [];
+
+        try {
+          const rpcRes = await fetch(`${SUPABASE_URL}/rest/v1/rpc/get_professional_builder_user_ids`, {
+            method: 'POST',
+            headers: jsonHeaders,
+            body: '{}',
+          });
+          if (rpcRes.ok) {
+            const ids = await rpcRes.json();
+            if (Array.isArray(ids)) {
+              builderUserIds = ids.filter(Boolean) as string[];
             }
           }
-        );
-        
-        const roleData = await rolesRes.json();
-        console.log('🏗️ CO/Contractor roles found:', roleData?.length || 0);
+        } catch (e) {
+          console.log('🏗️ RPC get_professional_builder_user_ids unavailable:', e);
+        }
 
-        if (!rolesRes.ok || !roleData || roleData.length === 0) {
-          console.log('🏗️ No COs/contractors found in user_roles');
-          
-          // Fallback: Try fetching profiles with role = 'professional_builder' directly
+        if (builderUserIds.length === 0) {
+          const rolesRes = await fetch(
+            `${SUPABASE_URL}/rest/v1/user_roles?role=eq.professional_builder&select=user_id`,
+            { headers: { apikey: SUPABASE_ANON_KEY, Authorization: authHeader } }
+          );
+          const roleData = await rolesRes.json();
+          if (rolesRes.ok && Array.isArray(roleData) && roleData.length > 0) {
+            builderUserIds = roleData.map((r: { user_id: string }) => r.user_id).filter(Boolean);
+          }
+        }
+
+        if (builderUserIds.length === 0) {
           const profilesRes = await fetch(
             `${SUPABASE_URL}/rest/v1/profiles?role=eq.professional_builder&select=*`,
-            {
-              headers: {
-                'apikey': SUPABASE_ANON_KEY,
-                'Authorization': `Bearer ${accessToken || SUPABASE_ANON_KEY}`,
-              }
-            }
+            { headers: { apikey: SUPABASE_ANON_KEY, Authorization: authHeader } }
           );
-          
           const profilesData = await profilesRes.json();
-          console.log('🏗️ Profiles with professional_builder role:', profilesData?.length || 0);
-          
-          if (profilesData && profilesData.length > 0) {
-            const transformedBuilders: RegisteredBuilder[] = profilesData.map((profile: any) => ({
-              id: profile.id,
-              user_id: profile.user_id,
-              full_name: profile.full_name || 'Builder',
-              company_name: profile.company_name,
-              role: 'builder' as const,
-              user_type: profile.company_name ? 'company' as const : 'individual' as const,
-              is_professional: true,
-              phone: profile.phone,
-              email: profile.email,
-              location: profile.location,
-              rating: profile.rating || 4.5,
-              total_projects: profile.total_projects || 0,
-              total_reviews: profile.total_reviews || 0,
-              specialties: profile.specialties || [],
-              description: profile.bio || '',
-              verified: profile.is_verified,
-              avatar_url: profile.avatar_url
-            }));
-            
-            setRegisteredBuilders(transformedBuilders);
-            console.log(`🏗️ Loaded ${transformedBuilders.length} builders from profiles`);
+          if (profilesRes.ok && Array.isArray(profilesData) && profilesData.length > 0) {
+            setRegisteredBuilders(profilesData.map(mapProfileToBuilder));
+            return;
           }
-          
-          setLoadingBuilders(false);
+          setRegisteredBuilders([]);
           return;
         }
 
-        const builderUserIds = roleData.map((r: any) => r.user_id);
-        console.log('🏗️ Builder user IDs:', builderUserIds);
-
-        // Fetch profiles for these users using REST API
         const profilesRes = await fetch(
           `${SUPABASE_URL}/rest/v1/profiles?user_id=in.(${builderUserIds.join(',')})&select=*`,
-          {
-            headers: {
-              'apikey': SUPABASE_ANON_KEY,
-              'Authorization': `Bearer ${accessToken || SUPABASE_ANON_KEY}`,
-            }
-          }
+          { headers: { apikey: SUPABASE_ANON_KEY, Authorization: authHeader } }
         );
-        
         const profilesData = await profilesRes.json();
-        console.log('🏗️ Builder profiles fetched:', profilesData?.length || 0);
 
         if (!profilesRes.ok || profilesData?.error) {
           console.error('🏗️ Error fetching builder profiles:', profilesData?.message || profilesData?.error);
-          setLoadingBuilders(false);
+          setRegisteredBuilders([]);
           return;
         }
 
-        // Transform to match expected format
-        const transformedBuilders: RegisteredBuilder[] = (profilesData || []).map((profile: any) => ({
-          id: profile.id,
-          user_id: profile.user_id,
-          full_name: profile.full_name || 'Builder',
-          company_name: profile.company_name,
-          role: 'builder' as const,
-          user_type: profile.company_name ? 'company' as const : 'individual' as const,
-          is_professional: true,
-          phone: profile.phone,
-          email: profile.email,
-          location: profile.location,
-          rating: profile.rating || 4.5,
-          total_projects: profile.total_projects || 0,
-          total_reviews: profile.total_reviews || 0,
-          specialties: profile.specialties || [],
-          description: profile.bio || '',
-          verified: profile.is_verified,
-          avatar_url: profile.avatar_url
-        }));
-
-        setRegisteredBuilders(transformedBuilders);
-        console.log(`🏗️ Loaded ${transformedBuilders.length} registered builders`);
+        setRegisteredBuilders((profilesData || []).map(mapProfileToBuilder));
       } catch (error) {
         console.error('🏗️ Error fetching registered builders:', error);
+        setRegisteredBuilders([]);
       } finally {
         setLoadingBuilders(false);
       }
@@ -269,6 +244,11 @@ export const BuilderFacebookLayout: React.FC<BuilderFacebookLayoutProps> = ({
       .slice(0, 2);
   };
 
+  const telHref = (phone: string) => {
+    const cleaned = phone.replace(/[^\d+]/g, '');
+    return cleaned ? `tel:${cleaned}` : undefined;
+  };
+
   const toggleBuilderExpand = (builderId: string) => {
     setExpandedBuilder(expandedBuilder === builderId ? null : builderId);
   };
@@ -278,7 +258,7 @@ export const BuilderFacebookLayout: React.FC<BuilderFacebookLayoutProps> = ({
       {/* Mobile Header */}
       <div className="lg:hidden">
         <MobileHeader
-          title="Builders"
+          title="CO/Contractors"
           onSearch={() => setShowMobileSearch(true)}
           onMessages={() => console.log('Open messages')}
           messageCount={3}
@@ -300,7 +280,7 @@ export const BuilderFacebookLayout: React.FC<BuilderFacebookLayoutProps> = ({
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
               <Input
-                placeholder="Search builders..."
+                placeholder="Search CO/contractors..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-9 bg-gray-100 dark:bg-gray-800 border-0 rounded-full"
@@ -351,13 +331,13 @@ export const BuilderFacebookLayout: React.FC<BuilderFacebookLayoutProps> = ({
           <div>
             <h3 className="text-base font-semibold flex items-center gap-2 text-gray-900 dark:text-white mb-2">
                 <Users className="h-5 w-5 text-blue-600" />
-                Builders
+                CO/Contractors
             </h3>
             <div>
               <div className="relative mb-2">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
                 <Input
-                  placeholder="Search builders..."
+                  placeholder="Search CO/contractors..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="pl-9 bg-gray-100 dark:bg-gray-800 border-0 rounded-full"
@@ -441,8 +421,30 @@ export const BuilderFacebookLayout: React.FC<BuilderFacebookLayoutProps> = ({
                           <div className="space-y-1 text-xs text-gray-600 dark:text-gray-400">
                             {builder.phone && (
                               <div className="flex items-center gap-2">
-                                <Phone className="h-3 w-3" />
-                                <span>{builder.phone}</span>
+                                <Phone className="h-3 w-3 shrink-0" />
+                                {telHref(builder.phone) ? (
+                                  <a
+                                    href={telHref(builder.phone)}
+                                    className="text-blue-600 hover:underline truncate"
+                                    onClick={(e) => e.stopPropagation()}
+                                  >
+                                    {builder.phone}
+                                  </a>
+                                ) : (
+                                  <span>{builder.phone}</span>
+                                )}
+                              </div>
+                            )}
+                            {builder.email && (
+                              <div className="flex items-center gap-2 min-w-0">
+                                <Mail className="h-3 w-3 shrink-0" />
+                                <a
+                                  href={`mailto:${builder.email}`}
+                                  className="text-blue-600 hover:underline truncate"
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  {builder.email}
+                                </a>
                               </div>
                             )}
                             {builder.location && (
@@ -454,22 +456,43 @@ export const BuilderFacebookLayout: React.FC<BuilderFacebookLayoutProps> = ({
                           </div>
 
                           {/* Action Buttons */}
-                          <div className="flex gap-2">
+                          <div className="flex flex-col gap-2">
+                            <div className="flex flex-wrap gap-2">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-8 flex-1 min-w-[5.5rem] text-xs"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  onBuilderContact?.(builder);
+                                }}
+                              >
+                                <MessageCircle className="h-3 w-3 mr-1" />
+                                Inbox
+                              </Button>
+                              {builder.email && (
+                                <Button size="sm" variant="outline" className="h-8 flex-1 min-w-[5.5rem] text-xs" asChild>
+                                  <a
+                                    href={`mailto:${builder.email}`}
+                                    onClick={(e) => e.stopPropagation()}
+                                  >
+                                    <Mail className="h-3 w-3 mr-1" />
+                                    Email
+                                  </a>
+                                </Button>
+                              )}
+                              {builder.phone && telHref(builder.phone) && (
+                                <Button size="sm" variant="outline" className="h-8 flex-1 min-w-[5.5rem] text-xs" asChild>
+                                  <a href={telHref(builder.phone)} onClick={(e) => e.stopPropagation()}>
+                                    <Phone className="h-3 w-3 mr-1" />
+                                    Call
+                                  </a>
+                                </Button>
+                              )}
+                            </div>
                             <Button
                               size="sm"
-                              variant="outline"
-                              className="flex-1 h-8 text-xs"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                onBuilderContact?.(builder);
-                              }}
-                            >
-                              <MessageCircle className="h-3 w-3 mr-1" />
-                              Contact
-                            </Button>
-                            <Button
-                              size="sm"
-                              className="flex-1 h-8 text-xs bg-blue-600 hover:bg-blue-700"
+                              className="h-8 w-full text-xs bg-blue-600 hover:bg-blue-700"
                               onClick={(e) => {
                                 e.stopPropagation();
                                 onBuilderProfile?.(builder);
@@ -516,7 +539,7 @@ export const BuilderFacebookLayout: React.FC<BuilderFacebookLayoutProps> = ({
               <div className="grid grid-cols-2 gap-2 text-center">
                 <div className="bg-white/20 rounded-lg p-2">
                   <div className="text-lg font-bold">{allBuilders.length}+</div>
-                  <div className="text-xs opacity-90">Builders</div>
+                  <div className="text-xs opacity-90">CO/Contractors</div>
                 </div>
                 <div className="bg-white/20 rounded-lg p-2">
                   <div className="text-lg font-bold">47</div>
@@ -603,12 +626,12 @@ export const BuilderFacebookLayout: React.FC<BuilderFacebookLayoutProps> = ({
       <aside className="hidden xl:block w-56 shrink-0 border-t xl:border-t-0 xl:border-l border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/25 order-3">
         <div className="xl:sticky xl:top-20 p-3 space-y-3 max-h-[calc(100vh-5rem)] overflow-y-auto">
           <div>
-            <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-2">Featured Builders</h3>
+            <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-2">Featured CO/Contractors</h3>
             <div className="space-y-2">
               {loadingBuilders ? (
                 <div className="flex items-center justify-center py-4">
                   <Loader2 className="h-5 w-5 animate-spin text-orange-500" />
-                  <span className="ml-2 text-sm text-gray-500">Loading builders...</span>
+                  <span className="ml-2 text-sm text-gray-500">Loading directory...</span>
                 </div>
               ) : allBuilders.length > 0 ? (
                 allBuilders.slice(0, 3).map((builder) => (

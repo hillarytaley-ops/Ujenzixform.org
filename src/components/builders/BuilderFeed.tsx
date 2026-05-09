@@ -19,9 +19,6 @@ import {
   FileVideo,
   X,
   Upload,
-  Globe,
-  Lock,
-  ChevronDown,
   Filter,
   Star,
   Bookmark,
@@ -30,12 +27,6 @@ import {
   Sparkles,
   Loader2
 } from 'lucide-react';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
 import { BuilderVideoPost, BuilderVideoPostProps, VideoComment } from './BuilderVideoPost';
 import { BuilderStories } from './BuilderStories';
 import { SUPABASE_ANON_KEY, SUPABASE_URL, supabase } from '@/integrations/supabase/client';
@@ -46,132 +37,12 @@ interface BuilderFeedProps {
   currentUserName?: string;
   currentUserAvatar?: string;
   currentUserRole?: string;
-  isBuilder?: boolean; // Whether current user is a registered builder
+  isBuilder?: boolean; // True when current user is a registered CO/contractor (professional_builder)
   onUploadVideo?: (file: File, caption: string) => void;
   onContactBuilder?: (builderId: string) => void;
   /** Parent supplies outer chrome (e.g. unified builders + feed card) */
   omitOuterCard?: boolean;
 }
-
-// Sample demo posts for builders
-const DEMO_POSTS: Omit<BuilderVideoPostProps, 'onLike' | 'onComment' | 'onShare' | 'onViewProfile'>[] = [
-  {
-    id: 'post-1',
-    builderId: 'builder-1',
-    builderName: 'John Kamau',
-    builderCompany: 'Kamau Construction Ltd',
-    builderAvatar: '',
-    builderVerified: true,
-    videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',
-    thumbnailUrl: '',
-    caption: '🏗️ Progress update on our latest residential project in Karen, Nairobi! The foundation work is complete and we\'re moving to the structural phase. Quality workmanship guaranteed! 💪\n\n#KenyaConstruction #NairobiBuilders #QualityHomes',
-    location: 'Karen, Nairobi',
-    timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000), // 2 hours ago
-    likes: 234,
-    shares: 45,
-    isLiked: false,
-    comments: [
-      {
-        id: 'c1',
-        userId: 'user-1',
-        userName: 'Grace Wanjiku',
-        content: 'Amazing progress! Looking forward to seeing the final result 🏠',
-        timestamp: new Date(Date.now() - 1 * 60 * 60 * 1000),
-        likes: 12,
-        isLiked: false
-      },
-      {
-        id: 'c2',
-        userId: 'user-2',
-        userName: 'Peter Mwangi',
-        content: 'Great work as always! Your team does excellent foundation work.',
-        timestamp: new Date(Date.now() - 30 * 60 * 1000),
-        likes: 8,
-        isLiked: false
-      }
-    ]
-  },
-  {
-    id: 'post-2',
-    builderId: 'builder-2',
-    builderName: 'Grace Wanjiku',
-    builderCompany: 'Elite Builders Kenya',
-    builderAvatar: '',
-    builderVerified: true,
-    videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4',
-    thumbnailUrl: '',
-    caption: '✨ Just completed this beautiful commercial plaza in Mombasa CBD! 5 floors of modern office and retail space. Thank you to our amazing team and clients for trusting us with this project.\n\nContact us for your next project! 📞 +254 733 456 789',
-    location: 'Mombasa, Kenya',
-    timestamp: new Date(Date.now() - 5 * 60 * 60 * 1000), // 5 hours ago
-    likes: 567,
-    shares: 89,
-    isLiked: true,
-    comments: [
-      {
-        id: 'c3',
-        userId: 'user-3',
-        userName: 'David Ochieng',
-        content: 'Congratulations on another successful project! The design is stunning.',
-        timestamp: new Date(Date.now() - 4 * 60 * 60 * 1000),
-        likes: 23,
-        isLiked: false
-      }
-    ]
-  },
-  {
-    id: 'post-3',
-    builderId: 'builder-3',
-    builderName: 'David Ochieng',
-    builderCompany: '',
-    builderAvatar: '',
-    builderVerified: false,
-    videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4',
-    thumbnailUrl: '',
-    caption: '⚡ Solar installation completed for a residential home in Kisumu! Going green with renewable energy. This 10kW system will power the entire household.\n\n🌞 Solar is the future! Contact me for your solar needs.',
-    location: 'Kisumu, Kenya',
-    timestamp: new Date(Date.now() - 24 * 60 * 60 * 1000), // 1 day ago
-    likes: 189,
-    shares: 34,
-    isLiked: false,
-    comments: []
-  },
-  {
-    id: 'post-4',
-    builderId: 'builder-4',
-    builderName: 'Mary Njeri',
-    builderCompany: 'Njeri Masonry Works',
-    builderAvatar: '',
-    builderVerified: true,
-    videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4',
-    thumbnailUrl: '',
-    caption: '🧱 Foundation work in progress! Our team specializes in strong, durable foundations that last generations. Using quality materials from certified suppliers.\n\n📍 Currently working in Nakuru region. Book your consultation today!',
-    location: 'Nakuru, Kenya',
-    timestamp: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000), // 2 days ago
-    likes: 312,
-    shares: 56,
-    isLiked: false,
-    comments: [
-      {
-        id: 'c4',
-        userId: 'user-4',
-        userName: 'Samuel Kiprop',
-        content: 'Your masonry work is top notch! Recommended to all my friends.',
-        timestamp: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000),
-        likes: 15,
-        isLiked: false
-      },
-      {
-        id: 'c5',
-        userId: 'user-5',
-        userName: 'Ann Chebet',
-        content: 'How much for a foundation for a 4 bedroom house?',
-        timestamp: new Date(Date.now() - 20 * 60 * 60 * 1000),
-        likes: 3,
-        isLiked: false
-      }
-    ]
-  }
-];
 
 // Location options for filtering
 const LOCATIONS = ['All Locations', 'Nairobi', 'Mombasa', 'Kisumu', 'Nakuru', 'Eldoret', 'Thika', 'Kiambu'];
@@ -195,11 +66,6 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
   const storedUserId = typeof window !== 'undefined' ? localStorage.getItem('user_id') : null;
   const storedUserName = typeof window !== 'undefined' ? localStorage.getItem('user_name') : null;
   
-  // User is a builder if: prop says so, OR localStorage role is professional_builder/admin
-  const effectiveIsBuilder = isBuilder || 
-    storedRole === 'professional_builder' || 
-    storedRole === 'admin';
-  
   // Use stored user ID if currentUserId not provided
   const effectiveUserId = currentUserId || storedUserId;
   
@@ -209,13 +75,13 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
   // Get effective user name from props or localStorage
   const effectiveUserName = currentUserName !== 'Guest' ? currentUserName : (storedUserName || 'Guest');
   
-  // Check if user can post (must be a registered builder)
-  // Only COs/contractors can post on the Builders page (not private clients)
-  const canPost = isBuilder || 
-    effectiveRole === 'professional_builder' || 
-    effectiveRole === 'admin' ||
-    storedRole === 'professional_builder' || 
-    storedRole === 'admin';
+  /** Only registered CO/contractors may post; feed is public for everyone to read. */
+  const isCoContractor =
+    isBuilder ||
+    effectiveRole === 'professional_builder' ||
+    storedRole === 'professional_builder';
+  const canPost = isCoContractor;
+  const effectiveIsBuilder = isCoContractor;
   const [posts, setPosts] = useState<Omit<BuilderVideoPostProps, 'onLike' | 'onComment' | 'onShare' | 'onViewProfile'>[]>([]);
   const [loadingPosts, setLoadingPosts] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -231,7 +97,6 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
   const [showLocationInput, setShowLocationInput] = useState(false);
   const [isCreatingPost, setIsCreatingPost] = useState(false);
   const [isPosting, setIsPosting] = useState(false);
-  const [privacy, setPrivacy] = useState<'public' | 'friends'>('public');
   
   // Filter states
   const [showFilters, setShowFilters] = useState(false);
@@ -276,12 +141,9 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
         }
       } catch (e) {}
 
-      // Fetch posts - show all posts that aren't deleted
-      // This ensures visitors can see all builder content
-      // Add pagination with offset and limit
-      const limitPlusOne = POSTS_PER_PAGE + 1; // Fetch one extra to check if there are more
-      // Show all posts except deleted ones (active, pending, or null status)
-      let postsUrl = `${SUPABASE_URL}/rest/v1/builder_posts?status=neq.deleted&order=created_at.desc&limit=${limitPlusOne}&offset=${offset}`;
+      // Public feed: active posts from CO/contractors (RLS also enforces this on the server)
+      const limitPlusOne = POSTS_PER_PAGE + 1;
+      let postsUrl = `${SUPABASE_URL}/rest/v1/builder_posts?status=eq.active&order=created_at.desc&limit=${limitPlusOne}&offset=${offset}`;
       
       const postsRes = await fetch(
         postsUrl,
@@ -564,6 +426,15 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
       console.log('📤 No content, returning early');
       return;
     }
+
+    if (!canPost) {
+      toast({
+        title: 'CO/Contractors only',
+        description: 'Only registered CO/contractors can post on this feed.',
+        variant: 'destructive',
+      });
+      return;
+    }
     
     // Get user ID directly from localStorage (bypasses Supabase client issues)
     let userId: string | null = null;
@@ -603,6 +474,15 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
     
     if (!newPostText.trim() && !selectedVideo && !selectedPhoto) {
       console.log('📤 No content to post');
+      return;
+    }
+
+    if (!canPost) {
+      toast({
+        title: 'CO/Contractors only',
+        description: 'Only registered CO/contractors can post on this feed.',
+        variant: 'destructive',
+      });
       return;
     }
 
@@ -808,7 +688,7 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
           video_url: videoUrl || null,
           image_urls: imageUrl ? [imageUrl] : null, // Database uses image_urls (array)
           project_location: postLocation || null,
-          privacy: privacy,
+          privacy: 'public',
           status: postStatus,
           likes_count: 0,
           shares_count: 0,
@@ -944,8 +824,8 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
     
     if (!userId) {
       toast({
-        title: 'Sign in required',
-        description: 'Please sign in to like posts',
+        title: 'Sign in to like',
+        description: 'Create a free account or sign in—any member of the public can like posts once signed in.',
         variant: 'destructive'
       });
       return;
@@ -1054,8 +934,8 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
     
     if (!userId) {
       toast({
-        title: 'Sign in required',
-        description: 'Please sign in to comment',
+        title: 'Sign in to comment',
+        description: 'Create a free account or sign in to join the conversation.',
         variant: 'destructive'
       });
       return;
@@ -1302,31 +1182,12 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
                   </div>
                 )}
                 
-                {/* Privacy Selector */}
-                <div className="flex items-center gap-2 flex-wrap">
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="outline" size="sm" className="gap-2">
-                        {privacy === 'public' ? <Globe className="h-4 w-4" /> : <Lock className="h-4 w-4" />}
-                        {privacy === 'public' ? 'Public' : 'Friends'}
-                        <ChevronDown className="h-3 w-3" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent>
-                      <DropdownMenuItem onClick={() => setPrivacy('public')}>
-                        <Globe className="h-4 w-4 mr-2" />
-                        Public
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => setPrivacy('friends')}>
-                        <Lock className="h-4 w-4 mr-2" />
-                        Friends
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                  
-                  {/* Show selected location badge */}
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:flex-wrap">
+                  <p className="text-xs text-muted-foreground">
+                    Posts on this feed are public for all visitors. Likes and comments are open to anyone with a signed-in account.
+                  </p>
                   {postLocation && (
-                    <Badge variant="secondary" className="gap-1">
+                    <Badge variant="secondary" className="gap-1 w-fit">
                       <MapPin className="h-3 w-3" />
                       {postLocation}
                     </Badge>
@@ -1466,7 +1327,7 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
               <div className="flex-1 text-center sm:text-left min-w-0">
                 <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Want to share your projects?</h3>
                 <p className="text-xs text-gray-600 dark:text-gray-400">
-                  Register as a builder to post updates and connect with clients.
+                  Register as a CO/contractor to post updates. Everyone can browse the feed; sign in to like or comment.
                 </p>
               </div>
               <div className="flex flex-col sm:flex-row gap-2 shrink-0 w-full sm:w-auto">
@@ -1477,7 +1338,7 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
                       className="bg-blue-600 hover:bg-blue-700"
                       onClick={() => window.location.href = '/professional-builder-registration'}
                     >
-                      Register as Builder
+                      Register as CO/Contractor
                     </Button>
                     <Button 
                       variant="outline"
@@ -1493,7 +1354,7 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
                     className="bg-blue-600 hover:bg-blue-700"
                     onClick={() => window.location.href = '/professional-builder-registration'}
                   >
-                    Become a Builder
+                    Become a CO/Contractor
                   </Button>
                 )}
               </div>
@@ -1504,8 +1365,10 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
 
       <BuilderStories
         embedded
+        currentUserId={effectiveUserId || undefined}
         currentUserName={effectiveUserName}
         currentUserAvatar={currentUserAvatar}
+        isBuilder={canPost}
         onCreateStory={() => setIsCreatingPost(true)}
       />
 
