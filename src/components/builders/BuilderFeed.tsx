@@ -32,6 +32,7 @@ import { BuilderStories } from './BuilderStories';
 import { SUPABASE_ANON_KEY, SUPABASE_URL, supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { getBuilderFeedGuestId } from '@/utils/builderFeedGuestId';
+import { normalizeTimelinePageFromStats } from '@/utils/normalizeTimelinePageFromStats';
 
 interface BuilderFeedProps {
   currentUserId?: string;
@@ -205,7 +206,7 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
         }
       }
 
-      // 2) Raw PostgREST (explicit Accept; some stacks differ from default)
+      // 2) Raw PostgREST RPC (no Prefer — some gateways mishandle it for set-returning RPCs)
       if (!rpcOk) {
         const rpcRes = await fetch(`${SUPABASE_URL}/rest/v1/rpc/get_public_builder_feed_posts`, {
           method: 'POST',
@@ -213,7 +214,6 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
             ...authHeaders,
             Accept: 'application/json',
             'Content-Type': 'application/json',
-            Prefer: 'return=representation',
           },
           body: JSON.stringify({ p_limit: limitPlusOne, p_offset: offset }),
         });
@@ -229,6 +229,39 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
             rpcRes.status,
             (rpcJson as { message?: string })?.message || rpcJson
           );
+        }
+      }
+
+      // 3) Same SECURITY DEFINER path as hero: stats JSON includes timeline_page when p_feed_limit is set
+      //    (covers prod where get_public_builder_feed_posts is not deployed yet).
+      if (!rpcOk) {
+        try {
+          const statsRes = await fetch(`${SUPABASE_URL}/rest/v1/rpc/get_builders_page_public_stats`, {
+            method: 'POST',
+            headers: {
+              ...authHeaders,
+              Accept: 'application/json',
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ p_feed_limit: limitPlusOne, p_feed_offset: offset }),
+          });
+          const statsJson: unknown = await statsRes.json();
+          const row =
+            Array.isArray(statsJson) && statsJson.length > 0
+              ? (statsJson[0] as Record<string, unknown>)
+              : (statsJson as Record<string, unknown>);
+          const tp =
+            row && typeof row === 'object' && !Array.isArray(row)
+              ? normalizeTimelinePageFromStats(row.timeline_page)
+              : null;
+          if (tp && tp.length > 0) {
+            postsData = tp;
+            postsRes = new Response(null, { status: 200 });
+            rpcOk = true;
+            console.log('📥 Posts via get_builders_page_public_stats.timeline_page:', tp.length);
+          }
+        } catch (e) {
+          console.warn('📥 stats bundle timeline fetch:', e);
         }
       }
 

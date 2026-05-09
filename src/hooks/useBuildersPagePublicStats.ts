@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { normalizeTimelinePageFromStats } from '@/utils/normalizeTimelinePageFromStats';
 
 export type BuildersPagePublicStats = {
   professionalBuilders: number;
@@ -18,20 +19,6 @@ const ZERO: Omit<BuildersPagePublicStats, 'loading' | 'error'> = {
   publishedVideos: 0,
   timelinePage: null,
 };
-
-function parseTimelinePageField(row: Record<string, unknown>): Record<string, unknown>[] | null {
-  const tp = row.timeline_page;
-  if (Array.isArray(tp)) return tp as Record<string, unknown>[];
-  if (typeof tp === 'string') {
-    try {
-      const parsed = JSON.parse(tp) as unknown;
-      return Array.isArray(parsed) ? (parsed as Record<string, unknown>[]) : null;
-    } catch {
-      return null;
-    }
-  }
-  return null;
-}
 
 /**
  * Live directory stats for /builders (hero + footer band). Falls back if RPC missing.
@@ -66,10 +53,18 @@ export function useBuildersPagePublicStats(): BuildersPagePublicStats {
 
         if (cancelled) return;
 
+        if (typeof data === 'string') {
+          try {
+            data = JSON.parse(data) as unknown;
+          } catch {
+            data = null;
+          }
+        }
+
         if (!rpcError && data && typeof data === 'object' && !Array.isArray(data)) {
           const row = data as Record<string, unknown>;
           const rpcActivePosts = Number(row.active_posts) || 0;
-          let timelinePage = parseTimelinePageField(row);
+          let timelinePage = normalizeTimelinePageFromStats(row.timeline_page);
 
           let anonPostCount: number | null = null;
           try {
