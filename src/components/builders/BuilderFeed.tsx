@@ -119,12 +119,6 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
   const [sortBy, setSortBy] = useState<'recent' | 'popular' | 'trending'>('recent');
   const [savedPosts, setSavedPosts] = useState<Set<string>>(new Set());
   const [feedType, setFeedType] = useState<'all' | 'following' | 'live'>('all');
-  /** When timeline is empty, explains split vs showcase (stats combine posts + videos). */
-  const [feedEmptyInsight, setFeedEmptyInsight] = useState<{
-    timelinePosts: number;
-    showcaseVideos: number;
-  } | null>(null);
-
   const timelineSeedKey =
     Array.isArray(seedTimelinePosts) && seedTimelinePosts.length > 0
       ? `${seedTimelinePosts.length}:${String((seedTimelinePosts[0] as { id?: string })?.id ?? '')}`
@@ -139,7 +133,6 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
       setLoadingPosts(true);
       setPostsOffset(0);
       setHasMorePosts(true);
-      setFeedEmptyInsight(null);
     } else {
       setLoadingMore(true);
     }
@@ -446,33 +439,10 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
         
         // Update offset for next load
         setPostsOffset(offset + transformedPosts.length);
-        setFeedEmptyInsight(null);
       } else {
         // No timeline posts (videos may still live under Project Showcase only)
         if (isInitialLoad) {
           setPosts([]);
-          try {
-            const statsRes = await fetch(`${SUPABASE_URL}/rest/v1/rpc/get_builders_page_public_stats`, {
-              method: 'POST',
-              headers: {
-                apikey: SUPABASE_ANON_KEY,
-                Authorization: `Bearer ${accessToken || SUPABASE_ANON_KEY}`,
-                'Content-Type': 'application/json',
-              },
-              body: '{}',
-            });
-            const statsJson = (await statsRes.json()) as Record<string, unknown>;
-            if (statsRes.ok && statsJson && typeof statsJson === 'object' && !Array.isArray(statsJson)) {
-              setFeedEmptyInsight({
-                timelinePosts: Number(statsJson.active_posts) || 0,
-                showcaseVideos: Number(statsJson.published_videos) || 0,
-              });
-            } else {
-              setFeedEmptyInsight(null);
-            }
-          } catch {
-            setFeedEmptyInsight(null);
-          }
         }
         setHasMorePosts(false);
       }
@@ -481,7 +451,6 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
       // Don't show demo posts - only real builder content
       if (isInitialLoad) {
         setPosts([]);
-        setFeedEmptyInsight(null);
       }
     } finally {
       setLoadingPosts(false);
@@ -1236,14 +1205,9 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
     return b.timestamp.getTime() - a.timestamp.getTime();
   });
 
-  /** Hero uses same RPC; prefer these when feed rows are empty so copy never contradicts the band stats */
-  const statsReady = directoryStatsLoading !== true;
-  const emptyFeedTimeline = statsReady
-    ? (directoryTimelinePostCount ?? 0)
-    : (feedEmptyInsight?.timelinePosts ?? 0);
-  const emptyFeedVideos = statsReady
-    ? (directoryShowcaseVideoCount ?? 0)
-    : (feedEmptyInsight?.showcaseVideos ?? 0);
+  /** Same numbers as hero (anon-visible counts from useBuildersPagePublicStats)—never use definer-only RPC here */
+  const emptyFeedTimeline = directoryTimelinePostCount ?? 0;
+  const emptyFeedVideos = directoryShowcaseVideoCount ?? 0;
 
   const feedBody = (
     <>
