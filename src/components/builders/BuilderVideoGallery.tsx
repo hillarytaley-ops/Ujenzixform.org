@@ -1,5 +1,7 @@
-import React, { useState, useEffect } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import React, { useState, useEffect, useCallback } from "react";
+import { supabase, SUPABASE_URL, SUPABASE_ANON_KEY } from "@/integrations/supabase/client";
+import { readPersistedAuthRawStringSync } from "@/utils/supabaseAccessToken";
+import { getBuilderFeedGuestId } from "@/utils/builderFeedGuestId";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -89,6 +91,10 @@ export const BuilderVideoGallery = ({
   const [videos, setVideos] = useState<BuilderVideo[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedVideo, setSelectedVideo] = useState<BuilderVideo | null>(null);
+  /** Open VideoPlayer with comment field focused (showcase “Comment” row) */
+  const [openPlayerFocusComments, setOpenPlayerFocusComments] = useState(false);
+  /** Video IDs the current visitor has liked (guest: localStorage; auth: server) */
+  const [galleryLikedVideoIds, setGalleryLikedVideoIds] = useState<Set<string>>(() => new Set());
   const [videoToDelete, setVideoToDelete] = useState<string | null>(null);
   const [editOpen, setEditOpen] = useState(false);
   const [editDraft, setEditDraft] = useState({
@@ -207,11 +213,161 @@ export const BuilderVideoGallery = ({
     }
   };
 
-  const handleVideoClick = (video: BuilderVideo) => {
+  const openVideoPlayer = (video: BuilderVideo, opts?: { focusComments?: boolean }) => {
+    setOpenPlayerFocusComments(!!opts?.focusComments);
     setSelectedVideo(video);
-    // Record view
-    recordView(video.id);
+    void recordView(video.id);
   };
+
+  /** Sync “liked” state for cards from guest localStorage or auth video_likes */
+  useEffect(() => {
+    if (!videos.length) return;
+    let cancelled = false;
+
+    const syncLikes = async () => {
+      try {
+        let userId: string | null = null;
+        let accessToken = '';
+        const raw = readPersistedAuthRawStringSync();
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          userId = parsed.user?.id ?? null;
+          accessToken = parsed.access_token || '';
+        }
+
+        if (userId) {
+          const ids = videos.map((v) => v.id).join(',');
+          const res = await fetch(
+            `${SUPABASE_URL}/rest/v1/video_likes?video_id=in.(${ids})&user_id=eq.${userId}&select=video_id`,
+            {
+              headers: {
+                apikey: SUPABASE_ANON_KEY,
+                Authorization: `Bearer ${accessToken || SUPABASE_ANON_KEY}`,
+                Accept: 'application/json',
+              },
+            }
+          );
+          const data = res.ok ? await res.json() : [];
+          const rows = Array.isArray(data) ? data : [];
+          if (!cancelled) {
+            setGalleryLikedVideoIds(new Set(rows.map((r: { video_id: string }) => r.video_id)));
+          }
+        } else {
+          const guestLikes = JSON.parse(
+            typeof localStorage !== 'undefined' ? localStorage.getItem('guestLikes') || '[]' : '[]'
+          );
+          const arr = Array.isArray(guestLikes) ? guestLikes : [];
+          if (!cancelled) setGalleryLikedVideoIds(new Set(arr as string[]));
+        }
+      } catch {
+        if (!cancelled) setGalleryLikedVideoIds(new Set());
+      }
+    };
+
+    void syncLikes();
+    return () => {
+      cancelled = true;
+    };
+  }, [videos]);
+
+  const toggleGalleryVideoLike = useCallback(
+    async (video: BuilderVideo, e?: React.MouseEvent) => {
+      e?.preventDefault();
+      e?.stopPropagation();
+
+      let userId: string | null = null;
+      let accessToken = '';
+      try {
+        const raw = readPersistedAuthRawStringSync();
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          userId = parsed.user?.id ?? null;
+          accessToken = parsed.access_token || '';
+        }
+      } catch {
+        /* ignore */
+      }
+
+      const guestId = !userId ? getBuilderFeedGuestId() : '';
+      if (!userId && !guestId) {
+        toast({
+          title: 'Cannot save like',
+          description: 'Allow storage for this site to remember your likes, or sign in.',
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      const liked = galleryLikedVideoIds.has(video.id);
+      const headers = {
+        apikey: SUPABASE_ANON_KEY,
+        Authorization: `Bearer ${accessToken || SUPABASE_ANON_KEY}`,
+        Accept: 'application/json',
+        'Content-Type': 'application/json',
+      } as const;
+
+      try {
+        if (liked) {
+          let deleteUrl = `${SUPABASE_URL}/rest/v1/video_likes?video_id=eq.${video.id}`;
+          if (userId) deleteUrl += `&user_id=eq.${userId}`;
+          else deleteUrl += `&user_id=is.null&guest_identifier=eq.${encodeURIComponent(guestId)}`;
+
+          const res = await fetch(deleteUrl, { method: 'DELETE', headers });
+          if (!res.ok) {
+            const t = await res.text();
+            console.error('video_likes delete:', res.status, t);
+            toast({ title: 'Unlike failed', description: 'Try again or open the video.', variant: 'destructive' });
+            return;
+          }
+          setGalleryLikedVideoIds((prev) => {
+            const next = new Set(prev);
+            next.delete(video.id);
+            return next;
+          });
+          setVideos((prev) =>
+            prev.map((v) =>
+              v.id === video.id ? { ...v, likes_count: Math.max(0, (v.likes_count || 0) - 1) } : v
+            )
+          );
+          if (!userId) {
+            const gl = JSON.parse(localStorage.getItem('guestLikes') || '[]') as string[];
+            localStorage.setItem('guestLikes', JSON.stringify(gl.filter((id) => id !== video.id)));
+          }
+        } else {
+          const res = await fetch(`${SUPABASE_URL}/rest/v1/video_likes`, {
+            method: 'POST',
+            headers: { ...headers, Prefer: 'return=minimal' },
+            body: JSON.stringify({
+              video_id: video.id,
+              user_id: userId,
+              guest_identifier: userId ? null : guestId,
+            }),
+          });
+          if (!res.ok) {
+            const t = await res.text();
+            console.error('video_likes insert:', res.status, t);
+            toast({ title: 'Like failed', description: 'Try again or sign in.', variant: 'destructive' });
+            return;
+          }
+          setGalleryLikedVideoIds((prev) => new Set(prev).add(video.id));
+          setVideos((prev) =>
+            prev.map((v) => (v.id === video.id ? { ...v, likes_count: (v.likes_count || 0) + 1 } : v))
+          );
+          if (!userId) {
+            const gl = JSON.parse(localStorage.getItem('guestLikes') || '[]') as string[];
+            if (!gl.includes(video.id)) {
+              gl.push(video.id);
+              localStorage.setItem('guestLikes', JSON.stringify(gl));
+            }
+          }
+        }
+      } catch (err) {
+        console.error('toggleGalleryVideoLike', err);
+        toast({ title: 'Error', description: 'Could not update like.', variant: 'destructive' });
+      }
+    },
+    [galleryLikedVideoIds, toast]
+  );
 
   const recordView = async (videoId: string) => {
     try {
@@ -488,9 +644,18 @@ export const BuilderVideoGallery = ({
               </div>
 
               {/* Video Player Area - Click to Play */}
-              <div 
+              <div
                 className="relative aspect-video bg-black cursor-pointer group"
-                onClick={() => handleVideoClick(video)}
+                onClick={() => openVideoPlayer(video)}
+                onKeyDown={(ev) => {
+                  if (ev.key === 'Enter' || ev.key === ' ') {
+                    ev.preventDefault();
+                    openVideoPlayer(video);
+                  }
+                }}
+                role="button"
+                tabIndex={0}
+                aria-label={`Play video: ${video.title}`}
               >
                 <video
                   src={video.video_url}
@@ -550,28 +715,39 @@ export const BuilderVideoGallery = ({
               )}
 
               {/* Action Buttons - Facebook Style */}
-              <div className="px-2 py-1 flex items-center justify-around border-b">
-                <Button 
-                  variant="ghost" 
-                  className="flex-1 text-gray-600 hover:bg-gray-100 gap-2"
-                  onClick={() => handleVideoClick(video)}
+              <div className="px-2 py-1 flex items-center justify-around border-b" onClick={(ev) => ev.stopPropagation()}>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className={`flex-1 gap-2 hover:bg-gray-100 ${
+                    galleryLikedVideoIds.has(video.id) ? 'text-blue-600' : 'text-gray-600'
+                  }`}
+                  onClick={(e) => void toggleGalleryVideoLike(video, e)}
                 >
-                  <ThumbsUp className="h-5 w-5" />
-                  <span className="hidden sm:inline">Like</span>
+                  <ThumbsUp
+                    className={`h-5 w-5 ${galleryLikedVideoIds.has(video.id) ? 'fill-current' : ''}`}
+                  />
+                  <span className="hidden sm:inline">{galleryLikedVideoIds.has(video.id) ? 'Liked' : 'Like'}</span>
                 </Button>
-                <Button 
-                  variant="ghost" 
+                <Button
+                  type="button"
+                  variant="ghost"
                   className="flex-1 text-gray-600 hover:bg-gray-100 gap-2"
-                  onClick={() => handleVideoClick(video)}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    openVideoPlayer(video, { focusComments: true });
+                  }}
                 >
                   <MessageCircle className="h-5 w-5" />
                   <span className="hidden sm:inline">Comment</span>
                 </Button>
-                <Button 
-                  variant="ghost" 
+                <Button
+                  type="button"
+                  variant="ghost"
                   className="flex-1 text-gray-600 hover:bg-gray-100 gap-2"
-                  onClick={() => {
-                    navigator.clipboard.writeText(window.location.href);
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    void navigator.clipboard.writeText(window.location.href);
                     toast({ title: "Link copied!", description: "Share this video with others" });
                   }}
                 >
@@ -613,7 +789,11 @@ export const BuilderVideoGallery = ({
         <VideoPlayer
           video={selectedVideo}
           isOpen={!!selectedVideo}
-          onClose={() => setSelectedVideo(null)}
+          initialFocusComments={openPlayerFocusComments}
+          onClose={() => {
+            setSelectedVideo(null);
+            setOpenPlayerFocusComments(false);
+          }}
           onVideoUpdate={fetchVideos}
         />
       )}

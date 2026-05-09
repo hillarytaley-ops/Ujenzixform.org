@@ -1,4 +1,5 @@
 import { readPersistedAuthRawStringSync } from '@/utils/supabaseAccessToken';
+import { getBuilderFeedGuestId } from '@/utils/builderFeedGuestId';
 import React, { useState, useEffect, useRef } from "react";
 import { supabase, SUPABASE_URL, SUPABASE_ANON_KEY } from "@/integrations/supabase/client";
 import {
@@ -69,9 +70,17 @@ interface VideoPlayerProps {
   isOpen: boolean;
   onClose: () => void;
   onVideoUpdate?: () => void;
+  /** When opening from showcase “Comment”, scroll and focus the comment field */
+  initialFocusComments?: boolean;
 }
 
-export const VideoPlayer = ({ video, isOpen, onClose, onVideoUpdate }: VideoPlayerProps) => {
+export const VideoPlayer = ({
+  video,
+  isOpen,
+  onClose,
+  onVideoUpdate,
+  initialFocusComments = false,
+}: VideoPlayerProps) => {
   const [comments, setComments] = useState<Comment[]>([]);
   const [newComment, setNewComment] = useState("");
   const [commenterName, setCommenterName] = useState("");
@@ -91,6 +100,18 @@ export const VideoPlayer = ({ video, isOpen, onClose, onVideoUpdate }: VideoPlay
       setLocalLikesCount(video.likes_count);
     }
   }, [isOpen, video.id]);
+
+  useEffect(() => {
+    if (!isOpen || !initialFocusComments) return;
+    const id = window.setTimeout(() => {
+      document.getElementById('video-player-comments')?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'nearest',
+      });
+      document.getElementById('comment-input')?.focus();
+    }, 150);
+    return () => window.clearTimeout(id);
+  }, [isOpen, initialFocusComments, video.id]);
 
   useEffect(() => {
     // Track watch time when component unmounts or video changes
@@ -244,8 +265,13 @@ export const VideoPlayer = ({ video, isOpen, onClose, onVideoUpdate }: VideoPlay
         let deleteUrl = `${SUPABASE_URL}/rest/v1/video_likes?video_id=eq.${video.id}`;
         if (userId) {
           deleteUrl += `&user_id=eq.${userId}`;
+        } else {
+          const gid = getBuilderFeedGuestId();
+          if (gid) {
+            deleteUrl += `&user_id=is.null&guest_identifier=eq.${encodeURIComponent(gid)}`;
+          }
         }
-        
+
         const response = await fetch(deleteUrl, {
           method: 'DELETE',
           headers: {
@@ -271,7 +297,7 @@ export const VideoPlayer = ({ video, isOpen, onClose, onVideoUpdate }: VideoPlay
         // Like using REST API
         console.log('❤️ Adding like via REST API...');
         
-        const guestIdentifier = !userId ? `guest-${Date.now()}` : null;
+        const guestIdentifier = !userId ? getBuilderFeedGuestId() || `guest-${Date.now()}` : null;
         
         const response = await fetch(`${SUPABASE_URL}/rest/v1/video_likes`, {
           method: 'POST',
@@ -293,7 +319,12 @@ export const VideoPlayer = ({ video, isOpen, onClose, onVideoUpdate }: VideoPlay
           console.log('❤️ Already liked, toggling to unlike...');
           setIsLiked(true);
           // Try to delete instead
-          const deleteUrl = `${SUPABASE_URL}/rest/v1/video_likes?video_id=eq.${video.id}${userId ? `&user_id=eq.${userId}` : ''}`;
+          let deleteUrl = `${SUPABASE_URL}/rest/v1/video_likes?video_id=eq.${video.id}`;
+          if (userId) deleteUrl += `&user_id=eq.${userId}`;
+          else {
+            const gid = getBuilderFeedGuestId();
+            if (gid) deleteUrl += `&user_id=is.null&guest_identifier=eq.${encodeURIComponent(gid)}`;
+          }
           await fetch(deleteUrl, {
             method: 'DELETE',
             headers: {
@@ -706,7 +737,7 @@ export const VideoPlayer = ({ video, isOpen, onClose, onVideoUpdate }: VideoPlay
             </div>
 
             {/* Comments Section */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-4">
+            <div id="video-player-comments" className="flex-1 overflow-y-auto p-4 space-y-4">
               <h3 className="font-semibold text-lg flex items-center">
                 <MessageCircle className="h-5 w-5 mr-2" />
                 Comments ({comments.length})
