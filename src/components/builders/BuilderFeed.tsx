@@ -142,7 +142,7 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
         }
       } catch (e) {}
 
-      // Public feed: active or legacy null status. Retry simpler filters if PostgREST rejects `or`.
+      // Prefer SECURITY DEFINER RPC so the feed matches public stats even if RLS on builder_posts is mis-deployed.
       const limitPlusOne = POSTS_PER_PAGE + 1;
       const authHeaders = {
         apikey: SUPABASE_ANON_KEY,
@@ -156,29 +156,55 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
         return { res, json };
       };
 
-      const feedFilter = encodeURIComponent('(status.eq.active,status.is.null)');
-      let { res: postsRes, json: postsData } = await tryFetchPosts(
-        `or=${feedFilter}&order=created_at.desc&limit=${limitPlusOne}&offset=${offset}`
-      );
+      let postsRes: Response;
+      let postsData: unknown;
 
-      if (!postsRes.ok || postsData?.error) {
-        console.warn('📥 builder_posts fetch (or=active|null) failed, retrying status=eq.active:', postsData?.message || postsData?.error);
+      const rpcRes = await fetch(`${SUPABASE_URL}/rest/v1/rpc/get_public_builder_feed_posts`, {
+        method: 'POST',
+        headers: {
+          ...authHeaders,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ p_limit: limitPlusOne, p_offset: offset }),
+      });
+      const rpcJson = await rpcRes.json();
+      const rpcOk = rpcRes.ok && Array.isArray(rpcJson);
+
+      if (rpcOk) {
+        postsRes = rpcRes;
+        postsData = rpcJson;
+        console.log('📥 Posts fetched via get_public_builder_feed_posts:', (rpcJson as unknown[]).length);
+      } else {
+        console.warn(
+          '📥 get_public_builder_feed_posts failed; falling back to builder_posts REST:',
+          rpcRes.status,
+          (rpcJson as { message?: string })?.message || rpcJson
+        );
+        const feedFilter = encodeURIComponent('(status.eq.active,status.is.null)');
         ({ res: postsRes, json: postsData } = await tryFetchPosts(
-          `status=eq.active&order=created_at.desc&limit=${limitPlusOne}&offset=${offset}`
+          `or=${feedFilter}&order=created_at.desc&limit=${limitPlusOne}&offset=${offset}`
         ));
+
+        if (!postsRes.ok || (postsData as { error?: unknown })?.error) {
+          console.warn('📥 builder_posts fetch (or=active|null) failed, retrying status=eq.active:', (postsData as { message?: string })?.message || (postsData as { error?: unknown })?.error);
+          ({ res: postsRes, json: postsData } = await tryFetchPosts(
+            `status=eq.active&order=created_at.desc&limit=${limitPlusOne}&offset=${offset}`
+          ));
+        }
+
+        if (!postsRes.ok || (postsData as { error?: unknown })?.error) {
+          console.warn('📥 builder_posts fetch (active only) failed, retrying RLS-only:', (postsData as { message?: string })?.message || (postsData as { error?: unknown })?.error);
+          ({ res: postsRes, json: postsData } = await tryFetchPosts(
+            `order=created_at.desc&limit=${limitPlusOne}&offset=${offset}`
+          ));
+        }
+
+        console.log('📥 Posts fetched (REST):', Array.isArray(postsData) ? postsData.length : 0, 'posts');
       }
 
-      if (!postsRes.ok || postsData?.error) {
-        console.warn('📥 builder_posts fetch (active only) failed, retrying RLS-only:', postsData?.message || postsData?.error);
-        ({ res: postsRes, json: postsData } = await tryFetchPosts(
-          `order=created_at.desc&limit=${limitPlusOne}&offset=${offset}`
-        ));
-      }
-
-      console.log('📥 Posts fetched:', Array.isArray(postsData) ? postsData.length : 0, 'posts');
-      
-      if (!postsRes.ok || postsData?.error || !Array.isArray(postsData)) {
-        console.log('📥 Error fetching posts:', postsData?.message || postsData?.error || 'invalid response');
+      if (!postsRes.ok || (postsData as { error?: unknown })?.error || !Array.isArray(postsData)) {
+        const errBody = postsData as { message?: string; error?: unknown };
+        console.log('📥 Error fetching posts:', errBody?.message || errBody?.error || 'invalid response');
         // Don't show demo posts - only show real builder posts
         if (isInitialLoad) {
           setPosts([]);
