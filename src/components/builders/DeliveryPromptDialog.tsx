@@ -41,6 +41,7 @@ import {
 import { supabase, SUPABASE_URL, SUPABASE_ANON_KEY } from '@/integrations/supabase/client';
 import { readAuthSessionForRest } from '@/utils/supabaseAccessToken';
 import { supplierLocationLine } from '@/utils/supplierLocationLine';
+import { parseLatLngFromString } from '@/utils/deliveryLocationDisplay';
 import { useToast } from '@/hooks/use-toast';
 import { MonitoringServicePrompt } from './MonitoringServicePrompt';
 import { deliveryProviderNotificationService } from '@/services/DeliveryProviderNotificationService';
@@ -539,8 +540,14 @@ export const DeliveryPromptDialog: React.FC<DeliveryPromptDialogProps> = ({
       // Supplier info is on purchase_orders; do not add to deliveryPayload.
 
       // Add optional fields
-      if (deliveryData.deliveryCoordinates) {
-        deliveryPayload.delivery_coordinates = deliveryData.deliveryCoordinates;
+      if (deliveryData.deliveryCoordinates?.trim()) {
+        const c = deliveryData.deliveryCoordinates.trim();
+        deliveryPayload.delivery_coordinates = c;
+        const parsed = parseLatLngFromString(c);
+        if (parsed) {
+          deliveryPayload.delivery_latitude = parsed.lat;
+          deliveryPayload.delivery_longitude = parsed.lng;
+        }
       }
       if (deliveryData.preferredTime && deliveryData.preferredTime !== 'anytime') {
         deliveryPayload.preferred_time = deliveryData.preferredTime;

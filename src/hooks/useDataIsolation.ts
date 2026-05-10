@@ -18,6 +18,7 @@ import { SUPABASE_ANON_KEY, SUPABASE_URL, supabase } from '@/integrations/supaba
 import { useAuth } from '@/contexts/AuthContext';
 import { trackingNumberService } from '@/services/TrackingNumberService';
 import { countOrdersInStatusBucket } from '@/lib/purchaseOrderMetrics';
+import { buildProviderDeliveryLocationLine } from '@/utils/deliveryLocationDisplay';
 
 export interface UserContext {
   userId: string;
@@ -1517,7 +1518,7 @@ export const useDeliveryProviderData = () => {
           try {
             const { data: drData } = await supabase
               .from('delivery_requests')
-              .select('id, purchase_order_id, delivery_address, pickup_address')
+              .select('id, purchase_order_id, delivery_address, pickup_address, delivery_coordinates, delivery_latitude, delivery_longitude')
               .in('purchase_order_id', poIdsForDR)
               .limit(500);
             
@@ -1578,9 +1579,14 @@ export const useDeliveryProviderData = () => {
               // This is DIFFERENT from the builder's profile/account address
               // The delivery address is specific to each delivery request and may be different for each order
               const deliveryRequest = deliveryRequestsMap.get(po.id);
-              const deliveryAddressFromForm = deliveryRequest?.delivery_address; // Address from delivery request form
               const pickupAddressFromForm = deliveryRequest?.pickup_address;
-              
+              const mergedFromDr = deliveryRequest
+                ? buildProviderDeliveryLocationLine(deliveryRequest).trim()
+                : '';
+              const fallbackPoAddr = (po.delivery_address || '').trim();
+              const deliveryLine =
+                mergedFromDr || fallbackPoAddr || 'Delivery location';
+
               allActiveDeliveries.push({
                 id: po.id,
                 purchase_order_id: po.id,
@@ -1591,11 +1597,9 @@ export const useDeliveryProviderData = () => {
                 purchase_order_status: po.status, // Alias
                 pickup_location: pickupAddressFromForm || po.supplier?.address || po.supplier?.location || po.pickup_address || 'Supplier location',
                 pickup_address: pickupAddressFromForm || po.supplier?.address || po.supplier?.location || po.pickup_address || 'Supplier location',
-                // CRITICAL: Use delivery_address from delivery_requests table (what builder filled in delivery request form)
-                // This is NOT the builder's profile address - it's the specific delivery address for this order
-                // Fallback to purchase_orders.delivery_address (which may have been synced from delivery_requests)
-                delivery_location: deliveryAddressFromForm || po.delivery_address || 'Delivery location',
-                delivery_address: deliveryAddressFromForm || po.delivery_address || 'Delivery location',
+                // GPS + builder line from delivery_requests when present; else PO delivery_address
+                delivery_location: deliveryLine,
+                delivery_address: deliveryLine,
                 material_type: Array.isArray(po.items) ? po.items.map((i: any) => i.name || i.material_type).join(', ') : 'Construction Materials',
                 quantity: Array.isArray(po.items) ? po.items.reduce((sum: number, i: any) => sum + (i.quantity || 1), 0) : 1,
                 builder_name: po.buyer?.full_name || po.builder_name || 'Builder',
@@ -3420,7 +3424,7 @@ export const useDeliveryProviderData = () => {
         try {
           const drQuery = supabase
             .from('delivery_requests')
-            .select('id, purchase_order_id, delivery_address, pickup_address')
+            .select('id, purchase_order_id, delivery_address, pickup_address, delivery_coordinates, delivery_latitude, delivery_longitude')
             .in('purchase_order_id', poIdsForDR)
             .limit(500);
           
@@ -3453,12 +3457,12 @@ export const useDeliveryProviderData = () => {
       // CRITICAL: Prioritize delivery_address from delivery_requests (builder-provided)
       const deliveredFromPOs = (ordersToTransform || []).map((po: any) => {
         const deliveryRequest = deliveryRequestsMap.get(po.id);
-        // CRITICAL: Get delivery_address from delivery_requests map
-        // IMPORTANT: This is the DELIVERY ADDRESS the builder provides when filling the delivery request form
-        // This is DIFFERENT from the builder's profile/account address
-        const deliveryAddressFromForm = deliveryRequest?.delivery_address; // Address from delivery request form
         const pickupAddressFromForm = deliveryRequest?.pickup_address;
-        
+        const mergedFromDr = deliveryRequest
+          ? buildProviderDeliveryLocationLine(deliveryRequest).trim()
+          : '';
+        const deliveryLine = mergedFromDr || (po.delivery_address || '').trim() || 'Delivery location';
+
         return {
           id: po.id,
           purchase_order_id: po.id,
@@ -3467,11 +3471,8 @@ export const useDeliveryProviderData = () => {
           order_number: po.po_number || null, // CRITICAL: Include order_number for matching with supplier dashboard
           pickup_location: pickupAddressFromForm || po.supplier?.address || po.supplier?.location || 'Supplier location',
           pickup_address: pickupAddressFromForm || po.supplier?.address || po.supplier?.location || 'Supplier location',
-        // CRITICAL: Use delivery_address from delivery_requests table (what builder filled in delivery request form)
-        // This is NOT the builder's profile address - it's the specific delivery address for this order
-        // Fallback to purchase_orders.delivery_address (which may have been synced from delivery_requests)
-          delivery_location: deliveryAddressFromForm || po.delivery_address || 'Delivery location',
-          delivery_address: deliveryAddressFromForm || po.delivery_address || 'Delivery location',
+          delivery_location: deliveryLine,
+          delivery_address: deliveryLine,
           material_type: Array.isArray(po.items) ? po.items.map((i: any) => i.name || i.material_type).join(', ') : 'Construction Materials',
           quantity: Array.isArray(po.items) ? po.items.reduce((sum: number, i: any) => sum + (i.quantity || 1), 0) : 1,
           builder_name: po.buyer?.full_name || 'Builder',
@@ -3631,7 +3632,7 @@ export const useDeliveryProviderData = () => {
               try {
                 const { data: drData } = await supabase
                   .from('delivery_requests')
-                  .select('id, purchase_order_id, delivery_address, pickup_address')
+                  .select('id, purchase_order_id, delivery_address, pickup_address, delivery_coordinates, delivery_latitude, delivery_longitude')
                   .in('purchase_order_id', missingPOIds)
                   .limit(500);
                 
@@ -3659,22 +3660,22 @@ export const useDeliveryProviderData = () => {
                 // IMPORTANT: This is the DELIVERY ADDRESS the builder provides when filling the delivery request form
                 // This is DIFFERENT from the builder's profile/account address
                 const deliveryRequest = deliveryRequestsMapForMissing.get(po.id);
-                const deliveryAddressFromForm = deliveryRequest?.delivery_address; // Address from delivery request form
                 const pickupAddressFromForm = deliveryRequest?.pickup_address;
-                
+                const mergedFromDr = deliveryRequest
+                  ? buildProviderDeliveryLocationLine(deliveryRequest).trim()
+                  : '';
+                const deliveryLine = mergedFromDr || (po.delivery_address || '').trim() || 'Delivery location';
+
                 const historyEntry = {
                   id: po.id,
                   purchase_order_id: po.id,
                   provider_id: userId,
                   status: 'delivered',
                   order_number: poNumber,
-                  pickup_location: builderProvidedPickup || 'Supplier location',
-                  pickup_address: builderProvidedPickup || 'Supplier location',
-                  // CRITICAL: Use delivery_address from delivery_requests table (what builder filled in delivery request form)
-                  // This is NOT the builder's profile address - it's the specific delivery address for this order
-                  // Fallback to purchase_orders.delivery_address (which may have been synced from delivery_requests)
-                  delivery_location: deliveryAddressFromForm || po.delivery_address || 'Delivery location',
-                  delivery_address: deliveryAddressFromForm || po.delivery_address || 'Delivery location',
+                  pickup_location: pickupAddressFromForm || 'Supplier location',
+                  pickup_address: pickupAddressFromForm || 'Supplier location',
+                  delivery_location: deliveryLine,
+                  delivery_address: deliveryLine,
                   material_type: 'Materials',
                   quantity: 1,
                   builder_name: 'Builder',
@@ -3686,7 +3687,7 @@ export const useDeliveryProviderData = () => {
                   delivered_at: po.delivered_at || po.updated_at || po.created_at,
                   created_at: po.created_at,
                   updated_at: po.updated_at,
-                  source: 'purchase_orders_direct'
+                  source: 'purchase_orders_direct',
                 };
                 missingOrders.push(historyEntry);
                 console.log('✅ Added missing delivered order to history:', poNumber);

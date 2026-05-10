@@ -26,6 +26,7 @@ import {
   resolvePickupForProvider,
   fetchSuppliersByIds,
 } from '@/utils/deliveryNotificationFormatters';
+import { buildProviderDeliveryLocationLine } from '@/utils/deliveryLocationDisplay';
 
 /** DB sometimes stores placeholder 0; treat as empty for card copy */
 function materialTypeForDisplay(raw: unknown): string {
@@ -758,32 +759,21 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
         // DO NOT use purchase_order.delivery_address as fallback - the builder may have entered a different address
         // CRITICAL: Builder-provided address from delivery_requests table - this is what the builder typed during delivery request
         // CRITICAL: Log the RAW value from database BEFORE any processing
-        console.log(`📍📍📍 RAW DB VALUE: Delivery request ${dr.id.slice(0, 8)} - delivery_address from DB (type: ${typeof dr.delivery_address}):`, {
-          raw: dr.delivery_address,
-          isNull: dr.delivery_address === null,
-          isUndefined: dr.delivery_address === undefined,
-          isEmpty: dr.delivery_address === '',
-          length: dr.delivery_address?.length || 0,
-          trimmed: (dr.delivery_address || '').trim(),
+        console.log(`📍📍📍 RAW DB VALUE: Delivery request ${dr.id.slice(0, 8)}`, {
+          delivery_address: dr.delivery_address,
           delivery_coordinates: dr.delivery_coordinates,
-          purchase_order_id: poId?.slice(0, 8) || 'NULL'
+          delivery_latitude: dr.delivery_latitude,
+          delivery_longitude: dr.delivery_longitude,
+          purchase_order_id: poId?.slice(0, 8) || 'NULL',
         });
-        
-        let deliveryAddr = (dr.delivery_address || '').trim();
-        
-        // CRITICAL: If delivery_address is NULL or empty, check delivery_coordinates FIRST
-        if (!deliveryAddr && dr.delivery_coordinates) {
-          deliveryAddr = dr.delivery_coordinates.trim();
-          console.log(`📍 USING COORDINATES: Delivery request ${dr.id.slice(0, 8)} has no address, using coordinates: "${deliveryAddr}"`);
-        }
-        
-        // CRITICAL: If delivery_address includes coordinates, use the full string (coordinates + address)
-        // The builder may have entered coordinates with address like "1.2921, 36.8219 | Nairobi, Kenya"
-        if (dr.delivery_coordinates && deliveryAddr && !deliveryAddr.includes(dr.delivery_coordinates)) {
-          // If coordinates exist but aren't in the address, prepend them
-          deliveryAddr = `${dr.delivery_coordinates} | ${deliveryAddr}`;
-          console.log(`📍 COORDINATES ADDED: Combined coordinates with address: "${deliveryAddr.substring(0, 60)}..."`);
-        }
+
+        // Prefer GPS (text column and/or lat,lng) merged with the saved address line — PO/project labels stay visible but coords lead for navigation.
+        let deliveryAddr = buildProviderDeliveryLocationLine({
+          delivery_address: dr.delivery_address,
+          delivery_coordinates: dr.delivery_coordinates,
+          delivery_latitude: dr.delivery_latitude,
+          delivery_longitude: dr.delivery_longitude,
+        }).trim();
         
         // CRITICAL: Check for placeholder values - ONLY exact matches, case-insensitive
         // DO NOT treat valid addresses as placeholders

@@ -1,4 +1,5 @@
 import { clearSupabasePersistedSessionSync, readPersistedAuthRawStringSync } from '@/utils/supabaseAccessToken';
+import { buildProviderDeliveryLocationLine } from '@/utils/deliveryLocationDisplay';
 import React, { useState, useEffect, useCallback, useRef, useMemo, lazy, Suspense } from "react";
 import { Link } from "react-router-dom";
 import { useUrlTabSync } from "@/hooks/useUrlTabSync";
@@ -216,7 +217,14 @@ interface DeliveryHistory {
 
 /** Map hook rows to dashboard cards immediately — avoids empty Schedule while async DR fetch + validation run */
 function mapIsolatedRowToActiveDeliveryQuick(d: any): ActiveDelivery {
+  const merged = buildProviderDeliveryLocationLine({
+    delivery_address: d.delivery_address ?? d.delivery_location,
+    delivery_coordinates: d.delivery_coordinates,
+    delivery_latitude: d.delivery_latitude,
+    delivery_longitude: d.delivery_longitude,
+  }).trim();
   const addr =
+    merged ||
     (d.delivery_location && String(d.delivery_location).trim()) ||
     (d.delivery_address && String(d.delivery_address).trim()) ||
     'Delivery address missing - contact builder';
@@ -476,7 +484,7 @@ const DeliveryDashboard = () => {
             const poIdsParam = purchaseOrderIds.join(',');
             console.log('🔍 SCHEDULED: Fetching delivery_requests for', purchaseOrderIds.length, 'purchase_order_ids to get builder-provided addresses...');
             const drResponse = await fetch(
-              `${SUPABASE_URL}/rest/v1/delivery_requests?purchase_order_id=in.(${poIdsParam})&select=id,purchase_order_id,delivery_address,pickup_address,delivery_coordinates,status&order=created_at.desc&limit=500`,
+              `${SUPABASE_URL}/rest/v1/delivery_requests?purchase_order_id=in.(${poIdsParam})&select=id,purchase_order_id,delivery_address,pickup_address,delivery_coordinates,delivery_latitude,delivery_longitude,status&order=created_at.desc&limit=500`,
               { headers, cache: 'no-store' }
             );
             
@@ -512,22 +520,22 @@ const DeliveryDashboard = () => {
           // CRITICAL: Get builder-provided address from delivery_requests
           const poId = d.purchase_order_id || d.id;
           const deliveryRequest = deliveryRequestsMap[poId];
-          const builderProvidedAddress = deliveryRequest?.delivery_address;
-          
-          // CRITICAL: Use builder-provided address from delivery_requests (highest priority)
-          // This is the address the builder filled in during delivery request form
+
+          // CRITICAL: Use builder-provided row from delivery_requests (address + GPS columns)
           let finalDeliveryAddress = 'Delivery address missing - contact builder';
-          if (builderProvidedAddress && builderProvidedAddress.trim() && 
-              builderProvidedAddress !== 'To be provided' && 
-              builderProvidedAddress !== 'Delivery location') {
-            // Include coordinates if available
-            if (deliveryRequest?.delivery_coordinates && !builderProvidedAddress.includes(deliveryRequest.delivery_coordinates)) {
-              finalDeliveryAddress = `${deliveryRequest.delivery_coordinates} | ${builderProvidedAddress}`;
-            } else {
-              finalDeliveryAddress = builderProvidedAddress;
+          if (deliveryRequest) {
+            const merged = buildProviderDeliveryLocationLine(deliveryRequest).trim();
+            if (
+              merged &&
+              merged !== 'To be provided' &&
+              merged !== 'Delivery location' &&
+              merged !== 'Address not found'
+            ) {
+              finalDeliveryAddress = merged;
+              console.log('✅✅✅ SCHEDULED: Using merged builder address for', poId?.substring(0, 8), ':', finalDeliveryAddress.substring(0, 60));
             }
-            console.log('✅✅✅ SCHEDULED: Using builder-provided address for', poId?.substring(0, 8), ':', finalDeliveryAddress.substring(0, 60));
-          } else if (d.delivery_location && d.delivery_location.trim() && 
+          }
+          if (finalDeliveryAddress === 'Delivery address missing - contact builder' && d.delivery_location && d.delivery_location.trim() && 
                      d.delivery_location !== 'To be provided' && 
                      d.delivery_location !== 'Delivery location') {
             finalDeliveryAddress = d.delivery_location;
@@ -830,7 +838,7 @@ const DeliveryDashboard = () => {
             const poIdsParam = purchaseOrderIds.join(',');
             console.log('🔍 Fetching delivery_requests for', purchaseOrderIds.length, 'purchase_order_ids:', purchaseOrderIds.slice(0, 3).map(id => id.substring(0, 8)));
             const drResponse = await fetch(
-              `${SUPABASE_URL}/rest/v1/delivery_requests?purchase_order_id=in.(${poIdsParam})&select=id,purchase_order_id,delivery_address,pickup_address,status&order=created_at.desc&limit=500`,
+              `${SUPABASE_URL}/rest/v1/delivery_requests?purchase_order_id=in.(${poIdsParam})&select=id,purchase_order_id,delivery_address,pickup_address,delivery_coordinates,delivery_latitude,delivery_longitude,status&order=created_at.desc&limit=500`,
               { headers, cache: 'no-store' }
             );
             
@@ -889,15 +897,18 @@ const DeliveryDashboard = () => {
           const fallbackPromises = missingPOIds.map(async (poId) => {
             try {
               const fallbackResponse = await fetch(
-                `${SUPABASE_URL}/rest/v1/delivery_requests?purchase_order_id=eq.${poId}&select=id,purchase_order_id,delivery_address,pickup_address&limit=1`,
+                `${SUPABASE_URL}/rest/v1/delivery_requests?purchase_order_id=eq.${poId}&select=id,purchase_order_id,delivery_address,pickup_address,delivery_coordinates,delivery_latitude,delivery_longitude&limit=1`,
                 { headers, cache: 'no-store' }
               );
               if (fallbackResponse.ok) {
                 const fallbackData = await fallbackResponse.json();
-                if (fallbackData && fallbackData.length > 0 && fallbackData[0].delivery_address) {
-                  deliveryRequestsMap[poId] = fallbackData[0];
-                  console.log('✅ Fetched address individually for', poId?.substring(0, 8), ':', fallbackData[0].delivery_address.substring(0, 60));
-                  return fallbackData[0];
+                if (fallbackData && fallbackData.length > 0) {
+                  const row = fallbackData[0];
+                  if (buildProviderDeliveryLocationLine(row).trim()) {
+                    deliveryRequestsMap[poId] = row;
+                    console.log('✅ Fetched delivery_request individually for', poId?.substring(0, 8), ':', buildProviderDeliveryLocationLine(row).substring(0, 60));
+                    return row;
+                  }
                 }
               }
             } catch (e: any) {
@@ -915,41 +926,39 @@ const DeliveryDashboard = () => {
           const poId = d.purchase_order_id || d.id;
           const deliveryRequest = deliveryRequestsMap[poId];
           
-          // CRITICAL: Prioritize delivery_address from delivery_requests (builder-provided)
-          // This is the address the builder filled in during delivery request form
-          const builderProvidedAddress = deliveryRequest?.delivery_address;
           const builderProvidedPickup = deliveryRequest?.pickup_address;
-          
-          // CRITICAL: Get the final delivery address - MUST use builder-provided address from delivery_requests
-          // This is the address the builder filled in during delivery request form
-          // Priority order:
-          // 1. builderProvidedAddress from delivery_requests (highest priority - this is what builder typed)
-          // 2. d.delivery_address from isolatedHistory (may already have it from useDataIsolation)
-          // 3. d.delivery_location from isolatedHistory (fallback)
-          let finalDeliveryAddress = null;
-          
-          if (builderProvidedAddress && builderProvidedAddress.trim() && 
-              builderProvidedAddress !== 'To be provided' && 
-              builderProvidedAddress !== 'Delivery location' &&
-              builderProvidedAddress !== 'Address not found') {
-            finalDeliveryAddress = builderProvidedAddress;
-            console.log('✅✅✅ USING BUILDER-PROVIDED ADDRESS from delivery_requests for', poId?.substring(0, 8), 'order', d.order_number || d.po_number, ':', finalDeliveryAddress.substring(0, 80));
-          } else if (d.delivery_address && d.delivery_address.trim() && 
+
+          // Merge GPS + address from delivery_requests when available; then fall back to hook row.
+          let finalDeliveryAddress: string | null = null;
+          if (deliveryRequest) {
+            const merged = buildProviderDeliveryLocationLine(deliveryRequest).trim();
+            if (
+              merged &&
+              merged !== 'To be provided' &&
+              merged !== 'Delivery location' &&
+              merged !== 'Address not found'
+            ) {
+              finalDeliveryAddress = merged;
+              console.log('✅✅✅ HISTORY: Merged delivery_requests address for', poId?.substring(0, 8), 'order', d.order_number || d.po_number, ':', finalDeliveryAddress.substring(0, 80));
+            }
+          }
+          if (!finalDeliveryAddress && d.delivery_address && d.delivery_address.trim() && 
                      d.delivery_address !== 'Delivery location' && 
                      d.delivery_address !== 'To be provided' &&
                      d.delivery_address !== 'Address not found') {
             finalDeliveryAddress = d.delivery_address;
             console.log('✅ Using delivery_address from isolatedHistory for', poId?.substring(0, 8), ':', finalDeliveryAddress.substring(0, 60));
-          } else if (d.delivery_location && d.delivery_location.trim() && 
+          } else if (!finalDeliveryAddress && d.delivery_location && d.delivery_location.trim() && 
                      d.delivery_location !== 'Delivery location' && 
                      d.delivery_location !== 'To be provided' &&
                      d.delivery_location !== 'Address not found') {
             finalDeliveryAddress = d.delivery_location;
             console.log('✅ Using delivery_location from isolatedHistory for', poId?.substring(0, 8), ':', finalDeliveryAddress.substring(0, 60));
-          } else {
+          } else if (!finalDeliveryAddress) {
             // Placeholder or missing: show user-friendly text; avoid console spam for legacy "To be provided" data
+            const drAddrRaw = (deliveryRequest?.delivery_address || '').trim();
             const isPlaceholder =
-              (builderProvidedAddress === 'To be provided' || (builderProvidedAddress || '').trim() === '') &&
+              (drAddrRaw === 'To be provided' || drAddrRaw === '') &&
               (d.delivery_address === 'To be provided' || (d.delivery_address || '').trim() === '') &&
               (d.delivery_location === 'To be provided' || (d.delivery_location || '').trim() === '');
             finalDeliveryAddress = isPlaceholder
