@@ -163,6 +163,8 @@ export const BuilderVideoPost: React.FC<BuilderVideoPostProps> = ({
   const longPressTriggeredRef = useRef(false);
   /** Delay closing the reaction strip so the pointer can cross the gap above Like (hover UX). */
   const reactionHideTimerRef = useRef<number | null>(null);
+  /** Avoid clearing picked emoji when only `likes` changed but `isLiked` stayed false (sync effect was wiping ❤️). */
+  const prevIsLikedFromParentRef = useRef(isLiked);
   const { toast } = useToast();
 
   const anchorForShare = shareAnchorId ?? `market-hub-post-${id}`;
@@ -179,7 +181,7 @@ export const BuilderVideoPost: React.FC<BuilderVideoPostProps> = ({
     reactionHideTimerRef.current = window.setTimeout(() => {
       reactionHideTimerRef.current = null;
       setShowReactions(false);
-    }, 550);
+    }, 2000);
   };
 
   const openReactionsBar = () => {
@@ -191,11 +193,16 @@ export const BuilderVideoPost: React.FC<BuilderVideoPostProps> = ({
     if (!reactionMode) {
       setLiked(isLiked);
       setLikeCount(likes);
-      if (!isLiked) {
-        setBinaryReactionEmoji(null);
-      }
     }
   }, [isLiked, likes, reactionMode]);
+
+  useEffect(() => {
+    if (reactionMode) return;
+    if (prevIsLikedFromParentRef.current === true && isLiked === false) {
+      setBinaryReactionEmoji(null);
+    }
+    prevIsLikedFromParentRef.current = isLiked;
+  }, [isLiked, reactionMode]);
 
   useEffect(() => {
     setLocalComments(comments);
