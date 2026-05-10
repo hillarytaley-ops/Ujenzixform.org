@@ -83,6 +83,17 @@ interface Notification {
   nearby?: boolean;
 }
 
+/** Same purchase_order_id: always prefer the row tied to a delivery_request (GPS source) over a PO-only stub. */
+function sortDeliveryAlertsByPoThenRecency(a: Notification, b: Notification): number {
+  const ap = a.purchase_order_id;
+  const bp = b.purchase_order_id;
+  if (ap && bp && ap === bp) {
+    if (a.delivery_request_id && !b.delivery_request_id) return -1;
+    if (!a.delivery_request_id && b.delivery_request_id) return 1;
+  }
+  return b.timestamp.getTime() - a.timestamp.getTime();
+}
+
 interface NotificationSettings {
   pushEnabled: boolean;
   soundEnabled: boolean;
@@ -683,6 +694,36 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
       });
       
       console.log(`✅ FINAL NOTIFICATION MAP: ${finalNotificationMap.size} unique (${finalDeliveryRequestsByPO.size} with PO + ${finalDeliveryRequestsByKey.size} without PO)`);
+
+      // Re-fetch full delivery_request rows (select=*) so lat/lng/coords are never dropped vs. the list query.
+      const drIdsForRefetch: string[] = [];
+      finalNotificationMap.forEach((row: any) => {
+        if (row?.id && typeof row.id === 'string' && row.id.length >= 32) drIdsForRefetch.push(row.id);
+      });
+      const uniqueDrIds = [...new Set(drIdsForRefetch)];
+      const drFullById = new Map<string, any>();
+      if (uniqueDrIds.length > 0) {
+        const chunkSize = 50;
+        try {
+          for (let i = 0; i < uniqueDrIds.length; i += chunkSize) {
+            const chunk = uniqueDrIds.slice(i, i + chunkSize);
+            const refRes = await fetch(
+              `${url}/rest/v1/delivery_requests?id=in.(${chunk.join(',')})&select=*`,
+              { headers, cache: 'no-store' }
+            );
+            if (refRes.ok) {
+              const refRows = await refRes.json();
+              if (Array.isArray(refRows)) {
+                refRows.forEach((row: any) => {
+                  if (row?.id) drFullById.set(row.id, row);
+                });
+              }
+            }
+          }
+        } catch (e) {
+          console.warn('delivery_notifications: refetch delivery_requests by id failed (non-fatal)', e);
+        }
+      }
       
       // THIRD PASS: Create notifications from the deduplicated map
       for (const [poId, dr] of finalNotificationMap.entries()) {
@@ -759,20 +800,21 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
         // DO NOT use purchase_order.delivery_address as fallback - the builder may have entered a different address
         // CRITICAL: Builder-provided address from delivery_requests table - this is what the builder typed during delivery request
         // CRITICAL: Log the RAW value from database BEFORE any processing
+        const drSource = (dr?.id && drFullById.get(dr.id)) || dr;
         console.log(`📍📍📍 RAW DB VALUE: Delivery request ${dr.id.slice(0, 8)}`, {
-          delivery_address: dr.delivery_address,
-          delivery_coordinates: dr.delivery_coordinates,
-          delivery_latitude: dr.delivery_latitude,
-          delivery_longitude: dr.delivery_longitude,
+          delivery_address: drSource.delivery_address,
+          delivery_coordinates: drSource.delivery_coordinates,
+          delivery_latitude: drSource.delivery_latitude,
+          delivery_longitude: drSource.delivery_longitude,
           purchase_order_id: poId?.slice(0, 8) || 'NULL',
         });
 
         // Prefer GPS (text column and/or lat,lng) merged with the saved address line — PO/project labels stay visible but coords lead for navigation.
         let deliveryAddr = buildProviderDeliveryLocationLine({
-          delivery_address: dr.delivery_address,
-          delivery_coordinates: dr.delivery_coordinates,
-          delivery_latitude: dr.delivery_latitude,
-          delivery_longitude: dr.delivery_longitude,
+          delivery_address: drSource.delivery_address,
+          delivery_coordinates: drSource.delivery_coordinates,
+          delivery_latitude: drSource.delivery_latitude,
+          delivery_longitude: drSource.delivery_longitude,
         }).trim();
         
         // CRITICAL: Check for placeholder values - ONLY exact matches, case-insensitive
@@ -946,12 +988,12 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
           addedPONumbers.add(normalizedPONumber);
         }
         const jobPt = resolveJobCoordinates({
-          delivery_latitude: dr.delivery_latitude,
-          delivery_longitude: dr.delivery_longitude,
-          pickup_latitude: dr.pickup_latitude,
-          pickup_longitude: dr.pickup_longitude,
+          delivery_latitude: drSource.delivery_latitude,
+          delivery_longitude: drSource.delivery_longitude,
+          pickup_latitude: drSource.pickup_latitude,
+          pickup_longitude: drSource.pickup_longitude,
           delivery_address: deliveryAddr,
-          pickup_address: dr.pickup_address || dr.pickup_location || '',
+          pickup_address: drSource.pickup_address || drSource.pickup_location || '',
         });
         let distanceKm: number | undefined;
         let nearby = false;
@@ -984,7 +1026,7 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
             ? `${matLabel || 'Materials'}: ${dr.quantity}`.trim()
             : '');
         const pickupResolved = resolvePickupForProvider(
-          dr.pickup_address || dr.pickup_location,
+          drSource.pickup_address || drSource.pickup_location,
           poRow?.supplier_id ? String(poRow.supplier_id) : undefined,
           supRow,
           (supRow?.company_name as string) || undefined
@@ -1019,6 +1061,9 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
         });
       }
       
+      // Prefer DR-backed cards over PO-only stubs for the same purchase_order_id (not time-windowed).
+      finalNotifications.sort(sortDeliveryAlertsByPoThenRecency);
+
       // CRITICAL VERIFICATION: Ensure we only have ONE notification per purchase_order_id
       const finalPOIds = finalNotifications.map(n => n.purchase_order_id).filter(Boolean);
       const duplicatePOIdsCheck = finalPOIds.filter((id, index) => finalPOIds.indexOf(id) !== index);
@@ -1037,10 +1082,14 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
         const emergencyMap = new Map<string, Notification>();
         finalNotifications.forEach(notif => {
           if (notif.purchase_order_id) {
-            if (!emergencyMap.has(notif.purchase_order_id)) {
+            const existing = emergencyMap.get(notif.purchase_order_id);
+            if (!existing) {
               emergencyMap.set(notif.purchase_order_id, notif);
+            } else if (notif.delivery_request_id && !existing.delivery_request_id) {
+              emergencyMap.set(notif.purchase_order_id, notif);
+              console.error(`🚨 EMERGENCY: Replaced PO-only duplicate with DR-backed card for ${notif.purchase_order_id}`);
             } else {
-              console.error(`🚨 EMERGENCY REMOVAL: Duplicate notification for PO ${notif.purchase_order_id} - removing ${notif.id} (keeping ${emergencyMap.get(notif.purchase_order_id)?.id})`);
+              console.error(`🚨 EMERGENCY REMOVAL: Duplicate notification for PO ${notif.purchase_order_id} - removing ${notif.id} (keeping ${existing.id})`);
             }
           } else {
             emergencyMap.set(notif.id, notif);
@@ -1088,26 +1137,26 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
         let skippedCount = 0;
         // Only add purchase_orders that DON'T have a delivery_request AND haven't been added yet
         // CRITICAL: Also filter out delivered/completed/cancelled purchase_orders
-        purchaseOrders.forEach((po: any) => {
+        for (const po of purchaseOrders) {
           // ABSOLUTE CHECK: If we already added a notification for this purchase_order_id, SKIP IT
           if (addedPOIds.has(po.id)) {
             skippedCount++;
             console.log(`🚫 SKIPPED: Purchase order ${po.id} already has a notification from delivery_request, not adding duplicate`);
-            return;
+            continue;
           }
           
           // CRITICAL: Skip delivered/completed/cancelled purchase_orders
           if (['delivered', 'completed', 'cancelled'].includes(po.status)) {
             skippedCount++;
             console.log(`🚫 SKIPPED: Purchase order ${po.id} has status ${po.status} - already completed/cancelled`);
-            return;
+            continue;
           }
           
           // CRITICAL: Skip if delivery_status is delivered/completed
           if (po.delivery_status && ['delivered', 'completed', 'cancelled'].includes(po.delivery_status)) {
             skippedCount++;
             console.log(`🚫 SKIPPED: Purchase order ${po.id} has delivery_status ${po.delivery_status} - already completed`);
-            return;
+            continue;
           }
           
           // CRITICAL: Only show if delivery is actually required and has valid data
@@ -1144,7 +1193,7 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
             if (!po.id || !isValidAddress) {
               skippedCount++;
               console.log(`🚫 SKIPPED: Purchase order ${po.id.slice(0, 8)} has invalid or placeholder delivery address - Address: "${deliveryAddr || 'empty'}", isPlaceholder: ${isPlaceholder}, isGPS: ${isGPSCoordinate}, length: ${deliveryAddr?.length || 0}, status: ${po.status}`);
-              return;
+              continue;
             }
             
             console.log(`✅ VALID PO ADDRESS: Purchase order ${po.id.slice(0, 8)} has valid address: "${deliveryAddr.substring(0, 50)}${deliveryAddr.length > 50 ? '...' : ''}"`);
@@ -1157,7 +1206,7 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
             if (!materialType || materialType.trim() === '') {
               skippedCount++;
               console.log(`🚫 SKIPPED: Purchase order ${po.id} has no material type`);
-              return;
+              continue;
             }
             
             // CRITICAL: Check po_number FIRST - if we've already added a notification for this po_number, SKIP IT
@@ -1166,7 +1215,7 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
               if (addedPONumbers.has(normalizedPONumber)) {
                 console.error(`🚨🚨🚨 BLOCKED: po_number "${po.po_number}" already has a notification! Skipping purchase_order_id ${po.id} to prevent duplicate cards.`);
                 skippedCount++;
-                return; // SKIP THIS - we already have a notification for this po_number
+                continue; // SKIP THIS - we already have a notification for this po_number
               }
               addedPONumbers.add(normalizedPONumber);
             }
@@ -1176,7 +1225,26 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
             const duplicateCheck = finalNotifications.find(n => n.purchase_order_id === po.id);
             if (duplicateCheck) {
               console.error(`🚫 BLOCKED: Purchase order ${po.id} duplicate detected right before adding, skipping`);
-              return;
+              continue;
+            }
+            let displayDelivery = po.delivery_address || '';
+            let linkedDrId: string | undefined;
+            try {
+              const drRes = await fetch(
+                `${url}/rest/v1/delivery_requests?purchase_order_id=eq.${po.id}&order=created_at.desc&limit=1&select=id,delivery_address,delivery_coordinates,delivery_latitude,delivery_longitude`,
+                { headers, cache: 'no-store' }
+              );
+              if (drRes.ok) {
+                const arr = await drRes.json();
+                if (Array.isArray(arr) && arr[0]) {
+                  const drRow = arr[0];
+                  linkedDrId = drRow.id;
+                  const merged = buildProviderDeliveryLocationLine(drRow).trim();
+                  if (merged) displayDelivery = merged;
+                }
+              }
+            } catch {
+              /* non-fatal */
             }
             const qtyText =
               formatOrderItemsQuantityLine(po.items) ||
@@ -1195,25 +1263,27 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
               type: 'new_delivery',
               title: '🚚 New Delivery Request!',
               message: qtyText
-                ? `${materialType} — ${qtyText} — deliver to ${po.delivery_address || 'Unknown location'}`
-                : `${materialType} delivery to ${po.delivery_address || 'Unknown location'}`,
+                ? `${materialType} — ${qtyText} — deliver to ${displayDelivery || 'Unknown location'}`
+                : `${materialType} delivery to ${displayDelivery || 'Unknown location'}`,
               timestamp: new Date(po.delivery_requested_at || po.order_created_at || po.created_at),
               read: false,
               priority: 'high',
-              actionUrl: `/delivery-dashboard?order=${po.id}`,
+              actionUrl: linkedDrId
+                ? `/delivery-dashboard?request=${linkedDrId}`
+                : `/delivery-dashboard?order=${po.id}`,
               status: 'pending',
               pickupAddress: pickupLine,
-              deliveryAddress: po.delivery_address || '',
+              deliveryAddress: displayDelivery,
               materialType: materialType,
               quantity: qtyText || String(po.items?.length || ''),
               purchase_order_id: po.id, // CRITICAL
               po_number: po.po_number || undefined, // CRITICAL: Include po_number for deduplication
-              delivery_request_id: undefined // No delivery_request yet
+              delivery_request_id: linkedDrId
             });
             
             seenPurchaseOrderIds.add(po.id);
           }
-        });
+        }
         
         if (skippedCount > 0) {
           console.log(`🚫 SKIPPED ${skippedCount} purchase_orders that already have delivery_request notifications`);
@@ -1226,17 +1296,8 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
       const finalSeenIds = new Set<string>();
       const finalSeenByAddress = new Map<string, Notification>(); // For NULL purchase_order_id deduplication
       
-      // Sort by timestamp first (most recent first), then prefer delivery_request over purchase_order
-      finalNotifications.sort((a, b) => {
-        // First, sort by timestamp (most recent first)
-        const timeDiff = b.timestamp.getTime() - a.timestamp.getTime();
-        if (Math.abs(timeDiff) < 60000) { // Within 1 minute - might be duplicates
-          // Prefer delivery_request_id over undefined (delivery_request is more specific)
-          if (a.delivery_request_id && !b.delivery_request_id) return -1;
-          if (!a.delivery_request_id && b.delivery_request_id) return 1;
-        }
-        return timeDiff;
-      });
+      // Same PO: always prefer DR-backed notification; then newest first.
+      finalNotifications.sort(sortDeliveryAlertsByPoThenRecency);
       
       finalNotifications.forEach((notif) => {
         // CRITICAL: Filter out empty/invalid notifications (must have at least purchase_order_id OR delivery_request_id)
