@@ -417,6 +417,31 @@ export const DeliveryPromptDialog: React.FC<DeliveryPromptDialogProps> = ({
       setSubmitting(false);
       return;
     }
+
+    // Block "same text as the order" with no GPS — that is almost always the project/site label, not a drop pin.
+    const addrTrim = deliveryData.deliveryAddress.trim();
+    const poAddrTrim = (purchaseOrder.delivery_address || '').trim();
+    const unchangedFromPo =
+      Boolean(
+        addrTrim &&
+          poAddrTrim &&
+          addrTrim.toLowerCase() === poAddrTrim.toLowerCase()
+      );
+    const headOfAddr = addrTrim.split('|')[0]?.trim() || addrTrim;
+    const hasGpsFromFields =
+      Boolean(deliveryData.deliveryCoordinates.trim()) ||
+      Boolean(parseLatLngFromString(headOfAddr)) ||
+      Boolean(parseLatLngFromString(addrTrim));
+    if (unchangedFromPo && !hasGpsFromFields) {
+      toast({
+        title: 'Map pin or GPS required',
+        description:
+          'You are still using the order’s project/site line only. Open “Search on Map” or use “Use my location” so drivers get coordinates. You can keep the site name after the pin.',
+        variant: 'destructive',
+      });
+      setSubmitting(false);
+      return;
+    }
     
     // If only coordinates provided, that's acceptable (will be used as address)
     // If only address provided, that's acceptable

@@ -26,7 +26,10 @@ import {
   resolvePickupForProvider,
   fetchSuppliersByIds,
 } from '@/utils/deliveryNotificationFormatters';
-import { buildProviderDeliveryLocationLine } from '@/utils/deliveryLocationDisplay';
+import {
+  buildProviderDeliveryLocationLine,
+  deliveryMergedLineContainsGps,
+} from '@/utils/deliveryLocationDisplay';
 
 /** DB sometimes stores placeholder 0; treat as empty for card copy */
 function materialTypeForDisplay(raw: unknown): string {
@@ -2672,11 +2675,17 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
                   {notification.deliveryAddress && (
                     <div className="mb-2 rounded-md border border-orange-200 bg-orange-50/80 px-2 py-1.5">
                       <p className="text-[10px] font-semibold uppercase leading-snug text-orange-800 break-words">
-                        📍 Delivery address (from builder — use this for delivery)
+                        📍 Drop-off (use for delivery)
                       </p>
                       <p className="min-w-0 break-words text-xs leading-snug text-orange-900" title={notification.deliveryAddress}>
                         {notification.deliveryAddress}
                       </p>
+                      {!deliveryMergedLineContainsGps(notification.deliveryAddress) && (
+                        <p className="mt-1 text-[10px] leading-snug text-amber-900 bg-amber-100/90 border border-amber-300 rounded px-1.5 py-1">
+                          No GPS is stored on this request yet — only a site/project label. Ask the builder to edit the
+                          delivery request and set a map pin, or resubmit with coordinates.
+                        </p>
+                      )}
                     </div>
                   )}
                   {(!notification.deliveryAddress || notification.deliveryAddress === 'Delivery address missing - contact builder') && notification.delivery_request_id && (

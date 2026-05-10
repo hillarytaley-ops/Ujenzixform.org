@@ -147,3 +147,14 @@ export function buildProviderDeliveryLocationLine(row: DeliveryLocationRow): str
   if (normAddr.includes(normCoord)) return addrRaw;
   return `${primaryCoord} | ${addrRaw}`;
 }
+
+/** True if a merged provider line (or similar blob) contains navigable GPS for drivers. */
+export function deliveryMergedLineContainsGps(line: string | null | undefined): boolean {
+  if (!line || typeof line !== 'string') return false;
+  const t = line.trim();
+  if (!t) return false;
+  if (/^-?\d+\.?\d*,\s*-?\d+\.?\d/.test(t)) return true;
+  if (t.toLowerCase().includes('[coords:')) return true;
+  if (/gps:\s*-?\d/i.test(t)) return true;
+  return false;
+}
