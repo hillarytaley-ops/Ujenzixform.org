@@ -13,7 +13,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
 import { Separator } from "@/components/ui/separator";
-import { KeyRound, CheckCircle, Loader2, Shield } from "lucide-react";
+import { KeyRound, CheckCircle, Loader2, Shield, ArrowLeft } from "lucide-react";
 import { canAccessAdminDashboardStorage } from "@/utils/adminStaffSession";
 import {
   isStaffEmailIdentifier,
@@ -477,6 +477,15 @@ export function AuthFormPanel({
         )}
       >
         <CardHeader className={cn("text-center", compact && "pb-2 pt-4 px-4")}>
+          <div className={cn("mb-3 flex justify-center", compact && "mb-2")}>
+            <Link
+              to="/"
+              className="inline-flex items-center gap-1.5 text-sm font-medium text-primary hover:underline"
+            >
+              <ArrowLeft className="h-4 w-4 shrink-0" aria-hidden />
+              Back to public Space
+            </Link>
+          </div>
           <CardTitle className={cn(compact && "text-lg")}>Welcome to UjenziXform</CardTitle>
           <CardDescription className={cn(compact && "text-xs")}>
             Kenya&apos;s Premier Construction Platform
