@@ -28,6 +28,8 @@ const LEAFLET_CSS = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
 const LEAFLET_JS = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
 
 const GMAPS_SCRIPT_ID = 'ujenzi-google-maps-js';
+/** If the script tag exists but `load` already fired, listener-based waits hang forever without polling. */
+const GMAPS_LOAD_TIMEOUT_MS = 28_000;
 
 /** Kenya — soft restriction; users can still pan slightly outside with strictBounds: false */
 const KENYA_LAT_LNG_BOUNDS = { north: 5.2, south: -5.0, west: 33.5, east: 42.0 };
@@ -44,20 +46,62 @@ function loadGoogleMapsScript(apiKey: string): Promise<void> {
   if (w.google?.maps?.Map) return Promise.resolve();
 
   return new Promise((resolve, reject) => {
-    const existing = document.getElementById(GMAPS_SCRIPT_ID) as HTMLScriptElement | null;
-    const finish = () => {
-      if (w.google?.maps?.Map) resolve();
-      else reject(new Error('Google Maps API unavailable'));
-    };
-    const fail = () => reject(new Error('Failed to load Google Maps'));
+    let settled = false;
+    let pollTimer: number | null = null;
+    let timeoutTimer: number | null = null;
 
+    const cleanup = () => {
+      if (pollTimer != null) {
+        window.clearInterval(pollTimer);
+        pollTimer = null;
+      }
+      if (timeoutTimer != null) {
+        window.clearTimeout(timeoutTimer);
+        timeoutTimer = null;
+      }
+    };
+
+    const ok = () => {
+      if (settled || !w.google?.maps?.Map) return;
+      settled = true;
+      cleanup();
+      resolve();
+    };
+
+    const bad = (message: string) => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      reject(new Error(message));
+    };
+
+    const armWaiters = () => {
+      pollTimer = window.setInterval(() => {
+        if (w.google?.maps?.Map) ok();
+      }, 120);
+      timeoutTimer = window.setTimeout(() => {
+        if (w.google?.maps?.Map) {
+          ok();
+          return;
+        }
+        bad(
+          'Google Maps did not become ready in time. Typical causes: invalid or restricted VITE_GOOGLE_MAPS_API_KEY, billing disabled in Google Cloud, or Maps JavaScript API / Places API not enabled for this key. After fixing the key, do a hard refresh.',
+        );
+      }, GMAPS_LOAD_TIMEOUT_MS);
+    };
+
+    const existing = document.getElementById(GMAPS_SCRIPT_ID) as HTMLScriptElement | null;
     if (existing) {
       if (w.google?.maps?.Map) {
-        resolve();
+        ok();
         return;
       }
-      existing.addEventListener('load', finish);
-      existing.addEventListener('error', fail);
+      const onLoad = () => ok();
+      const onErr = () => bad('Failed to load Google Maps (script error).');
+      existing.addEventListener('load', onLoad, { once: true });
+      existing.addEventListener('error', onErr, { once: true });
+      armWaiters();
+      ok();
       return;
     }
 
@@ -68,8 +112,11 @@ function loadGoogleMapsScript(apiKey: string): Promise<void> {
     )}&libraries=places&language=en&region=KE`;
     script.async = true;
     script.defer = true;
-    script.onload = finish;
-    script.onerror = fail;
+    script.onload = () => {
+      armWaiters();
+      ok();
+    };
+    script.onerror = () => bad('Could not download the Google Maps script (network, ad blocker, or CSP).');
     document.head.appendChild(script);
   });
 }
