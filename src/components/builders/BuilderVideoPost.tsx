@@ -152,7 +152,7 @@ export const BuilderVideoPost: React.FC<BuilderVideoPostProps> = ({
   const [isMuted, setIsMuted] = useState(true);
   const [showControls, setShowControls] = useState(false);
   const [showReactions, setShowReactions] = useState(false);
-  /** CO feed has no per-emoji in DB — we only show which emoji the visitor picked (cosmetic). */
+  /** Legacy binary-like feed only: cosmetic emoji when parent does not pass onReact / userReaction. */
   const [binaryReactionEmoji, setBinaryReactionEmoji] = useState<string | null>(null);
   const [emojiPopoverOpen, setEmojiPopoverOpen] = useState(false);
   const [replyingTo, setReplyingTo] = useState<{ id: string; name: string } | null>(null);
@@ -217,6 +217,9 @@ export const BuilderVideoPost: React.FC<BuilderVideoPostProps> = ({
 
   const displayLikes = reactionMode ? likes : likeCount;
   const displayLiked = reactionMode ? !!(userReaction && userReaction.length > 0) : liked;
+  const pickedReactionEmoji = reactionMode
+    ? userReaction || '👍'
+    : binaryReactionEmoji || '👍';
 
   // Reaction emojis
   const reactions = [
@@ -655,10 +658,19 @@ export const BuilderVideoPost: React.FC<BuilderVideoPostProps> = ({
 
       {/* Engagement Stats */}
       <div className="px-4 py-2 flex items-center justify-between text-sm text-gray-500 dark:text-gray-400">
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-2 min-w-0">
+          {displayLiked && (
+            <span
+              className="text-2xl sm:text-[1.65rem] leading-none shrink-0 drop-shadow-sm"
+              title="Your reaction"
+              aria-label="Your reaction"
+            >
+              {pickedReactionEmoji}
+            </span>
+          )}
           {displayLikes > 0 && (
             <>
-              <div className="flex -space-x-1">
+              <div className="flex -space-x-1 shrink-0">
                 <div className="w-5 h-5 rounded-full bg-blue-500 flex items-center justify-center">
                   <ThumbsUp className="h-3 w-3 text-white" fill="white" />
                 </div>
@@ -666,7 +678,7 @@ export const BuilderVideoPost: React.FC<BuilderVideoPostProps> = ({
                   <Heart className="h-3 w-3 text-white" fill="white" />
                 </div>
               </div>
-              <span className="ml-1 hover:underline cursor-pointer">{formatNumber(displayLikes)}</span>
+              <span className="ml-0.5 hover:underline cursor-pointer">{formatNumber(displayLikes)}</span>
             </>
           )}
         </div>
@@ -711,7 +723,7 @@ export const BuilderVideoPost: React.FC<BuilderVideoPostProps> = ({
               <div
                 role="listbox"
                 aria-label="Choose a reaction"
-                className="absolute bottom-full left-1/2 z-[60] flex -translate-x-1/2 translate-y-2 gap-0.5 rounded-full border border-gray-200 bg-white px-1.5 py-1.5 shadow-lg animate-in fade-in slide-in-from-bottom-2 duration-200 dark:border-gray-700 dark:bg-gray-800"
+                className="absolute bottom-full left-1/2 z-[60] flex -translate-x-1/2 translate-y-2 gap-1 rounded-full border border-gray-200 bg-white px-2 py-2 shadow-xl animate-in fade-in slide-in-from-bottom-2 duration-200 dark:border-gray-700 dark:bg-gray-800"
                 onMouseEnter={clearReactionHideTimer}
                 onMouseLeave={scheduleReactionHide}
               >
@@ -725,7 +737,7 @@ export const BuilderVideoPost: React.FC<BuilderVideoPostProps> = ({
                       e.stopPropagation();
                       handleReactionPick(reaction.emoji);
                     }}
-                    className="flex h-11 min-h-11 w-11 min-w-11 shrink-0 items-center justify-center rounded-full text-2xl transition-transform hover:scale-110 hover:bg-gray-100 active:scale-95 dark:hover:bg-gray-700"
+                    className="flex h-12 min-h-12 w-12 min-w-12 shrink-0 items-center justify-center rounded-full text-3xl transition-transform hover:scale-110 hover:bg-gray-100 active:scale-95 dark:hover:bg-gray-700"
                     title={reaction.name}
                   >
                     {reaction.emoji}
@@ -735,7 +747,11 @@ export const BuilderVideoPost: React.FC<BuilderVideoPostProps> = ({
             )}
             <Button
               variant="ghost"
-              className={`w-full h-10 gap-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors ${displayLiked ? 'text-blue-500' : 'text-gray-600 dark:text-gray-400'}`}
+              className={`w-full min-h-11 h-11 gap-2 rounded-xl transition-all ${
+                displayLiked
+                  ? 'bg-gradient-to-b from-blue-50 to-white font-semibold text-blue-900 shadow-sm ring-2 ring-blue-500/20 dark:from-blue-950/60 dark:to-gray-900 dark:text-blue-100 dark:ring-blue-400/25'
+                  : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'
+              }`}
               onClick={(e) => {
                 if (longPressTriggeredRef.current) {
                   e.preventDefault();
@@ -746,13 +762,13 @@ export const BuilderVideoPost: React.FC<BuilderVideoPostProps> = ({
               }}
             >
               {displayLiked ? (
-                <span className="text-lg">
-                  {reactionMode && userReaction ? userReaction : binaryReactionEmoji || '👍'}
+                <span className="text-2xl sm:text-[1.75rem] leading-none select-none" aria-hidden>
+                  {pickedReactionEmoji}
                 </span>
               ) : (
-                <ThumbsUp className="h-5 w-5" />
+                <ThumbsUp className="h-6 w-6 shrink-0" />
               )}
-              <span className="font-medium">Like</span>
+              <span className="font-medium">{displayLiked ? 'Liked' : 'Like'}</span>
             </Button>
           </div>
           <Button

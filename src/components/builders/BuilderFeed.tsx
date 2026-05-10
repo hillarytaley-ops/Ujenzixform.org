@@ -46,9 +46,9 @@ async function fetchViewerPostReactions(
   postIds: string[],
   feedUserId: string | null | undefined,
   accessToken: string,
-): Promise<Map<string, string>> {
+): Promise<{ map: Map<string, string>; ok: boolean }> {
   const reactionByPost = new Map<string, string>();
-  if (postIds.length === 0) return reactionByPost;
+  if (postIds.length === 0) return { map: reactionByPost, ok: true };
   const headers = {
     apikey: SUPABASE_ANON_KEY,
     Authorization: `Bearer ${accessToken || SUPABASE_ANON_KEY}`,
@@ -58,25 +58,32 @@ async function fetchViewerPostReactions(
       if (l.post_id) reactionByPost.set(l.post_id, (l.reaction as string) || '👍');
     }
   };
+  let ok = false;
   try {
     if (feedUserId) {
       const q = `${SUPABASE_URL}/rest/v1/post_likes?user_id=eq.${feedUserId}&post_id=in.(${postIds.join(',')})&select=`;
       let res = await fetch(`${q}post_id,reaction`, { headers });
       if (!res.ok) res = await fetch(`${q}post_id`, { headers });
-      if (res.ok) fill(asRestArray(await res.json()));
+      if (res.ok) {
+        fill(asRestArray(await res.json()));
+        ok = true;
+      }
     } else {
       const guestId = getBuilderFeedGuestId();
-      if (!guestId) return reactionByPost;
+      if (!guestId) return { map: reactionByPost, ok: false };
       const enc = encodeURIComponent(guestId);
       const q = `${SUPABASE_URL}/rest/v1/post_likes?post_id=in.(${postIds.join(',')})&user_id=is.null&guest_identifier=eq.${enc}&select=`;
       let res = await fetch(`${q}post_id,reaction`, { headers });
       if (!res.ok) res = await fetch(`${q}post_id`, { headers });
-      if (res.ok) fill(asRestArray(await res.json()));
+      if (res.ok) {
+        fill(asRestArray(await res.json()));
+        ok = true;
+      }
     }
+    return { map: reactionByPost, ok };
   } catch {
-    /* ignore */
+    return { map: reactionByPost, ok: false };
   }
-  return reactionByPost;
 }
 
 interface BuilderFeedProps {
@@ -478,9 +485,18 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
         const commenterMap = new Map(commenterProfiles.map((p: any) => [p.user_id, p]));
 
         // Signed-in: likes by user_id. Visitors: likes by stable guest_identifier (localStorage).
-        let reactionByPost = await fetchViewerPostReactions(postIds, feedUserId, accessToken);
-        reactionByPost = mergeViewerReactionsWithLocalFallback('builder', reactionByPost);
-        console.log('📥 Liked posts (this session):', reactionByPost.size);
+        const { map: rawReactions, ok: reactionsFetchOk } = await fetchViewerPostReactions(
+          postIds,
+          feedUserId,
+          accessToken,
+        );
+        const reactionByPost = mergeViewerReactionsWithLocalFallback(
+          'builder',
+          rawReactions,
+          postIds,
+          reactionsFetchOk,
+        );
+        console.log('📥 Liked posts (this session):', reactionByPost.size, 'fetchOk:', reactionsFetchOk);
 
         // Transform posts to match component format
         const transformedPosts = postsToProcess.map((post: any) => {

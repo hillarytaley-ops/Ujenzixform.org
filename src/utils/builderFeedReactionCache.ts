@@ -34,22 +34,41 @@ export function setFeedReactionCache(scope: FeedReactionScope, postId: string, r
 }
 
 /**
- * Merge server like-reactions with localStorage so emojis survive refresh when `reaction` is missing from API/DB.
+ * Merge server `post_likes` reactions with localStorage.
+ *
+ * When `fetchSucceeded` is false, we **do not** overwrite storage (empty server maps are common on
+ * network/RLS errors and would wipe the user's cached emojis).
+ *
+ * When `fetchSucceeded` is true, we merge 👍 defaults from cache, then persist only keys that still
+ * have a like (server map + upgrades). For `postIdsInBatch`, entries missing from the merged map
+ * are removed from storage so unlikes stay in sync.
  */
 export function mergeViewerReactionsWithLocalFallback(
   scope: FeedReactionScope,
   server: Map<string, string>,
+  postIdsInBatch: string[],
+  fetchSucceeded: boolean,
 ): Map<string, string> {
   const cache = readRaw(scope);
   const out = new Map(server);
+
+  if (!fetchSucceeded) {
+    for (const pid of postIdsInBatch) {
+      if (!out.has(pid) && cache[pid]) out.set(pid, cache[pid]!);
+    }
+    return out;
+  }
+
   for (const [pid, em] of out) {
     if (em === '👍' && cache[pid] && cache[pid] !== '👍') {
       out.set(pid, cache[pid]!);
     }
   }
-  const next: Record<string, string> = {};
-  for (const [k, v] of out) {
-    if (v) next[k] = v;
+
+  const next: Record<string, string> = { ...cache };
+  for (const pid of postIdsInBatch) {
+    if (out.has(pid)) next[pid] = out.get(pid)!;
+    else delete next[pid];
   }
   writeRaw(scope, next);
   return out;

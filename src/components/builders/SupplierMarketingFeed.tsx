@@ -212,6 +212,7 @@ export const SupplierMarketingFeed: React.FC<SupplierMarketingFeedProps> = ({
     const userIdForLikes = effectiveUserId || sessionUserId;
     const guestId = !userIdForLikes ? getBuilderFeedGuestId() : '';
     let reactionByPost = new Map<string, string>();
+    let reactionsFetchOk = false;
 
     if (postIds.length) {
       try {
@@ -220,6 +221,7 @@ export const SupplierMarketingFeed: React.FC<SupplierMarketingFeedProps> = ({
           let lr = await fetch(`${q}post_id,reaction`, { headers: h });
           if (!lr.ok) lr = await fetch(`${q}post_id`, { headers: h });
           if (lr.ok) {
+            reactionsFetchOk = true;
             asRestArray<{ post_id: string; reaction?: string }>(await lr.json()).forEach((l) => {
               if (l.post_id) reactionByPost.set(l.post_id, (l.reaction as string) || '👍');
             });
@@ -230,16 +232,25 @@ export const SupplierMarketingFeed: React.FC<SupplierMarketingFeedProps> = ({
           let lr = await fetch(`${q}post_id,reaction`, { headers: h });
           if (!lr.ok) lr = await fetch(`${q}post_id`, { headers: h });
           if (lr.ok) {
+            reactionsFetchOk = true;
             asRestArray<{ post_id: string; reaction?: string }>(await lr.json()).forEach((l) => {
               if (l.post_id) reactionByPost.set(l.post_id, (l.reaction as string) || '👍');
             });
           }
         }
       } catch {
-        /* ignore */
+        reactionsFetchOk = false;
       }
+    } else {
+      reactionsFetchOk = true;
     }
-    reactionByPost = mergeViewerReactionsWithLocalFallback('supplier', reactionByPost);
+
+    reactionByPost = mergeViewerReactionsWithLocalFallback(
+      'supplier',
+      reactionByPost,
+      postIds,
+      reactionsFetchOk,
+    );
 
     const mapped: SupplierPostRow[] = slice.map((post: Record<string, unknown>) => {
       const row = post as any;
