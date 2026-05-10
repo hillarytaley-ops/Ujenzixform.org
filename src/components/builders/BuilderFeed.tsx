@@ -34,10 +34,49 @@ import { SUPABASE_ANON_KEY, SUPABASE_URL, supabase } from '@/integrations/supaba
 import { useToast } from '@/hooks/use-toast';
 import { getBuilderFeedGuestId } from '@/utils/builderFeedGuestId';
 import { normalizeTimelinePageFromStats } from '@/utils/normalizeTimelinePageFromStats';
+import { mergeViewerReactionsWithLocalFallback, setFeedReactionCache } from '@/utils/builderFeedReactionCache';
 
 /** PostgREST error bodies are objects; `(x || []).map` breaks when x is a truthy non-array. */
 function asRestArray<T = Record<string, unknown>>(v: unknown): T[] {
   return Array.isArray(v) ? (v as T[]) : [];
+}
+
+/** Load this viewer's post_likes rows; retry without `reaction` if the column is not deployed yet. */
+async function fetchViewerPostReactions(
+  postIds: string[],
+  feedUserId: string | null | undefined,
+  accessToken: string,
+): Promise<Map<string, string>> {
+  const reactionByPost = new Map<string, string>();
+  if (postIds.length === 0) return reactionByPost;
+  const headers = {
+    apikey: SUPABASE_ANON_KEY,
+    Authorization: `Bearer ${accessToken || SUPABASE_ANON_KEY}`,
+  } as const;
+  const fill = (rows: { post_id?: string; reaction?: string }[]) => {
+    for (const l of rows) {
+      if (l.post_id) reactionByPost.set(l.post_id, (l.reaction as string) || '👍');
+    }
+  };
+  try {
+    if (feedUserId) {
+      const q = `${SUPABASE_URL}/rest/v1/post_likes?user_id=eq.${feedUserId}&post_id=in.(${postIds.join(',')})&select=`;
+      let res = await fetch(`${q}post_id,reaction`, { headers });
+      if (!res.ok) res = await fetch(`${q}post_id`, { headers });
+      if (res.ok) fill(asRestArray(await res.json()));
+    } else {
+      const guestId = getBuilderFeedGuestId();
+      if (!guestId) return reactionByPost;
+      const enc = encodeURIComponent(guestId);
+      const q = `${SUPABASE_URL}/rest/v1/post_likes?post_id=in.(${postIds.join(',')})&user_id=is.null&guest_identifier=eq.${enc}&select=`;
+      let res = await fetch(`${q}post_id,reaction`, { headers });
+      if (!res.ok) res = await fetch(`${q}post_id`, { headers });
+      if (res.ok) fill(asRestArray(await res.json()));
+    }
+  } catch {
+    /* ignore */
+  }
+  return reactionByPost;
 }
 
 interface BuilderFeedProps {
@@ -439,49 +478,9 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
         const commenterMap = new Map(commenterProfiles.map((p: any) => [p.user_id, p]));
 
         // Signed-in: likes by user_id. Visitors: likes by stable guest_identifier (localStorage).
-        const reactionByPost = new Map<string, string>();
-        try {
-          if (feedUserId) {
-            const likesRes = await fetch(
-              `${SUPABASE_URL}/rest/v1/post_likes?user_id=eq.${feedUserId}&post_id=in.(${postIds.join(',')})&select=post_id,reaction`,
-              {
-                headers: {
-                  apikey: SUPABASE_ANON_KEY,
-                  Authorization: `Bearer ${accessToken || SUPABASE_ANON_KEY}`,
-                },
-              }
-            );
-            if (likesRes.ok) {
-              const likesData = asRestArray<{ post_id?: string; reaction?: string }>(await likesRes.json());
-              likesData.forEach((l) => {
-                if (l.post_id) reactionByPost.set(l.post_id, (l.reaction as string) || '👍');
-              });
-            }
-          } else {
-            const guestId = getBuilderFeedGuestId();
-            if (guestId && postIds.length > 0) {
-              const enc = encodeURIComponent(guestId);
-              const likesRes = await fetch(
-                `${SUPABASE_URL}/rest/v1/post_likes?post_id=in.(${postIds.join(',')})&user_id=is.null&guest_identifier=eq.${enc}&select=post_id,reaction`,
-                {
-                  headers: {
-                    apikey: SUPABASE_ANON_KEY,
-                    Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
-                  },
-                }
-              );
-              if (likesRes.ok) {
-                const likesData = asRestArray<{ post_id?: string; reaction?: string }>(await likesRes.json());
-                likesData.forEach((l) => {
-                  if (l.post_id) reactionByPost.set(l.post_id, (l.reaction as string) || '👍');
-                });
-              }
-            }
-          }
-          console.log('📥 Liked posts (this session):', reactionByPost.size);
-        } catch (e) {
-          console.log('📥 Likes fetch skipped');
-        }
+        let reactionByPost = await fetchViewerPostReactions(postIds, feedUserId, accessToken);
+        reactionByPost = mergeViewerReactionsWithLocalFallback('builder', reactionByPost);
+        console.log('📥 Liked posts (this session):', reactionByPost.size);
 
         // Transform posts to match component format
         const transformedPosts = postsToProcess.map((post: any) => {
@@ -1079,16 +1078,34 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
       'Content-Type': 'application/json',
       Prefer: 'return=minimal',
     } as const;
-    const body = userId
+    const bodyWithReaction = userId
       ? { post_id: postId, user_id: userId, reaction }
       : { post_id: postId, user_id: null, guest_identifier: guestId, reaction };
-    const ins = await fetch(`${SUPABASE_URL}/rest/v1/post_likes`, {
-      method: 'POST',
-      headers: likeHeaders,
-      body: JSON.stringify(body),
-    });
+    const bodyBare = userId
+      ? { post_id: postId, user_id: userId }
+      : { post_id: postId, user_id: null, guest_identifier: guestId };
+
+    const postOnce = (body: object) =>
+      fetch(`${SUPABASE_URL}/rest/v1/post_likes`, {
+        method: 'POST',
+        headers: likeHeaders,
+        body: JSON.stringify(body),
+      });
+
+    let ins = await postOnce(bodyWithReaction);
+    let errText = await ins.text();
+
     if (!ins.ok) {
-      const errText = await ins.text();
+      const maybeMissingReactionCol =
+        ins.status === 400 &&
+        (/reaction/i.test(errText) || /schema cache/i.test(errText) || /column/i.test(errText));
+      if (maybeMissingReactionCol) {
+        ins = await postOnce(bodyBare);
+        errText = await ins.text();
+      }
+    }
+
+    if (!ins.ok) {
       let errJson: { code?: string; message?: string } | null = null;
       try {
         errJson = errText ? JSON.parse(errText) : null;
@@ -1106,11 +1123,13 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
             p.id === postId ? { ...p, userReaction: reaction, likes: likesIfDuplicate } : p
           )
         );
+        setFeedReactionCache('builder', postId, reaction);
         return;
       }
       console.error('post_likes insert:', ins.status, errText);
       throw new Error('Like not saved');
     }
+    setFeedReactionCache('builder', postId, reaction);
   };
 
   const handleReact = async (postId: string, incoming: string) => {
@@ -1168,6 +1187,7 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
       });
       try {
         await deleteBuilderPostLikeRemote(postId, userId, guestId, accessToken);
+        setFeedReactionCache('builder', postId, null);
       } catch {
         optimistic({ userReaction: current, likes: prevCount });
         toast({ title: 'Could not update', variant: 'destructive' });

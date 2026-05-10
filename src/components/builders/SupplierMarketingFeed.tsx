@@ -7,6 +7,7 @@ import { BuilderVideoPost, BuilderVideoPostProps, VideoComment } from './Builder
 import { SUPABASE_ANON_KEY, SUPABASE_URL, supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { getBuilderFeedGuestId } from '@/utils/builderFeedGuestId';
+import { mergeViewerReactionsWithLocalFallback, setFeedReactionCache } from '@/utils/builderFeedReactionCache';
 import { Link } from 'react-router-dom';
 import { Loader2, Image as ImageIcon, FileVideo, X, Upload } from 'lucide-react';
 import type { PublicSupplierDirectoryRow } from '@/utils/fetchPublicSupplierDirectory';
@@ -210,29 +211,27 @@ export const SupplierMarketingFeed: React.FC<SupplierMarketingFeedProps> = ({
     }
     const userIdForLikes = effectiveUserId || sessionUserId;
     const guestId = !userIdForLikes ? getBuilderFeedGuestId() : '';
-    const reactionByPost = new Map<string, string>();
+    let reactionByPost = new Map<string, string>();
 
     if (postIds.length) {
       try {
         if (userIdForLikes) {
-          const lr = await fetch(
-            `${SUPABASE_URL}/rest/v1/supplier_post_likes?user_id=eq.${userIdForLikes}&post_id=in.(${postIds.join(',')})&select=post_id,reaction`,
-            { headers: h }
-          );
+          const q = `${SUPABASE_URL}/rest/v1/supplier_post_likes?user_id=eq.${userIdForLikes}&post_id=in.(${postIds.join(',')})&select=`;
+          let lr = await fetch(`${q}post_id,reaction`, { headers: h });
+          if (!lr.ok) lr = await fetch(`${q}post_id`, { headers: h });
           if (lr.ok) {
-            asRestArray<{ post_id: string; reaction: string }>(await lr.json()).forEach((l) => {
-              if (l.post_id && l.reaction) reactionByPost.set(l.post_id, l.reaction);
+            asRestArray<{ post_id: string; reaction?: string }>(await lr.json()).forEach((l) => {
+              if (l.post_id) reactionByPost.set(l.post_id, (l.reaction as string) || '👍');
             });
           }
         } else if (guestId) {
           const enc = encodeURIComponent(guestId);
-          const lr = await fetch(
-            `${SUPABASE_URL}/rest/v1/supplier_post_likes?post_id=in.(${postIds.join(',')})&user_id=is.null&guest_identifier=eq.${enc}&select=post_id,reaction`,
-            { headers: h }
-          );
+          const q = `${SUPABASE_URL}/rest/v1/supplier_post_likes?post_id=in.(${postIds.join(',')})&user_id=is.null&guest_identifier=eq.${enc}&select=`;
+          let lr = await fetch(`${q}post_id,reaction`, { headers: h });
+          if (!lr.ok) lr = await fetch(`${q}post_id`, { headers: h });
           if (lr.ok) {
-            asRestArray<{ post_id: string; reaction: string }>(await lr.json()).forEach((l) => {
-              if (l.post_id && l.reaction) reactionByPost.set(l.post_id, l.reaction);
+            asRestArray<{ post_id: string; reaction?: string }>(await lr.json()).forEach((l) => {
+              if (l.post_id) reactionByPost.set(l.post_id, (l.reaction as string) || '👍');
             });
           }
         }
@@ -240,6 +239,7 @@ export const SupplierMarketingFeed: React.FC<SupplierMarketingFeedProps> = ({
         /* ignore */
       }
     }
+    reactionByPost = mergeViewerReactionsWithLocalFallback('supplier', reactionByPost);
 
     const mapped: SupplierPostRow[] = slice.map((post: Record<string, unknown>) => {
       const row = post as any;
@@ -329,7 +329,15 @@ export const SupplierMarketingFeed: React.FC<SupplierMarketingFeedProps> = ({
       ...authHeaders(),
       'Content-Type': 'application/json',
     } as const;
-    const userId = effectiveUserId || null;
+    let userId: string | null = effectiveUserId || null;
+    if (!userId) {
+      try {
+        const raw = readPersistedAuthRawStringSync();
+        if (raw) userId = JSON.parse(raw).user?.id ?? null;
+      } catch {
+        /* ignore */
+      }
+    }
     const guestId = !userId ? getBuilderFeedGuestId() : '';
 
     if (userId) {
@@ -356,27 +364,53 @@ export const SupplierMarketingFeed: React.FC<SupplierMarketingFeedProps> = ({
   };
 
   const insertSupplierLikeRemote = async (postId: string, reaction: string) => {
-    const userId = effectiveUserId || null;
+    let userId = effectiveUserId || null;
+    if (!userId) {
+      try {
+        const raw = readPersistedAuthRawStringSync();
+        if (raw) userId = JSON.parse(raw).user?.id ?? null;
+      } catch {
+        /* ignore */
+      }
+    }
     const guestId = !userId ? getBuilderFeedGuestId() : '';
     if (!userId && (!guestId || guestId.length < 8)) {
       throw new Error('guest');
     }
-    const body = userId
+    const headers = {
+      ...authHeaders(),
+      'Content-Type': 'application/json',
+      Prefer: 'return=minimal',
+    } as const;
+    const bodyWith = userId
       ? { post_id: postId, user_id: userId, reaction }
       : { post_id: postId, user_id: null, guest_identifier: guestId, reaction };
-    const ins = await fetch(`${SUPABASE_URL}/rest/v1/supplier_post_likes`, {
-      method: 'POST',
-      headers: {
-        ...authHeaders(),
-        'Content-Type': 'application/json',
-        Prefer: 'return=minimal',
-      },
-      body: JSON.stringify(body),
-    });
+    const bodyBare = userId
+      ? { post_id: postId, user_id: userId }
+      : { post_id: postId, user_id: null, guest_identifier: guestId };
+
+    const postOnce = (body: object) =>
+      fetch(`${SUPABASE_URL}/rest/v1/supplier_post_likes`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(body),
+      });
+
+    let ins = await postOnce(bodyWith);
+    let err = await ins.text();
     if (!ins.ok) {
-      const err = await ins.text();
+      const maybeMissingReactionCol =
+        ins.status === 400 &&
+        (/reaction/i.test(err) || /schema cache/i.test(err) || /column/i.test(err));
+      if (maybeMissingReactionCol) {
+        ins = await postOnce(bodyBare);
+        err = await ins.text();
+      }
+    }
+    if (!ins.ok) {
       throw new Error(err || 'Like failed');
     }
+    setFeedReactionCache('supplier', postId, reaction);
   };
 
   const handleReact = async (postId: string, incoming: string) => {
@@ -423,6 +457,7 @@ export const SupplierMarketingFeed: React.FC<SupplierMarketingFeedProps> = ({
       });
       try {
         await deleteSupplierLikeRemote(postId);
+        setFeedReactionCache('supplier', postId, null);
       } catch {
         optimistic({ userReaction: current, isLiked: !!current, likes: prevCount });
         toast({ title: 'Could not update', variant: 'destructive' });
