@@ -113,7 +113,9 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
   const canPost =
     showComposer && isCoContractor && !isSupplierRole;
   const effectiveIsBuilder = isCoContractor;
-  const [posts, setPosts] = useState<Omit<BuilderVideoPostProps, 'onLike' | 'onComment' | 'onShare' | 'onViewProfile'>[]>([]);
+  const [posts, setPosts] = useState<
+    Omit<BuilderVideoPostProps, 'onLike' | 'onComment' | 'onShare' | 'onViewProfile' | 'onReact'>[]
+  >([]);
   const [loadingPosts, setLoadingPosts] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMorePosts, setHasMorePosts] = useState(true);
@@ -168,23 +170,21 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
     try {
       // Fetch posts from builder_posts table using fetch API (bypass Supabase client)
       let accessToken = '';
+      let sessionUserId: string | null = null;
       try {
         const storedSession = readPersistedAuthRawStringSync();
         if (storedSession) {
           const parsed = JSON.parse(storedSession);
           accessToken = parsed.access_token || '';
+          sessionUserId = parsed.user?.id ?? null;
         }
-      } catch (e) {}
-      
-      // Get current user ID to show their own posts regardless of status
-      let currentUserId: string | null = null;
-      try {
-        const storedSession = readPersistedAuthRawStringSync();
-        if (storedSession) {
-          const parsed = JSON.parse(storedSession);
-          currentUserId = parsed.user?.id;
-        }
-      } catch (e) {}
+      } catch {
+        /* ignore */
+      }
+
+      // Same identity as handleReact: prefer prop/localStorage user id, then Supabase session.
+      // Otherwise refresh loads guest likes while reactions were saved under user_id (emoji vanishes).
+      const feedUserId = effectiveUserId || sessionUserId;
 
       // Prefer SECURITY DEFINER RPC so the feed matches public stats even if RLS on builder_posts is mis-deployed.
       const limitPlusOne = POSTS_PER_PAGE + 1;
@@ -339,13 +339,13 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
 
       if (
         includeAuthorPendingVideos &&
-        currentUserId &&
+        feedUserId &&
         isInitialLoad &&
         offset === 0
       ) {
         try {
           const pr = await fetch(
-            `${SUPABASE_URL}/rest/v1/builder_posts?builder_id=eq.${currentUserId}&status=eq.pending&video_url=not.is.null&order=created_at.desc&limit=20`,
+            `${SUPABASE_URL}/rest/v1/builder_posts?builder_id=eq.${feedUserId}&status=eq.pending&video_url=not.is.null&order=created_at.desc&limit=20`,
             { headers: authHeaders }
           );
           if (pr.ok) {
@@ -439,11 +439,11 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
         const commenterMap = new Map(commenterProfiles.map((p: any) => [p.user_id, p]));
 
         // Signed-in: likes by user_id. Visitors: likes by stable guest_identifier (localStorage).
-        let userLikes: Set<string> = new Set();
+        const reactionByPost = new Map<string, string>();
         try {
-          if (currentUserId) {
+          if (feedUserId) {
             const likesRes = await fetch(
-              `${SUPABASE_URL}/rest/v1/post_likes?user_id=eq.${currentUserId}&post_id=in.(${postIds.join(',')})&select=post_id`,
+              `${SUPABASE_URL}/rest/v1/post_likes?user_id=eq.${feedUserId}&post_id=in.(${postIds.join(',')})&select=post_id,reaction`,
               {
                 headers: {
                   apikey: SUPABASE_ANON_KEY,
@@ -452,15 +452,17 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
               }
             );
             if (likesRes.ok) {
-              const likesData = asRestArray(await likesRes.json());
-              userLikes = new Set(likesData.map((l: any) => l.post_id));
+              const likesData = asRestArray<{ post_id?: string; reaction?: string }>(await likesRes.json());
+              likesData.forEach((l) => {
+                if (l.post_id) reactionByPost.set(l.post_id, (l.reaction as string) || '👍');
+              });
             }
           } else {
             const guestId = getBuilderFeedGuestId();
             if (guestId && postIds.length > 0) {
               const enc = encodeURIComponent(guestId);
               const likesRes = await fetch(
-                `${SUPABASE_URL}/rest/v1/post_likes?post_id=in.(${postIds.join(',')})&user_id=is.null&guest_identifier=eq.${enc}&select=post_id`,
+                `${SUPABASE_URL}/rest/v1/post_likes?post_id=in.(${postIds.join(',')})&user_id=is.null&guest_identifier=eq.${enc}&select=post_id,reaction`,
                 {
                   headers: {
                     apikey: SUPABASE_ANON_KEY,
@@ -469,12 +471,14 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
                 }
               );
               if (likesRes.ok) {
-                const likesData = asRestArray(await likesRes.json());
-                userLikes = new Set(likesData.map((l: any) => l.post_id));
+                const likesData = asRestArray<{ post_id?: string; reaction?: string }>(await likesRes.json());
+                likesData.forEach((l) => {
+                  if (l.post_id) reactionByPost.set(l.post_id, (l.reaction as string) || '👍');
+                });
               }
             }
           }
-          console.log('📥 Liked posts (this session):', userLikes.size);
+          console.log('📥 Liked posts (this session):', reactionByPost.size);
         } catch (e) {
           console.log('📥 Likes fetch skipped');
         }
@@ -518,7 +522,7 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
             timestamp: new Date(post.created_at),
             likes: post.likes_count || 0,
             shares: post.shares_count || 0,
-            isLiked: userLikes.has(post.id), // Check if user has liked this post
+            userReaction: reactionByPost.get(post.id) || null,
             comments: postComments
           };
         });
@@ -958,7 +962,7 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
       console.log('📤 Media URLs for display:', { displayVideoUrl, displayImageUrl });
 
       // Add to local state for immediate display
-      const newPost: Omit<BuilderVideoPostProps, 'onLike' | 'onComment' | 'onShare' | 'onViewProfile'> = {
+      const newPost: Omit<BuilderVideoPostProps, 'onLike' | 'onComment' | 'onShare' | 'onViewProfile' | 'onReact'> = {
         id: newPostData?.id || `post-${Date.now()}`,
         builderId: postUserId,
         builderName: profile?.full_name || effectiveUserName,
@@ -971,7 +975,7 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
         timestamp: new Date(),
         likes: 0,
         shares: 0,
-        isLiked: false,
+        userReaction: null,
         comments: []
       };
 
@@ -1019,7 +1023,97 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
     }
   };
 
-  const handleLike = async (postId: string) => {
+  const deleteBuilderPostLikeRemote = async (
+    postId: string,
+    userId: string | null,
+    guestId: string,
+    accessToken: string
+  ) => {
+    const likeHeaders = {
+      apikey: SUPABASE_ANON_KEY,
+      Authorization: `Bearer ${accessToken || SUPABASE_ANON_KEY}`,
+      'Content-Type': 'application/json',
+    } as const;
+    if (userId) {
+      const del = await fetch(
+        `${SUPABASE_URL}/rest/v1/post_likes?post_id=eq.${postId}&user_id=eq.${userId}`,
+        {
+          method: 'DELETE',
+          headers: {
+            apikey: SUPABASE_ANON_KEY,
+            Authorization: `Bearer ${accessToken || SUPABASE_ANON_KEY}`,
+          },
+        }
+      );
+      if (!del.ok) {
+        const err = await del.text();
+        console.error('post_likes delete:', del.status, err);
+        throw new Error('Unlike not saved');
+      }
+      return;
+    }
+    const rpc = await fetch(`${SUPABASE_URL}/rest/v1/rpc/delete_guest_post_like`, {
+      method: 'POST',
+      headers: likeHeaders,
+      body: JSON.stringify({ p_post_id: postId, p_guest: guestId }),
+    });
+    if (!rpc.ok) {
+      const err = await rpc.text();
+      console.error('delete_guest_post_like:', rpc.status, err);
+      throw new Error('Unlike not saved');
+    }
+  };
+
+  const insertBuilderPostLikeRemote = async (
+    postId: string,
+    userId: string | null,
+    guestId: string,
+    reaction: string,
+    accessToken: string,
+    /** If insert hits unique duplicate, restore this like count (pre-optimistic bump). */
+    likesIfDuplicate: number
+  ) => {
+    const likeHeaders = {
+      apikey: SUPABASE_ANON_KEY,
+      Authorization: `Bearer ${accessToken || SUPABASE_ANON_KEY}`,
+      'Content-Type': 'application/json',
+      Prefer: 'return=minimal',
+    } as const;
+    const body = userId
+      ? { post_id: postId, user_id: userId, reaction }
+      : { post_id: postId, user_id: null, guest_identifier: guestId, reaction };
+    const ins = await fetch(`${SUPABASE_URL}/rest/v1/post_likes`, {
+      method: 'POST',
+      headers: likeHeaders,
+      body: JSON.stringify(body),
+    });
+    if (!ins.ok) {
+      const errText = await ins.text();
+      let errJson: { code?: string; message?: string } | null = null;
+      try {
+        errJson = errText ? JSON.parse(errText) : null;
+      } catch {
+        /* ignore */
+      }
+      const dup =
+        ins.status === 409 ||
+        errJson?.code === '23505' ||
+        (typeof errJson?.message === 'string' && errJson.message.toLowerCase().includes('duplicate'));
+      if (dup) {
+        console.warn('post_likes insert: duplicate key, treating as already saved');
+        setPosts((prev) =>
+          prev.map((p) =>
+            p.id === postId ? { ...p, userReaction: reaction, likes: likesIfDuplicate } : p
+          )
+        );
+        return;
+      }
+      console.error('post_likes insert:', ins.status, errText);
+      throw new Error('Like not saved');
+    }
+  };
+
+  const handleReact = async (postId: string, incoming: string) => {
     let userId: string | null = effectiveUserId || null;
     if (!userId) {
       try {
@@ -1028,125 +1122,82 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
           const parsed = JSON.parse(storedSession);
           userId = parsed.user?.id;
         }
-      } catch (e) {}
+      } catch {
+        /* ignore */
+      }
     }
 
     const guestId = !userId ? getBuilderFeedGuestId() : '';
     if (!userId && !guestId) {
       toast({
-        title: 'Cannot save like',
+        title: 'Cannot save reaction',
         description: 'Allow storage for this site so we can remember your likes, or sign in.',
         variant: 'destructive',
       });
       return;
     }
 
-    const post = posts.find(p => p.id === postId);
+    const post = posts.find((p) => p.id === postId);
     if (!post) return;
-    
-    const newLikedState = !post.isLiked;
-    const newLikeCount = newLikedState ? post.likes + 1 : post.likes - 1;
-    
-    setPosts((prev) =>
-      prev.map((p) =>
-        p.id === postId
-          ? { ...p, isLiked: newLikedState, likes: newLikeCount }
-          : p
-      )
-    );
 
-    // Persist to database
+    let accessToken = '';
     try {
-      let accessToken = '';
-      try {
-        const storedSession = readPersistedAuthRawStringSync();
-        if (storedSession) {
-          const parsed = JSON.parse(storedSession);
-          accessToken = parsed.access_token || '';
-        }
-      } catch (e) {}
-
-      const likeHeaders = {
-        apikey: SUPABASE_ANON_KEY,
-        Authorization: `Bearer ${accessToken || SUPABASE_ANON_KEY}`,
-        'Content-Type': 'application/json',
-        Prefer: 'return=minimal',
-      } as const;
-
-      if (newLikedState) {
-        const body = userId
-          ? { post_id: postId, user_id: userId }
-          : { post_id: postId, user_id: null, guest_identifier: guestId };
-        const ins = await fetch(`${SUPABASE_URL}/rest/v1/post_likes`, {
-          method: 'POST',
-          headers: likeHeaders,
-          body: JSON.stringify(body),
-        });
-        if (!ins.ok) {
-          const errText = await ins.text();
-          let errJson: { code?: string; message?: string } | null = null;
-          try {
-            errJson = errText ? JSON.parse(errText) : null;
-          } catch {
-            /* ignore */
-          }
-          const dup =
-            ins.status === 409 ||
-            errJson?.code === '23505' ||
-            (typeof errJson?.message === 'string' &&
-              errJson.message.toLowerCase().includes('duplicate'));
-          if (dup) {
-            // Row already exists (e.g. UI missed it on load, or double-submit). Match DB: liked, no extra count bump.
-            console.warn('post_likes insert: duplicate key, treating as already liked');
-            setPosts((prev) =>
-              prev.map((p) =>
-                p.id === postId ? { ...p, isLiked: true, likes: post.likes } : p
-              )
-            );
-            return;
-          }
-          console.error('post_likes insert:', ins.status, errText);
-          throw new Error('Like not saved');
-        }
-      } else if (userId) {
-        const del = await fetch(
-          `${SUPABASE_URL}/rest/v1/post_likes?post_id=eq.${postId}&user_id=eq.${userId}`,
-          {
-            method: 'DELETE',
-            headers: {
-              apikey: SUPABASE_ANON_KEY,
-              Authorization: `Bearer ${accessToken || SUPABASE_ANON_KEY}`,
-            },
-          }
-        );
-        if (!del.ok) {
-          const err = await del.text();
-          console.error('post_likes delete:', del.status, err);
-          throw new Error('Unlike not saved');
-        }
-      } else {
-        const rpc = await fetch(`${SUPABASE_URL}/rest/v1/rpc/delete_guest_post_like`, {
-          method: 'POST',
-          headers: likeHeaders,
-          body: JSON.stringify({ p_post_id: postId, p_guest: guestId }),
-        });
-        if (!rpc.ok) {
-          const err = await rpc.text();
-          console.error('delete_guest_post_like:', rpc.status, err);
-          throw new Error('Unlike not saved');
-        }
+      const storedSession = readPersistedAuthRawStringSync();
+      if (storedSession) {
+        const parsed = JSON.parse(storedSession);
+        accessToken = parsed.access_token || '';
       }
+    } catch {
+      /* ignore */
+    }
 
-      console.log('👍 Like persisted (counts updated by database triggers)');
-    } catch (error) {
-      console.error('Error saving like:', error);
-      setPosts((prev) =>
-        prev.map((p) =>
-          p.id === postId
-            ? { ...p, isLiked: !newLikedState, likes: post.likes }
-            : p
-        )
+    const current = post.userReaction ?? null;
+    const isUnlike = incoming === '';
+    const sameAgain = !isUnlike && current && incoming === current;
+    const nextReaction = isUnlike || sameAgain ? null : incoming;
+    const prevCount = post.likes;
+
+    const optimistic = (patch: Partial<(typeof posts)[number]>) => {
+      setPosts((prev) => prev.map((p) => (p.id === postId ? { ...p, ...patch } : p)));
+    };
+
+    if (nextReaction === null) {
+      optimistic({
+        userReaction: null,
+        likes: Math.max(0, prevCount - 1),
+      });
+      try {
+        await deleteBuilderPostLikeRemote(postId, userId, guestId, accessToken);
+      } catch {
+        optimistic({ userReaction: current, likes: prevCount });
+        toast({ title: 'Could not update', variant: 'destructive' });
+      }
+      return;
+    }
+
+    const hadReaction = !!current;
+    const switching = hadReaction && current !== nextReaction;
+    const likesBeforeInsertBump = prevCount;
+    optimistic({
+      userReaction: nextReaction,
+      likes: switching || hadReaction ? prevCount : prevCount + 1,
+    });
+
+    try {
+      if (switching) {
+        await deleteBuilderPostLikeRemote(postId, userId, guestId, accessToken);
+      }
+      await insertBuilderPostLikeRemote(
+        postId,
+        userId,
+        guestId,
+        nextReaction,
+        accessToken,
+        likesBeforeInsertBump
       );
+    } catch {
+      optimistic({ userReaction: current, likes: prevCount });
+      toast({ title: 'Could not save reaction', variant: 'destructive' });
     }
   };
 
@@ -1822,7 +1873,8 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
             <BuilderVideoPost
               {...post}
               embedded
-              onLike={handleLike}
+              userReaction={post.userReaction ?? null}
+              onReact={(id, r) => void handleReact(id, r)}
               onComment={handleComment}
               onShare={handleShare}
               onViewProfile={handleViewProfile}

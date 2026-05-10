@@ -201,7 +201,14 @@ export const SupplierMarketingFeed: React.FC<SupplierMarketingFeedProps> = ({
       }
     }
 
-    const userIdForLikes = effectiveUserId || null;
+    let sessionUserId: string | null = null;
+    try {
+      const raw = readPersistedAuthRawStringSync();
+      if (raw) sessionUserId = JSON.parse(raw).user?.id ?? null;
+    } catch {
+      /* ignore */
+    }
+    const userIdForLikes = effectiveUserId || sessionUserId;
     const guestId = !userIdForLikes ? getBuilderFeedGuestId() : '';
     const reactionByPost = new Map<string, string>();
 
@@ -376,7 +383,15 @@ export const SupplierMarketingFeed: React.FC<SupplierMarketingFeedProps> = ({
     const post = posts.find((p) => p.id === postId);
     if (!post) return;
 
-    const userId = effectiveUserId || null;
+    let userId: string | null = effectiveUserId || null;
+    if (!userId) {
+      try {
+        const raw = readPersistedAuthRawStringSync();
+        if (raw) userId = JSON.parse(raw).user?.id ?? null;
+      } catch {
+        /* ignore */
+      }
+    }
     const guestId = !userId ? getBuilderFeedGuestId() : '';
     if (!userId && !guestId) {
       toast({
