@@ -38,23 +38,69 @@ function splitLeadingLatLngPrefix(addr: string): { coords: string; remainder: st
   return null;
 }
 
-/** Parse "lat, lng" or "@lat,lng" from a single string (map picker / manual paste). */
+/**
+ * Parse "lat, lng" or "@lat,lng" from a string (map picker / manual paste / "lat, lng | label").
+ * Tries the full trimmed string, then the segment before the first "|" (common in saved delivery_address).
+ */
 export function parseLatLngFromString(input: string): { lat: number; lng: number } | null {
   if (!input || typeof input !== 'string') return null;
-  const t = input.trim();
-  const commaFormat = t.match(/^(-?\d+\.?\d*)\s*,\s*(-?\d+\.?\d*)$/);
-  if (commaFormat) {
-    const lat = parseFloat(commaFormat[1]);
-    const lng = parseFloat(commaFormat[2]);
-    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
-    return { lat, lng };
+  const trimmed = input.trim();
+  const candidates: string[] = [];
+  const push = (s: string | undefined) => {
+    const v = (s ?? '').trim();
+    if (v && !candidates.includes(v)) candidates.push(v);
+  };
+  push(trimmed);
+  push(trimmed.split('|')[0]);
+
+  for (const t of candidates) {
+    const commaFormat = t.match(/^(-?\d+\.?\d*)\s*,\s*(-?\d+\.?\d*)$/);
+    if (commaFormat) {
+      const lat = parseFloat(commaFormat[1]);
+      const lng = parseFloat(commaFormat[2]);
+      if (!Number.isFinite(lat) || !Number.isFinite(lng)) continue;
+      return { lat, lng };
+    }
+    const gmapsFormat = t.match(/@(-?\d+\.?\d*),(-?\d+\.?\d*)/);
+    if (gmapsFormat) {
+      const lat = parseFloat(gmapsFormat[1]);
+      const lng = parseFloat(gmapsFormat[2]);
+      if (!Number.isFinite(lat) || !Number.isFinite(lng)) continue;
+      return { lat, lng };
+    }
   }
-  const gmapsFormat = t.match(/@(-?\d+\.?\d*),(-?\d+\.?\d*)/);
-  if (gmapsFormat) {
-    const lat = parseFloat(gmapsFormat[1]);
-    const lng = parseFloat(gmapsFormat[2]);
-    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
-    return { lat, lng };
+  return null;
+}
+
+/** Extract GPS embedded as `[Coords: lat, lng]` or `GPS: lat, lng` (legacy DeliveryRequest.tsx format). */
+export function scavengeCoordinatesFromBlob(text: string): { coords: string; label: string } | null {
+  if (!text || typeof text !== 'string') return null;
+  let t = text.trim();
+  const bracket = t.match(/\[\s*Coords:\s*(-?\d+\.?\d*)\s*,\s*(-?\d+\.?\d*)\s*\]/i);
+  if (bracket) {
+    const lat = parseFloat(bracket[1]);
+    const lng = parseFloat(bracket[2]);
+    if (Number.isFinite(lat) && Number.isFinite(lng)) {
+      const label = t
+        .replace(bracket[0], ' ')
+        .replace(/\s*\|\s*/g, ' ')
+        .replace(/\s{2,}/g, ' ')
+        .trim();
+      return { coords: `${lat}, ${lng}`, label };
+    }
+  }
+  const gps = t.match(/GPS:\s*(-?\d+\.?\d*)\s*,\s*(-?\d+\.?\d*)/i);
+  if (gps) {
+    const lat = parseFloat(gps[1]);
+    const lng = parseFloat(gps[2]);
+    if (Number.isFinite(lat) && Number.isFinite(lng)) {
+      const label = t
+        .replace(gps[0], ' ')
+        .replace(/\s*\|\s*/g, ' ')
+        .replace(/\s{2,}/g, ' ')
+        .trim();
+      return { coords: `${lat}, ${lng}`, label };
+    }
   }
   return null;
 }
@@ -64,18 +110,33 @@ export function parseLatLngFromString(input: string): { lat: number; lng: number
  * then the builder/PO text (project name, street, etc.).
  */
 export function buildProviderDeliveryLocationLine(row: DeliveryLocationRow): string {
-  let addrRaw = (row.delivery_address ?? row.delivery_location ?? '').trim();
+  const rawFull = (row.delivery_address ?? row.delivery_location ?? '').trim();
   const coordText = (row.delivery_coordinates ?? '').trim();
   const latN = normalizeCoordField(row.delivery_latitude);
   const lngN = normalizeCoordField(row.delivery_longitude);
-  const fromLatLng = latN != null && lngN != null ? `${latN}, ${lngN}` : '';
-  let primaryCoord = coordText || fromLatLng;
 
+  let addrRaw = rawFull;
+  let primaryCoord = '';
+
+  if (latN != null && lngN != null) {
+    primaryCoord = `${latN}, ${lngN}`;
+  }
+  if (!primaryCoord && coordText) {
+    const p = parseLatLngFromString(coordText);
+    primaryCoord = p ? `${p.lat}, ${p.lng}` : coordText;
+  }
   if (!primaryCoord && addrRaw) {
     const split = splitLeadingLatLngPrefix(addrRaw);
     if (split) {
       primaryCoord = split.coords;
       addrRaw = split.remainder;
+    }
+  }
+  if (!primaryCoord && addrRaw) {
+    const scav = scavengeCoordinatesFromBlob(addrRaw);
+    if (scav) {
+      primaryCoord = scav.coords;
+      addrRaw = scav.label;
     }
   }
 

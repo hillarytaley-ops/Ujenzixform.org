@@ -548,6 +548,14 @@ export const DeliveryPromptDialog: React.FC<DeliveryPromptDialogProps> = ({
           deliveryPayload.delivery_latitude = parsed.lat;
           deliveryPayload.delivery_longitude = parsed.lng;
         }
+      } else {
+        // GPS may only appear inside the combined delivery_address line (e.g. "lat, lng | project …").
+        const fromLine = parseLatLngFromString(fullDeliveryAddress.trim());
+        if (fromLine) {
+          deliveryPayload.delivery_coordinates = `${fromLine.lat}, ${fromLine.lng}`;
+          deliveryPayload.delivery_latitude = fromLine.lat;
+          deliveryPayload.delivery_longitude = fromLine.lng;
+        }
       }
       if (deliveryData.preferredTime && deliveryData.preferredTime !== 'anytime') {
         deliveryPayload.preferred_time = deliveryData.preferredTime;
