@@ -93,6 +93,8 @@ interface DeliveryPromptDialogProps {
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
   purchaseOrder: PurchaseOrder | null;
+  /** When set, opens on the form to PATCH this row (drop-off / GPS) without creating a new request. */
+  editDeliveryRequestId?: string | null;
   onDeliveryRequested?: (opts?: { deliveryAddress?: string }) => void;
   onDeclined?: () => void;
 }
@@ -130,10 +132,12 @@ export const DeliveryPromptDialog: React.FC<DeliveryPromptDialogProps> = ({
   isOpen,
   onOpenChange,
   purchaseOrder,
+  editDeliveryRequestId = null,
   onDeliveryRequested,
   onDeclined
 }) => {
   const [step, setStep] = useState<'prompt' | 'form' | 'success'>('prompt');
+  const [successWasEdit, setSuccessWasEdit] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [showMonitoringPrompt, setShowMonitoringPrompt] = useState(false);
   const [gettingLocation, setGettingLocation] = useState(false);
@@ -238,9 +242,9 @@ export const DeliveryPromptDialog: React.FC<DeliveryPromptDialogProps> = ({
     }
   };
 
-  // Pre-fill form with purchase order data
+  // Pre-fill form with purchase order data (skip while loading an existing delivery_request for edit)
   useEffect(() => {
-    if (purchaseOrder) {
+    if (purchaseOrder && !editDeliveryRequestId) {
       const fromItems = buildDeliveryInstructionsFromPoItems(purchaseOrder.items);
       const poIdChanged = lastPrefilledPurchaseOrderId.current !== purchaseOrder.id;
       if (poIdChanged) {
@@ -267,12 +271,111 @@ export const DeliveryPromptDialog: React.FC<DeliveryPromptDialogProps> = ({
         return next;
       });
     }
-  }, [purchaseOrder]);
+  }, [purchaseOrder, editDeliveryRequestId]);
+
+  // Load existing delivery request when editing drop-off
+  useEffect(() => {
+    if (!isOpen || !editDeliveryRequestId || !purchaseOrder) return;
+    setStep('form');
+    let cancelled = false;
+    (async () => {
+      try {
+        const { accessToken } = await readAuthSessionForRest();
+        if (!accessToken) {
+          toast({
+            title: 'Sign in required',
+            description: 'Please sign in again to edit this delivery.',
+            variant: 'destructive',
+          });
+          onOpenChange(false);
+          return;
+        }
+        const res = await fetchWithTimeout(
+          `${SUPABASE_URL}/rest/v1/delivery_requests?id=eq.${editDeliveryRequestId}&select=*`,
+          {
+            method: 'GET',
+            headers: {
+              apikey: SUPABASE_ANON_KEY,
+              Authorization: `Bearer ${accessToken}`,
+              'Content-Type': 'application/json',
+            },
+          },
+          8000
+        );
+        if (!res.ok || cancelled) return;
+        const rows = await res.json();
+        const dr = Array.isArray(rows) ? rows[0] : null;
+        if (!dr || cancelled) return;
+        if (String(dr.purchase_order_id || '') !== String(purchaseOrder.id)) {
+          toast({
+            title: 'Could not open editor',
+            description: 'This delivery request does not belong to the selected order.',
+            variant: 'destructive',
+          });
+          onOpenChange(false);
+          return;
+        }
+        const coordsFromCols =
+          (dr.delivery_coordinates && String(dr.delivery_coordinates).trim()) ||
+          (dr.delivery_latitude != null &&
+          dr.delivery_longitude != null &&
+          !Number.isNaN(Number(dr.delivery_latitude)) &&
+          !Number.isNaN(Number(dr.delivery_longitude))
+            ? `${Number(dr.delivery_latitude)}, ${Number(dr.delivery_longitude)}`
+            : '');
+        const savedAddr = (dr.delivery_address || '').trim();
+        let deliveryAddress = savedAddr;
+        let deliveryCoordinates = coordsFromCols;
+        const pipeIdx = savedAddr.indexOf('|');
+        if (pipeIdx > 0) {
+          const head = savedAddr.slice(0, pipeIdx).trim();
+          const tail = savedAddr.slice(pipeIdx + 1).trim();
+          if (parseLatLngFromString(head)) {
+            deliveryCoordinates = deliveryCoordinates || head;
+            deliveryAddress = tail;
+          }
+        } else if (!deliveryCoordinates && parseLatLngFromString(savedAddr)) {
+          const ll = parseLatLngFromString(savedAddr);
+          if (ll) {
+            deliveryCoordinates = `${ll.lat}, ${ll.lng}`;
+            deliveryAddress = '';
+          }
+        }
+        const pickupRaw = dr.pickup_date != null ? String(dr.pickup_date) : '';
+        const preferredDate =
+          pickupRaw.length >= 10 ? pickupRaw.slice(0, 10) : purchaseOrder.delivery_date || '';
+        const pt = dr.preferred_time != null ? String(dr.preferred_time).trim().toLowerCase() : '';
+        const preferredTime =
+          pt === 'morning' || pt === 'afternoon' || pt === 'anytime' ? pt : 'anytime';
+        const specFromDr = (dr.special_instructions || '').trim();
+        setDeliveryData({
+          deliveryAddress,
+          deliveryCoordinates,
+          preferredDate,
+          preferredTime,
+          specialInstructions:
+            specFromDr || buildDeliveryInstructionsFromPoItems(purchaseOrder.items),
+        });
+        setStep('form');
+      } catch (e: any) {
+        console.error('Edit delivery load failed:', e);
+        toast({
+          title: 'Could not load delivery',
+          description: e?.message || 'Please try again.',
+          variant: 'destructive',
+        });
+        onOpenChange(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen, editDeliveryRequestId, purchaseOrder?.id]);
 
   // Fresh open / different order → start at the choice step (survives refresh by reopening from dashboard)
   useEffect(() => {
-    if (isOpen) setStep('prompt');
-  }, [isOpen, purchaseOrder?.id]);
+    if (isOpen && !editDeliveryRequestId) setStep('prompt');
+  }, [isOpen, purchaseOrder?.id, editDeliveryRequestId]);
 
   const detectMaterialType = (materialName: string): string => {
     const name = materialName.toLowerCase();
@@ -432,7 +535,7 @@ export const DeliveryPromptDialog: React.FC<DeliveryPromptDialogProps> = ({
       Boolean(deliveryData.deliveryCoordinates.trim()) ||
       Boolean(parseLatLngFromString(headOfAddr)) ||
       Boolean(parseLatLngFromString(addrTrim));
-    if (unchangedFromPo && !hasGpsFromFields) {
+    if (!editDeliveryRequestId && unchangedFromPo && !hasGpsFromFields) {
       toast({
         title: 'Map pin or GPS required',
         description:
@@ -584,6 +687,108 @@ export const DeliveryPromptDialog: React.FC<DeliveryPromptDialogProps> = ({
       }
       if (deliveryData.preferredTime && deliveryData.preferredTime !== 'anytime') {
         deliveryPayload.preferred_time = deliveryData.preferredTime;
+      }
+
+      // Explicit edit: PATCH only (do not reset status, duplicate cleanup, or mark_delivery_requested)
+      if (editDeliveryRequestId) {
+        const editPatch: Record<string, unknown> = {
+          pickup_address: deliveryPayload.pickup_address,
+          delivery_address: deliveryPayload.delivery_address,
+          pickup_date: deliveryPayload.pickup_date,
+          special_instructions: deliveryPayload.special_instructions,
+          updated_at: new Date().toISOString(),
+        };
+        if (deliveryPayload.delivery_coordinates) {
+          editPatch.delivery_coordinates = deliveryPayload.delivery_coordinates;
+          editPatch.delivery_latitude = deliveryPayload.delivery_latitude;
+          editPatch.delivery_longitude = deliveryPayload.delivery_longitude;
+        } else {
+          const fromAddr = parseLatLngFromString(String(deliveryPayload.delivery_address || ''));
+          if (fromAddr) {
+            editPatch.delivery_coordinates = `${fromAddr.lat}, ${fromAddr.lng}`;
+            editPatch.delivery_latitude = fromAddr.lat;
+            editPatch.delivery_longitude = fromAddr.lng;
+          }
+        }
+        if (deliveryData.preferredTime && deliveryData.preferredTime !== 'anytime') {
+          editPatch.preferred_time = deliveryData.preferredTime;
+        } else {
+          editPatch.preferred_time = null;
+        }
+
+        const patchResponse = await fetchWithTimeout(
+          `${SUPABASE_URL}/rest/v1/delivery_requests?id=eq.${editDeliveryRequestId}`,
+          {
+            method: 'PATCH',
+            headers: {
+              apikey: SUPABASE_ANON_KEY,
+              Authorization: `Bearer ${accessToken}`,
+              'Content-Type': 'application/json',
+              Prefer: 'return=minimal',
+            },
+            body: JSON.stringify(editPatch),
+          },
+          10000
+        );
+
+        if (!patchResponse.ok) {
+          const errText = await patchResponse.text().catch(() => '');
+          throw new Error(errText || `Could not save changes (${patchResponse.status})`);
+        }
+
+        const addr = deliveryPayload.delivery_address;
+        const isNewPlaceholder =
+          addr &&
+          (addr.toLowerCase().trim() === 'to be provided' ||
+            addr.toLowerCase().trim() === 'tbd' ||
+            addr.toLowerCase().trim() === 'n/a');
+
+        if (addr && !isNewPlaceholder && addr.length > 10) {
+          try {
+            const existingPOAddress = purchaseOrder.delivery_address;
+            const isExistingPOPlaceholder =
+              existingPOAddress &&
+              (existingPOAddress.toLowerCase().trim() === 'to be provided' ||
+                existingPOAddress.toLowerCase().trim() === 'tbd' ||
+                existingPOAddress.toLowerCase().trim() === 'n/a');
+            if (!isExistingPOPlaceholder || !existingPOAddress || existingPOAddress.length <= 10) {
+              await fetchWithTimeout(
+                `${SUPABASE_URL}/rest/v1/purchase_orders?id=eq.${purchaseOrder.id}`,
+                {
+                  method: 'PATCH',
+                  headers: {
+                    apikey: SUPABASE_ANON_KEY,
+                    Authorization: `Bearer ${accessToken}`,
+                    'Content-Type': 'application/json',
+                    Prefer: 'return=minimal',
+                  },
+                  body: JSON.stringify({
+                    delivery_address: addr,
+                    updated_at: new Date().toISOString(),
+                  }),
+                },
+                5000
+              );
+            }
+          } catch {
+            /* non-critical */
+          }
+        }
+
+        setSuccessWasEdit(true);
+        setStep('success');
+        setSubmitting(false);
+        toast({
+          title: 'Drop-off updated',
+          description: 'Your delivery address and map details were saved on this request.',
+        });
+        setTimeout(() => {
+          onDeliveryRequested?.({ deliveryAddress: fullDeliveryAddress });
+          onOpenChange(false);
+          setStep('prompt');
+          setSuccessWasEdit(false);
+        }, 1400);
+        return;
       }
 
       console.log('📦 Creating delivery request with payload:', deliveryPayload);
@@ -1282,9 +1487,10 @@ export const DeliveryPromptDialog: React.FC<DeliveryPromptDialogProps> = ({
       }
 
       // Show success immediately - don't wait for notifications
+      setSuccessWasEdit(false);
       setStep('success');
       setSubmitting(false);
-      
+
       toast({
         title: '🚚 Delivery request submitted',
         description:
@@ -1424,7 +1630,10 @@ export const DeliveryPromptDialog: React.FC<DeliveryPromptDialogProps> = ({
   return (
     <>
     <Dialog open={isOpen} onOpenChange={(open) => {
-      if (!open) setStep('prompt');
+      if (!open) {
+        setStep('prompt');
+        setSuccessWasEdit(false);
+      }
       onOpenChange(open);
     }}>
       <DialogContent className="max-w-lg">
@@ -1507,9 +1716,11 @@ export const DeliveryPromptDialog: React.FC<DeliveryPromptDialogProps> = ({
             <DialogHeader className="pb-2">
               <DialogTitle className="flex items-center gap-2 text-base">
                 <MapPinned className="h-4 w-4 text-blue-600" />
-                Delivery Location
+                {editDeliveryRequestId ? 'Edit drop-off' : 'Delivery Location'}
               </DialogTitle>
-              <DialogDescription className="sr-only">Enter delivery address and preferences</DialogDescription>
+              <DialogDescription className="sr-only">
+                {editDeliveryRequestId ? 'Update delivery address and GPS' : 'Enter delivery address and preferences'}
+              </DialogDescription>
             </DialogHeader>
 
             {/* Products bought by builder - MUST show what client ordered */}
@@ -1726,8 +1937,17 @@ export const DeliveryPromptDialog: React.FC<DeliveryPromptDialogProps> = ({
             </div>
 
             <DialogFooter className="flex gap-2 pt-2">
-              <Button variant="outline" onClick={() => setStep('prompt')} disabled={submitting} size="sm" className="h-8">
-                Back
+              <Button
+                variant="outline"
+                onClick={() => {
+                  if (editDeliveryRequestId) onOpenChange(false);
+                  else setStep('prompt');
+                }}
+                disabled={submitting}
+                size="sm"
+                className="h-8"
+              >
+                {editDeliveryRequestId ? 'Cancel' : 'Back'}
               </Button>
               <Button
                 onClick={handleRequestDelivery}
@@ -1742,7 +1962,19 @@ export const DeliveryPromptDialog: React.FC<DeliveryPromptDialogProps> = ({
                     : undefined
                 }
               >
-                {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Truck className="h-4 w-4 mr-1" />Send Request</>}
+                {submitting ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : editDeliveryRequestId ? (
+                  <>
+                    <CheckCircle className="h-4 w-4 mr-1" />
+                    Save changes
+                  </>
+                ) : (
+                  <>
+                    <Truck className="h-4 w-4 mr-1" />
+                    Send Request
+                  </>
+                )}
               </Button>
             </DialogFooter>
           </>
@@ -1750,20 +1982,26 @@ export const DeliveryPromptDialog: React.FC<DeliveryPromptDialogProps> = ({
 
         {step === 'success' && (
           <>
-            <DialogDescription className="sr-only">Delivery request submitted successfully</DialogDescription>
+            <DialogDescription className="sr-only">
+              {successWasEdit ? 'Drop-off updated' : 'Delivery request submitted successfully'}
+            </DialogDescription>
           <div className="py-8 text-center">
             <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
               <CheckCircle className="h-8 w-8 text-green-600" />
             </div>
             <h3 className="text-xl font-semibold text-green-800 mb-2">
-              Delivery Request Sent!
+              {successWasEdit ? 'Drop-off saved' : 'Delivery Request Sent!'}
             </h3>
             <p className="text-gray-600 mb-4">
-              Nearby delivery providers have been notified. You'll receive updates when a provider accepts.
+              {successWasEdit
+                ? 'Drivers and admins will see your updated address and coordinates on this delivery request.'
+                : "Nearby delivery providers have been notified. You'll receive updates when a provider accepts."}
             </p>
-            <Badge className="bg-blue-100 text-blue-700 border-blue-300">
-              First-come-first-served matching active
-            </Badge>
+            {!successWasEdit ? (
+              <Badge className="bg-blue-100 text-blue-700 border-blue-300">
+                First-come-first-served matching active
+              </Badge>
+            ) : null}
           </div>
           </>
         )}

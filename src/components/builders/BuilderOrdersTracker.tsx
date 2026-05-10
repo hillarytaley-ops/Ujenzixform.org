@@ -45,6 +45,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { DeliveryPromptDialog } from './DeliveryPromptDialog';
 import {
   builderFulfillmentOrderChoice,
+  findEditableDeliveryRequestId,
   hasActiveDeliveryRequestForOrder,
   purchaseOrderRequiresDeliveryProvider,
 } from '@/utils/purchaseOrderFulfillment';
@@ -329,10 +330,17 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({
   const [showQRDialog, setShowQRDialog] = useState(false);
   const [activeFilter, setActiveFilter] = useState<OrderFilter>('pending'); // Default to pending orders
   const [deliveryRequestsList, setDeliveryRequestsList] = useState<
-    { id: string; purchase_order_id?: string; status?: string | null }[]
+    {
+      id: string;
+      purchase_order_id?: string;
+      status?: string | null;
+      updated_at?: string | null;
+      created_at?: string | null;
+    }[]
   >([]);
   const [showDeliveryPrompt, setShowDeliveryPrompt] = useState(false);
   const [selectedOrderForDelivery, setSelectedOrderForDelivery] = useState<PurchaseOrder | null>(null);
+  const [editDeliveryRequestId, setEditDeliveryRequestId] = useState<string | null>(null);
   /** purchase_order_id → invoice.id for unpaid supplier invoices (builder pays on Invoices tab). */
   const [payInvoiceByPoId, setPayInvoiceByPoId] = useState<Record<string, string>>({});
   const { toast } = useToast();
@@ -486,7 +494,7 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({
         const drTimeoutId = setTimeout(() => drController.abort(), 5000);
 
         const drResponse = await fetch(
-          `${SUPABASE_URL}/rest/v1/delivery_requests?purchase_order_id=in.(${orderIdsParam})&select=id,purchase_order_id,provider_id,status,accepted_at,updated_at,created_at`,
+          `${SUPABASE_URL}/rest/v1/delivery_requests?purchase_order_id=in.(${orderIdsParam})&select=id,purchase_order_id,provider_id,status,accepted_at,updated_at,created_at,delivery_address,delivery_coordinates,delivery_latitude,delivery_longitude,special_instructions,pickup_date,preferred_time,pickup_address`,
           { headers, signal: drController.signal, cache: 'no-store' }
         );
         clearTimeout(drTimeoutId);
@@ -499,6 +507,8 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({
               id: dr.id,
               purchase_order_id: dr.purchase_order_id,
               status: dr.status,
+              updated_at: dr.updated_at,
+              created_at: dr.created_at,
             }))
           );
 
@@ -1587,11 +1597,34 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({
               onClick={(e) => {
                 e.stopPropagation();
                 setSelectedOrderForDelivery(order);
+                setEditDeliveryRequestId(null);
                 setShowDeliveryPrompt(true);
               }}
             >
               <Truck className="h-3.5 w-3.5 sm:mr-1" />
               <span className="hidden sm:inline text-xs font-semibold">Re-request</span>
+            </Button>
+          ) : null}
+          {purchaseOrderRequiresDeliveryProvider(order) &&
+          builderFulfillmentOrderChoice(order) !== 'pickup' &&
+          findEditableDeliveryRequestId(order.id, deliveryRequestsList) ? (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              title="Update delivery address or GPS on your open request"
+              className="h-8 shrink-0 border-blue-300 bg-blue-50 px-2 text-blue-900 hover:bg-blue-100"
+              onClick={(e) => {
+                e.stopPropagation();
+                const drId = findEditableDeliveryRequestId(order.id, deliveryRequestsList);
+                if (!drId) return;
+                setSelectedOrderForDelivery(order);
+                setEditDeliveryRequestId(drId);
+                setShowDeliveryPrompt(true);
+              }}
+            >
+              <Edit className="h-3.5 w-3.5 sm:mr-1" />
+              <span className="hidden sm:inline text-xs font-semibold">Edit drop-off</span>
             </Button>
           ) : null}
           {showSupplierPayLinks && payInvoiceByPoId[order.id] ? (
@@ -1738,6 +1771,7 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({
               const statusOk = BUILDER_DELIVERY_DIALOG_STATUSES.has(order.status);
               const openDialog = () => {
                 setSelectedOrderForDelivery(order);
+                setEditDeliveryRequestId(null);
                 setShowDeliveryPrompt(true);
               };
 
@@ -1764,11 +1798,38 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({
               }
 
               if (needsProvider && !hasProvider && activeDr) {
+                const editableDrId = findEditableDeliveryRequestId(order.id, deliveryRequestsList);
                 return (
                   <Alert className="border-blue-200 bg-blue-50">
                     <Clock className="h-4 w-4 text-blue-700" />
-                    <AlertDescription className="text-sm text-blue-900">
-                      <strong>Waiting for a delivery provider.</strong> Your request is in the provider queue. Providers are not notified again until you submit a new request from this order.
+                    <AlertDescription className="space-y-2 text-sm text-blue-900">
+                      <p>
+                        <strong>Waiting for a delivery provider.</strong> Your request is in the provider queue. Providers are not notified again until you submit a new request from this order.
+                      </p>
+                      {editableDrId ? (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="h-auto w-full max-w-full whitespace-normal border-blue-300 bg-white px-3 py-2 text-left text-blue-900 hover:bg-blue-100 sm:w-auto"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedOrderForDelivery(order);
+                            setEditDeliveryRequestId(editableDrId);
+                            setShowDeliveryPrompt(true);
+                          }}
+                        >
+                          <span className="flex items-start gap-2">
+                            <Edit className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+                            <span className="flex min-w-0 flex-col gap-0.5">
+                              <span className="font-semibold">Edit drop-off / GPS</span>
+                              <span className="text-xs font-normal opacity-90">
+                                Update the address saved on your delivery request so drivers see the correct pin.
+                              </span>
+                            </span>
+                          </span>
+                        </Button>
+                      ) : null}
                     </AlertDescription>
                   </Alert>
                 );
@@ -2191,6 +2252,7 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({
                         className="h-auto w-full max-w-full whitespace-normal border-0 bg-orange-800 px-3 py-2 text-left hover:bg-orange-900 text-white"
                         onClick={() => {
                           setSelectedOrderForDelivery(firstRerequestOrder);
+                          setEditDeliveryRequestId(null);
                           setShowDeliveryPrompt(true);
                         }}
                       >
@@ -2440,9 +2502,13 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({
 
       <DeliveryPromptDialog
         isOpen={showDeliveryPrompt}
+        editDeliveryRequestId={editDeliveryRequestId}
         onOpenChange={(open) => {
           setShowDeliveryPrompt(open);
-          if (!open) setSelectedOrderForDelivery(null);
+          if (!open) {
+            setSelectedOrderForDelivery(null);
+            setEditDeliveryRequestId(null);
+          }
         }}
         purchaseOrder={
           selectedOrderForDelivery
@@ -2452,6 +2518,7 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({
         onDeliveryRequested={() => {
           setShowDeliveryPrompt(false);
           setSelectedOrderForDelivery(null);
+          setEditDeliveryRequestId(null);
           void fetchOrders();
         }}
         onDeclined={() => {

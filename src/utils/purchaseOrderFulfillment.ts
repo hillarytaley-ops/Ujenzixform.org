@@ -36,6 +36,45 @@ export function hasActiveDeliveryRequestForOrder(
   );
 }
 
+/** Builder may PATCH drop-off details while the job is not yet in active transit. */
+export const BUILDER_EDITABLE_DELIVERY_REQUEST_STATUSES = new Set([
+  "pending",
+  "requested",
+  "quoted",
+  "quote_accepted",
+  "delivery_quote_paid",
+  "assigned",
+  "accepted",
+  "scheduled",
+  "confirmed",
+  "active",
+]);
+
+export function findEditableDeliveryRequestId(
+  orderId: string,
+  rows: {
+    id: string;
+    purchase_order_id?: string;
+    status?: string | null;
+    updated_at?: string | null;
+    created_at?: string | null;
+  }[]
+): string | null {
+  const eligible = rows.filter(
+    (r) =>
+      r.purchase_order_id === orderId &&
+      r.status &&
+      BUILDER_EDITABLE_DELIVERY_REQUEST_STATUSES.has(String(r.status).toLowerCase())
+  );
+  if (eligible.length === 0) return null;
+  eligible.sort((a, b) => {
+    const ta = new Date(a.updated_at || a.created_at || 0).getTime();
+    const tb = new Date(b.updated_at || b.created_at || 0).getTime();
+    return tb - ta;
+  });
+  return eligible[0].id;
+}
+
 /** Resolve choice when column missing on older rows */
 export function builderFulfillmentOrderChoice(po: {
   builder_fulfillment_choice?: string | null;
