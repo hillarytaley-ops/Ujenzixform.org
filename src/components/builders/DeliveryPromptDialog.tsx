@@ -1601,10 +1601,12 @@ export const DeliveryPromptDialog: React.FC<DeliveryPromptDialogProps> = ({
                           : undefined
                       }
                       onLocationSelect={(location) => {
+                        const mapAddr = (location.address || '').trim();
                         setDeliveryData(prev => ({
                           ...prev,
                           deliveryCoordinates: `${location.latitude}, ${location.longitude}`,
-                          deliveryAddress: prev.deliveryAddress || location.address
+                          // Prefer reverse-geocoded / map label over PO prefilled project text — prefill is often a site name, not the pin.
+                          deliveryAddress: mapAddr || prev.deliveryAddress
                         }));
                         setShowDeliveryMap(false);
                         toast({

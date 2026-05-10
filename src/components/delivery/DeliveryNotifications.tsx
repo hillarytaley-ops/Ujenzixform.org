@@ -844,8 +844,14 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
             );
             
             if (poAddress && !isPOPlaceholder && poAddress.length >= 3) {
-              deliveryAddr = poAddress;
-              console.log(`✅ FALLBACK SUCCESS: Using purchase_order address: "${deliveryAddr.substring(0, 50)}..."`);
+              // Keep GPS from delivery_requests when present; PO line is often project/site, not the map pin.
+              deliveryAddr = buildProviderDeliveryLocationLine({
+                delivery_address: poAddress,
+                delivery_coordinates: dr.delivery_coordinates,
+                delivery_latitude: dr.delivery_latitude,
+                delivery_longitude: dr.delivery_longitude,
+              }).trim();
+              console.log(`✅ FALLBACK SUCCESS: Merged PO address with delivery_request GPS: "${deliveryAddr.substring(0, 50)}..."`);
             } else {
               // Purchase order also has placeholder or invalid address
               deliveryAddr = 'Delivery address missing - contact builder';
@@ -881,8 +887,13 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
             if (poAddress && poAddress.length >= 3) {
               const isPOPlaceholder = ['to be provided', 'tbd', 'n/a', 'na', 'tba', 'to be determined', 'delivery location', 'address not found'].includes(poAddress.toLowerCase().trim());
               if (!isPOPlaceholder) {
-                deliveryAddr = poAddress;
-                console.log(`✅ FALLBACK SUCCESS (empty): Using purchase_order address (private builder logic): "${deliveryAddr.substring(0, 50)}..."`);
+                deliveryAddr = buildProviderDeliveryLocationLine({
+                  delivery_address: poAddress,
+                  delivery_coordinates: dr.delivery_coordinates,
+                  delivery_latitude: dr.delivery_latitude,
+                  delivery_longitude: dr.delivery_longitude,
+                }).trim();
+                console.log(`✅ FALLBACK SUCCESS (empty): Merged PO address with delivery_request GPS: "${deliveryAddr.substring(0, 50)}..."`);
               }
             }
           }
