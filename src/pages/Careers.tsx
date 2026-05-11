@@ -213,6 +213,15 @@ const Careers = () => {
       setPositions((data ?? []) as JobPosition[]);
     } catch (error) {
       console.error('Error loading positions:', error);
+      const message =
+        error && typeof error === 'object' && 'message' in error
+          ? String((error as { message: unknown }).message)
+          : 'Could not load job listings.';
+      toast({
+        variant: 'destructive',
+        title: 'Careers listings unavailable',
+        description: `${message} You can still use the general application below or email ${CAREERS_EMAIL}.`,
+      });
       setPositions([]);
     } finally {
       setLoading(false);

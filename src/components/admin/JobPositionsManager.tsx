@@ -249,7 +249,7 @@ export const JobPositionsManager: React.FC = () => {
             benefits: editingPosition.benefits,
             responsibilities: editingPosition.responsibilities,
             icon_name: editingPosition.icon_name,
-            is_active: editingPosition.is_active,
+            is_active: editingPosition.is_active ?? true,
             is_featured: editingPosition.is_featured,
             positions_available: editingPosition.positions_available
           } as any)
@@ -273,7 +273,7 @@ export const JobPositionsManager: React.FC = () => {
             benefits: editingPosition.benefits || [],
             responsibilities: editingPosition.responsibilities || [],
             icon_name: editingPosition.icon_name,
-            is_active: editingPosition.is_active,
+            is_active: editingPosition.is_active ?? true,
             is_featured: editingPosition.is_featured,
             positions_available: editingPosition.positions_available
           } as any);
