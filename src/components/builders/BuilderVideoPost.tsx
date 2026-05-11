@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
@@ -40,6 +40,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover';
+import { loadRecentCommentEmojis, pushRecentCommentEmoji } from '@/utils/commentEmojiRecent';
 
 async function copyTextToClipboard(text: string): Promise<boolean> {
   try {
@@ -155,6 +156,8 @@ export const BuilderVideoPost: React.FC<BuilderVideoPostProps> = ({
   /** Legacy binary-like feed only: cosmetic emoji when parent does not pass onReact / userReaction. */
   const [binaryReactionEmoji, setBinaryReactionEmoji] = useState<string | null>(null);
   const [emojiPopoverOpen, setEmojiPopoverOpen] = useState(false);
+  /** Persisted in localStorage so “recent” picks survive reloads and new days. */
+  const [recentCommentEmojis, setRecentCommentEmojis] = useState<string[]>([]);
   const [replyingTo, setReplyingTo] = useState<{ id: string; name: string } | null>(null);
   const [likedComments, setLikedComments] = useState<Set<string>>(new Set());
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -215,6 +218,10 @@ export const BuilderVideoPost: React.FC<BuilderVideoPostProps> = ({
     };
   }, []);
 
+  useEffect(() => {
+    setRecentCommentEmojis(loadRecentCommentEmojis());
+  }, []);
+
   const displayLikes = reactionMode ? likes : likeCount;
   const displayLiked = reactionMode ? !!(userReaction && userReaction.length > 0) : liked;
   const pickedReactionEmoji = reactionMode
@@ -230,6 +237,24 @@ export const BuilderVideoPost: React.FC<BuilderVideoPostProps> = ({
     { emoji: '😢', name: 'Sad', color: 'text-yellow-500' },
     { emoji: '😡', name: 'Angry', color: 'text-orange-500' },
   ];
+
+  const commentPickerEmojis = useMemo(() => {
+    const seen = new Set<string>();
+    const out: string[] = [];
+    for (const e of recentCommentEmojis) {
+      if (!seen.has(e)) {
+        seen.add(e);
+        out.push(e);
+      }
+    }
+    for (const e of COMMENT_QUICK_EMOJIS) {
+      if (!seen.has(e)) {
+        seen.add(e);
+        out.push(e);
+      }
+    }
+    return out;
+  }, [recentCommentEmojis]);
 
   const initials = (builderCompany || builderName || 'U')
     .split(' ')
@@ -318,6 +343,7 @@ export const BuilderVideoPost: React.FC<BuilderVideoPostProps> = ({
 
   const insertCommentEmoji = (emoji: string) => {
     setCommentText((prev) => `${prev}${emoji}`);
+    setRecentCommentEmojis(pushRecentCommentEmoji(emoji));
     setEmojiPopoverOpen(false);
     setTimeout(() => commentInputRef.current?.focus(), 0);
   };
@@ -841,7 +867,13 @@ export const BuilderVideoPost: React.FC<BuilderVideoPostProps> = ({
                 className="pr-20 rounded-full bg-gray-100 dark:bg-gray-800 border-0 focus-visible:ring-1"
               />
               <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
-                <Popover open={emojiPopoverOpen} onOpenChange={setEmojiPopoverOpen}>
+                <Popover
+                  open={emojiPopoverOpen}
+                  onOpenChange={(open) => {
+                    setEmojiPopoverOpen(open);
+                    if (open) setRecentCommentEmojis(loadRecentCommentEmojis());
+                  }}
+                >
                   <PopoverTrigger asChild>
                     <Button
                       type="button"
@@ -856,7 +888,7 @@ export const BuilderVideoPost: React.FC<BuilderVideoPostProps> = ({
                   </PopoverTrigger>
                   <PopoverContent className="w-auto p-2" align="end" side="top">
                     <div className="grid grid-cols-6 gap-1 max-w-[220px]">
-                      {COMMENT_QUICK_EMOJIS.map((em) => (
+                      {commentPickerEmojis.map((em) => (
                         <button
                           key={em}
                           type="button"
