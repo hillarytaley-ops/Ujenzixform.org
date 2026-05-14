@@ -158,7 +158,7 @@ export const EtimsFiscalReceiptView: React.FC<EtimsFiscalReceiptViewProps> = ({
           <div className="min-w-[11rem] space-y-1 border border-slate-200 px-3 py-2 text-xs dark:border-slate-700">
             {receipt.taxBreakdown.subtotalOrTaxable ? (
               <div className="flex justify-between gap-4">
-                <span className="text-muted-foreground">Subtotal / Taxable</span>
+                <span className="text-muted-foreground">Subtotal (excl. VAT)</span>
                 <span className="font-mono">{receipt.taxBreakdown.subtotalOrTaxable}</span>
               </div>
             ) : null}

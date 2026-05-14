@@ -29,7 +29,7 @@ import { useToast } from '@/hooks/use-toast';
 import { sortSupplyChainDocsNewestFirst } from '@/utils/sortSupplyChainDocs';
 import { chunkArray } from '@/utils/performance';
 import { EtimsFiscalReceiptView } from '@/components/etims/EtimsFiscalReceiptView';
-import { pickEtimsTotalAmountKes } from '@/lib/etims/formatEtimsReceiptForUi';
+import { pickEtimsTotalAmountKes, resolveEtimsReceiptTaxBreakdown } from '@/lib/etims/formatEtimsReceiptForUi';
 import { PaystackCheckout, isPaystackTestModeBanner } from '@/components/payment/PaystackCheckout';
 import { Separator } from '@/components/ui/separator';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -1468,8 +1468,26 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
                         <p className="font-medium">KES {Number(invoice.subtotal).toLocaleString()}</p>
                       </div>
                       <div>
-                        <p className="text-gray-500">VAT / Tax</p>
-                        <p className="font-medium">KES {Number(invoice.tax_amount || 0).toLocaleString()}</p>
+                        <p className="text-gray-500">VAT / Tax (16%)</p>
+                        <p className="font-medium">
+                          KES{' '}
+                          {(() => {
+                            const stored = Number(invoice.tax_amount || 0);
+                            if (stored > 0) return stored.toLocaleString();
+                            const tb = resolveEtimsReceiptTaxBreakdown(poEtimsRow?.etims_response ?? null, {
+                              invoiceSubtotal: invoice.subtotal,
+                              invoiceTaxAmount: invoice.tax_amount,
+                              invoiceTotalAmount: invoice.total_amount,
+                              poTotalAmount: poEtimsRow?.total_amount ?? null,
+                            });
+                            const parsed = tb.taxAmount
+                              ? parseFloat(tb.taxAmount.replace(/,/g, ''))
+                              : 0;
+                            return Number.isFinite(parsed) && parsed > 0
+                              ? parsed.toLocaleString()
+                              : '0';
+                          })()}
+                        </p>
                       </div>
                       <div>
                         <p className="text-gray-500">Total Amount</p>

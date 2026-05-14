@@ -298,31 +298,73 @@ export function resolveEtimsReceiptTaxBreakdown(
   if (invTax != null && invTax > 0 && (tax == null || tax === 0)) tax = invTax;
   if (invTotal != null && invTotal > 0 && total == null) total = invTotal;
 
+  // Single figure used for both subtotal and total — no separate tax in DB/integrator
+  if (
+    total == null &&
+    taxable != null &&
+    taxable > 0 &&
+    invTotal != null &&
+    invTotal > 0 &&
+    Math.abs(invTotal - taxable) < 0.01
+  ) {
+    total = invTotal;
+  }
+  if (total == null && taxable != null && taxable > 0 && invSub == null && invTotal == null) {
+    total = taxable;
+  }
+
   // Tax-exclusive: subtotal + tax = total
-  if (taxable != null && tax != null && total == null) total = taxable + tax;
-  if (taxable != null && total != null && (tax == null || tax === 0) && total >= taxable) {
+  if (taxable != null && tax != null && tax > 0 && total == null) total = taxable + tax;
+  if (taxable != null && total != null && (tax == null || tax === 0) && total > taxable) {
     tax = Math.round((total - taxable) * 100) / 100;
   }
-  if (tax != null && total != null && taxable == null && total >= tax) {
+  if (tax != null && tax > 0 && total != null && taxable == null && total >= tax) {
     taxable = Math.round((total - tax) * 100) / 100;
   }
 
-  // VAT-inclusive total only — derive taxable + tax at 16%
-  if (total != null && total > 0 && (tax == null || tax === 0) && (taxable == null || taxable === 0)) {
-    const exVat = Math.round((total / (1 + DEFAULT_VAT_RATE)) * 100) / 100;
+  // VAT-inclusive: one amount (subtotal === total) or only grand total known — split at 16%
+  const vatInclusiveFigure =
+    total != null && total > 0 && (tax == null || tax === 0)
+      ? taxable != null && taxable > 0 && Math.abs(total - taxable) < 0.01
+        ? total
+        : taxable == null || taxable === 0
+          ? total
+          : null
+      : null;
+
+  if (vatInclusiveFigure != null && vatInclusiveFigure > 0) {
+    const exVat = Math.round((vatInclusiveFigure / (1 + DEFAULT_VAT_RATE)) * 100) / 100;
     taxable = exVat;
-    tax = Math.round((total - exVat) * 100) / 100;
+    tax = Math.round((vatInclusiveFigure - exVat) * 100) / 100;
+    total = vatInclusiveFigure;
+  }
+
+  // Tax-exclusive subtotal only — add 16% VAT
+  if (
+    taxable != null &&
+    taxable > 0 &&
+    (tax == null || tax === 0) &&
+    total == null &&
+    invSub != null &&
+    invSub > 0 &&
+    (invTotal == null || invTotal <= 0)
+  ) {
+    tax = Math.round(taxable * DEFAULT_VAT_RATE * 100) / 100;
+    total = Math.round((taxable + tax) * 100) / 100;
   }
 
   const subtotalOrTaxable =
     taxable != null && taxable > 0 ? formatMoneyNum(taxable) : invSub != null && invSub > 0 ? formatMoneyNum(invSub) : null;
 
+  const taxNum = tax != null && tax > 0 ? tax : invTax != null && invTax > 0 ? invTax : null;
+
   return {
     subtotalOrTaxable,
-    taxLabel: tax != null && taxable != null && taxable > 0
-      ? `${taxLabel}${Math.abs(tax / taxable - DEFAULT_VAT_RATE) < 0.02 ? ' (16%)' : ''}`
-      : taxLabel,
-    taxAmount: tax != null && tax > 0 ? formatMoneyNum(tax) : invTax != null && invTax > 0 ? formatMoneyNum(invTax) : null,
+    taxLabel:
+      taxNum != null && taxable != null && taxable > 0
+        ? `${taxLabel}${Math.abs(taxNum / taxable - DEFAULT_VAT_RATE) < 0.02 ? ' (16%)' : ''}`
+        : taxLabel,
+    taxAmount: taxNum != null ? formatMoneyNum(taxNum) : null,
     totalAmount: total != null && total > 0 ? formatMoneyNum(total) : null,
   };
 }
