@@ -189,13 +189,142 @@ function pickFromRoots(raw: unknown, keys: readonly string[]): string | null {
 }
 
 function formatMoneyLabel(raw: unknown, keys: readonly string[]): string | null {
+  const n = parseMoneyNum(raw, keys);
+  return n != null ? formatMoneyNum(n) : null;
+}
+
+function parseMoneyNum(raw: unknown, keys: readonly string[]): number | null {
   const s = pickFromRoots(raw, keys);
   if (!s) return null;
   const n = parseFloat(s.replace(/,/g, ''));
-  if (Number.isFinite(n)) {
-    return n.toLocaleString(undefined, { maximumFractionDigits: 2, minimumFractionDigits: 2 });
+  return Number.isFinite(n) ? n : null;
+}
+
+function formatMoneyNum(n: number): string {
+  return n.toLocaleString(undefined, { maximumFractionDigits: 2, minimumFractionDigits: 2 });
+}
+
+/** Sum per-line tax from integrator salesItems when header tax fields are absent. */
+function sumLineTaxFromSalesItems(raw: unknown): number | null {
+  const lines = extractEtimsSalesItems(raw);
+  if (!lines.length) return null;
+  let sum = 0;
+  let any = false;
+  for (const row of lines) {
+    for (const k of ['taxAmount', 'tax_amount', 'taxAmt', 'tax_amt', 'vatAmount', 'vat_amount'] as const) {
+      const v = row[k];
+      if (typeof v === 'number' && Number.isFinite(v)) {
+        sum += v;
+        any = true;
+        break;
+      }
+      if (v != null && typeof v !== 'object') {
+        const n = parseFloat(String(v).replace(/,/g, ''));
+        if (Number.isFinite(n)) {
+          sum += n;
+          any = true;
+          break;
+        }
+      }
+    }
   }
-  return s;
+  return any ? sum : null;
+}
+
+/** Kenya standard VAT rate for derived breakdown when integrator omits tax rows. */
+const DEFAULT_VAT_RATE = 0.16;
+
+export type EtimsReceiptTaxBreakdown = {
+  subtotalOrTaxable: string | null;
+  taxLabel: string;
+  taxAmount: string | null;
+  totalAmount: string | null;
+};
+
+export function resolveEtimsReceiptTaxBreakdown(
+  etimsResponse: unknown,
+  opts?: {
+    invoiceSubtotal?: number | null;
+    invoiceTaxAmount?: number | null;
+    invoiceTotalAmount?: number | null;
+    poTotalAmount?: number | null;
+  },
+): EtimsReceiptTaxBreakdown {
+  const taxLabel = 'VAT / Tax';
+
+  let taxable =
+    parseMoneyNum(etimsResponse, [
+      'taxableAmount',
+      'taxable_amount',
+      'taxblAmt',
+      'taxbl_amt',
+      'taxblAmtA',
+      'taxbl_amt_a',
+      'netAmount',
+      'net_amount',
+    ]) ?? null;
+
+  let tax =
+    parseMoneyNum(etimsResponse, [
+      'taxAmount',
+      'tax_amount',
+      'taxAmt',
+      'tax_amt',
+      'taxAmtA',
+      'tax_amt_a',
+      'vatAmount',
+      'vat_amount',
+      'totalTax',
+      'total_tax',
+    ]) ?? sumLineTaxFromSalesItems(etimsResponse);
+
+  let total =
+    parseMoneyNum(etimsResponse, ['totalAmount', 'total_amount', 'grandTotal', 'grand_total']) ??
+    (opts?.invoiceTotalAmount != null && Number.isFinite(opts.invoiceTotalAmount)
+      ? opts.invoiceTotalAmount
+      : null) ??
+    (opts?.poTotalAmount != null && Number.isFinite(opts.poTotalAmount) ? opts.poTotalAmount : null);
+
+  const invSub =
+    opts?.invoiceSubtotal != null && Number.isFinite(opts.invoiceSubtotal) ? opts.invoiceSubtotal : null;
+  const invTax =
+    opts?.invoiceTaxAmount != null && Number.isFinite(opts.invoiceTaxAmount) ? opts.invoiceTaxAmount : null;
+  const invTotal =
+    opts?.invoiceTotalAmount != null && Number.isFinite(opts.invoiceTotalAmount)
+      ? opts.invoiceTotalAmount
+      : null;
+
+  if (invSub != null && invSub > 0 && taxable == null) taxable = invSub;
+  if (invTax != null && invTax > 0 && (tax == null || tax === 0)) tax = invTax;
+  if (invTotal != null && invTotal > 0 && total == null) total = invTotal;
+
+  // Tax-exclusive: subtotal + tax = total
+  if (taxable != null && tax != null && total == null) total = taxable + tax;
+  if (taxable != null && total != null && (tax == null || tax === 0) && total >= taxable) {
+    tax = Math.round((total - taxable) * 100) / 100;
+  }
+  if (tax != null && total != null && taxable == null && total >= tax) {
+    taxable = Math.round((total - tax) * 100) / 100;
+  }
+
+  // VAT-inclusive total only — derive taxable + tax at 16%
+  if (total != null && total > 0 && (tax == null || tax === 0) && (taxable == null || taxable === 0)) {
+    const exVat = Math.round((total / (1 + DEFAULT_VAT_RATE)) * 100) / 100;
+    taxable = exVat;
+    tax = Math.round((total - exVat) * 100) / 100;
+  }
+
+  const subtotalOrTaxable =
+    taxable != null && taxable > 0 ? formatMoneyNum(taxable) : invSub != null && invSub > 0 ? formatMoneyNum(invSub) : null;
+
+  return {
+    subtotalOrTaxable,
+    taxLabel: tax != null && taxable != null && taxable > 0
+      ? `${taxLabel}${Math.abs(tax / taxable - DEFAULT_VAT_RATE) < 0.02 ? ' (16%)' : ''}`
+      : taxLabel,
+    taxAmount: tax != null && tax > 0 ? formatMoneyNum(tax) : invTax != null && invTax > 0 ? formatMoneyNum(invTax) : null,
+    totalAmount: total != null && total > 0 ? formatMoneyNum(total) : null,
+  };
 }
 
 export type EtimsReceiptLineDisplay = {
@@ -227,6 +356,7 @@ export type EtimsReceiptDisplay = {
   signature: string | null;
   lines: EtimsReceiptLineDisplay[];
   verificationUrl: string | null;
+  taxBreakdown: EtimsReceiptTaxBreakdown;
 };
 
 /** Structured receipt fields for fiscal-style UI. */
@@ -236,6 +366,10 @@ export function parseEtimsReceiptForDisplay(
     storedVerificationUrl?: string | null;
     traderInvoiceNoDb?: string | null;
     poNumber?: string | null;
+    invoiceSubtotal?: number | null;
+    invoiceTaxAmount?: number | null;
+    invoiceTotalAmount?: number | null;
+    poTotalAmount?: number | null;
   },
 ): EtimsReceiptDisplay {
   const salesLines = extractEtimsSalesItems(etimsResponse);
@@ -274,5 +408,11 @@ export function parseEtimsReceiptForDisplay(
     signature: pickFromRoots(etimsResponse, ['signature', 'receiptSignature', 'receipt_signature']),
     lines,
     verificationUrl: resolveEtimsVerificationUrl(opts?.storedVerificationUrl, etimsResponse),
+    taxBreakdown: resolveEtimsReceiptTaxBreakdown(etimsResponse, {
+      invoiceSubtotal: opts?.invoiceSubtotal,
+      invoiceTaxAmount: opts?.invoiceTaxAmount,
+      invoiceTotalAmount: opts?.invoiceTotalAmount,
+      poTotalAmount: opts?.poTotalAmount,
+    }),
   };
 }

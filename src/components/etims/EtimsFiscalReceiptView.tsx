@@ -25,6 +25,10 @@ export type EtimsFiscalReceiptViewProps = {
   traderInvoiceNoDb?: string | null;
   etimsSubmittedAt?: string | null;
   supplierName?: string | null;
+  invoiceSubtotal?: number | null;
+  invoiceTaxAmount?: number | null;
+  invoiceTotalAmount?: number | null;
+  poTotalAmount?: number | null;
   className?: string;
 };
 
@@ -35,6 +39,10 @@ export const EtimsFiscalReceiptView: React.FC<EtimsFiscalReceiptViewProps> = ({
   traderInvoiceNoDb,
   etimsSubmittedAt,
   supplierName,
+  invoiceSubtotal,
+  invoiceTaxAmount,
+  invoiceTotalAmount,
+  poTotalAmount,
   className,
 }) => {
   const receipt = useMemo(
@@ -43,8 +51,21 @@ export const EtimsFiscalReceiptView: React.FC<EtimsFiscalReceiptViewProps> = ({
         storedVerificationUrl: verificationUrl,
         traderInvoiceNoDb,
         poNumber,
+        invoiceSubtotal,
+        invoiceTaxAmount,
+        invoiceTotalAmount,
+        poTotalAmount,
       }),
-    [etimsResponse, verificationUrl, traderInvoiceNoDb, poNumber],
+    [
+      etimsResponse,
+      verificationUrl,
+      traderInvoiceNoDb,
+      poNumber,
+      invoiceSubtotal,
+      invoiceTaxAmount,
+      invoiceTotalAmount,
+      poTotalAmount,
+    ],
   );
 
   const hasPayload =
@@ -129,26 +150,28 @@ export const EtimsFiscalReceiptView: React.FC<EtimsFiscalReceiptViewProps> = ({
         </section>
       ) : null}
 
-      {/* Totals */}
-      {(receipt.taxableAmount || receipt.taxAmount || receipt.totalAmount) && (
+      {/* Totals — subtotal, VAT/tax deduction, grand total */}
+      {(receipt.taxBreakdown.subtotalOrTaxable ||
+        receipt.taxBreakdown.taxAmount ||
+        receipt.taxBreakdown.totalAmount) && (
         <section className="flex justify-end border-b border-slate-200 px-4 py-3 dark:border-slate-800">
-          <div className="min-w-[9rem] space-y-1 border border-slate-200 px-3 py-2 text-xs dark:border-slate-700">
-            {receipt.taxableAmount ? (
+          <div className="min-w-[11rem] space-y-1 border border-slate-200 px-3 py-2 text-xs dark:border-slate-700">
+            {receipt.taxBreakdown.subtotalOrTaxable ? (
               <div className="flex justify-between gap-4">
-                <span className="text-muted-foreground">Taxable</span>
-                <span className="font-mono">{receipt.taxableAmount}</span>
+                <span className="text-muted-foreground">Subtotal / Taxable</span>
+                <span className="font-mono">{receipt.taxBreakdown.subtotalOrTaxable}</span>
               </div>
             ) : null}
-            {receipt.taxAmount ? (
+            {receipt.taxBreakdown.taxAmount ? (
               <div className="flex justify-between gap-4">
-                <span className="text-muted-foreground">Tax</span>
-                <span className="font-mono">{receipt.taxAmount}</span>
+                <span className="text-muted-foreground">{receipt.taxBreakdown.taxLabel}</span>
+                <span className="font-mono">{receipt.taxBreakdown.taxAmount}</span>
               </div>
             ) : null}
-            {receipt.totalAmount ? (
+            {receipt.taxBreakdown.totalAmount ? (
               <div className="flex justify-between gap-4 border-t border-slate-200 pt-1 font-semibold dark:border-slate-700">
-                <span>Total</span>
-                <span className="font-mono">{receipt.totalAmount}</span>
+                <span>Total amount</span>
+                <span className="font-mono">{receipt.taxBreakdown.totalAmount}</span>
               </div>
             ) : null}
           </div>

@@ -134,6 +134,10 @@ function KraEtimsReceiptPanel({
   traderInvoiceNoDb,
   etimsSubmittedAt,
   supplierName,
+  invoiceSubtotal,
+  invoiceTaxAmount,
+  invoiceTotalAmount,
+  poTotalAmount,
 }: {
   poNumber: string;
   verificationUrl: string | null | undefined;
@@ -141,6 +145,10 @@ function KraEtimsReceiptPanel({
   traderInvoiceNoDb?: string | null;
   etimsSubmittedAt?: string | null;
   supplierName?: string | null;
+  invoiceSubtotal?: number | null;
+  invoiceTaxAmount?: number | null;
+  invoiceTotalAmount?: number | null;
+  poTotalAmount?: number | null;
 }) {
   return (
     <EtimsFiscalReceiptView
@@ -150,6 +158,10 @@ function KraEtimsReceiptPanel({
       traderInvoiceNoDb={traderInvoiceNoDb}
       etimsSubmittedAt={etimsSubmittedAt}
       supplierName={supplierName}
+      invoiceSubtotal={invoiceSubtotal}
+      invoiceTaxAmount={invoiceTaxAmount}
+      invoiceTotalAmount={invoiceTotalAmount}
+      poTotalAmount={poTotalAmount}
     />
   );
 }
@@ -1184,6 +1196,7 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
                           etimsResponse={po.etims_response}
                           traderInvoiceNoDb={po.etims_trader_invoice_no}
                           etimsSubmittedAt={po.etims_submitted_at}
+                          poTotalAmount={po.total_amount}
                         />
                       </CardContent>
                     </Card>
@@ -1230,6 +1243,7 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
                           etimsResponse={po.etims_response}
                           traderInvoiceNoDb={po.etims_trader_invoice_no}
                           etimsSubmittedAt={po.etims_submitted_at}
+                          poTotalAmount={po.total_amount}
                         />
                       </CardContent>
                     </Card>
@@ -1274,6 +1288,7 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
                           etimsResponse={po.etims_response}
                           traderInvoiceNoDb={po.etims_trader_invoice_no}
                           etimsSubmittedAt={po.etims_submitted_at}
+                          poTotalAmount={po.total_amount}
                         />
                       </CardContent>
                     </Card>
@@ -1344,6 +1359,7 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
                           etimsResponse={po.etims_response}
                           traderInvoiceNoDb={po.etims_trader_invoice_no}
                           etimsSubmittedAt={po.etims_submitted_at}
+                          poTotalAmount={po.total_amount}
                         />
                         <p className="text-xs text-muted-foreground">
                           {canPayStandalone ? (
@@ -1431,6 +1447,11 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
                         etimsResponse={poEtimsRow?.etims_response ?? null}
                         traderInvoiceNoDb={poEtimsRow?.etims_trader_invoice_no}
                         etimsSubmittedAt={poEtimsRow?.etims_submitted_at}
+                        supplierName={invoice.supplier?.company_name}
+                        invoiceSubtotal={invoice.subtotal}
+                        invoiceTaxAmount={invoice.tax_amount}
+                        invoiceTotalAmount={invoice.total_amount}
+                        poTotalAmount={poEtimsRow?.total_amount ?? null}
                       />
                     ) : null}
                     <div className="grid grid-cols-2 gap-4 text-sm">
@@ -1445,6 +1466,10 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
                       <div>
                         <p className="text-gray-500">Subtotal</p>
                         <p className="font-medium">KES {Number(invoice.subtotal).toLocaleString()}</p>
+                      </div>
+                      <div>
+                        <p className="text-gray-500">VAT / Tax</p>
+                        <p className="font-medium">KES {Number(invoice.tax_amount || 0).toLocaleString()}</p>
                       </div>
                       <div>
                         <p className="text-gray-500">Total Amount</p>
