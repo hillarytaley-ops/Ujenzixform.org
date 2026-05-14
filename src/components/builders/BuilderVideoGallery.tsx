@@ -1,7 +1,8 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { supabase, SUPABASE_URL, SUPABASE_ANON_KEY } from "@/integrations/supabase/client";
 import { readPersistedAuthRawStringSync } from "@/utils/supabaseAccessToken";
 import { getBuilderFeedGuestId } from "@/utils/builderFeedGuestId";
+import { getPublicVisitorDisplayName } from "@/utils/publicVisitorDisplayName";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -49,6 +50,274 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+
+const GALLERY_REACTIONS = ['👍', '❤️', '😂', '😮', '😢', '😡'] as const;
+
+type GalleryComment = {
+  id: string;
+  commenter_name: string;
+  comment_text: string;
+  created_at: string;
+};
+
+function GalleryVideoCardActions({
+  video,
+  isLiked,
+  browseOnly,
+  onToggleLike,
+  onShare,
+  onOpenPlayer,
+  onCommentPosted,
+}: {
+  video: BuilderVideo;
+  isLiked: boolean;
+  browseOnly?: boolean;
+  onToggleLike: (e?: React.MouseEvent) => void;
+  onShare: (e: React.MouseEvent) => void;
+  onOpenPlayer: (e: React.MouseEvent) => void;
+  onCommentPosted: () => void;
+}) {
+  const { toast } = useToast();
+  const reactionRootRef = useRef<HTMLDivElement>(null);
+  const [showReactions, setShowReactions] = useState(false);
+  const [pickedEmoji, setPickedEmoji] = useState<string | null>(null);
+  const [commentsOpen, setCommentsOpen] = useState(false);
+  const [comments, setComments] = useState<GalleryComment[]>([]);
+  const [loadingComments, setLoadingComments] = useState(false);
+  const [commentText, setCommentText] = useState('');
+  const [commenterName, setCommenterName] = useState(() => getPublicVisitorDisplayName() || '');
+  const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (!showReactions) return;
+    const closeOnOutside = (ev: PointerEvent) => {
+      const root = reactionRootRef.current;
+      if (root && ev.target instanceof Node && root.contains(ev.target)) return;
+      setShowReactions(false);
+    };
+    const id = window.setTimeout(() => document.addEventListener('pointerdown', closeOnOutside), 0);
+    return () => {
+      window.clearTimeout(id);
+      document.removeEventListener('pointerdown', closeOnOutside);
+    };
+  }, [showReactions]);
+
+  const loadComments = async () => {
+    setLoadingComments(true);
+    try {
+      const approvedOrLegacy = `video_id=eq.${video.id}&or=(is_approved.eq.true,is_approved.is.null)&order=created_at.desc&limit=20`;
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/video_comments?${approvedOrLegacy}`, {
+        headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` },
+      });
+      if (res.ok) {
+        const rows = (await res.json()) as GalleryComment[];
+        setComments(Array.isArray(rows) ? rows : []);
+      }
+    } catch {
+      /* ignore */
+    } finally {
+      setLoadingComments(false);
+    }
+  };
+
+  const handleLikeClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!showReactions) {
+      e.preventDefault();
+      setShowReactions(true);
+      return;
+    }
+    onToggleLike(e);
+    setShowReactions(false);
+  };
+
+  const pickReaction = (emoji: string, e: React.PointerEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    setPickedEmoji(emoji);
+    setShowReactions(false);
+    if (!isLiked) onToggleLike();
+  };
+
+  const toggleComments = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const next = !commentsOpen;
+    setCommentsOpen(next);
+    if (next) void loadComments();
+  };
+
+  const submitComment = async (e: React.FormEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const text = commentText.trim();
+    const name = commenterName.trim() || getPublicVisitorDisplayName() || '';
+    if (!text) {
+      toast({ title: 'Comment required', variant: 'destructive' });
+      return;
+    }
+    if (name.length < 2) {
+      toast({ title: 'Name required', description: 'Enter your name to comment.', variant: 'destructive' });
+      return;
+    }
+    setSubmitting(true);
+    try {
+      let userId: string | null = null;
+      let accessToken = '';
+      try {
+        const raw = readPersistedAuthRawStringSync();
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          userId = parsed.user?.id ?? null;
+          accessToken = parsed.access_token || '';
+        }
+      } catch {
+        /* ignore */
+      }
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/video_comments`, {
+        method: 'POST',
+        headers: {
+          apikey: SUPABASE_ANON_KEY,
+          Authorization: `Bearer ${accessToken || SUPABASE_ANON_KEY}`,
+          'Content-Type': 'application/json',
+          Prefer: 'return=representation',
+        },
+        body: JSON.stringify({
+          video_id: video.id,
+          user_id: userId,
+          commenter_name: name,
+          comment_text: text,
+          is_approved: true,
+        }),
+      });
+      if (!res.ok) throw new Error('post failed');
+      const row = (await res.json()) as GalleryComment[] | GalleryComment;
+      const created = Array.isArray(row) ? row[0] : row;
+      if (created) setComments((prev) => [created, ...prev]);
+      setCommentText('');
+      onCommentPosted();
+      toast({ title: 'Comment posted' });
+    } catch {
+      toast({ title: 'Could not post comment', variant: 'destructive' });
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <>
+      <div
+        className="px-2 py-1 flex flex-wrap items-center gap-1 border-t border-b"
+        onClick={(ev) => ev.stopPropagation()}
+      >
+        <div ref={reactionRootRef} className="relative flex-1 min-w-[5rem] pb-1">
+          {showReactions && (
+            <div
+              role="listbox"
+              aria-label="Choose a reaction"
+              className="absolute bottom-[calc(100%-4px)] left-1/2 z-[200] flex -translate-x-1/2 gap-0.5 rounded-full border border-gray-200 bg-white px-2 py-1.5 shadow-xl dark:border-gray-700 dark:bg-gray-800"
+              onPointerDown={(e) => e.stopPropagation()}
+            >
+              {GALLERY_REACTIONS.map((emoji) => (
+                <button
+                  key={emoji}
+                  type="button"
+                  className="emoji-native text-2xl min-h-11 min-w-11 flex items-center justify-center rounded-full hover:bg-gray-100 active:scale-95 touch-manipulation"
+                  onPointerDown={(e) => pickReaction(emoji, e)}
+                >
+                  {emoji}
+                </button>
+              ))}
+            </div>
+          )}
+          <Button
+            type="button"
+            variant="ghost"
+            className={`w-full gap-1.5 h-10 text-sm ${isLiked ? 'text-blue-600 font-semibold' : 'text-gray-600'}`}
+            onClick={handleLikeClick}
+          >
+            {isLiked ? (
+              <span className="emoji-native text-xl leading-none">{pickedEmoji || '👍'}</span>
+            ) : (
+              <ThumbsUp className="h-5 w-5 shrink-0" />
+            )}
+            <span>{isLiked ? 'Liked' : 'Like'}</span>
+          </Button>
+        </div>
+        <Button
+          type="button"
+          variant="ghost"
+          className={`flex-1 min-w-[5rem] gap-1.5 h-10 text-sm ${commentsOpen ? 'text-blue-600' : 'text-gray-600'}`}
+          onClick={toggleComments}
+        >
+          <MessageCircle className="h-5 w-5 shrink-0" />
+          <span>Comment</span>
+        </Button>
+        <Button type="button" variant="ghost" className="flex-1 min-w-[5rem] gap-1.5 h-10 text-sm text-gray-600" onClick={onShare}>
+          <Share2 className="h-5 w-5 shrink-0" />
+          <span>Share</span>
+        </Button>
+        {browseOnly && (
+          <Button
+            type="button"
+            size="sm"
+            className="shrink-0 bg-blue-600 hover:bg-blue-700 text-white h-10 text-sm ml-auto"
+            onClick={(e) => {
+              e.stopPropagation();
+              onOpenPlayer(e);
+            }}
+          >
+            <Play className="h-4 w-4 mr-1" />
+            Watch
+          </Button>
+        )}
+      </div>
+
+      {commentsOpen && (
+        <div className="px-4 py-3 border-b bg-white space-y-3" onClick={(e) => e.stopPropagation()}>
+          {loadingComments ? (
+            <div className="flex items-center gap-2 text-sm text-gray-500">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Loading comments…
+            </div>
+          ) : comments.length === 0 ? (
+            <p className="text-sm text-gray-500">No comments yet. Be the first.</p>
+          ) : (
+            <ul className="space-y-2 max-h-40 overflow-y-auto">
+              {comments.map((c) => (
+                <li key={c.id} className="text-sm">
+                  <span className="font-semibold text-gray-900">{c.commenter_name}</span>
+                  <span className="text-gray-600"> {c.comment_text}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+          <form onSubmit={submitComment} className="space-y-2">
+            {!getPublicVisitorDisplayName() && (
+              <Input
+                placeholder="Your name"
+                value={commenterName}
+                onChange={(e) => setCommenterName(e.target.value)}
+                className="h-9 text-sm"
+              />
+            )}
+            <div className="flex gap-2">
+              <Textarea
+                placeholder="Write a comment…"
+                value={commentText}
+                rows={2}
+                className="text-sm min-h-[2.5rem] resize-none"
+                onChange={(e) => setCommentText(e.target.value)}
+              />
+              <Button type="submit" size="sm" disabled={submitting} className="shrink-0 self-end">
+                {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Post'}
+              </Button>
+            </div>
+          </form>
+        </div>
+      )}
+    </>
+  );
+}
 
 interface BuilderVideo {
   id: string;
@@ -708,63 +977,28 @@ export const BuilderVideoGallery = ({
                 </span>
               </div>
 
-              {browseOnly ? (
-                <div className="px-4 py-3 border-t flex items-center justify-end gap-2">
-                  <Button
-                    type="button"
-                    size="sm"
-                    className="bg-blue-600 hover:bg-blue-700 text-white"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      openVideoPlayer(video);
-                    }}
-                  >
-                    <Play className="h-4 w-4 mr-1" />
-                    View project
-                  </Button>
-                </div>
-              ) : (
-              <div className="px-2 py-1 flex items-center justify-around border-b" onClick={(ev) => ev.stopPropagation()}>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  className={`flex-1 gap-2 hover:bg-gray-100 ${
-                    galleryLikedVideoIds.has(video.id) ? 'text-blue-600' : 'text-gray-600'
-                  }`}
-                  onClick={(e) => void toggleGalleryVideoLike(video, e)}
-                >
-                  <ThumbsUp
-                    className={`h-5 w-5 ${galleryLikedVideoIds.has(video.id) ? 'fill-current' : ''}`}
-                  />
-                  <span className="hidden sm:inline">{galleryLikedVideoIds.has(video.id) ? 'Liked' : 'Like'}</span>
-                </Button>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  className="flex-1 text-gray-600 hover:bg-gray-100 gap-2"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    openVideoPlayer(video, { focusComments: true });
-                  }}
-                >
-                  <MessageCircle className="h-5 w-5" />
-                  <span className="hidden sm:inline">Comment</span>
-                </Button>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  className="flex-1 text-gray-600 hover:bg-gray-100 gap-2"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    void navigator.clipboard.writeText(window.location.href);
-                    toast({ title: "Link copied!", description: "Share this video with others" });
-                  }}
-                >
-                  <Share2 className="h-5 w-5" />
-                  <span className="hidden sm:inline">Share</span>
-                </Button>
-              </div>
-              )}
+              <GalleryVideoCardActions
+                video={video}
+                isLiked={galleryLikedVideoIds.has(video.id)}
+                browseOnly={browseOnly}
+                onToggleLike={(e) => void toggleGalleryVideoLike(video, e)}
+                onShare={(e) => {
+                  e.stopPropagation();
+                  void navigator.clipboard.writeText(window.location.href);
+                  toast({ title: 'Link copied!', description: 'Share this project with others' });
+                }}
+                onOpenPlayer={(e) => {
+                  e.stopPropagation();
+                  openVideoPlayer(video);
+                }}
+                onCommentPosted={() =>
+                  setVideos((prev) =>
+                    prev.map((v) =>
+                      v.id === video.id ? { ...v, comments_count: (v.comments_count || 0) + 1 } : v,
+                    ),
+                  )
+                }
+              />
 
               {/* Owner Actions */}
               {isOwner && (
