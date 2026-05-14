@@ -18,6 +18,7 @@
  * - finance_officer: Financial reports, payments, billing
  * - monitoring_officer: Camera monitoring, site surveillance
  * - customer_support: Feedback, chat, user queries
+ * - marketing_officer: Sales pipeline, campaigns, report marking
  * - moderator: Content moderation, feedback review
  * - viewer: Read-only access to overview
  * 
@@ -139,6 +140,7 @@ export const ELEVATED_ADMIN_EXTRA_TABS: ReadonlySet<string> = new Set([
   "builder-moderation",
   "tracking",
   "voice-calls",
+  "sales-marketing",
 ]);
 
 /** Core RBAC tabs plus every extra nav tab — canonical super admin is never blocked by a missing id here. */
@@ -311,6 +313,26 @@ export const STAFF_ROLES: Record<string, StaffRole> = {
     ],
     canManageStaff: false,
     canExportData: false,
+    canDeleteRecords: false,
+    canApproveRegistrations: false,
+    canAccessSensitiveData: false
+  },
+  marketing_officer: {
+    id: 'marketing_officer',
+    name: 'Marketing Officer',
+    description: 'Sales pipeline, campaigns, and weekly report marking',
+    color: 'bg-rose-600',
+    allowedTabs: [
+      'overview',
+      'sales-marketing',
+      'analytics',
+      'feedback',
+      'registrations',
+      'careers',
+      'supply-chain-docs'
+    ],
+    canManageStaff: false,
+    canExportData: true,
     canDeleteRecords: false,
     canApproveRegistrations: false,
     canAccessSensitiveData: false

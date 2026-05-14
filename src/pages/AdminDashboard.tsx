@@ -122,6 +122,7 @@ import { EnhancedCommunicationsManager } from "@/components/admin/EnhancedCommun
 import { AdminVoiceCalls } from "@/components/admin/AdminVoiceCalls";
 import { SupabaseSecurityAdvisor } from "@/components/admin/SupabaseSecurityAdvisor";
 import { JobPositionsManager } from "@/components/admin/JobPositionsManager";
+import { SalesMarketingHub } from "@/components/admin/SalesMarketingHub";
 import { AnalyticsDashboard } from "@/components/analytics/AnalyticsDashboard";
 import { ReviewsManager } from "@/components/reviews/ReviewsManager";
 import { SMSTestPanel } from "@/components/admin/SMSTestPanel";
@@ -452,7 +453,7 @@ const AdminDashboard = () => {
     "ml", "security", "staff", "activity-log", "scanning", "qr-codes", "communications",
     "builder-moderation", "delivery-analytics", "delivery-pay", "settings", "careers", "user-roles",
     "messaging", "analytics", "reviews", "sms-test", "etims-test", "tracking", "voice-calls",
-    "supply-chain-docs"
+    "supply-chain-docs", "sales-marketing"
   ] as const;
   const [activeTab, setActiveTab] = useUrlTabSync([...ADMIN_TABS], "overview");
   /** Bumped when opening Material Images from Product Submissions so focus runs if data was already loaded. */
@@ -4756,6 +4757,17 @@ const AdminDashboard = () => {
           {/* Analytics Tab */}
           <TabsContent value="analytics" className="space-y-6">
             <AnalyticsDashboard />
+          </TabsContent>
+
+          {/* Sales & Marketing Tab */}
+          <TabsContent value="sales-marketing" className="space-y-6">
+            <SalesMarketingHub
+              staffEmail={staffEmail}
+              staffName={staffName}
+              staffRole={staffRole}
+              pendingRegistrations={stats.pendingRegistrations}
+              onNavigateTab={setActiveTab}
+            />
           </TabsContent>
 
           {/* Reviews Tab */}

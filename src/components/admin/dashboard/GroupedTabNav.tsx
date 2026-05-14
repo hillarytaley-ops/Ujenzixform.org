@@ -46,6 +46,7 @@ import {
   UserCog,
   MessageCircle,
   Star,
+  Megaphone,
   ChevronDown,
   Layers,
   Headphones,
@@ -201,6 +202,15 @@ export const GroupedTabNav: React.FC<GroupedTabNavProps> = ({
       ],
     },
     {
+      id: 'sales-marketing',
+      label: 'Sales & Marketing',
+      icon: Megaphone,
+      color: 'rose',
+      tabs: [
+        { value: 'sales-marketing', label: 'Sales & Marketing', icon: Megaphone },
+      ],
+    },
+    {
       id: 'finance-system',
       label: 'System',
       icon: Layers,
@@ -228,6 +238,7 @@ export const GroupedTabNav: React.FC<GroupedTabNavProps> = ({
     cyan: 'bg-cyan-600 hover:bg-cyan-700',
     teal: 'bg-teal-600 hover:bg-teal-700',
     emerald: 'bg-emerald-600 hover:bg-emerald-700',
+    rose: 'bg-rose-600 hover:bg-rose-700',
     slate: 'bg-slate-600 hover:bg-slate-700',
   };
 
