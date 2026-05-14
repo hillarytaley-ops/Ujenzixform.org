@@ -164,6 +164,7 @@ export const BuilderVideoPost: React.FC<BuilderVideoPostProps> = ({
   const commentInputRef = useRef<HTMLInputElement>(null);
   const longPressTimerRef = useRef<number | null>(null);
   const longPressTriggeredRef = useRef(false);
+  const reactionRootRef = useRef<HTMLDivElement>(null);
   /** Delay closing the reaction strip so the pointer can cross the gap above Like (hover UX). */
   const reactionHideTimerRef = useRef<number | null>(null);
   /** Avoid clearing picked emoji when only `likes` changed but `isLiked` stayed false (sync effect was wiping ❤️). */
@@ -179,18 +180,40 @@ export const BuilderVideoPost: React.FC<BuilderVideoPostProps> = ({
     }
   };
 
+  const openReactionsBar = () => {
+    clearReactionHideTimer();
+    setShowReactions(true);
+  };
+
+  const closeReactionsBar = () => {
+    clearReactionHideTimer();
+    setShowReactions(false);
+  };
+
+  /** Desktop hover: open on enter; close only after a pause so the cursor can reach emojis. */
   const scheduleReactionHide = () => {
     clearReactionHideTimer();
     reactionHideTimerRef.current = window.setTimeout(() => {
       reactionHideTimerRef.current = null;
       setShowReactions(false);
-    }, 2000);
+    }, 450);
   };
 
-  const openReactionsBar = () => {
-    clearReactionHideTimer();
-    setShowReactions(true);
-  };
+  useEffect(() => {
+    if (!showReactions) return;
+    const closeOnOutside = (ev: PointerEvent) => {
+      const root = reactionRootRef.current;
+      if (root && ev.target instanceof Node && root.contains(ev.target)) return;
+      setShowReactions(false);
+    };
+    const id = window.setTimeout(() => {
+      document.addEventListener('pointerdown', closeOnOutside);
+    }, 0);
+    return () => {
+      window.clearTimeout(id);
+      document.removeEventListener('pointerdown', closeOnOutside);
+    };
+  }, [showReactions]);
 
   useEffect(() => {
     if (!reactionMode) {
@@ -296,16 +319,32 @@ export const BuilderVideoPost: React.FC<BuilderVideoPostProps> = ({
     onLike?.(id);
   };
 
+  const handleLikeButtonClick = (e: React.MouseEvent) => {
+    if (longPressTriggeredRef.current) {
+      e.preventDefault();
+      longPressTriggeredRef.current = false;
+      return;
+    }
+    if (!showReactions) {
+      e.preventDefault();
+      e.stopPropagation();
+      openReactionsBar();
+      return;
+    }
+    handleLike();
+    closeReactionsBar();
+  };
+
   const handleReactionPick = (emoji: string) => {
     longPressTriggeredRef.current = false;
     clearReactionHideTimer();
     if (reactionMode && onReact) {
       onReact(id, emoji);
-      setShowReactions(false);
+      closeReactionsBar();
       return;
     }
     // Binary like feed: any emoji = "like" once; do not toggle off when already liked (was breaking UX).
-    setShowReactions(false);
+    closeReactionsBar();
     setBinaryReactionEmoji(emoji);
     if (!liked) {
       setLiked(true);
@@ -731,36 +770,41 @@ export const BuilderVideoPost: React.FC<BuilderVideoPostProps> = ({
       {/* Action Buttons - Facebook Style */}
       <div className="px-2 py-1">
         <div className="flex items-center justify-around">
-          {/* Like + reactions: hover opens bar; delayed hide + overlap so pointer can reach emojis */}
+          {/* Like + reactions: tap opens picker; hover opens on desktop */}
           <div
-            className="relative flex-1"
-            onMouseEnter={openReactionsBar}
+            ref={reactionRootRef}
+            className="relative flex-1 pb-1"
+            onMouseEnter={() => {
+              if (window.matchMedia('(hover: hover) and (pointer: fine)').matches) {
+                openReactionsBar();
+              }
+            }}
             onMouseLeave={() => {
-              scheduleReactionHide();
-              clearLongPressTimer();
+              if (window.matchMedia('(hover: hover) and (pointer: fine)').matches) {
+                scheduleReactionHide();
+              }
             }}
-            onPointerDown={startReactionLongPress}
-            onPointerUp={() => {
-              clearLongPressTimer();
-            }}
-            onPointerCancel={clearLongPressTimer}
           >
             {showReactions && (
               <div
                 role="listbox"
                 aria-label="Choose a reaction"
-                className="absolute bottom-full left-1/2 z-[200] flex -translate-x-1/2 translate-y-2 gap-1 rounded-full border border-gray-200 bg-white px-2 py-2 shadow-xl animate-in fade-in slide-in-from-bottom-2 duration-200 dark:border-gray-700 dark:bg-gray-800 max-sm:fixed max-sm:bottom-[calc(4.5rem+env(safe-area-inset-bottom))] max-sm:left-1/2 max-sm:-translate-x-1/2 max-sm:translate-y-0"
+                className="absolute bottom-[calc(100%-4px)] left-1/2 z-[200] flex -translate-x-1/2 gap-1 rounded-full border border-gray-200 bg-white px-2 py-2 shadow-xl dark:border-gray-700 dark:bg-gray-800"
                 onMouseEnter={clearReactionHideTimer}
-                onMouseLeave={scheduleReactionHide}
+                onMouseLeave={() => {
+                  if (window.matchMedia('(hover: hover) and (pointer: fine)').matches) {
+                    scheduleReactionHide();
+                  }
+                }}
+                onPointerDown={(e) => e.stopPropagation()}
               >
                 {reactions.map((reaction) => (
                   <button
                     key={reaction.name}
                     type="button"
-                    onPointerDown={(e) => e.stopPropagation()}
-                    onMouseDown={(e) => e.stopPropagation()}
-                    onClick={(e) => {
+                    onPointerDown={(e) => {
                       e.stopPropagation();
+                      e.preventDefault();
                       handleReactionPick(reaction.emoji);
                     }}
                     className="emoji-native flex h-12 min-h-12 w-12 min-w-12 shrink-0 items-center justify-center rounded-full text-3xl transition-transform hover:scale-110 hover:bg-gray-100 active:scale-95 dark:hover:bg-gray-700 touch-manipulation"
@@ -778,14 +822,7 @@ export const BuilderVideoPost: React.FC<BuilderVideoPostProps> = ({
                   ? 'bg-gradient-to-b from-blue-50 to-white font-semibold text-blue-900 shadow-sm ring-2 ring-blue-500/20 dark:from-blue-950/60 dark:to-gray-900 dark:text-blue-100 dark:ring-blue-400/25'
                   : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'
               }`}
-              onClick={(e) => {
-                if (longPressTriggeredRef.current) {
-                  e.preventDefault();
-                  longPressTriggeredRef.current = false;
-                  return;
-                }
-                handleLike();
-              }}
+              onClick={handleLikeButtonClick}
             >
               {displayLiked ? (
                 <span className="emoji-native text-2xl sm:text-[1.75rem] leading-none select-none" aria-hidden>

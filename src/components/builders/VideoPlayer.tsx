@@ -94,9 +94,40 @@ export const VideoPlayer = ({
   const [localLikesCount, setLocalLikesCount] = useState(video.likes_count);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [replyTo, setReplyTo] = useState<string | null>(null);
+  const [showReactions, setShowReactions] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
+  const reactionRootRef = useRef<HTMLDivElement>(null);
   const watchStartTime = useRef<number>(Date.now());
   const { toast } = useToast();
+
+  const VIDEO_REACTIONS = ['👍', '❤️', '😂', '😮', '😢', '😡'] as const;
+
+  useEffect(() => {
+    if (!showReactions) return;
+    const closeOnOutside = (ev: PointerEvent) => {
+      const root = reactionRootRef.current;
+      if (root && ev.target instanceof Node && root.contains(ev.target)) return;
+      setShowReactions(false);
+    };
+    const id = window.setTimeout(() => {
+      document.addEventListener('pointerdown', closeOnOutside);
+    }, 0);
+    return () => {
+      window.clearTimeout(id);
+      document.removeEventListener('pointerdown', closeOnOutside);
+    };
+  }, [showReactions]);
+
+  const handleLikeButtonClick = (e: React.MouseEvent) => {
+    if (!showReactions) {
+      e.preventDefault();
+      e.stopPropagation();
+      setShowReactions(true);
+      return;
+    }
+    void handleLike();
+    setShowReactions(false);
+  };
 
   useEffect(() => {
     if (isOpen) {
@@ -662,19 +693,43 @@ export const VideoPlayer = ({
                 </div>
               </div>
 
-              {/* Facebook-style Reaction Bar */}
+              {/* Reaction bar — tap Like to open picker */}
               <div className="flex items-center justify-between pt-3 border-t mt-3">
-                {/* Reaction Button with Hover Menu */}
-                <div className="relative group flex-1">
+                <div ref={reactionRootRef} className="relative flex-1 pb-1">
+                  {showReactions && (
+                    <div
+                      role="listbox"
+                      aria-label="Choose a reaction"
+                      className="absolute bottom-[calc(100%-4px)] left-1/2 z-50 flex -translate-x-1/2 gap-0.5 rounded-full border bg-white px-2 py-1.5 shadow-lg"
+                      onPointerDown={(e) => e.stopPropagation()}
+                    >
+                      {VIDEO_REACTIONS.map((emoji) => (
+                        <button
+                          key={emoji}
+                          type="button"
+                          title="React"
+                          className="emoji-native text-2xl p-1.5 rounded-full hover:bg-gray-100 active:scale-95 touch-manipulation min-h-11 min-w-11 flex items-center justify-center"
+                          onPointerDown={(e) => {
+                            e.stopPropagation();
+                            e.preventDefault();
+                            void handleLike();
+                            setShowReactions(false);
+                          }}
+                        >
+                          {emoji}
+                        </button>
+                      ))}
+                    </div>
+                  )}
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={handleLike}
+                    onClick={handleLikeButtonClick}
                     className={`w-full justify-center hover:bg-gray-100 ${isLiked ? 'text-blue-600' : 'text-gray-600'}`}
                   >
                     {isLiked ? (
                       <>
-                        <span className="text-xl mr-2">👍</span>
+                        <span className="emoji-native text-xl mr-2">👍</span>
                         <span className="font-semibold">Liked</span>
                       </>
                     ) : (
@@ -684,52 +739,6 @@ export const VideoPlayer = ({
                       </>
                     )}
                   </Button>
-                  
-                  {/* Reaction Popup on Hover */}
-                  <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:flex bg-white rounded-full shadow-lg border p-1 space-x-1 z-50">
-                    <button 
-                      onClick={() => { handleLike(); }} 
-                      className="text-2xl hover:scale-125 transition-transform p-1"
-                      title="Like"
-                    >
-                      👍
-                    </button>
-                    <button 
-                      onClick={() => { handleLike(); }} 
-                      className="text-2xl hover:scale-125 transition-transform p-1"
-                      title="Love"
-                    >
-                      ❤️
-                    </button>
-                    <button 
-                      onClick={() => { handleLike(); }} 
-                      className="text-2xl hover:scale-125 transition-transform p-1"
-                      title="Haha"
-                    >
-                      😂
-                    </button>
-                    <button 
-                      onClick={() => { handleLike(); }} 
-                      className="text-2xl hover:scale-125 transition-transform p-1"
-                      title="Wow"
-                    >
-                      😮
-                    </button>
-                    <button 
-                      onClick={() => { handleLike(); }} 
-                      className="text-2xl hover:scale-125 transition-transform p-1"
-                      title="Sad"
-                    >
-                      😢
-                    </button>
-                    <button 
-                      onClick={() => { handleLike(); }} 
-                      className="text-2xl hover:scale-125 transition-transform p-1"
-                      title="Angry"
-                    >
-                      😡
-                    </button>
-                  </div>
                 </div>
 
                 {/* Comment Button */}
