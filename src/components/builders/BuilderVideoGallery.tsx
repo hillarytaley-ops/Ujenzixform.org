@@ -58,7 +58,29 @@ type GalleryComment = {
   commenter_name: string;
   comment_text: string;
   created_at: string;
+  parent_comment_id?: string | null;
+  replies?: GalleryComment[];
 };
+
+function organizeGalleryComments(rows: GalleryComment[]): GalleryComment[] {
+  const map = new Map<string, GalleryComment>();
+  const roots: GalleryComment[] = [];
+  for (const row of rows) {
+    map.set(row.id, { ...row, replies: [] });
+  }
+  for (const row of rows) {
+    const node = map.get(row.id);
+    if (!node) continue;
+    if (row.parent_comment_id) {
+      const parent = map.get(row.parent_comment_id);
+      if (parent) parent.replies!.push(node);
+      else roots.push(node);
+    } else {
+      roots.push(node);
+    }
+  }
+  return roots;
+}
 
 function GalleryVideoCardActions({
   video,
@@ -87,6 +109,8 @@ function GalleryVideoCardActions({
   const [commentText, setCommentText] = useState('');
   const [commenterName, setCommenterName] = useState(() => getPublicVisitorDisplayName() || '');
   const [submitting, setSubmitting] = useState(false);
+  const [replyTo, setReplyTo] = useState<{ id: string; name: string } | null>(null);
+  const commentInputRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     if (!showReactions) return;
@@ -105,13 +129,13 @@ function GalleryVideoCardActions({
   const loadComments = async () => {
     setLoadingComments(true);
     try {
-      const approvedOrLegacy = `video_id=eq.${video.id}&or=(is_approved.eq.true,is_approved.is.null)&order=created_at.desc&limit=20`;
+      const approvedOrLegacy = `video_id=eq.${video.id}&or=(is_approved.eq.true,is_approved.is.null)&order=created_at.asc&limit=80`;
       const res = await fetch(`${SUPABASE_URL}/rest/v1/video_comments?${approvedOrLegacy}`, {
         headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` },
       });
       if (res.ok) {
         const rows = (await res.json()) as GalleryComment[];
-        setComments(Array.isArray(rows) ? rows : []);
+        setComments(organizeGalleryComments(Array.isArray(rows) ? rows : []));
       }
     } catch {
       /* ignore */
@@ -144,6 +168,18 @@ function GalleryVideoCardActions({
     const next = !commentsOpen;
     setCommentsOpen(next);
     if (next) void loadComments();
+  };
+
+  const startReply = (commentId: string, name: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setReplyTo({ id: commentId, name });
+    setCommentText(`@${name} `);
+    setTimeout(() => commentInputRef.current?.focus(), 0);
+  };
+
+  const cancelReply = () => {
+    setReplyTo(null);
+    setCommentText('');
   };
 
   const submitComment = async (e: React.FormEvent) => {
@@ -186,22 +222,47 @@ function GalleryVideoCardActions({
           user_id: userId,
           commenter_name: name,
           comment_text: text,
+          parent_comment_id: replyTo?.id ?? null,
           is_approved: true,
         }),
       });
       if (!res.ok) throw new Error('post failed');
-      const row = (await res.json()) as GalleryComment[] | GalleryComment;
-      const created = Array.isArray(row) ? row[0] : row;
-      if (created) setComments((prev) => [created, ...prev]);
+      const wasReply = !!replyTo;
       setCommentText('');
+      setReplyTo(null);
       onCommentPosted();
-      toast({ title: 'Comment posted' });
+      toast({ title: wasReply ? 'Reply posted' : 'Comment posted' });
+      await loadComments();
     } catch {
       toast({ title: 'Could not post comment', variant: 'destructive' });
     } finally {
       setSubmitting(false);
     }
   };
+
+  const renderComment = (c: GalleryComment, isReply = false) => (
+    <li key={c.id} className={isReply ? 'ml-6 mt-2 border-l-2 border-blue-100 pl-3' : ''}>
+      <div className="text-sm">
+        <span className="font-semibold text-gray-900">{c.commenter_name}</span>
+        <span className="text-gray-600"> {c.comment_text}</span>
+        <span className="text-gray-400 text-xs ml-2">
+          {formatDistanceToNow(new Date(c.created_at), { addSuffix: true })}
+        </span>
+      </div>
+      <button
+        type="button"
+        className="text-xs font-medium text-blue-600 hover:underline mt-0.5"
+        onClick={(e) => startReply(c.id, c.commenter_name, e)}
+      >
+        Reply
+      </button>
+      {c.replies && c.replies.length > 0 && (
+        <ul className="mt-1 space-y-1">
+          {c.replies.map((r) => renderComment(r, true))}
+        </ul>
+      )}
+    </li>
+  );
 
   return (
     <>
@@ -282,14 +343,19 @@ function GalleryVideoCardActions({
           ) : comments.length === 0 ? (
             <p className="text-sm text-gray-500">No comments yet. Be the first.</p>
           ) : (
-            <ul className="space-y-2 max-h-40 overflow-y-auto">
-              {comments.map((c) => (
-                <li key={c.id} className="text-sm">
-                  <span className="font-semibold text-gray-900">{c.commenter_name}</span>
-                  <span className="text-gray-600"> {c.comment_text}</span>
-                </li>
-              ))}
+            <ul className="space-y-3 max-h-52 overflow-y-auto">
+              {comments.map((c) => renderComment(c))}
             </ul>
+          )}
+          {replyTo && (
+            <div className="flex items-center justify-between rounded-md bg-blue-50 px-3 py-1.5 text-xs text-blue-800">
+              <span>
+                Replying to <strong>{replyTo.name}</strong>
+              </span>
+              <button type="button" className="font-medium hover:underline" onClick={cancelReply}>
+                Cancel
+              </button>
+            </div>
           )}
           <form onSubmit={submitComment} className="space-y-2">
             {!getPublicVisitorDisplayName() && (
@@ -302,14 +368,15 @@ function GalleryVideoCardActions({
             )}
             <div className="flex gap-2">
               <Textarea
-                placeholder="Write a comment…"
+                ref={commentInputRef}
+                placeholder={replyTo ? `Reply to ${replyTo.name}…` : 'Write a comment…'}
                 value={commentText}
                 rows={2}
                 className="text-sm min-h-[2.5rem] resize-none"
                 onChange={(e) => setCommentText(e.target.value)}
               />
               <Button type="submit" size="sm" disabled={submitting} className="shrink-0 self-end">
-                {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Post'}
+                {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : replyTo ? 'Reply' : 'Post'}
               </Button>
             </div>
           </form>
