@@ -1,6 +1,5 @@
 /**
- * KRA eTIMS receipt verification QR — encodes the official verification URL
- * (e.g. etims-sbx.kra.go.ke/.../indexEtimsReceiptData?Data=...).
+ * KRA eTIMS receipt verification QR — encodes the official verification URL.
  */
 
 import React, { useEffect, useState } from 'react';
@@ -22,7 +21,7 @@ function isHttpsOrHttpUrl(s: string): boolean {
 async function qrPngDataUrl(text: string, size: number): Promise<string> {
   return QRCode.toDataURL(text, {
     width: size,
-    margin: 2,
+    margin: 1,
     errorCorrectionLevel: 'M',
     color: { dark: '#0f172a', light: '#ffffff' },
   });
@@ -31,22 +30,24 @@ async function qrPngDataUrl(text: string, size: number): Promise<string> {
 export type EtimsVerificationQrProps = {
   verificationUrl: string;
   className?: string;
-  /** QR image width in px (default 200) */
+  /** QR image width in px — default 120 (receipt standard) */
   size?: number;
-  compact?: boolean;
+  /** Receipt footer: compact, no card chrome */
+  variant?: 'card' | 'footer';
 };
 
 export const EtimsVerificationQr: React.FC<EtimsVerificationQrProps> = ({
   verificationUrl,
   className,
-  size = 200,
-  compact = false,
+  size = 120,
+  variant = 'card',
 }) => {
   const { toast } = useToast();
   const url = verificationUrl.trim();
   const valid = url.length > 0 && isHttpsOrHttpUrl(url);
   const [dataUrl, setDataUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const isFooter = variant === 'footer';
 
   useEffect(() => {
     if (!valid) {
@@ -76,7 +77,7 @@ export const EtimsVerificationQr: React.FC<EtimsVerificationQrProps> = ({
   const copyLink = async () => {
     try {
       await navigator.clipboard.writeText(url);
-      toast({ title: 'Link copied', description: 'Paste in a browser to verify on KRA eTIMS.' });
+      toast({ title: 'Link copied' });
     } catch {
       toast({ variant: 'destructive', title: 'Could not copy link' });
     }
@@ -85,57 +86,61 @@ export const EtimsVerificationQr: React.FC<EtimsVerificationQrProps> = ({
   return (
     <div
       className={cn(
-        'flex flex-col items-center rounded-lg border border-border bg-white px-4 text-center dark:bg-slate-950',
-        compact ? 'py-4' : 'py-5',
+        isFooter
+          ? 'flex flex-col items-center text-center'
+          : 'flex flex-col items-center rounded-lg border border-border bg-white px-4 py-4 text-center dark:bg-slate-950',
         className,
       )}
     >
-      <p className={cn('font-semibold text-foreground', compact ? 'text-xs' : 'text-sm')}>
-        Scan QR code to verify receipt
-      </p>
-      <p className="mt-1 text-[11px] text-muted-foreground">Official KRA eTIMS verification</p>
+      {!isFooter ? (
+        <>
+          <p className="text-sm font-semibold text-foreground">Scan QR code to verify receipt</p>
+          <p className="mt-1 text-[11px] text-muted-foreground">Official KRA eTIMS verification</p>
+        </>
+      ) : null}
 
-      <div className="relative my-4 flex items-center justify-center">
+      <div className={cn('flex items-center justify-center', isFooter ? 'my-2' : 'my-3')}>
         {dataUrl ? (
           <img
             src={dataUrl}
             alt="KRA eTIMS verification QR code"
             width={size}
             height={size}
-            className="rounded-md border border-border bg-white p-1 shadow-sm"
+            className="rounded-sm border border-slate-200 bg-white p-0.5"
           />
         ) : error ? (
-          <div className="flex h-[120px] w-[120px] flex-col items-center justify-center gap-1 rounded-md border border-dashed border-amber-400/60 bg-amber-50/50 text-[10px] text-amber-900 dark:bg-amber-950/30 dark:text-amber-200">
-            <QrCode className="h-6 w-6 opacity-60" />
+          <div
+            className="flex flex-col items-center justify-center gap-1 rounded border border-dashed border-amber-400/60 bg-amber-50/50 text-[10px] text-amber-900"
+            style={{ width: size, height: size }}
+          >
+            <QrCode className="h-5 w-5 opacity-60" />
             QR unavailable
           </div>
         ) : (
           <div
-            className="flex items-center justify-center rounded-md border border-border bg-muted/30"
+            className="flex items-center justify-center rounded border border-border bg-muted/30"
             style={{ width: size, height: size }}
           >
-            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
           </div>
         )}
       </div>
 
-      <div className="w-full max-w-md space-y-2">
-        <p className="text-left text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Link</p>
-        <p className="break-all rounded-md border bg-muted/30 px-2 py-1.5 font-mono text-[10px] leading-relaxed text-foreground">
-          {url}
-        </p>
-        <div className="flex flex-wrap justify-center gap-2">
-          <Button type="button" variant="outline" size="sm" className="h-8 text-xs" onClick={() => void copyLink()}>
+      <div className={cn('w-full', isFooter ? 'max-w-[280px]' : 'max-w-sm space-y-2')}>
+        <p className="text-left text-[9px] font-medium uppercase tracking-wide text-muted-foreground">Link</p>
+        <p className="break-all text-left font-mono text-[9px] leading-relaxed text-foreground">{url}</p>
+        <div className="mt-2 flex flex-wrap justify-center gap-1.5">
+          <Button type="button" variant="outline" size="sm" className="h-7 px-2 text-[10px]" onClick={() => void copyLink()}>
             Copy link
           </Button>
           <Button
             type="button"
             variant="secondary"
             size="sm"
-            className="h-8 gap-1 text-xs"
+            className="h-7 gap-1 px-2 text-[10px]"
             onClick={() => window.open(url, '_blank', 'noopener,noreferrer')}
           >
-            <ExternalLink className="h-3.5 w-3.5" />
+            <ExternalLink className="h-3 w-3" />
             Open on KRA
           </Button>
         </div>

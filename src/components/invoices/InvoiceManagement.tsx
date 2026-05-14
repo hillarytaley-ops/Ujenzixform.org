@@ -28,16 +28,8 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { sortSupplyChainDocsNewestFirst } from '@/utils/sortSupplyChainDocs';
 import { chunkArray } from '@/utils/performance';
-import {
-  buildEtimsReceiptKvRows,
-  extractEtimsSalesItems,
-  lineAmount,
-  lineItemCode,
-  lineQty,
-  pickEtimsTotalAmountKes,
-  resolveEtimsVerificationUrl,
-} from '@/lib/etims/formatEtimsReceiptForUi';
-import { EtimsVerificationQr } from '@/components/etims/EtimsVerificationQr';
+import { EtimsFiscalReceiptView } from '@/components/etims/EtimsFiscalReceiptView';
+import { pickEtimsTotalAmountKes } from '@/lib/etims/formatEtimsReceiptForUi';
 import { PaystackCheckout, isPaystackTestModeBanner } from '@/components/payment/PaystackCheckout';
 import { Separator } from '@/components/ui/separator';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -83,9 +75,9 @@ interface Invoice {
 interface InvoiceManagementProps {
   userId: string;
   userRole: 'builder' | 'supplier' | 'admin';
-  /** public.suppliers.id — passed to list_invoices_for_supplier RPC */
+  /** public.suppliers.id ??? passed to list_invoices_for_supplier RPC */
   supplierRecordId?: string | null;
-  /** profiles.id — match invoices / PO buyer_id when stored as profile row id (same as delivery notes) */
+  /** profiles.id ??? match invoices / PO buyer_id when stored as profile row id (same as delivery notes) */
   builderProfileId?: string | null;
 }
 
@@ -122,48 +114,6 @@ function invoiceLineLabel(line: Record<string, unknown>, index: number): string 
   return `Line ${index + 1}`;
 }
 
-function isHttpsOrHttpUrl(s: string): boolean {
-  try {
-    const u = new URL(s.trim());
-    return u.protocol === 'https:' || u.protocol === 'http:';
-  } catch {
-    return false;
-  }
-}
-
-/**
- * Shows the integrator/KRA verification page inside the app (iframe).
- * We cannot "extract" HTML into our DOM from third-party URLs without their API; embedding is the supported pattern.
- */
-function KraEtimsReceiptEmbed({ url }: { url: string }) {
-  const trimmed = url.trim();
-  if (!trimmed || !isHttpsOrHttpUrl(trimmed)) {
-    return (
-      <p className="text-sm text-muted-foreground">
-        This receipt address cannot be previewed here. If it is not a normal web link, open it from your integrator or
-        KRA portal directly.
-      </p>
-    );
-  }
-  return (
-    <div className="space-y-2">
-      <div className="relative w-full overflow-hidden rounded-md border border-border bg-white shadow-inner dark:bg-slate-950">
-        <iframe
-          title="KRA eTIMS verification receipt"
-          src={trimmed}
-          className="h-[min(70vh,560px)] min-h-[320px] w-full border-0 sm:min-h-[380px]"
-          referrerPolicy="no-referrer-when-downgrade"
-          allow="clipboard-write"
-        />
-      </div>
-      <p className="text-xs text-muted-foreground">
-        In-app preview. If the frame stays blank, the tax site may block embedding; your eTIMS submission is still valid on
-        KRA or your OSCU.
-      </p>
-    </div>
-  );
-}
-
 /** KES amount for Paystack when there is no supplier invoice row yet (PO total or eTIMS JSON). */
 function resolvePoStandalonePayAmountKes(po: {
   total_amount?: number | null;
@@ -176,137 +126,31 @@ function resolvePoStandalonePayAmountKes(po: {
   return null;
 }
 
-/** Stored integrator JSON + optional KRA page button; iframe only under optional details (often blocked). */
+/** Fiscal tax receipt layout with verification QR at the bottom. */
 function KraEtimsReceiptPanel({
   poNumber,
   verificationUrl,
   etimsResponse,
   traderInvoiceNoDb,
   etimsSubmittedAt,
+  supplierName,
 }: {
   poNumber: string;
   verificationUrl: string | null | undefined;
   etimsResponse: unknown;
   traderInvoiceNoDb?: string | null;
   etimsSubmittedAt?: string | null;
+  supplierName?: string | null;
 }) {
-  const resolvedUrl = useMemo(
-    () => resolveEtimsVerificationUrl(verificationUrl, etimsResponse),
-    [verificationUrl, etimsResponse],
-  );
-  const kv = useMemo(() => {
-    const rows = buildEtimsReceiptKvRows(etimsResponse);
-    if (!resolvedUrl) return rows;
-    return rows.filter((r) => r.label !== 'Verification URL');
-  }, [etimsResponse, resolvedUrl]);
-  const salesLines = useMemo(() => extractEtimsSalesItems(etimsResponse), [etimsResponse]);
-  const hasStoredPayload =
-    etimsResponse != null &&
-    typeof etimsResponse === 'object' &&
-    Object.keys(etimsResponse as Record<string, unknown>).length > 0;
-
   return (
-    <div className="space-y-3 rounded-lg border border-sky-200/70 bg-white/95 p-3 text-slate-900 shadow-sm dark:border-sky-900/50 dark:bg-slate-950/80 dark:text-slate-100">
-      <div>
-        <p className="text-xs font-semibold uppercase tracking-wide text-sky-800 dark:text-sky-200">
-          eTIMS receipt (stored from integrator)
-        </p>
-        <p className="text-xs text-muted-foreground dark:text-slate-400">PO {poNumber}</p>
-      </div>
-      {etimsSubmittedAt ? (
-        <p className="text-xs text-muted-foreground dark:text-slate-400">
-          Submitted{' '}
-          {new Date(etimsSubmittedAt).toLocaleString(undefined, {
-            dateStyle: 'medium',
-            timeStyle: 'short',
-          })}
-        </p>
-      ) : null}
-      {traderInvoiceNoDb?.trim() ? (
-        <p className="text-sm">
-          <span className="text-muted-foreground dark:text-slate-400">Trader invoice no. </span>
-          <span className="font-mono font-medium text-foreground">{traderInvoiceNoDb.trim()}</span>
-        </p>
-      ) : null}
-
-      {resolvedUrl ? (
-        <EtimsVerificationQr verificationUrl={resolvedUrl} className="mx-auto w-full max-w-sm" />
-      ) : null}
-
-      {!hasStoredPayload ? (
-        <p className="text-sm text-amber-900 dark:text-amber-200">
-          Receipt details were not found on this order in the database. If you have a verification link, open the KRA
-          / OSCU page below.
-        </p>
-      ) : (
-        <>
-          <dl className="space-y-2 text-sm">
-            {kv.map(({ label, value }, idx) => (
-              <div key={`${label}-${idx}`}>
-                <dt className="text-muted-foreground dark:text-slate-400">{label}</dt>
-                <dd className="mt-0.5 min-w-0 break-all font-mono text-xs text-foreground">{value}</dd>
-              </div>
-            ))}
-          </dl>
-          {salesLines.length > 0 ? (
-            <div className="overflow-x-auto rounded-md border border-border">
-              <table className="w-full text-left text-xs">
-                <thead className="bg-muted/60 dark:bg-muted/30">
-                  <tr>
-                    <th className="px-2 py-1.5 font-medium">Item code</th>
-                    <th className="px-2 py-1.5 font-medium">Qty</th>
-                    <th className="px-2 py-1.5 font-medium">Amount</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {salesLines.map((row, i) => (
-                    <tr key={i} className="border-t border-border">
-                      <td className="px-2 py-1 font-mono">{lineItemCode(row)}</td>
-                      <td className="px-2 py-1">{lineQty(row)}</td>
-                      <td className="px-2 py-1">{lineAmount(row)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          ) : null}
-          <details className="rounded-md border border-border bg-muted/20 p-2 text-xs dark:bg-muted/10">
-            <summary className="cursor-pointer font-medium text-foreground">Full integrator response (JSON)</summary>
-            <pre className="mt-2 max-h-48 overflow-auto whitespace-pre-wrap break-all rounded bg-muted/50 p-2 font-mono text-[10px] leading-relaxed dark:bg-muted/20">
-              {JSON.stringify(etimsResponse, null, 2)}
-            </pre>
-          </details>
-        </>
-      )}
-
-      {resolvedUrl ? (
-        <div className="flex flex-col gap-2 border-t border-border pt-3 sm:flex-row sm:flex-wrap sm:items-center">
-          <Button
-            type="button"
-            variant="default"
-            size="sm"
-            className="w-fit bg-sky-700 text-white hover:bg-sky-800 dark:bg-sky-600 dark:hover:bg-sky-500"
-            onClick={() => window.open(resolvedUrl, '_blank', 'noopener,noreferrer')}
-          >
-            Open KRA verification page
-          </Button>
-          <p className="text-[11px] text-muted-foreground dark:text-slate-400">
-            Same link as the QR above � opens the official tax receipt on KRA.
-          </p>
-        </div>
-      ) : null}
-
-      {resolvedUrl ? (
-        <details className="text-xs text-muted-foreground dark:text-slate-400">
-          <summary className="cursor-pointer select-none text-foreground/90 dark:text-slate-300">
-            Try embedded preview (optional — may be blank)
-          </summary>
-          <div className="mt-2">
-            <KraEtimsReceiptEmbed url={resolvedUrl} />
-          </div>
-        </details>
-      ) : null}
-    </div>
+    <EtimsFiscalReceiptView
+      poNumber={poNumber}
+      verificationUrl={verificationUrl}
+      etimsResponse={etimsResponse}
+      traderInvoiceNoDb={traderInvoiceNoDb}
+      etimsSubmittedAt={etimsSubmittedAt}
+      supplierName={supplierName}
+    />
   );
 }
 
@@ -333,7 +177,7 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [saving, setSaving] = useState(false);
   const [acknowledging, setAcknowledging] = useState(false);
-  /** Which invoice row is running the async “acknowledge then open pay” flow */
+  /** Which invoice row is running the async ???acknowledge then open pay??? flow */
   const [payNowBusyId, setPayNowBusyId] = useState<string | null>(null);
   const [payInvoice, setPayInvoice] = useState<Invoice | null>(null);
   /** Paystack checkout for PO with eTIMS but no supplier invoice yet (`order_id` = `etims_po_<uuid>`). */
@@ -356,7 +200,7 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
   /** Latest fetcher for Realtime / visibility handlers (avoid stale closures). */
   const fetchInvoicesRef = useRef<(opts?: { silent?: boolean }) => Promise<void>>(async () => {});
 
-  /** PO rows with eTIMS / Paystack fields — builder (by buyer_id) or supplier (by supplier_id). */
+  /** PO rows with eTIMS / Paystack fields ??? builder (by buyer_id) or supplier (by supplier_id). */
   type BuilderEtimsReceiptPo = {
     id: string;
     po_number: string;
@@ -372,7 +216,7 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
   const [builderEtimsReceiptsLoading, setBuilderEtimsReceiptsLoading] = useState(false);
   const [supplierEtimsReceipts, setSupplierEtimsReceipts] = useState<BuilderEtimsReceiptPo[]>([]);
   const [supplierEtimsReceiptsLoading, setSupplierEtimsReceiptsLoading] = useState(false);
-  /** supplier_id values that belong to this dashboard — for Realtime PO filter */
+  /** supplier_id values that belong to this dashboard ??? for Realtime PO filter */
   const supplierEtimsSupplierIdsRef = useRef<Set<string>>(new Set());
 
   useLayoutEffect(() => {
@@ -770,7 +614,7 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
     [builderEtimsReceipts]
   );
 
-  /** Receipt exists but no supplier invoice row for this PO yet — show its own row under Unpaid only.
+  /** Receipt exists but no supplier invoice row for this PO yet ??? show its own row under Unpaid only.
    *  If *any* non-cancelled invoice exists for the PO, hide this card: eTIMS belongs on that invoice row (avoids Unpaid duplicate after pay). */
   const builderUnpaidEtimsStandalone = useMemo(() => {
     if (userRole !== 'builder' || invoicePaymentListTab !== 'unpaid') return [];
@@ -793,13 +637,13 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
     });
   }, [userRole, invoicePaymentListTab, builderEtimsReceipts, invoices]);
 
-  /** eTIMS-only POs where builder completed Paystack (test) — full receipt under Paid tab */
+  /** eTIMS-only POs where builder completed Paystack (test) ??? full receipt under Paid tab */
   const builderEtimsPaidStandalone = useMemo(() => {
     if (userRole !== 'builder') return [];
     return builderEtimsReceipts.filter((po) => Boolean(po.builder_etims_paystack_paid_at));
   }, [userRole, builderEtimsReceipts]);
 
-  /** Supplier: same PO-level eTIMS as builder sees for this supplier’s orders (read-only mirror). */
+  /** Supplier: same PO-level eTIMS as builder sees for this supplier???s orders (read-only mirror). */
   const supplierUnpaidEtimsStandalone = useMemo(() => {
     if (userRole !== 'supplier' || invoicePaymentListTab !== 'unpaid') return [];
     return supplierEtimsReceipts.filter((po) => {
@@ -968,7 +812,7 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
     }
   };
 
-  /** Builder: one obvious “Pay now” — acknowledges supplier invoice if needed, then opens Paystack / record dialog */
+  /** Builder: one obvious ???Pay now??? ??? acknowledges supplier invoice if needed, then opens Paystack / record dialog */
   const handlePayNowClick = async (invoice: Invoice) => {
     if (userRole !== 'builder') return;
     if (invoiceIsPaid(invoice)) return;
@@ -1069,7 +913,7 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
       const ref = paymentReference.trim();
       const stamp = new Date().toISOString();
       const line = ref
-        ? `\n[${stamp}] Builder marked paid — reference: ${ref}`
+        ? `\n[${stamp}] Builder marked paid ??? reference: ${ref}`
         : `\n[${stamp}] Builder marked paid`;
       const nextNotes = `${payInvoice.notes || ''}${line}`.trim();
 
@@ -1115,7 +959,7 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
       ) : st === 'sent' ? (
         <Badge variant="secondary">Sent</Badge>
       ) : (
-        <Badge variant="outline">{status || '—'}</Badge>
+        <Badge variant="outline">{status || '???'}</Badge>
       );
     return (
       <div className="flex flex-row flex-wrap items-center justify-end gap-1 shrink-0">
@@ -1171,7 +1015,7 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
               there to pay the PO / eTIMS total; once an invoice row exists, use <strong className="text-foreground">Pay now</strong>{' '}
               on that row so the supplier invoice is marked paid.
             </p>
-            {builderEtimsReceiptsLoading ? <p className="mt-1">Loading receipt links…</p> : null}
+            {builderEtimsReceiptsLoading ? <p className="mt-1">Loading receipt links???</p> : null}
           </AlertDescription>
         </Alert>
       )}
@@ -1186,7 +1030,7 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
               here until a <strong className="text-foreground">supplier invoice</strong> row exists for that PO. The
               builder pays from their dashboard; you can issue and send your invoice when ready.
             </p>
-            {supplierEtimsReceiptsLoading ? <p className="mt-1">Loading receipt links…</p> : null}
+            {supplierEtimsReceiptsLoading ? <p className="mt-1">Loading receipt links???</p> : null}
           </AlertDescription>
         </Alert>
       )}
@@ -1215,7 +1059,7 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
           aria-label="Loading invoices"
         >
           <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
-          <span>Loading supplier invoices…</span>
+          <span>Loading supplier invoices???</span>
         </div>
       )}
 
@@ -1226,7 +1070,7 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
           aria-label="Loading invoices"
         >
           <Loader2 className="h-5 w-5 shrink-0 animate-spin" />
-          <span>Loading supplier invoices…</span>
+          <span>Loading supplier invoices???</span>
         </div>
       )}
 
@@ -1252,7 +1096,7 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
                   {builderPayPrompt.needPayment.length > 0 && (
                     <p>
                       <strong>{builderPayPrompt.needPayment.length}</strong> invoice
-                      {builderPayPrompt.needPayment.length === 1 ? ' is' : 's are'} ready for payment — complete
+                      {builderPayPrompt.needPayment.length === 1 ? ' is' : 's are'} ready for payment ??? complete
                       transfer (M-Pesa, bank, etc.) per your agreement, then tap <strong>Pay now</strong> for Paystack or
                       to record it.
                     </p>
@@ -1323,7 +1167,7 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
                                   timeStyle: 'short',
                                 })}
                                 {po.builder_etims_paystack_reference
-                                  ? ` · Paystack ref ${po.builder_etims_paystack_reference}`
+                                  ? ` ? Paystack ref ${po.builder_etims_paystack_reference}`
                                   : ''}
                               </p>
                             ) : null}
@@ -1369,7 +1213,7 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
                                   timeStyle: 'short',
                                 })}
                                 {po.builder_etims_paystack_reference
-                                  ? ` · ref ${po.builder_etims_paystack_reference}`
+                                  ? ` ? ref ${po.builder_etims_paystack_reference}`
                                   : ''}
                               </p>
                             ) : null}
@@ -1402,7 +1246,7 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
                   <Card>
                     <CardContent className="flex items-center gap-2 py-6 text-sm text-muted-foreground">
                       <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
-                      Loading KRA receipt links…
+                      Loading KRA receipt links???
                     </CardContent>
                   </Card>
                 ) : null}
@@ -1446,7 +1290,7 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
                   <Card>
                     <CardContent className="flex items-center gap-2 py-6 text-sm text-muted-foreground">
                       <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
-                      Loading KRA receipt links…
+                      Loading KRA receipt links???
                     </CardContent>
                   </Card>
                 ) : null}
@@ -1506,7 +1350,7 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
                             <>
                               Amount: <strong className="text-foreground">KES {payAmt!.toLocaleString()}</strong>
                               {paystackSandbox ? (
-                                <> · Paystack test mode (sandbox keys).</>
+                                <> ? Paystack test mode (sandbox keys).</>
                               ) : null}
                             </>
                           ) : (
@@ -1550,7 +1394,7 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
                     <div>
                       <CardTitle>{invoice.invoice_number}</CardTitle>
                       <p className="text-sm text-gray-500">
-                        PO: {invoice.purchase_order?.po_number || 'N/A'} •{' '}
+                        PO: {invoice.purchase_order?.po_number || 'N/A'} ???{' '}
                         {invoice.supplier?.company_name || 'Supplier'}
                       </p>
                       {userRole === 'builder' && !invoiceIsPaid(invoice) && (
@@ -1626,7 +1470,7 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
                           {acknowledging && payNowBusyId === invoice.id ? (
                             <>
                               <Loader2 className="h-5 w-5 mr-2 animate-spin" />
-                              Opening…
+                              Opening???
                             </>
                           ) : (
                             <>
@@ -1658,18 +1502,18 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
                 {showBuilderSupplierPaymentTabs ? (
                   invoicePaymentListTab === 'paid' ? (
                     <>
-                      <span className="font-medium text-foreground">Paid invoices</span> — subtotal for{' '}
+                      <span className="font-medium text-foreground">Paid invoices</span> ??? subtotal for{' '}
                       {displayInvoices.length} invoice{displayInvoices.length === 1 ? '' : 's'} in this tab
                     </>
                   ) : (
                     <>
-                      <span className="font-medium text-foreground">Unpaid invoices</span> — subtotal for{' '}
+                      <span className="font-medium text-foreground">Unpaid invoices</span> ??? subtotal for{' '}
                       {displayInvoices.length} invoice{displayInvoices.length === 1 ? '' : 's'} in this tab
                     </>
                   )
                 ) : (
                   <>
-                    <span className="font-medium text-foreground">Total</span> — {displayInvoices.length} invoice
+                    <span className="font-medium text-foreground">Total</span> ??? {displayInvoices.length} invoice
                     {displayInvoices.length === 1 ? '' : 's'}
                   </>
                 )}
@@ -1699,7 +1543,7 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
           <DialogHeader>
             <DialogTitle>Settle this invoice</DialogTitle>
             <DialogDescription>
-              Pay with Paystack (card, M-Pesa, bank, etc. — whatever your Paystack business has enabled), or record a
+              Pay with Paystack (card, M-Pesa, bank, etc. ??? whatever your Paystack business has enabled), or record a
               payment you already made directly to the supplier.
             </DialogDescription>
           </DialogHeader>
@@ -1708,7 +1552,7 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
               <div className="rounded-md border bg-muted/50 px-3 py-2 text-sm">
                 <p className="font-medium">{payInvoice.invoice_number}</p>
                 <p className="text-muted-foreground">
-                  {payInvoice.supplier?.company_name || 'Supplier'} ·{' '}
+                  {payInvoice.supplier?.company_name || 'Supplier'} ?{' '}
                   <span className="font-semibold text-foreground">
                     KES {Number(payInvoice.total_amount).toLocaleString(undefined, { minimumFractionDigits: 2 })}
                   </span>
@@ -1718,7 +1562,7 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
               <PaystackCheckout
                 amount={Number(payInvoice.total_amount)}
                 currency="KES"
-                description={`Invoice ${payInvoice.invoice_number} — ${payInvoice.supplier?.company_name || 'Supplier'}`}
+                description={`Invoice ${payInvoice.invoice_number} ??? ${payInvoice.supplier?.company_name || 'Supplier'}`}
                 orderId={`inv_${payInvoice.id}`}
                 successNavigateTo="/professional-builder-dashboard?tab=invoices"
                 onCancel={() => {
@@ -1761,12 +1605,12 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
               {recordingPayment ? (
                 <>
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Saving…
+                  Saving???
                 </>
               ) : (
                 <>
                   <CreditCard className="h-4 w-4 mr-2" />
-                  I've paid — record payment
+                  I've paid ??? record payment
                 </>
               )}
             </Button>
@@ -1803,7 +1647,7 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
               <PaystackCheckout
                 amount={paystackEtimsPo.amount}
                 currency="KES"
-                description={`PO ${paystackEtimsPo.poNumber} (eTIMS — no supplier invoice yet)`}
+                description={`PO ${paystackEtimsPo.poNumber} (eTIMS ??? no supplier invoice yet)`}
                 orderId={`etims_po_${paystackEtimsPo.poId}`}
                 successNavigateTo="/professional-builder-dashboard?tab=invoices"
                 onCancel={() => setPaystackEtimsPo(null)}
@@ -1852,9 +1696,9 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
                     const qty = line.quantity ?? line.qty;
                     const unit = typeof line.unit === 'string' ? line.unit : '';
                     const up = line.unit_price ?? line.price;
-                    const qtyStr = qty !== undefined && qty !== null ? String(qty) : '—';
+                    const qtyStr = qty !== undefined && qty !== null ? String(qty) : '???';
                     const upNum = typeof up === 'number' ? up : Number(up);
-                    const upStr = Number.isFinite(upNum) ? `KES ${upNum.toLocaleString()}` : '—';
+                    const upStr = Number.isFinite(upNum) ? `KES ${upNum.toLocaleString()}` : '???';
                     return (
                       <div
                         key={index}

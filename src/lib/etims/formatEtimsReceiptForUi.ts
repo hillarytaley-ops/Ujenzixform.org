@@ -161,3 +161,118 @@ export function lineAmount(row: Record<string, unknown>): string {
   if (a != null && typeof a !== 'object') return String(a);
   return '—';
 }
+
+export function lineItemName(row: Record<string, unknown>): string {
+  for (const k of ['itemName', 'item_name', 'name', 'material_name', 'description', 'title'] as const) {
+    const v = row[k];
+    if (typeof v === 'string' && v.trim()) return v.trim();
+  }
+  const code = lineItemCode(row);
+  return code !== '—' ? code : 'Item';
+}
+
+export function lineUnitPrice(row: Record<string, unknown>): string {
+  const p = row.unitPrice ?? row.unit_price ?? row.price;
+  if (typeof p === 'number' && Number.isFinite(p)) {
+    return p.toLocaleString(undefined, { maximumFractionDigits: 2, minimumFractionDigits: 2 });
+  }
+  if (p != null && typeof p !== 'object') return String(p);
+  return '—';
+}
+
+function pickFromRoots(raw: unknown, keys: readonly string[]): string | null {
+  for (const o of scalarRoots(raw)) {
+    const s = pickScalar(o, keys);
+    if (s) return s;
+  }
+  return null;
+}
+
+function formatMoneyLabel(raw: unknown, keys: readonly string[]): string | null {
+  const s = pickFromRoots(raw, keys);
+  if (!s) return null;
+  const n = parseFloat(s.replace(/,/g, ''));
+  if (Number.isFinite(n)) {
+    return n.toLocaleString(undefined, { maximumFractionDigits: 2, minimumFractionDigits: 2 });
+  }
+  return s;
+}
+
+export type EtimsReceiptLineDisplay = {
+  index: number;
+  name: string;
+  code: string;
+  qty: string;
+  unitPrice: string;
+  amount: string;
+};
+
+export type EtimsReceiptDisplay = {
+  invoiceNo: string | null;
+  traderInvoiceNo: string | null;
+  salesDate: string | null;
+  customerName: string | null;
+  customerPin: string | null;
+  paymentType: string | null;
+  currency: string | null;
+  exchangeRate: string | null;
+  totalAmount: string | null;
+  taxableAmount: string | null;
+  taxAmount: string | null;
+  receiptNo: string | null;
+  scdcId: string | null;
+  scuReceiptNo: string | null;
+  scuDate: string | null;
+  internalData: string | null;
+  signature: string | null;
+  lines: EtimsReceiptLineDisplay[];
+  verificationUrl: string | null;
+};
+
+/** Structured receipt fields for fiscal-style UI. */
+export function parseEtimsReceiptForDisplay(
+  etimsResponse: unknown,
+  opts?: {
+    storedVerificationUrl?: string | null;
+    traderInvoiceNoDb?: string | null;
+    poNumber?: string | null;
+  },
+): EtimsReceiptDisplay {
+  const salesLines = extractEtimsSalesItems(etimsResponse);
+  const lines: EtimsReceiptLineDisplay[] = salesLines.map((row, i) => ({
+    index: i + 1,
+    name: lineItemName(row),
+    code: lineItemCode(row),
+    qty: lineQty(row),
+    unitPrice: lineUnitPrice(row),
+    amount: lineAmount(row),
+  }));
+
+  const traderFromDb = opts?.traderInvoiceNoDb?.trim() || null;
+
+  return {
+    invoiceNo: pickFromRoots(etimsResponse, ['receiptNo', 'receipt_no', 'invoiceNo', 'invoice_no', 'mrcNo', 'mrc_no']),
+    traderInvoiceNo:
+      traderFromDb ||
+      pickFromRoots(etimsResponse, ['traderInvoiceNo', 'trader_invoice_no']) ||
+      opts?.poNumber?.trim() ||
+      null,
+    salesDate: pickFromRoots(etimsResponse, ['salesDate', 'sales_date', 'scuDate', 'scu_date']),
+    customerName: pickFromRoots(etimsResponse, ['customerName', 'customer_name']),
+    customerPin: pickFromRoots(etimsResponse, ['customerPin', 'customer_pin']),
+    paymentType: pickFromRoots(etimsResponse, ['paymentType', 'payment_type']),
+    currency: pickFromRoots(etimsResponse, ['currency']) || 'KES',
+    exchangeRate: pickFromRoots(etimsResponse, ['exchangeRate', 'exchange_rate']),
+    totalAmount: formatMoneyLabel(etimsResponse, ['totalAmount', 'total_amount']),
+    taxableAmount: formatMoneyLabel(etimsResponse, ['taxableAmount', 'taxable_amount', 'taxblAmt', 'taxbl_amt']),
+    taxAmount: formatMoneyLabel(etimsResponse, ['taxAmount', 'tax_amount', 'taxAmt', 'tax_amt']),
+    receiptNo: pickFromRoots(etimsResponse, ['receiptNo', 'receipt_no', 'scuReceiptNo', 'scu_receipt_no']),
+    scdcId: pickFromRoots(etimsResponse, ['scdcId', 'scdc_id', 'scuId', 'scu_id']),
+    scuReceiptNo: pickFromRoots(etimsResponse, ['scuReceiptNo', 'scu_receipt_no']),
+    scuDate: pickFromRoots(etimsResponse, ['scuDate', 'scu_date']),
+    internalData: pickFromRoots(etimsResponse, ['internalData', 'internal_data']),
+    signature: pickFromRoots(etimsResponse, ['signature', 'receiptSignature', 'receipt_signature']),
+    lines,
+    verificationUrl: resolveEtimsVerificationUrl(opts?.storedVerificationUrl, etimsResponse),
+  };
+}
