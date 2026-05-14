@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { supabase, SUPABASE_URL, SUPABASE_ANON_KEY } from "@/integrations/supabase/client";
 import { readPersistedAuthRawStringSync } from "@/utils/supabaseAccessToken";
 import { getBuilderFeedGuestId } from "@/utils/builderFeedGuestId";
@@ -24,7 +24,8 @@ import {
   MoreHorizontal,
   Globe,
   CheckCircle2,
-  Loader2
+  Loader2,
+  Smile
 } from "lucide-react";
 import { VideoPlayer } from "./VideoPlayer";
 import { formatDistanceToNow } from "date-fns";
@@ -50,8 +51,11 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { loadRecentCommentEmojis, pushRecentCommentEmoji } from "@/utils/commentEmojiRecent";
 
 const GALLERY_REACTIONS = ['👍', '❤️', '😂', '😮', '😢', '😡'] as const;
+const COMMENT_QUICK_EMOJIS = ['👍', '❤️', '😂', '😮', '🙏', '🔥', '💪', '🏗️', '👏', '🎉', '✅', '⭐', '😍', '🤝', '💯'];
 
 type GalleryComment = {
   id: string;
@@ -110,7 +114,31 @@ function GalleryVideoCardActions({
   const [commenterName, setCommenterName] = useState(() => getPublicVisitorDisplayName() || '');
   const [submitting, setSubmitting] = useState(false);
   const [replyTo, setReplyTo] = useState<{ id: string; name: string } | null>(null);
+  const [emojiPopoverOpen, setEmojiPopoverOpen] = useState(false);
+  const [recentCommentEmojis, setRecentCommentEmojis] = useState<string[]>([]);
   const commentInputRef = useRef<HTMLTextAreaElement>(null);
+
+  const commentPickerEmojis = useMemo(() => {
+    const seen = new Set<string>();
+    const out: string[] = [];
+    for (const e of recentCommentEmojis) {
+      if (!seen.has(e)) {
+        seen.add(e);
+        out.push(e);
+      }
+    }
+    for (const e of COMMENT_QUICK_EMOJIS) {
+      if (!seen.has(e)) {
+        seen.add(e);
+        out.push(e);
+      }
+    }
+    return out;
+  }, [recentCommentEmojis]);
+
+  useEffect(() => {
+    setRecentCommentEmojis(loadRecentCommentEmojis());
+  }, []);
 
   useEffect(() => {
     if (!showReactions) return;
@@ -180,6 +208,13 @@ function GalleryVideoCardActions({
   const cancelReply = () => {
     setReplyTo(null);
     setCommentText('');
+  };
+
+  const insertCommentEmoji = (emoji: string) => {
+    setCommentText((prev) => `${prev}${emoji}`);
+    setRecentCommentEmojis(pushRecentCommentEmoji(emoji));
+    setEmojiPopoverOpen(false);
+    setTimeout(() => commentInputRef.current?.focus(), 0);
   };
 
   const submitComment = async (e: React.FormEvent) => {
@@ -366,13 +401,61 @@ function GalleryVideoCardActions({
                 className="h-9 text-sm"
               />
             )}
-            <div className="flex gap-2">
+            <div className="flex flex-wrap items-center gap-0.5 pb-1 border-b border-gray-100">
+              {commentPickerEmojis.slice(0, 10).map((em) => (
+                <button
+                  key={em}
+                  type="button"
+                  className="emoji-native text-xl min-h-9 min-w-9 flex items-center justify-center rounded-md hover:bg-gray-100 active:bg-gray-200 touch-manipulation"
+                  onClick={() => insertCommentEmoji(em)}
+                  title="Add to comment"
+                >
+                  {em}
+                </button>
+              ))}
+              <Popover
+                open={emojiPopoverOpen}
+                onOpenChange={(open) => {
+                  setEmojiPopoverOpen(open);
+                  if (open) setRecentCommentEmojis(loadRecentCommentEmojis());
+                }}
+              >
+                <PopoverTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-9 w-9 p-0 rounded-md shrink-0"
+                    aria-label="More emojis"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <Smile className="h-5 w-5 text-gray-500" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-2" align="start" side="top" onClick={(e) => e.stopPropagation()}>
+                  <p className="text-xs text-gray-500 mb-2 px-1">Tap to add to your comment</p>
+                  <div className="grid grid-cols-6 gap-1 max-w-[240px]">
+                    {commentPickerEmojis.map((em) => (
+                      <button
+                        key={`pop-${em}`}
+                        type="button"
+                        className="emoji-native text-2xl min-h-10 min-w-10 flex items-center justify-center rounded-md hover:bg-gray-100 active:scale-95 touch-manipulation"
+                        onClick={() => insertCommentEmoji(em)}
+                      >
+                        {em}
+                      </button>
+                    ))}
+                  </div>
+                </PopoverContent>
+              </Popover>
+            </div>
+            <div className="flex gap-2 pt-2">
               <Textarea
                 ref={commentInputRef}
                 placeholder={replyTo ? `Reply to ${replyTo.name}…` : 'Write a comment…'}
                 value={commentText}
                 rows={2}
-                className="text-sm min-h-[2.5rem] resize-none"
+                className="text-sm min-h-[2.5rem] resize-none flex-1"
                 onChange={(e) => setCommentText(e.target.value)}
               />
               <Button type="submit" size="sm" disabled={submitting} className="shrink-0 self-end">

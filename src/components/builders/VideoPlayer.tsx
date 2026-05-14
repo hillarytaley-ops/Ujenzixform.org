@@ -1,7 +1,7 @@
 import { readPersistedAuthRawStringSync } from '@/utils/supabaseAccessToken';
 import { getBuilderFeedGuestId } from '@/utils/builderFeedGuestId';
 import { getPublicVisitorDisplayName } from '@/utils/publicVisitorDisplayName';
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import { supabase, SUPABASE_URL, SUPABASE_ANON_KEY } from "@/integrations/supabase/client";
 import {
   Dialog,
@@ -28,9 +28,14 @@ import {
   Phone,
   Mail,
   Building,
+  Smile,
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { SUPPORT_PHONE_PRIMARY } from "@/config/appIdentity";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { loadRecentCommentEmojis, pushRecentCommentEmoji } from "@/utils/commentEmojiRecent";
+
+const COMMENT_QUICK_EMOJIS = ['👍', '❤️', '😂', '😮', '🙏', '🔥', '💪', '🏗️', '👏', '🎉', '✅', '⭐', '😍', '🤝', '💯'];
 interface BuilderVideo {
   id: string;
   builder_id: string;
@@ -97,8 +102,33 @@ export const VideoPlayer = ({
   const [showReactions, setShowReactions] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const reactionRootRef = useRef<HTMLDivElement>(null);
+  const commentInputRef = useRef<HTMLTextAreaElement>(null);
   const watchStartTime = useRef<number>(Date.now());
+  const [emojiPopoverOpen, setEmojiPopoverOpen] = useState(false);
+  const [recentCommentEmojis, setRecentCommentEmojis] = useState<string[]>([]);
   const { toast } = useToast();
+
+  const commentPickerEmojis = useMemo(() => {
+    const seen = new Set<string>();
+    const out: string[] = [];
+    for (const e of recentCommentEmojis) {
+      if (!seen.has(e)) {
+        seen.add(e);
+        out.push(e);
+      }
+    }
+    for (const e of COMMENT_QUICK_EMOJIS) {
+      if (!seen.has(e)) {
+        seen.add(e);
+        out.push(e);
+      }
+    }
+    return out;
+  }, [recentCommentEmojis]);
+
+  useEffect(() => {
+    setRecentCommentEmojis(loadRecentCommentEmojis());
+  }, []);
 
   const VIDEO_REACTIONS = ['👍', '❤️', '😂', '😮', '😢', '😡'] as const;
 
@@ -127,6 +157,13 @@ export const VideoPlayer = ({
     }
     void handleLike();
     setShowReactions(false);
+  };
+
+  const insertCommentEmoji = (emoji: string) => {
+    setNewComment((prev) => `${prev}${emoji}`);
+    setRecentCommentEmojis(pushRecentCommentEmoji(emoji));
+    setEmojiPopoverOpen(false);
+    setTimeout(() => commentInputRef.current?.focus(), 0);
   };
 
   useEffect(() => {
@@ -806,6 +843,46 @@ export const VideoPlayer = ({
                 </div>
               )}
 
+              <div className="flex flex-wrap items-center gap-0.5 pb-2">
+                {commentPickerEmojis.slice(0, 10).map((em) => (
+                  <button
+                    key={em}
+                    type="button"
+                    className="emoji-native text-xl min-h-9 min-w-9 flex items-center justify-center rounded-md hover:bg-gray-100 active:bg-gray-200 touch-manipulation"
+                    onClick={() => insertCommentEmoji(em)}
+                  >
+                    {em}
+                  </button>
+                ))}
+                <Popover
+                  open={emojiPopoverOpen}
+                  onOpenChange={(open) => {
+                    setEmojiPopoverOpen(open);
+                    if (open) setRecentCommentEmojis(loadRecentCommentEmojis());
+                  }}
+                >
+                  <PopoverTrigger asChild>
+                    <Button type="button" variant="ghost" size="sm" className="h-9 w-9 p-0" aria-label="More emojis">
+                      <Smile className="h-5 w-5 text-gray-500" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-2" align="start" side="top">
+                    <div className="grid grid-cols-6 gap-1 max-w-[240px]">
+                      {commentPickerEmojis.map((em) => (
+                        <button
+                          key={`vp-${em}`}
+                          type="button"
+                          className="emoji-native text-2xl min-h-10 min-w-10 flex items-center justify-center rounded-md hover:bg-gray-100 touch-manipulation"
+                          onClick={() => insertCommentEmoji(em)}
+                        >
+                          {em}
+                        </button>
+                      ))}
+                    </div>
+                  </PopoverContent>
+                </Popover>
+              </div>
+
               <div className="flex items-start space-x-2">
                 <Avatar className="h-8 w-8 flex-shrink-0">
                   <AvatarFallback className="bg-blue-500 text-white text-sm">
@@ -814,6 +891,7 @@ export const VideoPlayer = ({
                 </Avatar>
                 <div className="flex-1 relative">
                   <Textarea
+                    ref={commentInputRef}
                     id="comment-input"
                     placeholder="Write a comment..."
                     value={newComment}
@@ -824,8 +902,8 @@ export const VideoPlayer = ({
                         handleSubmitComment();
                       }
                     }}
-                    rows={1}
-                    className="resize-none rounded-2xl bg-gray-100 border-0 pr-10 min-h-[40px]"
+                    rows={2}
+                    className="resize-none rounded-2xl bg-gray-100 border-0 pr-10 min-h-[48px]"
                   />
                   <button 
                     onClick={handleSubmitComment}
