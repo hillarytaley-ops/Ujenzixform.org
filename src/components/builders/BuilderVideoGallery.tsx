@@ -689,39 +689,27 @@ export const BuilderVideoGallery = ({
                 </div>
               </div>
 
-              {/* Engagement — hidden in public browse-only showcase */}
-              {!browseOnly && ((video.likes_count || 0) > 0 || (video.comments_count || 0) > 0) && (
-                <div className="px-4 py-2 border-b flex items-center justify-between text-sm text-gray-500">
-                  <div className="flex items-center gap-1">
-                    {(video.likes_count || 0) > 0 && (
-                      <>
-                        <span className="bg-blue-500 text-white rounded-full p-0.5">
-                          <ThumbsUp className="h-3 w-3" />
-                        </span>
-                        <span className="bg-red-500 text-white rounded-full p-0.5">
-                          <Heart className="h-3 w-3" />
-                        </span>
-                        <span className="ml-1">{video.likes_count}</span>
-                      </>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-3">
-                    {(video.comments_count || 0) > 0 && (
-                      <span>
-                        {video.comments_count}{' '}
-                        {video.comments_count === 1 ? 'comment' : 'comments'}
-                      </span>
-                    )}
-                  </div>
-                </div>
-              )}
+              {/* Engagement stats — always visible on every showcase card */}
+              <div className="px-4 py-2.5 border-t flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-gray-600 bg-gray-50/80">
+                <span className="inline-flex items-center gap-1.5">
+                  <Eye className="h-4 w-4 shrink-0 text-gray-500" />
+                  <span className="font-semibold text-gray-900 tabular-nums">{video.views_count || 0}</span>
+                  <span className="text-gray-500">views</span>
+                </span>
+                <span className="inline-flex items-center gap-1.5">
+                  <ThumbsUp className="h-4 w-4 shrink-0 text-blue-500" />
+                  <span className="font-semibold text-gray-900 tabular-nums">{video.likes_count || 0}</span>
+                  <span className="text-gray-500">likes</span>
+                </span>
+                <span className="inline-flex items-center gap-1.5">
+                  <MessageCircle className="h-4 w-4 shrink-0 text-gray-500" />
+                  <span className="font-semibold text-gray-900 tabular-nums">{video.comments_count || 0}</span>
+                  <span className="text-gray-500">comments</span>
+                </span>
+              </div>
 
               {browseOnly ? (
-                <div className="px-4 py-3 border-t flex items-center justify-between gap-2">
-                  <span className="text-xs text-gray-500 flex items-center gap-1">
-                    <Eye className="h-3.5 w-3.5" />
-                    {video.views_count || 0} views
-                  </span>
+                <div className="px-4 py-3 border-t flex items-center justify-end gap-2">
                   <Button
                     type="button"
                     size="sm"
