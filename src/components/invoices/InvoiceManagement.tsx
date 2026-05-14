@@ -35,7 +35,9 @@ import {
   lineItemCode,
   lineQty,
   pickEtimsTotalAmountKes,
+  resolveEtimsVerificationUrl,
 } from '@/lib/etims/formatEtimsReceiptForUi';
+import { EtimsVerificationQr } from '@/components/etims/EtimsVerificationQr';
 import { PaystackCheckout, isPaystackTestModeBanner } from '@/components/payment/PaystackCheckout';
 import { Separator } from '@/components/ui/separator';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -188,8 +190,15 @@ function KraEtimsReceiptPanel({
   traderInvoiceNoDb?: string | null;
   etimsSubmittedAt?: string | null;
 }) {
-  const url = (verificationUrl || '').trim();
-  const kv = useMemo(() => buildEtimsReceiptKvRows(etimsResponse), [etimsResponse]);
+  const resolvedUrl = useMemo(
+    () => resolveEtimsVerificationUrl(verificationUrl, etimsResponse),
+    [verificationUrl, etimsResponse],
+  );
+  const kv = useMemo(() => {
+    const rows = buildEtimsReceiptKvRows(etimsResponse);
+    if (!resolvedUrl) return rows;
+    return rows.filter((r) => r.label !== 'Verification URL');
+  }, [etimsResponse, resolvedUrl]);
   const salesLines = useMemo(() => extractEtimsSalesItems(etimsResponse), [etimsResponse]);
   const hasStoredPayload =
     etimsResponse != null &&
@@ -218,6 +227,10 @@ function KraEtimsReceiptPanel({
           <span className="text-muted-foreground dark:text-slate-400">Trader invoice no. </span>
           <span className="font-mono font-medium text-foreground">{traderInvoiceNoDb.trim()}</span>
         </p>
+      ) : null}
+
+      {resolvedUrl ? (
+        <EtimsVerificationQr verificationUrl={resolvedUrl} className="mx-auto w-full max-w-sm" />
       ) : null}
 
       {!hasStoredPayload ? (
@@ -266,30 +279,30 @@ function KraEtimsReceiptPanel({
         </>
       )}
 
-      {url && isHttpsOrHttpUrl(url) ? (
+      {resolvedUrl ? (
         <div className="flex flex-col gap-2 border-t border-border pt-3 sm:flex-row sm:flex-wrap sm:items-center">
           <Button
             type="button"
             variant="default"
             size="sm"
             className="w-fit bg-sky-700 text-white hover:bg-sky-800 dark:bg-sky-600 dark:hover:bg-sky-500"
-            onClick={() => window.open(url, '_blank', 'noopener,noreferrer')}
+            onClick={() => window.open(resolvedUrl, '_blank', 'noopener,noreferrer')}
           >
             Open KRA verification page
           </Button>
           <p className="text-[11px] text-muted-foreground dark:text-slate-400">
-            Official tax portal view (new tab). In-app iframe is often blocked by KRA.
+            Same link as the QR above — opens the official tax receipt on KRA.
           </p>
         </div>
       ) : null}
 
-      {url && isHttpsOrHttpUrl(url) ? (
+      {resolvedUrl ? (
         <details className="text-xs text-muted-foreground dark:text-slate-400">
           <summary className="cursor-pointer select-none text-foreground/90 dark:text-slate-300">
             Try embedded preview (optional â€” may be blank)
           </summary>
           <div className="mt-2">
-            <KraEtimsReceiptEmbed url={url} />
+            <KraEtimsReceiptEmbed url={resolvedUrl} />
           </div>
         </details>
       ) : null}

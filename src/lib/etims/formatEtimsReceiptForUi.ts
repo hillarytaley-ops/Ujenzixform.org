@@ -74,7 +74,9 @@ export function buildEtimsReceiptKvRows(raw: unknown): EtimsReceiptKv[] {
   for (const o of roots) {
     const url =
       pickScalar(o, ['invoiceVerificationUrl', 'invoice_verification_url']) ||
-      pickScalar(o, ['verificationUrl', 'verification_url']);
+      pickScalar(o, ['verificationUrl', 'verification_url']) ||
+      pickScalar(o, ['receiptVerificationUrl', 'receipt_verification_url']) ||
+      pickScalar(o, ['link', 'receiptLink', 'receipt_link']);
     if (url && /^https?:\/\//i.test(url)) {
       add('Verification URL', url);
       break;
@@ -90,6 +92,26 @@ export function buildEtimsReceiptKvRows(raw: unknown): EtimsReceiptKv[] {
   }
 
   return rows;
+}
+
+/** Best verification URL from DB column and/or stored integrator JSON. */
+export function resolveEtimsVerificationUrl(
+  storedUrl: string | null | undefined,
+  etimsResponse: unknown,
+): string | null {
+  const fromDb = typeof storedUrl === 'string' ? storedUrl.trim() : '';
+  if (fromDb && /^https?:\/\//i.test(fromDb)) return fromDb;
+
+  const roots = scalarRoots(etimsResponse);
+  for (const o of roots) {
+    const url =
+      pickScalar(o, ['invoiceVerificationUrl', 'invoice_verification_url']) ||
+      pickScalar(o, ['verificationUrl', 'verification_url']) ||
+      pickScalar(o, ['receiptVerificationUrl', 'receipt_verification_url']) ||
+      pickScalar(o, ['link', 'receiptLink', 'receipt_link']);
+    if (url && /^https?:\/\//i.test(url)) return url;
+  }
+  return null;
 }
 
 /** Total in major currency units (e.g. KES) from stored integrator JSON, for Paystack sandbox amount. */

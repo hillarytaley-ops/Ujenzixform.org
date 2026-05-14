@@ -294,7 +294,13 @@ export function pickEtimsPersistFields(data: unknown): {
       ? inner.invoiceVerificationUrl
       : typeof inner.invoice_verification_url === "string"
         ? inner.invoice_verification_url
-        : null;
+        : typeof inner.verificationUrl === "string"
+          ? inner.verificationUrl
+          : typeof inner.verification_url === "string"
+            ? inner.verification_url
+            : typeof inner.link === "string"
+              ? inner.link
+              : null;
   const traderInvoiceNo =
     typeof inner.traderInvoiceNo === "string"
       ? inner.traderInvoiceNo

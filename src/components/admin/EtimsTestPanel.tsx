@@ -669,7 +669,7 @@ export const EtimsTestPanel: React.FC<EtimsTestPanelProps> = ({ enforceSupplierI
                 <code className="rounded bg-muted px-1">purchase_orders</code> (<code className="rounded bg-muted px-1">etims_*</code>
                 columns). Builders also get auto-submit when accepting a quote.
               </li>
-              <li>Receipt URLs from the integrator can appear on the builder Invoices tab.</li>
+              <li>Each paid eTIMS receipt shows a verification QR code builders can scan on KRA.</li>
             </ul>
           </AccordionContent>
         </AccordionItem>
