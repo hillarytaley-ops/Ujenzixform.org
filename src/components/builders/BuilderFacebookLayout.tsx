@@ -25,7 +25,7 @@ import {
   Loader2,
   Truck
 } from 'lucide-react';
-import { BuilderFeed } from './BuilderFeed';
+import { BuilderVideoGallery } from './BuilderVideoGallery';
 import { SupplierMarketingFeed } from './SupplierMarketingFeed';
 import { BuilderGrid } from './BuilderGrid';
 import { BuilderVideoGallery } from './BuilderVideoGallery';
@@ -114,7 +114,7 @@ export const BuilderFacebookLayout: React.FC<BuilderFacebookLayoutProps> = ({
   }, [supplierRows]);
   
   // Mobile navigation state
-  const [mobileTab, setMobileTab] = useState<'feed' | 'builders' | 'create' | 'notifications' | 'menu'>('feed');
+  const [mobileTab, setMobileTab] = useState<'showcase' | 'builders' | 'create' | 'notifications' | 'menu'>('showcase');
   const [showMobileSearch, setShowMobileSearch] = useState(false);
 
   const builderMarketHubMainRef = useRef<HTMLDivElement>(null);
@@ -128,6 +128,13 @@ export const BuilderFacebookLayout: React.FC<BuilderFacebookLayoutProps> = ({
 
   const scrollToProjectShowcase = () => {
     document.getElementById('builder-project-showcase-section')?.scrollIntoView({
+      behavior: 'smooth',
+      block: 'start',
+    });
+  };
+
+  const scrollToShowcaseTop = () => {
+    document.getElementById('builder-feed-showcase-tabs')?.scrollIntoView({
       behavior: 'smooth',
       block: 'start',
     });
@@ -873,45 +880,24 @@ export const BuilderFacebookLayout: React.FC<BuilderFacebookLayoutProps> = ({
           id="builder-feed-showcase-tabs"
           className="w-full flex flex-col min-h-0 flex-1 scroll-mt-20"
         >
-          <div className="flex-1 min-h-0">
-            <BuilderFeed
-              omitOuterCard
-              showComposer={false}
-              currentUserId={currentUserId}
-              currentUserName={currentUserName}
-              currentUserAvatar={currentUserAvatar}
-              currentUserRole={currentUserRole}
-              isBuilder={isBuilder}
-              directoryTimelinePostCount={directoryTimelinePostCount}
-              directoryShowcaseVideoCount={directoryShowcaseVideoCount}
-              directoryStatsLoading={directoryStatsLoading}
-              seedTimelinePosts={seedTimelinePosts}
-              onOpenProjectShowcase={scrollToProjectShowcase}
-              onContactBuilder={(builderId) => {
-                const builder = allBuilders.find(b => b.id === builderId || b.user_id === builderId);
-                if (builder) onBuilderContact?.(builder);
-              }}
-            />
-          </div>
-
           <section
             id="builder-project-showcase-section"
-            className="border-t border-slate-200 dark:border-slate-700 scroll-mt-20"
+            className="flex-1 min-h-0"
             aria-labelledby="builder-project-showcase-heading"
           >
             <div className="border-b border-slate-100 dark:border-slate-800 bg-slate-50/40 dark:bg-slate-900/20 px-3 py-2.5 sm:px-4">
-              <h3
+              <h2
                 id="builder-project-showcase-heading"
-                className="text-base font-bold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent"
+                className="text-base sm:text-lg font-bold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent"
               >
                 Project showcase
-              </h3>
+              </h2>
               <p className="text-xs text-gray-500 dark:text-gray-400 leading-snug mt-0.5">
-                Completed projects from COs/contractors across Kenya — scroll up for the social timeline.
+                Completed projects from COs and contractors across Kenya — browse portfolios, not social posts.
               </p>
             </div>
             <div className="p-2 sm:p-3 min-h-0">
-              <BuilderVideoGallery />
+              <BuilderVideoGallery browseOnly />
             </div>
           </section>
         </div>
@@ -1135,22 +1121,20 @@ export const BuilderFacebookLayout: React.FC<BuilderFacebookLayoutProps> = ({
         peopleTabLabel={marketAudience === 'contractors' ? 'COs' : 'Suppliers'}
         onTabChange={(tab) => {
           setMobileTab(tab);
-          if (tab === 'feed') {
-            scrollToBuilderMarketHubTop();
+          if (tab === 'showcase') {
+            scrollToShowcaseTop();
           } else if (tab === 'builders') {
             setShowMobileSearch(true);
           } else if (tab === 'create') {
-            scrollToBuilderMarketHubTop();
-            window.setTimeout(() => {
-              const anchor =
-                marketAudience === 'contractors'
-                  ? document.getElementById('builder-feed-composer-anchor')
-                  : document.getElementById('supplier-feed-composer-anchor');
-              anchor?.scrollIntoView({
-                behavior: 'smooth',
-                block: 'center',
+            if (isBuilder) {
+              scrollToShowcaseTop();
+              toast({
+                title: 'Upload showcase video',
+                description: 'Open your builder dashboard → Portfolio to add a project video.',
               });
-            }, 280);
+            } else {
+              window.location.href = '/builder-registration';
+            }
           } else if (tab === 'notifications') {
             toast({
               title: 'Alerts',

@@ -81,12 +81,15 @@ interface BuilderVideoGalleryProps {
   builderId?: string; // If provided, show only this builder's videos
   showUploadButton?: boolean;
   isOwner?: boolean; // If true, show edit/delete options
+  /** Public hub: hide like/comment/share — portfolio browse only */
+  browseOnly?: boolean;
 }
 
 export const BuilderVideoGallery = ({ 
   builderId, 
   showUploadButton = false,
-  isOwner = false 
+  isOwner = false,
+  browseOnly = false,
 }: BuilderVideoGalleryProps) => {
   const [videos, setVideos] = useState<BuilderVideo[]>([]);
   const [loading, setLoading] = useState(true);
@@ -555,9 +558,8 @@ export const BuilderVideoGallery = ({
             No project showcase videos yet
           </h3>
           <p className="text-gray-600 text-sm max-w-md mx-auto leading-relaxed">
-            This section lists <strong>portfolio videos</strong> saved to the showcase library. Timeline clips and posts
-            live in the feed above. If you added showcase videos but they are still hidden, they may be unpublished
-            drafts; an admin can mark them published, or ensure new uploads are set to published when saving.
+            No published showcase videos yet. COs and contractors can upload project videos from their dashboard
+            portfolio tab; admins can publish drafts when ready.
           </p>
         </Card>
       ) : (
@@ -687,8 +689,8 @@ export const BuilderVideoGallery = ({
                 </div>
               </div>
 
-              {/* Engagement summary: likes are their own counter (not views/comments). Hide when zero like the main feed. */}
-              {((video.likes_count || 0) > 0 || (video.comments_count || 0) > 0) && (
+              {/* Engagement — hidden in public browse-only showcase */}
+              {!browseOnly && ((video.likes_count || 0) > 0 || (video.comments_count || 0) > 0) && (
                 <div className="px-4 py-2 border-b flex items-center justify-between text-sm text-gray-500">
                   <div className="flex items-center gap-1">
                     {(video.likes_count || 0) > 0 && (
@@ -714,7 +716,26 @@ export const BuilderVideoGallery = ({
                 </div>
               )}
 
-              {/* Action Buttons - Facebook Style */}
+              {browseOnly ? (
+                <div className="px-4 py-3 border-t flex items-center justify-between gap-2">
+                  <span className="text-xs text-gray-500 flex items-center gap-1">
+                    <Eye className="h-3.5 w-3.5" />
+                    {video.views_count || 0} views
+                  </span>
+                  <Button
+                    type="button"
+                    size="sm"
+                    className="bg-blue-600 hover:bg-blue-700 text-white"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      openVideoPlayer(video);
+                    }}
+                  >
+                    <Play className="h-4 w-4 mr-1" />
+                    View project
+                  </Button>
+                </div>
+              ) : (
               <div className="px-2 py-1 flex items-center justify-around border-b" onClick={(ev) => ev.stopPropagation()}>
                 <Button
                   type="button"
@@ -755,6 +776,7 @@ export const BuilderVideoGallery = ({
                   <span className="hidden sm:inline">Share</span>
                 </Button>
               </div>
+              )}
 
               {/* Owner Actions */}
               {isOwner && (

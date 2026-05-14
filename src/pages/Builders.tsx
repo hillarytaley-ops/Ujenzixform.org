@@ -235,8 +235,7 @@ const Builders = () => {
             </h1>
 
             <p className="text-xs sm:text-sm text-white/80 mb-2 max-w-xl mx-auto leading-snug">
-              COs, contractors, and suppliers in one place — directory, social feed, project showcase, and supplier
-              marketing.
+              COs, contractors, and suppliers in one place — directory, project showcase, and supplier listings.
             </p>
 
             <div className="flex flex-wrap gap-1.5 justify-center mb-2">

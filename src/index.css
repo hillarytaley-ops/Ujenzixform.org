@@ -40,6 +40,17 @@ p, span, div, h1, h2, h3, h4, h5, h6, label, button {
   backface-visibility: hidden;
 }
 
+/* Native emoji rendering — avoids invisible glyphs on some mobile WebViews */
+.emoji-native {
+  font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", "Twemoji Mozilla", sans-serif;
+  font-style: normal;
+  font-weight: normal;
+  line-height: 1;
+  display: inline-block;
+  vertical-align: middle;
+  -webkit-font-smoothing: antialiased;
+}
+
 /* GPU acceleration for smooth scrolling */
 .gpu-accelerated {
   transform: translateZ(0);

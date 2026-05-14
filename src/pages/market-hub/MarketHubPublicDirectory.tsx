@@ -40,7 +40,7 @@ export default function MarketHubPublicDirectory({
   return (
     <div className="space-y-3">
       <p className="text-center text-xs text-muted-foreground px-2 sm:hidden max-w-md mx-auto leading-snug">
-        Switch between CO/contractors and suppliers below. Use the bottom bar for search, create, and site menu.
+        Switch between CO/contractors and suppliers below. Use the bottom bar for projects, directory search, and site menu.
       </p>
 
       {userProfile &&

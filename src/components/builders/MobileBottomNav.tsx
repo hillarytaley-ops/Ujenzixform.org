@@ -12,8 +12,8 @@ import {
 } from 'lucide-react';
 
 interface MobileBottomNavProps {
-  activeTab: 'feed' | 'builders' | 'create' | 'notifications' | 'menu';
-  onTabChange: (tab: 'feed' | 'builders' | 'create' | 'notifications' | 'menu') => void;
+  activeTab: 'showcase' | 'builders' | 'create' | 'notifications' | 'menu';
+  onTabChange: (tab: 'showcase' | 'builders' | 'create' | 'notifications' | 'menu') => void;
   /** Middle-left tab label (directory list). Default: Builders */
   peopleTabLabel?: string;
   notificationCount?: number;
@@ -33,7 +33,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
   }, []);
 
   const tabs = [
-    { id: 'feed' as const, icon: Home, label: 'Feed' },
+    { id: 'showcase' as const, icon: Home, label: 'Projects' },
     { id: 'builders' as const, icon: Users, label: peopleTabLabel },
     { id: 'create' as const, icon: Plus, label: 'Create', isSpecial: true },
     { id: 'notifications' as const, icon: Bell, label: 'Alerts', badge: notificationCount },

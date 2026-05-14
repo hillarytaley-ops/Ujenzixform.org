@@ -473,8 +473,8 @@ export const BuilderVideoPost: React.FC<BuilderVideoPostProps> = ({
     <Card
       className={
         embedded
-          ? 'w-full max-w-none mx-0 rounded-none border-0 shadow-none bg-white dark:bg-gray-900 overflow-hidden'
-          : 'w-full max-w-2xl mx-auto bg-white dark:bg-gray-900 shadow-md hover:shadow-lg transition-shadow duration-300 rounded-lg overflow-hidden'
+          ? 'w-full max-w-none mx-0 rounded-none border-0 shadow-none bg-white dark:bg-gray-900'
+          : 'w-full max-w-2xl mx-auto bg-white dark:bg-gray-900 shadow-md hover:shadow-lg transition-shadow duration-300 rounded-lg'
       }
     >
       {/* Post Header - Facebook Style */}
@@ -664,7 +664,7 @@ export const BuilderVideoPost: React.FC<BuilderVideoPostProps> = ({
       </div>
       ) : imageUrl && imageUrl.length > 0 ? (
         /* Image Display */
-        <div className="relative bg-gray-100 dark:bg-gray-800 min-h-[200px]">
+        <div className="relative bg-gray-100 dark:bg-gray-800 min-h-[200px] overflow-hidden rounded-none">
           <img
             src={imageUrl}
             alt={caption || 'Post image'}
@@ -687,7 +687,7 @@ export const BuilderVideoPost: React.FC<BuilderVideoPostProps> = ({
         <div className="flex items-center gap-2 min-w-0">
           {displayLiked && (
             <span
-              className="text-2xl sm:text-[1.65rem] leading-none shrink-0 drop-shadow-sm"
+              className="emoji-native text-2xl sm:text-[1.65rem] leading-none shrink-0 drop-shadow-sm"
               title="Your reaction"
               aria-label="Your reaction"
             >
@@ -749,7 +749,7 @@ export const BuilderVideoPost: React.FC<BuilderVideoPostProps> = ({
               <div
                 role="listbox"
                 aria-label="Choose a reaction"
-                className="absolute bottom-full left-1/2 z-[60] flex -translate-x-1/2 translate-y-2 gap-1 rounded-full border border-gray-200 bg-white px-2 py-2 shadow-xl animate-in fade-in slide-in-from-bottom-2 duration-200 dark:border-gray-700 dark:bg-gray-800"
+                className="absolute bottom-full left-1/2 z-[200] flex -translate-x-1/2 translate-y-2 gap-1 rounded-full border border-gray-200 bg-white px-2 py-2 shadow-xl animate-in fade-in slide-in-from-bottom-2 duration-200 dark:border-gray-700 dark:bg-gray-800 max-sm:fixed max-sm:bottom-[calc(4.5rem+env(safe-area-inset-bottom))] max-sm:left-1/2 max-sm:-translate-x-1/2 max-sm:translate-y-0"
                 onMouseEnter={clearReactionHideTimer}
                 onMouseLeave={scheduleReactionHide}
               >
@@ -763,7 +763,7 @@ export const BuilderVideoPost: React.FC<BuilderVideoPostProps> = ({
                       e.stopPropagation();
                       handleReactionPick(reaction.emoji);
                     }}
-                    className="flex h-12 min-h-12 w-12 min-w-12 shrink-0 items-center justify-center rounded-full text-3xl transition-transform hover:scale-110 hover:bg-gray-100 active:scale-95 dark:hover:bg-gray-700"
+                    className="emoji-native flex h-12 min-h-12 w-12 min-w-12 shrink-0 items-center justify-center rounded-full text-3xl transition-transform hover:scale-110 hover:bg-gray-100 active:scale-95 dark:hover:bg-gray-700 touch-manipulation"
                     title={reaction.name}
                   >
                     {reaction.emoji}
@@ -788,7 +788,7 @@ export const BuilderVideoPost: React.FC<BuilderVideoPostProps> = ({
               }}
             >
               {displayLiked ? (
-                <span className="text-2xl sm:text-[1.75rem] leading-none select-none" aria-hidden>
+                <span className="emoji-native text-2xl sm:text-[1.75rem] leading-none select-none" aria-hidden>
                   {pickedReactionEmoji}
                 </span>
               ) : (
