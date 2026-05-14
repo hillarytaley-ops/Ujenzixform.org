@@ -3014,11 +3014,10 @@ const SupplierDashboard = () => {
               <CardHeader>
                 <CardTitle className={`flex items-center gap-2 ${textColor}`}>
                   <Landmark className="h-5 w-5 text-sky-500 shrink-0" />
-                  eTIMS (KRA integrator) test
+                  eTIMS integrator
                 </CardTitle>
                 <CardDescription className={mutedText}>
-                  Smoke-test the deployed Edge function <code className="text-xs">etims-proxy</code> against your
-                  integrator sandbox. Requires Edge secrets in Supabase.
+                  Test your KRA connection and submit tax invoices from purchase orders.
                 </CardDescription>
               </CardHeader>
               <CardContent>

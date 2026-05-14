@@ -4,11 +4,28 @@
  */
 
 import React, { useMemo, useState } from "react";
-import { Check, ChevronsUpDown, Loader2, Landmark, Play } from "lucide-react";
+import {
+  Check,
+  ChevronsUpDown,
+  Coins,
+  Globe2,
+  HelpCircle,
+  Landmark,
+  ListOrdered,
+  Loader2,
+  PackageSearch,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
 import {
   Command,
   CommandEmpty,
@@ -18,6 +35,7 @@ import {
   CommandList,
 } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { invokeEtimsProxy } from "@/lib/etims/invokeEtimsProxy";
 import { EtimsPurchaseOrderSubmitCard } from "@/components/admin/EtimsPurchaseOrderSubmitCard";
@@ -102,6 +120,14 @@ function extractIntegratorPayload(root: unknown): {
   const message = typeof root.message === "string" ? root.message : null;
   const rows = asNameCodeRows(root.data);
   return { httpStatus, statusCode, message, rows, raw: root };
+}
+
+function StepBadge({ n }: { n: number }) {
+  return (
+    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-sky-600 text-xs font-semibold text-white">
+      {n}
+    </span>
+  );
 }
 
 function EtimsListPicker({
@@ -191,16 +217,14 @@ function EtimsListPicker({
         </PopoverContent>
       </Popover>
       {ready ? (
-        <p className="text-xs text-muted-foreground">
-          {rows!.length} option{rows!.length === 1 ? "" : "s"} loaded — search in the list above.
-        </p>
+        <p className="text-xs text-muted-foreground">{rows!.length} options loaded</p>
       ) : null}
     </div>
   );
 }
 
 export type EtimsTestPanelProps = {
-  /** Supplier row id: restricts PO submit to that supplier’s orders */
+  /** Supplier row id: restricts PO submit to that supplier's orders */
   enforceSupplierId?: string | null;
   /** Supplier dashboard: open My Materials for the catalog id from a failed submit */
   onOpenCatalogForEtims?: (catalogMaterialId: string) => void;
@@ -326,217 +350,330 @@ export const EtimsTestPanel: React.FC<EtimsTestPanelProps> = ({ enforceSupplierI
   const invoiceCurrencyForSubmit = selectedCurrencyCode.trim() || undefined;
   const invoiceCountryForSubmit = selectedCountryCode.trim() || undefined;
 
-  return (
-    <div className="space-y-4">
-      <Alert className="border-border bg-muted/40 dark:bg-slate-950/60 dark:border-slate-700">
-        <Landmark className="h-4 w-4" />
-        <AlertTitle className="text-foreground">Integrator connection test</AlertTitle>
-        <AlertDescription className="text-muted-foreground">
-          Uses Edge <code className="rounded bg-muted px-1 py-0.5 text-xs text-foreground">etims-proxy</code> (signed-in
-          supplier or admin). Set credentials in Supabase
-          {secretsUrl ? (
-            <>
-              {" "}
-              (<a href={secretsUrl} target="_blank" rel="noreferrer" className="text-primary underline">
-                Edge secrets
-              </a>
-              ).
-            </>
-          ) : (
-            " (Edge secrets)."
-          )}{" "}
-          Invoice lines need an <span className="font-mono text-foreground">itemCode</span> that already exists on the
-          integrator. Use <strong>Load integrator items</strong> to list codes from <span className="font-mono">GET /items</span>
-          , then paste each code into <strong>My Materials</strong> for the matching product (or register new items via{" "}
-          <span className="font-mono">POST /items</span> in Postman if the list is empty).
-          <span className="mt-2 block text-xs leading-relaxed">
-            <strong className="text-foreground">Where tax invoices go:</strong> the app calls your integrator via{" "}
-            <span className="font-mono text-foreground">etims-proxy</span> (<span className="font-mono">POST /invoices</span>
-            ). Results are stored on <span className="font-mono text-foreground">purchase_orders</span> (
-            <span className="font-mono">etims_*</span>). Builders also get a best-effort auto-submit when they{" "}
-            <strong>accept a quote</strong> (same API); GRN does not gate this. If the integrator returns a receipt URL, it
-            can appear on the builder <strong>Invoices</strong> tab.
-          </span>
-        </AlertDescription>
-      </Alert>
+  const connectionStatus = itemCatalogRows !== null
+    ? itemCatalogRows.length > 0
+      ? "connected"
+      : "empty"
+    : currencyRows || countryRows
+      ? "partial"
+      : "idle";
 
-      <div className="flex flex-wrap gap-2">
-        <Button type="button" variant="secondary" disabled={loading} onClick={() => run("Currencies", "currencies")}>
-          {loading && lastLabel === "Currencies" ? (
-            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-          ) : (
-            <Play className="h-4 w-4 mr-2" />
-          )}
-          Load currencies
-        </Button>
-        <Button type="button" variant="outline" disabled={loading} onClick={() => run("Countries", "countries")}>
-          {loading && lastLabel === "Countries" ? (
-            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-          ) : (
-            <Play className="h-4 w-4 mr-2" />
-          )}
-          Load countries
-        </Button>
-        <Button type="button" variant="outline" disabled={loading} onClick={() => void loadIntegratorItems()}>
-          {loading && lastLabel === "Items" ? (
-            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-          ) : (
-            <Play className="h-4 w-4 mr-2" />
-          )}
-          Load integrator items
-        </Button>
+  return (
+    <div className="space-y-5">
+      {/* Compact intro */}
+      <div className="flex flex-col gap-3 rounded-lg border border-sky-200/60 bg-gradient-to-r from-sky-50/80 to-cyan-50/50 px-4 py-3 dark:border-sky-800/40 dark:from-sky-950/30 dark:to-cyan-950/20 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-start gap-3">
+          <Landmark className="mt-0.5 h-5 w-5 shrink-0 text-sky-600 dark:text-sky-400" />
+          <div>
+            <p className="text-sm font-medium text-foreground">KRA eTIMS integrator sandbox</p>
+            <p className="text-xs text-muted-foreground">
+              Test your connection, then submit a purchase order as a tax invoice.
+            </p>
+          </div>
+        </div>
+        {secretsUrl ? (
+          <Button variant="outline" size="sm" className="shrink-0 border-sky-300/60 bg-white/60 dark:bg-slate-900/40" asChild>
+            <a href={secretsUrl} target="_blank" rel="noreferrer">
+              Edge secrets
+            </a>
+          </Button>
+        ) : null}
       </div>
 
-      {itemCatalogRows !== null ? (
-        <div className="rounded-md border border-border bg-card p-4 space-y-2">
-          <p className="text-sm font-medium text-foreground">Integrator item codes</p>
-          <p className="text-xs text-muted-foreground leading-relaxed">
-            Copy the <span className="font-mono">itemCode</span> for each product into{" "}
-            <strong>My Materials → eTIMS item code</strong> so purchase-order invoice submit can map lines automatically.
-          </p>
-          {itemCatalogRows.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No rows — try registering items on the integrator first.</p>
-          ) : (
-            <div className="max-h-[min(20rem,45vh)] overflow-auto rounded border border-border">
-              <table className="w-full text-sm">
-                <thead className="sticky top-0 border-b border-border bg-muted/30">
-                  <tr>
-                    <th className="px-3 py-2 text-left font-medium">itemCode</th>
-                    <th className="px-3 py-2 text-left font-medium">Name</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {itemCatalogRows.map((row) => (
-                    <tr key={row.code} className="border-b border-border/60">
-                      <td className="px-3 py-2 font-mono text-xs">{row.code}</td>
-                      <td className="px-3 py-2">{row.name}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+      {/* Step 1 — Connection */}
+      <Card>
+        <CardHeader className="pb-3">
+          <div className="flex items-center gap-3">
+            <StepBadge n={1} />
+            <div>
+              <CardTitle className="text-base">Test connection</CardTitle>
+              <CardDescription>Load reference data from your integrator via the Edge proxy.</CardDescription>
             </div>
-          )}
-        </div>
-      ) : null}
-
-      <div className="rounded-md border border-border bg-card p-4 space-y-4">
-        <p className="text-sm font-medium text-foreground">Selections for invoice test</p>
-        <p className="text-xs text-muted-foreground leading-relaxed">
-          Load each list once. Use the searchable dropdowns to pick currency and (optionally) country. These values are
-          passed into <span className="font-mono text-foreground">POST /invoices</span> when you submit a purchase order
-          below (currency and exchange rate always; country only if selected — omit if your integrator rejects extra
-          fields).
-        </p>
-        <div className="grid gap-4 sm:grid-cols-2">
-          <EtimsListPicker
-            id="etims-pick-currency"
-            label="Invoice currency"
-            placeholder="Load currencies first…"
-            rows={currencyRows}
-            value={selectedCurrencyCode}
-            onChange={setSelectedCurrencyCode}
-            disabled={loading}
-          />
-          <div className="space-y-1.5">
-            <Label htmlFor="etims-ex-rate">Exchange rate</Label>
-            <Input
-              id="etims-ex-rate"
-              type="number"
-              min={0.000001}
-              step="any"
-              value={exchangeRateStr}
-              onChange={(e) => setExchangeRateStr(e.target.value)}
-              disabled={!currencyRows?.length}
-              className="font-mono text-sm"
-            />
-            <p className="text-xs text-muted-foreground">Usually 1 when invoice currency matches your books.</p>
           </div>
-          <div className="sm:col-span-2">
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid gap-2 sm:grid-cols-3">
+            <Button
+              type="button"
+              variant={currencyRows ? "secondary" : "outline"}
+              disabled={loading}
+              className="h-auto justify-start gap-2 py-3"
+              onClick={() => run("Currencies", "currencies")}
+            >
+              {loading && lastLabel === "Currencies" ? (
+                <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
+              ) : (
+                <Coins className="h-4 w-4 shrink-0 text-amber-600" />
+              )}
+              <div className="text-left">
+                <span className="block text-sm font-medium">Currencies</span>
+                {currencyRows ? (
+                  <span className="text-xs text-muted-foreground">{currencyRows.length} loaded</span>
+                ) : (
+                  <span className="text-xs text-muted-foreground">Load list</span>
+                )}
+              </div>
+            </Button>
+            <Button
+              type="button"
+              variant={countryRows ? "secondary" : "outline"}
+              disabled={loading}
+              className="h-auto justify-start gap-2 py-3"
+              onClick={() => run("Countries", "countries")}
+            >
+              {loading && lastLabel === "Countries" ? (
+                <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
+              ) : (
+                <Globe2 className="h-4 w-4 shrink-0 text-emerald-600" />
+              )}
+              <div className="text-left">
+                <span className="block text-sm font-medium">Countries</span>
+                {countryRows ? (
+                  <span className="text-xs text-muted-foreground">{countryRows.length} loaded</span>
+                ) : (
+                  <span className="text-xs text-muted-foreground">Load list</span>
+                )}
+              </div>
+            </Button>
+            <Button
+              type="button"
+              variant={itemCatalogRows ? "secondary" : "outline"}
+              disabled={loading}
+              className="h-auto justify-start gap-2 py-3"
+              onClick={() => void loadIntegratorItems()}
+            >
+              {loading && lastLabel === "Items" ? (
+                <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
+              ) : (
+                <PackageSearch className="h-4 w-4 shrink-0 text-sky-600" />
+              )}
+              <div className="text-left">
+                <span className="block text-sm font-medium">Item catalog</span>
+                {itemCatalogRows ? (
+                  <span className="text-xs text-muted-foreground">{itemCatalogRows.length} items</span>
+                ) : (
+                  <span className="text-xs text-muted-foreground">Load codes</span>
+                )}
+              </div>
+            </Button>
+          </div>
+
+          {connectionStatus !== "idle" ? (
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge
+                variant="outline"
+                className={cn(
+                  connectionStatus === "connected" && "border-emerald-500/50 bg-emerald-50 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200",
+                  connectionStatus === "empty" && "border-amber-500/50 bg-amber-50 text-amber-800 dark:bg-amber-950/40 dark:text-amber-200",
+                  connectionStatus === "partial" && "border-sky-500/50 bg-sky-50 text-sky-800 dark:bg-sky-950/40 dark:text-sky-200",
+                )}
+              >
+                {connectionStatus === "connected"
+                  ? "Catalog ready"
+                  : connectionStatus === "empty"
+                    ? "Catalog empty — register items on integrator"
+                    : "Partial — load item catalog next"}
+              </Badge>
+            </div>
+          ) : null}
+
+          {itemCatalogRows !== null && itemCatalogRows.length > 0 ? (
+            <Accordion type="single" collapsible className="rounded-md border">
+              <AccordionItem value="catalog" className="border-0">
+                <AccordionTrigger className="px-4 py-3 text-sm hover:no-underline">
+                  <div className="flex items-center gap-2">
+                    <ListOrdered className="h-4 w-4 text-muted-foreground" />
+                    Integrator item codes ({itemCatalogRows.length})
+                  </div>
+                </AccordionTrigger>
+                <AccordionContent className="px-0 pb-0">
+                  <p className="px-4 pb-2 text-xs text-muted-foreground">
+                    Copy each code into <strong>My Materials → eTIMS item code</strong> for automatic line mapping.
+                  </p>
+                  <div className="max-h-48 overflow-auto border-t">
+                    <table className="w-full text-sm">
+                      <thead className="sticky top-0 border-b bg-muted/40">
+                        <tr>
+                          <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">Code</th>
+                          <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">Name</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {itemCatalogRows.map((row) => (
+                          <tr key={row.code} className="border-b border-border/50 last:border-0">
+                            <td className="px-4 py-2 font-mono text-xs">{row.code}</td>
+                            <td className="px-4 py-2 text-sm">{row.name}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </AccordionContent>
+              </AccordionItem>
+            </Accordion>
+          ) : null}
+        </CardContent>
+      </Card>
+
+      {/* Step 2 — Invoice settings */}
+      <Card>
+        <CardHeader className="pb-3">
+          <div className="flex items-center gap-3">
+            <StepBadge n={2} />
+            <div>
+              <CardTitle className="text-base">Invoice settings</CardTitle>
+              <CardDescription>Currency and exchange rate sent with each invoice submission.</CardDescription>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="grid gap-4 sm:grid-cols-2">
             <EtimsListPicker
-              id="etims-pick-country"
-              label="Country code (optional)"
-              placeholder="Load countries first…"
-              rows={countryRows}
-              value={selectedCountryCode}
-              onChange={setSelectedCountryCode}
-              optionalClear
+              id="etims-pick-currency"
+              label="Invoice currency"
+              placeholder="Load currencies first…"
+              rows={currencyRows}
+              value={selectedCurrencyCode}
+              onChange={setSelectedCurrencyCode}
               disabled={loading}
             />
+            <div className="space-y-1.5">
+              <Label htmlFor="etims-ex-rate">Exchange rate</Label>
+              <Input
+                id="etims-ex-rate"
+                type="number"
+                min={0.000001}
+                step="any"
+                value={exchangeRateStr}
+                onChange={(e) => setExchangeRateStr(e.target.value)}
+                disabled={!currencyRows?.length}
+                className="font-mono text-sm"
+              />
+              <p className="text-xs text-muted-foreground">Use 1 when currency matches your books.</p>
+            </div>
+            <div className="sm:col-span-2">
+              <EtimsListPicker
+                id="etims-pick-country"
+                label="Country code (optional)"
+                placeholder="Load countries first…"
+                rows={countryRows}
+                value={selectedCountryCode}
+                onChange={setSelectedCountryCode}
+                optionalClear
+                disabled={loading}
+              />
+            </div>
           </div>
-        </div>
-      </div>
+        </CardContent>
+      </Card>
 
+      {/* Step 3 — Submit invoice (delegated) */}
+      <EtimsPurchaseOrderSubmitCard
+        stepNumber={3}
+        enforceSupplierId={enforceSupplierId}
+        invoiceCurrency={invoiceCurrencyForSubmit}
+        invoiceExchangeRate={exchangeRateNum}
+        invoiceCountryCode={invoiceCountryForSubmit}
+        onOpenCatalogForEtims={onOpenCatalogForEtims}
+      />
+
+      {/* API response (collapsible) */}
       {lastPayload !== null && (
-        <div className="space-y-3">
-          {lastLabel && (
-            <p className="text-sm font-medium text-foreground">
-              Last request: <span className="text-muted-foreground">{lastLabel}</span>
-            </p>
-          )}
-
-          {showTable ? (
-            <details className="rounded-md border border-border bg-card">
-              <summary className="cursor-pointer select-none px-3 py-2 text-sm font-medium text-foreground hover:bg-muted/40">
-                Table preview (last request only, {parsed.rows!.length} rows)
-              </summary>
-              <div className="max-h-[min(24rem,55vh)] overflow-auto border-t border-border">
-                <table className="w-full text-sm">
-                  <thead className="border-b border-border bg-muted/30">
-                    <tr>
-                      <th className="px-3 py-2 text-left font-medium w-[100px]">Code</th>
-                      <th className="px-3 py-2 text-left font-medium">Name</th>
-                      {hasDescriptionCol ? (
-                        <th className="px-3 py-2 text-left font-medium">Description</th>
-                      ) : null}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {parsed.rows!.map((row, i) => (
-                      <tr key={`${row.code}-${i}`} className="border-b border-border/60">
-                        <td className="px-3 py-2 font-mono">{row.code}</td>
-                        <td className="px-3 py-2">{row.name}</td>
+        <Card className="border-dashed">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              Last API response
+              {lastLabel ? (
+                <span className="ml-2 font-normal">— {lastLabel}</span>
+              ) : null}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3 pt-0">
+            {showTable ? (
+              <details className="rounded-md border">
+                <summary className="cursor-pointer select-none px-3 py-2 text-sm font-medium hover:bg-muted/40">
+                  Table preview ({parsed.rows!.length} rows)
+                </summary>
+                <div className="max-h-48 overflow-auto border-t">
+                  <table className="w-full text-sm">
+                    <thead className="border-b bg-muted/30">
+                      <tr>
+                        <th className="px-3 py-2 text-left font-medium">Code</th>
+                        <th className="px-3 py-2 text-left font-medium">Name</th>
                         {hasDescriptionCol ? (
-                          <td className="px-3 py-2 text-muted-foreground">{row.description ?? "—"}</td>
+                          <th className="px-3 py-2 text-left font-medium">Description</th>
                         ) : null}
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </details>
-          ) : emptyList ? (
-            <div className="rounded-md border border-border bg-muted/30 px-3 py-4 text-center text-sm text-muted-foreground">
-              {parsed.message ?? "Request succeeded"} — no rows in this list.
-            </div>
-          ) : (
-            <Alert variant={parsed.httpStatus !== null && parsed.httpStatus >= 400 ? "destructive" : "default"}>
-              <AlertTitle className="text-foreground">Response</AlertTitle>
-              <AlertDescription className="text-muted-foreground">
-                {isRecord(lastPayload) && typeof lastPayload.message === "string"
-                  ? lastPayload.message
-                  : "Could not show as a table (unexpected shape). See raw JSON below."}
-              </AlertDescription>
-            </Alert>
-          )}
+                    </thead>
+                    <tbody>
+                      {parsed.rows!.map((row, i) => (
+                        <tr key={`${row.code}-${i}`} className="border-b border-border/60">
+                          <td className="px-3 py-2 font-mono text-xs">{row.code}</td>
+                          <td className="px-3 py-2">{row.name}</td>
+                          {hasDescriptionCol ? (
+                            <td className="px-3 py-2 text-muted-foreground">{row.description ?? "—"}</td>
+                          ) : null}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </details>
+            ) : emptyList ? (
+              <p className="rounded-md border bg-muted/30 px-3 py-3 text-center text-sm text-muted-foreground">
+                {parsed.message ?? "Request succeeded"} — no rows returned.
+              </p>
+            ) : (
+              <Alert variant={parsed.httpStatus !== null && parsed.httpStatus >= 400 ? "destructive" : "default"}>
+                <AlertTitle>Response</AlertTitle>
+                <AlertDescription>
+                  {isRecord(lastPayload) && typeof lastPayload.message === "string"
+                    ? lastPayload.message
+                    : "Unexpected response shape — see raw JSON below."}
+                </AlertDescription>
+              </Alert>
+            )}
 
-          <details className="rounded-md border border-border bg-muted/30 text-sm">
-            <summary className="cursor-pointer select-none px-3 py-2 font-medium text-foreground hover:bg-muted/50">
-              Raw JSON (technical)
-            </summary>
-            <pre className="max-h-64 overflow-auto border-t border-border p-3 text-xs text-foreground">{rawJson}</pre>
-          </details>
-        </div>
+            <details className="rounded-md border bg-muted/20 text-sm">
+              <summary className="cursor-pointer select-none px-3 py-2 font-medium hover:bg-muted/40">
+                Raw JSON
+              </summary>
+              <pre className="max-h-48 overflow-auto border-t p-3 text-xs">{rawJson}</pre>
+            </details>
+          </CardContent>
+        </Card>
       )}
 
-      <div className="border-t border-border pt-6">
-        <EtimsPurchaseOrderSubmitCard
-          enforceSupplierId={enforceSupplierId}
-          invoiceCurrency={invoiceCurrencyForSubmit}
-          invoiceExchangeRate={exchangeRateNum}
-          invoiceCountryCode={invoiceCountryForSubmit}
-          onOpenCatalogForEtims={onOpenCatalogForEtims}
-        />
-      </div>
+      {/* Help accordion */}
+      <Accordion type="single" collapsible className="rounded-lg border bg-muted/20">
+        <AccordionItem value="help" className="border-0">
+          <AccordionTrigger className="px-4 py-3 text-sm hover:no-underline">
+            <div className="flex items-center gap-2 text-muted-foreground">
+              <HelpCircle className="h-4 w-4" />
+              How eTIMS works on UjenziXform
+            </div>
+          </AccordionTrigger>
+          <AccordionContent className="px-4 pb-4 text-xs leading-relaxed text-muted-foreground">
+            <ul className="list-disc space-y-2 pl-4">
+              <li>
+                Calls go through the Edge function <code className="rounded bg-muted px-1">etims-proxy</code> using your
+                signed-in session. Credentials live in Supabase Edge secrets.
+              </li>
+              <li>
+                Each invoice line needs an <code className="rounded bg-muted px-1">itemCode</code> registered on your
+                integrator. Map codes in <strong>My Materials</strong> or register via{" "}
+                <code className="rounded bg-muted px-1">POST /items</code>.
+              </li>
+              <li>
+                Submissions use <code className="rounded bg-muted px-1">POST /invoices</code> and results are stored on{" "}
+                <code className="rounded bg-muted px-1">purchase_orders</code> (<code className="rounded bg-muted px-1">etims_*</code>
+                columns). Builders also get auto-submit when accepting a quote.
+              </li>
+              <li>Receipt URLs from the integrator can appear on the builder Invoices tab.</li>
+            </ul>
+          </AccordionContent>
+        </AccordionItem>
+      </Accordion>
     </div>
   );
 };

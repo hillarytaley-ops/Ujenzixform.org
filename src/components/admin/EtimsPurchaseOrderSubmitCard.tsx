@@ -4,11 +4,17 @@
  */
 
 import React, { useEffect, useState } from "react";
-import { Check, ChevronsUpDown, Loader2, Package, RefreshCw, Send } from "lucide-react";
+import { Check, ChevronsUpDown, HelpCircle, Loader2, RefreshCw, Send, Warehouse } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
 import {
   Command,
   CommandEmpty,
@@ -127,6 +133,8 @@ function formatKesAmount(n: number): string {
 }
 
 export type EtimsPurchaseOrderSubmitCardProps = {
+  /** Optional step badge number when embedded in EtimsTestPanel */
+  stepNumber?: number;
   /** When set, PO must belong to this supplier row id */
   enforceSupplierId?: string | null;
   /** From integrator GET currencies; defaults to KES in builder if omitted */
@@ -139,6 +147,7 @@ export type EtimsPurchaseOrderSubmitCardProps = {
 };
 
 export const EtimsPurchaseOrderSubmitCard: React.FC<EtimsPurchaseOrderSubmitCardProps> = ({
+  stepNumber,
   enforceSupplierId,
   invoiceCurrency,
   invoiceExchangeRate,
@@ -432,43 +441,40 @@ export const EtimsPurchaseOrderSubmitCard: React.FC<EtimsPurchaseOrderSubmitCard
   };
 
   return (
-    <div className="space-y-6 rounded-md border border-border bg-card p-4">
-      <div className="flex items-center gap-2 text-foreground">
-        <Send className="h-4 w-4 shrink-0" />
-        <h3 className="text-sm font-semibold">Purchase order → eTIMS invoice</h3>
-      </div>
-      <Alert className="border-border bg-muted/30">
-        <Package className="h-4 w-4" />
-        <AlertTitle className="text-foreground">Line mapping (step 1)</AlertTitle>
-        <AlertDescription className="text-muted-foreground text-xs leading-relaxed">
-          Each line needs a KRA item code for the integrator: set{" "}
-          <code className="rounded bg-muted px-1">etims_item_code</code> on the PO JSON, or store it on{" "}
-          <code className="rounded bg-muted px-1">supplier_product_prices</code> /{" "}
-          <code className="rounded bg-muted px-1">materials</code> for the same{" "}
-          <code className="rounded bg-muted px-1">material_id</code> (the app fills missing codes at submit). Suppliers can
-          set the code when adding or editing a product in their catalog; admins can set it from Product Submissions (edit on
-          any tab).           Optional per line: <code className="rounded bg-muted px-1">taxCode</code> (A–E). If submission fails with
-          &quot;No item with name: …&quot;, that code is not on the linked eTIMS item register for this sandbox or
-          production tenant—register the item with KRA or use a code your integrator has already provisioned.
-        </AlertDescription>
-      </Alert>
-
-      {(invoiceCurrency || invoiceCountryCode || (invoiceExchangeRate != null && invoiceExchangeRate !== 1)) && (
-        <p className="text-xs text-muted-foreground">
-          Invoice payload: currency{" "}
-          <span className="font-mono text-foreground">{invoiceCurrency?.trim() || "KES (default)"}</span>
-          {invoiceExchangeRate != null && invoiceExchangeRate !== 1 ? (
-            <>
-              , rate <span className="font-mono text-foreground">{invoiceExchangeRate}</span>
-            </>
-          ) : null}
-          {invoiceCountryCode?.trim() ? (
-            <>
-              , country <span className="font-mono text-foreground">{invoiceCountryCode.trim()}</span>
-            </>
-          ) : null}
-        </p>
-      )}
+    <Card>
+      <CardHeader className="pb-3">
+        <div className="flex items-center gap-3">
+          {stepNumber != null ? (
+            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-sky-600 text-xs font-semibold text-white">
+              {stepNumber}
+            </span>
+          ) : (
+            <Send className="h-5 w-5 shrink-0 text-sky-600" />
+          )}
+          <div>
+            <CardTitle className="text-base">Submit purchase order as invoice</CardTitle>
+            <CardDescription>Pick an order, confirm item codes, then send to the integrator.</CardDescription>
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-5">
+        {(invoiceCurrency || invoiceCountryCode || (invoiceExchangeRate != null && invoiceExchangeRate !== 1)) && (
+          <div className="flex flex-wrap gap-2 text-xs">
+            <span className="rounded-md border bg-muted/40 px-2 py-1">
+              Currency <span className="font-mono font-medium">{invoiceCurrency?.trim() || "KES"}</span>
+            </span>
+            {invoiceExchangeRate != null && invoiceExchangeRate !== 1 ? (
+              <span className="rounded-md border bg-muted/40 px-2 py-1">
+                Rate <span className="font-mono font-medium">{invoiceExchangeRate}</span>
+              </span>
+            ) : null}
+            {invoiceCountryCode?.trim() ? (
+              <span className="rounded-md border bg-muted/40 px-2 py-1">
+                Country <span className="font-mono font-medium">{invoiceCountryCode.trim()}</span>
+              </span>
+            ) : null}
+          </div>
+        )}
 
       <div className="grid gap-3 sm:grid-cols-2">
         <div className="sm:col-span-2 space-y-2">
@@ -483,7 +489,7 @@ export const EtimsPurchaseOrderSubmitCard: React.FC<EtimsPurchaseOrderSubmitCard
               onClick={() => void loadRecentOrders()}
             >
               {ordersLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
-              Refresh list
+              Refresh
             </Button>
           </div>
           <Popover open={poPickerOpen} onOpenChange={setPoPickerOpen}>
@@ -641,14 +647,6 @@ export const EtimsPurchaseOrderSubmitCard: React.FC<EtimsPurchaseOrderSubmitCard
               </Command>
             </PopoverContent>
           </Popover>
-          <p className="text-xs text-muted-foreground">
-            {enforceSupplierId
-              ? "Showing recent orders for this supplier (same list as your dashboard access)."
-              : "Showing recent orders you can read (admin: broader access; others: per RLS)."}{" "}
-            Delivery / workflow status is omitted here; use View Orders for logistics. Invoiced POs show an{" "}
-            <span className="whitespace-nowrap font-medium text-foreground">eTIMS: invoiced</span> badge when submission
-            succeeded.
-          </p>
         </div>
 
         <div className="sm:col-span-2 space-y-1.5">
@@ -671,16 +669,16 @@ export const EtimsPurchaseOrderSubmitCard: React.FC<EtimsPurchaseOrderSubmitCard
         </div>
       </div>
 
-      <Button type="button" disabled={busy} onClick={onSubmitInvoice}>
+      <Button type="button" className="w-full sm:w-auto" disabled={busy} onClick={onSubmitInvoice}>
         {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-        <span className="ml-2">Submit invoice to integrator</span>
+        <span className="ml-2">Submit invoice</span>
       </Button>
 
-      <div className="border-t border-border pt-4">
-        <h3 className="mb-2 text-sm font-semibold text-foreground">Item stock (integrator)</h3>
-        <p className="mb-3 text-xs text-muted-foreground">
-          Calls <code className="rounded bg-muted px-1">PUT …/items/{"{code}"}/stocks</code> via the same Edge proxy.
-        </p>
+      <div className="rounded-lg border bg-muted/20 p-4">
+        <div className="mb-3 flex items-center gap-2">
+          <Warehouse className="h-4 w-4 text-muted-foreground" />
+          <h4 className="text-sm font-medium">Push stock to integrator</h4>
+        </div>
         <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
           <div className="min-w-0 flex-1 space-y-1.5">
             <div className="flex flex-wrap items-center justify-between gap-2">
@@ -694,7 +692,7 @@ export const EtimsPurchaseOrderSubmitCard: React.FC<EtimsPurchaseOrderSubmitCard
                 onClick={() => void loadStockItemCodeSuggestions()}
               >
                 {stockCodesLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
-                Refresh catalog codes
+                Refresh codes
               </Button>
             </div>
             <datalist id="etims-stock-code-datalist">
@@ -742,11 +740,6 @@ export const EtimsPurchaseOrderSubmitCard: React.FC<EtimsPurchaseOrderSubmitCard
               }
               return null;
             })()}
-            <p className="text-xs text-muted-foreground">
-              {enforceSupplierId?.trim()
-                ? "Dropdown lists materials and supplier price rows that have an eTIMS code for this supplier. You can still paste any integrator code."
-                : "Dropdown lists catalog rows with codes (recent materials). Narrow codes by using this card on a supplier-scoped page when possible."}
-            </p>
           </div>
           <div className="w-full space-y-1.5 sm:w-32">
             <Label htmlFor="etims-stock-n">Stock</Label>
@@ -763,6 +756,23 @@ export const EtimsPurchaseOrderSubmitCard: React.FC<EtimsPurchaseOrderSubmitCard
           </Button>
         </div>
       </div>
-    </div>
+
+        <Accordion type="single" collapsible className="rounded-md border">
+          <AccordionItem value="mapping" className="border-0">
+            <AccordionTrigger className="px-3 py-2 text-xs hover:no-underline">
+              <span className="flex items-center gap-2 text-muted-foreground">
+                <HelpCircle className="h-3.5 w-3.5" />
+                Item code mapping tips
+              </span>
+            </AccordionTrigger>
+            <AccordionContent className="px-3 pb-3 text-xs leading-relaxed text-muted-foreground">
+              Set <code className="rounded bg-muted px-1">etims_item_code</code> on each product in My Materials.
+              Missing codes are filled from your catalog at submit. If the integrator reports an unknown item, register
+              the SKU with KRA or use a code already on your OSCU tenant.
+            </AccordionContent>
+          </AccordionItem>
+        </Accordion>
+      </CardContent>
+    </Card>
   );
 };
