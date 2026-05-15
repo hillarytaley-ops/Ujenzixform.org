@@ -618,7 +618,9 @@ export const BuilderVideoGallery = ({
 
       const mapped: BuilderVideo[] = rows.map((video: Record<string, unknown>) => ({
         ...(video as unknown as BuilderVideo),
-        views_count: Number(video.view_count) || 0,
+        // DB column is views_count; legacy typo view_count would read as undefined and show 0 after refetch.
+        views_count:
+          Number(video.views_count ?? video.view_count) || 0,
         likes_count: Number(video.likes_count) || 0,
         comments_count: Number(video.comments_count) || 0,
         builder_profile:
