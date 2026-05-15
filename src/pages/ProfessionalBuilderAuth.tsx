@@ -4,7 +4,7 @@
 
 import { LEGACY_SUPABASE_AUTH_STORAGE_KEY } from '@/utils/supabaseAccessToken';
 import React, { useState, useRef } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -45,7 +45,13 @@ console.log('🔐 ProfessionalBuilderAuth BUILD v15 - SECURE');
 
 const ProfessionalBuilderAuth: React.FC = () => {
   const { toast } = useToast();
+  const [searchParams] = useSearchParams();
   const [activeTab, setActiveTab] = useState<'signin' | 'signup'>('signin');
+
+  React.useEffect(() => {
+    const t = searchParams.get('tab');
+    if (t === 'signup' || t === 'signin') setActiveTab(t);
+  }, [searchParams]);
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [email, setEmail] = useState('');

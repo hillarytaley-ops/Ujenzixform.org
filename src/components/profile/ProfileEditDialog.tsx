@@ -14,7 +14,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
-import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { supabase, SUPABASE_URL, SUPABASE_ANON_KEY } from '@/integrations/supabase/client';
@@ -35,7 +35,9 @@ import {
   Crosshair,
   Map,
   Landmark,
+  PlugZap,
 } from 'lucide-react';
+import { testEtimsIntegratorConnection } from '@/lib/etims/purchaseOrderEtims';
 
 interface ProfileEditDialogProps {
   isOpen: boolean;
@@ -71,7 +73,33 @@ interface ProfileData {
   procurement_contact_name?: string;
   procurement_contact_phone?: string;
   procurement_contact_email?: string;
+  /** Supplier: registered legal name (suppliers.legal_business_name) */
+  legal_business_name?: string;
+  /** Supplier KRA PIN (suppliers.kra_pin) */
+  supplier_kra_pin?: string;
+  vat_registration_status?: string;
+  physical_business_address?: string;
+  invoice_contact_phone?: string;
+  invoice_contact_email?: string;
+  /** General business email on supplier row (suppliers.email) */
+  supplier_business_email?: string;
+  etims_branch_code?: string;
+  etims_business_place_code?: string;
+  etims_device_serial?: string;
+  etims_integrator_account_ref?: string;
+  etims_connection_notes?: string;
+  etims_default_payment_type?: string;
+  etims_invoice_notes?: string;
 }
+
+const SUPPLIER_VAT_OPTIONS = [
+  { value: 'registered', label: 'VAT registered' },
+  { value: 'exempt', label: 'Exempt / zero-rated context' },
+  { value: 'not_registered', label: 'Not VAT registered' },
+  { value: 'unknown', label: 'Unknown / not specified' },
+] as const;
+
+const SUPPLIER_PAYMENT_TYPES = ['01', '02', '03', '04', '05', '06', '07'] as const;
 
 const KENYAN_COUNTIES = [
   'Nairobi', 'Mombasa', 'Kisumu', 'Nakuru', 'Eldoret', 'Thika', 'Kiambu',
@@ -96,6 +124,7 @@ export const ProfileEditDialog: React.FC<ProfileEditDialogProps> = ({
   const [gettingLocation, setGettingLocation] = useState(false);
   const [locationError, setLocationError] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [testingSupplierEtims, setTestingSupplierEtims] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -268,6 +297,24 @@ export const ProfileEditDialog: React.FC<ProfileEditDialogProps> = ({
                 company_logo_url: supplierData.company_logo_url,
                 website: supplierData.website_url || profileData.website,
                 bio: supplierData.description || profileData.bio,
+                legal_business_name: supplierData.legal_business_name || '',
+                supplier_kra_pin: supplierData.kra_pin || '',
+                vat_registration_status: supplierData.vat_registration_status || 'unknown',
+                physical_business_address:
+                  supplierData.physical_business_address ||
+                  supplierData.physical_address ||
+                  supplierData.address ||
+                  '',
+                invoice_contact_phone: supplierData.invoice_contact_phone || supplierData.phone || '',
+                invoice_contact_email: supplierData.invoice_contact_email || supplierData.email || '',
+                supplier_business_email: supplierData.email || profileData.email || '',
+                etims_branch_code: supplierData.etims_branch_code || '',
+                etims_business_place_code: supplierData.etims_business_place_code || '',
+                etims_device_serial: supplierData.etims_device_serial || '',
+                etims_integrator_account_ref: supplierData.etims_integrator_account_ref || '',
+                etims_connection_notes: supplierData.etims_connection_notes || '',
+                etims_default_payment_type: supplierData.etims_default_payment_type || '01',
+                etims_invoice_notes: supplierData.etims_invoice_notes || '',
               };
             }
           }
@@ -814,6 +861,26 @@ export const ProfileEditDialog: React.FC<ProfileEditDialogProps> = ({
           supplierUpdateData.description = profile.bio;
         }
 
+        supplierUpdateData.legal_business_name = profile.legal_business_name?.trim() || null;
+        supplierUpdateData.kra_pin = profile.supplier_kra_pin?.trim().toUpperCase() || null;
+        supplierUpdateData.vat_registration_status = profile.vat_registration_status?.trim() || null;
+        supplierUpdateData.physical_business_address = profile.physical_business_address?.trim() || null;
+        supplierUpdateData.invoice_contact_phone = profile.invoice_contact_phone?.trim() || null;
+        supplierUpdateData.invoice_contact_email = profile.invoice_contact_email?.trim() || null;
+        if (profile.supplier_business_email !== undefined) {
+          supplierUpdateData.email = profile.supplier_business_email?.trim() || null;
+        }
+        supplierUpdateData.etims_branch_code = profile.etims_branch_code?.trim() || null;
+        supplierUpdateData.etims_business_place_code = profile.etims_business_place_code?.trim() || null;
+        supplierUpdateData.etims_device_serial = profile.etims_device_serial?.trim() || null;
+        supplierUpdateData.etims_integrator_account_ref = profile.etims_integrator_account_ref?.trim() || null;
+        supplierUpdateData.etims_connection_notes = profile.etims_connection_notes?.trim() || null;
+        supplierUpdateData.etims_default_payment_type =
+          profile.etims_default_payment_type && /^0[1-7]$/.test(profile.etims_default_payment_type.trim())
+            ? profile.etims_default_payment_type.trim()
+            : '01';
+        supplierUpdateData.etims_invoice_notes = profile.etims_invoice_notes?.trim() || null;
+
         console.log('📝 ProfileEditDialog: Supplier update data:', supplierUpdateData);
 
         // Fire and forget - don't block profile save
@@ -1040,6 +1107,40 @@ export const ProfileEditDialog: React.FC<ProfileEditDialogProps> = ({
   const isDelivery = userRole === 'delivery' || userRole === 'delivery_provider';
   const isBuilder = userRole === 'builder';
 
+  const runSupplierEtimsConnectionTest = async () => {
+    if (!profile?.supplier_id) {
+      toast({ title: 'Supplier profile not loaded', variant: 'destructive' });
+      return;
+    }
+    setTestingSupplierEtims(true);
+    try {
+      const res = await testEtimsIntegratorConnection();
+      const nowIso = new Date().toISOString();
+      const payload = res.ok
+        ? { etims_last_connection_test_at: nowIso, etims_last_connection_test_result: res.data as object, updated_at: nowIso }
+        : {
+            etims_last_connection_test_at: nowIso,
+            etims_last_connection_test_result: { error: res.message, status: res.status } as object,
+            updated_at: nowIso,
+          };
+      const { error } = await supabase.from('suppliers').update(payload).eq('id', profile.supplier_id);
+      if (error) throw error;
+      if (!res.ok) {
+        toast({ title: 'Connection test failed', description: res.message, variant: 'destructive' });
+        return;
+      }
+      toast({
+        title: 'Integrator reachable',
+        description: 'Edge proxy returned a successful response from GET branches.',
+      });
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
+      toast({ title: 'Test failed', description: msg, variant: 'destructive' });
+    } finally {
+      setTestingSupplierEtims(false);
+    }
+  };
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
@@ -1155,6 +1256,232 @@ export const ProfileEditDialog: React.FC<ProfileEditDialogProps> = ({
                     <p className="text-xs text-muted-foreground mt-1">
                       The person customers should ask for
                     </p>
+                  </div>
+
+                  <div className="rounded-lg border border-emerald-200/80 bg-emerald-50/50 p-4 space-y-4 dark:bg-emerald-950/25">
+                    <div className="flex items-start gap-2">
+                      <Landmark className="h-5 w-5 shrink-0 text-emerald-700 dark:text-emerald-400" />
+                      <div>
+                        <h4 className="text-sm font-semibold text-emerald-900 dark:text-emerald-100">
+                          KRA & eTIMS (legal seller / tax invoices)
+                        </h4>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          Required for valid tax invoices: legal name, PIN, VAT status, place of business, contacts,
+                          integrator reference (no passwords — those stay in Edge secrets), branch/device codes, and
+                          invoice defaults.
+                        </p>
+                      </div>
+                    </div>
+
+                    <Alert className="py-2">
+                      <AlertTitle className="text-xs">API credentials</AlertTitle>
+                      <AlertDescription className="text-xs">
+                        Store integrator Basic auth in Supabase Edge (`etims-proxy`). Use “Integrator account ref” only
+                        for a non-secret label (tenant, sub-account). Optional notes below are for your team — never put
+                        passwords there.
+                      </AlertDescription>
+                    </Alert>
+
+                    <div>
+                      <Label htmlFor="supplier-legal-name">Legal / registered business name</Label>
+                      <Input
+                        id="supplier-legal-name"
+                        className="mt-1"
+                        value={profile.legal_business_name || ''}
+                        onChange={(e) => setProfile({ ...profile, legal_business_name: e.target.value })}
+                        placeholder="As registered with KRA"
+                      />
+                    </div>
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <div>
+                        <Label htmlFor="supplier-kra-pin">KRA PIN</Label>
+                        <Input
+                          id="supplier-kra-pin"
+                          className="mt-1 font-mono uppercase"
+                          value={profile.supplier_kra_pin || ''}
+                          onChange={(e) => setProfile({ ...profile, supplier_kra_pin: e.target.value.toUpperCase() })}
+                          placeholder="P051234567X"
+                        />
+                      </div>
+                      <div>
+                        <Label>VAT / tax registration</Label>
+                        <Select
+                          value={profile.vat_registration_status || 'unknown'}
+                          onValueChange={(v) => setProfile({ ...profile, vat_registration_status: v })}
+                        >
+                          <SelectTrigger className="mt-1">
+                            <SelectValue placeholder="Select status" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {SUPPLIER_VAT_OPTIONS.map((o) => (
+                              <SelectItem key={o.value} value={o.value}>
+                                {o.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+
+                    <div>
+                      <Label htmlFor="supplier-phys-addr">Business physical address</Label>
+                      <Textarea
+                        id="supplier-phys-addr"
+                        className="mt-1"
+                        rows={3}
+                        value={profile.physical_business_address || ''}
+                        onChange={(e) => setProfile({ ...profile, physical_business_address: e.target.value })}
+                        placeholder="Street, building, town, county — principal place of business or invoicing branch"
+                      />
+                    </div>
+
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <div>
+                        <Label htmlFor="supplier-inv-phone" className="flex items-center gap-1">
+                          <Phone className="h-3.5 w-3.5" />
+                          Invoice contact phone
+                        </Label>
+                        <Input
+                          id="supplier-inv-phone"
+                          className="mt-1"
+                          value={profile.invoice_contact_phone || ''}
+                          onChange={(e) => setProfile({ ...profile, invoice_contact_phone: e.target.value })}
+                          placeholder="Shown on tax invoices"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="supplier-inv-email" className="flex items-center gap-1">
+                          <Mail className="h-3.5 w-3.5" />
+                          Invoice contact email
+                        </Label>
+                        <Input
+                          id="supplier-inv-email"
+                          type="email"
+                          className="mt-1"
+                          value={profile.invoice_contact_email || ''}
+                          onChange={(e) => setProfile({ ...profile, invoice_contact_email: e.target.value })}
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <Label htmlFor="supplier-business-email" className="flex items-center gap-1">
+                        <Mail className="h-3.5 w-3.5" />
+                        General business email
+                      </Label>
+                      <Input
+                        id="supplier-business-email"
+                        type="email"
+                        className="mt-1"
+                        value={profile.supplier_business_email || ''}
+                        onChange={(e) => setProfile({ ...profile, supplier_business_email: e.target.value })}
+                        placeholder="Primary email on your supplier account"
+                      />
+                    </div>
+
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <div>
+                        <Label htmlFor="etims-branch">Branch / location code</Label>
+                        <Input
+                          id="etims-branch"
+                          className="mt-1 font-mono text-sm"
+                          value={profile.etims_branch_code || ''}
+                          onChange={(e) => setProfile({ ...profile, etims_branch_code: e.target.value })}
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="etims-bplace">Business place code</Label>
+                        <Input
+                          id="etims-bplace"
+                          className="mt-1 font-mono text-sm"
+                          value={profile.etims_business_place_code || ''}
+                          onChange={(e) => setProfile({ ...profile, etims_business_place_code: e.target.value })}
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <Label htmlFor="etims-device">Device / OSCU serial (if applicable)</Label>
+                      <Input
+                        id="etims-device"
+                        className="mt-1 font-mono text-sm"
+                        value={profile.etims_device_serial || ''}
+                        onChange={(e) => setProfile({ ...profile, etims_device_serial: e.target.value })}
+                      />
+                    </div>
+
+                    <div>
+                      <Label htmlFor="etims-int-ref">Integrator account reference (non-secret)</Label>
+                      <Input
+                        id="etims-int-ref"
+                        className="mt-1"
+                        value={profile.etims_integrator_account_ref || ''}
+                        onChange={(e) => setProfile({ ...profile, etims_integrator_account_ref: e.target.value })}
+                        placeholder="Tenant label, sub-account id, etc."
+                      />
+                    </div>
+
+                    <div>
+                      <Label htmlFor="etims-conn-notes">eTIMS / connection notes (no passwords)</Label>
+                      <Textarea
+                        id="etims-conn-notes"
+                        className="mt-1"
+                        rows={2}
+                        value={profile.etims_connection_notes || ''}
+                        onChange={(e) => setProfile({ ...profile, etims_connection_notes: e.target.value })}
+                        placeholder="Sandbox vs prod, support ticket ref, onboarding checklist…"
+                      />
+                    </div>
+
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <div>
+                        <Label>Default payment type on tax invoices</Label>
+                        <Select
+                          value={profile.etims_default_payment_type || '01'}
+                          onValueChange={(v) => setProfile({ ...profile, etims_default_payment_type: v })}
+                        >
+                          <SelectTrigger className="mt-1">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {SUPPLIER_PAYMENT_TYPES.map((c) => (
+                              <SelectItem key={c} value={c}>
+                                {c}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="flex items-end">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="w-full"
+                          disabled={testingSupplierEtims}
+                          onClick={() => void runSupplierEtimsConnectionTest()}
+                        >
+                          {testingSupplierEtims ? (
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          ) : (
+                            <PlugZap className="mr-2 h-4 w-4" />
+                          )}
+                          Test integrator connection
+                        </Button>
+                      </div>
+                    </div>
+
+                    <div>
+                      <Label htmlFor="etims-inv-notes">Default invoice remarks / footer</Label>
+                      <Textarea
+                        id="etims-inv-notes"
+                        className="mt-1"
+                        rows={2}
+                        value={profile.etims_invoice_notes || ''}
+                        onChange={(e) => setProfile({ ...profile, etims_invoice_notes: e.target.value })}
+                        placeholder="Optional text for printed / PDF tax invoices"
+                      />
+                    </div>
                   </div>
                 </>
               )}
