@@ -69,6 +69,10 @@ interface Invoice {
   };
   supplier?: {
     company_name?: string;
+    contact_person?: string | null;
+    phone?: string | null;
+    email?: string | null;
+    address?: string | null;
   };
 }
 
@@ -134,6 +138,10 @@ function KraEtimsReceiptPanel({
   traderInvoiceNoDb,
   etimsSubmittedAt,
   supplierName,
+  supplierContactPerson,
+  supplierPhone,
+  supplierEmail,
+  supplierAddress,
   invoiceSubtotal,
   invoiceTaxAmount,
   invoiceTotalAmount,
@@ -145,6 +153,10 @@ function KraEtimsReceiptPanel({
   traderInvoiceNoDb?: string | null;
   etimsSubmittedAt?: string | null;
   supplierName?: string | null;
+  supplierContactPerson?: string | null;
+  supplierPhone?: string | null;
+  supplierEmail?: string | null;
+  supplierAddress?: string | null;
   invoiceSubtotal?: number | null;
   invoiceTaxAmount?: number | null;
   invoiceTotalAmount?: number | null;
@@ -158,6 +170,10 @@ function KraEtimsReceiptPanel({
       traderInvoiceNoDb={traderInvoiceNoDb}
       etimsSubmittedAt={etimsSubmittedAt}
       supplierName={supplierName}
+      supplierContactPerson={supplierContactPerson}
+      supplierPhone={supplierPhone}
+      supplierEmail={supplierEmail}
+      supplierAddress={supplierAddress}
       invoiceSubtotal={invoiceSubtotal}
       invoiceTaxAmount={invoiceTaxAmount}
       invoiceTotalAmount={invoiceTotalAmount}
@@ -228,6 +244,14 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
   const [builderEtimsReceiptsLoading, setBuilderEtimsReceiptsLoading] = useState(false);
   const [supplierEtimsReceipts, setSupplierEtimsReceipts] = useState<BuilderEtimsReceiptPo[]>([]);
   const [supplierEtimsReceiptsLoading, setSupplierEtimsReceiptsLoading] = useState(false);
+  /** Supplier profile for letterhead on receipts when RPC rows omit nested supplier fields */
+  const [supplierLetterhead, setSupplierLetterhead] = useState<{
+    company_name: string;
+    contact_person?: string | null;
+    phone?: string | null;
+    email?: string | null;
+    address?: string | null;
+  } | null>(null);
   /** supplier_id values that belong to this dashboard ??? for Realtime PO filter */
   const supplierEtimsSupplierIdsRef = useRef<Set<string>>(new Set());
 
@@ -279,7 +303,7 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
       const invoiceSelect = `
           *,
           purchase_order:purchase_orders(po_number, etims_verification_url),
-          supplier:suppliers(company_name)
+          supplier:suppliers(company_name, phone, email, address, contact_person)
         `;
 
       // Supplier: prefer RPC with p_supplier_id when dashboard resolved suppliers.id.
@@ -342,7 +366,10 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
               ),
               Promise.all(
                 chunkArray(supIds, 80).map((chunk) =>
-                  supabase.from('suppliers').select('id, company_name').in('id', chunk)
+                  supabase
+                    .from('suppliers')
+                    .select('id, company_name, phone, email, address, contact_person')
+                    .in('id', chunk)
                 )
               ),
             ]);
@@ -351,7 +378,14 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
               if (poRes.error) throw poRes.error;
               if (poRes.data?.length) poMerged.push(...poRes.data);
             }
-            const supMerged: { id: string; company_name?: string }[] = [];
+            const supMerged: {
+              id: string;
+              company_name?: string;
+              phone?: string | null;
+              email?: string | null;
+              address?: string | null;
+              contact_person?: string | null;
+            }[] = [];
             for (const supRes of supChunkRows) {
               if (supRes.error) throw supRes.error;
               if (supRes.data?.length) supMerged.push(...supRes.data);
@@ -367,7 +401,13 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
                   }
                 : undefined,
               supplier: supById[inv.supplier_id]
-                ? { company_name: supById[inv.supplier_id].company_name }
+                ? {
+                    company_name: supById[inv.supplier_id].company_name,
+                    phone: supById[inv.supplier_id].phone,
+                    email: supById[inv.supplier_id].email,
+                    address: supById[inv.supplier_id].address,
+                    contact_person: supById[inv.supplier_id].contact_person,
+                  }
                 : undefined,
             })) as Invoice[];
             setInvoices(
@@ -507,6 +547,43 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
     }
     setSupplierEtimsReceiptsLoading(false);
   }, [userRole, userId, supplierRecordId]);
+
+  const mergeSupplierHead = useCallback(
+    (inv?: Invoice | null) => ({
+      company_name: inv?.supplier?.company_name || supplierLetterhead?.company_name || null,
+      contact_person: inv?.supplier?.contact_person ?? supplierLetterhead?.contact_person ?? null,
+      phone: inv?.supplier?.phone ?? supplierLetterhead?.phone ?? null,
+      email: inv?.supplier?.email ?? supplierLetterhead?.email ?? null,
+      address: inv?.supplier?.address ?? supplierLetterhead?.address ?? null,
+    }),
+    [supplierLetterhead],
+  );
+
+  useEffect(() => {
+    if (userRole !== 'supplier' || !supplierRecordId) {
+      setSupplierLetterhead(null);
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      const { data, error } = await supabase
+        .from('suppliers')
+        .select('company_name, phone, email, address, contact_person')
+        .eq('id', supplierRecordId)
+        .maybeSingle();
+      if (cancelled || error || !data) return;
+      setSupplierLetterhead({
+        company_name: (data.company_name as string)?.trim() || 'Supplier',
+        contact_person: data.contact_person,
+        phone: data.phone,
+        email: data.email,
+        address: data.address,
+      });
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [userRole, supplierRecordId]);
 
   useEffect(() => {
     invoiceFetchGenerationRef.current = 0;
@@ -1243,6 +1320,11 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
                           etimsResponse={po.etims_response}
                           traderInvoiceNoDb={po.etims_trader_invoice_no}
                           etimsSubmittedAt={po.etims_submitted_at}
+                          supplierName={supplierLetterhead?.company_name ?? undefined}
+                          supplierContactPerson={supplierLetterhead?.contact_person ?? undefined}
+                          supplierPhone={supplierLetterhead?.phone ?? undefined}
+                          supplierEmail={supplierLetterhead?.email ?? undefined}
+                          supplierAddress={supplierLetterhead?.address ?? undefined}
                           poTotalAmount={po.total_amount}
                         />
                       </CardContent>
@@ -1288,6 +1370,11 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
                           etimsResponse={po.etims_response}
                           traderInvoiceNoDb={po.etims_trader_invoice_no}
                           etimsSubmittedAt={po.etims_submitted_at}
+                          supplierName={supplierLetterhead?.company_name ?? undefined}
+                          supplierContactPerson={supplierLetterhead?.contact_person ?? undefined}
+                          supplierPhone={supplierLetterhead?.phone ?? undefined}
+                          supplierEmail={supplierLetterhead?.email ?? undefined}
+                          supplierAddress={supplierLetterhead?.address ?? undefined}
                           poTotalAmount={po.total_amount}
                         />
                       </CardContent>
@@ -1403,6 +1490,8 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
               rowStatus !== 'cancelled' &&
               (rowStatus !== 'draft' || paystackSandbox);
 
+            const supplierHead = mergeSupplierHead(invoice);
+
             return (
               <Card key={invoice.id}>
                 <CardHeader>
@@ -1440,6 +1529,33 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
+                    {userRole === 'supplier' &&
+                    (supplierHead.company_name?.trim() ||
+                      supplierHead.contact_person?.trim() ||
+                      supplierHead.address?.trim() ||
+                      supplierHead.phone?.trim() ||
+                      supplierHead.email?.trim()) ? (
+                      <div className="rounded-lg border border-border bg-muted/40 px-4 py-3 text-sm dark:bg-muted/20">
+                        <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                          Supplier (issuer)
+                        </p>
+                        {supplierHead.company_name?.trim() ? (
+                          <p className="mt-1 text-base font-bold">{supplierHead.company_name.trim()}</p>
+                        ) : null}
+                        {supplierHead.contact_person?.trim() ? (
+                          <p className="text-xs text-muted-foreground">{supplierHead.contact_person.trim()}</p>
+                        ) : null}
+                        {supplierHead.address?.trim() ? (
+                          <p className="mt-1 whitespace-pre-line text-xs leading-snug text-muted-foreground">
+                            {supplierHead.address.trim()}
+                          </p>
+                        ) : null}
+                        <div className="mt-2 flex flex-col gap-0.5 text-xs text-muted-foreground sm:flex-row sm:flex-wrap sm:gap-x-4">
+                          {supplierHead.phone?.trim() ? <span>Tel: {supplierHead.phone.trim()}</span> : null}
+                          {supplierHead.email?.trim() ? <span>Email: {supplierHead.email.trim()}</span> : null}
+                        </div>
+                      </div>
+                    ) : null}
                     {showBuilderEtimsReceiptPanel ? (
                       <KraEtimsReceiptPanel
                         poNumber={invoice.purchase_order?.po_number || invoice.purchase_order_id}
@@ -1447,7 +1563,11 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
                         etimsResponse={poEtimsRow?.etims_response ?? null}
                         traderInvoiceNoDb={poEtimsRow?.etims_trader_invoice_no}
                         etimsSubmittedAt={poEtimsRow?.etims_submitted_at}
-                        supplierName={invoice.supplier?.company_name}
+                        supplierName={supplierHead.company_name}
+                        supplierContactPerson={supplierHead.contact_person}
+                        supplierPhone={supplierHead.phone}
+                        supplierEmail={supplierHead.email}
+                        supplierAddress={supplierHead.address}
                         invoiceSubtotal={invoice.subtotal}
                         invoiceTaxAmount={invoice.tax_amount}
                         invoiceTotalAmount={invoice.total_amount}

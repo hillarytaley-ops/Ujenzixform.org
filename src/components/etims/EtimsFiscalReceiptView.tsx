@@ -25,6 +25,11 @@ export type EtimsFiscalReceiptViewProps = {
   traderInvoiceNoDb?: string | null;
   etimsSubmittedAt?: string | null;
   supplierName?: string | null;
+  /** Supplier / issuer contact — shown at top of the receipt */
+  supplierContactPerson?: string | null;
+  supplierPhone?: string | null;
+  supplierEmail?: string | null;
+  supplierAddress?: string | null;
   invoiceSubtotal?: number | null;
   invoiceTaxAmount?: number | null;
   invoiceTotalAmount?: number | null;
@@ -39,6 +44,10 @@ export const EtimsFiscalReceiptView: React.FC<EtimsFiscalReceiptViewProps> = ({
   traderInvoiceNoDb,
   etimsSubmittedAt,
   supplierName,
+  supplierContactPerson,
+  supplierPhone,
+  supplierEmail,
+  supplierAddress,
   invoiceSubtotal,
   invoiceTaxAmount,
   invoiceTotalAmount,
@@ -82,6 +91,13 @@ export const EtimsFiscalReceiptView: React.FC<EtimsFiscalReceiptViewProps> = ({
 
   const displayDate = receipt.salesDate || submittedLabel;
 
+  const hasSupplierHead =
+    Boolean(supplierName?.trim()) ||
+    Boolean(supplierContactPerson?.trim()) ||
+    Boolean(supplierAddress?.trim()) ||
+    Boolean(supplierPhone?.trim()) ||
+    Boolean(supplierEmail?.trim());
+
   return (
     <article
       className={cn(
@@ -89,12 +105,35 @@ export const EtimsFiscalReceiptView: React.FC<EtimsFiscalReceiptViewProps> = ({
         className,
       )}
     >
-      {/* Header */}
+      {/* Header — supplier / issuer (who buyers pay) */}
       <header className="border-b border-slate-200 px-4 py-4 text-center dark:border-slate-800">
-        {supplierName?.trim() ? (
-          <p className="text-sm font-bold uppercase tracking-wide">{supplierName.trim()}</p>
-        ) : null}
-        <p className="text-[11px] text-muted-foreground">Purchase order {poNumber}</p>
+        <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+          Supplier / issuer
+        </p>
+        {hasSupplierHead ? (
+          <div className="mt-2 space-y-1.5 text-sm">
+            {supplierName?.trim() ? (
+              <p className="text-base font-bold leading-tight text-slate-900 dark:text-slate-50">
+                {supplierName.trim()}
+              </p>
+            ) : null}
+            {supplierContactPerson?.trim() ? (
+              <p className="text-xs text-slate-700 dark:text-slate-200">{supplierContactPerson.trim()}</p>
+            ) : null}
+            {supplierAddress?.trim() ? (
+              <p className="whitespace-pre-line text-xs leading-snug text-muted-foreground">
+                {supplierAddress.trim()}
+              </p>
+            ) : null}
+            <div className="flex flex-col items-center gap-0.5 text-[11px] text-muted-foreground sm:flex-row sm:flex-wrap sm:justify-center sm:gap-x-4">
+              {supplierPhone?.trim() ? <span>Tel: {supplierPhone.trim()}</span> : null}
+              {supplierEmail?.trim() ? <span>Email: {supplierEmail.trim()}</span> : null}
+            </div>
+          </div>
+        ) : (
+          <p className="mt-2 text-xs italic text-muted-foreground">Supplier contact not on file</p>
+        )}
+        <p className="mt-3 text-[11px] text-muted-foreground">Purchase order {poNumber}</p>
         <p className="mt-3 text-xs font-semibold tracking-[0.2em] text-slate-700 dark:text-slate-300">
           ——— FISCAL TAX RECEIPT ———
         </p>
