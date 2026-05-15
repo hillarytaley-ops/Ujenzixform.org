@@ -450,7 +450,7 @@ export async function submitEtimsInvoiceForPurchaseOrder(
 ): Promise<SubmitEtimsInvoiceResult> {
   const { data: po, error: poErr } = await supabase
     .from("purchase_orders")
-    .select("id, po_number, total_amount, items, supplier_id, buyer_id, accepted_quote_id, status")
+    .select("id, po_number, total_amount, items, supplier_id, buyer_id, status")
     .eq("id", purchaseOrderId)
     .maybeSingle();
 
