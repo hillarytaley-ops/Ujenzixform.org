@@ -1,7 +1,7 @@
 import { readPersistedAuthRawStringSync } from '@/utils/supabaseAccessToken';
 import { useState, useEffect } from "react";
 import { supabase, SUPABASE_URL, SUPABASE_ANON_KEY } from "@/integrations/supabase/client";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -23,9 +23,7 @@ import {
   Eye, 
   Clock, 
   CheckCircle, 
-  XCircle,
   Trash2,
-  Edit,
   RefreshCw
 } from "lucide-react";
 
@@ -36,9 +34,22 @@ interface BuilderVideo {
   video_url: string;
   thumbnail_url?: string;
   is_published?: boolean;
+  project_type?: string | null;
+  is_featured?: boolean | null;
   created_at: string;
   views_count?: number;
 }
+
+/** Matches public portfolio filters in BuilderVideoGallery (project_type / is_featured). */
+const PORTFOLIO_SUBTITLE_OPTIONS: { value: string; label: string }[] = [
+  { value: 'featured', label: 'Featured' },
+  { value: 'Residential', label: 'Residential' },
+  { value: 'Commercial', label: 'Commercial' },
+  { value: 'Industrial', label: 'Industrial' },
+  { value: 'Renovation', label: 'Renovation' },
+  { value: 'Infrastructure', label: 'Infrastructure' },
+  { value: 'Interior Design', label: 'Interior Design' },
+];
 
 interface BuilderVideoPortfolioProps {
   builderId: string;
@@ -54,7 +65,9 @@ export function BuilderVideoPortfolio({ builderId, isOwner = false }: BuilderVid
   const [uploadForm, setUploadForm] = useState({
     title: '',
     description: '',
-    file: null as File | null
+    file: null as File | null,
+    /** '' = not set; 'featured' maps to is_featured; others map to project_type */
+    portfolioSubtitle: '' as string,
   });
   const { toast } = useToast();
 
@@ -244,6 +257,12 @@ export function BuilderVideoPortfolio({ builderId, isOwner = false }: BuilderVid
 
       // Create database record using native fetch
       console.log('📹 Creating database record...');
+      const isFeatured = uploadForm.portfolioSubtitle === 'featured';
+      const projectType =
+        uploadForm.portfolioSubtitle && uploadForm.portfolioSubtitle !== 'featured'
+          ? uploadForm.portfolioSubtitle
+          : null;
+
       const dbResponse = await fetch(
         `${SUPABASE_URL}/rest/v1/builder_videos`,
         {
@@ -259,6 +278,8 @@ export function BuilderVideoPortfolio({ builderId, isOwner = false }: BuilderVid
             title: uploadForm.title,
             description: uploadForm.description || '',
             video_url: publicUrl,
+            project_type: projectType,
+            is_featured: isFeatured,
             is_published: true // Auto-publish for immediate visibility to visitors
           })
         }
@@ -280,7 +301,7 @@ export function BuilderVideoPortfolio({ builderId, isOwner = false }: BuilderVid
       });
 
       setShowUploadDialog(false);
-      setUploadForm({ title: '', description: '', file: null });
+      setUploadForm({ title: '', description: '', file: null, portfolioSubtitle: '' });
       fetchVideos();
     } catch (error: any) {
       clearTimeout(uploadTimeout);
@@ -371,6 +392,34 @@ export function BuilderVideoPortfolio({ builderId, isOwner = false }: BuilderVid
                     placeholder="Describe your project..."
                     className="bg-gray-800 border-gray-600 text-white"
                   />
+                </div>
+                <div>
+                  <Label className="text-white mb-2 block">Project subtitle</Label>
+                  <p className="text-gray-500 text-xs mb-2">
+                    Tag how this video should appear in your public portfolio filters (Residential, Featured, etc.).
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {PORTFOLIO_SUBTITLE_OPTIONS.map((opt) => (
+                      <button
+                        key={opt.value}
+                        type="button"
+                        onClick={() =>
+                          setUploadForm((prev) => ({
+                            ...prev,
+                            portfolioSubtitle:
+                              prev.portfolioSubtitle === opt.value ? '' : opt.value,
+                          }))
+                        }
+                        className={`px-3 py-1.5 text-sm rounded-full transition-all border ${
+                          uploadForm.portfolioSubtitle === opt.value
+                            ? 'bg-blue-600 text-white border-blue-500 shadow-md'
+                            : 'bg-gray-800 text-gray-300 border-gray-600 hover:bg-gray-700'
+                        }`}
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
                 </div>
                 <div>
                   <Label htmlFor="video" className="text-white">Video File</Label>
@@ -470,6 +519,18 @@ export function BuilderVideoPortfolio({ builderId, isOwner = false }: BuilderVid
                   <h3 className="text-white font-medium line-clamp-1">{video.title}</h3>
                   {isOwner && getPublishedBadge(video.is_published)}
                 </div>
+                {(video.is_featured || video.project_type) && (
+                  <div className="flex flex-wrap gap-1.5 mb-2">
+                    {video.is_featured && (
+                      <Badge className="bg-amber-600 hover:bg-amber-600 text-white text-xs">Featured</Badge>
+                    )}
+                    {video.project_type ? (
+                      <Badge variant="secondary" className="text-xs bg-gray-700 text-gray-200">
+                        {video.project_type}
+                      </Badge>
+                    ) : null}
+                  </div>
+                )}
                 <p className="text-gray-400 text-sm line-clamp-2 mb-3">{video.description}</p>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2 text-gray-500 text-xs">
