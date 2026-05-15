@@ -75,6 +75,22 @@ export function BuilderVideoPortfolio({ builderId, isOwner = false }: BuilderVid
     setLoading(true);
     console.log('📹 Fetching videos for builder:', builderId, 'isOwner:', isOwner);
     try {
+      // Must send the signed-in user's JWT so PostgREST uses role "authenticated"
+      // and RLS policy builders_view_own_videos applies (anon key → permission denied for owners).
+      const { data: sessionData } = await supabase.auth.getSession();
+      let accessToken = sessionData.session?.access_token || '';
+      if (!accessToken) {
+        try {
+          const stored = readPersistedAuthRawStringSync();
+          if (stored) {
+            accessToken = JSON.parse(stored).access_token || '';
+          }
+        } catch {
+          /* ignore */
+        }
+      }
+      const bearer = accessToken || SUPABASE_ANON_KEY;
+
       // Build query params
       let queryParams = `builder_id=eq.${builderId}&order=created_at.desc`;
       if (!isOwner) {
@@ -92,7 +108,7 @@ export function BuilderVideoPortfolio({ builderId, isOwner = false }: BuilderVid
           method: 'GET',
           headers: {
             'apikey': SUPABASE_ANON_KEY,
-            'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+            'Authorization': `Bearer ${bearer}`,
             'Content-Type': 'application/json'
           },
           signal: controller.signal
@@ -121,7 +137,7 @@ export function BuilderVideoPortfolio({ builderId, isOwner = false }: BuilderVid
 
   useEffect(() => {
     fetchVideos();
-  }, [builderId]);
+  }, [builderId, isOwner]);
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
