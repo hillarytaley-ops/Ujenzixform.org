@@ -260,6 +260,9 @@ export const ProductManagement: React.FC<ProductManagementProps> = ({ supplierId
         description?: string;
         variant_prices?: any[];
         etims_item_code?: string | null;
+        etims_tax_code?: string | null;
+        etims_qty_unit_code?: string | null;
+        etims_pkg_unit_code?: string | null;
       }
     >
   >({});
@@ -539,6 +542,9 @@ export const ProductManagement: React.FC<ProductManagementProps> = ({ supplierId
             description?: string;
             variant_prices?: any[];
             etims_item_code?: string | null;
+            etims_tax_code?: string | null;
+            etims_qty_unit_code?: string | null;
+            etims_pkg_unit_code?: string | null;
           }
         > = {};
         data.forEach((item: any) => {
@@ -548,10 +554,10 @@ export const ProductManagement: React.FC<ProductManagementProps> = ({ supplierId
             in_stock: item.in_stock,
             description: item.description || '',
             variant_prices: item.variant_prices || [],
-            etims_item_code:
-              typeof item.etims_item_code === 'string' && item.etims_item_code.trim()
-                ? item.etims_item_code.trim()
-                : null,
+            etims_item_code: item.etims_item_code ?? null,
+            etims_tax_code: item.etims_tax_code ?? null,
+            etims_qty_unit_code: item.etims_qty_unit_code ?? null,
+            etims_pkg_unit_code: item.etims_pkg_unit_code ?? null,
           };
         });
         setSupplierPrices(priceMap);
@@ -2177,6 +2183,46 @@ export const ProductManagement: React.FC<ProductManagementProps> = ({ supplierId
                 <p className="text-xs text-muted-foreground">
                   Use your integrator catalog item code for this SKU so invoice lines can map correctly.
                 </p>
+                <div className="grid gap-2 sm:grid-cols-3">
+                  <div>
+                    <Label htmlFor="etims-tax-code-input" className="text-xs">
+                      Tax code (A–E)
+                    </Label>
+                    <Input
+                      id="etims-tax-code-input"
+                      key={`etims-tax-${pricingProduct.id}-${supplierPrices[pricingProduct.id]?.etims_tax_code ?? ''}`}
+                      defaultValue={supplierPrices[pricingProduct.id]?.etims_tax_code ?? ''}
+                      placeholder="D"
+                      className="h-9 mt-1 font-mono text-sm uppercase"
+                      maxLength={1}
+                      autoComplete="off"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="etims-qty-unit-input" className="text-xs">
+                      Qty unit code
+                    </Label>
+                    <Input
+                      id="etims-qty-unit-input"
+                      key={`etims-qu-${pricingProduct.id}-${supplierPrices[pricingProduct.id]?.etims_qty_unit_code ?? ''}`}
+                      defaultValue={supplierPrices[pricingProduct.id]?.etims_qty_unit_code ?? ''}
+                      className="h-9 mt-1 font-mono text-sm"
+                      autoComplete="off"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="etims-pkg-unit-input" className="text-xs">
+                      Pkg unit code
+                    </Label>
+                    <Input
+                      id="etims-pkg-unit-input"
+                      key={`etims-pu-${pricingProduct.id}-${supplierPrices[pricingProduct.id]?.etims_pkg_unit_code ?? ''}`}
+                      defaultValue={supplierPrices[pricingProduct.id]?.etims_pkg_unit_code ?? ''}
+                      className="h-9 mt-1 font-mono text-sm"
+                      autoComplete="off"
+                    />
+                  </div>
+                </div>
               </div>
 
               {/* Description Field - Optional */}
@@ -2273,6 +2319,36 @@ export const ProductManagement: React.FC<ProductManagementProps> = ({ supplierId
                   marketPrice,
                   etimsTrim || null,
                 );
+
+                const effId = getEffectiveSupplierId();
+                if (effId && pricingProduct) {
+                  const taxEl = document.getElementById('etims-tax-code-input') as HTMLInputElement | null;
+                  const qtyEl = document.getElementById('etims-qty-unit-input') as HTMLInputElement | null;
+                  const pkgEl = document.getElementById('etims-pkg-unit-input') as HTMLInputElement | null;
+                  const taxRaw = taxEl?.value?.trim().toUpperCase() || '';
+                  const tax = /^[A-E]$/.test(taxRaw) ? taxRaw : null;
+                  const qtyU = qtyEl?.value?.trim() || null;
+                  const pkgU = pkgEl?.value?.trim() || null;
+                  const { error: metaErr } = await supabase
+                    .from('supplier_product_prices')
+                    .update({
+                      etims_tax_code: tax,
+                      etims_qty_unit_code: qtyU,
+                      etims_pkg_unit_code: pkgU,
+                      updated_at: new Date().toISOString(),
+                    })
+                    .eq('supplier_id', effId)
+                    .eq('product_id', pricingProduct.id);
+                  if (metaErr && !metaErr.message?.includes('column')) {
+                    toast({
+                      title: 'eTIMS metadata',
+                      description: metaErr.message,
+                      variant: 'destructive',
+                    });
+                  } else {
+                    await loadSupplierPrices();
+                  }
+                }
                 
                 // If custom images were uploaded, save them to supplier_product_prices
                 if (editingImage || editingAdditionalImages.some(img => img)) {

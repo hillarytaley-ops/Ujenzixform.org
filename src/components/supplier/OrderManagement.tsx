@@ -2,6 +2,7 @@ import { readPersistedAuthRawStringSync } from '@/utils/supabaseAccessToken';
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -53,6 +54,12 @@ import { purchaseOrderRequiresDeliveryProvider } from "@/utils/purchaseOrderFulf
 import { format } from 'date-fns';
 import { getPrefetchedOrders } from '@/services/dataPrefetch';
 import { fetchBuyerRolesMap, isOrderInNotDispatchedBucket } from '@/utils/supplierPrivateBuilderOrders';
+import {
+  purchaseOrderStatusBlocksEtimsInvoice,
+  submitEtimsCreditNoteForPurchaseOrder,
+  submitEtimsInvoiceForPurchaseOrder,
+} from '@/lib/etims/purchaseOrderEtims';
+import { EtimsVerificationQr } from '@/components/etims/EtimsVerificationQr';
 
 interface OrderItem {
   name: string;
@@ -92,6 +99,18 @@ interface Order {
   monitoring_package_summary?: string | null;
   /** Builder completed Paystack for eTIMS-only PO (sandbox / receipt test); suppliers see this for visibility */
   builder_etims_paystack_paid_at?: string | null;
+  /** KRA eTIMS sale invoice (per purchase order — one supplier, one tax invoice) */
+  etims_verification_url?: string | null;
+  etims_response?: unknown;
+  etims_trader_invoice_no?: string | null;
+  etims_submitted_at?: string | null;
+  etims_error?: string | null;
+  etims_validated_at?: string | null;
+  etims_credit_verification_url?: string | null;
+  etims_credit_trader_invoice_no?: string | null;
+  etims_credit_submitted_at?: string | null;
+  etims_credit_error?: string | null;
+  accepted_quote_id?: string | null;
 }
 
 interface OrderManagementProps {
@@ -125,6 +144,7 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, in
   const [statusFilter, setStatusFilter] = useState('all');
   const [orderTypeFilter, setOrderTypeFilter] = useState('all');
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [etimsWorking, setEtimsWorking] = useState<'sale' | 'credit' | null>(null);
   const [updatingOrderId, setUpdatingOrderId] = useState<string | null>(null); // Track which order is being updated
   const [activeOrderTab, setActiveOrderTab] = useState<'not_dispatched' | 'shipped' | 'delivered'>('not_dispatched');
   const { toast } = useToast();
@@ -166,6 +186,17 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, in
         builder_fulfillment_choice: po.builder_fulfillment_choice ?? null,
         monitoring_package_summary,
         builder_etims_paystack_paid_at: po.builder_etims_paystack_paid_at ?? null,
+        etims_verification_url: po.etims_verification_url ?? null,
+        etims_response: po.etims_response ?? null,
+        etims_trader_invoice_no: po.etims_trader_invoice_no ?? null,
+        etims_submitted_at: po.etims_submitted_at ?? null,
+        etims_error: po.etims_error ?? null,
+        etims_validated_at: po.etims_validated_at ?? null,
+        etims_credit_verification_url: po.etims_credit_verification_url ?? null,
+        etims_credit_trader_invoice_no: po.etims_credit_trader_invoice_no ?? null,
+        etims_credit_submitted_at: po.etims_credit_submitted_at ?? null,
+        etims_credit_error: po.etims_credit_error ?? null,
+        accepted_quote_id: po.accepted_quote_id ?? null,
       };
     });
   };
@@ -1053,6 +1084,17 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, in
           builder_fulfillment_choice: po.builder_fulfillment_choice ?? null,
           monitoring_package_summary,
           builder_etims_paystack_paid_at: po.builder_etims_paystack_paid_at ?? null,
+          etims_verification_url: po.etims_verification_url ?? null,
+          etims_response: po.etims_response ?? null,
+          etims_trader_invoice_no: po.etims_trader_invoice_no ?? null,
+          etims_submitted_at: po.etims_submitted_at ?? null,
+          etims_error: po.etims_error ?? null,
+          etims_validated_at: po.etims_validated_at ?? null,
+          etims_credit_verification_url: po.etims_credit_verification_url ?? null,
+          etims_credit_trader_invoice_no: po.etims_credit_trader_invoice_no ?? null,
+          etims_credit_submitted_at: po.etims_credit_submitted_at ?? null,
+          etims_credit_error: po.etims_credit_error ?? null,
+          accepted_quote_id: po.accepted_quote_id ?? null,
         };
       });
       } catch (mapErr) {
@@ -1089,6 +1131,17 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, in
             builder_fulfillment_choice: po.builder_fulfillment_choice ?? null,
             monitoring_package_summary,
             builder_etims_paystack_paid_at: po.builder_etims_paystack_paid_at ?? null,
+            etims_verification_url: po.etims_verification_url ?? null,
+            etims_response: po.etims_response ?? null,
+            etims_trader_invoice_no: po.etims_trader_invoice_no ?? null,
+            etims_submitted_at: po.etims_submitted_at ?? null,
+            etims_error: po.etims_error ?? null,
+            etims_validated_at: po.etims_validated_at ?? null,
+            etims_credit_verification_url: po.etims_credit_verification_url ?? null,
+            etims_credit_trader_invoice_no: po.etims_credit_trader_invoice_no ?? null,
+            etims_credit_submitted_at: po.etims_credit_submitted_at ?? null,
+            etims_credit_error: po.etims_credit_error ?? null,
+            accepted_quote_id: po.accepted_quote_id ?? null,
           };
         });
       }
@@ -1103,6 +1156,20 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, in
     } finally {
       setLoading(false);
     }
+  };
+
+  const refreshOrderEtimsFields = async (orderId: string) => {
+    const { data, error } = await supabase
+      .from('purchase_orders')
+      .select(
+        'etims_verification_url,etims_response,etims_trader_invoice_no,etims_submitted_at,etims_error,etims_validated_at,etims_credit_verification_url,etims_credit_trader_invoice_no,etims_credit_submitted_at,etims_credit_error,etims_credit_response',
+      )
+      .eq('id', orderId)
+      .maybeSingle();
+    if (error || !data) return;
+    const d = data as Partial<Order>;
+    setOrders((prev) => prev.map((o) => (o.id === orderId ? { ...o, ...d } : o)));
+    setSelectedOrder((prev) => (prev?.id === orderId ? { ...prev, ...d } : prev));
   };
 
   const updateOrderStatus = async (orderId: string, newStatus: Order['status']) => {
@@ -1748,6 +1815,146 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, in
                     </Table>
                   </CardContent>
                 </Card>
+
+                {!purchaseOrderStatusBlocksEtimsInvoice(selectedOrder.status) ? (
+                  <Card className="border-emerald-200 bg-emerald-50/50 dark:bg-emerald-950/20">
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm flex items-center gap-2 text-emerald-900 dark:text-emerald-100">
+                        <FileText className="h-4 w-4" />
+                        KRA eTIMS tax invoice
+                      </CardTitle>
+                      <CardDescription className="text-xs text-emerald-800/90 dark:text-emerald-200/90">
+                        Submit through the platform integrator (one sale invoice per purchase order for your supplier).
+                        Buyer KRA PIN and billing name are taken from their profile when available.
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-3 text-sm">
+                      {selectedOrder.etims_error && !selectedOrder.etims_validated_at ? (
+                        <Alert variant="destructive" className="py-2">
+                          <AlertTitle className="text-sm">Last submission error</AlertTitle>
+                          <AlertDescription className="text-xs">{selectedOrder.etims_error}</AlertDescription>
+                        </Alert>
+                      ) : null}
+
+                      {selectedOrder.etims_validated_at && selectedOrder.etims_trader_invoice_no ? (
+                        <div className="rounded-md border border-emerald-200 bg-white/90 p-3 space-y-2 dark:bg-slate-900/80">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <Badge className="bg-emerald-600 hover:bg-emerald-600">KRA receipt saved</Badge>
+                            <span className="font-mono text-xs">{selectedOrder.etims_trader_invoice_no}</span>
+                          </div>
+                          {selectedOrder.etims_submitted_at ? (
+                            <p className="text-xs text-muted-foreground">
+                              Submitted {format(new Date(selectedOrder.etims_submitted_at), 'MMM dd, yyyy HH:mm')}
+                            </p>
+                          ) : null}
+                          {selectedOrder.etims_verification_url ? (
+                            <EtimsVerificationQr
+                              verificationUrl={selectedOrder.etims_verification_url}
+                              size={112}
+                              variant="footer"
+                            />
+                          ) : (
+                            <p className="text-xs text-muted-foreground">No verification URL returned — check integrator response JSON on the order.</p>
+                          )}
+                        </div>
+                      ) : (
+                        <p className="text-xs text-muted-foreground">
+                          No validated KRA receipt on this order yet. Use the button below after catalog item codes and
+                          buyer PIN are in place.
+                        </p>
+                      )}
+
+                      {selectedOrder.etims_credit_trader_invoice_no || selectedOrder.etims_credit_error ? (
+                        <div className="rounded-md border bg-muted/40 p-3 space-y-1">
+                          <p className="text-xs font-semibold">Credit note</p>
+                          {selectedOrder.etims_credit_error ? (
+                            <p className="text-xs text-destructive">{selectedOrder.etims_credit_error}</p>
+                          ) : null}
+                          {selectedOrder.etims_credit_trader_invoice_no ? (
+                            <p className="font-mono text-xs">{selectedOrder.etims_credit_trader_invoice_no}</p>
+                          ) : null}
+                          {selectedOrder.etims_credit_verification_url ? (
+                            <EtimsVerificationQr
+                              verificationUrl={selectedOrder.etims_credit_verification_url}
+                              size={96}
+                              variant="footer"
+                            />
+                          ) : null}
+                        </div>
+                      ) : null}
+
+                      <div className="flex flex-wrap gap-2">
+                        <Button
+                          type="button"
+                          size="sm"
+                          className="bg-emerald-600 hover:bg-emerald-700"
+                          disabled={!!etimsWorking}
+                          onClick={() => {
+                            void (async () => {
+                              setEtimsWorking('sale');
+                              try {
+                                const r = await submitEtimsInvoiceForPurchaseOrder(selectedOrder.id, {
+                                  enforceSupplierId: supplierId,
+                                });
+                                if (!r.ok) {
+                                  toast({
+                                    title: 'eTIMS invoice failed',
+                                    description: r.message,
+                                    variant: 'destructive',
+                                  });
+                                } else {
+                                  toast({
+                                    title: 'KRA sale invoice submitted',
+                                    description: 'Verification details were saved on this order.',
+                                  });
+                                  await refreshOrderEtimsFields(selectedOrder.id);
+                                }
+                              } finally {
+                                setEtimsWorking(null);
+                              }
+                            })();
+                          }}
+                        >
+                          {etimsWorking === 'sale' ? 'Submitting…' : 'Generate & submit sale invoice'}
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          disabled={
+                            !!etimsWorking ||
+                            !selectedOrder.etims_validated_at ||
+                            !!(selectedOrder.etims_credit_submitted_at && !selectedOrder.etims_credit_error)
+                          }
+                          onClick={() => {
+                            void (async () => {
+                              setEtimsWorking('credit');
+                              try {
+                                const r = await submitEtimsCreditNoteForPurchaseOrder(selectedOrder.id, {
+                                  enforceSupplierId: supplierId,
+                                });
+                                if (!r.ok) {
+                                  toast({
+                                    title: 'Credit note failed',
+                                    description: r.message,
+                                    variant: 'destructive',
+                                  });
+                                } else {
+                                  toast({ title: 'Credit note submitted', description: 'Saved on this order.' });
+                                  await refreshOrderEtimsFields(selectedOrder.id);
+                                }
+                              } finally {
+                                setEtimsWorking(null);
+                              }
+                            })();
+                          }}
+                        >
+                          {etimsWorking === 'credit' ? 'Submitting…' : 'Submit credit note'}
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ) : null}
 
                 {/* Delivery Provider Info */}
                 <Card className={selectedOrder.delivery_provider_name ? 'bg-blue-50 border-blue-200' : 'bg-gray-50 border-gray-200'}>

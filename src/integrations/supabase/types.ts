@@ -2832,6 +2832,12 @@ export type Database = {
           company_logo_url: string | null
           company_name: string | null
           company_registration: string | null
+          kra_pin: string | null
+          billing_company_name: string | null
+          billing_address: string | null
+          procurement_contact_name: string | null
+          procurement_contact_phone: string | null
+          procurement_contact_email: string | null
           created_at: string
           full_name: string | null
           id: string
@@ -2849,6 +2855,12 @@ export type Database = {
           company_logo_url?: string | null
           company_name?: string | null
           company_registration?: string | null
+          kra_pin?: string | null
+          billing_company_name?: string | null
+          billing_address?: string | null
+          procurement_contact_name?: string | null
+          procurement_contact_phone?: string | null
+          procurement_contact_email?: string | null
           created_at?: string
           full_name?: string | null
           id?: string
@@ -2866,6 +2878,12 @@ export type Database = {
           company_logo_url?: string | null
           company_name?: string | null
           company_registration?: string | null
+          kra_pin?: string | null
+          billing_company_name?: string | null
+          billing_address?: string | null
+          procurement_contact_name?: string | null
+          procurement_contact_phone?: string | null
+          procurement_contact_email?: string | null
           created_at?: string
           full_name?: string | null
           id?: string
@@ -2876,9 +2894,6 @@ export type Database = {
           user_id?: string
           user_type?: string | null
         }
-        Relationships: []
-      }
-      projects: {
         Row: {
           access_code: string | null
           builder_id: string | null
@@ -3166,7 +3181,13 @@ export type Database = {
           etims_response: Json | null
           etims_submitted_at: string | null
           etims_trader_invoice_no: string | null
+          etims_validated_at: string | null
           etims_verification_url: string | null
+          etims_credit_error: string | null
+          etims_credit_response: Json | null
+          etims_credit_submitted_at: string | null
+          etims_credit_trader_invoice_no: string | null
+          etims_credit_verification_url: string | null
           id: string
           items: Json
           payment_terms: string | null
@@ -3199,7 +3220,13 @@ export type Database = {
           etims_response?: Json | null
           etims_submitted_at?: string | null
           etims_trader_invoice_no?: string | null
+          etims_validated_at?: string | null
           etims_verification_url?: string | null
+          etims_credit_error?: string | null
+          etims_credit_response?: Json | null
+          etims_credit_submitted_at?: string | null
+          etims_credit_trader_invoice_no?: string | null
+          etims_credit_verification_url?: string | null
           id?: string
           items?: Json
           payment_terms?: string | null
@@ -3232,7 +3259,13 @@ export type Database = {
           etims_response?: Json | null
           etims_submitted_at?: string | null
           etims_trader_invoice_no?: string | null
+          etims_validated_at?: string | null
           etims_verification_url?: string | null
+          etims_credit_error?: string | null
+          etims_credit_response?: Json | null
+          etims_credit_submitted_at?: string | null
+          etims_credit_trader_invoice_no?: string | null
+          etims_credit_verification_url?: string | null
           id?: string
           items?: Json
           payment_terms?: string | null
@@ -4251,16 +4284,31 @@ export type Database = {
           contact_person: string | null
           created_at: string
           email: string | null
+          etims_branch_code: string | null
+          etims_business_place_code: string | null
+          etims_connection_notes: string | null
+          etims_default_payment_type: string | null
+          etims_device_serial: string | null
+          etims_integrator_account_ref: string | null
+          etims_invoice_notes: string | null
+          etims_last_connection_test_at: string | null
+          etims_last_connection_test_result: Json | null
           id: string
+          invoice_contact_email: string | null
+          invoice_contact_phone: string | null
           is_verified: boolean | null
+          kra_pin: string | null
+          legal_business_name: string | null
           materials_offered: string[] | null
           phone: string | null
+          physical_business_address: string | null
           profile_id: string | null
           rating: number | null
           registration_admin_status: string | null
           specialties: string[] | null
           updated_at: string
           user_id: string | null
+          vat_registration_status: string | null
         }
         Insert: {
           address?: string | null
@@ -4269,16 +4317,31 @@ export type Database = {
           contact_person?: string | null
           created_at?: string
           email?: string | null
+          etims_branch_code?: string | null
+          etims_business_place_code?: string | null
+          etims_connection_notes?: string | null
+          etims_default_payment_type?: string | null
+          etims_device_serial?: string | null
+          etims_integrator_account_ref?: string | null
+          etims_invoice_notes?: string | null
+          etims_last_connection_test_at?: string | null
+          etims_last_connection_test_result?: Json | null
           id?: string
+          invoice_contact_email?: string | null
+          invoice_contact_phone?: string | null
           is_verified?: boolean | null
+          kra_pin?: string | null
+          legal_business_name?: string | null
           materials_offered?: string[] | null
           phone?: string | null
+          physical_business_address?: string | null
           profile_id?: string | null
           rating?: number | null
           registration_admin_status?: string | null
           specialties?: string[] | null
           updated_at?: string
           user_id?: string | null
+          vat_registration_status?: string | null
         }
         Update: {
           address?: string | null
@@ -4287,16 +4350,31 @@ export type Database = {
           contact_person?: string | null
           created_at?: string
           email?: string | null
+          etims_branch_code?: string | null
+          etims_business_place_code?: string | null
+          etims_connection_notes?: string | null
+          etims_default_payment_type?: string | null
+          etims_device_serial?: string | null
+          etims_integrator_account_ref?: string | null
+          etims_invoice_notes?: string | null
+          etims_last_connection_test_at?: string | null
+          etims_last_connection_test_result?: Json | null
           id?: string
+          invoice_contact_email?: string | null
+          invoice_contact_phone?: string | null
           is_verified?: boolean | null
+          kra_pin?: string | null
+          legal_business_name?: string | null
           materials_offered?: string[] | null
           phone?: string | null
+          physical_business_address?: string | null
           profile_id?: string | null
           rating?: number | null
           registration_admin_status?: string | null
           specialties?: string[] | null
           updated_at?: string
           user_id?: string | null
+          vat_registration_status?: string | null
         }
         Relationships: [
           {

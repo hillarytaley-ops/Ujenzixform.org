@@ -33,7 +33,8 @@ import {
   CheckCircle2,
   AlertTriangle,
   Crosshair,
-  Map
+  Map,
+  Landmark,
 } from 'lucide-react';
 
 interface ProfileEditDialogProps {
@@ -63,6 +64,13 @@ interface ProfileData {
   contact_person?: string;
   company_logo_url?: string;
   county?: string;
+  /** Builder: KRA / billing for eTIMS customer fields */
+  kra_pin?: string;
+  billing_company_name?: string;
+  billing_address?: string;
+  procurement_contact_name?: string;
+  procurement_contact_phone?: string;
+  procurement_contact_email?: string;
 }
 
 const KENYAN_COUNTIES = [
@@ -524,6 +532,18 @@ export const ProfileEditDialog: React.FC<ProfileEditDialogProps> = ({
       if (profile.bio) updateData.bio = profile.bio;
       if (profile.website) updateData.website = profile.website;
       if (profile.county) updateData.county = profile.county;
+      if (isBuilder) {
+        if (profile.kra_pin !== undefined) updateData.kra_pin = profile.kra_pin?.trim() || null;
+        if (profile.billing_company_name !== undefined)
+          updateData.billing_company_name = profile.billing_company_name?.trim() || null;
+        if (profile.billing_address !== undefined) updateData.billing_address = profile.billing_address?.trim() || null;
+        if (profile.procurement_contact_name !== undefined)
+          updateData.procurement_contact_name = profile.procurement_contact_name?.trim() || null;
+        if (profile.procurement_contact_phone !== undefined)
+          updateData.procurement_contact_phone = profile.procurement_contact_phone?.trim() || null;
+        if (profile.procurement_contact_email !== undefined)
+          updateData.procurement_contact_email = profile.procurement_contact_email?.trim() || null;
+      }
 
       console.log('📝 ProfileEditDialog: Update data:', updateData);
 
@@ -567,6 +587,18 @@ export const ProfileEditDialog: React.FC<ProfileEditDialogProps> = ({
           if (profile.bio) insertData.bio = profile.bio;
           if (profile.website) insertData.website = profile.website;
           if (profile.county) insertData.county = profile.county;
+          if (isBuilder) {
+            if (profile.kra_pin !== undefined) insertData.kra_pin = profile.kra_pin?.trim() || null;
+            if (profile.billing_company_name !== undefined)
+              insertData.billing_company_name = profile.billing_company_name?.trim() || null;
+            if (profile.billing_address !== undefined) insertData.billing_address = profile.billing_address?.trim() || null;
+            if (profile.procurement_contact_name !== undefined)
+              insertData.procurement_contact_name = profile.procurement_contact_name?.trim() || null;
+            if (profile.procurement_contact_phone !== undefined)
+              insertData.procurement_contact_phone = profile.procurement_contact_phone?.trim() || null;
+            if (profile.procurement_contact_email !== undefined)
+              insertData.procurement_contact_email = profile.procurement_contact_email?.trim() || null;
+          }
           
           response = await fetch(
             `${SUPABASE_URL}/rest/v1/profiles`,
@@ -679,6 +711,18 @@ export const ProfileEditDialog: React.FC<ProfileEditDialogProps> = ({
           if (profile.bio) insertData.bio = profile.bio;
           if (profile.website) insertData.website = profile.website;
           if (profile.county) insertData.county = profile.county;
+          if (isBuilder) {
+            if (profile.kra_pin !== undefined) insertData.kra_pin = profile.kra_pin?.trim() || null;
+            if (profile.billing_company_name !== undefined)
+              insertData.billing_company_name = profile.billing_company_name?.trim() || null;
+            if (profile.billing_address !== undefined) insertData.billing_address = profile.billing_address?.trim() || null;
+            if (profile.procurement_contact_name !== undefined)
+              insertData.procurement_contact_name = profile.procurement_contact_name?.trim() || null;
+            if (profile.procurement_contact_phone !== undefined)
+              insertData.procurement_contact_phone = profile.procurement_contact_phone?.trim() || null;
+            if (profile.procurement_contact_email !== undefined)
+              insertData.procurement_contact_email = profile.procurement_contact_email?.trim() || null;
+          }
           
           response = await fetch(
             `${SUPABASE_URL}/rest/v1/profiles`,
@@ -994,6 +1038,7 @@ export const ProfileEditDialog: React.FC<ProfileEditDialogProps> = ({
 
   const isSupplier = userRole === 'supplier';
   const isDelivery = userRole === 'delivery' || userRole === 'delivery_provider';
+  const isBuilder = userRole === 'builder';
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -1239,6 +1284,79 @@ export const ProfileEditDialog: React.FC<ProfileEditDialogProps> = ({
                   className="mt-1"
                 />
               </div>
+
+              {/* Website */}
+              {isBuilder && (
+                <div className="rounded-lg border border-emerald-200/80 bg-emerald-50/40 p-4 space-y-3 dark:bg-emerald-950/20">
+                  <h4 className="text-sm font-semibold flex items-center gap-2">
+                    <Landmark className="h-4 w-4 text-emerald-700" />
+                    Tax invoicing (your company as buyer)
+                  </h4>
+                  <p className="text-xs text-muted-foreground">
+                    Used as customer PIN and name on supplier eTIMS invoices. Keep this aligned with your KRA records.
+                  </p>
+                  <div>
+                    <Label htmlFor="kra-pin-builder">KRA PIN</Label>
+                    <Input
+                      id="kra-pin-builder"
+                      className="mt-1 font-mono uppercase"
+                      value={profile.kra_pin || ''}
+                      onChange={(e) => setProfile({ ...profile, kra_pin: e.target.value.toUpperCase() })}
+                      placeholder="P051234567X"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="billing-company">Billing company name</Label>
+                    <Input
+                      id="billing-company"
+                      className="mt-1"
+                      value={profile.billing_company_name || ''}
+                      onChange={(e) => setProfile({ ...profile, billing_company_name: e.target.value })}
+                      placeholder="Legal name on tax invoices"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="billing-addr">Billing address</Label>
+                    <Textarea
+                      id="billing-addr"
+                      className="mt-1"
+                      rows={2}
+                      value={profile.billing_address || ''}
+                      onChange={(e) => setProfile({ ...profile, billing_address: e.target.value })}
+                    />
+                  </div>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div>
+                      <Label htmlFor="proc-name">Procurement contact</Label>
+                      <Input
+                        id="proc-name"
+                        className="mt-1"
+                        value={profile.procurement_contact_name || ''}
+                        onChange={(e) => setProfile({ ...profile, procurement_contact_name: e.target.value })}
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="proc-phone">Procurement phone</Label>
+                      <Input
+                        id="proc-phone"
+                        className="mt-1"
+                        value={profile.procurement_contact_phone || ''}
+                        onChange={(e) => setProfile({ ...profile, procurement_contact_phone: e.target.value })}
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <Label htmlFor="proc-email">Procurement email</Label>
+                    <Input
+                      id="proc-email"
+                      type="email"
+                      className="mt-1"
+                      value={profile.procurement_contact_email || ''}
+                      onChange={(e) => setProfile({ ...profile, procurement_contact_email: e.target.value })}
+                    />
+                  </div>
+                </div>
+              )}
 
               {/* Website */}
               <div>

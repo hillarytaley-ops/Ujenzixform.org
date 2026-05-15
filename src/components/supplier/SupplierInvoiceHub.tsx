@@ -11,9 +11,10 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { FileText, Package, Receipt, Loader2, Eye, Download } from 'lucide-react';
+import { FileText, Landmark, Package, Receipt, Loader2, Eye, Download } from 'lucide-react';
 import { supabase, isAbortLikeSupabaseError } from '@/integrations/supabase/client';
 import { InvoiceManagement } from '@/components/invoices/InvoiceManagement';
+import { SupplierEtimsSettingsPanel } from '@/components/supplier/SupplierEtimsSettingsPanel';
 import { useToast } from '@/hooks/use-toast';
 import { openDeliveryNotePdfWindow } from '@/utils/deliveryNoteDocument';
 import { MobileHorizontalScroll } from '@/components/ui/mobile-horizontal-scroll';
@@ -608,7 +609,7 @@ export const SupplierInvoiceHub: React.FC<SupplierInvoiceHubProps> = ({
       <CardContent>
         <Tabs value={subTab} onValueChange={setSubTab} className="space-y-4">
           <TabsList
-            className={`grid h-auto w-full grid-cols-3 gap-1 p-1 sm:gap-2 ${
+            className={`grid h-auto w-full grid-cols-2 gap-1 p-1 sm:grid-cols-4 sm:gap-2 ${
               isDarkMode ? 'bg-slate-900' : 'bg-muted'
             }`}
           >
@@ -617,6 +618,13 @@ export const SupplierInvoiceHub: React.FC<SupplierInvoiceHubProps> = ({
               <span className="truncate sm:max-w-none">
                 <span className="sm:hidden">Inv.</span>
                 <span className="hidden sm:inline">Invoices</span>
+              </span>
+            </TabsTrigger>
+            <TabsTrigger value="etims-settings" className="min-w-0 gap-1 px-2 py-2 text-xs sm:gap-2 sm:px-3 sm:text-sm">
+              <Landmark className="h-3.5 w-3.5 shrink-0 text-emerald-600 sm:h-4 sm:w-4" />
+              <span className="truncate sm:max-w-none">
+                <span className="sm:hidden">KRA</span>
+                <span className="hidden sm:inline">KRA / eTIMS</span>
               </span>
             </TabsTrigger>
             <TabsTrigger value="delivery-notes" className="min-w-0 gap-1 px-2 py-2 text-xs sm:gap-2 sm:px-3 sm:text-sm">
@@ -642,12 +650,27 @@ export const SupplierInvoiceHub: React.FC<SupplierInvoiceHubProps> = ({
           <TabsContent value="invoices" forceMount className="mt-0 space-y-4">
             <p className={`text-sm ${mutedText}`}>
               Invoices tied to your supplier account: edit and send when marked editable. Use Unpaid / Paid under the
-              list header to switch views.
+              list header to switch views. KRA-certified tax receipts are generated per purchase order from the Orders
+              tab (one invoice per supplier order).
             </p>
             <InvoiceManagement
               userId={userId}
               userRole="supplier"
               supplierRecordId={supplierRecordId}
+            />
+          </TabsContent>
+
+          <TabsContent value="etims-settings" forceMount className="mt-0 space-y-3">
+            <p className={`text-sm ${mutedText}`}>
+              Capture legal seller details, KRA identifiers, branch/device metadata, and invoice defaults. Ask buyers
+              to complete KRA / billing fields in their profile so sale invoices include customer PIN and name.
+            </p>
+            <SupplierEtimsSettingsPanel
+              supplierRecordId={supplierRecordId}
+              isDarkMode={isDarkMode}
+              textColor={textColor}
+              mutedText={mutedText}
+              cardBg={cardBg}
             />
           </TabsContent>
 
