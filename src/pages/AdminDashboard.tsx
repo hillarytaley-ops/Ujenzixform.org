@@ -157,6 +157,7 @@ import {
 } from "@/components/ui/select";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { StaffManagement } from "@/components/admin/StaffManagement";
+import { AdminAccountsHub } from "@/components/admin/AdminAccountsHub";
 import { ActivityLogViewer } from "@/components/admin/ActivityLogViewer";
 import { ThemeToggle, ThemeProvider } from "@/components/admin/dashboard/ThemeToggle";
 import { MobileNav } from "@/components/admin/dashboard/MobileNav";
@@ -449,7 +450,7 @@ const AdminDashboard = () => {
   const ADMIN_TABS = [
     "overview", "orders", "monitoring", "gps", "pages", "registrations",
     "pending-products", "videos", "material-images", "delivery-apps", "delivery-requests",
-    "monitoring-requests", "camera-assignment", "feedback", "documents", "financial",
+    "monitoring-requests", "camera-assignment", "feedback", "documents", "financial", "accounts",
     "ml", "security", "staff", "activity-log", "scanning", "qr-codes", "communications",
     "builder-moderation", "delivery-analytics", "delivery-pay", "settings", "careers", "user-roles",
     "messaging", "analytics", "reviews", "sms-test", "etims-test", "tracking", "voice-calls",
@@ -973,6 +974,8 @@ const AdminDashboard = () => {
           await loadBuilderDeliveryRequests();
           break;
         case 'financial':
+          break;
+        case 'accounts':
           break;
         case 'ml':
           loadMLActivities();
@@ -2435,6 +2438,12 @@ const AdminDashboard = () => {
               <TabsTrigger value="financial" className="data-[state=active]:bg-emerald-600">
                 <DollarSign className="h-4 w-4 mr-2" />
                 Finance
+              </TabsTrigger>
+            )}
+            {shouldShowTab('accounts') && (
+              <TabsTrigger value="accounts" className="data-[state=active]:bg-teal-600">
+                <Landmark className="h-4 w-4 mr-2" />
+                Accounts
               </TabsTrigger>
             )}
             {shouldShowTab('ml') && (
@@ -4124,6 +4133,10 @@ const AdminDashboard = () => {
           {/* Finance — standalone (documents + supplier & delivery payout registries) */}
           <TabsContent value="financial" className="space-y-6">
             <FinancialTab />
+          </TabsContent>
+
+          <TabsContent value="accounts" className="space-y-6">
+            <AdminAccountsHub />
           </TabsContent>
 
           <TabsContent value="supply-chain-docs" className="space-y-6">

@@ -54,6 +54,7 @@ export const ALL_ADMIN_TABS = [
   'feedback',
   'documents',
   'financial',
+  'accounts',
   'ml',
   'security',
   'staff',
@@ -270,6 +271,7 @@ export const STAFF_ROLES: Record<string, StaffRole> = {
     allowedTabs: [
       'overview',
       'financial',
+      'accounts',
       'delivery-pay',
       'delivery-analytics',
       'activity-log',
@@ -442,6 +444,12 @@ export const TAB_METADATA: Record<AdminTab, { name: string; icon: string; descri
     name: 'Financial',
     icon: 'DollarSign',
     description: 'Financial reports and transactions',
+    category: 'Finance'
+  },
+  'accounts': {
+    name: 'Accounts',
+    icon: 'Landmark',
+    description: 'Accounting tools and payslip generation',
     category: 'Finance'
   },
   'ml': {

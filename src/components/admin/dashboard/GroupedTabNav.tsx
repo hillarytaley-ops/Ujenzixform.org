@@ -54,6 +54,7 @@ import {
   Video,
   ClipboardList,
   Landmark,
+  Receipt,
 } from 'lucide-react';
 
 interface TabGroup {
@@ -198,7 +199,8 @@ export const GroupedTabNav: React.FC<GroupedTabNavProps> = ({
               ? financialDocsCount
               : undefined,
         },
-        { value: 'etims-test', label: 'eTIMS test', icon: Landmark },
+        { value: 'accounts', label: 'Accounts', icon: Landmark },
+        { value: 'etims-test', label: 'eTIMS test', icon: Receipt },
       ],
     },
     {
