@@ -67,6 +67,19 @@ function chunkIds(ids: string[], size: number): string[][] {
   return out;
 }
 
+/**
+ * Some legacy rows store `suppliers.user_id` in `purchase_orders.supplier_id` while
+ * `supplier_product_prices.supplier_id` always references `suppliers.id`.
+ */
+export async function resolveSuppliersRowId(supplierKey: string | null | undefined): Promise<string> {
+  const k = typeof supplierKey === "string" ? supplierKey.trim() : "";
+  if (!k) return "";
+  const { data, error } = await supabase.from("suppliers").select("id").or(`id.eq.${k},user_id.eq.${k}`).maybeSingle();
+  if (error || !data) return k;
+  const id = (data as { id?: string }).id;
+  return typeof id === "string" && id.trim() ? id.trim() : k;
+}
+
 type CatalogEtimsHints = {
   itemCode?: string;
   taxCode?: string;
@@ -95,6 +108,9 @@ export async function enrichPurchaseOrderItemsWithEtimsCatalogCodes(
 ): Promise<unknown> {
   const lines = parsePurchaseOrderItems(items);
   if (lines.length === 0) return items;
+
+  const sppSupplierId = await resolveSuppliersRowId(supplierId);
+  const supplierKey = sppSupplierId || supplierId;
 
   const productIds = new Set<string>();
   for (const line of lines) {
@@ -127,7 +143,7 @@ export async function enrichPurchaseOrderItemsWithEtimsCatalogCodes(
       .select(
         "product_id,etims_item_code,etims_tax_code,etims_qty_unit_code,etims_pkg_unit_code,etims_item_class_code",
       )
-      .eq("supplier_id", supplierId)
+      .eq("supplier_id", supplierKey)
       .in("product_id", part);
     for (const row of sppRows ?? []) {
       const r = row as { product_id?: string };
@@ -327,7 +343,7 @@ export function buildEtimsInvoiceBodyFromPurchaseOrder(
       const catId = catalogIdFromPoLine(line);
       const label = str(line.material_name ?? line.name ?? line.item_name ?? line.description);
       const who = catId
-        ? `No integrator item code on file for catalog id ${catId}${label ? ` (${label})` : ""}. Add eTIMS item code on that product in your supplier catalog (or admin catalog), or put etims_item_code on this line in the PO items JSON.`
+        ? `No integrator item code on file for catalog id ${catId}${label ? ` (${label})` : ""}. Add the code in My Materials (product pricing), Bulk eTIMS CSV, or the admin catalog; or set etims_item_code on this PO line.`
         : `This line has no material/product id and no etims_item_code (line ${i + 1}${label ? `: ${label}` : ""}). Fix the PO items JSON so each row includes material_id (or product_id) plus etims_item_code, or only etims_item_code.`;
       if (catId) throw new EtimsMissingItemCodeError(who, catId);
       throw new Error(who);
@@ -458,8 +474,13 @@ export async function submitEtimsInvoiceForPurchaseOrder(
     return { ok: false, message: poErr?.message ?? "Purchase order not found or not accessible." };
   }
 
-  if (options.enforceSupplierId && String(po.supplier_id) !== String(options.enforceSupplierId)) {
-    return { ok: false, message: "This order does not belong to your supplier account." };
+  const poSupplierCanonical = await resolveSuppliersRowId(String((po as { supplier_id: string }).supplier_id));
+
+  if (options.enforceSupplierId) {
+    const reqSup = await resolveSuppliersRowId(String(options.enforceSupplierId));
+    if (poSupplierCanonical && reqSup && poSupplierCanonical !== reqSup) {
+      return { ok: false, message: "This order does not belong to your supplier account." };
+    }
   }
 
   if (purchaseOrderStatusBlocksEtimsInvoice((po as { status?: string }).status)) {
@@ -473,7 +494,7 @@ export async function submitEtimsInvoiceForPurchaseOrder(
   const { data: sup } = await supabase
     .from("suppliers")
     .select("etims_default_payment_type")
-    .eq("id", (po as { supplier_id: string }).supplier_id)
+    .eq("id", poSupplierCanonical || String((po as { supplier_id: string }).supplier_id))
     .maybeSingle();
   const supPay = (sup as { etims_default_payment_type?: string | null } | null)?.etims_default_payment_type;
   const paymentFromSupplier =
@@ -484,7 +505,7 @@ export async function submitEtimsInvoiceForPurchaseOrder(
   const party = await fetchBuilderPartyForEtims((po as { buyer_id?: string | null }).buyer_id ?? null);
 
   const itemsForInvoice = await enrichPurchaseOrderItemsWithEtimsCatalogCodes(
-    String((po as { supplier_id: string }).supplier_id),
+    poSupplierCanonical || String((po as { supplier_id: string }).supplier_id),
     (po as { items: unknown }).items,
   );
 
@@ -597,8 +618,13 @@ export async function submitEtimsCreditNoteForPurchaseOrder(
     items: unknown;
   };
 
-  if (options.enforceSupplierId && String(row.supplier_id) !== String(options.enforceSupplierId)) {
-    return { ok: false, message: "This order does not belong to your supplier account." };
+  const creditPoSupplierId = await resolveSuppliersRowId(String(row.supplier_id));
+
+  if (options.enforceSupplierId) {
+    const reqSup = await resolveSuppliersRowId(String(options.enforceSupplierId));
+    if (creditPoSupplierId && reqSup && creditPoSupplierId !== reqSup) {
+      return { ok: false, message: "This order does not belong to your supplier account." };
+    }
   }
 
   if (!row.etims_validated_at || !str(row.etims_trader_invoice_no)) {
@@ -611,7 +637,7 @@ export async function submitEtimsCreditNoteForPurchaseOrder(
   const { data: sup } = await supabase
     .from("suppliers")
     .select("etims_default_payment_type")
-    .eq("id", row.supplier_id)
+    .eq("id", creditPoSupplierId || String(row.supplier_id))
     .maybeSingle();
   const supPay = (sup as { etims_default_payment_type?: string | null } | null)?.etims_default_payment_type;
   const paymentFromSupplier =
@@ -620,7 +646,10 @@ export async function submitEtimsCreditNoteForPurchaseOrder(
       : undefined;
 
   const party = await fetchBuilderPartyForEtims(row.buyer_id ?? null);
-  const itemsForInvoice = await enrichPurchaseOrderItemsWithEtimsCatalogCodes(String(row.supplier_id), row.items);
+  const itemsForInvoice = await enrichPurchaseOrderItemsWithEtimsCatalogCodes(
+    creditPoSupplierId || String(row.supplier_id),
+    row.items,
+  );
 
   const creditTraderNo = `CN-${row.po_number}-${Date.now()}`.slice(0, 200);
 
