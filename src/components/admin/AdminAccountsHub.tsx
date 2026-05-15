@@ -104,7 +104,7 @@ function buildPayslipHtml(opts: {
 h1{font-size:1.25rem;margin:0 0 4px} .muted{color:#555;font-size:0.9rem} table{width:100%;border-collapse:collapse;margin-top:12px}
 .net{font-size:1.1rem;font-weight:700;margin-top:16px;padding:12px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px}
 @media print{body{margin:0}.no-print{display:none}}</style></head><body>
-<p class="no-print"><button onclick="window.print()" style="padding:10px 16px;cursor:pointer">Print / Save as PDF</button></p>
+<p class="no-print"><button type="button" id="ujx-payslip-print" style="padding:10px 16px;cursor:pointer">Print / Save as PDF</button></p>
 <h1>${escapeHtml(opts.employerName)}</h1>
 <p class="muted">Payslip — ${opts.kind === 'staff' ? 'Staff' : 'Delivery provider'}</p>
 <p><strong>Employee:</strong> ${escapeHtml(opts.employeeName)}<br/>
@@ -120,6 +120,7 @@ ${ded.map(([l, a]) => rowHtml(l as string, a as number, l === 'Total deductions'
 </tbody></table>
 <div class="net">Net pay: ${escapeHtml(opts.currency)} ${escapeHtml(opts.net)}</div>
 <p class="muted" style="margin-top:24px;font-size:0.8rem">Generated in UjenziXform Admin — figures are entered by finance; statutory amounts are your responsibility to verify.</p>
+<script>(function(){var b=document.getElementById("ujx-payslip-print");if(b)b.addEventListener("click",function(){window.print();});})();</script>
 </body></html>`;
 }
 
@@ -274,17 +275,57 @@ export const AdminAccountsHub: React.FC = () => {
       totalDed: totals.totalDed,
       net: formatMoney(totals.net),
     });
-    const w = window.open('', '_blank', 'noopener,noreferrer');
-    if (!w) {
+
+    // Do not pass `noopener` here: Chromium often detaches the returned Window so
+    // document.write() leaves a permanent blank page. Prefer blob: URL (works with a normal new tab).
+    try {
+      const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const w = window.open(url, '_blank');
+      if (!w) {
+        URL.revokeObjectURL(url);
+        toast({
+          title: 'Popup blocked',
+          description: 'Allow pop-ups for this site, or use Download payslip below.',
+          variant: 'destructive',
+        });
+        triggerHtmlDownload(html, `payslip-${(name || 'payee').replace(/\s+/g, '-')}.html`);
+        return;
+      }
+      window.setTimeout(() => {
+        try {
+          URL.revokeObjectURL(url);
+        } catch {
+          /* ignore */
+        }
+      }, 600_000);
+    } catch (e) {
+      console.error(e);
       toast({
-        title: 'Popup blocked',
-        description: 'Allow pop-ups for this site to view the payslip.',
+        title: 'Could not open payslip',
+        description: e instanceof Error ? e.message : 'Try again or download the HTML file.',
         variant: 'destructive',
       });
-      return;
+      triggerHtmlDownload(html, `payslip-${(name || 'payee').replace(/\s+/g, '-')}.html`);
     }
-    w.document.write(html);
-    w.document.close();
+  };
+
+  const triggerHtmlDownload = (html: string, filename: string) => {
+    try {
+      const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      a.rel = 'noopener';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.setTimeout(() => URL.revokeObjectURL(url), 30_000);
+      toast({ title: 'Download started', description: 'Open the file in your browser to print.' });
+    } catch {
+      toast({ title: 'Download failed', variant: 'destructive' });
+    }
   };
 
   return (
