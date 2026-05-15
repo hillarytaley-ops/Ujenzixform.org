@@ -202,6 +202,29 @@ const Careers = () => {
   const loadPositions = async () => {
     setLoading(true);
     try {
+      // 1) SECURITY DEFINER RPC — public catalog regardless of signed-in role / RLS quirks
+      const { data: rpcData, error: rpcError } = await supabase.rpc('get_public_job_positions');
+      if (!rpcError && Array.isArray(rpcData)) {
+        setPositions(rpcData as JobPosition[]);
+        return;
+      }
+
+      // 2) Anon REST — same rows a signed-out visitor would get (explicit public read)
+      const restUrl = `${SUPABASE_URL}/rest/v1/job_positions?select=*&is_active=eq.true&order=is_featured.desc,created_at.desc`;
+      const restRes = await fetch(restUrl, {
+        headers: {
+          apikey: SUPABASE_ANON_KEY,
+          Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+          Accept: 'application/json',
+        },
+      });
+      if (restRes.ok) {
+        const json = await restRes.json();
+        setPositions(Array.isArray(json) ? (json as JobPosition[]) : []);
+        return;
+      }
+
+      // 3) Session client (legacy)
       const { data, error } = await supabase
         .from('job_positions')
         .select('*')
