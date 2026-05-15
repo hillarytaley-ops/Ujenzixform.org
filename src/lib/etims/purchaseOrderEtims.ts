@@ -5,7 +5,9 @@
  * Each `purchase_orders.items` element may include:
  *   `etims_item_code` (or `itemCode` / `item_code`) — integrator **itemCode** (must exist on OSCU item master).
  *   `quantity` or `qty`, `unit_price` or `unitPrice`, optional `discountAmount`, `pkg`.
- *   Optional line fields accepted by many deployments: `taxCode` / `tax_code` (A–E), `insuranceCompanyCode`.
+ *   Optional line fields: `taxCode` / `tax_code` (A–E), `qtyUnitCode` / `qty_unit_code`,
+ *   `pkgUnitCode` / `pkg_unit_code`, `itemClassCode` / `item_class_code` / `etims_item_class_code`,
+ *   numeric `pkg` (package count), `insuranceCompanyCode`.
  *
  * Valid JSON example (integrator “tax code change” body, no stray quotes): `samples/integrator-invoice-tax-code-d.json`.
  */
@@ -70,6 +72,7 @@ type CatalogEtimsHints = {
   taxCode?: string;
   qtyUnit?: string;
   pkgUnit?: string;
+  itemClassCode?: string;
 };
 
 function mergeHints(base: CatalogEtimsHints, patch: CatalogEtimsHints): CatalogEtimsHints {
@@ -78,6 +81,7 @@ function mergeHints(base: CatalogEtimsHints, patch: CatalogEtimsHints): CatalogE
     taxCode: base.taxCode || patch.taxCode,
     qtyUnit: base.qtyUnit || patch.qtyUnit,
     pkgUnit: base.pkgUnit || patch.pkgUnit,
+    itemClassCode: base.itemClassCode || patch.itemClassCode,
   };
 }
 
@@ -107,18 +111,22 @@ export async function enrichPurchaseOrderItemsWithEtimsCatalogCodes(
     const tcRaw = row.etims_tax_code;
     const quRaw = row.etims_qty_unit_code;
     const puRaw = row.etims_pkg_unit_code;
+    const clsRaw = row.etims_item_class_code;
     return {
       itemCode: typeof icRaw === "string" && icRaw.trim() ? icRaw.trim() : undefined,
       taxCode: typeof tcRaw === "string" && tcRaw.trim() ? tcRaw.trim().slice(0, 8) : undefined,
       qtyUnit: typeof quRaw === "string" && quRaw.trim() ? quRaw.trim().slice(0, 32) : undefined,
       pkgUnit: typeof puRaw === "string" && puRaw.trim() ? puRaw.trim().slice(0, 32) : undefined,
+      itemClassCode: typeof clsRaw === "string" && clsRaw.trim() ? clsRaw.trim().slice(0, 64) : undefined,
     };
   };
 
   for (const part of chunkIds(ids, 80)) {
     const { data: sppRows } = await supabase
       .from("supplier_product_prices")
-      .select("product_id,etims_item_code,etims_tax_code,etims_qty_unit_code,etims_pkg_unit_code")
+      .select(
+        "product_id,etims_item_code,etims_tax_code,etims_qty_unit_code,etims_pkg_unit_code,etims_item_class_code",
+      )
       .eq("supplier_id", supplierId)
       .in("product_id", part);
     for (const row of sppRows ?? []) {
@@ -133,7 +141,7 @@ export async function enrichPurchaseOrderItemsWithEtimsCatalogCodes(
   for (const part of chunkIds(ids, 80)) {
     const { data: matRows } = await supabase
       .from("materials")
-      .select("id,etims_item_code,etims_tax_code,etims_qty_unit_code,etims_pkg_unit_code")
+      .select("id,etims_item_code,etims_tax_code,etims_qty_unit_code,etims_pkg_unit_code,etims_item_class_code")
       .in("id", part);
     for (const row of matRows ?? []) {
       const r = row as { id?: string };
@@ -169,6 +177,12 @@ export async function enrichPurchaseOrderItemsWithEtimsCatalogCodes(
     if (!str(line.taxCode ?? line.tax_code) && hints.taxCode) out.tax_code = hints.taxCode;
     if (!str(line.qtyUnitCode ?? line.qty_unit_code) && hints.qtyUnit) out.qty_unit_code = hints.qtyUnit;
     if (!str(line.pkgUnitCode ?? line.pkg_unit_code) && hints.pkgUnit) out.pkg_unit_code = hints.pkgUnit;
+    if (
+      !str(line.itemClassCode ?? line.item_class_code ?? line.etims_item_class_code) &&
+      hints.itemClassCode
+    ) {
+      out.item_class_code = hints.itemClassCode;
+    }
     return out;
   });
 
@@ -321,7 +335,7 @@ export function buildEtimsInvoiceBodyFromPurchaseOrder(
     const qty = num(line.quantity ?? line.qty, 1);
     const unitPrice = num(line.unit_price ?? line.unitPrice ?? line.price, 0);
     const discountAmount = num(line.discountAmount ?? line.discount_amount, 0);
-    const pkg = num(line.pkg ?? line.pkgUnitCode ?? line.pkg_unit_code, 0);
+    const pkg = num(line.pkg ?? line.packageCount ?? line.package_count, 0);
     const amount = num(line.amount ?? line.lineTotal ?? line.total, unitPrice * qty - discountAmount);
     // SalesItem: itemCode (+ item_code duplicate for some deserializers). Optional taxCode, insuranceCompanyCode.
     const row: EtimsSalesItem = {
@@ -335,6 +349,12 @@ export function buildEtimsInvoiceBodyFromPurchaseOrder(
     };
     const taxCode = str(line.taxCode ?? line.tax_code);
     if (taxCode) row.taxCode = taxCode;
+    const qtyUnitCode = str(line.qtyUnitCode ?? line.qty_unit_code);
+    if (qtyUnitCode) row.qtyUnitCode = qtyUnitCode.slice(0, 32);
+    const pkgUnitCode = str(line.pkgUnitCode ?? line.pkg_unit_code);
+    if (pkgUnitCode) row.pkgUnitCode = pkgUnitCode.slice(0, 32);
+    const itemClassCode = str(line.itemClassCode ?? line.item_class_code ?? line.etims_item_class_code);
+    if (itemClassCode) row.itemClassCode = itemClassCode.slice(0, 64);
     const ins = str(line.insuranceCompanyCode ?? line.insurance_company_code);
     if (ins) row.insuranceCompanyCode = ins;
     salesItems.push(row);

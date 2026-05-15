@@ -66,4 +66,32 @@ describe("buildEtimsInvoiceBodyFromPurchaseOrder", () => {
     expect(body.totalAmount).toBe(99);
     expect(body.salesItems[0].amount + body.salesItems[1].amount).toBeCloseTo(99, 5);
   });
+
+  it("passes tax category, unit codes, and item classification onto salesItems when present on PO lines", () => {
+    const body = buildEtimsInvoiceBodyFromPurchaseOrder(
+      {
+        id: "00000000-0000-4000-8000-000000000004",
+        po_number: "PO-TAX-UNITS",
+        total_amount: 50,
+        items: [
+          {
+            etims_item_code: "KE1UCT0000001",
+            quantity: 2,
+            unit_price: 25,
+            tax_code: "D",
+            qty_unit_code: "UOM003",
+            pkg_unit_code: "PKG01",
+            item_class_code: "50211505",
+          },
+        ],
+      },
+      {},
+    );
+
+    expect(body.salesItems[0].taxCode).toBe("D");
+    expect(body.salesItems[0].qtyUnitCode).toBe("UOM003");
+    expect(body.salesItems[0].pkgUnitCode).toBe("PKG01");
+    expect(body.salesItems[0].itemClassCode).toBe("50211505");
+    expect(body.salesItems[0].pkg).toBe(0);
+  });
 });

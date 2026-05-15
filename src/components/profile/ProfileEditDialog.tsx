@@ -127,6 +127,14 @@ export const ProfileEditDialog: React.FC<ProfileEditDialogProps> = ({
   const [testingSupplierEtims, setTestingSupplierEtims] = useState(false);
   const { toast } = useToast();
 
+  const isSupplier = userRole === 'supplier';
+  const isDelivery = userRole === 'delivery' || userRole === 'delivery_provider';
+  /** Buyers who place orders and receive supplier eTIMS invoices (profiles.* tax fields) */
+  const isBuyerTaxProfile =
+    userRole === 'builder' ||
+    userRole === 'professional_builder' ||
+    userRole === 'private_client';
+
   useEffect(() => {
     if (isOpen) {
       // Reset profile state when dialog opens to ensure fresh data
@@ -575,12 +583,13 @@ export const ProfileEditDialog: React.FC<ProfileEditDialogProps> = ({
       };
 
       // Add optional fields if they exist in the profile
-      if (profile.company_name) updateData.company_name = profile.company_name;
+      if (!isBuyerTaxProfile && profile.company_name) updateData.company_name = profile.company_name;
       if (profile.bio) updateData.bio = profile.bio;
       if (profile.website) updateData.website = profile.website;
       if (profile.county) updateData.county = profile.county;
-      if (isBuilder) {
-        if (profile.kra_pin !== undefined) updateData.kra_pin = profile.kra_pin?.trim() || null;
+      if (isBuyerTaxProfile) {
+        if (profile.company_name !== undefined) updateData.company_name = profile.company_name?.trim() || null;
+        if (profile.kra_pin !== undefined) updateData.kra_pin = profile.kra_pin?.trim().toUpperCase() || null;
         if (profile.billing_company_name !== undefined)
           updateData.billing_company_name = profile.billing_company_name?.trim() || null;
         if (profile.billing_address !== undefined) updateData.billing_address = profile.billing_address?.trim() || null;
@@ -630,12 +639,13 @@ export const ProfileEditDialog: React.FC<ProfileEditDialogProps> = ({
           };
 
           // Add optional fields if they exist
-          if (profile.company_name) insertData.company_name = profile.company_name;
+          if (!isBuyerTaxProfile && profile.company_name) insertData.company_name = profile.company_name;
           if (profile.bio) insertData.bio = profile.bio;
           if (profile.website) insertData.website = profile.website;
           if (profile.county) insertData.county = profile.county;
-          if (isBuilder) {
-            if (profile.kra_pin !== undefined) insertData.kra_pin = profile.kra_pin?.trim() || null;
+          if (isBuyerTaxProfile) {
+            if (profile.company_name !== undefined) insertData.company_name = profile.company_name?.trim() || null;
+            if (profile.kra_pin !== undefined) insertData.kra_pin = profile.kra_pin?.trim().toUpperCase() || null;
             if (profile.billing_company_name !== undefined)
               insertData.billing_company_name = profile.billing_company_name?.trim() || null;
             if (profile.billing_address !== undefined) insertData.billing_address = profile.billing_address?.trim() || null;
@@ -754,12 +764,13 @@ export const ProfileEditDialog: React.FC<ProfileEditDialogProps> = ({
           };
 
           // Add optional fields if they exist
-          if (profile.company_name) insertData.company_name = profile.company_name;
+          if (!isBuyerTaxProfile && profile.company_name) insertData.company_name = profile.company_name;
           if (profile.bio) insertData.bio = profile.bio;
           if (profile.website) insertData.website = profile.website;
           if (profile.county) insertData.county = profile.county;
-          if (isBuilder) {
-            if (profile.kra_pin !== undefined) insertData.kra_pin = profile.kra_pin?.trim() || null;
+          if (isBuyerTaxProfile) {
+            if (profile.company_name !== undefined) insertData.company_name = profile.company_name?.trim() || null;
+            if (profile.kra_pin !== undefined) insertData.kra_pin = profile.kra_pin?.trim().toUpperCase() || null;
             if (profile.billing_company_name !== undefined)
               insertData.billing_company_name = profile.billing_company_name?.trim() || null;
             if (profile.billing_address !== undefined) insertData.billing_address = profile.billing_address?.trim() || null;
@@ -1102,10 +1113,6 @@ export const ProfileEditDialog: React.FC<ProfileEditDialogProps> = ({
       .toUpperCase()
       .slice(0, 2);
   };
-
-  const isSupplier = userRole === 'supplier';
-  const isDelivery = userRole === 'delivery' || userRole === 'delivery_provider';
-  const isBuilder = userRole === 'builder';
 
   const runSupplierEtimsConnectionTest = async () => {
     if (!profile?.supplier_id) {
@@ -1486,8 +1493,8 @@ export const ProfileEditDialog: React.FC<ProfileEditDialogProps> = ({
                 </>
               )}
 
-              {/* Company Name (for non-suppliers) */}
-              {!isSupplier && (
+              {/* Company name (non-buyer-tax roles; buyers use company / business name in tax card) */}
+              {!isSupplier && !isBuyerTaxProfile && (
                 <div>
                   <Label htmlFor="companyName" className="flex items-center gap-2">
                     <Building2 className="h-4 w-4" />
@@ -1612,16 +1619,27 @@ export const ProfileEditDialog: React.FC<ProfileEditDialogProps> = ({
                 />
               </div>
 
-              {/* Website */}
-              {isBuilder && (
+              {/* Buyer / company profile for tax invoices */}
+              {isBuyerTaxProfile && (
                 <div className="rounded-lg border border-emerald-200/80 bg-emerald-50/40 p-4 space-y-3 dark:bg-emerald-950/20">
                   <h4 className="text-sm font-semibold flex items-center gap-2">
                     <Landmark className="h-4 w-4 text-emerald-700" />
-                    Tax invoicing (your company as buyer)
+                    Company profile for tax invoices
                   </h4>
                   <p className="text-xs text-muted-foreground">
-                    Used as customer PIN and name on supplier eTIMS invoices. Keep this aligned with your KRA records.
+                    Company or business name, KRA PIN, billing address, and procurement contacts are used on supplier
+                    eTIMS invoices. Keep this aligned with your KRA records.
                   </p>
+                  <div>
+                    <Label htmlFor="company-name-buyer">Company / business name</Label>
+                    <Input
+                      id="company-name-buyer"
+                      className="mt-1"
+                      value={profile.company_name || ''}
+                      onChange={(e) => setProfile({ ...profile, company_name: e.target.value })}
+                      placeholder="Registered or trading name"
+                    />
+                  </div>
                   <div>
                     <Label htmlFor="kra-pin-builder">KRA PIN</Label>
                     <Input

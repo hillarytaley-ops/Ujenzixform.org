@@ -19,12 +19,19 @@ export interface EtimsSalesItem {
   /** Duplicate for runtimes that only bind snake_case */
   item_code?: string;
   qty: number;
+  /** Package count / quantity of packages when integrator expects a number (not the pkg *unit* code). */
   pkg?: number;
   unitPrice: number;
   amount: number;
   discountAmount?: number;
   /** A–E per Swagger (e.g. D = Non VAT); omit if unused */
   taxCode?: string;
+  /** Integrator qty unit master code (catalog / item registration). */
+  qtyUnitCode?: string;
+  /** Integrator package unit master code. */
+  pkgUnitCode?: string;
+  /** UNSPSC / KRA-style item classification when the integrator accepts it on sale lines. */
+  itemClassCode?: string;
   /** Pharmacy / insurance; omit unless required */
   insuranceCompanyCode?: string;
 }

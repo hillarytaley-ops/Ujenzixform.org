@@ -65,6 +65,10 @@ interface Product {
   variants?: ProductVariant[];
   /** KRA / eTIMS integrator item code (optional; required on PO lines at eTIMS submit) */
   etims_item_code?: string | null;
+  etims_item_class_code?: string | null;
+  etims_tax_code?: string | null;
+  etims_qty_unit_code?: string | null;
+  etims_pkg_unit_code?: string | null;
 }
 
 interface SupplierProductManagerProps {
@@ -175,6 +179,10 @@ export const SupplierProductManager: React.FC<SupplierProductManagerProps> = ({ 
     pricing_type: 'single' as 'single' | 'variants',
     variants: [] as ProductVariant[],
     etims_item_code: '',
+    etims_item_class_code: '',
+    etims_tax_code: '',
+    etims_qty_unit_code: '',
+    etims_pkg_unit_code: '',
   });
   
   // New variant form state
@@ -305,6 +313,11 @@ export const SupplierProductManager: React.FC<SupplierProductManagerProps> = ({ 
         : parseFloat(formData.unit_price);
       
       const etimsTrim = formData.etims_item_code.trim();
+      const taxRaw = formData.etims_tax_code.trim().toUpperCase();
+      const tax = /^[A-E]$/.test(taxRaw) ? taxRaw : null;
+      const qu = formData.etims_qty_unit_code.trim() || null;
+      const pu = formData.etims_pkg_unit_code.trim() || null;
+      const cls = formData.etims_item_class_code.trim() || null;
       const productData = {
         supplier_id: supplierId,
         name: formData.name,
@@ -318,6 +331,10 @@ export const SupplierProductManager: React.FC<SupplierProductManagerProps> = ({ 
         pricing_type: formData.pricing_type,
         variants: formData.pricing_type === 'variants' ? formData.variants : [],
         etims_item_code: etimsTrim || null,
+        etims_item_class_code: cls,
+        etims_tax_code: tax,
+        etims_qty_unit_code: qu,
+        etims_pkg_unit_code: pu,
         updated_at: new Date().toISOString()
       };
 
@@ -370,6 +387,10 @@ export const SupplierProductManager: React.FC<SupplierProductManagerProps> = ({ 
         pricing_type: 'single',
         variants: [],
         etims_item_code: '',
+        etims_item_class_code: '',
+        etims_tax_code: '',
+        etims_qty_unit_code: '',
+        etims_pkg_unit_code: '',
       });
       setShowAddDialog(false);
       setEditingProduct(null);
@@ -398,6 +419,10 @@ export const SupplierProductManager: React.FC<SupplierProductManagerProps> = ({ 
       pricing_type: product.pricing_type || 'single',
       variants: product.variants || [],
       etims_item_code: typeof product.etims_item_code === 'string' ? product.etims_item_code : '',
+      etims_item_class_code: typeof product.etims_item_class_code === 'string' ? product.etims_item_class_code : '',
+      etims_tax_code: typeof product.etims_tax_code === 'string' ? product.etims_tax_code : '',
+      etims_qty_unit_code: typeof product.etims_qty_unit_code === 'string' ? product.etims_qty_unit_code : '',
+      etims_pkg_unit_code: typeof product.etims_pkg_unit_code === 'string' ? product.etims_pkg_unit_code : '',
     });
     setNewVariantLabel('');
     setNewVariantPrice('');
@@ -525,6 +550,10 @@ export const SupplierProductManager: React.FC<SupplierProductManagerProps> = ({ 
       pricing_type: 'single',
       variants: [],
       etims_item_code: '',
+      etims_item_class_code: '',
+      etims_tax_code: '',
+      etims_qty_unit_code: '',
+      etims_pkg_unit_code: '',
     });
     setNewVariantLabel('');
     setNewVariantPrice('');
@@ -905,18 +934,77 @@ export const SupplierProductManager: React.FC<SupplierProductManagerProps> = ({ 
                   />
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="etims-item-code">KRA eTIMS item code (optional)</Label>
-                  <Input
-                    id="etims-item-code"
-                    placeholder="Paste the item code from your integrator or OSCU export"
-                    value={formData.etims_item_code}
-                    onChange={(e) => setFormData({ ...formData, etims_item_code: e.target.value })}
-                    className="font-mono text-sm"
-                    autoComplete="off"
-                  />
+                <div className="space-y-3 rounded-lg border border-emerald-200/80 bg-emerald-50/40 p-4 dark:bg-emerald-950/20">
+                  <p className="text-sm font-medium text-emerald-900 dark:text-emerald-100">eTIMS product metadata</p>
+                  <div className="space-y-2">
+                    <Label htmlFor="etims-item-code">Integrator item code (optional)</Label>
+                    <Input
+                      id="etims-item-code"
+                      placeholder="OSCU / catalog itemCode"
+                      value={formData.etims_item_code}
+                      onChange={(e) => setFormData({ ...formData, etims_item_code: e.target.value })}
+                      className="font-mono text-sm"
+                      autoComplete="off"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="etims-item-class">Item classification code (optional)</Label>
+                    <Input
+                      id="etims-item-class"
+                      placeholder="UNSPSC / KRA class"
+                      value={formData.etims_item_class_code}
+                      onChange={(e) => setFormData({ ...formData, etims_item_class_code: e.target.value })}
+                      className="font-mono text-sm"
+                      autoComplete="off"
+                    />
+                  </div>
+                  <div className="grid gap-3 sm:grid-cols-3">
+                    <div>
+                      <Label htmlFor="etims-tax" className="text-xs">
+                        Tax category (A–E)
+                      </Label>
+                      <Input
+                        id="etims-tax"
+                        maxLength={1}
+                        placeholder="D"
+                        value={formData.etims_tax_code}
+                        onChange={(e) =>
+                          setFormData({ ...formData, etims_tax_code: e.target.value.toUpperCase().slice(0, 1) })
+                        }
+                        className="mt-1 h-9 font-mono text-sm uppercase"
+                        autoComplete="off"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="etims-qty-unit" className="text-xs">
+                        Qty unit code
+                      </Label>
+                      <Input
+                        id="etims-qty-unit"
+                        placeholder="Integrator UOM"
+                        value={formData.etims_qty_unit_code}
+                        onChange={(e) => setFormData({ ...formData, etims_qty_unit_code: e.target.value })}
+                        className="mt-1 h-9 font-mono text-sm"
+                        autoComplete="off"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="etims-pkg-unit" className="text-xs">
+                        Pkg unit code
+                      </Label>
+                      <Input
+                        id="etims-pkg-unit"
+                        placeholder="Package UOM"
+                        value={formData.etims_pkg_unit_code}
+                        onChange={(e) => setFormData({ ...formData, etims_pkg_unit_code: e.target.value })}
+                        className="mt-1 h-9 font-mono text-sm"
+                        autoComplete="off"
+                      />
+                    </div>
+                  </div>
                   <p className="text-xs text-muted-foreground">
-                    Used when this material is invoiced through eTIMS. Leave blank if you do not use eTIMS for this SKU.
+                    Used when purchase orders are enriched for eTIMS invoices. Item code must exist on your OSCU when
+                    submitting sales.
                   </p>
                 </div>
 

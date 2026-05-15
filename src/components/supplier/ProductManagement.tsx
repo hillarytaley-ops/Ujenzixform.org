@@ -260,6 +260,7 @@ export const ProductManagement: React.FC<ProductManagementProps> = ({ supplierId
         description?: string;
         variant_prices?: any[];
         etims_item_code?: string | null;
+        etims_item_class_code?: string | null;
         etims_tax_code?: string | null;
         etims_qty_unit_code?: string | null;
         etims_pkg_unit_code?: string | null;
@@ -542,6 +543,7 @@ export const ProductManagement: React.FC<ProductManagementProps> = ({ supplierId
             description?: string;
             variant_prices?: any[];
             etims_item_code?: string | null;
+            etims_item_class_code?: string | null;
             etims_tax_code?: string | null;
             etims_qty_unit_code?: string | null;
             etims_pkg_unit_code?: string | null;
@@ -555,6 +557,7 @@ export const ProductManagement: React.FC<ProductManagementProps> = ({ supplierId
             description: item.description || '',
             variant_prices: item.variant_prices || [],
             etims_item_code: item.etims_item_code ?? null,
+            etims_item_class_code: item.etims_item_class_code ?? null,
             etims_tax_code: item.etims_tax_code ?? null,
             etims_qty_unit_code: item.etims_qty_unit_code ?? null,
             etims_pkg_unit_code: item.etims_pkg_unit_code ?? null,
@@ -2166,10 +2169,10 @@ export const ProductManagement: React.FC<ProductManagementProps> = ({ supplierId
                 </p>
               </div>
               
-              {/* KRA eTIMS / item code — stored on supplier_product_prices */}
+              {/* KRA eTIMS — stored on supplier_product_prices */}
               <div className="space-y-2">
                 <Label htmlFor="etims-item-code-input" className="flex items-center gap-2">
-                  Item code (KRA eTIMS)
+                  Integrator item code (OSCU / catalog)
                   <span className="text-xs text-muted-foreground font-normal">Optional</span>
                 </Label>
                 <Input
@@ -2181,12 +2184,26 @@ export const ProductManagement: React.FC<ProductManagementProps> = ({ supplierId
                   autoComplete="off"
                 />
                 <p className="text-xs text-muted-foreground">
-                  Use your integrator catalog item code for this SKU so invoice lines can map correctly.
+                  Must match an item registered on your eTIMS device. Used as <span className="font-mono">itemCode</span> on
+                  invoice lines.
                 </p>
+                <div>
+                  <Label htmlFor="etims-item-class-input" className="text-xs">
+                    Item classification code
+                  </Label>
+                  <Input
+                    id="etims-item-class-input"
+                    key={`etims-cls-${pricingProduct.id}-${supplierPrices[pricingProduct.id]?.etims_item_class_code ?? ''}`}
+                    defaultValue={supplierPrices[pricingProduct.id]?.etims_item_class_code ?? ''}
+                    placeholder="UNSPSC / KRA class (if required)"
+                    className="h-9 mt-1 font-mono text-sm"
+                    autoComplete="off"
+                  />
+                </div>
                 <div className="grid gap-2 sm:grid-cols-3">
                   <div>
                     <Label htmlFor="etims-tax-code-input" className="text-xs">
-                      Tax code (A–E)
+                      Tax category (A–E)
                     </Label>
                     <Input
                       id="etims-tax-code-input"
@@ -2325,13 +2342,16 @@ export const ProductManagement: React.FC<ProductManagementProps> = ({ supplierId
                   const taxEl = document.getElementById('etims-tax-code-input') as HTMLInputElement | null;
                   const qtyEl = document.getElementById('etims-qty-unit-input') as HTMLInputElement | null;
                   const pkgEl = document.getElementById('etims-pkg-unit-input') as HTMLInputElement | null;
+                  const classEl = document.getElementById('etims-item-class-input') as HTMLInputElement | null;
                   const taxRaw = taxEl?.value?.trim().toUpperCase() || '';
                   const tax = /^[A-E]$/.test(taxRaw) ? taxRaw : null;
                   const qtyU = qtyEl?.value?.trim() || null;
                   const pkgU = pkgEl?.value?.trim() || null;
+                  const classTrim = classEl?.value?.trim() || null;
                   const { error: metaErr } = await supabase
                     .from('supplier_product_prices')
                     .update({
+                      etims_item_class_code: classTrim,
                       etims_tax_code: tax,
                       etims_qty_unit_code: qtyU,
                       etims_pkg_unit_code: pkgU,
