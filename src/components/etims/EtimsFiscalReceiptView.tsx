@@ -4,7 +4,7 @@
  */
 
 import React, { useMemo } from 'react';
-import { parseEtimsReceiptForDisplay } from '@/lib/etims/formatEtimsReceiptForUi';
+import { parseEtimsReceiptForDisplay, pickEtimsIssuerFromResponse } from '@/lib/etims/formatEtimsReceiptForUi';
 import { EtimsVerificationQr } from '@/components/etims/EtimsVerificationQr';
 import { cn } from '@/lib/utils';
 
@@ -91,12 +91,23 @@ export const EtimsFiscalReceiptView: React.FC<EtimsFiscalReceiptViewProps> = ({
 
   const displayDate = receipt.salesDate || submittedLabel;
 
+  const issuerFromJson = useMemo(() => pickEtimsIssuerFromResponse(etimsResponse), [etimsResponse]);
+
+  const displayName = supplierName?.trim() || issuerFromJson.name?.trim() || null;
+  const displayContactLine =
+    supplierContactPerson?.trim() ||
+    [issuerFromJson.branch?.trim(), issuerFromJson.pin?.trim()].filter(Boolean).join(' · ') ||
+    null;
+  const displayPhone = supplierPhone?.trim() || issuerFromJson.phone?.trim() || null;
+  const displayEmail = supplierEmail?.trim() || null;
+  const displayAddress = supplierAddress?.trim() || null;
+
   const hasSupplierHead =
-    Boolean(supplierName?.trim()) ||
-    Boolean(supplierContactPerson?.trim()) ||
-    Boolean(supplierAddress?.trim()) ||
-    Boolean(supplierPhone?.trim()) ||
-    Boolean(supplierEmail?.trim());
+    Boolean(displayName) ||
+    Boolean(displayContactLine) ||
+    Boolean(displayAddress) ||
+    Boolean(displayPhone) ||
+    Boolean(displayEmail);
 
   return (
     <article
@@ -112,22 +123,18 @@ export const EtimsFiscalReceiptView: React.FC<EtimsFiscalReceiptViewProps> = ({
         </p>
         {hasSupplierHead ? (
           <div className="mt-2 space-y-1.5 text-sm">
-            {supplierName?.trim() ? (
-              <p className="text-base font-bold leading-tight text-slate-900 dark:text-slate-50">
-                {supplierName.trim()}
-              </p>
+            {displayName ? (
+              <p className="text-base font-bold leading-tight text-slate-900 dark:text-slate-50">{displayName}</p>
             ) : null}
-            {supplierContactPerson?.trim() ? (
-              <p className="text-xs text-slate-700 dark:text-slate-200">{supplierContactPerson.trim()}</p>
+            {displayContactLine ? (
+              <p className="text-xs text-slate-700 dark:text-slate-200">{displayContactLine}</p>
             ) : null}
-            {supplierAddress?.trim() ? (
-              <p className="whitespace-pre-line text-xs leading-snug text-muted-foreground">
-                {supplierAddress.trim()}
-              </p>
+            {displayAddress ? (
+              <p className="whitespace-pre-line text-xs leading-snug text-muted-foreground">{displayAddress}</p>
             ) : null}
             <div className="flex flex-col items-center gap-0.5 text-[11px] text-muted-foreground sm:flex-row sm:flex-wrap sm:justify-center sm:gap-x-4">
-              {supplierPhone?.trim() ? <span>Tel: {supplierPhone.trim()}</span> : null}
-              {supplierEmail?.trim() ? <span>Email: {supplierEmail.trim()}</span> : null}
+              {displayPhone ? <span>Tel: {displayPhone}</span> : null}
+              {displayEmail ? <span>Email: {displayEmail}</span> : null}
             </div>
           </div>
         ) : (

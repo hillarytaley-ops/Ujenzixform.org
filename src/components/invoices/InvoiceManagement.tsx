@@ -300,10 +300,12 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
       }
       if (!silent && userRole !== 'builder') setLoading(true);
 
+      // Only non-revoked supplier columns in embed; letterhead contact fields come from RPC
+      // get_supplier_letterhead_* (column-level REVOKE on suppliers for authenticated).
       const invoiceSelect = `
           *,
           purchase_order:purchase_orders(po_number, etims_verification_url),
-          supplier:suppliers(company_name, phone, email, address, contact_person)
+          supplier:suppliers(company_name)
         `;
 
       // Supplier: prefer RPC with p_supplier_id when dashboard resolved suppliers.id.
@@ -365,12 +367,27 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
                 )
               ),
               Promise.all(
-                chunkArray(supIds, 80).map((chunk) =>
-                  supabase
-                    .from('suppliers')
-                    .select('id, company_name, phone, email, address, contact_person')
-                    .in('id', chunk)
-                )
+                chunkArray(supIds, 80).map(async (chunk) => {
+                  const r = await supabase.rpc('get_supplier_letterhead_batch', {
+                    p_supplier_ids: chunk,
+                  });
+                  if (!r.error && Array.isArray(r.data)) {
+                    return { data: r.data, error: null as null };
+                  }
+                  const fb = await supabase.from('suppliers').select('id, company_name').in('id', chunk);
+                  if (fb.error) throw fb.error;
+                  return {
+                    data: (fb.data ?? []).map((row) => ({
+                      id: row.id as string,
+                      company_name: row.company_name as string | undefined,
+                      phone: null as string | null,
+                      email: null as string | null,
+                      address: null as string | null,
+                      contact_person: null as string | null,
+                    })),
+                    error: null as null,
+                  };
+                })
               ),
             ]);
             const poMerged: { id: string; po_number?: string; etims_verification_url?: string | null }[] = [];
@@ -566,19 +583,40 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
     }
     let cancelled = false;
     void (async () => {
-      const { data, error } = await supabase
+      const { data: rpcRows, error: rpcError } = await supabase.rpc('get_supplier_letterhead_for_dashboard', {
+        p_supplier_id: supplierRecordId,
+      });
+      const row = Array.isArray(rpcRows) ? rpcRows[0] : (rpcRows as Record<string, unknown> | null | undefined);
+      if (!cancelled && !rpcError && row && typeof row === 'object') {
+        setSupplierLetterhead({
+          company_name: (String((row as { company_name?: string }).company_name ?? '').trim() || 'Supplier') as string,
+          contact_person: (row as { contact_person?: string | null }).contact_person ?? null,
+          phone: (row as { phone?: string | null }).phone ?? null,
+          email: (row as { email?: string | null }).email ?? null,
+          address: (row as { address?: string | null }).address ?? null,
+        });
+        return;
+      }
+      if (rpcError && !isAbortLikeSupabaseError(rpcError)) {
+        console.warn('[invoices] get_supplier_letterhead_for_dashboard:', rpcError.message);
+      }
+      const { data: fb, error: fbErr } = await supabase
         .from('suppliers')
-        .select('company_name, phone, email, address, contact_person')
+        .select('company_name')
         .eq('id', supplierRecordId)
         .maybeSingle();
-      if (cancelled || error || !data) return;
-      setSupplierLetterhead({
-        company_name: (data.company_name as string)?.trim() || 'Supplier',
-        contact_person: data.contact_person,
-        phone: data.phone,
-        email: data.email,
-        address: data.address,
-      });
+      if (cancelled || fbErr) return;
+      if (fb?.company_name != null && String(fb.company_name).trim()) {
+        setSupplierLetterhead({
+          company_name: String(fb.company_name).trim(),
+          contact_person: null,
+          phone: null,
+          email: null,
+          address: null,
+        });
+      } else {
+        setSupplierLetterhead(null);
+      }
     })();
     return () => {
       cancelled = true;

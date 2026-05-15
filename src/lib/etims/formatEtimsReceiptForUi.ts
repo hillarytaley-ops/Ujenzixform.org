@@ -188,6 +188,62 @@ function pickFromRoots(raw: unknown, keys: readonly string[]): string | null {
   return null;
 }
 
+/** Trader / seller identity sometimes embedded in integrator or KRA JSON (varies by integrator). */
+export type EtimsIssuerFromJson = {
+  name: string | null;
+  pin: string | null;
+  branch: string | null;
+  phone: string | null;
+};
+
+export function pickEtimsIssuerFromResponse(raw: unknown): EtimsIssuerFromJson {
+  return {
+    name: pickFromRoots(raw, [
+      'traderOrgNm',
+      'trader_org_nm',
+      'traderOrgName',
+      'trader_org_name',
+      'taxpayerName',
+      'taxpayer_name',
+      'businessName',
+      'business_name',
+      'sellerName',
+      'seller_name',
+      'vendorName',
+      'vendor_name',
+      'bnm',
+      'shopNm',
+      'shop_nm',
+    ]),
+    pin: pickFromRoots(raw, [
+      'traderTin',
+      'trader_tin',
+      'taxpayerTin',
+      'taxpayer_tin',
+      'sellerPin',
+      'seller_pin',
+      'tin',
+      'pin',
+    ]),
+    branch: pickFromRoots(raw, [
+      'branchName',
+      'branch_name',
+      'bhfNm',
+      'bhf_nm',
+      'branchNm',
+      'branch_nm',
+    ]),
+    phone: pickFromRoots(raw, [
+      'traderPhone',
+      'trader_phone',
+      'sellerPhone',
+      'seller_phone',
+      'vendorPhone',
+      'vendor_phone',
+    ]),
+  };
+}
+
 function formatMoneyLabel(raw: unknown, keys: readonly string[]): string | null {
   const n = parseMoneyNum(raw, keys);
   return n != null ? formatMoneyNum(n) : null;
