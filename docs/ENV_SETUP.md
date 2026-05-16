@@ -134,6 +134,12 @@ These should **NEVER** be prefixed with `VITE_` as they would be exposed to the 
 - **Live SMS** → set `AFRICASTALKING_USERNAME` to your **production app username** (not the word `sandbox`) and use the **live** API key for that app.
 - After rotating a key in AT, wait **~5 minutes** before testing ([AT help](https://help.africastalking.com/en/articles/1036048-why-am-i-getting-the-error-supplied-authentication-is-invalid)).
 
+### Sign in with Google (OAuth)
+
+The **Google** button on `/auth` is wired in code; enable the provider in Supabase and create OAuth credentials in Google Cloud: **[OAUTH_GOOGLE_SETUP.md](./OAUTH_GOOGLE_SETUP.md)**.
+
+**Vercel (pre-launch):** `VITE_PUBLIC_SITE_URL=https://ujenzi-pro.vercel.app` is set in `vercel.json`. Match Supabase **Site URL** and Google OAuth origins to that host. After go-live, change to `https://ujenzixform.org`.
+
 ### Sign in with Apple (OAuth)
 
 The **Apple** button on `/auth` is wired in code; enable the provider in Supabase and complete Apple Developer steps: **[OAUTH_APPLE_SETUP.md](./OAUTH_APPLE_SETUP.md)**.

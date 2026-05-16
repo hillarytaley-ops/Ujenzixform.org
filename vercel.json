@@ -5,7 +5,8 @@
   "devCommand": "npm run dev",
   "installCommand": "npm install",
   "env": {
-    "VERCEL_TOOLBAR_ENABLED": "false"
+    "VERCEL_TOOLBAR_ENABLED": "false",
+    "VITE_PUBLIC_SITE_URL": "https://ujenzi-pro.vercel.app"
   },
   "redirects": [],
   "rewrites": [

@@ -7,13 +7,23 @@ import { execSync } from "node:child_process";
 /** Dev-only fallback when `.env` has no Supabase URL (matches previous embedded default). */
 const LEGACY_DEV_SUPABASE_URL = "https://wuuyjjpgzgeimiptuuws.supabase.co";
 
-/** Canonical site URL for og:image / og:url (Vercel preview vs production). */
-function resolveSiteOrigin(): string {
-  const explicit = process.env.VITE_PUBLIC_SITE_URL?.trim();
+/**
+ * Canonical site URL (OAuth redirects, og:url).
+ * Pre-launch: stable Vercel production host. After go-live: set VITE_PUBLIC_SITE_URL to your custom domain.
+ */
+function resolveSiteOrigin(env: Record<string, string> = {}): string {
+  const explicit = (env.VITE_PUBLIC_SITE_URL || process.env.VITE_PUBLIC_SITE_URL)?.trim();
   if (explicit) return explicit.replace(/\/$/, "");
-  const vercel = process.env.VERCEL_URL?.trim();
-  if (vercel) return `https://${vercel.replace(/^https?:\/\//, "")}`;
-  return "https://ujenzixform.org";
+
+  const prodHost = process.env.VERCEL_PROJECT_PRODUCTION_URL?.trim();
+  if (prodHost) return `https://${prodHost.replace(/^https?:\/\//, "")}`;
+
+  if (process.env.VERCEL_ENV === "production") {
+    const vercel = process.env.VERCEL_URL?.trim();
+    if (vercel) return `https://${vercel.replace(/^https?:\/\//, "")}`;
+  }
+
+  return "https://ujenzi-pro.vercel.app";
 }
 
 /** Injected into client bundle for footer “Build:” line (compare to GitHub commit). */
@@ -129,11 +139,13 @@ function gaBootstrapPlugin(): Plugin {
 
 export default defineConfig(({ mode }) => {
   // Load env file based on mode (ensures .env.local is properly loaded)
-  loadEnv(mode, process.cwd(), '');
-  
+  const env = loadEnv(mode, process.cwd(), "");
+  const publicSiteOrigin = resolveSiteOrigin(env);
+
   return {
     define: {
       __APP_BUILD_ID__: JSON.stringify(resolveAppBuildId()),
+      "import.meta.env.VITE_PUBLIC_SITE_URL": JSON.stringify(publicSiteOrigin),
     },
     server: {
       host: "::",
@@ -147,8 +159,7 @@ export default defineConfig(({ mode }) => {
       {
         name: "inject-site-origin-meta",
         transformIndexHtml(html) {
-          const origin = resolveSiteOrigin();
-          const env = loadEnv(mode, process.cwd(), "");
+          const origin = resolveSiteOrigin(env);
           let supabaseUrl = env.VITE_SUPABASE_URL?.trim();
           if (!supabaseUrl && mode === "development") {
             supabaseUrl = LEGACY_DEV_SUPABASE_URL;

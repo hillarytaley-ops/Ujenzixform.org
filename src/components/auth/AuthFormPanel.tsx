@@ -23,6 +23,7 @@ import {
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { SimplePasswordReset } from "@/components/SimplePasswordReset";
 import { cn } from "@/lib/utils";
+import { resolveAuthRedirectOrigin } from "@/config/authRedirectOrigin";
 
 function authDevLog(...args: unknown[]) {
   if (import.meta.env.DEV) console.log("[auth]", ...args);
@@ -424,20 +425,71 @@ export function AuthFormPanel({
     }
   };
 
+  /** OAuth return target — must be listed in Supabase Auth → Redirect URLs. */
+  const buildOAuthRedirectTo = useCallback(() => {
+    const nextSafe = sanitizeRegistrationNextPath(searchParams.get("next"));
+    const qs = new URLSearchParams();
+    if (nextSafe) qs.set("next", nextSafe);
+    const origin = resolveAuthRedirectOrigin();
+    return `${origin}/auth${qs.toString() ? `?${qs.toString()}` : ""}`;
+  }, [searchParams]);
+
+  // Surface Google/OAuth errors and show loading while PKCE exchanges ?code= on return.
+  useEffect(() => {
+    const fromQuery = searchParams.get("error_description") || searchParams.get("error");
+    let fromHash = "";
+    try {
+      const hash = window.location.hash.replace(/^#/, "");
+      if (hash) {
+        const hp = new URLSearchParams(hash);
+        fromHash = hp.get("error_description") || hp.get("error") || "";
+      }
+    } catch {
+      /* ignore */
+    }
+    const raw = fromQuery || fromHash;
+    if (!raw) return;
+
+    toast({
+      variant: "destructive",
+      title: "Google sign-in failed",
+      description: decodeURIComponent(raw.replace(/\+/g, " ")),
+    });
+    setFormLoading(false);
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        next.delete("error");
+        next.delete("error_description");
+        next.delete("error_code");
+        return next;
+      },
+      { replace: true }
+    );
+    if (window.location.hash) {
+      window.history.replaceState(null, "", window.location.pathname + window.location.search);
+    }
+  }, [searchParams, setSearchParams, toast]);
+
+  useEffect(() => {
+    if (searchParams.has("code")) setFormLoading(true);
+  }, [searchParams]);
+
   const signInWithGoogle = async () => {
     if (formLoading) return;
     setFormLoading(true);
     try {
-      const nextSafe = sanitizeRegistrationNextPath(searchParams.get("next"));
-      const qs = new URLSearchParams();
-      if (nextSafe) qs.set("next", nextSafe);
-      const redirectTo = `${window.location.origin}/auth${qs.toString() ? `?${qs.toString()}` : ""}`;
+      const redirectTo = buildOAuthRedirectTo();
 
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
           redirectTo,
           skipBrowserRedirect: false,
+          queryParams: {
+            access_type: "online",
+            prompt: "select_account",
+          },
         },
       });
       if (error) {
