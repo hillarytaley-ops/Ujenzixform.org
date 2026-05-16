@@ -21,23 +21,12 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { trackingNumberService } from '@/services/TrackingNumberService';
-
-/** Order is in a state where supplier has dispatched goods (navigation to route is meaningful). */
-function supplierHasDispatched(d: DeliveryRequest): boolean {
-  const s = (d.status || '').toLowerCase();
-  const postDispatch = [
-    'in_transit',
-    'dispatched',
-    'shipped',
-    'out_for_delivery',
-    'picked_up',
-    'delivery_arrived',
-    'on_the_way',
-  ];
-  if (postDispatch.includes(s)) return true;
-  if (typeof d._dispatched_count === 'number' && d._dispatched_count > 0) return true;
-  return false;
-}
+import {
+  openDeliveryNavigation,
+  resolveNavTarget,
+  resolvePickupNavTarget,
+  type DeliveryNavLeg,
+} from '@/utils/deliveryNavigation';
 
 interface DeliveryRequest {
   id: string;
@@ -73,7 +62,8 @@ interface DeliveryRequestCardProps {
   hiringApprovalMessage?: string;
   onAccept?: (deliveryId: string) => void;
   onReject?: (deliveryId: string, reason: string) => void;
-  onNavigate?: (delivery: DeliveryRequest) => void;
+  onNavigate?: (delivery: DeliveryRequest, leg: DeliveryNavLeg) => void;
+  onOpenMapTab?: (deliveryId: string) => void;
   onCall?: (phone: string) => void;
   onCaptureProof?: (deliveryId: string) => void;
   onMarkArrived?: (deliveryId: string) => void;
@@ -87,9 +77,10 @@ export const DeliveryRequestCard: React.FC<DeliveryRequestCardProps> = ({
   onAccept,
   onReject,
   onNavigate,
+  onOpenMapTab,
   onCall,
   onCaptureProof,
-  onMarkArrived
+  onMarkArrived,
 }) => {
   const [isAccepting, setIsAccepting] = useState(false);
   const [isRejecting, setIsRejecting] = useState(false);
@@ -344,7 +335,29 @@ export const DeliveryRequestCard: React.FC<DeliveryRequestCardProps> = ({
     'delivery_arrived',
     'on_the_way',
   ].includes(delivery.status);
-  const canNavigate = supplierHasDispatched(delivery);
+  const pickupNav = resolvePickupNavTarget(delivery.pickup_location);
+  const dropNav = resolveNavTarget(delivery.delivery_location);
+  const canNavigatePickup = Boolean(pickupNav);
+  const canNavigateDrop = Boolean(dropNav);
+  const canNavigateRoute = Boolean(pickupNav && dropNav) || canNavigateDrop || canNavigatePickup;
+
+  const handleNavigate = (leg: DeliveryNavLeg) => {
+    if (onNavigate) {
+      onNavigate(delivery, leg);
+      return;
+    }
+    const ok = openDeliveryNavigation(delivery.pickup_location, {
+      delivery_address: delivery.delivery_location,
+      delivery_location: delivery.delivery_location,
+    }, leg);
+    if (!ok) {
+      toast({
+        title: "Location not available",
+        description: "Add GPS coordinates or a street address on this delivery request.",
+        variant: "destructive",
+      });
+    }
+  };
 
   return (
     <>
@@ -560,7 +573,7 @@ export const DeliveryRequestCard: React.FC<DeliveryRequestCardProps> = ({
                   </div>
                 )}
 
-                {/* After accept: Call / Proof; Navigate only once supplier has dispatched */}
+                {/* After accept: contact, proof, navigation */}
                 {showPostAcceptActions && (
                   <div className="space-y-1">
                     <div className="flex flex-wrap gap-1 justify-start sm:justify-end">
@@ -613,15 +626,50 @@ export const DeliveryRequestCard: React.FC<DeliveryRequestCardProps> = ({
                         <Camera className="h-3 w-3 mr-0.5 shrink-0" />
                         Proof
                       </Button>
-                      {canNavigate && onNavigate && (
-                        <Button 
-                          size="sm" 
-                          className="h-7 px-2 text-[0.6875rem] sm:text-xs bg-teal-600 hover:bg-teal-700 flex-1 sm:flex-initial min-w-[4.5rem]"
-                          onClick={() => onNavigate(delivery)}
-                          title="Open navigation to route"
+                      {canNavigatePickup && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-7 px-2 text-[0.6875rem] sm:text-xs border-green-300 text-green-800 hover:bg-green-50 flex-1 sm:flex-initial min-w-[4.5rem]"
+                          onClick={() => handleNavigate("pickup")}
+                          title="Navigate to pickup"
                         >
                           <NavigationIcon className="h-3 w-3 mr-0.5 shrink-0" />
-                          Navigate
+                          Pickup
+                        </Button>
+                      )}
+                      {canNavigateDrop && (
+                        <Button
+                          size="sm"
+                          className="h-7 px-2 text-[0.6875rem] sm:text-xs bg-teal-600 hover:bg-teal-700 flex-1 sm:flex-initial min-w-[4.5rem]"
+                          onClick={() => handleNavigate("drop")}
+                          title="Navigate to drop-off"
+                        >
+                          <NavigationIcon className="h-3 w-3 mr-0.5 shrink-0" />
+                          Drop
+                        </Button>
+                      )}
+                      {canNavigateRoute && pickupNav && dropNav && (
+                        <Button
+                          size="sm"
+                          className="h-7 px-2 text-[0.6875rem] sm:text-xs bg-blue-600 hover:bg-blue-700 flex-1 sm:flex-initial min-w-[4.5rem]"
+                          onClick={() => handleNavigate("route")}
+                          title="Full route: pickup to drop-off"
+                        >
+                          <Route className="h-3 w-3 mr-0.5 shrink-0" />
+                          Route
+                        </Button>
+                      )}
+                      {onOpenMapTab && (canNavigateDrop || canNavigatePickup) && (
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          className="h-7 px-2 text-[0.6875rem] sm:text-xs flex-1 sm:flex-initial min-w-[4.5rem]"
+                          onClick={() => onOpenMapTab(delivery.id)}
+                          title="Open Map tab for this order"
+                        >
+                          <MapPin className="h-3 w-3 mr-0.5 shrink-0" />
+                          Map
                         </Button>
                       )}
                     </div>

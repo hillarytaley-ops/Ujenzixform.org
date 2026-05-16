@@ -1,5 +1,10 @@
 import { clearSupabasePersistedSessionSync, readPersistedAuthRawStringSync } from '@/utils/supabaseAccessToken';
 import { buildProviderDeliveryLocationLine } from '@/utils/deliveryLocationDisplay';
+import {
+  buildMapStopsFromDeliveryCard,
+  openDeliveryNavigation,
+  type DeliveryNavLeg,
+} from '@/utils/deliveryNavigation';
 import React, { useState, useEffect, useCallback, useRef, useMemo, lazy, Suspense } from "react";
 import { Link } from "react-router-dom";
 import { useUrlTabSync } from "@/hooks/useUrlTabSync";
@@ -317,6 +322,7 @@ const DeliveryDashboard = () => {
   const [activeTab, setActiveTab] = useUrlTabSync(DELIVERY_TABS, "deliveries");
   const [deliveriesSubTab, setDeliveriesSubTab] = useState("scheduled"); // Sub-tab for Deliveries (scheduled only now)
   const [selectedScheduledOrderId, setSelectedScheduledOrderId] = useState<string>(""); // Selected order from dropdown
+  const [mapFocusOrderId, setMapFocusOrderId] = useState<string | null>(null);
   const [showProfileEdit, setShowProfileEdit] = useState(false);
   const [showProfileView, setShowProfileView] = useState(false);
   const [selectedDeliveryForScan, setSelectedDeliveryForScan] = useState<string | null>(null);
@@ -388,20 +394,6 @@ const DeliveryDashboard = () => {
       deliveries: trend.deliveries
     }));
   }, [deliveryTrends]);
-
-  // Map locations - DYNAMIC: Build from real active deliveries
-  const mapLocations = React.useMemo(() => {
-    return activeDeliveries.slice(0, 10).map((d, index) => ({
-      id: d.id || String(index + 1),
-      type: (index % 2 === 0 ? 'pickup' : 'delivery') as 'pickup' | 'delivery',
-      name: d.material_type || 'Delivery',
-      address: d.delivery_address || d.delivery_location || 'Location pending',
-      lat: -1.2921 + (Math.random() * 0.05 - 0.025), // Approximate Nairobi coordinates
-      lng: 36.8219 + (Math.random() * 0.05 - 0.025),
-      status: d.status || 'pending',
-      estimatedTime: '30 min'
-    }));
-  }, [activeDeliveries]);
 
   // Route optimizer deliveries - DYNAMIC: Build from real active deliveries
   const routeDeliveries = React.useMemo(() => {
@@ -1187,6 +1179,60 @@ const DeliveryDashboard = () => {
     useLegacyFallback,
     unifiedLoading
   });
+
+  const scheduledForNavigation = useMemo((): ActiveDelivery[] => {
+    if (useLegacyFallback) {
+      return deliveryCategories.scheduled as ActiveDelivery[];
+    }
+    return [...unifiedScheduled, ...(unifiedInTransit || [])].map(toCardDelivery);
+  }, [
+    useLegacyFallback,
+    deliveryCategories.scheduled,
+    unifiedScheduled,
+    unifiedInTransit,
+    toCardDelivery,
+  ]);
+
+  const mapStops = useMemo(
+    () => scheduledForNavigation.flatMap((d) => buildMapStopsFromDeliveryCard(d)),
+    [scheduledForNavigation]
+  );
+
+  const handleDeliveryNavigate = useCallback(
+    (delivery: ActiveDelivery, leg: DeliveryNavLeg) => {
+      const ok = openDeliveryNavigation(
+        delivery.pickup_location,
+        {
+          delivery_address: delivery.delivery_location,
+          delivery_location: delivery.delivery_location,
+        },
+        leg
+      );
+      if (!ok) {
+        toast({
+          title: "Location not available",
+          description: "This order needs GPS coordinates or a street address on the drop-off.",
+          variant: "destructive",
+        });
+        return;
+      }
+      const legLabel =
+        leg === "route" ? "Pickup → drop-off route" : leg === "pickup" ? "Pickup" : "Drop-off";
+      toast({
+        title: "Opening Google Maps",
+        description: `Starting navigation: ${legLabel}`,
+      });
+    },
+    [toast]
+  );
+
+  const openMapForOrder = useCallback(
+    (orderId: string) => {
+      setMapFocusOrderId(orderId);
+      setActiveTab("map");
+    },
+    [setActiveTab]
+  );
 
   /**
    * Receiving Scanner must use the SAME rows the Deliveries tab shows as "Scheduled".
@@ -3098,7 +3144,24 @@ const DeliveryDashboard = () => {
                                           </p>
                                         )}
                                       </div>
-                                      <ChevronRight className={`h-5 w-5 flex-shrink-0 ${isSelected ? 'text-teal-600' : 'text-gray-400'}`} />
+                                      <div className="flex items-center gap-1 shrink-0">
+                                        <Button
+                                          type="button"
+                                          size="sm"
+                                          variant="outline"
+                                          className="h-8 px-2"
+                                          title="Navigate to drop-off"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleDeliveryNavigate(delivery, "drop");
+                                          }}
+                                        >
+                                          <NavigationIcon className="h-4 w-4" />
+                                        </Button>
+                                        <ChevronRight
+                                          className={`h-5 w-5 ${isSelected ? "text-teal-600" : "text-gray-400"}`}
+                                        />
+                                      </div>
                                     </div>
                                   </button>
                                 </li>
@@ -3174,25 +3237,10 @@ const DeliveryDashboard = () => {
                                 });
                               }
                             }}
-                            onNavigate={(delivery) => {
-                              // Open Google Maps with the delivery location
-                              const deliveryAddress = delivery.delivery_location || delivery.delivery_address || '';
-                              if (deliveryAddress) {
-                                const encodedAddress = encodeURIComponent(deliveryAddress);
-                                const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodedAddress}`;
-                                window.open(mapsUrl, '_blank');
-                                toast({
-                                  title: "🗺️ Opening Maps",
-                                  description: `Navigating to ${deliveryAddress}`,
-                                });
-                              } else {
-                                toast({
-                                  title: "Location Not Available",
-                                  description: "Delivery location is not specified for this order.",
-                                  variant: "destructive",
-                                });
-                              }
-                            }}
+                            onNavigate={(delivery, leg) =>
+                              handleDeliveryNavigate(delivery as ActiveDelivery, leg)
+                            }
+                            onOpenMapTab={openMapForOrder}
                             onCall={(phone) => window.open(`tel:${phone}`)}
                             onCaptureProof={(id) => setShowProofCapture(id)}
                           />
@@ -3336,10 +3384,12 @@ const DeliveryDashboard = () => {
           <TabsContent value="map">
             <DeliveryTabSuspense>
               <LazyDeliveryMap
-                locations={mapLocations}
-                driverLocation={{ lat: -1.2864, lng: 36.8172 }}
-                onNavigate={(location) => console.log("Navigate to:", location)}
-                onRefresh={() => console.log("Refresh map")}
+                stops={mapStops}
+                focusOrderId={mapFocusOrderId}
+                onRefresh={() => {
+                  void refetchData();
+                  void refetchUnified();
+                }}
               />
             </DeliveryTabSuspense>
           </TabsContent>
