@@ -105,6 +105,13 @@ interface JobApplication {
   applicant_phone?: string;
 }
 
+export type JobPositionsInitialSection = 'positions' | 'applications';
+
+export interface JobPositionsManagerProps {
+  /** Opens the Job Positions or Applications sub-tab first (used by admin Hiring Manager nav). */
+  initialSection?: JobPositionsInitialSection;
+}
+
 const DEPARTMENTS = [
   'Engineering',
   'Product',
@@ -166,7 +173,9 @@ const emptyPosition: Partial<JobPosition> = {
   positions_available: 1
 };
 
-export const JobPositionsManager: React.FC = () => {
+export const JobPositionsManager: React.FC<JobPositionsManagerProps> = ({
+  initialSection = 'positions',
+}) => {
   const [positions, setPositions] = useState<JobPosition[]>([]);
   const [applications, setApplications] = useState<JobApplication[]>([]);
   const [loading, setLoading] = useState(true);
@@ -418,7 +427,7 @@ export const JobPositionsManager: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      <Tabs defaultValue="positions" className="space-y-6">
+      <Tabs key={initialSection} defaultValue={initialSection} className="space-y-6">
         <TabsList>
           <TabsTrigger value="positions" className="gap-2">
             <Briefcase className="h-4 w-4" />

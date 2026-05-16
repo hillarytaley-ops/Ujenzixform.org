@@ -134,6 +134,7 @@ export const ELEVATED_ADMIN_EXTRA_TABS: ReadonlySet<string> = new Set([
   "videos",
   "messaging",
   "careers",
+  "career-applications",
   "analytics",
   "reviews",
   "material-images",
@@ -331,6 +332,7 @@ export const STAFF_ROLES: Record<string, StaffRole> = {
       'feedback',
       'registrations',
       'careers',
+      'career-applications',
       'supply-chain-docs'
     ],
     canManageStaff: false,

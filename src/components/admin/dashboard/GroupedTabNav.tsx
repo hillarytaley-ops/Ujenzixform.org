@@ -55,6 +55,8 @@ import {
   ClipboardList,
   Landmark,
   Receipt,
+  UserRoundPlus,
+  FileText,
 } from 'lucide-react';
 
 interface TabGroup {
@@ -213,6 +215,16 @@ export const GroupedTabNav: React.FC<GroupedTabNavProps> = ({
       ],
     },
     {
+      id: 'hiring-manager',
+      label: 'Hiring Manager',
+      icon: UserRoundPlus,
+      color: 'amber',
+      tabs: [
+        { value: 'careers', label: 'Careers', icon: Briefcase },
+        { value: 'career-applications', label: 'Applications', icon: FileText },
+      ],
+    },
+    {
       id: 'finance-system',
       label: 'System',
       icon: Layers,
@@ -225,7 +237,6 @@ export const GroupedTabNav: React.FC<GroupedTabNavProps> = ({
         { value: 'activity-log', label: 'Activity Log', icon: History },
         { value: 'ml', label: 'Analytics (ML)', icon: BarChart3 },
         { value: 'pages', label: 'Pages', icon: Globe },
-        { value: 'careers', label: 'Careers', icon: Briefcase },
         { value: 'settings', label: 'Settings', icon: Settings },
       ],
     },
@@ -242,6 +253,7 @@ export const GroupedTabNav: React.FC<GroupedTabNavProps> = ({
     emerald: 'bg-emerald-600 hover:bg-emerald-700',
     rose: 'bg-rose-600 hover:bg-rose-700',
     slate: 'bg-slate-600 hover:bg-slate-700',
+    amber: 'bg-amber-600 hover:bg-amber-700',
   };
 
   const getActiveGroupId = () => {

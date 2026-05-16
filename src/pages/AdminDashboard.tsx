@@ -452,7 +452,7 @@ const AdminDashboard = () => {
     "pending-products", "videos", "material-images", "delivery-apps", "delivery-requests",
     "monitoring-requests", "camera-assignment", "feedback", "documents", "financial", "accounts",
     "ml", "security", "staff", "activity-log", "scanning", "qr-codes", "communications",
-    "builder-moderation", "delivery-analytics", "delivery-pay", "settings", "careers", "user-roles",
+    "builder-moderation", "delivery-analytics", "delivery-pay", "settings", "careers", "career-applications", "user-roles",
     "messaging", "analytics", "reviews", "sms-test", "etims-test", "tracking", "voice-calls",
     "supply-chain-docs", "sales-marketing"
   ] as const;
@@ -2510,6 +2510,12 @@ const AdminDashboard = () => {
               <TabsTrigger value="careers" className="data-[state=active]:bg-amber-600">
                 <Briefcase className="h-4 w-4 mr-2" />
                 Careers
+              </TabsTrigger>
+            )}
+            {shouldShowTab('career-applications') && (
+              <TabsTrigger value="career-applications" className="data-[state=active]:bg-amber-600">
+                <ClipboardPenLine className="h-4 w-4 mr-2" />
+                Job applications
               </TabsTrigger>
             )}
             {shouldShowTab('user-roles') && (
@@ -4755,7 +4761,11 @@ const AdminDashboard = () => {
 
           {/* Careers & Job Applications Tab */}
           <TabsContent value="careers" className="space-y-6">
-            <JobPositionsManager />
+            <JobPositionsManager initialSection="positions" />
+          </TabsContent>
+
+          <TabsContent value="career-applications" className="space-y-6">
+            <JobPositionsManager initialSection="applications" />
           </TabsContent>
 
           {/* User Roles Management Tab */}
