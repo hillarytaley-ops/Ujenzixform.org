@@ -41,6 +41,8 @@ export const CSP_DIRECTIVES = {
     "'self'",
     'data:',
     'blob:',
+    // Arbitrary HTTPS CDNs (supplier images, avatars, etc.); production header also set in vercel.json
+    'https:',
     SUPABASE_URL,
     'https://*.supabase.co',
     'https://images.unsplash.com', // For placeholder images
