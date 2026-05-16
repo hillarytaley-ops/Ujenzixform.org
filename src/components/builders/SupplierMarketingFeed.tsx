@@ -8,6 +8,7 @@ import { SUPABASE_ANON_KEY, SUPABASE_URL, supabase } from '@/integrations/supaba
 import { useToast } from '@/hooks/use-toast';
 import { getBuilderFeedGuestId } from '@/utils/builderFeedGuestId';
 import { mergeViewerReactionsWithLocalFallback, setFeedReactionCache } from '@/utils/builderFeedReactionCache';
+import { normalizeEmojiForDisplay } from '@/utils/emojiDisplay';
 import { Link } from 'react-router-dom';
 import { Loader2, Image as ImageIcon, FileVideo, X, Upload } from 'lucide-react';
 import type { PublicSupplierDirectoryRow } from '@/utils/fetchPublicSupplierDirectory';
@@ -223,7 +224,9 @@ export const SupplierMarketingFeed: React.FC<SupplierMarketingFeedProps> = ({
           if (lr.ok) {
             reactionsFetchOk = true;
             asRestArray<{ post_id: string; reaction?: string }>(await lr.json()).forEach((l) => {
-              if (l.post_id) reactionByPost.set(l.post_id, (l.reaction as string) || '👍');
+              if (l.post_id) {
+                reactionByPost.set(l.post_id, normalizeEmojiForDisplay(l.reaction as string, '👍'));
+              }
             });
           }
         } else if (guestId) {
@@ -234,7 +237,9 @@ export const SupplierMarketingFeed: React.FC<SupplierMarketingFeedProps> = ({
           if (lr.ok) {
             reactionsFetchOk = true;
             asRestArray<{ post_id: string; reaction?: string }>(await lr.json()).forEach((l) => {
-              if (l.post_id) reactionByPost.set(l.post_id, (l.reaction as string) || '👍');
+              if (l.post_id) {
+                reactionByPost.set(l.post_id, normalizeEmojiForDisplay(l.reaction as string, '👍'));
+              }
             });
           }
         }

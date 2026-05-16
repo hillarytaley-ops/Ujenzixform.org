@@ -41,6 +41,8 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover';
 import { loadRecentCommentEmojis, pushRecentCommentEmoji } from '@/utils/commentEmojiRecent';
+import { normalizeEmojiForDisplay } from '@/utils/emojiDisplay';
+import { EmojiText } from '@/components/ui/EmojiText';
 
 async function copyTextToClipboard(text: string): Promise<boolean> {
   try {
@@ -247,9 +249,10 @@ export const BuilderVideoPost: React.FC<BuilderVideoPostProps> = ({
 
   const displayLikes = reactionMode ? likes : likeCount;
   const displayLiked = reactionMode ? !!(userReaction && userReaction.length > 0) : liked;
-  const pickedReactionEmoji = reactionMode
-    ? userReaction || '👍'
-    : binaryReactionEmoji || '👍';
+  const pickedReactionEmoji = normalizeEmojiForDisplay(
+    reactionMode ? userReaction : binaryReactionEmoji || (liked ? '👍' : null),
+    '👍'
+  );
 
   // Reaction emojis
   const reactions = [
@@ -583,7 +586,9 @@ export const BuilderVideoPost: React.FC<BuilderVideoPostProps> = ({
       {/* Caption */}
       {caption && (
         <div className="px-4 pb-3">
-          <p className="text-gray-900 dark:text-white whitespace-pre-wrap">{caption}</p>
+          <EmojiText as="p" className="text-gray-900 dark:text-white whitespace-pre-wrap">
+            {caption}
+          </EmojiText>
         </div>
       )}
 
@@ -972,16 +977,17 @@ export const BuilderVideoPost: React.FC<BuilderVideoPostProps> = ({
                     <span className="font-semibold text-sm text-gray-900 dark:text-white">
                       {comment.userName || 'Visitor'}
                     </span>
-                    <p className="text-sm text-gray-700 dark:text-gray-300">
-                      {/* Highlight @mentions */}
+                    <EmojiText as="p" className="text-sm text-gray-700 dark:text-gray-300">
                       {String(comment.content ?? '').split(/(@\w+)/g).map((part, i) =>
                         part.startsWith('@') ? (
-                          <span key={i} className="text-blue-500 font-medium">{part}</span>
+                          <span key={i} className="text-blue-500 font-medium">
+                            {part}
+                          </span>
                         ) : (
                           <span key={i}>{part}</span>
                         )
                       )}
-                    </p>
+                    </EmojiText>
                   </div>
                   <div className="flex items-center gap-4 mt-1 ml-3 text-xs text-gray-500">
                     <span>{formatTimeAgo(comment.timestamp)}</span>

@@ -34,6 +34,7 @@ import { SUPABASE_ANON_KEY, SUPABASE_URL, supabase } from '@/integrations/supaba
 import { useToast } from '@/hooks/use-toast';
 import { getBuilderFeedGuestId } from '@/utils/builderFeedGuestId';
 import { normalizeTimelinePageFromStats } from '@/utils/normalizeTimelinePageFromStats';
+import { normalizeEmojiForDisplay } from '@/utils/emojiDisplay';
 import { mergeViewerReactionsWithLocalFallback, setFeedReactionCache } from '@/utils/builderFeedReactionCache';
 
 /** PostgREST error bodies are objects; `(x || []).map` breaks when x is a truthy non-array. */
@@ -55,7 +56,9 @@ async function fetchViewerPostReactions(
   } as const;
   const fill = (rows: { post_id?: string; reaction?: string }[]) => {
     for (const l of rows) {
-      if (l.post_id) reactionByPost.set(l.post_id, (l.reaction as string) || '👍');
+      if (l.post_id) {
+        reactionByPost.set(l.post_id, normalizeEmojiForDisplay(l.reaction as string, '👍'));
+      }
     }
   };
   let ok = false;
@@ -510,7 +513,7 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
                 userId: c.user_id || '',
                 userName: commenter?.full_name || c.commenter_name || 'Visitor',
                 userAvatar: commenter?.avatar_url,
-                content: c.content != null ? String(c.content) : '',
+                content: c.content != null ? String(c.content) : '', // EmojiText in BuilderVideoPost renders with emoji fallbacks
                 timestamp: c.created_at ? new Date(c.created_at) : new Date(),
                 likes: c.likes_count || 0,
                 isLiked: false

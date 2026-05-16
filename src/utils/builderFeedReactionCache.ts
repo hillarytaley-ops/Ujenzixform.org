@@ -1,3 +1,5 @@
+import { normalizeEmojiForDisplay } from "@/utils/emojiDisplay";
+
 const KEYS = {
   builder: 'ux_builder_feed_reaction_v1',
   supplier: 'ux_supplier_feed_reaction_v1',
@@ -28,7 +30,7 @@ function writeRaw(scope: FeedReactionScope, next: Record<string, string>) {
 
 export function setFeedReactionCache(scope: FeedReactionScope, postId: string, reaction: string | null) {
   const next = readRaw(scope);
-  if (reaction && reaction.length > 0) next[postId] = reaction;
+  if (reaction && reaction.length > 0) next[postId] = normalizeEmojiForDisplay(reaction);
   else delete next[postId];
   writeRaw(scope, next);
 }
@@ -50,22 +52,34 @@ export function mergeViewerReactionsWithLocalFallback(
   fetchSucceeded: boolean,
 ): Map<string, string> {
   const cache = readRaw(scope);
-  const out = new Map(server);
+  const out = new Map<string, string>();
+  for (const [pid, em] of server) {
+    out.set(pid, normalizeEmojiForDisplay(em));
+  }
 
   if (!fetchSucceeded) {
     for (const pid of postIdsInBatch) {
-      if (!out.has(pid) && cache[pid]) out.set(pid, cache[pid]!);
+      if (!out.has(pid) && cache[pid]) {
+        out.set(pid, normalizeEmojiForDisplay(cache[pid]));
+      }
     }
     return out;
   }
 
   for (const [pid, em] of out) {
-    if (em === '👍' && cache[pid] && cache[pid] !== '👍') {
-      out.set(pid, cache[pid]!);
+    const cached = cache[pid] ? normalizeEmojiForDisplay(cache[pid]) : null;
+    const normalized = normalizeEmojiForDisplay(em);
+    if (normalized === "👍" && cached && cached !== "👍") {
+      out.set(pid, cached);
+    } else {
+      out.set(pid, normalized);
     }
   }
 
-  const next: Record<string, string> = { ...cache };
+  const next: Record<string, string> = {};
+  for (const [pid, em] of Object.entries(cache)) {
+    next[pid] = normalizeEmojiForDisplay(em);
+  }
   for (const pid of postIdsInBatch) {
     if (out.has(pid)) next[pid] = out.get(pid)!;
     else delete next[pid];
