@@ -3227,16 +3227,10 @@ const ProfessionalBuilderDashboardPage = () => {
               );
             })()}
 
-            <BuilderDeliveryQuotePanel
-              profileId={profile?.id}
-              authUserId={user?.id}
-              paystackSuccessPath="/professional-builder-dashboard?tab=deliveries"
-            />
-            
             <Card>
               <CardContent className="p-0">
                 <Tabs value={deliveriesSubTab} onValueChange={setDeliveriesSubTab} className="w-full">
-                  <TabsList className="grid w-full grid-cols-3 mb-6 bg-gray-100 p-1 rounded-lg h-auto">
+                  <TabsList className="grid w-full grid-cols-3 mb-4 bg-gray-100 p-1 rounded-lg h-auto">
                     <TabsTrigger 
                       value="request"
                       className="data-[state=active]:bg-white data-[state=active]:text-blue-700 data-[state=active]:shadow-sm data-[state=active]:border-blue-200 data-[state=active]:border py-3 rounded-md font-medium transition-all"
@@ -3259,9 +3253,17 @@ const ProfessionalBuilderDashboardPage = () => {
                       <span>Delivery History</span>
                     </TabsTrigger>
                   </TabsList>
+
+                  <div className="px-4 sm:px-6">
+                    <BuilderDeliveryQuotePanel
+                      profileId={profile?.id}
+                      authUserId={user?.id}
+                      paystackSuccessPath="/professional-builder-dashboard?tab=deliveries"
+                    />
+                  </div>
                   
                   {/* Request Delivery Sub-tab */}
-                  <TabsContent value="request" className="mt-0">
+                  <TabsContent value="request" className="mt-0 px-4 sm:px-6 pb-6">
                     <Card>
                       <CardHeader>
                         <CardTitle className="flex items-center gap-2">
@@ -3299,7 +3301,7 @@ const ProfessionalBuilderDashboardPage = () => {
                   </TabsContent>
                   
                   {/* Delivery Schedule Sub-tab - Shows scheduled deliveries sorted by soonest date */}
-                  <TabsContent value="schedule" className="mt-0">
+                  <TabsContent value="schedule" className="mt-0 px-4 sm:px-6 pb-6">
                     <Card>
                       <CardHeader className="flex flex-row items-center justify-between">
                         <div>
@@ -3446,7 +3448,7 @@ const ProfessionalBuilderDashboardPage = () => {
                   </TabsContent>
                   
                   {/* Delivery History Sub-tab - Shows completed/delivered deliveries */}
-                  <TabsContent value="history" className="mt-0">
+                  <TabsContent value="history" className="mt-0 px-4 sm:px-6 pb-6">
                     <Card>
                       <CardHeader>
                         <CardTitle className="flex items-center gap-2">
