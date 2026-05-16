@@ -51,8 +51,9 @@ export async function syncDeliveryProviderDetails(
     bankAccountNumber,
     bankBranch,
     isVerified = false,
-    isActive = true,
   } = payload;
+
+  const resolvedIsActive = payload.isActive ?? (isVerified ? true : false);
 
   const displayName = (providerName || '').trim() || 'Delivery Provider';
   const phoneTrim = (phone || '').trim() || '0000000000';
@@ -88,7 +89,7 @@ export async function syncDeliveryProviderDetails(
       bank_account_number: bankAccountNumber?.trim() || null,
       bank_branch: bankBranch?.trim() || null,
       is_verified: isVerified,
-      is_active: isActive,
+      is_active: resolvedIsActive,
       updated_at: new Date().toISOString(),
     };
 

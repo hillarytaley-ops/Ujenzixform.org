@@ -110,6 +110,8 @@ interface NotificationSettings {
 
 interface DeliveryNotificationsProps {
   userId: string;
+  canAcceptDeliveryOrders?: boolean;
+  hiringApprovalMessage?: string;
   onNotificationClick?: (notification: Notification) => void;
   onAcceptDelivery?: (requestId: string) => void;
   onRejectDelivery?: (requestId: string) => void;
@@ -119,6 +121,8 @@ interface DeliveryNotificationsProps {
 
 export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
   userId,
+  canAcceptDeliveryOrders = true,
+  hiringApprovalMessage,
   onNotificationClick,
   onAcceptDelivery,
   onRejectDelivery,
@@ -1594,6 +1598,19 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
       setAcceptingId(null);
       return;
     }
+
+    if (!canAcceptDeliveryOrders) {
+      toast({
+        title: 'Approval required',
+        description:
+          hiringApprovalMessage ||
+          'Your application must be approved by Hiring Manager before you can accept delivery orders.',
+        variant: 'destructive',
+      });
+      acceptingRef.current = null;
+      setAcceptingId(null);
+      return;
+    }
     
     // Safety timeout: Always clear loading state after 35 seconds max (even if service hangs)
     const safetyTimeout = setTimeout(() => {
@@ -2796,11 +2813,18 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
                         </div>
                       ) : (
                         <div className="flex flex-col gap-2">
+                          {!canAcceptDeliveryOrders && (
+                            <p className="text-xs rounded-md px-2 py-1.5 bg-amber-50 text-amber-900 border border-amber-200">
+                              {hiringApprovalMessage ||
+                                'Pending Hiring Manager approval — you cannot accept orders yet.'}
+                            </p>
+                          )}
                           <div className="flex flex-col gap-2 min-[420px]:flex-row">
                             <Button
                               size="sm"
                               onClick={() => handleAcceptDelivery(notification.delivery_request_id!)}
                               disabled={
+                                !canAcceptDeliveryOrders ||
                                 acceptingId === notification.delivery_request_id ||
                                 rejectingId === notification.delivery_request_id ||
                                 dismissingId === notification.delivery_request_id

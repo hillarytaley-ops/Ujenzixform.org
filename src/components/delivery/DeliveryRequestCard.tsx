@@ -69,6 +69,8 @@ interface DeliveryRequest {
 interface DeliveryRequestCardProps {
   delivery: DeliveryRequest;
   isDarkMode?: boolean;
+  canAcceptDeliveries?: boolean;
+  hiringApprovalMessage?: string;
   onAccept?: (deliveryId: string) => void;
   onReject?: (deliveryId: string, reason: string) => void;
   onNavigate?: (delivery: DeliveryRequest) => void;
@@ -80,6 +82,8 @@ interface DeliveryRequestCardProps {
 export const DeliveryRequestCard: React.FC<DeliveryRequestCardProps> = ({
   delivery,
   isDarkMode = false,
+  canAcceptDeliveries = true,
+  hiringApprovalMessage,
   onAccept,
   onReject,
   onNavigate,
@@ -163,6 +167,17 @@ export const DeliveryRequestCard: React.FC<DeliveryRequestCardProps> = ({
     // Prevent double-click using ref (immediate check, no state delay)
     if (acceptingRef.current || isAccepting) {
       console.log('🛑 Already accepting, ignoring click');
+      return;
+    }
+
+    if (!canAcceptDeliveries) {
+      toast({
+        title: 'Approval required',
+        description:
+          hiringApprovalMessage ||
+          'Your application must be approved by Hiring Manager before you can accept delivery orders.',
+        variant: 'destructive',
+      });
       return;
     }
     
@@ -501,12 +516,24 @@ export const DeliveryRequestCard: React.FC<DeliveryRequestCardProps> = ({
               <div className="flex flex-col gap-1 w-full">
                 {/* Accept/Reject Buttons for Pending Requests - SINGLE CLICK */}
                 {isPendingRequest && (
-                  <div className="flex gap-2 w-full">
+                  <div className="flex flex-col gap-2 w-full">
+                    {!canAcceptDeliveries && (
+                      <p className={`text-xs rounded-md px-2 py-1.5 ${isDarkMode ? 'bg-amber-900/40 text-amber-200' : 'bg-amber-50 text-amber-900 border border-amber-200'}`}>
+                        {hiringApprovalMessage ||
+                          'Pending Hiring Manager approval — you cannot accept orders yet.'}
+                      </p>
+                    )}
+                    <div className="flex gap-2 w-full">
                     <Button 
                       className="flex-1 bg-green-600 hover:bg-green-700 text-white"
                       onClick={(e) => handleAccept(e)}
-                      disabled={isAccepting || acceptingRef.current}
+                      disabled={!canAcceptDeliveries || isAccepting || acceptingRef.current}
                       type="button"
+                      title={
+                        !canAcceptDeliveries
+                          ? 'Awaiting Hiring Manager approval'
+                          : undefined
+                      }
                     >
                       {isAccepting ? (
                         <>
@@ -529,10 +556,11 @@ export const DeliveryRequestCard: React.FC<DeliveryRequestCardProps> = ({
                       <ThumbsDown className="h-4 w-4 mr-1" />
                       Reject
                     </Button>
+                    </div>
                   </div>
                 )}
 
-                {/* After accept: Call / Proof; Navigate only once supplier has dispatched (status or _dispatched_count) */}
+                {/* After accept: Call / Proof; Navigate only once supplier has dispatched */}
                 {showPostAcceptActions && (
                   <div className="space-y-1">
                     <div className="flex flex-wrap gap-1 justify-start sm:justify-end">

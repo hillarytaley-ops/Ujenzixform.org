@@ -282,7 +282,9 @@ const DeliveryDashboard = () => {
     refetch: refetchData,
     acceptDelivery: handleAcceptDelivery,
     rejectDelivery: handleRejectDelivery,
-    updateDeliveryStatus
+    updateDeliveryStatus,
+    canAcceptDeliveryOrders,
+    hiringApprovalMessage,
   } = useDeliveryProviderData();
 
   // Single source for Deliveries tab: one RPC, aligned with Supplier Orders/QR
@@ -2889,6 +2891,18 @@ const DeliveryDashboard = () => {
           }}
         />
 
+        {!canAcceptDeliveryOrders && hiringApprovalMessage && (
+          <Alert
+            className={`mb-6 border-amber-300 ${isDarkMode ? 'bg-amber-950/40 border-amber-800' : 'bg-amber-50'}`}
+          >
+            <AlertCircle className="h-5 w-5 text-amber-600" />
+            <AlertDescription className={isDarkMode ? 'text-amber-100' : 'text-amber-900'}>
+              <p className="font-semibold">Hiring Manager approval required</p>
+              <p className="text-sm mt-1 opacity-95">{hiringApprovalMessage}</p>
+            </AlertDescription>
+          </Alert>
+        )}
+
         {builderInvoicePayPrompts.length > 0 && (
           <Alert
             className={`mb-6 border-red-300 ${isDarkMode ? 'bg-red-950/40 border-red-800' : 'bg-red-50'}`}
@@ -3099,6 +3113,8 @@ const DeliveryDashboard = () => {
                             key={selectedDelivery.id}
                             delivery={selectedDelivery}
                             isDarkMode={isDarkMode}
+                            canAcceptDeliveries={canAcceptDeliveryOrders}
+                            hiringApprovalMessage={hiringApprovalMessage}
                             onAccept={async (deliveryId) => {
                               try {
                                 // IMMEDIATE OPTIMISTIC UPDATE: Add to schedule immediately
@@ -3372,6 +3388,8 @@ const DeliveryDashboard = () => {
             <DeliveryTabSuspense>
               <LazyDeliveryNotifications
                 userId={user?.id || localStorage.getItem("user_id") || ""}
+                canAcceptDeliveryOrders={canAcceptDeliveryOrders}
+                hiringApprovalMessage={hiringApprovalMessage}
                 onNotificationClick={(notification) =>
                   console.log("Notification clicked:", notification)
                 }

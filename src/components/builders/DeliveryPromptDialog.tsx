@@ -43,11 +43,14 @@ import { readAuthSessionForRest } from '@/utils/supabaseAccessToken';
 import { supplierLocationLine } from '@/utils/supplierLocationLine';
 import { parseLatLngFromString } from '@/utils/deliveryLocationDisplay';
 import {
+  buildDeliveryPrefillContext,
   isPlaceholderDeliveryAddress,
   isUsableDeliveryAddressText,
   looksLikeProjectSiteLabel,
+  sanitizeCoordinatesForPrefill,
   sanitizeDeliveryAddressForPrefill,
 } from '@/utils/deliveryAddressValidation';
+import { getCartProjectLocation } from '@/utils/builderCartProject';
 import { useToast } from '@/hooks/use-toast';
 import { MonitoringServicePrompt } from './MonitoringServicePrompt';
 import { deliveryProviderNotificationService } from '@/services/DeliveryProviderNotificationService';
@@ -158,10 +161,18 @@ export const DeliveryPromptDialog: React.FC<DeliveryPromptDialogProps> = ({
   const lastPrefilledPurchaseOrderId = useRef<string | null>(null);
   const { toast } = useToast();
 
-  // Required for Send Request: address or coordinates (same validation as submit) — ensures address is never missing on provider dashboard
-  const projectSiteCtx = {
-    projectName: purchaseOrder?.project_name ?? null,
-  };
+  // Re-open dialog → fresh prefill (never keep stale project labels from a prior open)
+  useEffect(() => {
+    if (!isOpen) {
+      lastPrefilledPurchaseOrderId.current = null;
+    }
+  }, [isOpen]);
+
+  const projectSiteCtx = buildDeliveryPrefillContext({
+    projectName: purchaseOrder?.project_name,
+    projectLocation: getCartProjectLocation(),
+    deliveryAddress: purchaseOrder?.delivery_address,
+  });
   const hasAddress = isUsableDeliveryAddressText(deliveryData.deliveryAddress, projectSiteCtx);
   const hasCoordinates = Boolean(deliveryData.deliveryCoordinates.trim());
 
@@ -246,27 +257,38 @@ export const DeliveryPromptDialog: React.FC<DeliveryPromptDialogProps> = ({
     }
   };
 
-  // Pre-fill form with purchase order data (skip while loading an existing delivery_request for edit)
+  // Pre-fill from PO — never project name/location; builder must enter street address or GPS
   useEffect(() => {
     if (purchaseOrder && !editDeliveryRequestId) {
+      const ctx = buildDeliveryPrefillContext({
+        projectName: purchaseOrder.project_name,
+        projectLocation: getCartProjectLocation(),
+        deliveryAddress: purchaseOrder.delivery_address,
+      });
       const fromItems = buildDeliveryInstructionsFromPoItems(purchaseOrder.items);
       const poIdChanged = lastPrefilledPurchaseOrderId.current !== purchaseOrder.id;
       if (poIdChanged) {
         lastPrefilledPurchaseOrderId.current = purchaseOrder.id;
-      }
-      setDeliveryData(prev => {
-        const next: typeof prev = {
-          ...prev,
-          deliveryAddress: sanitizeDeliveryAddressForPrefill(purchaseOrder.delivery_address, {
-            projectName: purchaseOrder.project_name,
-          }),
+        setDeliveryData({
+          deliveryAddress: sanitizeDeliveryAddressForPrefill(purchaseOrder.delivery_address, ctx),
+          deliveryCoordinates: '',
           preferredDate: purchaseOrder.delivery_date || '',
-        };
-        // Prefill materials for providers: new PO → always from items; same PO → only if still empty (e.g. items arrived async)
-        if (fromItems && (poIdChanged || !prev.specialInstructions.trim())) {
+          preferredTime: 'anytime',
+          specialInstructions: fromItems || '',
+        });
+        return;
+      }
+      setDeliveryData((prev) => {
+        const next = { ...prev };
+        const safeAddr = sanitizeDeliveryAddressForPrefill(purchaseOrder.delivery_address, ctx);
+        if (safeAddr && !prev.deliveryAddress.trim()) {
+          next.deliveryAddress = safeAddr;
+        }
+        if (purchaseOrder.delivery_date && !prev.preferredDate) {
+          next.preferredDate = purchaseOrder.delivery_date;
+        }
+        if (fromItems && !prev.specialInstructions.trim()) {
           next.specialInstructions = fromItems;
-        } else if (poIdChanged && !fromItems) {
-          next.specialInstructions = '';
         }
         return next;
       });
@@ -323,26 +345,27 @@ export const DeliveryPromptDialog: React.FC<DeliveryPromptDialogProps> = ({
           !Number.isNaN(Number(dr.delivery_longitude))
             ? `${Number(dr.delivery_latitude)}, ${Number(dr.delivery_longitude)}`
             : '');
-        const savedAddr = (dr.delivery_address || '').trim();
-        let deliveryAddress = sanitizeDeliveryAddressForPrefill(savedAddr, {
+        const editCtx = buildDeliveryPrefillContext({
           projectName: purchaseOrder.project_name,
+          projectLocation: getCartProjectLocation(),
+          deliveryAddress: purchaseOrder.delivery_address,
         });
-        let deliveryCoordinates = coordsFromCols;
+        const savedAddr = (dr.delivery_address || '').trim();
+        let deliveryAddress = sanitizeDeliveryAddressForPrefill(savedAddr, editCtx);
+        let deliveryCoordinates = sanitizeCoordinatesForPrefill(coordsFromCols);
         const pipeIdx = savedAddr.indexOf('|');
         if (pipeIdx > 0) {
           const head = savedAddr.slice(0, pipeIdx).trim();
           const tail = savedAddr.slice(pipeIdx + 1).trim();
-          if (parseLatLngFromString(head)) {
-            deliveryCoordinates = deliveryCoordinates || head;
-            deliveryAddress =
-              sanitizeDeliveryAddressForPrefill(tail, {
-                projectName: purchaseOrder.project_name,
-              }) || deliveryAddress;
+          const headCoords = sanitizeCoordinatesForPrefill(head);
+          if (headCoords) {
+            deliveryCoordinates = deliveryCoordinates || headCoords;
+            deliveryAddress = sanitizeDeliveryAddressForPrefill(tail, editCtx) || deliveryAddress;
           }
-        } else if (!deliveryCoordinates && parseLatLngFromString(savedAddr)) {
-          const ll = parseLatLngFromString(savedAddr);
-          if (ll) {
-            deliveryCoordinates = `${ll.lat}, ${ll.lng}`;
+        } else if (!deliveryCoordinates) {
+          const headCoords = sanitizeCoordinatesForPrefill(savedAddr);
+          if (headCoords) {
+            deliveryCoordinates = headCoords;
             deliveryAddress = '';
           }
         }
@@ -510,7 +533,11 @@ export const DeliveryPromptDialog: React.FC<DeliveryPromptDialogProps> = ({
 
     // CRITICAL: Validate required fields - either address or coordinates MUST be provided
     // Delivery address is MANDATORY - builder must provide it before creating delivery request
-    const ctx = { projectName: purchaseOrder.project_name };
+    const ctx = buildDeliveryPrefillContext({
+      projectName: purchaseOrder.project_name,
+      projectLocation: getCartProjectLocation(),
+      deliveryAddress: purchaseOrder.delivery_address,
+    });
     const hasAddress = isUsableDeliveryAddressText(deliveryData.deliveryAddress, ctx);
     const hasCoordinates = deliveryData.deliveryCoordinates.trim();
 
@@ -1670,9 +1697,8 @@ export const DeliveryPromptDialog: React.FC<DeliveryPromptDialogProps> = ({
                 <div className="flex items-center gap-1 p-2 bg-gray-50 rounded">
                   <MapPin className="h-3 w-3 text-gray-400" />
                   <span className="truncate text-gray-500">
-                    {sanitizeDeliveryAddressForPrefill(purchaseOrder.delivery_address, {
-                      projectName: purchaseOrder.project_name,
-                    }) || 'Set drop-off address below'}
+                    {sanitizeDeliveryAddressForPrefill(purchaseOrder.delivery_address, projectSiteCtx) ||
+                      'Set drop-off address below'}
                   </span>
                 </div>
                 <div className="flex items-center gap-1 p-2 bg-gray-50 rounded">

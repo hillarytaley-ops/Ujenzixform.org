@@ -43,7 +43,11 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { DeliveryPromptDialog } from './DeliveryPromptDialog';
-import { sanitizeDeliveryAddressForPrefill } from '@/utils/deliveryAddressValidation';
+import {
+  buildDeliveryPrefillContext,
+  sanitizeDeliveryAddressForPrefill,
+} from '@/utils/deliveryAddressValidation';
+import { getCartProjectLocation } from '@/utils/builderCartProject';
 import {
   builderFulfillmentOrderChoice,
   findEditableDeliveryRequestId,
@@ -1952,9 +1956,14 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({
                 <div>
                   <p className="font-medium">Delivery Address</p>
                   <p className="text-gray-600">
-                    {sanitizeDeliveryAddressForPrefill(order.delivery_address, {
-                      projectName: order.project_name,
-                    }) || (isOrdersMode ? 'Set on Deliveries tab' : 'Not set yet')}
+                    {sanitizeDeliveryAddressForPrefill(
+                      order.delivery_address,
+                      buildDeliveryPrefillContext({
+                        projectName: order.project_name,
+                        projectLocation: getCartProjectLocation(),
+                        deliveryAddress: order.delivery_address,
+                      })
+                    ) || (isOrdersMode ? 'Set on Deliveries tab' : 'Not set yet')}
                   </p>
                 </div>
               </div>

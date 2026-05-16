@@ -457,6 +457,8 @@ export const useDeliveryProviderData = () => {
     averageRating: 0,
     totalDistance: 0
   });
+  const [canAcceptDeliveryOrders, setCanAcceptDeliveryOrders] = useState(false);
+  const [hiringApprovalMessage, setHiringApprovalMessage] = useState('');
 
   const fetchData = useCallback(async () => {
     // Try to get userId from context or localStorage fallback
@@ -484,6 +486,21 @@ export const useDeliveryProviderData = () => {
     console.log('📦 useDeliveryProviderData: Fetching data for userId:', userId);
     setLoading(true);
     setError(null);
+
+    let hiringApproved = false;
+    try {
+      const { getDeliveryHiringApprovalState } = await import('@/utils/deliveryProviderHiringApproval');
+      const hiringState = await getDeliveryHiringApprovalState(userId);
+      hiringApproved = hiringState.canAcceptDeliveryOrders;
+      setCanAcceptDeliveryOrders(hiringState.canAcceptDeliveryOrders);
+      setHiringApprovalMessage(hiringState.message);
+    } catch (hiringErr) {
+      console.warn('useDeliveryProviderData: hiring approval check failed', hiringErr);
+      setCanAcceptDeliveryOrders(false);
+      setHiringApprovalMessage(
+        'Unable to verify Hiring Manager approval. You cannot accept orders until this is resolved.'
+      );
+    }
     // CRITICAL: reset each run — stale count skipped the full fetch and left Schedule empty/wrong
     fastPathCountRef.current = 0;
 
@@ -3988,11 +4005,11 @@ export const useDeliveryProviderData = () => {
       setDeliveryHistory(dedupedHistory);
       console.log('✅ CRITICAL: setDeliveryHistory called with', dedupedHistory.length, 'items (deduped from', filteredHistory.length, ')');
 
-      // Fetch ALL pending requests from multiple tables for testing
-      // All registered providers can see and accept any pending request
-      // Use direct REST API to bypass potential RLS issues
-      // Note: SUPABASE_URL, SUPABASE_ANON_KEY, and accessToken are already declared above
-      
+      // Open jobs only for Hiring Manager–approved providers (RLS also enforces server-side)
+      if (!hiringApproved) {
+        setPendingRequests([]);
+        console.log('📦 Skipping pending requests — provider not approved by Hiring Manager');
+      } else {
       const restHeaders = {
         'apikey': SUPABASE_ANON_KEY,
         'Authorization': `Bearer ${accessToken}`,
@@ -4092,6 +4109,7 @@ export const useDeliveryProviderData = () => {
 
       console.log(`📦 Loaded ${allPending.length} pending delivery requests for provider`);
       setPendingRequests(allPending);
+      }
 
       // Calculate stats from actual data
       // active count = fastData (scheduled + in transit); history = dedupedHistory (delivered)
@@ -4172,6 +4190,11 @@ export const useDeliveryProviderData = () => {
     console.log('✅ acceptDelivery: Accepting delivery', deliveryId, 'for provider', userId);
 
     try {
+      const { assertDeliveryProviderHiringApproved } = await import(
+        '@/utils/deliveryProviderHiringApproval'
+      );
+      await assertDeliveryProviderHiringApproved(userId);
+
       // First, check if this delivery is already accepted by someone else
       const { data: existingRequest, error: checkError } = await supabase
         .from('delivery_requests')
@@ -4315,7 +4338,9 @@ export const useDeliveryProviderData = () => {
     refetch: fetchData,
     acceptDelivery,
     rejectDelivery,
-    updateDeliveryStatus
+    updateDeliveryStatus,
+    canAcceptDeliveryOrders,
+    hiringApprovalMessage,
   };
 };
 

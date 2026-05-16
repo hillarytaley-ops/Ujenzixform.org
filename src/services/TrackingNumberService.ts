@@ -81,6 +81,11 @@ class TrackingNumberService {
     }
     
     console.log('🚚 onProviderAcceptsDelivery called with:', { deliveryRequestId, providerId });
+
+    const { assertDeliveryProviderHiringApproved } = await import(
+      '@/utils/deliveryProviderHiringApproval'
+    );
+    await assertDeliveryProviderHiringApproved(providerId);
     
     try {
       // First, get the delivery request to check its expected delivery date
