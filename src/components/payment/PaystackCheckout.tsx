@@ -28,6 +28,8 @@ export type PaystackCheckoutProps = {
   successNavigateTo?: string;
   onCancel?: () => void;
   className?: string;
+  /** compact: email + pay button only (embedded in delivery quote cards). */
+  variant?: "full" | "compact";
 };
 
 export function PaystackCheckout({
@@ -38,6 +40,7 @@ export function PaystackCheckout({
   successNavigateTo = "/home",
   onCancel,
   className,
+  variant = "full",
 }: PaystackCheckoutProps) {
   const { toast } = useToast();
   const [email, setEmail] = useState("");
@@ -145,10 +148,12 @@ export function PaystackCheckout({
   };
 
   const showTestBanner = isPaystackTestModeBanner();
+  const compact = variant === "compact";
+  const emailInputId = compact ? `paystack-email-${orderId.replace(/[^a-z0-9]/gi, "")}` : "paystack-email";
 
   return (
     <div className={className}>
-      {showTestBanner && (
+      {showTestBanner && !compact && (
         <Alert className="mb-4 border-amber-300 bg-amber-50 dark:bg-amber-950/30 dark:border-amber-700">
           <FlaskConical className="h-4 w-4 text-amber-800 dark:text-amber-200" />
           <AlertTitle className="text-amber-900 dark:text-amber-100">Paystack test mode</AlertTitle>
@@ -174,21 +179,23 @@ export function PaystackCheckout({
         </Alert>
       )}
 
-      <Alert className="mb-4 border-emerald-200 bg-emerald-50/80">
-        <Shield className="h-4 w-4 text-emerald-700" />
-        <AlertTitle>Pay with Paystack</AlertTitle>
-        <AlertDescription className="text-muted-foreground">
-          Cards, M-Pesa, and other channels your Paystack business has enabled appear on Paystack&apos;s secure
-          checkout page — you are not entering card details in UjenziXform.
-        </AlertDescription>
-      </Alert>
+      {!compact && (
+        <Alert className="mb-4 border-emerald-200 bg-emerald-50/80">
+          <Shield className="h-4 w-4 text-emerald-700" />
+          <AlertTitle>Pay with Paystack</AlertTitle>
+          <AlertDescription className="text-muted-foreground">
+            Cards, M-Pesa, and other channels your Paystack business has enabled appear on Paystack&apos;s secure
+            checkout page — you are not entering card details in UjenziXform.
+          </AlertDescription>
+        </Alert>
+      )}
 
-      <TermsFeeSummary variant="checkout" className="mb-4" />
+      {!compact && <TermsFeeSummary variant="checkout" className="mb-4" />}
 
-      <div className="space-y-2 mb-4">
-        <Label htmlFor="paystack-email">Email for receipt</Label>
+      <div className={`space-y-2 ${compact ? "mb-3" : "mb-4"}`}>
+        <Label htmlFor={emailInputId}>Email for receipt</Label>
         <Input
-          id="paystack-email"
+          id={emailInputId}
           type="email"
           autoComplete="email"
           placeholder="you@example.com"
@@ -200,7 +207,11 @@ export function PaystackCheckout({
 
       <Button
         type="button"
-        className="w-full py-6 text-lg bg-emerald-600 hover:bg-emerald-700"
+        className={
+          compact
+            ? "w-full py-5 text-base font-semibold bg-emerald-600 hover:bg-emerald-700 shadow-md"
+            : "w-full py-6 text-lg bg-emerald-600 hover:bg-emerald-700"
+        }
         onClick={startCheckout}
         disabled={busy}
       >

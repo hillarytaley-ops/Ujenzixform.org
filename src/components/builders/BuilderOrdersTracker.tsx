@@ -59,6 +59,10 @@ import {
   hasAdminQuotePipelineDeliveryRequestForOrder,
   purchaseOrderRequiresDeliveryProvider,
 } from '@/utils/purchaseOrderFulfillment';
+import {
+  needsDeliveryQuotePayment,
+  parseDeliveryQuoteAmount,
+} from '@/utils/deliveryQuotePayment';
 import { PaystackCheckout } from '@/components/payment/PaystackCheckout';
 import { format } from 'date-fns';
 import QRCode from 'qrcode';
@@ -1888,15 +1892,8 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({
               );
               if (adminQuoteDr) {
                 const quoteStatus = String(adminQuoteDr.status || '').toLowerCase();
-                const quoteAmt =
-                  adminQuoteDr.estimated_cost != null
-                    ? Number(adminQuoteDr.estimated_cost)
-                    : NaN;
-                const canPayQuote =
-                  quoteStatus === 'quote_accepted' &&
-                  !adminQuoteDr.delivery_quote_paid_at &&
-                  Number.isFinite(quoteAmt) &&
-                  quoteAmt >= 1;
+                const quoteAmt = parseDeliveryQuoteAmount(adminQuoteDr.estimated_cost);
+                const canPayQuote = needsDeliveryQuotePayment(adminQuoteDr) && quoteAmt != null;
 
                 if (quoteStatus === 'quoted') {
                   return (
@@ -1906,7 +1903,7 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({
                         <p>
                           <strong>Admin delivery quote ready.</strong> Review the amount, accept the quote, then pay with Paystack. Drivers are notified only after payment.
                         </p>
-                        {Number.isFinite(quoteAmt) && (
+                        {quoteAmt != null && (
                           <p className="text-lg font-semibold">KES {quoteAmt.toLocaleString()}</p>
                         )}
                         {adminQuoteDr.delivery_quote_notes ? (
@@ -1944,13 +1941,14 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({
                         <p>
                           <strong>Pay delivery quote.</strong> You accepted the admin quote. Complete Paystack payment to open this job to nearby drivers — do not use Re-request delivery.
                         </p>
-                        <p className="text-lg font-semibold">KES {quoteAmt.toLocaleString()}</p>
+                        <p className="text-lg font-semibold">KES {quoteAmt!.toLocaleString()}</p>
                         <PaystackCheckout
-                          amount={quoteAmt}
+                          amount={quoteAmt!}
                           currency="KES"
                           description={`Delivery quote ${adminQuoteDr.id.slice(0, 8)}`}
                           orderId={`drq_${adminQuoteDr.id}`}
                           successNavigateTo={paystackSuccessPath}
+                          variant="compact"
                           className="max-w-md"
                         />
                       </AlertDescription>
