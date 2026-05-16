@@ -425,7 +425,7 @@ export const AdminAccountsHub: React.FC = () => {
                   <Label className="text-gray-300">Provider</Label>
                   <Select value={selectedDeliveryKey} onValueChange={setSelectedDeliveryKey}>
                     <SelectTrigger className="bg-slate-950 border-slate-700 text-white mt-1">
-                      <SelectValue placeholder="Choose from directory…" />
+                      <SelectValue placeholder="Choose delivery provider…" />
                     </SelectTrigger>
                     <SelectContent className="max-h-72">
                       {delivery.map((d) => (
