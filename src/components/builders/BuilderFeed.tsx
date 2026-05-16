@@ -1971,7 +1971,7 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
 
   return (
     <div className="w-full max-w-2xl mx-auto px-1 sm:px-0">
-      <Card className="overflow-hidden rounded-xl border border-slate-200/90 dark:border-slate-800 bg-white dark:bg-gray-900 shadow-sm">
+      <Card className="rounded-xl border border-slate-200/90 dark:border-slate-800 bg-white dark:bg-gray-900 shadow-sm overflow-visible">
         {feedBody}
       </Card>
     </div>

@@ -732,12 +732,12 @@ export const VideoPlayer = ({
 
               {/* Reaction bar — tap Like to open picker */}
               <div className="flex items-center justify-between pt-3 border-t mt-3">
-                <div ref={reactionRootRef} className="relative flex-1 pb-1">
+                <div ref={reactionRootRef} className="relative z-[210] flex-1 overflow-visible pb-1">
                   {showReactions && (
                     <div
                       role="listbox"
                       aria-label="Choose a reaction"
-                      className="absolute bottom-[calc(100%-4px)] left-1/2 z-50 flex -translate-x-1/2 gap-0.5 rounded-full border bg-white px-2 py-1.5 shadow-lg"
+                      className="absolute bottom-[calc(100%-4px)] left-1/2 z-[220] flex w-max max-w-[calc(100vw-1rem)] -translate-x-1/2 flex-wrap justify-center gap-0.5 rounded-2xl border bg-white px-1.5 py-1.5 shadow-lg sm:rounded-full sm:px-2 sm:py-1.5"
                       onPointerDown={(e) => e.stopPropagation()}
                     >
                       {VIDEO_REACTIONS.map((emoji) => (
@@ -745,7 +745,7 @@ export const VideoPlayer = ({
                           key={emoji}
                           type="button"
                           title="React"
-                          className="emoji-native text-2xl p-1.5 rounded-full hover:bg-gray-100 active:scale-95 touch-manipulation min-h-11 min-w-11 flex items-center justify-center"
+                          className="emoji-native flex min-h-10 min-w-10 items-center justify-center rounded-full p-1.5 text-2xl hover:bg-gray-100 active:scale-95 touch-manipulation sm:min-h-11 sm:min-w-11"
                           onPointerDown={(e) => {
                             e.stopPropagation();
                             e.preventDefault();

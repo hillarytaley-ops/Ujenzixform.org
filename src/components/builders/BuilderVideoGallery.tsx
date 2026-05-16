@@ -305,19 +305,19 @@ function GalleryVideoCardActions({
         className="px-2 py-1 flex flex-wrap items-center gap-1 border-t border-b"
         onClick={(ev) => ev.stopPropagation()}
       >
-        <div ref={reactionRootRef} className="relative flex-1 min-w-[5rem] pb-1">
+        <div ref={reactionRootRef} className="relative z-[210] flex-1 min-w-[5rem] overflow-visible pb-1">
           {showReactions && (
             <div
               role="listbox"
               aria-label="Choose a reaction"
-              className="absolute bottom-[calc(100%-4px)] left-1/2 z-[200] flex -translate-x-1/2 gap-0.5 rounded-full border border-gray-200 bg-white px-2 py-1.5 shadow-xl dark:border-gray-700 dark:bg-gray-800"
+              className="absolute bottom-[calc(100%-4px)] left-1/2 z-[220] flex w-max max-w-[calc(100vw-1rem)] -translate-x-1/2 flex-wrap justify-center gap-0.5 rounded-2xl border border-gray-200 bg-white px-1.5 py-1.5 shadow-xl sm:rounded-full sm:px-2 sm:py-1.5 dark:border-gray-700 dark:bg-gray-800"
               onPointerDown={(e) => e.stopPropagation()}
             >
               {GALLERY_REACTIONS.map((emoji) => (
                 <button
                   key={emoji}
                   type="button"
-                  className="emoji-native text-2xl min-h-11 min-w-11 flex items-center justify-center rounded-full hover:bg-gray-100 active:scale-95 touch-manipulation"
+                  className="emoji-native flex min-h-10 min-w-10 items-center justify-center rounded-full text-2xl hover:bg-gray-100 active:scale-95 touch-manipulation sm:min-h-11 sm:min-w-11"
                   onPointerDown={(e) => pickReaction(emoji, e)}
                 >
                   {emoji}
