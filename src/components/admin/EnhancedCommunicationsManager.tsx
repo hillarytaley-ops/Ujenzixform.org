@@ -7,6 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
+import { getAccessTokenWithPersistenceFallback } from "@/utils/supabaseAccessToken";
 import { 
   MessageSquare, 
   Send, 
@@ -144,6 +145,16 @@ export function EnhancedCommunicationsManager({ staffId, staffName }: EnhancedCo
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const { toast } = useToast();
 
+  const getRestAuthHeaders = useCallback(async (): Promise<Record<string, string> | null> => {
+    const token = await getAccessTokenWithPersistenceFallback();
+    if (!token) return null;
+    return {
+      apikey: SUPABASE_ANON_KEY,
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    };
+  }, []);
+
   // Get current user ID
   useEffect(() => {
     const getUserId = async () => {
@@ -170,14 +181,15 @@ export function EnhancedCommunicationsManager({ staffId, staffName }: EnhancedCo
   const fetchConversations = useCallback(async () => {
     try {
       console.log('🔄 Fetching conversations via REST API...');
+      const headers = await getRestAuthHeaders();
+      if (!headers) {
+        setConversations([]);
+        return;
+      }
       const response = await fetch(`${SUPABASE_URL}/rest/v1/conversations?select=*&order=created_at.desc`, {
-        headers: {
-          'apikey': SUPABASE_ANON_KEY,
-          'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
-          'Content-Type': 'application/json'
-        }
+        headers,
       });
-      
+
       if (!response.ok) {
         const errorText = await response.text();
         console.error('❌ REST API error fetching conversations:', response.status, errorText);
@@ -188,7 +200,7 @@ export function EnhancedCommunicationsManager({ staffId, staffName }: EnhancedCo
         });
         return;
       }
-      
+
       const data = await response.json();
       console.log('✅ Conversations fetched:', data?.length || 0, data?.slice(0, 2));
       setConversations(data || []);
@@ -200,23 +212,22 @@ export function EnhancedCommunicationsManager({ staffId, staffName }: EnhancedCo
         variant: "destructive"
       });
     }
-  }, [toast]);
+  }, [toast, getRestAuthHeaders]);
 
   // Fetch messages for a conversation using REST API
   const fetchMessages = useCallback(async (conversationId: string) => {
     try {
       console.log('🔄 Fetching messages for conversation:', conversationId);
+      const headers = await getRestAuthHeaders();
+      if (!headers) {
+        setMessages([]);
+        return;
+      }
       const response = await fetch(
         `${SUPABASE_URL}/rest/v1/chat_messages?conversation_id=eq.${conversationId}&select=*&order=created_at.asc`,
-        {
-          headers: {
-            'apikey': SUPABASE_ANON_KEY,
-            'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
-            'Content-Type': 'application/json'
-          }
-        }
+        { headers }
       );
-      
+
       if (!response.ok) {
         console.error('❌ Error fetching messages:', response.status);
         toast({
@@ -226,7 +237,7 @@ export function EnhancedCommunicationsManager({ staffId, staffName }: EnhancedCo
         });
         return;
       }
-      
+
       const data = await response.json();
       console.log('✅ Messages fetched:', data?.length || 0);
       setMessages(data || []);
@@ -238,19 +249,20 @@ export function EnhancedCommunicationsManager({ staffId, staffName }: EnhancedCo
         variant: "destructive"
       });
     }
-  }, [toast]);
+  }, [toast, getRestAuthHeaders]);
 
   // Fetch chat feedback using REST API
   const fetchFeedbacks = useCallback(async () => {
     try {
+      const headers = await getRestAuthHeaders();
+      if (!headers) {
+        setFeedbacks([]);
+        return;
+      }
       const response = await fetch(`${SUPABASE_URL}/rest/v1/chat_feedback?select=*&order=created_at.desc&limit=100`, {
-        headers: {
-          'apikey': SUPABASE_ANON_KEY,
-          'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
-          'Content-Type': 'application/json'
-        }
+        headers,
       });
-      
+
       if (response.ok) {
         const data = await response.json();
         setFeedbacks(data || []);
@@ -261,19 +273,20 @@ export function EnhancedCommunicationsManager({ staffId, staffName }: EnhancedCo
       console.error('Error fetching feedback:', error);
       // Silent fail for feedback - non-critical
     }
-  }, []);
+  }, [getRestAuthHeaders]);
 
   // Fetch transcripts using REST API
   const fetchTranscripts = useCallback(async () => {
     try {
+      const headers = await getRestAuthHeaders();
+      if (!headers) {
+        setTranscripts([]);
+        return;
+      }
       const response = await fetch(`${SUPABASE_URL}/rest/v1/chat_transcripts?select=*&order=created_at.desc&limit=50`, {
-        headers: {
-          'apikey': SUPABASE_ANON_KEY,
-          'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
-          'Content-Type': 'application/json'
-        }
+        headers,
       });
-      
+
       if (response.ok) {
         const data = await response.json();
         setTranscripts(data || []);
@@ -284,7 +297,7 @@ export function EnhancedCommunicationsManager({ staffId, staffName }: EnhancedCo
       console.error('Error fetching transcripts:', error);
       // Silent fail for transcripts - non-critical
     }
-  }, []);
+  }, [getRestAuthHeaders]);
 
   // Track known message IDs to detect new messages
   const knownMessageIdsRef = useRef<Set<string>>(new Set());
@@ -334,17 +347,14 @@ export function EnhancedCommunicationsManager({ staffId, staffName }: EnhancedCo
       
       try {
         // Fetch latest messages
+        const headers = await getRestAuthHeaders();
+        if (!headers) return;
+
         const response = await fetch(
           `${SUPABASE_URL}/rest/v1/chat_messages?select=*&order=created_at.desc&limit=100`,
-          {
-            headers: {
-              'apikey': SUPABASE_ANON_KEY,
-              'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
-              'Content-Type': 'application/json'
-            }
-          }
+          { headers }
         );
-        
+
         if (!response.ok) return;
         
         const allMessages: ChatMessage[] = await response.json();
@@ -438,7 +448,7 @@ export function EnhancedCommunicationsManager({ staffId, staffName }: EnhancedCo
       }
       supabase.removeChannel(channel);
     };
-  }, [selectedConversation, fetchConversations, playNotificationSound, toast]);
+  }, [selectedConversation, fetchConversations, playNotificationSound, toast, getRestAuthHeaders]);
 
   // Auto-scroll
   useEffect(() => {
@@ -490,14 +500,24 @@ export function EnhancedCommunicationsManager({ staffId, staffName }: EnhancedCo
     console.log('⚡ Optimistic update - message shown instantly');
 
     try {
+      const authHeaders = await getRestAuthHeaders();
+      if (!authHeaders) {
+        setMessages(prev => prev.filter(m => m.id !== tempId));
+        setReplyMessage(content);
+        toast({
+          variant: 'destructive',
+          title: 'Not signed in',
+          description: 'Sign in with your admin account to send messages.',
+        });
+        return;
+      }
+
       // Insert message via REST API
       const insertResponse = await fetch(`${SUPABASE_URL}/rest/v1/chat_messages`, {
         method: 'POST',
         headers: {
-          'apikey': SUPABASE_ANON_KEY,
-          'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
-          'Content-Type': 'application/json',
-          'Prefer': 'return=representation'
+          ...authHeaders,
+          Prefer: 'return=representation',
         },
         body: JSON.stringify({
           conversation_id: selectedConversation.id,
@@ -513,10 +533,10 @@ export function EnhancedCommunicationsManager({ staffId, staffName }: EnhancedCo
       if (!insertResponse.ok) {
         throw new Error(`Insert failed: ${insertResponse.status}`);
       }
-      
+
       const [insertedMessage] = await insertResponse.json();
       console.log('✅ Message saved to database:', insertedMessage.id);
-      
+
       // Replace temp message with real one
       setMessages(prev => prev.map(m => m.id === tempId ? insertedMessage : m));
       knownMessageIdsRef.current.add(insertedMessage.id);
@@ -524,11 +544,7 @@ export function EnhancedCommunicationsManager({ staffId, staffName }: EnhancedCo
       // Update conversation
       await fetch(`${SUPABASE_URL}/rest/v1/conversations?id=eq.${selectedConversation.id}`, {
         method: 'PATCH',
-        headers: {
-          'apikey': SUPABASE_ANON_KEY,
-          'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
-          'Content-Type': 'application/json'
-        },
+        headers: authHeaders,
         body: JSON.stringify({
           status: 'open',
           agent_id: currentUserId,
@@ -542,11 +558,7 @@ export function EnhancedCommunicationsManager({ staffId, staffName }: EnhancedCo
       // Mark client messages as read
       await fetch(`${SUPABASE_URL}/rest/v1/chat_messages?conversation_id=eq.${selectedConversation.id}&sender_type=eq.client`, {
         method: 'PATCH',
-        headers: {
-          'apikey': SUPABASE_ANON_KEY,
-          'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
-          'Content-Type': 'application/json'
-        },
+        headers: authHeaders,
         body: JSON.stringify({ read: true })
       });
 
