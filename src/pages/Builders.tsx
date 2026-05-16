@@ -253,7 +253,7 @@ const Builders = () => {
                 Browse
               </Button>
 
-              <Link to="/builder-registration">
+              <Link to="/auth?tab=signup">
                 <Button
                   size="sm"
                   className="h-8 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-[11px] px-2.5"
@@ -280,7 +280,7 @@ const Builders = () => {
                 )}
 
               {!loading && !userProfile && (
-                <Link to="/builder-signin">
+                <Link to="/auth?tab=signin">
                   <Button
                     size="sm"
                     className="h-8 bg-green-600 hover:bg-green-700 text-white font-semibold text-[11px] px-2.5"
