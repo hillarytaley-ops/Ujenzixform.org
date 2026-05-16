@@ -46,6 +46,17 @@ interface DeliveryRow {
   bank_account_holder_name?: string | null;
 }
 
+/** Dropdown line: name + email when useful; trailing "· status" is registration/verification state, not a job role. */
+function formatDeliverySelectLabel(d: DeliveryRow): string {
+  const primary = (d.full_name || d.provider_name || d.email || 'Unknown').trim();
+  const email = (d.email || '').trim();
+  const withEmail =
+    email && primary.toLowerCase() !== email.toLowerCase() && !primary.includes('@')
+      ? `${primary} (${email})`
+      : primary;
+  return d.status ? `${withEmail} · ${d.status}` : withEmail;
+}
+
 function escapeHtml(s: string): string {
   return s
     .replace(/&/g, '&amp;')
@@ -414,7 +425,13 @@ export const AdminAccountsHub: React.FC = () => {
         <TabsContent value="delivery" className="space-y-4 mt-4">
           <Card className="bg-slate-900/50 border-slate-800">
             <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle className="text-white text-base">Delivery providers</CardTitle>
+              <div>
+                <CardTitle className="text-white text-base">Delivery providers</CardTitle>
+                <CardDescription className="text-gray-500 text-xs mt-1 max-w-xl">
+                  One row per account with a delivery role. The name comes from their signup/application or profile;
+                  text after &quot;·&quot; is application or verification status—not a staff job title.
+                </CardDescription>
+              </div>
               <Button variant="ghost" size="sm" onClick={() => void loadDelivery()} disabled={loadingDelivery}>
                 <RefreshCw className={`h-4 w-4 ${loadingDelivery ? 'animate-spin' : ''}`} />
               </Button>
@@ -430,8 +447,7 @@ export const AdminAccountsHub: React.FC = () => {
                     <SelectContent className="max-h-72">
                       {delivery.map((d) => (
                         <SelectItem key={`${d.source}-${d.id}`} value={`${d.source || 'unknown'}:${d.id}`}>
-                          {(d.full_name || d.provider_name || d.email || 'Unknown') +
-                            (d.status ? ` · ${d.status}` : '')}
+                          {formatDeliverySelectLabel(d)}
                         </SelectItem>
                       ))}
                     </SelectContent>
