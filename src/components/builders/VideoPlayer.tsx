@@ -731,33 +731,34 @@ export const VideoPlayer = ({
               </div>
 
               {/* Reaction bar — tap Like to open picker */}
-              <div className="flex items-center justify-between pt-3 border-t mt-3">
-                <div ref={reactionRootRef} className="relative z-[210] flex-1 overflow-visible pb-1">
-                  {showReactions && (
-                    <div
-                      role="listbox"
-                      aria-label="Choose a reaction"
-                      className="absolute bottom-[calc(100%-4px)] left-1/2 z-[220] flex w-screen max-w-[100vw] -translate-x-1/2 flex-nowrap justify-center gap-0.5 overflow-x-auto overscroll-x-contain rounded-2xl border bg-white px-2 py-2 shadow-lg sm:w-max sm:max-w-none sm:flex-wrap sm:overflow-visible sm:rounded-full sm:px-2 sm:py-1.5"
-                      onPointerDown={(e) => e.stopPropagation()}
-                    >
-                      {VIDEO_REACTIONS.map((emoji) => (
-                        <button
-                          key={emoji}
-                          type="button"
-                          title="React"
-                          className="emoji-native flex min-h-10 min-w-10 shrink-0 snap-center items-center justify-center rounded-full p-1.5 text-2xl hover:bg-gray-100 active:scale-95 touch-manipulation sm:min-h-11 sm:min-w-11"
-                          onPointerDown={(e) => {
-                            e.stopPropagation();
-                            e.preventDefault();
-                            void handleLike();
-                            setShowReactions(false);
-                          }}
-                        >
-                          {emoji}
-                        </button>
-                      ))}
-                    </div>
-                  )}
+              <div ref={reactionRootRef} className="relative z-[210] pt-3 border-t mt-3">
+                {showReactions && (
+                  <div
+                    role="listbox"
+                    aria-label="Choose a reaction"
+                    className="absolute bottom-full left-0 right-0 z-[220] mb-0.5 flex flex-wrap justify-center gap-1 rounded-2xl border bg-white px-2 py-2 shadow-lg"
+                    onPointerDown={(e) => e.stopPropagation()}
+                  >
+                    {VIDEO_REACTIONS.map((emoji) => (
+                      <button
+                        key={emoji}
+                        type="button"
+                        title="React"
+                        className="emoji-native flex min-h-10 min-w-10 shrink-0 items-center justify-center rounded-full p-1.5 text-2xl hover:bg-gray-100 active:scale-95 touch-manipulation sm:min-h-11 sm:min-w-11"
+                        onPointerDown={(e) => {
+                          e.stopPropagation();
+                          e.preventDefault();
+                          void handleLike();
+                          setShowReactions(false);
+                        }}
+                      >
+                        {emoji}
+                      </button>
+                    ))}
+                  </div>
+                )}
+                <div className="flex items-center justify-between">
+                  <div className="relative flex-1 overflow-visible pb-1">
                   <Button
                     variant="ghost"
                     size="sm"
@@ -802,6 +803,7 @@ export const VideoPlayer = ({
                   <Send className="h-5 w-5 mr-2" />
                   <span>Share</span>
                 </Button>
+                </div>
               </div>
             </div>
 

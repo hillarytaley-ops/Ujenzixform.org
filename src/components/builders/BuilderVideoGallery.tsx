@@ -302,29 +302,30 @@ function GalleryVideoCardActions({
   return (
     <>
       <div
-        className="px-2 py-1 flex flex-wrap items-center gap-1 border-t border-b"
+        ref={reactionRootRef}
+        className="relative z-[210] px-2 py-1 flex flex-wrap items-center gap-1 border-t border-b"
         onClick={(ev) => ev.stopPropagation()}
       >
-        <div ref={reactionRootRef} className="relative z-[210] flex-1 min-w-[5rem] overflow-visible pb-1">
-          {showReactions && (
-            <div
-              role="listbox"
-              aria-label="Choose a reaction"
-              className="absolute bottom-[calc(100%-4px)] left-1/2 z-[220] flex w-screen max-w-[100vw] -translate-x-1/2 flex-nowrap justify-center gap-0.5 overflow-x-auto overscroll-x-contain rounded-2xl border border-gray-200 bg-white px-2 py-2 shadow-xl sm:w-max sm:max-w-none sm:flex-wrap sm:overflow-visible sm:rounded-full sm:px-2 sm:py-1.5 dark:border-gray-700 dark:bg-gray-800"
-              onPointerDown={(e) => e.stopPropagation()}
-            >
-              {GALLERY_REACTIONS.map((emoji) => (
-                <button
-                  key={emoji}
-                  type="button"
-                  className="emoji-native flex min-h-10 min-w-10 shrink-0 snap-center items-center justify-center rounded-full text-2xl hover:bg-gray-100 active:scale-95 touch-manipulation sm:min-h-11 sm:min-w-11"
-                  onPointerDown={(e) => pickReaction(emoji, e)}
-                >
-                  {emoji}
-                </button>
-              ))}
-            </div>
-          )}
+        {showReactions && (
+          <div
+            role="listbox"
+            aria-label="Choose a reaction"
+            className="absolute bottom-full left-1 right-1 z-[220] mb-0.5 flex flex-wrap justify-center gap-1 rounded-2xl border border-gray-200 bg-white px-2 py-2 shadow-xl dark:border-gray-700 dark:bg-gray-800"
+            onPointerDown={(e) => e.stopPropagation()}
+          >
+            {GALLERY_REACTIONS.map((emoji) => (
+              <button
+                key={emoji}
+                type="button"
+                className="emoji-native flex min-h-10 min-w-10 shrink-0 items-center justify-center rounded-full text-2xl hover:bg-gray-100 active:scale-95 touch-manipulation sm:min-h-11 sm:min-w-11"
+                onPointerDown={(e) => pickReaction(emoji, e)}
+              >
+                {emoji}
+              </button>
+            ))}
+          </div>
+        )}
+        <div className="flex-1 min-w-[5rem] pb-1">
           <Button
             type="button"
             variant="ghost"

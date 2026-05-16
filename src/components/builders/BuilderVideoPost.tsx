@@ -768,12 +768,44 @@ export const BuilderVideoPost: React.FC<BuilderVideoPostProps> = ({
       <Separator />
 
       {/* Action Buttons - Facebook Style */}
-      <div className="px-2 py-1">
+      <div
+        ref={reactionRootRef}
+        className="relative z-[210] px-2 py-1"
+      >
+        {showReactions && (
+          <div
+            role="listbox"
+            aria-label="Choose a reaction"
+            className="absolute bottom-full left-1 right-1 z-[220] mb-0.5 flex flex-wrap justify-center gap-1 rounded-2xl border border-gray-200 bg-white px-2 py-2 shadow-xl dark:border-gray-700 dark:bg-gray-800"
+            onMouseEnter={clearReactionHideTimer}
+            onMouseLeave={() => {
+              if (window.matchMedia('(hover: hover) and (pointer: fine)').matches) {
+                scheduleReactionHide();
+              }
+            }}
+            onPointerDown={(e) => e.stopPropagation()}
+          >
+            {reactions.map((reaction) => (
+              <button
+                key={reaction.name}
+                type="button"
+                onPointerDown={(e) => {
+                  e.stopPropagation();
+                  e.preventDefault();
+                  handleReactionPick(reaction.emoji);
+                }}
+                className="emoji-native flex h-10 min-h-10 w-10 min-w-10 shrink-0 items-center justify-center rounded-full text-2xl transition-transform hover:scale-110 hover:bg-gray-100 active:scale-95 sm:h-12 sm:min-h-12 sm:w-12 sm:min-w-12 sm:text-3xl dark:hover:bg-gray-700 touch-manipulation"
+                title={reaction.name}
+              >
+                {reaction.emoji}
+              </button>
+            ))}
+          </div>
+        )}
         <div className="flex items-center justify-around">
           {/* Like + reactions: tap opens picker; hover opens on desktop */}
           <div
-            ref={reactionRootRef}
-            className="relative z-[210] flex-1 overflow-visible pb-1"
+            className="relative flex-1 overflow-visible pb-1"
             onMouseEnter={() => {
               if (window.matchMedia('(hover: hover) and (pointer: fine)').matches) {
                 openReactionsBar();
@@ -785,36 +817,6 @@ export const BuilderVideoPost: React.FC<BuilderVideoPostProps> = ({
               }
             }}
           >
-            {showReactions && (
-              <div
-                role="listbox"
-                aria-label="Choose a reaction"
-                className="absolute bottom-[calc(100%-4px)] left-1/2 z-[220] flex w-screen max-w-[100vw] -translate-x-1/2 flex-nowrap justify-center gap-0.5 overflow-x-auto overscroll-x-contain rounded-2xl border border-gray-200 bg-white px-2 py-2 shadow-xl sm:w-max sm:max-w-none sm:flex-wrap sm:overflow-visible sm:rounded-full dark:border-gray-700 dark:bg-gray-800"
-                onMouseEnter={clearReactionHideTimer}
-                onMouseLeave={() => {
-                  if (window.matchMedia('(hover: hover) and (pointer: fine)').matches) {
-                    scheduleReactionHide();
-                  }
-                }}
-                onPointerDown={(e) => e.stopPropagation()}
-              >
-                {reactions.map((reaction) => (
-                  <button
-                    key={reaction.name}
-                    type="button"
-                    onPointerDown={(e) => {
-                      e.stopPropagation();
-                      e.preventDefault();
-                      handleReactionPick(reaction.emoji);
-                    }}
-                    className="emoji-native flex h-10 min-h-10 w-10 min-w-10 shrink-0 snap-center items-center justify-center rounded-full text-2xl transition-transform hover:scale-110 hover:bg-gray-100 active:scale-95 sm:h-12 sm:min-h-12 sm:w-12 sm:min-w-12 sm:text-3xl dark:hover:bg-gray-700 touch-manipulation"
-                    title={reaction.name}
-                  >
-                    {reaction.emoji}
-                  </button>
-                ))}
-              </div>
-            )}
             <Button
               variant="ghost"
               className={`w-full min-h-11 h-11 gap-2 rounded-xl transition-all ${
