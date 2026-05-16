@@ -433,6 +433,7 @@ const AdminDashboard = () => {
   const [documents, setDocuments] = useState<DocumentRecord[]>([]);
   const [mlActivities, setMLActivities] = useState<MLActivity[]>([]);
   const [deliveryApplications, setDeliveryApplications] = useState<DeliveryApplication[]>([]);
+  const [deliveryReviewActionId, setDeliveryReviewActionId] = useState<string | null>(null);
   const [builderDeliveryRequests, setBuilderDeliveryRequests] = useState<BuilderDeliveryRequest[]>([]);
   const [alertingNearbyId, setAlertingNearbyId] = useState<string | null>(null);
   const [quoteDraftById, setQuoteDraftById] = useState<Record<string, { amount: string; notes: string }>>({});
@@ -1799,7 +1800,9 @@ const AdminDashboard = () => {
           created_at: row.created_at,
           reviewed_at: null,
           reviewed_by: null,
-          _registration_id: row.registration_id,
+          _registration_id:
+            row.registration_id ??
+            (String(row.source || '').toLowerCase() === 'registration' ? row.id : null),
           _source: row.source,
           bank_name: row.bank_name ?? null,
           bank_account_holder_name: row.bank_account_holder_name ?? null,
@@ -1855,6 +1858,107 @@ const AdminDashboard = () => {
       }
     } catch (error) {
       console.error('Error loading delivery applications:', error);
+    }
+  };
+
+  const deliveryAppRowStatus = (app: DeliveryApplication) => (app.status || '').trim().toLowerCase();
+
+  const canReviewDeliveryApplicationRow = (app: DeliveryApplication) => {
+    if (deliveryAppRowStatus(app) !== 'pending') return false;
+    const src = (app._source || '').toLowerCase();
+    if (src === 'provider') return true;
+    return !!(app._registration_id || src === 'registration');
+  };
+
+  const approveDeliveryApplicationRow = async (app: DeliveryApplication) => {
+    setDeliveryReviewActionId(app.id);
+    try {
+      const regId = app._registration_id ?? (app._source === 'registration' ? app.id : null);
+      if (regId) {
+        const { data, error } = await supabase.rpc('admin_update_delivery_provider_status', {
+          registration_id: regId,
+          new_status: 'approved',
+          admin_notes_text: null,
+        });
+        if (error) throw error;
+        const row = data as { success?: boolean; error?: string } | null;
+        if (row && row.success === false) throw new Error(row.error || 'Approval failed');
+        toast({
+          title: '✅ Application approved',
+          description: `${app.full_name} is approved; profile and delivery provider records are synced for orders.`,
+        });
+      } else if ((app._source || '').toLowerCase() === 'provider') {
+        const { error } = await supabase
+          .from('delivery_providers')
+          .update({
+            is_verified: true,
+            is_active: true,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', app.id);
+        if (error) throw error;
+        toast({
+          title: '✅ Provider verified',
+          description: `${app.full_name}'s delivery profile is verified and active.`,
+        });
+      } else {
+        throw new Error('Cannot approve this row (no registration id and not a provider-only record).');
+      }
+      await loadDeliveryApplications();
+    } catch (error: unknown) {
+      toast({
+        variant: 'destructive',
+        title: 'Approval failed',
+        description: error instanceof Error ? error.message : 'Could not approve.',
+      });
+    } finally {
+      setDeliveryReviewActionId(null);
+    }
+  };
+
+  const rejectDeliveryApplicationRow = async (app: DeliveryApplication) => {
+    setDeliveryReviewActionId(app.id);
+    try {
+      const regId = app._registration_id ?? (app._source === 'registration' ? app.id : null);
+      if (regId) {
+        const { data, error } = await supabase.rpc('admin_update_delivery_provider_status', {
+          registration_id: regId,
+          new_status: 'rejected',
+          admin_notes_text: null,
+        });
+        if (error) throw error;
+        const row = data as { success?: boolean; error?: string } | null;
+        if (row && row.success === false) throw new Error(row.error || 'Rejection failed');
+        toast({
+          title: 'Application rejected',
+          description: `${app.full_name}'s delivery registration was rejected.`,
+        });
+      } else if ((app._source || '').toLowerCase() === 'provider') {
+        const { error } = await supabase
+          .from('delivery_providers')
+          .update({
+            is_verified: false,
+            is_active: false,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', app.id);
+        if (error) throw error;
+        toast({
+          title: 'Provider deactivated',
+          description: `${app.full_name}'s delivery profile was marked inactive.`,
+        });
+      } else {
+        throw new Error('Cannot reject this row (no registration id and not a provider-only record).');
+      }
+      await loadDeliveryApplications();
+    } catch (error: unknown) {
+      toast({
+        variant: 'destructive',
+        title: 'Rejection failed',
+        description: error instanceof Error ? error.message : 'Could not reject.',
+      });
+    } finally {
+      setDeliveryReviewActionId(null);
     }
   };
 
@@ -2937,7 +3041,7 @@ const AdminDashboard = () => {
                     </div>
                     <div>
                       <p className="text-2xl font-bold text-white">
-                        {deliveryApplications.filter(a => a.status === 'pending').length}
+                        {deliveryApplications.filter((a) => deliveryAppRowStatus(a) === 'pending').length}
                       </p>
                       <p className="text-sm text-yellow-300">Pending Review</p>
                     </div>
@@ -2953,7 +3057,7 @@ const AdminDashboard = () => {
                     </div>
                     <div>
                       <p className="text-2xl font-bold text-white">
-                        {deliveryApplications.filter(a => a.status === 'approved').length}
+                        {deliveryApplications.filter((a) => deliveryAppRowStatus(a) === 'approved').length}
                       </p>
                       <p className="text-sm text-blue-300">Approved</p>
                     </div>
@@ -2969,7 +3073,7 @@ const AdminDashboard = () => {
                     </div>
                     <div>
                       <p className="text-2xl font-bold text-white">
-                        {deliveryApplications.filter(a => a.status === 'rejected').length}
+                        {deliveryApplications.filter((a) => deliveryAppRowStatus(a) === 'rejected').length}
                       </p>
                       <p className="text-sm text-red-300">Rejected</p>
                     </div>
@@ -3010,13 +3114,17 @@ const AdminDashboard = () => {
                   </div>
                 ) : (
                   <div className="space-y-4">
-                    {deliveryApplications.map((app) => (
+                    {deliveryApplications.map((app) => {
+                      const dStatus = deliveryAppRowStatus(app);
+                      const showReviewActions = canReviewDeliveryApplicationRow(app);
+                      const busy = deliveryReviewActionId === app.id;
+                      return (
                       <div 
                         key={app.id} 
                         className={`p-5 rounded-xl border transition-all hover:shadow-lg ${
-                          app.status === 'pending' 
+                          dStatus === 'pending' 
                             ? 'bg-yellow-900/10 border-yellow-700/50 hover:bg-yellow-900/20' 
-                            : app.status === 'approved'
+                            : dStatus === 'approved'
                             ? 'bg-green-900/10 border-green-700/50 hover:bg-green-900/20'
                             : 'bg-red-900/10 border-red-700/50 hover:bg-red-900/20'
                         }`}
@@ -3025,12 +3133,12 @@ const AdminDashboard = () => {
                         <div className="flex justify-between items-start mb-4">
                           <div className="flex items-center gap-3">
                             <div className={`p-3 rounded-full ${
-                              app.status === 'pending' ? 'bg-yellow-600/30' :
-                              app.status === 'approved' ? 'bg-green-600/30' : 'bg-red-600/30'
+                              dStatus === 'pending' ? 'bg-yellow-600/30' :
+                              dStatus === 'approved' ? 'bg-green-600/30' : 'bg-red-600/30'
                             }`}>
                               <Truck className={`h-6 w-6 ${
-                                app.status === 'pending' ? 'text-yellow-400' :
-                                app.status === 'approved' ? 'text-green-400' : 'text-red-400'
+                                dStatus === 'pending' ? 'text-yellow-400' :
+                                dStatus === 'approved' ? 'text-green-400' : 'text-red-400'
                               }`} />
                             </div>
                             <div>
@@ -3040,10 +3148,10 @@ const AdminDashboard = () => {
                           </div>
                           <div className="flex items-center gap-3">
                             <Badge className={
-                              app.status === 'pending' ? 'bg-yellow-600' :
-                              app.status === 'approved' ? 'bg-green-600' : 'bg-red-600'
+                              dStatus === 'pending' ? 'bg-yellow-600' :
+                              dStatus === 'approved' ? 'bg-green-600' : 'bg-red-600'
                             }>
-                              {app.status.charAt(0).toUpperCase() + app.status.slice(1)}
+                              {dStatus ? dStatus.charAt(0).toUpperCase() + dStatus.slice(1) : '—'}
                             </Badge>
                             <span className="text-gray-500 text-xs">
                               {new Date(app.created_at).toLocaleDateString()}
@@ -3147,84 +3255,41 @@ const AdminDashboard = () => {
                           </div>
                         </div>
 
-                        {/* Action Buttons - only for applications from delivery_provider_registrations */}
-                        {app.status === 'pending' && (app._registration_id || app._source === 'registration') && (
-                          <div className="flex gap-3 pt-3 border-t border-slate-700">
-                            <Button
-                              className="bg-green-600 hover:bg-green-700 flex-1"
-                              onClick={async () => {
-                                try {
-                                  const regId = app._registration_id || app.id;
-                                  const { data, error } = await supabase.rpc(
-                                    'admin_update_delivery_provider_status',
-                                    {
-                                      registration_id: regId,
-                                      new_status: 'approved',
-                                      admin_notes_text: null,
-                                    }
-                                  );
-                                  if (error) throw error;
-                                  const row = data as { success?: boolean; error?: string } | null;
-                                  if (row && row.success === false) {
-                                    throw new Error(row.error || 'Approval failed');
-                                  }
-                                  toast({
-                                    title: "✅ Application Approved",
-                                    description: `${app.full_name} has been approved as a delivery provider. Their name and phone are now synced for orders.`
-                                  });
-                                  loadDeliveryApplications();
-                                } catch (error: unknown) {
-                                  toast({
-                                    variant: "destructive",
-                                    title: "Error",
-                                    description: error instanceof Error ? error.message : "Failed to approve application."
-                                  });
-                                }
-                              }}
-                            >
-                              <CheckCircle className="h-4 w-4 mr-2" />
-                              Approve Application
-                            </Button>
-                            <Button
-                              variant="destructive"
-                              className="flex-1"
-                              onClick={async () => {
-                                try {
-                                  const regId = app._registration_id || app.id;
-                                  const { data, error } = await supabase.rpc(
-                                    'admin_update_delivery_provider_status',
-                                    {
-                                      registration_id: regId,
-                                      new_status: 'rejected',
-                                      admin_notes_text: null,
-                                    }
-                                  );
-                                  if (error) throw error;
-                                  const row = data as { success?: boolean; error?: string } | null;
-                                  if (row && row.success === false) {
-                                    throw new Error(row.error || 'Rejection failed');
-                                  }
-                                  toast({
-                                    title: "❌ Application Rejected",
-                                    description: `${app.full_name}'s application has been rejected.`
-                                  });
-                                  loadDeliveryApplications();
-                                } catch (error: unknown) {
-                                  toast({
-                                    variant: "destructive",
-                                    title: "Error",
-                                    description: error instanceof Error ? error.message : "Failed to reject application."
-                                  });
-                                }
-                              }}
-                            >
-                              <XCircle className="h-4 w-4 mr-2" />
-                              Reject Application
-                            </Button>
+                        {/* Approve / reject — registration workflow or verify-only delivery_providers row */}
+                        {showReviewActions && (
+                          <div className="flex flex-col gap-2 pt-3 border-t border-slate-700">
+                            <p className="text-gray-500 text-xs">
+                              Source:{' '}
+                              <span className="text-slate-300">
+                                {(app._source || 'registration').replace('_', ' ')}
+                              </span>
+                              {app._registration_id ? (
+                                <span className="text-gray-600"> · registration linked</span>
+                              ) : null}
+                            </p>
+                            <div className="flex gap-3">
+                              <Button
+                                className="bg-green-600 hover:bg-green-700 flex-1"
+                                disabled={busy}
+                                onClick={() => void approveDeliveryApplicationRow(app)}
+                              >
+                                <CheckCircle className="h-4 w-4 mr-2" />
+                                {busy ? 'Working…' : 'Approve'}
+                              </Button>
+                              <Button
+                                variant="destructive"
+                                className="flex-1"
+                                disabled={busy}
+                                onClick={() => void rejectDeliveryApplicationRow(app)}
+                              >
+                                <XCircle className="h-4 w-4 mr-2" />
+                                {busy ? 'Working…' : 'Reject'}
+                              </Button>
+                            </div>
                           </div>
                         )}
 
-                        {app.status !== 'pending' && app.reviewed_at && (
+                        {dStatus !== 'pending' && app.reviewed_at && (
                           <div className="pt-3 border-t border-slate-700">
                             <p className="text-gray-500 text-xs">
                               Reviewed on {new Date(app.reviewed_at).toLocaleString()}
@@ -3232,7 +3297,8 @@ const AdminDashboard = () => {
                           </div>
                         )}
                       </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
               </CardContent>
