@@ -137,7 +137,6 @@ export const GroupedTabNav: React.FC<GroupedTabNavProps> = ({
         { value: 'tracking', label: 'Tracking Numbers', icon: Navigation },
         { value: 'gps', label: 'GPS Tracking', icon: MapPin },
         { value: 'delivery-analytics', label: 'Delivery Analytics', icon: TrendingUp },
-        { value: 'delivery-pay', label: 'DeliveryPay', icon: DollarSign },
       ],
     },
     {
@@ -201,6 +200,7 @@ export const GroupedTabNav: React.FC<GroupedTabNavProps> = ({
               : undefined,
         },
         { value: 'accounts', label: 'Accounts', icon: Landmark },
+        { value: 'delivery-pay', label: 'DeliveryPay', icon: DollarSign },
         { value: 'etims-test', label: 'eTIMS test', icon: Receipt },
       ],
     },
@@ -330,22 +330,26 @@ export const GroupedTabNav: React.FC<GroupedTabNavProps> = ({
                 {group.label}
               </DropdownMenuLabel>
               <DropdownMenuSeparator className="bg-slate-700" />
-              {visibleTabs.map((tab) => (
-                <DropdownMenuItem
-                  key={tab.value}
-                  onClick={() => onTabChange(tab.value)}
-                  className={`cursor-pointer ${
-                    activeTab === tab.value 
-                      ? `${colorClasses[group.color]} text-white` 
-                      : 'text-slate-300 hover:bg-slate-800'
-                  }`}
-                >
-                  <tab.icon className="h-4 w-4 mr-2" />
-                  {tab.label}
-                  {tab.badge && (
-                    <Badge className="ml-auto bg-yellow-600 text-xs">{tab.badge}</Badge>
+              {visibleTabs.map((tab, tabIndex) => (
+                <React.Fragment key={tab.value}>
+                  {group.id === 'finance' && tab.value === 'delivery-pay' && tabIndex > 0 && (
+                    <DropdownMenuSeparator className="bg-slate-700" />
                   )}
-                </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={() => onTabChange(tab.value)}
+                    className={`cursor-pointer ${
+                      activeTab === tab.value 
+                        ? `${colorClasses[group.color]} text-white` 
+                        : 'text-slate-300 hover:bg-slate-800'
+                    }`}
+                  >
+                    <tab.icon className="h-4 w-4 mr-2" />
+                    {tab.label}
+                    {tab.badge && (
+                      <Badge className="ml-auto bg-yellow-600 text-xs">{tab.badge}</Badge>
+                    )}
+                  </DropdownMenuItem>
+                </React.Fragment>
               ))}
             </DropdownMenuContent>
           </DropdownMenu>

@@ -27,6 +27,7 @@ const navItems = [
   { id: 'documents', label: 'Documents', icon: FileText, color: 'text-orange-400' },
   { id: 'financial', label: 'Financial', icon: DollarSign, color: 'text-emerald-400' },
   { id: 'accounts', label: 'Accounts', icon: Landmark, color: 'text-teal-400' },
+  { id: 'delivery-pay', label: 'DeliveryPay', icon: DollarSign, color: 'text-emerald-300' },
   { id: 'careers', label: 'Careers (jobs)', icon: Briefcase, color: 'text-amber-400' },
   { id: 'career-applications', label: 'Job applications', icon: FileText, color: 'text-amber-300' },
   { id: 'delivery-apps', label: 'Delivery providers', icon: Truck, color: 'text-amber-200' },
