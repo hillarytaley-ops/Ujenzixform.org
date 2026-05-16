@@ -43,6 +43,7 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { DeliveryPromptDialog } from './DeliveryPromptDialog';
+import { sanitizeDeliveryAddressForPrefill } from '@/utils/deliveryAddressValidation';
 import {
   builderFulfillmentOrderChoice,
   findEditableDeliveryRequestId,
@@ -152,10 +153,37 @@ interface ScanEvent {
   material_type?: string;
 }
 
+export type BuilderOrdersTrackerMode = 'orders' | 'deliveries';
+
 interface BuilderOrdersTrackerProps {
   builderId: string;
   /** When false, hide supplier-invoice Pay now (e.g. private client QR tab reuses this component). Default true. */
   showSupplierPayLinks?: boolean;
+  /**
+   * orders — track POs, QR, pay supplier (no delivery request / drop-off form).
+   * deliveries — request delivery, edit drop-off, awaiting provider (Delivery Location dialog).
+   */
+  mode?: BuilderOrdersTrackerMode;
+}
+
+function orderNeedsDeliveryWorkflow(
+  order: PurchaseOrder,
+  deliveryRows: { purchase_order_id?: string; status?: string | null }[]
+): boolean {
+  if (shouldShowRerequestDelivery(order, deliveryRows)) return true;
+  if (findEditableDeliveryRequestId(order.id, deliveryRows)) return true;
+  const status = (order.status || '').toLowerCase();
+  if (
+    status === 'awaiting_delivery_request' ||
+    status === 'delivery_requested' ||
+    status === 'awaiting_delivery_provider'
+  ) {
+    return true;
+  }
+  if (purchaseOrderRequiresDeliveryProvider(order) && builderFulfillmentOrderChoice(order) !== 'pickup') {
+    if (!order.delivery_provider_id && !providerDisplayName(order)) return true;
+  }
+  return false;
 }
 
 /** Real provider name for UI — strips placeholders; keeps "Assigned driver" and falls back when only id is set */
@@ -321,14 +349,18 @@ type OrderFilter = 'all' | 'pending' | 'dispatched' | 'in_transit' | 'received';
 export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({
   builderId,
   showSupplierPayLinks = true,
+  mode = 'orders',
 }) => {
+  const isDeliveriesMode = mode === 'deliveries';
+  const isOrdersMode = mode === 'orders';
+  const showDeliveryActions = isDeliveriesMode;
   const [orders, setOrders] = useState<PurchaseOrder[]>([]);
   const [scanEvents, setScanEvents] = useState<ScanEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [expandedOrder, setExpandedOrder] = useState<string | null>(null);
   const [selectedQRItem, setSelectedQRItem] = useState<MaterialItem | null>(null);
   const [showQRDialog, setShowQRDialog] = useState(false);
-  const [activeFilter, setActiveFilter] = useState<OrderFilter>('pending'); // Default to pending orders
+  const [activeFilter, setActiveFilter] = useState<OrderFilter>('pending');
   const [deliveryRequestsList, setDeliveryRequestsList] = useState<
     {
       id: string;
@@ -344,6 +376,10 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({
   /** purchase_order_id → invoice.id for unpaid supplier invoices (builder pays on Invoices tab). */
   const [payInvoiceByPoId, setPayInvoiceByPoId] = useState<Record<string, string>>({});
   const { toast } = useToast();
+
+  useEffect(() => {
+    if (isDeliveriesMode) setActiveFilter('pending');
+  }, [isDeliveriesMode]);
 
   useEffect(() => {
     if (!showSupplierPayLinks || !builderId?.trim() || orders.length === 0) {
@@ -1587,7 +1623,7 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({
             </Badge>
           </button>
           <div className="flex w-full min-w-0 flex-wrap items-center justify-end gap-1.5 border-t border-gray-100 pt-2 sm:w-auto sm:flex-nowrap sm:border-t-0 sm:pt-0 sm:pl-0">
-          {shouldShowRerequestDelivery(order, deliveryRequestsList) ? (
+          {showDeliveryActions && shouldShowRerequestDelivery(order, deliveryRequestsList) ? (
             <Button
               type="button"
               variant="outline"
@@ -1605,7 +1641,8 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({
               <span className="hidden sm:inline text-xs font-semibold">Re-request</span>
             </Button>
           ) : null}
-          {purchaseOrderRequiresDeliveryProvider(order) &&
+          {showDeliveryActions &&
+          purchaseOrderRequiresDeliveryProvider(order) &&
           builderFulfillmentOrderChoice(order) !== 'pickup' &&
           findEditableDeliveryRequestId(order.id, deliveryRequestsList) ? (
             <Button
@@ -1761,6 +1798,7 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({
             </div>
 
             {(() => {
+              if (!showDeliveryActions) return null;
               const choice = builderFulfillmentOrderChoice(order);
               const needsProvider = purchaseOrderRequiresDeliveryProvider(order);
               const hasProvider = orderHasAssignedProvider(order);
@@ -1913,7 +1951,11 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({
                 <MapPin className="h-4 w-4 text-gray-400 mt-0.5" />
                 <div>
                   <p className="font-medium">Delivery Address</p>
-                  <p className="text-gray-600">{order.delivery_address}</p>
+                  <p className="text-gray-600">
+                    {sanitizeDeliveryAddressForPrefill(order.delivery_address, {
+                      projectName: order.project_name,
+                    }) || (isOrdersMode ? 'Set on Deliveries tab' : 'Not set yet')}
+                  </p>
                 </div>
               </div>
               
@@ -2030,14 +2072,21 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({
     const acceptedByProvider: PurchaseOrder[] = [];
     const awaitingProvider: PurchaseOrder[] = [];
     
-    filteredOrders.forEach(order => {
+    const pendingPool = isDeliveriesMode
+      ? filteredOrders.filter((o) => orderNeedsDeliveryWorkflow(o, deliveryRequestsList))
+      : filteredOrders;
+
+    pendingPool.forEach(order => {
       const orderStatus = order.status || 'pending';
       const hasProvider = order.delivery_provider_id || order.delivery_provider_name;
       const deliveryStatus = order.delivery_status || 'pending';
       const providerAccepted = hasProvider || ['assigned', 'accepted', 'picked_up', 'in_transit', 'delivered'].includes(deliveryStatus);
       
       // Separate "Supplier Responded" orders (quoted, quote_responded, quote_revised, quote_viewed_by_builder)
-      if (orderStatus === 'quoted' || orderStatus === 'quote_responded' || orderStatus === 'quote_revised' || orderStatus === 'quote_viewed_by_builder') {
+      if (
+        !isDeliveriesMode &&
+        (orderStatus === 'quoted' || orderStatus === 'quote_responded' || orderStatus === 'quote_revised' || orderStatus === 'quote_viewed_by_builder')
+      ) {
         supplierResponded.push(order);
       } 
       // Separate "Delivery Assigned" orders (delivery_assigned)
@@ -2206,11 +2255,17 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({
         <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div className="min-w-0 space-y-1">
             <CardTitle className="flex flex-wrap items-center gap-2 text-lg sm:text-2xl">
-              <Package className="h-5 w-5 shrink-0 text-blue-600" />
-              Your Orders
+              {isDeliveriesMode ? (
+                <Truck className="h-5 w-5 shrink-0 text-teal-600" />
+              ) : (
+                <Package className="h-5 w-5 shrink-0 text-blue-600" />
+              )}
+              {isDeliveriesMode ? 'Delivery requests (your orders)' : 'Your Orders'}
             </CardTitle>
             <CardDescription className="break-words">
-              Track your material orders and deliveries
+              {isDeliveriesMode
+                ? 'Set drop-off address or GPS, request providers, and track responses — not on the Orders tab.'
+                : 'Track material orders, QR scans, and payments. Use the Deliveries tab for drop-off and providers.'}
             </CardDescription>
           </div>
           <Button variant="outline" size="sm" onClick={fetchOrders} className="w-full shrink-0 sm:w-auto">
@@ -2219,20 +2274,36 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({
           </Button>
         </CardHeader>
         <CardContent className="space-y-4">
-          {orders.some(
-            (o) =>
-              o.status === 'awaiting_delivery_request' &&
-              builderFulfillmentOrderChoice(o) === 'pending'
-          ) && (
-            <Alert className="border-amber-200 bg-amber-50 dark:bg-amber-950/30">
-              <AlertTriangle className="h-4 w-4 text-amber-700" />
-              <AlertDescription className="text-sm text-amber-900 dark:text-amber-100">
-                <strong>Finish delivery or pickup.</strong> Some orders need you to choose delivery (with a real address or GPS) or pickup. Providers are notified only after you complete{' '}
-                <strong>Request delivery</strong> on the order — refreshing does not send anything by itself.
-              </AlertDescription>
-            </Alert>
-          )}
-          {orders.some((o) => shouldShowRerequestDelivery(o, deliveryRequestsList)) &&
+          {isOrdersMode &&
+            orders.some(
+              (o) =>
+                o.status === 'awaiting_delivery_request' &&
+                builderFulfillmentOrderChoice(o) === 'pending'
+            ) && (
+              <Alert className="border-blue-200 bg-blue-50 dark:bg-blue-950/30">
+                <Truck className="h-4 w-4 text-blue-700" />
+                <AlertDescription className="text-sm text-blue-900 dark:text-blue-100">
+                  <strong>Delivery setup is on the Deliveries tab.</strong> Open{' '}
+                  <strong>Deliveries → Request Delivery</strong> to enter a street address or GPS and notify providers.
+                </AlertDescription>
+              </Alert>
+            )}
+          {showDeliveryActions &&
+            orders.some(
+              (o) =>
+                o.status === 'awaiting_delivery_request' &&
+                builderFulfillmentOrderChoice(o) === 'pending'
+            ) && (
+              <Alert className="border-amber-200 bg-amber-50 dark:bg-amber-950/30">
+                <AlertTriangle className="h-4 w-4 text-amber-700" />
+                <AlertDescription className="text-sm text-amber-900 dark:text-amber-100">
+                  <strong>Finish delivery or pickup.</strong> Some orders need you to choose delivery (with a real address or GPS) or pickup. Providers are notified only after you complete{' '}
+                  <strong>Request delivery</strong> below — refreshing does not send anything by itself.
+                </AlertDescription>
+              </Alert>
+            )}
+          {showDeliveryActions &&
+            orders.some((o) => shouldShowRerequestDelivery(o, deliveryRequestsList)) &&
             (() => {
               const firstRerequestOrder = orders.find((o) =>
                 shouldShowRerequestDelivery(o, deliveryRequestsList)
@@ -2295,9 +2366,25 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({
                 </Button>
               )}
             </div>
-          ) : activeFilter === 'pending' ? (
-            // Grouped display for pending orders
+          ) : activeFilter === 'pending' && isOrdersMode ? (
+            filteredOrders.map((order) => {
+              const isExpanded = expandedOrder === order.id;
+              const progress = getOrderProgress(order.material_items || []);
+              return renderOrderCard(order, isExpanded, progress);
+            })
+          ) : activeFilter === 'pending' && isDeliveriesMode ? (
             <div className="space-y-6">
+              {supplierResponded.length === 0 &&
+                acceptedByProvider.length === 0 &&
+                awaitingProvider.length === 0 && (
+                  <div className="text-center py-8 text-gray-500">
+                    <Truck className="h-12 w-12 mx-auto mb-3 text-gray-300" />
+                    <p className="font-medium">No orders need delivery action right now</p>
+                    <p className="text-sm mt-1">
+                      When an order needs a drop-off address or a provider, it will appear here.
+                    </p>
+                  </div>
+                )}
               {/* Supplier Responded Orders */}
               {supplierResponded.length > 0 && (
                 <div className="space-y-3">
@@ -2357,8 +2444,8 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({
         </CardContent>
       </Card>
 
-      {/* Recent Scan Activity */}
-      {scanEvents.length > 0 && (() => {
+      {/* Recent Scan Activity — orders tab only */}
+      {isOrdersMode && scanEvents.length > 0 && (() => {
         // Group scans by order
         const scansByOrder = new Map<string, ScanEvent[]>();
         const ungroupedScans: ScanEvent[] = [];
@@ -2500,33 +2587,35 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({
         item={selectedQRItem} 
       />
 
-      <DeliveryPromptDialog
-        isOpen={showDeliveryPrompt}
-        editDeliveryRequestId={editDeliveryRequestId}
-        onOpenChange={(open) => {
-          setShowDeliveryPrompt(open);
-          if (!open) {
+      {showDeliveryActions ? (
+        <DeliveryPromptDialog
+          isOpen={showDeliveryPrompt}
+          editDeliveryRequestId={editDeliveryRequestId}
+          onOpenChange={(open) => {
+            setShowDeliveryPrompt(open);
+            if (!open) {
+              setSelectedOrderForDelivery(null);
+              setEditDeliveryRequestId(null);
+            }
+          }}
+          purchaseOrder={
+            selectedOrderForDelivery
+              ? buildPurchaseOrderForDeliveryDialog(selectedOrderForDelivery)
+              : null
+          }
+          onDeliveryRequested={() => {
+            setShowDeliveryPrompt(false);
             setSelectedOrderForDelivery(null);
             setEditDeliveryRequestId(null);
-          }
-        }}
-        purchaseOrder={
-          selectedOrderForDelivery
-            ? buildPurchaseOrderForDeliveryDialog(selectedOrderForDelivery)
-            : null
-        }
-        onDeliveryRequested={() => {
-          setShowDeliveryPrompt(false);
-          setSelectedOrderForDelivery(null);
-          setEditDeliveryRequestId(null);
-          void fetchOrders();
-        }}
-        onDeclined={() => {
-          setShowDeliveryPrompt(false);
-          setSelectedOrderForDelivery(null);
-          void fetchOrders();
-        }}
-      />
+            void fetchOrders();
+          }}
+          onDeclined={() => {
+            setShowDeliveryPrompt(false);
+            setSelectedOrderForDelivery(null);
+            void fetchOrders();
+          }}
+        />
+      ) : null}
     </div>
   );
 };

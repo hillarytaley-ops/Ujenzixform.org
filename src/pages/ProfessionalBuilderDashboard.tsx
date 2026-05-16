@@ -3187,7 +3187,7 @@ const ProfessionalBuilderDashboardPage = () => {
                     builderId = localStorage.getItem('user_id') || '';
                   }
                 }
-                return <BuilderOrdersTracker builderId={builderId} />;
+                return <BuilderOrdersTracker builderId={builderId} mode="orders" />;
               })()}
             </div>
           </TabsContent>
@@ -3209,9 +3209,22 @@ const ProfessionalBuilderDashboardPage = () => {
                   }
                 } catch (e) {}
               }
-              return builderId && userId ? (
-                <MissingDeliveryAddressAlert builderId={builderId} userId={userId} />
-              ) : null;
+              return (
+                <>
+                  {builderId && userId ? (
+                    <MissingDeliveryAddressAlert builderId={builderId} userId={userId} />
+                  ) : null}
+                  {builderId ? (
+                    <div className="mb-6">
+                      <BuilderOrdersTracker
+                        builderId={builderId}
+                        mode="deliveries"
+                        showSupplierPayLinks={false}
+                      />
+                    </div>
+                  ) : null}
+                </>
+              );
             })()}
 
             <BuilderDeliveryQuotePanel
