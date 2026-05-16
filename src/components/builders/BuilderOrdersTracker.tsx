@@ -33,6 +33,9 @@ import {
   FileText,
   Phone,
   CreditCard,
+  Banknote,
+  Loader2,
+  ThumbsUp,
 } from 'lucide-react';
 import { SUPABASE_ANON_KEY, SUPABASE_URL, supabase } from '@/integrations/supabase/client';
 import {
@@ -50,10 +53,13 @@ import {
 import { getCartProjectLocation } from '@/utils/builderCartProject';
 import {
   builderFulfillmentOrderChoice,
+  findAdminQuoteDeliveryRequestForOrder,
   findEditableDeliveryRequestId,
   hasActiveDeliveryRequestForOrder,
+  hasAdminQuotePipelineDeliveryRequestForOrder,
   purchaseOrderRequiresDeliveryProvider,
 } from '@/utils/purchaseOrderFulfillment';
+import { PaystackCheckout } from '@/components/payment/PaystackCheckout';
 import { format } from 'date-fns';
 import QRCode from 'qrcode';
 
@@ -220,6 +226,7 @@ function shouldShowRerequestDelivery(
 ): boolean {
   if (['completed', 'cancelled', 'received', 'delivered', 'verified'].includes(order.status)) return false;
   if (builderFulfillmentOrderChoice(order) === 'pickup') return false;
+  if (hasAdminQuotePipelineDeliveryRequestForOrder(order.id, deliveryRows)) return false;
   return (
     purchaseOrderRequiresDeliveryProvider(order) &&
     !orderHasAssignedProvider(order) &&
@@ -372,8 +379,16 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({
       status?: string | null;
       updated_at?: string | null;
       created_at?: string | null;
+      estimated_cost?: number | null;
+      delivery_quote_paid_at?: string | null;
+      delivery_quote_notes?: string | null;
     }[]
   >([]);
+  const [quoteActionBusyId, setQuoteActionBusyId] = useState<string | null>(null);
+  const paystackSuccessPath =
+    typeof window !== 'undefined' && window.location.pathname.includes('private')
+      ? '/private-client-dashboard?tab=deliveries'
+      : '/professional-builder-dashboard?tab=deliveries';
   const [showDeliveryPrompt, setShowDeliveryPrompt] = useState(false);
   const [selectedOrderForDelivery, setSelectedOrderForDelivery] = useState<PurchaseOrder | null>(null);
   const [editDeliveryRequestId, setEditDeliveryRequestId] = useState<string | null>(null);
@@ -534,7 +549,7 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({
         const drTimeoutId = setTimeout(() => drController.abort(), 5000);
 
         const drResponse = await fetch(
-          `${SUPABASE_URL}/rest/v1/delivery_requests?purchase_order_id=in.(${orderIdsParam})&select=id,purchase_order_id,provider_id,status,accepted_at,updated_at,created_at,delivery_address,delivery_coordinates,delivery_latitude,delivery_longitude,special_instructions,pickup_date,preferred_time,pickup_address`,
+          `${SUPABASE_URL}/rest/v1/delivery_requests?purchase_order_id=in.(${orderIdsParam})&select=id,purchase_order_id,provider_id,status,accepted_at,updated_at,created_at,delivery_address,delivery_coordinates,delivery_latitude,delivery_longitude,special_instructions,pickup_date,preferred_time,pickup_address,estimated_cost,delivery_quote_paid_at,delivery_quote_notes`,
           { headers, signal: drController.signal, cache: 'no-store' }
         );
         clearTimeout(drTimeoutId);
@@ -1119,6 +1134,34 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({
       setLoading(false);
     }
   }, [builderId]);
+
+  const acceptAdminDeliveryQuote = async (deliveryRequestId: string) => {
+    setQuoteActionBusyId(deliveryRequestId);
+    try {
+      const { error } = await supabase
+        .from('delivery_requests')
+        .update({
+          status: 'quote_accepted',
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', deliveryRequestId)
+        .eq('status', 'quoted');
+      if (error) throw error;
+      toast({
+        title: 'Quote accepted',
+        description: 'Pay the delivery quote with Paystack to alert nearby drivers.',
+      });
+      await fetchOrders();
+    } catch (e: unknown) {
+      toast({
+        title: 'Could not accept quote',
+        description: e instanceof Error ? e.message : 'Please try again.',
+        variant: 'destructive',
+      });
+    } finally {
+      setQuoteActionBusyId(null);
+    }
+  };
 
   // Order status flow: confirmed → dispatched → in_transit → delivered
   const getStatusColor = (status: string) => {
@@ -1837,6 +1880,94 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({
                     </AlertDescription>
                   </Alert>
                 );
+              }
+
+              const adminQuoteDr = findAdminQuoteDeliveryRequestForOrder(
+                order.id,
+                deliveryRequestsList
+              );
+              if (adminQuoteDr) {
+                const quoteStatus = String(adminQuoteDr.status || '').toLowerCase();
+                const quoteAmt =
+                  adminQuoteDr.estimated_cost != null
+                    ? Number(adminQuoteDr.estimated_cost)
+                    : NaN;
+                const canPayQuote =
+                  quoteStatus === 'quote_accepted' &&
+                  !adminQuoteDr.delivery_quote_paid_at &&
+                  Number.isFinite(quoteAmt) &&
+                  quoteAmt >= 1;
+
+                if (quoteStatus === 'quoted') {
+                  return (
+                    <Alert className="border-blue-200 bg-blue-50">
+                      <Banknote className="h-4 w-4 text-blue-700" />
+                      <AlertDescription className="space-y-3 text-sm text-blue-900">
+                        <p>
+                          <strong>Admin delivery quote ready.</strong> Review the amount, accept the quote, then pay with Paystack. Drivers are notified only after payment.
+                        </p>
+                        {Number.isFinite(quoteAmt) && (
+                          <p className="text-lg font-semibold">KES {quoteAmt.toLocaleString()}</p>
+                        )}
+                        {adminQuoteDr.delivery_quote_notes ? (
+                          <p className="text-xs border rounded-md p-2 bg-white/80 whitespace-pre-wrap">
+                            {adminQuoteDr.delivery_quote_notes}
+                          </p>
+                        ) : null}
+                        <Button
+                          type="button"
+                          size="sm"
+                          className="bg-emerald-600 hover:bg-emerald-700"
+                          disabled={quoteActionBusyId === adminQuoteDr.id}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            void acceptAdminDeliveryQuote(adminQuoteDr.id);
+                          }}
+                        >
+                          {quoteActionBusyId === adminQuoteDr.id ? (
+                            <Loader2 className="h-4 w-4 animate-spin mr-1" />
+                          ) : (
+                            <ThumbsUp className="h-4 w-4 mr-1" />
+                          )}
+                          Accept quote &amp; pay
+                        </Button>
+                      </AlertDescription>
+                    </Alert>
+                  );
+                }
+
+                if (canPayQuote) {
+                  return (
+                    <Alert className="border-amber-200 bg-amber-50">
+                      <Banknote className="h-4 w-4 text-amber-700" />
+                      <AlertDescription className="space-y-3 text-sm text-amber-950">
+                        <p>
+                          <strong>Pay delivery quote.</strong> You accepted the admin quote. Complete Paystack payment to open this job to nearby drivers — do not use Re-request delivery.
+                        </p>
+                        <p className="text-lg font-semibold">KES {quoteAmt.toLocaleString()}</p>
+                        <PaystackCheckout
+                          amount={quoteAmt}
+                          currency="KES"
+                          description={`Delivery quote ${adminQuoteDr.id.slice(0, 8)}`}
+                          orderId={`drq_${adminQuoteDr.id}`}
+                          successNavigateTo={paystackSuccessPath}
+                          className="max-w-md"
+                        />
+                      </AlertDescription>
+                    </Alert>
+                  );
+                }
+
+                if (quoteStatus === 'delivery_quote_paid' && !hasProvider) {
+                  return (
+                    <Alert className="border-teal-200 bg-teal-50">
+                      <Clock className="h-4 w-4 text-teal-700" />
+                      <AlertDescription className="text-sm text-teal-900">
+                        <strong>Delivery quote paid.</strong> Payment received — waiting for a delivery provider to accept this job from the driver queue.
+                      </AlertDescription>
+                    </Alert>
+                  );
+                }
               }
 
               if (needsProvider && !hasProvider && activeDr) {

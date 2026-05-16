@@ -166,7 +166,7 @@ export function BuilderDeliveryQuotePanel({
   if (rows.length === 0) return null;
 
   return (
-    <div className="space-y-4 mb-6">
+    <div id="delivery-quotes-from-admin" className="space-y-4 mb-6">
       <Card className="border-blue-200 bg-blue-50/50 dark:bg-blue-950/20">
         <CardHeader className="pb-2">
           <CardTitle className="flex items-center gap-2 text-lg">

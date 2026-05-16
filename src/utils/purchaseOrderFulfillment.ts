@@ -36,6 +36,58 @@ export function hasActiveDeliveryRequestForOrder(
   );
 }
 
+/** Admin quote flow: builder accepts quote → Paystack → drivers notified (delivery_quote_paid). */
+export const ADMIN_QUOTE_DELIVERY_REQUEST_STATUSES = new Set([
+  "quoted",
+  "quote_accepted",
+  "delivery_quote_paid",
+]);
+
+export type DeliveryRequestQuoteRow = {
+  id: string;
+  purchase_order_id?: string;
+  status?: string | null;
+  estimated_cost?: number | null;
+  delivery_quote_paid_at?: string | null;
+  delivery_quote_notes?: string | null;
+};
+
+export function hasAdminQuotePipelineDeliveryRequestForOrder(
+  orderId: string,
+  rows: { purchase_order_id?: string; status?: string | null }[]
+): boolean {
+  return rows.some(
+    (d) =>
+      d.purchase_order_id === orderId &&
+      d.status &&
+      ADMIN_QUOTE_DELIVERY_REQUEST_STATUSES.has(String(d.status).toLowerCase())
+  );
+}
+
+export function findAdminQuoteDeliveryRequestForOrder(
+  orderId: string,
+  rows: DeliveryRequestQuoteRow[]
+): DeliveryRequestQuoteRow | null {
+  const match = rows.filter(
+    (d) =>
+      d.purchase_order_id === orderId &&
+      d.status &&
+      ADMIN_QUOTE_DELIVERY_REQUEST_STATUSES.has(String(d.status).toLowerCase())
+  );
+  if (match.length === 0) return null;
+  const priority = (s: string) => {
+    const x = s.toLowerCase();
+    if (x === "quote_accepted") return 3;
+    if (x === "quoted") return 2;
+    if (x === "delivery_quote_paid") return 1;
+    return 0;
+  };
+  match.sort(
+    (a, b) => priority(String(b.status)) - priority(String(a.status))
+  );
+  return match[0];
+}
+
 /** Builder may PATCH drop-off details while the job is not yet in active transit. */
 export const BUILDER_EDITABLE_DELIVERY_REQUEST_STATUSES = new Set([
   "pending",
