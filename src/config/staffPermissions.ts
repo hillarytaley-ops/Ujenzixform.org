@@ -415,8 +415,8 @@ export const TAB_METADATA: Record<AdminTab, { name: string; icon: string; descri
   'delivery-apps': {
     name: 'Delivery Applications',
     icon: 'Truck',
-    description: 'Delivery provider applications',
-    category: 'Logistics'
+    description: 'Delivery provider onboarding and applications',
+    category: 'Hiring'
   },
   'delivery-requests': {
     name: 'Delivery Requests',

@@ -133,7 +133,6 @@ export const GroupedTabNav: React.FC<GroupedTabNavProps> = ({
       icon: Truck,
       color: 'orange',
       tabs: [
-        { value: 'delivery-apps', label: 'Delivery Apps', icon: Truck, badge: deliveryAppsCount || undefined },
         { value: 'delivery-requests', label: 'Delivery Requests', icon: Package, badge: deliveryRequestsCount || undefined },
         { value: 'tracking', label: 'Tracking Numbers', icon: Navigation },
         { value: 'gps', label: 'GPS Tracking', icon: MapPin },
@@ -222,6 +221,12 @@ export const GroupedTabNav: React.FC<GroupedTabNavProps> = ({
       tabs: [
         { value: 'careers', label: 'Careers', icon: Briefcase },
         { value: 'career-applications', label: 'Applications', icon: FileText },
+        {
+          value: 'delivery-apps',
+          label: 'Delivery providers',
+          icon: Truck,
+          badge: deliveryAppsCount || undefined,
+        },
       ],
     },
     {

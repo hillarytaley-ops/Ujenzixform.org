@@ -2398,12 +2398,6 @@ const AdminDashboard = () => {
                 Material Images
               </TabsTrigger>
             )}
-            {shouldShowTab('delivery-apps') && (
-              <TabsTrigger value="delivery-apps" className="data-[state=active]:bg-green-600">
-                <Truck className="h-4 w-4 mr-2" />
-                Delivery Apps ({deliveryApplications.length})
-              </TabsTrigger>
-            )}
             {shouldShowTab('delivery-requests') && (
               <TabsTrigger value="delivery-requests" className="data-[state=active]:bg-orange-600">
                 <Package className="h-4 w-4 mr-2" />
@@ -2516,6 +2510,12 @@ const AdminDashboard = () => {
               <TabsTrigger value="career-applications" className="data-[state=active]:bg-amber-600">
                 <ClipboardPenLine className="h-4 w-4 mr-2" />
                 Job applications
+              </TabsTrigger>
+            )}
+            {shouldShowTab('delivery-apps') && (
+              <TabsTrigger value="delivery-apps" className="data-[state=active]:bg-amber-600">
+                <Truck className="h-4 w-4 mr-2" />
+                Delivery providers ({deliveryApplications.length})
               </TabsTrigger>
             )}
             {shouldShowTab('user-roles') && (
@@ -2984,7 +2984,7 @@ const AdminDashboard = () => {
                 <div className="flex justify-between items-center">
                   <CardTitle className="text-white flex items-center gap-2">
                     <Truck className="h-5 w-5 text-green-400" />
-                    All Delivery Provider Applications
+                    Delivery provider applications
                   </CardTitle>
                   <Button
                     variant="outline"
@@ -2996,6 +2996,10 @@ const AdminDashboard = () => {
                     Refresh
                   </Button>
                 </div>
+                <CardDescription className="text-gray-500 text-sm pt-1">
+                  Main navigation: <span className="text-slate-300">Hiring Manager</span> →{' '}
+                  <span className="text-slate-300">Delivery providers</span>.
+                </CardDescription>
               </CardHeader>
               <CardContent>
                 {deliveryApplications.length === 0 ? (
