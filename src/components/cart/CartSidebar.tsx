@@ -339,12 +339,8 @@ export const CartSidebar: React.FC = () => {
         const poNumber = `QR-${Date.now()}-${Math.random().toString(36).substr(2, 5).toUpperCase()}`;
         const supplierName = suppliersMap[supplierId] || supplierItems[0]?.supplier_name || 'General Catalog';
         
-        // Get selected project details for delivery address
         const selectedProject = projects.find(p => p.id === selectedProjectId);
-        const deliveryAddress = selectedProject 
-          ? `${selectedProject.name} - ${selectedProject.location}${selectedProject.address ? ` (${selectedProject.address})` : ''}`
-          : 'To be provided';
-        const projectName = selectedProject?.name 
+        const projectName = selectedProject?.name
           ? `${selectedProject.name} - Quote from ${supplierName}`
           : `Quote Request - ${supplierName}`;
 
@@ -353,7 +349,7 @@ export const CartSidebar: React.FC = () => {
           buyer_id: userId,
           supplier_id: supplierId,
           total_amount: supplierTotal,
-          delivery_address: deliveryAddress,
+          delivery_address: 'To be provided',
           delivery_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
           project_name: projectName,
           status: 'pending',
@@ -550,11 +546,7 @@ export const CartSidebar: React.FC = () => {
 
       console.log('✅ Final supplier for order:', validatedSupplierId, supplierName);
       
-      // Get selected project details for delivery address
       const selectedProject = projects.find(p => p.id === selectedProjectId);
-      const deliveryAddress = selectedProject 
-        ? `${selectedProject.name} - ${selectedProject.location}${selectedProject.address ? ` (${selectedProject.address})` : ''}`
-        : 'To be provided';
       const projectName = selectedProject?.name || 'Direct Purchase - ' + new Date().toLocaleDateString();
 
       // Create purchase order using native fetch
@@ -563,7 +555,7 @@ export const CartSidebar: React.FC = () => {
         buyer_id: userId,
         supplier_id: validatedSupplierId,
         total_amount: getTotalPrice(),
-        delivery_address: deliveryAddress,
+        delivery_address: 'To be provided',
         delivery_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
         project_name: projectName,
         status: 'confirmed',
@@ -920,11 +912,11 @@ export const CartSidebar: React.FC = () => {
                 {selectedProjectId && (
                   <div className="text-xs text-blue-600 flex items-center gap-1">
                     <MapPin className="h-3 w-3" />
-                    Materials will be delivered to: {projects.find(p => p.id === selectedProjectId)?.location}
+                    Linked to project: {projects.find((p) => p.id === selectedProjectId)?.name}
                   </div>
                 )}
                 <p className="text-[10px] text-blue-500">
-                  Linking orders to projects helps track spending and ensures accurate delivery
+                  Project link tracks spending only. Enter the real delivery address or GPS when you request delivery.
                 </p>
               </div>
             )}

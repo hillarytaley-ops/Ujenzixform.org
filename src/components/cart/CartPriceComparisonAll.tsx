@@ -543,9 +543,7 @@ export const CartPriceComparisonAll: React.FC<CartPriceComparisonAllProps> = ({
           supplier_id: supplierId,
           total_amount: totalAmount,
           project_id: cartPid,
-          delivery_address: cartPname
-            ? `${cartPname} - ${cartPloc || 'Site'}`
-            : 'To be provided',
+          delivery_address: 'To be provided',
           delivery_date: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
           project_name: cartPname
             ? `${cartPname} — Price comparison quote`

@@ -42,6 +42,12 @@ import { supabase, SUPABASE_URL, SUPABASE_ANON_KEY } from '@/integrations/supaba
 import { readAuthSessionForRest } from '@/utils/supabaseAccessToken';
 import { supplierLocationLine } from '@/utils/supplierLocationLine';
 import { parseLatLngFromString } from '@/utils/deliveryLocationDisplay';
+import {
+  isPlaceholderDeliveryAddress,
+  isUsableDeliveryAddressText,
+  looksLikeProjectSiteLabel,
+  sanitizeDeliveryAddressForPrefill,
+} from '@/utils/deliveryAddressValidation';
 import { useToast } from '@/hooks/use-toast';
 import { MonitoringServicePrompt } from './MonitoringServicePrompt';
 import { deliveryProviderNotificationService } from '@/services/DeliveryProviderNotificationService';
@@ -153,12 +159,10 @@ export const DeliveryPromptDialog: React.FC<DeliveryPromptDialogProps> = ({
   const { toast } = useToast();
 
   // Required for Send Request: address or coordinates (same validation as submit) — ensures address is never missing on provider dashboard
-  const hasAddress = Boolean(
-    deliveryData.deliveryAddress.trim() &&
-    deliveryData.deliveryAddress.toLowerCase() !== 'to be provided' &&
-    deliveryData.deliveryAddress.toLowerCase() !== 'tbd' &&
-    deliveryData.deliveryAddress.toLowerCase() !== 'n/a'
-  );
+  const projectSiteCtx = {
+    projectName: purchaseOrder?.project_name ?? null,
+  };
+  const hasAddress = isUsableDeliveryAddressText(deliveryData.deliveryAddress, projectSiteCtx);
   const hasCoordinates = Boolean(deliveryData.deliveryCoordinates.trim());
 
   // Get current GPS location
@@ -253,14 +257,10 @@ export const DeliveryPromptDialog: React.FC<DeliveryPromptDialogProps> = ({
       setDeliveryData(prev => {
         const next: typeof prev = {
           ...prev,
-          // CRITICAL: Don't pre-populate with purchase_order.delivery_address if it's a placeholder
-          // The builder should enter their own delivery address, not inherit "To be provided"
-          deliveryAddress: (purchaseOrder.delivery_address && 
-                           purchaseOrder.delivery_address.toLowerCase() !== 'to be provided' &&
-                           purchaseOrder.delivery_address.toLowerCase() !== 'tbd' &&
-                           purchaseOrder.delivery_address.toLowerCase() !== 'n/a') 
-                           ? purchaseOrder.delivery_address : '',
-          preferredDate: purchaseOrder.delivery_date || ''
+          deliveryAddress: sanitizeDeliveryAddressForPrefill(purchaseOrder.delivery_address, {
+            projectName: purchaseOrder.project_name,
+          }),
+          preferredDate: purchaseOrder.delivery_date || '',
         };
         // Prefill materials for providers: new PO → always from items; same PO → only if still empty (e.g. items arrived async)
         if (fromItems && (poIdChanged || !prev.specialInstructions.trim())) {
@@ -324,7 +324,9 @@ export const DeliveryPromptDialog: React.FC<DeliveryPromptDialogProps> = ({
             ? `${Number(dr.delivery_latitude)}, ${Number(dr.delivery_longitude)}`
             : '');
         const savedAddr = (dr.delivery_address || '').trim();
-        let deliveryAddress = savedAddr;
+        let deliveryAddress = sanitizeDeliveryAddressForPrefill(savedAddr, {
+          projectName: purchaseOrder.project_name,
+        });
         let deliveryCoordinates = coordsFromCols;
         const pipeIdx = savedAddr.indexOf('|');
         if (pipeIdx > 0) {
@@ -332,7 +334,10 @@ export const DeliveryPromptDialog: React.FC<DeliveryPromptDialogProps> = ({
           const tail = savedAddr.slice(pipeIdx + 1).trim();
           if (parseLatLngFromString(head)) {
             deliveryCoordinates = deliveryCoordinates || head;
-            deliveryAddress = tail;
+            deliveryAddress =
+              sanitizeDeliveryAddressForPrefill(tail, {
+                projectName: purchaseOrder.project_name,
+              }) || deliveryAddress;
           }
         } else if (!deliveryCoordinates && parseLatLngFromString(savedAddr)) {
           const ll = parseLatLngFromString(savedAddr);
@@ -505,41 +510,38 @@ export const DeliveryPromptDialog: React.FC<DeliveryPromptDialogProps> = ({
 
     // CRITICAL: Validate required fields - either address or coordinates MUST be provided
     // Delivery address is MANDATORY - builder must provide it before creating delivery request
-    const hasAddress = deliveryData.deliveryAddress.trim() && 
-                       deliveryData.deliveryAddress.toLowerCase() !== 'to be provided' &&
-                       deliveryData.deliveryAddress.toLowerCase() !== 'tbd' &&
-                       deliveryData.deliveryAddress.toLowerCase() !== 'n/a';
+    const ctx = { projectName: purchaseOrder.project_name };
+    const hasAddress = isUsableDeliveryAddressText(deliveryData.deliveryAddress, ctx);
     const hasCoordinates = deliveryData.deliveryCoordinates.trim();
-    
+
     if (!hasAddress && !hasCoordinates) {
       toast({
         title: 'Delivery Address Required',
-        description: 'Please provide either a delivery address or GPS coordinates. This is mandatory for delivery service providers.',
-        variant: 'destructive'
+        description:
+          'Enter a street address or use GPS / Search on Map. Project names cannot be used as the delivery address.',
+        variant: 'destructive',
       });
       setSubmitting(false);
       return;
     }
 
-    // Block "same text as the order" with no GPS — that is almost always the project/site label, not a drop pin.
     const addrTrim = deliveryData.deliveryAddress.trim();
-    const poAddrTrim = (purchaseOrder.delivery_address || '').trim();
-    const unchangedFromPo =
-      Boolean(
-        addrTrim &&
-          poAddrTrim &&
-          addrTrim.toLowerCase() === poAddrTrim.toLowerCase()
-      );
     const headOfAddr = addrTrim.split('|')[0]?.trim() || addrTrim;
     const hasGpsFromFields =
       Boolean(deliveryData.deliveryCoordinates.trim()) ||
       Boolean(parseLatLngFromString(headOfAddr)) ||
       Boolean(parseLatLngFromString(addrTrim));
-    if (!editDeliveryRequestId && unchangedFromPo && !hasGpsFromFields) {
+
+    if (
+      addrTrim &&
+      !hasGpsFromFields &&
+      (looksLikeProjectSiteLabel(addrTrim, ctx) ||
+        isPlaceholderDeliveryAddress(addrTrim))
+    ) {
       toast({
-        title: 'Map pin or GPS required',
+        title: 'Real address or GPS required',
         description:
-          'You are still using the order’s project/site line only. Open “Search on Map” or use “Use my location” so drivers get coordinates. You can keep the site name after the pin.',
+          'Do not use the project name as the delivery address. Type a proper street address or set coordinates with Search on Map / Get GPS.',
         variant: 'destructive',
       });
       setSubmitting(false);
@@ -1667,7 +1669,11 @@ export const DeliveryPromptDialog: React.FC<DeliveryPromptDialogProps> = ({
               <div className="grid grid-cols-2 gap-2 text-xs">
                 <div className="flex items-center gap-1 p-2 bg-gray-50 rounded">
                   <MapPin className="h-3 w-3 text-gray-400" />
-                  <span className="truncate">{purchaseOrder.delivery_address || 'To be provided'}</span>
+                  <span className="truncate text-gray-500">
+                    {sanitizeDeliveryAddressForPrefill(purchaseOrder.delivery_address, {
+                      projectName: purchaseOrder.project_name,
+                    }) || 'Set drop-off address below'}
+                  </span>
                 </div>
                 <div className="flex items-center gap-1 p-2 bg-gray-50 rounded">
                   <Calendar className="h-3 w-3 text-gray-400" />
@@ -1884,7 +1890,7 @@ export const DeliveryPromptDialog: React.FC<DeliveryPromptDialogProps> = ({
                   aria-required="true"
                 />
                 <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1.5 mt-1">
-                  This address is shared <strong>directly</strong> with the delivery provider who accepts your order. It must not be missing from their dashboard. Provide a street address above or use GPS / Search on Map.
+                  This address is shared <strong>directly</strong> with the delivery provider. Do not enter the project name — use a proper street address or GPS / Search on Map.
                 </p>
                 {!deliveryData.deliveryAddress.trim() && !deliveryData.deliveryCoordinates.trim() && (
                   <p className="text-xs text-red-500 mt-0.5">

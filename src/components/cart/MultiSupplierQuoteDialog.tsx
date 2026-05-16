@@ -277,10 +277,7 @@ export const MultiSupplierQuoteDialog: React.FC<MultiSupplierQuoteDialogProps> =
           supplier_id: validSupplierId,
           total_amount: totalAmount,
           project_id: cartPid,
-          delivery_address:
-            cartPname != null
-              ? `${cartPname} - ${cartPloc || 'Site'}`
-              : 'To be provided',
+          delivery_address: 'To be provided',
           delivery_date: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 14 days
           project_name:
             cartPname != null

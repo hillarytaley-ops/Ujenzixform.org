@@ -1548,15 +1548,11 @@ export const MaterialsGrid: React.FC<MaterialsGridProps> = ({
       const qty = getQuantity(material.id) || 1;
       const poNumber = `QR-${Date.now()}-${Math.random().toString(36).substr(2, 5).toUpperCase()}`;
       const cartPname = getCartProjectName();
-      const cartPloc = getCartProjectLocation();
       const projectName =
         cartPname != null
           ? `${cartPname} — Quote: ${material.name}`
           : `Quote Request - ${material.category || 'Materials'}`;
-      const deliveryAddress =
-        cartPname != null
-          ? `${cartPname} - ${cartPloc || 'Site'}`
-          : 'To be confirmed';
+      const deliveryAddress = 'To be provided';
 
       console.log('Creating quote request:', { poNumber, buyerId: user.id, supplierId, material: material.name, qty, cartPid });
       
