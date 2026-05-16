@@ -789,7 +789,7 @@ export const BuilderVideoPost: React.FC<BuilderVideoPostProps> = ({
               <div
                 role="listbox"
                 aria-label="Choose a reaction"
-                className="absolute bottom-[calc(100%-4px)] left-1/2 z-[220] flex w-max max-w-[calc(100vw-1rem)] -translate-x-1/2 flex-wrap justify-center gap-0.5 rounded-2xl border border-gray-200 bg-white px-1.5 py-1.5 shadow-xl sm:gap-1 sm:rounded-full sm:px-2 sm:py-2 dark:border-gray-700 dark:bg-gray-800"
+                className="absolute bottom-[calc(100%-4px)] left-1/2 z-[220] flex w-screen max-w-[100vw] -translate-x-1/2 flex-nowrap justify-center gap-0.5 overflow-x-auto overscroll-x-contain rounded-2xl border border-gray-200 bg-white px-2 py-2 shadow-xl sm:w-max sm:max-w-none sm:flex-wrap sm:overflow-visible sm:rounded-full dark:border-gray-700 dark:bg-gray-800"
                 onMouseEnter={clearReactionHideTimer}
                 onMouseLeave={() => {
                   if (window.matchMedia('(hover: hover) and (pointer: fine)').matches) {
@@ -807,7 +807,7 @@ export const BuilderVideoPost: React.FC<BuilderVideoPostProps> = ({
                       e.preventDefault();
                       handleReactionPick(reaction.emoji);
                     }}
-                    className="emoji-native flex h-10 min-h-10 w-10 min-w-10 shrink-0 items-center justify-center rounded-full text-2xl transition-transform hover:scale-110 hover:bg-gray-100 active:scale-95 sm:h-12 sm:min-h-12 sm:w-12 sm:min-w-12 sm:text-3xl dark:hover:bg-gray-700 touch-manipulation"
+                    className="emoji-native flex h-10 min-h-10 w-10 min-w-10 shrink-0 snap-center items-center justify-center rounded-full text-2xl transition-transform hover:scale-110 hover:bg-gray-100 active:scale-95 sm:h-12 sm:min-h-12 sm:w-12 sm:min-w-12 sm:text-3xl dark:hover:bg-gray-700 touch-manipulation"
                     title={reaction.name}
                   >
                     {reaction.emoji}
