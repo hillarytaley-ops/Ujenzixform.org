@@ -93,7 +93,17 @@ export function DeliveryProviderHiringGateScreen({
               </Button>
             </div>
             <p className="text-center text-xs text-muted-foreground">
-              Support: {SUPPORT_PHONE_PRIMARY} · {SUPPORT_EMAIL}
+              Support:{" "}
+              <a
+                href={`tel:${SUPPORT_PHONE_PRIMARY.tel}`}
+                className="underline hover:text-teal-700"
+              >
+                {SUPPORT_PHONE_PRIMARY.display}
+              </a>{" "}
+              ·{" "}
+              <a href={`mailto:${SUPPORT_EMAIL}`} className="underline hover:text-teal-700">
+                {SUPPORT_EMAIL}
+              </a>
             </p>
           </CardContent>
         </Card>
