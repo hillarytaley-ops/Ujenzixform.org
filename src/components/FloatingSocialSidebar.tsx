@@ -44,6 +44,25 @@ import {
   SOCIAL_WHATSAPP_URL,
 } from '@/config/appIdentity';
 
+/** Touch handlers must not read e.currentTarget inside setTimeout — React clears it and nodes unmount. */
+function applyTouchStyles(el: EventTarget | null, styles: Partial<CSSStyleDeclaration>) {
+  if (!(el instanceof HTMLElement)) return;
+  Object.assign(el.style, styles);
+}
+
+function scheduleTouchStylesReset(
+  el: EventTarget | null,
+  styles: Partial<CSSStyleDeclaration>,
+  delayMs: number
+) {
+  if (!(el instanceof HTMLElement)) return;
+  const node = el;
+  window.setTimeout(() => {
+    if (!node.isConnected) return;
+    Object.assign(node.style, styles);
+  }, delayMs);
+}
+
 /**
  * ⚠️ PROTECTED: Pages where the floating social button should NOT appear
  * Do not remove any pages from this list without authorization
@@ -140,21 +159,20 @@ export const FloatingSocialSidebar: React.FC = () => {
                 }}
                 title={link.name}
                 onTouchStart={(e) => {
-                  // Provide visual feedback on touch
-                  e.currentTarget.style.opacity = '0.7';
-                  e.currentTarget.style.transform = 'scale(0.9)';
+                  applyTouchStyles(e.currentTarget, { opacity: '0.7', transform: 'scale(0.9)' });
                 }}
                 onTouchEnd={(e) => {
-                  // Reset after touch
-                  setTimeout(() => {
-                    e.currentTarget.style.opacity = '1';
-                    e.currentTarget.style.transform = isOpen ? 'scale(1)' : 'scale(0.5)';
-                  }, 150);
+                  scheduleTouchStylesReset(
+                    e.currentTarget,
+                    { opacity: '1', transform: isOpen ? 'scale(1)' : 'scale(0.5)' },
+                    150
+                  );
                 }}
                 onTouchCancel={(e) => {
-                  // Reset if touch is cancelled
-                  e.currentTarget.style.opacity = '1';
-                  e.currentTarget.style.transform = isOpen ? 'scale(1)' : 'scale(0.5)';
+                  applyTouchStyles(e.currentTarget, {
+                    opacity: '1',
+                    transform: isOpen ? 'scale(1)' : 'scale(0.5)',
+                  });
                 }}
               >
                 <IconComponent size={20} className="text-white" style={{ pointerEvents: 'none' }} />
@@ -171,14 +189,10 @@ export const FloatingSocialSidebar: React.FC = () => {
         <button
           onClick={() => setIsOpen(!isOpen)}
           onTouchStart={(e) => {
-            // Provide visual feedback on touch
-            e.currentTarget.style.opacity = '0.8';
+            applyTouchStyles(e.currentTarget, { opacity: '0.8' });
           }}
           onTouchEnd={(e) => {
-            // Reset opacity after touch
-            setTimeout(() => {
-              e.currentTarget.style.opacity = '1';
-            }, 100);
+            scheduleTouchStylesReset(e.currentTarget, { opacity: '1' }, 100);
           }}
           className={`relative flex items-center justify-center w-14 h-14 rounded-full shadow-lg hover:shadow-xl hover:scale-110 transition-all duration-300 active:scale-95 touch-manipulation ${
             isOpen 
@@ -281,41 +295,32 @@ export const FloatingSocialSidebar: React.FC = () => {
                 }}
                 title={link.name}
                 onTouchStart={(e) => {
-                  // CRITICAL: Stop ALL event propagation immediately - prevent backdrop from closing
                   e.stopPropagation();
                   if (e.nativeEvent) {
                     e.nativeEvent.stopImmediatePropagation();
                   }
-                  // Provide visual feedback on touch
-                  e.currentTarget.style.opacity = '0.7';
-                  e.currentTarget.style.transform = 'scale(0.9)';
+                  applyTouchStyles(e.currentTarget, { opacity: '0.7', transform: 'scale(0.9)' });
                 }}
                 onTouchEnd={(e) => {
-                  // CRITICAL: Stop ALL event propagation - allow link to open
                   e.stopPropagation();
                   if (e.nativeEvent) {
                     e.nativeEvent.stopImmediatePropagation();
                   }
-                  // Link will navigate via href - don't prevent default
-                  // Reset visual feedback after navigation starts
-                  setTimeout(() => {
-                    if (e.currentTarget) {
-                      e.currentTarget.style.opacity = '1';
-                      e.currentTarget.style.transform = isOpen ? 'scale(1)' : 'scale(0.5)';
-                    }
-                  }, 100);
+                  scheduleTouchStylesReset(
+                    e.currentTarget,
+                    { opacity: '1', transform: isOpen ? 'scale(1)' : 'scale(0.5)' },
+                    100
+                  );
                 }}
                 onTouchCancel={(e) => {
-                  // CRITICAL: Stop ALL event propagation
                   e.stopPropagation();
                   if (e.nativeEvent) {
                     e.nativeEvent.stopImmediatePropagation();
                   }
-                  // Reset if touch is cancelled
-                  if (e.currentTarget) {
-                    e.currentTarget.style.opacity = '1';
-                    e.currentTarget.style.transform = isOpen ? 'scale(1)' : 'scale(0.5)';
-                  }
+                  applyTouchStyles(e.currentTarget, {
+                    opacity: '1',
+                    transform: isOpen ? 'scale(1)' : 'scale(0.5)',
+                  });
                 }}
                 onClick={(e) => {
                   // CRITICAL: Stop event propagation to prevent backdrop from closing menu
@@ -344,15 +349,11 @@ export const FloatingSocialSidebar: React.FC = () => {
           }}
           onTouchStart={(e) => {
             e.stopPropagation();
-            // Provide visual feedback on touch
-            e.currentTarget.style.opacity = '0.8';
+            applyTouchStyles(e.currentTarget, { opacity: '0.8' });
           }}
           onTouchEnd={(e) => {
             e.stopPropagation();
-            // Reset opacity after touch
-            setTimeout(() => {
-              e.currentTarget.style.opacity = '1';
-            }, 100);
+            scheduleTouchStylesReset(e.currentTarget, { opacity: '1' }, 100);
           }}
           className={`relative flex items-center justify-center rounded-full shadow-lg hover:shadow-xl transition-all duration-300 active:scale-95 ${
             isOpen 
