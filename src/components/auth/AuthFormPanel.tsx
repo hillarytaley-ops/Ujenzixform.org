@@ -223,6 +223,23 @@ export function AuthFormPanel({
       if (path) {
         const picked = ROLE_REDIRECT_PRIORITY.find((r) => roles.includes(r)) ?? roles[0] ?? "";
         if (picked) localStorage.setItem("user_role", picked);
+        const isDelivery =
+          picked === "delivery" || picked === "delivery_provider";
+        if (isDelivery) {
+          const { getDeliveryHiringApprovalState } = await import(
+            "@/utils/deliveryProviderHiringApproval"
+          );
+          const hiring = await getDeliveryHiringApprovalState(session.user.id);
+          if (!hiring.canAcceptDeliveryOrders) {
+            toast({
+              title: "✅ Signed in",
+              description:
+                "Your delivery application is pending approval. Browse the site until admin approves you.",
+            });
+            navigate("/home?browse=1", { replace: true });
+            return;
+          }
+        }
         toast({ title: "✅ Welcome back!" });
         navigate(path, { replace: true });
         return;

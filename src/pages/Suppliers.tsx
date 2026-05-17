@@ -28,6 +28,7 @@ import {
 } from "lucide-react";
 import Navigation from "@/components/Navigation";
 import Footer from "@/components/Footer";
+import { useDeliveryProviderHiringApproval } from "@/hooks/useDeliveryProviderHiringApproval";
 import { MaterialsGrid } from "@/components/suppliers/MaterialsGrid";
 import { CartSidebar } from "@/components/cart/CartSidebar";
 import { FloatingCartButton } from "@/components/cart/FloatingCartButton";
@@ -142,7 +143,7 @@ const Suppliers = () => {
     }
   }, []);
 
-  // Check if user is a delivery provider (restricted access)
+  // Approved delivery providers cannot purchase on the marketplace
   const isDeliveryProvider = userRole === 'delivery' || userRole === 'delivery_provider';
   
   // Check if user is already logged in as a builder (hide explore sections)
@@ -165,8 +166,11 @@ const Suppliers = () => {
   /** Public catalog without purchase: simplify hero and avoid duplicate titles with MaterialsGrid */
   const showPurchaseAccountGuidance = !isFromDashboard && !canPurchaseMaterials;
 
-  // Show restricted access message for delivery providers
-  if (user && isDeliveryProvider) {
+  const { canAcceptDeliveryOrders, loading: hiringLoading } =
+    useDeliveryProviderHiringApproval();
+
+  // Approved delivery providers only — pending providers browse like the public
+  if (user && isDeliveryProvider && !hiringLoading && canAcceptDeliveryOrders) {
     return (
       <div className="min-h-screen bg-gray-50">
         <Navigation />

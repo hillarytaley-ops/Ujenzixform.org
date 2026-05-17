@@ -380,9 +380,18 @@ export const prefetchDashboardData = async (
         result = await prefetchBuilderData(userId, accessToken);
         break;
       case 'delivery_provider':
-      case 'delivery':
+      case 'delivery': {
+        const { getDeliveryHiringApprovalState } = await import(
+          '@/utils/deliveryProviderHiringApproval'
+        );
+        const hiring = await getDeliveryHiringApprovalState(userId);
+        if (!hiring.canAcceptDeliveryOrders) {
+          console.log('📦 Prefetch: Skipping delivery — hiring approval pending');
+          break;
+        }
         result = await prefetchDeliveryData(userId, accessToken);
         break;
+      }
       case 'admin':
         // Admin data is too large to prefetch efficiently
         console.log('📦 Prefetch: Skipping admin prefetch (data too large)');

@@ -10,6 +10,7 @@ import {
   hasMarketplaceLogisticsAccess,
   hasScannerPortalAccess,
 } from "@/config/roleRouteAccess";
+import { useDeliveryProviderHiringApproval } from "@/hooks/useDeliveryProviderHiringApproval";
 import { SUPPLIERS_PAGE_PATHS } from "@/config/authRouteAliases";
 
 const SUPPLIERS_PATH_SET = new Set<string>(SUPPLIERS_PAGE_PATHS);
@@ -40,6 +41,8 @@ const Navigation = () => {
   const location = useLocation();
 
   const { user: authUser, session, userRole: authRole, loading: authLoading } = useAuth();
+  const { canAcceptDeliveryOrders, isPendingDeliveryProvider } =
+    useDeliveryProviderHiringApproval();
 
   /** Never trust localStorage email/role alone — only Supabase session user (same as AuthContext). */
   const sessionUser = authUser ?? session?.user ?? null;
@@ -114,15 +117,24 @@ const Navigation = () => {
   /** Guests: marketing only. Signed-in: operational links only when `user_roles` allows that route. */
   const navItems = useMemo(() => {
     if (!isLoggedIn) return [...GUEST_MARKETING_NAV];
+    if (isPendingDeliveryProvider) {
+      return [
+        { path: "/home", label: "Home" },
+        { path: "/builders", label: "Market hub" },
+        { path: "/suppliers", label: "Materials" },
+        ...MARKETING_TAIL_NAV,
+      ];
+    }
     const r = displayRole;
+    const roleAccess = { deliveryHiringApproved: canAcceptDeliveryOrders };
     const ops: { path: string; label: string }[] = [];
-    if (r && hasMarketplaceLogisticsAccess(r)) {
+    if (r && hasMarketplaceLogisticsAccess(r, roleAccess)) {
       ops.push({ path: "/suppliers", label: "Materials" }, { path: "/delivery", label: "Delivery" });
     }
-    if (r && hasScannerPortalAccess(r)) {
+    if (r && hasScannerPortalAccess(r, roleAccess)) {
       ops.push({ path: "/scanners", label: "Scanners" });
     }
-    if (r && hasMarketplaceLogisticsAccess(r)) {
+    if (r && hasMarketplaceLogisticsAccess(r, roleAccess)) {
       ops.push({ path: "/monitoring", label: "Monitoring" });
     }
     const adminExtra =
@@ -134,7 +146,7 @@ const Navigation = () => {
       ...MARKETING_TAIL_NAV,
       ...adminExtra,
     ];
-  }, [isLoggedIn, displayRole]);
+  }, [isLoggedIn, displayRole, isPendingDeliveryProvider, canAcceptDeliveryOrders]);
 
   const isNavItemActive = (path: string) => {
     if (path === "/") return location.pathname === "/" || location.pathname === "/home";

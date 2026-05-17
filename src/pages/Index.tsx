@@ -23,6 +23,11 @@ import {
   hasMarketplaceLogisticsAccess,
   hasScannerPortalAccess,
 } from "@/config/roleRouteAccess";
+import {
+  getDeliveryHiringApprovalState,
+  isDeliveryProviderRole,
+} from "@/utils/deliveryProviderHiringApproval";
+import { useDeliveryProviderHiringApproval } from "@/hooks/useDeliveryProviderHiringApproval";
 
 const IndexHomeBelowFold = lazy(() => import("./index/IndexHomeBelowFold"));
 
@@ -43,20 +48,45 @@ const Index = () => {
   const [searchParams] = useSearchParams();
   const skipDashboardRedirect = searchParams.get("browse") === "1";
   const homeStats = useHomePagePublicStats();
+  const { canAcceptDeliveryOrders } = useDeliveryProviderHiringApproval();
 
   const homeToolAccess = useMemo(
     () => ({
-      marketplace: !loading && !!userRole && hasMarketplaceLogisticsAccess(userRole),
-      scanner: !loading && !!userRole && hasScannerPortalAccess(userRole),
-      monitoring: !loading && !!userRole && hasMarketplaceLogisticsAccess(userRole),
+      marketplace:
+        !loading &&
+        !!userRole &&
+        hasMarketplaceLogisticsAccess(userRole, {
+          deliveryHiringApproved: canAcceptDeliveryOrders,
+        }),
+      scanner:
+        !loading &&
+        !!userRole &&
+        hasScannerPortalAccess(userRole, {
+          deliveryHiringApproved: canAcceptDeliveryOrders,
+        }),
+      monitoring:
+        !loading &&
+        !!userRole &&
+        hasMarketplaceLogisticsAccess(userRole, {
+          deliveryHiringApproved: canAcceptDeliveryOrders,
+        }),
     }),
-    [loading, userRole]
+    [loading, userRole, canAcceptDeliveryOrders]
   );
 
   // AUTO-REDIRECT: Users with roles go to their dashboards (unless explicitly browsing public home)
   useEffect(() => {
     if (skipDashboardRedirect) return;
     if (!loading && user && userRole && DASHBOARDS[userRole]) {
+      if (isDeliveryProviderRole(userRole)) {
+        void getDeliveryHiringApprovalState(user.id).then((state) => {
+          if (state.canAcceptDeliveryOrders) {
+            console.log("🏠 Index: Approved delivery provider — redirecting to dashboard");
+            window.location.href = DASHBOARDS[userRole];
+          }
+        });
+        return;
+      }
       console.log("🏠 Index: User has role", userRole, "- redirecting to dashboard");
       window.location.href = DASHBOARDS[userRole];
     }

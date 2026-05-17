@@ -8,6 +8,11 @@ import { Navigate, useLocation } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { fetchUserRolesViaRest } from '@/lib/userRolesRest';
 import { canAccessAdminDashboardStorage } from '@/utils/adminStaffSession';
+import {
+  DELIVERY_PROVIDER_PUBLIC_HOME,
+  getDeliveryHiringApprovalState,
+  isDeliveryProviderRole,
+} from '@/utils/deliveryProviderHiringApproval';
 
 interface RoleProtectedRouteProps {
   children: React.ReactNode;
@@ -53,6 +58,10 @@ export const RoleProtectedRoute = ({ children, allowedRoles }: RoleProtectedRout
   });
   const [sessionUser, setSessionUser] = useState<User | null>(null);
   const [dbRole, setDbRole] = useState<string | null>(null);
+  const [hiringGate, setHiringGate] = useState<{ ready: boolean; approved: boolean }>({
+    ready: false,
+    approved: true,
+  });
 
   useEffect(() => {
     if (allowsAdminStaffStorageBypass && canAccessAdminDashboardStorage()) {
@@ -111,6 +120,26 @@ export const RoleProtectedRoute = ({ children, allowedRoles }: RoleProtectedRout
     };
   }, [allowsAdminStaffStorageBypass]);
 
+  useEffect(() => {
+    if (!sessionUser?.id || !dbRole || !isDeliveryProviderRole(dbRole)) {
+      setHiringGate({ ready: true, approved: true });
+      return;
+    }
+
+    let cancelled = false;
+    setHiringGate({ ready: false, approved: false });
+
+    void getDeliveryHiringApprovalState(sessionUser.id).then((state) => {
+      if (!cancelled) {
+        setHiringGate({ ready: true, approved: state.canAcceptDeliveryOrders });
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [sessionUser?.id, dbRole]);
+
   if (!ready) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-slate-950">
@@ -138,7 +167,32 @@ export const RoleProtectedRoute = ({ children, allowedRoles }: RoleProtectedRout
   }
 
   if (allowedRoles.includes(dbRole)) {
+    if (isDeliveryProviderRole(dbRole)) {
+      if (!hiringGate.ready) {
+        return (
+          <div className="flex items-center justify-center min-h-screen bg-slate-950">
+            <div className="animate-spin rounded-full h-8 w-8 border-4 border-blue-500 border-t-transparent" />
+          </div>
+        );
+      }
+      if (!hiringGate.approved) {
+        return <Navigate to={DELIVERY_PROVIDER_PUBLIC_HOME} replace />;
+      }
+    }
     return <>{children}</>;
+  }
+
+  if (isDeliveryProviderRole(dbRole)) {
+    if (!hiringGate.ready) {
+      return (
+        <div className="flex items-center justify-center min-h-screen bg-slate-950">
+          <div className="animate-spin rounded-full h-8 w-8 border-4 border-blue-500 border-t-transparent" />
+        </div>
+      );
+    }
+    if (!hiringGate.approved) {
+      return <Navigate to={DELIVERY_PROVIDER_PUBLIC_HOME} replace />;
+    }
   }
 
   const correctDashboard = DASHBOARDS[dbRole] || '/home';

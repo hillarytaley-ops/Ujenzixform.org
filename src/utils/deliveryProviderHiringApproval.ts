@@ -1,5 +1,14 @@
 import { supabase } from '@/integrations/supabase/client';
 
+/** Logged-in delivery providers who are not yet approved browse like guests. */
+export const DELIVERY_PROVIDER_PUBLIC_HOME = '/home?browse=1';
+
+export const DELIVERY_PROVIDER_ROLES = ['delivery', 'delivery_provider'] as const;
+
+export function isDeliveryProviderRole(role: string | null | undefined): boolean {
+  return !!role && (DELIVERY_PROVIDER_ROLES as readonly string[]).includes(role);
+}
+
 export type DeliveryHiringStatus =
   | 'approved'
   | 'pending'
