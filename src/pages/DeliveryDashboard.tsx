@@ -29,6 +29,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { DeliveryDashboardNavCards } from "@/components/delivery/DeliveryDashboardNavCards";
+import { DeliveryProviderHiringGateScreen } from "@/components/delivery/DeliveryProviderHiringGateScreen";
 import { 
   Truck, 
   Package, 
@@ -268,7 +269,7 @@ function mapIsolatedRowToActiveDeliveryQuick(d: any): ActiveDelivery {
 }
 
 const DeliveryDashboard = () => {
-  const { user, signOut } = useAuth();
+  const { user, signOut, userRole } = useAuth();
   const { t } = useLanguage();
   const { toast } = useToast();
   
@@ -290,7 +291,12 @@ const DeliveryDashboard = () => {
     updateDeliveryStatus,
     canAcceptDeliveryOrders,
     hiringApprovalMessage,
+    hiringApprovalStatus,
   } = useDeliveryProviderData();
+
+  const isAdminUser = userRole === "admin";
+  const dashboardLocked =
+    !isAdminUser && !dataLoading && !canAcceptDeliveryOrders;
 
   // Single source for Deliveries tab: one RPC, aligned with Supplier Orders/QR
   const {
@@ -1730,6 +1736,11 @@ const DeliveryDashboard = () => {
 
   // Function to load notification counts (declared before subscription to avoid initialization error)
   const loadNotificationCounts = useCallback(async () => {
+    if (!isAdminUser && !canAcceptDeliveryOrders) {
+      setNotificationCount(0);
+      setPendingNotificationCount(0);
+      return;
+    }
     try {
       let accessToken = SUPABASE_ANON_KEY;
       try {
@@ -2047,7 +2058,7 @@ const DeliveryDashboard = () => {
     } catch (error) {
       console.error('Error loading notification counts:', error);
     }
-  }, [user?.id]);
+  }, [user?.id, isAdminUser, canAcceptDeliveryOrders]);
 
   const refreshAlertsBadge = useCallback(() => {
     void loadNotificationCounts();
@@ -2402,6 +2413,7 @@ const DeliveryDashboard = () => {
   // Load notification counts for the Alerts tab badge (run when user is available and when Alerts tab is shown)
   useEffect(() => {
     if (!user?.id) return;
+    if (!isAdminUser && !canAcceptDeliveryOrders) return;
     loadNotificationCounts();
 
     let debounceTimer: ReturnType<typeof setTimeout> | null = null;
@@ -2460,11 +2472,11 @@ const DeliveryDashboard = () => {
       subscription.unsubscribe();
       clearInterval(interval);
     };
-  }, [loadNotificationCounts, user?.id]);
+  }, [loadNotificationCounts, user?.id, isAdminUser, canAcceptDeliveryOrders]);
 
   // When user becomes available, refresh Alerts badge count (in case first run was before auth)
   useEffect(() => {
-    if (user?.id) {
+    if (user?.id && (isAdminUser || canAcceptDeliveryOrders)) {
       const t = setTimeout(loadNotificationCounts, 800);
       return () => clearTimeout(t);
     }
@@ -2529,6 +2541,7 @@ const DeliveryDashboard = () => {
   useEffect(() => {
     const fetchDashboardData = async () => {
       if (!user) return;
+      if (!isAdminUser && !canAcceptDeliveryOrders) return;
 
       try {
         // Fetch provider profile
@@ -2590,10 +2603,10 @@ const DeliveryDashboard = () => {
       }
     };
 
-    if (user) {
+    if (user && (isAdminUser || canAcceptDeliveryOrders)) {
       fetchDashboardData();
     }
-  }, [user]);
+  }, [user, isAdminUser, canAcceptDeliveryOrders]);
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-KE', {
@@ -2653,8 +2666,25 @@ const DeliveryDashboard = () => {
     signOut().catch(() => {});
   };
 
-  if (loading) {
+  if (loading || dataLoading) {
     return <DashboardLoader type="delivery" />;
+  }
+
+  if (dashboardLocked) {
+    const displayName =
+      user?.email?.split("@")[0] ||
+      providerProfile?.full_name ||
+      isolatedProfile?.full_name ||
+      "";
+    return (
+      <DeliveryProviderHiringGateScreen
+        message={hiringApprovalMessage}
+        status={hiringApprovalStatus}
+        userName={displayName}
+        onExit={handleExitDashboard}
+        onLogout={handleLogoutDelivery}
+      />
+    );
   }
 
   return (
@@ -2936,18 +2966,6 @@ const DeliveryDashboard = () => {
             setDeliveriesSubTab("scheduled");
           }}
         />
-
-        {!canAcceptDeliveryOrders && hiringApprovalMessage && (
-          <Alert
-            className={`mb-6 border-amber-300 ${isDarkMode ? 'bg-amber-950/40 border-amber-800' : 'bg-amber-50'}`}
-          >
-            <AlertCircle className="h-5 w-5 text-amber-600" />
-            <AlertDescription className={isDarkMode ? 'text-amber-100' : 'text-amber-900'}>
-              <p className="font-semibold">Hiring Manager approval required</p>
-              <p className="text-sm mt-1 opacity-95">{hiringApprovalMessage}</p>
-            </AlertDescription>
-          </Alert>
-        )}
 
         {builderInvoicePayPrompts.length > 0 && (
           <Alert

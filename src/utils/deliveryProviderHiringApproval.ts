@@ -16,13 +16,13 @@ export interface DeliveryHiringApprovalState {
 const STATUS_MESSAGES: Record<DeliveryHiringStatus, string> = {
   approved: '',
   pending:
-    'Your application is pending Hiring Manager review. You cannot accept delivery orders until you are approved.',
+    'Your application is pending admin or Hiring Manager review. You cannot access the delivery dashboard until you are approved.',
   rejected:
     'Your delivery provider application was not approved. Contact support if you believe this is an error.',
   under_review:
-    'Your application is under review. You cannot accept delivery orders until Hiring Manager approval.',
+    'Your application is under review. You cannot access the delivery dashboard until admin or Hiring Manager approval.',
   none:
-    'Complete your delivery provider registration and wait for Hiring Manager approval before accepting orders.',
+    'Complete your delivery provider registration at ujenzixform.org and wait for admin or Hiring Manager approval before using the dashboard.',
 };
 
 /**

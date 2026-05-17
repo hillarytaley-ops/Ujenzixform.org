@@ -459,6 +459,9 @@ export const useDeliveryProviderData = () => {
   });
   const [canAcceptDeliveryOrders, setCanAcceptDeliveryOrders] = useState(false);
   const [hiringApprovalMessage, setHiringApprovalMessage] = useState('');
+  const [hiringApprovalStatus, setHiringApprovalStatus] = useState<
+    import('@/utils/deliveryProviderHiringApproval').DeliveryHiringStatus
+  >('none');
 
   const fetchData = useCallback(async () => {
     // Try to get userId from context or localStorage fallback
@@ -494,13 +497,34 @@ export const useDeliveryProviderData = () => {
       hiringApproved = hiringState.canAcceptDeliveryOrders;
       setCanAcceptDeliveryOrders(hiringState.canAcceptDeliveryOrders);
       setHiringApprovalMessage(hiringState.message);
+      setHiringApprovalStatus(hiringState.status);
     } catch (hiringErr) {
       console.warn('useDeliveryProviderData: hiring approval check failed', hiringErr);
       setCanAcceptDeliveryOrders(false);
+      setHiringApprovalStatus('pending');
       setHiringApprovalMessage(
-        'Unable to verify Hiring Manager approval. You cannot accept orders until this is resolved.'
+        'Unable to verify Hiring Manager approval. You cannot access the delivery dashboard until this is resolved.'
       );
     }
+
+    if (!hiringApproved) {
+      fastPathCountRef.current = 0;
+      setActiveDeliveries([]);
+      setDeliveryHistory([]);
+      setPendingRequests([]);
+      setStats({
+        totalDeliveries: 0,
+        completedToday: 0,
+        pendingDeliveries: 0,
+        totalEarnings: 0,
+        averageRating: 0,
+        totalDistance: 0,
+      });
+      setLoading(false);
+      console.log('📦 useDeliveryProviderData: Hiring gate — dashboard data not loaded');
+      return;
+    }
+
     // CRITICAL: reset each run — stale count skipped the full fetch and left Schedule empty/wrong
     fastPathCountRef.current = 0;
 
@@ -4341,6 +4365,7 @@ export const useDeliveryProviderData = () => {
     updateDeliveryStatus,
     canAcceptDeliveryOrders,
     hiringApprovalMessage,
+    hiringApprovalStatus,
   };
 };
 
