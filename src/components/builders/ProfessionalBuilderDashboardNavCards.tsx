@@ -13,7 +13,7 @@ import {
   History,
   Navigation as NavigationIcon,
   Store,
-  Megaphone,
+  Eye,
 } from "lucide-react";
 
 type NavStats = { pendingOrders: number };
@@ -230,8 +230,8 @@ export function ProfessionalBuilderDashboardNavCards({
         }`}
         onClick={() => setActiveTab("market-hub")}
       >
-        <Megaphone className="h-5 w-5 shrink-0" aria-hidden />
-        <span className={navLabelClass}>Market hub</span>
+        <Eye className="h-5 w-5 shrink-0" aria-hidden />
+        <span className={navLabelClass}>Hub showcase</span>
       </Button>
       <Button
         type="button"

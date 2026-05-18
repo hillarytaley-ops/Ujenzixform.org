@@ -62,7 +62,6 @@ import {
   Bell,
 } from "lucide-react";
 import { BuilderProfileEdit } from "@/components/builders/BuilderProfileEdit";
-import { BuilderFeed } from "@/components/builders/BuilderFeed";
 import { BuilderOrdersTracker } from "@/components/builders/BuilderOrdersTracker";
 import { ReviewPrompt } from "@/components/reviews/ReviewSystem";
 import { Star } from "lucide-react";
@@ -156,6 +155,11 @@ const LazyInAppCommunication = React.lazy(() =>
 const LazyBuilderVideoPortfolio = React.lazy(() =>
   import("@/components/builders/BuilderVideoPortfolio").then((m) => ({
     default: m.BuilderVideoPortfolio,
+  }))
+);
+const LazyBuilderVideoGallery = React.lazy(() =>
+  import("@/components/builders/BuilderVideoGallery").then((m) => ({
+    default: m.BuilderVideoGallery,
   }))
 );
 const LazyUserAnalyticsDashboard = React.lazy(() =>
@@ -4415,27 +4419,37 @@ const ProfessionalBuilderDashboardPage = () => {
           <TabsContent value="market-hub">
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <MessageSquare className="h-5 w-5 text-orange-600" />
-                  Public market hub — timeline posts
-                </CardTitle>
-                <CardDescription>
-                  Publish updates that appear on the public Construction Market Hub. Videos require admin approval
-                  before they are visible to visitors; text and photos publish immediately.
-                </CardDescription>
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div className="space-y-1">
+                    <CardTitle className="flex items-center gap-2">
+                      <Video className="h-5 w-5 text-purple-600" />
+                      Public hub — project showcase
+                    </CardTitle>
+                    <CardDescription>
+                      Preview how visitors see your published showcase videos on the Construction Market Hub. Upload
+                      and manage videos in the Portfolio tab; admins approve videos before they go live.
+                    </CardDescription>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="shrink-0 border-purple-200 text-purple-800 hover:bg-purple-50"
+                    onClick={() => setActiveTab("portfolio")}
+                  >
+                    <Video className="h-4 w-4 mr-2" />
+                    Manage in Portfolio
+                  </Button>
+                </div>
               </CardHeader>
               <CardContent className="min-w-0 p-2 sm:p-4">
                 {user?.id ? (
-                  <BuilderFeed
-                    omitOuterCard
-                    showComposer
-                    includeAuthorPendingVideos
-                    currentUserId={user.id}
-                    currentUserName={profile?.full_name || user.email || 'Builder'}
-                    currentUserAvatar={profile?.avatar_url}
-                    currentUserRole="professional_builder"
-                    isBuilder
-                  />
+                  <BuilderDashboardTabSuspense>
+                    <LazyBuilderVideoGallery
+                      builderId={user.id}
+                      isOwner
+                      showUploadButton={false}
+                    />
+                  </BuilderDashboardTabSuspense>
                 ) : null}
               </CardContent>
             </Card>

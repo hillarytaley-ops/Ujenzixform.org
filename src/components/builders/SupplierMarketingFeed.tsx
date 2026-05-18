@@ -30,6 +30,8 @@ interface SupplierMarketingFeedProps {
   showComposer?: boolean;
   /** Dashboard: merge own pending video posts into the list. */
   includeAuthorPendingVideos?: boolean;
+  /** Dashboard preview: only this supplier's posts (matches their slice on the public hub). */
+  authorUserIdOnly?: string;
 }
 
 type SupplierPostRow = Omit<
@@ -51,6 +53,7 @@ export const SupplierMarketingFeed: React.FC<SupplierMarketingFeedProps> = ({
   omitOuterCard = false,
   showComposer = false,
   includeAuthorPendingVideos = false,
+  authorUserIdOnly,
 }) => {
   const { toast } = useToast();
   const storedRole = typeof window !== 'undefined' ? localStorage.getItem('user_role') : null;
@@ -109,25 +112,35 @@ export const SupplierMarketingFeed: React.FC<SupplierMarketingFeedProps> = ({
     let rows: Record<string, unknown>[] = [];
 
     try {
-      const { data, error } = await (supabase as any).rpc('get_public_supplier_feed_posts', {
-        p_limit: limitPlusOne,
-        p_offset: offset,
-      });
-      if (!error && Array.isArray(data)) {
-        rows = data as Record<string, unknown>[];
+      if (authorUserIdOnly) {
+        const res = await fetch(
+          `${SUPABASE_URL}/rest/v1/supplier_marketing_posts?supplier_user_id=eq.${encodeURIComponent(authorUserIdOnly)}&status=eq.active&order=created_at.desc&limit=${limitPlusOne}&offset=${offset}`,
+          { headers: { ...authHeaders(), Accept: 'application/json' } }
+        );
+        if (res.ok) {
+          rows = asRestArray(await res.json());
+        }
       } else {
-        const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/get_public_supplier_feed_posts`, {
-          method: 'POST',
-          headers: {
-            ...authHeaders(),
-            Accept: 'application/json',
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ p_limit: limitPlusOne, p_offset: offset }),
+        const { data, error } = await (supabase as any).rpc('get_public_supplier_feed_posts', {
+          p_limit: limitPlusOne,
+          p_offset: offset,
         });
-        const json = await res.json();
-        if (res.ok && Array.isArray(json)) {
-          rows = json as Record<string, unknown>[];
+        if (!error && Array.isArray(data)) {
+          rows = data as Record<string, unknown>[];
+        } else {
+          const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/get_public_supplier_feed_posts`, {
+            method: 'POST',
+            headers: {
+              ...authHeaders(),
+              Accept: 'application/json',
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ p_limit: limitPlusOne, p_offset: offset }),
+          });
+          const json = await res.json();
+          if (res.ok && Array.isArray(json)) {
+            rows = json as Record<string, unknown>[];
+          }
         }
       }
     } catch (e) {
@@ -311,7 +324,7 @@ export const SupplierMarketingFeed: React.FC<SupplierMarketingFeedProps> = ({
 
   useEffect(() => {
     void fetchPosts(0, true);
-  }, [includeAuthorPendingVideos]);
+  }, [includeAuthorPendingVideos, authorUserIdOnly]);
 
   useEffect(() => {
     if (loadingPosts) return;
@@ -713,6 +726,11 @@ export const SupplierMarketingFeed: React.FC<SupplierMarketingFeedProps> = ({
 
   const inner = (
     <div className="space-y-3">
+      {authorUserIdOnly && showComposer ? (
+        <p className="text-xs text-muted-foreground px-1">
+          Below is how your published posts appear to visitors on the public Construction Market Hub.
+        </p>
+      ) : null}
       {!showComposer ? (
         <Card
           id="supplier-feed-composer-anchor"

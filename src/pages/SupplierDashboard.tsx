@@ -2282,7 +2282,7 @@ const SupplierDashboard = () => {
           >
             <div className="flex flex-col items-center gap-1.5 sm:gap-2 px-1">
               <Megaphone className="h-5 w-5 sm:h-6 sm:w-6 shrink-0" />
-              <span className="text-[10px] sm:text-xs md:text-sm text-center leading-tight">Market hub</span>
+              <span className="text-[10px] sm:text-xs md:text-sm text-center leading-tight">Hub posts</span>
             </div>
           </Button>
           <Button 
@@ -2499,10 +2499,11 @@ const SupplierDashboard = () => {
               <CardHeader>
                 <CardTitle className={`flex items-center gap-2 ${textColor}`}>
                   <Megaphone className="h-5 w-5 text-amber-600" />
-                  Public market hub — your posts
+                  Public hub — your marketing posts
                 </CardTitle>
                 <CardDescription className={mutedText}>
-                  Text and photos go live immediately. Videos stay private until an admin approves them.
+                  Publish below, then preview how your posts appear to visitors on the Construction Market Hub. Text and
+                  photos go live immediately; videos require admin approval.
                 </CardDescription>
               </CardHeader>
               <CardContent className="min-w-0">

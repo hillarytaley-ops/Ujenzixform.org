@@ -45,6 +45,7 @@ export function SupplierMarketHubDashboardPanel({
       omitOuterCard
       showComposer
       includeAuthorPendingVideos
+      authorUserIdOnly={currentUserId}
       currentUserId={currentUserId}
       currentUserName={currentUserName}
       currentUserAvatar={currentUserAvatar}
