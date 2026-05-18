@@ -13,6 +13,7 @@ import {
   getDeliveryHiringApprovalState,
   isDeliveryProviderRole,
 } from '@/utils/deliveryProviderHiringApproval';
+import { fetchAccountPaused } from '@/utils/accountPaused';
 
 interface RoleProtectedRouteProps {
   children: React.ReactNode;
@@ -61,6 +62,10 @@ export const RoleProtectedRoute = ({ children, allowedRoles }: RoleProtectedRout
   const [hiringGate, setHiringGate] = useState<{ ready: boolean; approved: boolean }>({
     ready: false,
     approved: true,
+  });
+  const [accountPaused, setAccountPaused] = useState<{ ready: boolean; paused: boolean }>({
+    ready: false,
+    paused: false,
   });
 
   useEffect(() => {
@@ -121,6 +126,35 @@ export const RoleProtectedRoute = ({ children, allowedRoles }: RoleProtectedRout
   }, [allowsAdminStaffStorageBypass]);
 
   useEffect(() => {
+    if (!sessionUser?.id || !dbRole) {
+      setAccountPaused({ ready: true, paused: false });
+      return;
+    }
+    const isAdminRole = dbRole === 'admin' || dbRole === 'super_admin';
+    if (isAdminRole || isAdminDashboardPath) {
+      setAccountPaused({ ready: true, paused: false });
+      return;
+    }
+
+    let cancelled = false;
+    setAccountPaused({ ready: false, paused: false });
+
+    void (async () => {
+      const token = (await supabase.auth.getSession()).data.session?.access_token;
+      if (!token || cancelled) {
+        if (!cancelled) setAccountPaused({ ready: true, paused: false });
+        return;
+      }
+      const paused = await fetchAccountPaused(sessionUser.id, token);
+      if (!cancelled) setAccountPaused({ ready: true, paused });
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [sessionUser?.id, dbRole, isAdminDashboardPath]);
+
+  useEffect(() => {
     if (!sessionUser?.id || !dbRole || !isDeliveryProviderRole(dbRole)) {
       setHiringGate({ ready: true, approved: true });
       return;
@@ -167,6 +201,16 @@ export const RoleProtectedRoute = ({ children, allowedRoles }: RoleProtectedRout
   }
 
   if (allowedRoles.includes(dbRole)) {
+    if (!accountPaused.ready) {
+      return (
+        <div className="flex items-center justify-center min-h-screen bg-slate-950">
+          <div className="animate-spin rounded-full h-8 w-8 border-4 border-blue-500 border-t-transparent" />
+        </div>
+      );
+    }
+    if (accountPaused.paused) {
+      return <Navigate to="/account-paused" replace />;
+    }
     if (isDeliveryProviderRole(dbRole)) {
       if (!hiringGate.ready) {
         return (

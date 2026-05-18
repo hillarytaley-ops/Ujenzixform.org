@@ -2844,6 +2844,9 @@ export type Database = {
           is_professional: boolean | null
           phone: string | null
           registration_admin_status: string | null
+          is_paused: boolean
+          paused_at: string | null
+          paused_by: string | null
           updated_at: string
           user_id: string
           user_type: string | null
@@ -2867,6 +2870,9 @@ export type Database = {
           is_professional?: boolean | null
           phone?: string | null
           registration_admin_status?: string | null
+          is_paused?: boolean
+          paused_at?: string | null
+          paused_by?: string | null
           updated_at?: string
           user_id: string
           user_type?: string | null
@@ -2890,6 +2896,9 @@ export type Database = {
           is_professional?: boolean | null
           phone?: string | null
           registration_admin_status?: string | null
+          is_paused?: boolean
+          paused_at?: string | null
+          paused_by?: string | null
           updated_at?: string
           user_id?: string
           user_type?: string | null

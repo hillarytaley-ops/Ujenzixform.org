@@ -72,6 +72,7 @@ const DeliveryAuth = lazyImport(() => import("./pages/DeliveryAuth"));
 const PrivacyPolicy = lazyImport(() => import("./pages/PrivacyPolicy"));
 const TermsOfService = lazyImport(() => import("./pages/TermsOfService"));
 const PaystackPaymentCallback = lazyImport(() => import("./pages/PaystackPaymentCallback"));
+const AccountPaused = lazyImport(() => import("./pages/AccountPaused"));
 
 // Auth Guard
 import { AuthRequired } from "@/components/security/AuthRequired";
@@ -279,6 +280,16 @@ const App = () => {
                     <Route path="/delivery-auth" element={<SuspenseWrapper><DeliveryAuth /></SuspenseWrapper>} />
                     <Route path="/admin-login" element={<AdminAuth />} />
                     <Route path="/reset-password" element={<SuspenseWrapper><ResetPassword /></SuspenseWrapper>} />
+                    <Route
+                      path="/account-paused"
+                      element={
+                        <AuthRequired>
+                          <SuspenseWrapper>
+                            <AccountPaused />
+                          </SuspenseWrapper>
+                        </AuthRequired>
+                      }
+                    />
                     
                     {/* Public home (same Index as /); ?browse=1 skips auto-redirect to role dashboard */}
                     <Route path="/home" element={<Index />} />
