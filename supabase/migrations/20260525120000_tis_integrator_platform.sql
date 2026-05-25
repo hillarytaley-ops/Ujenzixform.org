@@ -97,48 +97,61 @@ CREATE TRIGGER update_tis_vendor_onboarding_updated_at
   FOR EACH ROW EXECUTE FUNCTION public.update_updated_at();
 
 -- ---------------------------------------------------------------------------
--- 5) RLS
+-- 5) RLS (app_role enum has admin/supplier/builder — not super_admin; staff via admin_staff)
 -- ---------------------------------------------------------------------------
 ALTER TABLE public.tis_integrator_platform ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.tis_vendor_onboarding ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.tis_submission_log ENABLE ROW LEVEL SECURITY;
 
--- Admin / super_admin full access
+CREATE OR REPLACE FUNCTION public.is_tis_integrator_staff()
+RETURNS boolean
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT
+    public.has_role(auth.uid(), 'admin'::app_role)
+    OR EXISTS (
+      SELECT 1
+      FROM public.admin_staff s
+      WHERE coalesce(s.status, 'active') = 'active'
+        AND (
+          s.user_id = auth.uid()
+          OR lower(trim(s.email)) = lower(trim(coalesce(auth.jwt()->>'email', '')))
+        )
+        AND s.role IN ('admin', 'super_admin', 'administrator', 'finance_officer')
+    );
+$$;
+
+REVOKE ALL ON FUNCTION public.is_tis_integrator_staff() FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.is_tis_integrator_staff() TO authenticated;
+
+DROP POLICY IF EXISTS "Admin read tis_integrator_platform" ON public.tis_integrator_platform;
+DROP POLICY IF EXISTS "Admin write tis_integrator_platform" ON public.tis_integrator_platform;
+DROP POLICY IF EXISTS "Admin read tis_vendor_onboarding" ON public.tis_vendor_onboarding;
+DROP POLICY IF EXISTS "Admin write tis_vendor_onboarding" ON public.tis_vendor_onboarding;
+DROP POLICY IF EXISTS "Supplier read own tis_vendor_onboarding" ON public.tis_vendor_onboarding;
+DROP POLICY IF EXISTS "Admin read tis_submission_log" ON public.tis_submission_log;
+DROP POLICY IF EXISTS "Authenticated insert tis_submission_log" ON public.tis_submission_log;
+
 CREATE POLICY "Admin read tis_integrator_platform"
   ON public.tis_integrator_platform FOR SELECT TO authenticated
-  USING (EXISTS (
-    SELECT 1 FROM public.user_roles ur
-    WHERE ur.user_id = auth.uid() AND ur.role IN ('admin', 'super_admin')
-  ));
+  USING (public.is_tis_integrator_staff());
 
 CREATE POLICY "Admin write tis_integrator_platform"
   ON public.tis_integrator_platform FOR ALL TO authenticated
-  USING (EXISTS (
-    SELECT 1 FROM public.user_roles ur
-    WHERE ur.user_id = auth.uid() AND ur.role IN ('admin', 'super_admin')
-  ))
-  WITH CHECK (EXISTS (
-    SELECT 1 FROM public.user_roles ur
-    WHERE ur.user_id = auth.uid() AND ur.role IN ('admin', 'super_admin')
-  ));
+  USING (public.is_tis_integrator_staff())
+  WITH CHECK (public.is_tis_integrator_staff());
 
 CREATE POLICY "Admin read tis_vendor_onboarding"
   ON public.tis_vendor_onboarding FOR SELECT TO authenticated
-  USING (EXISTS (
-    SELECT 1 FROM public.user_roles ur
-    WHERE ur.user_id = auth.uid() AND ur.role IN ('admin', 'super_admin')
-  ));
+  USING (public.is_tis_integrator_staff());
 
 CREATE POLICY "Admin write tis_vendor_onboarding"
   ON public.tis_vendor_onboarding FOR ALL TO authenticated
-  USING (EXISTS (
-    SELECT 1 FROM public.user_roles ur
-    WHERE ur.user_id = auth.uid() AND ur.role IN ('admin', 'super_admin')
-  ))
-  WITH CHECK (EXISTS (
-    SELECT 1 FROM public.user_roles ur
-    WHERE ur.user_id = auth.uid() AND ur.role IN ('admin', 'super_admin')
-  ));
+  USING (public.is_tis_integrator_staff())
+  WITH CHECK (public.is_tis_integrator_staff());
 
 CREATE POLICY "Supplier read own tis_vendor_onboarding"
   ON public.tis_vendor_onboarding FOR SELECT TO authenticated
@@ -148,10 +161,7 @@ CREATE POLICY "Supplier read own tis_vendor_onboarding"
 
 CREATE POLICY "Admin read tis_submission_log"
   ON public.tis_submission_log FOR SELECT TO authenticated
-  USING (EXISTS (
-    SELECT 1 FROM public.user_roles ur
-    WHERE ur.user_id = auth.uid() AND ur.role IN ('admin', 'super_admin')
-  ));
+  USING (public.is_tis_integrator_staff());
 
 CREATE POLICY "Authenticated insert tis_submission_log"
   ON public.tis_submission_log FOR INSERT TO authenticated
