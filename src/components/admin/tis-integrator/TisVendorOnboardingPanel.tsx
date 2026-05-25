@@ -50,6 +50,7 @@ import {
   type TisSolutionType,
   type TisVendorOnboardingStatus,
 } from "./types";
+import { tis } from "./tisTheme";
 
 type SupplierRow = {
   id: string;
@@ -305,15 +306,15 @@ export const TisVendorOnboardingPanel: React.FC = () => {
   const readyCount = suppliers.filter((s) => tisReadiness(s) === "ready").length;
 
   return (
-    <Card className="border-slate-700 bg-slate-900/40">
+    <Card className={tis.card}>
       <CardHeader className="pb-3">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <CardTitle className="text-base text-white flex items-center gap-2">
+            <CardTitle className={`${tis.cardTitle} flex items-center gap-2`}>
               <UserPlus className="h-4 w-4 text-indigo-400" />
               Vendor onboarding (TIS clients)
             </CardTitle>
-            <CardDescription className="text-gray-400">
+            <CardDescription className={tis.cardDesc}>
               Onboard supplier taxpayers onto UjenziXform KRA Invoicing Services. Edit TIS identity and workflow status.
             </CardDescription>
           </div>
@@ -335,7 +336,7 @@ export const TisVendorOnboardingPanel: React.FC = () => {
             placeholder="Search company or KRA PIN…"
             value={filter}
             onChange={(e) => setFilter(e.target.value)}
-            className="max-w-sm bg-slate-950/60"
+            className={`max-w-sm ${tis.input}`}
           />
           <p className="text-xs text-muted-foreground">
             {activeCount} active · {readyCount} TIS-ready (PIN + branch) · {suppliers.length} total vendors
@@ -348,18 +349,18 @@ export const TisVendorOnboardingPanel: React.FC = () => {
             Loading vendors…
           </div>
         ) : (
-          <div className="max-h-[min(28rem,55vh)] overflow-auto rounded-md border border-slate-700">
+          <div className={`max-h-[min(28rem,55vh)] overflow-auto ${tis.tableWrap}`}>
             <Table>
               <TableHeader>
-                <TableRow className="border-slate-700 hover:bg-transparent">
-                  <TableHead className="text-gray-300">Vendor</TableHead>
-                  <TableHead className="text-gray-300">KRA PIN</TableHead>
-                  <TableHead className="text-gray-300">Branch</TableHead>
-                  <TableHead className="text-gray-300">TIS readiness</TableHead>
-                  <TableHead className="text-gray-300">Onboarding</TableHead>
-                  <TableHead className="text-gray-300">OSCU/VSCU</TableHead>
-                  <TableHead className="text-gray-300">Solution</TableHead>
-                  <TableHead className="text-gray-300 w-20" />
+                <TableRow className="border-slate-200 hover:bg-transparent">
+                  <TableHead className={tis.tableHead}>Vendor</TableHead>
+                  <TableHead className={tis.tableHead}>KRA PIN</TableHead>
+                  <TableHead className={tis.tableHead}>Branch</TableHead>
+                  <TableHead className={tis.tableHead}>TIS readiness</TableHead>
+                  <TableHead className={tis.tableHead}>Onboarding</TableHead>
+                  <TableHead className={tis.tableHead}>OSCU/VSCU</TableHead>
+                  <TableHead className={tis.tableHead}>Solution</TableHead>
+                  <TableHead className={`${tis.tableHead} w-20`} />
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -375,17 +376,17 @@ export const TisVendorOnboardingPanel: React.FC = () => {
                     const ob = onboarding.get(row.id);
                     const status = ob?.onboarding_status ?? "draft";
                     return (
-                      <TableRow key={row.id} className="border-slate-800">
-                        <TableCell className="text-sm text-white">
+                      <TableRow key={row.id} className={tis.tableRow}>
+                        <TableCell className={`text-sm ${tis.tableCell}`}>
                           {row.company_name || row.legal_business_name || row.id.slice(0, 8)}
                           {row.is_verified ? (
-                            <Badge variant="outline" className="ml-2 border-emerald-600/50 text-emerald-400">
+                            <Badge variant="outline" className="ml-2 border-emerald-300 bg-emerald-50 text-emerald-700">
                               verified
                             </Badge>
                           ) : null}
                         </TableCell>
-                        <TableCell className="font-mono text-xs text-gray-300">{row.kra_pin || "—"}</TableCell>
-                        <TableCell className="font-mono text-xs text-gray-300">{row.etims_branch_code || "—"}</TableCell>
+                        <TableCell className={tis.tableCellMono}>{row.kra_pin || "—"}</TableCell>
+                        <TableCell className={tis.tableCellMono}>{row.etims_branch_code || "—"}</TableCell>
                         <TableCell>
                           {state === "ready" ? (
                             <Badge className="bg-emerald-700/80">
@@ -395,7 +396,7 @@ export const TisVendorOnboardingPanel: React.FC = () => {
                           ) : state === "partial" ? (
                             <Badge variant="secondary">Partial</Badge>
                           ) : (
-                            <Badge variant="outline" className="border-amber-600/50 text-amber-400">
+                            <Badge variant="outline" className="border-amber-300 bg-amber-50 text-amber-800">
                               <XCircle className="mr-1 h-3 w-3" />
                               Missing
                             </Badge>
@@ -408,17 +409,17 @@ export const TisVendorOnboardingPanel: React.FC = () => {
                         </TableCell>
                         <TableCell>
                           {ob?.initialized_at ? (
-                            <Badge variant="outline" className="border-emerald-600/50 text-emerald-400">
+                            <Badge variant="outline" className="border-emerald-300 bg-emerald-50 text-emerald-700">
                               <Zap className="mr-1 h-3 w-3" />
                               Init OK
                             </Badge>
                           ) : (
-                            <Badge variant="outline" className="text-amber-400 border-amber-600/50">
+                            <Badge variant="outline" className="border-amber-300 bg-amber-50 text-amber-800">
                               Not init
                             </Badge>
                           )}
                         </TableCell>
-                        <TableCell className="text-xs text-gray-400">{ob?.solution_type ?? "—"}</TableCell>
+                        <TableCell className={`text-xs ${tis.tableCellMuted}`}>{ob?.solution_type ?? "—"}</TableCell>
                         <TableCell>
                           <Button type="button" variant="ghost" size="sm" onClick={() => openEdit(row)}>
                             <Pencil className="h-4 w-4" />

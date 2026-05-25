@@ -37,6 +37,7 @@ import {
   submitEtimsInvoiceForPurchaseOrder,
 } from "@/lib/etims/purchaseOrderEtims";
 import { logTisSubmission } from "@/lib/etims/logTisSubmission";
+import { tis } from "./tisTheme";
 
 type PoRow = {
   id: string;
@@ -227,41 +228,41 @@ export const TisSubmissionOpsPanel: React.FC = () => {
   return (
     <div className="space-y-6">
       <div className="grid gap-4 sm:grid-cols-3">
-        <Card className="border-slate-700 bg-slate-900/40">
+        <Card className={tis.card}>
           <CardContent className="flex items-center gap-3 pt-6">
             <Clock className="h-8 w-8 text-amber-400" />
             <div>
-              <p className="text-2xl font-semibold text-white">{stats.pending}</p>
-              <p className="text-xs text-gray-400">Pending submission</p>
+              <p className={tis.statValue}>{stats.pending}</p>
+              <p className={tis.statLabel}>Pending submission</p>
             </div>
           </CardContent>
         </Card>
-        <Card className="border-slate-700 bg-slate-900/40">
+        <Card className={tis.card}>
           <CardContent className="flex items-center gap-3 pt-6">
             <CheckCircle2 className="h-8 w-8 text-emerald-400" />
             <div>
-              <p className="text-2xl font-semibold text-white">{stats.success}</p>
-              <p className="text-xs text-gray-400">Submitted to KRA</p>
+              <p className={tis.statValue}>{stats.success}</p>
+              <p className={tis.statLabel}>Submitted to KRA</p>
             </div>
           </CardContent>
         </Card>
-        <Card className="border-slate-700 bg-slate-900/40">
+        <Card className={tis.card}>
           <CardContent className="flex items-center gap-3 pt-6">
             <AlertTriangle className="h-8 w-8 text-red-400" />
             <div>
-              <p className="text-2xl font-semibold text-white">{stats.failed}</p>
-              <p className="text-xs text-gray-400">Failed / error</p>
+              <p className={tis.statValue}>{stats.failed}</p>
+              <p className={tis.statLabel}>Failed / error</p>
             </div>
           </CardContent>
         </Card>
       </div>
 
-      <Card className="border-slate-700 bg-slate-900/40">
+      <Card className={tis.card}>
         <CardHeader>
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <CardTitle className="text-base text-white">Purchase order submissions</CardTitle>
-              <CardDescription className="text-gray-400">
+              <CardTitle className={tis.cardTitle}>Purchase order submissions</CardTitle>
+              <CardDescription className={tis.cardDesc}>
                 Monitor and retry eTIMS sales invoices and credit notes across all vendor clients.
               </CardDescription>
             </div>
@@ -277,10 +278,10 @@ export const TisSubmissionOpsPanel: React.FC = () => {
               placeholder="Search PO number or vendor…"
               value={filter}
               onChange={(e) => setFilter(e.target.value)}
-              className="max-w-sm bg-slate-950/60"
+              className={`max-w-sm ${tis.input}`}
             />
             <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as FilterStatus)}>
-              <SelectTrigger className="w-[180px] bg-slate-950/60">
+              <SelectTrigger className={`w-[180px] ${tis.select}`}>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -298,16 +299,16 @@ export const TisSubmissionOpsPanel: React.FC = () => {
               Loading…
             </div>
           ) : (
-            <div className="max-h-[min(20rem,45vh)] overflow-auto rounded-md border border-slate-700">
+            <div className={`max-h-[min(20rem,45vh)] overflow-auto ${tis.tableWrap}`}>
               <Table>
                 <TableHeader>
-                  <TableRow className="border-slate-700 hover:bg-transparent">
-                    <TableHead className="text-gray-300">PO</TableHead>
-                    <TableHead className="text-gray-300">Vendor</TableHead>
-                    <TableHead className="text-gray-300">Amount</TableHead>
-                    <TableHead className="text-gray-300">Status</TableHead>
-                    <TableHead className="text-gray-300">Invoice no</TableHead>
-                    <TableHead className="text-gray-300">Actions</TableHead>
+                  <TableRow className="border-slate-200 hover:bg-transparent">
+                    <TableHead className={tis.tableHead}>PO</TableHead>
+                    <TableHead className={tis.tableHead}>Vendor</TableHead>
+                    <TableHead className={tis.tableHead}>Amount</TableHead>
+                    <TableHead className={tis.tableHead}>Status</TableHead>
+                    <TableHead className={tis.tableHead}>Invoice no</TableHead>
+                    <TableHead className={tis.tableHead}>Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -323,12 +324,12 @@ export const TisSubmissionOpsPanel: React.FC = () => {
                     filtered.map((po) => {
                       const st = poStatus(po);
                       return (
-                        <TableRow key={po.id} className="border-slate-800">
-                          <TableCell className="font-mono text-xs text-white">{po.po_number}</TableCell>
-                          <TableCell className="text-sm text-gray-300">
+                        <TableRow key={po.id} className={tis.tableRow}>
+                          <TableCell className={tis.tableCellMono}>{po.po_number}</TableCell>
+                          <TableCell className={`text-sm ${tis.tableCell}`}>
                             {po.supplier_name ?? "—"}
                           </TableCell>
-                          <TableCell className="text-sm text-gray-300">
+                          <TableCell className={`text-sm ${tis.tableCell}`}>
                             KES {Number(po.total_amount).toLocaleString()}
                           </TableCell>
                           <TableCell>
@@ -342,7 +343,7 @@ export const TisSubmissionOpsPanel: React.FC = () => {
                               <Badge variant="secondary">Pending</Badge>
                             )}
                           </TableCell>
-                          <TableCell className="max-w-[8rem] truncate text-xs font-mono text-gray-400">
+                          <TableCell className={`max-w-[8rem] truncate ${tis.tableCellMono}`}>
                             {po.etims_trader_invoice_no ?? "—"}
                           </TableCell>
                           <TableCell>
@@ -389,33 +390,33 @@ export const TisSubmissionOpsPanel: React.FC = () => {
       </Card>
 
       {logs.length > 0 && (
-        <Card className="border-slate-700 bg-slate-900/40">
+        <Card className={tis.card}>
           <CardHeader>
-            <CardTitle className="text-base text-white">Recent audit log</CardTitle>
-            <CardDescription className="text-gray-400">Integrator submission events (last 50).</CardDescription>
+            <CardTitle className={tis.cardTitle}>Recent audit log</CardTitle>
+            <CardDescription className={tis.cardDesc}>Integrator submission events (last 50).</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="max-h-48 overflow-auto rounded-md border border-slate-700">
+            <div className={`max-h-48 overflow-auto ${tis.tableWrap}`}>
               <Table>
                 <TableHeader>
-                  <TableRow className="border-slate-700 hover:bg-transparent">
-                    <TableHead className="text-gray-300">Time</TableHead>
-                    <TableHead className="text-gray-300">Type</TableHead>
-                    <TableHead className="text-gray-300">Status</TableHead>
-                    <TableHead className="text-gray-300">Invoice</TableHead>
+                  <TableRow className="border-slate-200 hover:bg-transparent">
+                    <TableHead className={tis.tableHead}>Time</TableHead>
+                    <TableHead className={tis.tableHead}>Type</TableHead>
+                    <TableHead className={tis.tableHead}>Status</TableHead>
+                    <TableHead className={tis.tableHead}>Invoice</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {logs.map((log) => (
-                    <TableRow key={log.id} className="border-slate-800">
-                      <TableCell className="text-xs text-gray-500">
+                    <TableRow key={log.id} className={tis.tableRow}>
+                      <TableCell className={`text-xs ${tis.tableCellMuted}`}>
                         {new Date(log.created_at).toLocaleString()}
                       </TableCell>
-                      <TableCell className="text-xs text-gray-300">{log.submission_type}</TableCell>
+                      <TableCell className={`text-xs ${tis.tableCell}`}>{log.submission_type}</TableCell>
                       <TableCell>
                         <Badge variant={log.status === "success" ? "default" : "destructive"}>{log.status}</Badge>
                       </TableCell>
-                      <TableCell className="font-mono text-xs text-gray-400">
+                      <TableCell className={tis.tableCellMono}>
                         {log.trader_invoice_no ?? log.error_message?.slice(0, 40) ?? "—"}
                       </TableCell>
                     </TableRow>

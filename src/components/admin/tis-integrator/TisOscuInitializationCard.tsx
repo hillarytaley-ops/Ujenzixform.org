@@ -16,6 +16,7 @@ import {
   validateOscuInitFields,
   type OscuInitRequest,
 } from "@/lib/etims/tisOscuInitialization";
+import { tis } from "./tisTheme";
 import { logOnboardingEvent, syncPlatformCertificationChecklist } from "@/lib/etims/tisOnboardingWorkflow";
 import type { TisSolutionType } from "./types";
 
@@ -132,16 +133,16 @@ export const TisOscuInitializationCard: React.FC<TisOscuInitializationCardProps>
   };
 
   return (
-    <div className="space-y-3 rounded-lg border border-sky-800/40 bg-sky-950/20 p-4">
+    <div className={`space-y-3 ${tis.initCard}`}>
       <div className="flex items-start justify-between gap-2">
         <div>
-          <p className="text-sm font-medium text-white flex items-center gap-2">
-            <Radio className="h-4 w-4 text-sky-400" />
+          <p className={`${tis.initTitle} flex items-center gap-2`}>
+            <Radio className="h-4 w-4 text-sky-600" />
             {solutionType} device initialization
           </p>
-          <p className="text-xs text-gray-400 mt-1">
-            KRA spec: POST <code className="text-sky-300">selectInitOsdcInfo</code> with tin, bhfId, dvcSrlNo. Falls back
-            to <code className="text-sky-300">initialize</code> for integrator wrappers.
+          <p className={tis.initDesc}>
+            KRA spec: POST <code className={tis.code}>selectInitOsdcInfo</code> with tin, bhfId, dvcSrlNo. Falls back
+            to <code className={tis.code}>initialize</code> for integrator wrappers.
           </p>
         </div>
         {initializedAt ? (
@@ -155,23 +156,23 @@ export const TisOscuInitializationCard: React.FC<TisOscuInitializationCardProps>
       <div className="grid gap-3 sm:grid-cols-3">
         <div className="space-y-1">
           <Label className="text-xs">KRA PIN (tin)</Label>
-          <Input value={tin} onChange={(e) => setTin(e.target.value)} className="font-mono bg-slate-950/60" placeholder="P0XXXXXXXXX" />
+          <Input value={tin} onChange={(e) => setTin(e.target.value)} className={`font-mono ${tis.input}`} placeholder="P0XXXXXXXXX" />
         </div>
         <div className="space-y-1">
           <Label className="text-xs">Branch (bhfId)</Label>
-          <Input value={bhfId} onChange={(e) => setBhfId(e.target.value)} className="font-mono bg-slate-950/60" placeholder="00" maxLength={2} />
+          <Input value={bhfId} onChange={(e) => setBhfId(e.target.value)} className={`font-mono ${tis.input}`} placeholder="00" maxLength={2} />
         </div>
         <div className="space-y-1">
           <Label className="text-xs">Device serial (dvcSrlNo)</Label>
-          <Input value={dvcSrlNo} onChange={(e) => setDvcSrlNo(e.target.value)} className="font-mono bg-slate-950/60" placeholder="KRA-approved serial" />
+          <Input value={dvcSrlNo} onChange={(e) => setDvcSrlNo(e.target.value)} className={`font-mono ${tis.input}`} placeholder="KRA-approved serial" />
         </div>
       </div>
 
       {communicationKeyRef ? (
-        <Alert className="border-emerald-800/40 bg-emerald-950/20">
-          <KeyRound className="h-4 w-4 text-emerald-400" />
-          <AlertTitle className="text-emerald-300">Communication key ref</AlertTitle>
-          <AlertDescription className="text-xs text-gray-400">
+        <Alert className="border-emerald-200 bg-emerald-50">
+          <KeyRound className="h-4 w-4 text-emerald-600" />
+          <AlertTitle className="text-emerald-800">Communication key ref</AlertTitle>
+          <AlertDescription className="text-xs text-emerald-700">
             {communicationKeyRef} — full cmcKey belongs in Supabase Edge secrets only, not in the database.
           </AlertDescription>
         </Alert>

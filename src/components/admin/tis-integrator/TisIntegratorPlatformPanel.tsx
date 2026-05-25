@@ -29,6 +29,7 @@ import {
   type TisIntegratorPlatform,
   type TisSolutionType,
 } from "./types";
+import { tis } from "./tisTheme";
 
 function secretsDashboardUrl(): string | null {
   const raw = import.meta.env.VITE_SUPABASE_URL;
@@ -156,60 +157,67 @@ export const TisIntegratorPlatformPanel: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-3 rounded-lg border border-indigo-500/30 bg-indigo-950/20 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+      <div className={`flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between ${tis.banner}`}>
         <div className="flex items-start gap-3">
-          <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-indigo-400" />
+          <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-indigo-600" />
           <div>
-            <p className="text-sm font-medium text-white">UjenziXform — KRA third-party TIS integrator</p>
-            <p className="text-xs text-gray-400">
+            <p className={tis.bannerTitle}>UjenziXform — KRA third-party TIS integrator</p>
+            <p className={tis.bannerDesc}>
               Trader Invoicing System package for vendor taxpayers. OSCU/VSCU credentials live in Edge secrets — not
               here.
             </p>
           </div>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Badge variant="outline" className="border-indigo-500/40 text-indigo-300">
+          <Badge variant="outline" className="border-indigo-300 bg-indigo-50 text-indigo-700">
             {solutionType}
           </Badge>
-          <Badge variant="outline" className={environment === "production" ? "border-emerald-500/40 text-emerald-300" : "border-amber-500/40 text-amber-300"}>
+          <Badge
+            variant="outline"
+            className={
+              environment === "production"
+                ? "border-emerald-300 bg-emerald-50 text-emerald-700"
+                : "border-amber-300 bg-amber-50 text-amber-800"
+            }
+          >
             {environment}
           </Badge>
-          <Badge>{CERTIFICATION_STATUS_LABELS[certStatus]}</Badge>
+          <Badge className="bg-slate-700 text-white hover:bg-slate-700">{CERTIFICATION_STATUS_LABELS[certStatus]}</Badge>
         </div>
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">
-        <Card className="border-slate-700 bg-slate-900/40">
+        <Card className={tis.card}>
           <CardHeader>
-            <CardTitle className="text-base text-white">Platform identity</CardTitle>
-            <CardDescription className="text-gray-400">
+            <CardTitle className={tis.cardTitle}>Platform identity</CardTitle>
+            <CardDescription className={tis.cardDesc}>
               Registered integrator product for KRA certification listing.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
               <Label>Integrator name</Label>
-              <Input value={integratorName} onChange={(e) => setIntegratorName(e.target.value)} className="bg-slate-950/60" />
+              <Input value={integratorName} onChange={(e) => setIntegratorName(e.target.value)} className={tis.input} />
             </div>
             <div className="space-y-2">
               <Label>Integrator KRA PIN</Label>
-              <Input value={integratorPin} onChange={(e) => setIntegratorPin(e.target.value)} placeholder="P0XXXXXXXXX" className="bg-slate-950/60 font-mono" />
+              <Input value={integratorPin} onChange={(e) => setIntegratorPin(e.target.value)} placeholder="P0XXXXXXXXX" className={`${tis.input} font-mono`} />
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
                 <Label>Product name (TIS)</Label>
-                <Input value={productName} onChange={(e) => setProductName(e.target.value)} className="bg-slate-950/60" />
+                <Input value={productName} onChange={(e) => setProductName(e.target.value)} className={tis.input} />
               </div>
               <div className="space-y-2">
                 <Label>Version</Label>
-                <Input value={productVersion} onChange={(e) => setProductVersion(e.target.value)} className="bg-slate-950/60" />
+                <Input value={productVersion} onChange={(e) => setProductVersion(e.target.value)} className={tis.input} />
               </div>
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
                 <Label>Solution type</Label>
                 <Select value={solutionType} onValueChange={(v) => setSolutionType(v as TisSolutionType)}>
-                  <SelectTrigger className="bg-slate-950/60">
+                  <SelectTrigger className={tis.select}>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -221,7 +229,7 @@ export const TisIntegratorPlatformPanel: React.FC = () => {
               <div className="space-y-2">
                 <Label>Environment</Label>
                 <Select value={environment} onValueChange={(v) => setEnvironment(v as TisEnvironment)}>
-                  <SelectTrigger className="bg-slate-950/60">
+                  <SelectTrigger className={tis.select}>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -234,7 +242,7 @@ export const TisIntegratorPlatformPanel: React.FC = () => {
             <div className="space-y-2">
               <Label>Certification status</Label>
               <Select value={certStatus} onValueChange={(v) => setCertStatus(v as TisCertificationStatus)}>
-                <SelectTrigger className="bg-slate-950/60">
+                <SelectTrigger className={tis.select}>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -248,16 +256,16 @@ export const TisIntegratorPlatformPanel: React.FC = () => {
             </div>
             <div className="space-y-2">
               <Label>KRA contact email</Label>
-              <Input type="email" value={kraEmail} onChange={(e) => setKraEmail(e.target.value)} className="bg-slate-950/60" />
+              <Input type="email" value={kraEmail} onChange={(e) => setKraEmail(e.target.value)} className={tis.input} />
             </div>
             <div className="space-y-2">
               <Label>Notes</Label>
-              <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} className="bg-slate-950/60" />
+              <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} className={tis.input} />
             </div>
-            <div className="rounded-md border border-slate-700 bg-slate-950/40 px-3 py-2 text-xs text-gray-400">
-              Active API base: <code className="text-sky-300">{activeBaseUrl}</code>
+            <div className={tis.infoBox}>
+              Active API base: <code className={tis.code}>{activeBaseUrl}</code>
               {secretsUrl ? (
-                <Button variant="link" size="sm" className="ml-2 h-auto p-0 text-sky-400" asChild>
+                <Button variant="link" size="sm" className="ml-2 h-auto p-0 text-indigo-600" asChild>
                   <a href={secretsUrl} target="_blank" rel="noreferrer">
                     Edge secrets <ExternalLink className="ml-1 inline h-3 w-3" />
                   </a>
@@ -271,10 +279,10 @@ export const TisIntegratorPlatformPanel: React.FC = () => {
           </CardContent>
         </Card>
 
-        <Card className="border-slate-700 bg-slate-900/40">
+        <Card className={tis.card}>
           <CardHeader>
-            <CardTitle className="text-base text-white">KRA TIS certification checklist</CardTitle>
-            <CardDescription className="text-gray-400">
+            <CardTitle className={tis.cardTitle}>KRA TIS certification checklist</CardTitle>
+            <CardDescription className={tis.cardDesc}>
               Track integrator requirements per KRA OSCU/VSCU technical specification.
             </CardDescription>
           </CardHeader>

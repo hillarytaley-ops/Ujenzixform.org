@@ -23,6 +23,7 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { invokeEtimsProxy } from "@/lib/etims/invokeEtimsProxy";
 import { logTisSubmission } from "@/lib/etims/logTisSubmission";
+import { tis } from "./tisTheme";
 
 type ApiAction = {
   id: string;
@@ -163,10 +164,10 @@ export const TisIntegratorApiConsole: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      <Card className="border-slate-700 bg-slate-900/40">
+      <Card className={tis.card}>
         <CardHeader>
-          <CardTitle className="text-base text-white">Master data (GET)</CardTitle>
-          <CardDescription className="text-gray-400">
+          <CardTitle className={tis.cardTitle}>Master data (GET)</CardTitle>
+          <CardDescription className={tis.cardDesc}>
             KRA reference endpoints required for TIS initialization and catalog setup.
           </CardDescription>
         </CardHeader>
@@ -196,10 +197,10 @@ export const TisIntegratorApiConsole: React.FC = () => {
         </CardContent>
       </Card>
 
-      <Card className="border-slate-700 bg-slate-900/40">
+      <Card className={tis.card}>
         <CardHeader>
-          <CardTitle className="text-base text-white">Registration (POST)</CardTitle>
-          <CardDescription className="text-gray-400">
+          <CardTitle className={tis.cardTitle}>Registration (POST)</CardTitle>
+          <CardDescription className={tis.cardDesc}>
             Register items and customers with the integrator before invoicing.
           </CardDescription>
         </CardHeader>
@@ -222,7 +223,7 @@ export const TisIntegratorApiConsole: React.FC = () => {
           </div>
           <div className="space-y-2">
             <Label>Request body (JSON)</Label>
-            <Textarea value={postBody} onChange={(e) => setPostBody(e.target.value)} rows={10} className="font-mono text-xs bg-slate-950/60" />
+            <Textarea value={postBody} onChange={(e) => setPostBody(e.target.value)} rows={10} className={`font-mono text-xs ${tis.input}`} />
           </div>
           <Button type="button" onClick={() => void runPost()} disabled={!!loading}>
             {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
@@ -231,10 +232,10 @@ export const TisIntegratorApiConsole: React.FC = () => {
         </CardContent>
       </Card>
 
-      <Card className="border-slate-700 bg-slate-900/40">
+      <Card className={tis.card}>
         <CardHeader>
-          <CardTitle className="text-base text-white">Purchase / import sync queries</CardTitle>
-          <CardDescription className="text-gray-400">
+          <CardTitle className={tis.cardTitle}>Purchase / import sync queries</CardTitle>
+          <CardDescription className={tis.cardDesc}>
             Poll KRA for purchase and import data (last_request_date = yyyyMMddHHmmss).
           </CardDescription>
         </CardHeader>
@@ -242,7 +243,7 @@ export const TisIntegratorApiConsole: React.FC = () => {
           <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
             <div className="space-y-2">
               <Label>last_request_date</Label>
-              <Input value={syncDate} onChange={(e) => setSyncDate(e.target.value)} className="font-mono bg-slate-950/60 max-w-xs" />
+              <Input value={syncDate} onChange={(e) => setSyncDate(e.target.value)} className={`font-mono max-w-xs ${tis.input}`} />
             </div>
             <div className="flex flex-wrap gap-2">
               <Button type="button" variant="outline" size="sm" disabled={!!loading} onClick={() => void runSyncQuery("purchases/queries")}>
@@ -260,15 +261,15 @@ export const TisIntegratorApiConsole: React.FC = () => {
       </Card>
 
       {lastResult ? (
-        <Card className="border-slate-700 bg-slate-900/40">
+        <Card className={tis.card}>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm text-white flex items-center gap-2">
+            <CardTitle className={`text-sm ${tis.cardTitle} flex items-center gap-2`}>
               Last response
               <Badge variant="outline">JSON</Badge>
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <pre className="max-h-64 overflow-auto rounded-md bg-slate-950/80 p-3 text-[11px] text-gray-300">
+            <pre className={tis.pre}>
               {lastResult}
             </pre>
           </CardContent>

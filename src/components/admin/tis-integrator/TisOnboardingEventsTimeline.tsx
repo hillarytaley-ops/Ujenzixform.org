@@ -6,6 +6,7 @@ import React, { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Loader2 } from "lucide-react";
 import { ONBOARDING_STATUS_LABELS } from "./types";
+import { tis } from "./tisTheme";
 
 type EventRow = {
   id: string;
@@ -49,8 +50,8 @@ export const TisOnboardingEventsTimeline: React.FC<{ supplierId: string | null }
   if (!supplierId) return null;
 
   return (
-    <div className="space-y-2 rounded-md border border-slate-700 bg-slate-950/40 p-3">
-      <p className="text-xs font-medium text-gray-300">Onboarding audit trail</p>
+    <div className={tis.timeline}>
+      <p className={tis.timelineTitle}>Onboarding audit trail</p>
       {loading ? (
         <div className="flex items-center text-xs text-muted-foreground">
           <Loader2 className="mr-2 h-3 w-3 animate-spin" />
@@ -61,9 +62,9 @@ export const TisOnboardingEventsTimeline: React.FC<{ supplierId: string | null }
       ) : (
         <ul className="max-h-32 space-y-1.5 overflow-auto text-xs">
           {events.map((ev) => (
-            <li key={ev.id} className="border-l-2 border-indigo-600/50 pl-2 text-gray-400">
-              <span className="text-gray-500">{new Date(ev.created_at).toLocaleString()} · </span>
-              <span className="text-gray-300">{ev.event_type.replace(/_/g, " ")}</span>
+            <li key={ev.id} className="border-l-2 border-indigo-400 pl-2 text-slate-600">
+              <span className="text-slate-500">{new Date(ev.created_at).toLocaleString()} · </span>
+              <span className="text-slate-800">{ev.event_type.replace(/_/g, " ")}</span>
               {ev.from_status && ev.to_status ? (
                 <span>
                   {" "}

@@ -11,6 +11,7 @@ import { TisIntegratorPlatformPanel } from "./TisIntegratorPlatformPanel";
 import { TisVendorOnboardingPanel } from "./TisVendorOnboardingPanel";
 import { TisSubmissionOpsPanel } from "./TisSubmissionOpsPanel";
 import { TisIntegratorApiConsole } from "./TisIntegratorApiConsole";
+import { tis } from "./tisTheme";
 
 const SUB_TABS = [
   { id: "platform", label: "Platform & certification", icon: ShieldCheck },
@@ -23,27 +24,27 @@ export const TisIntegratorHub: React.FC = () => {
   const [subTab, setSubTab] = useState<string>("platform");
 
   return (
-    <div className="space-y-4">
-      <div className="rounded-lg border border-indigo-500/25 bg-gradient-to-r from-indigo-950/40 to-slate-900/40 px-4 py-3">
+    <div className={`space-y-4 ${tis.shell} p-4 sm:p-5`}>
+      <div className={tis.banner}>
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-start gap-3">
-            <Building2 className="mt-0.5 h-6 w-6 shrink-0 text-indigo-400" />
+            <Building2 className="mt-0.5 h-6 w-6 shrink-0 text-indigo-600" />
             <div>
-              <h2 className="text-lg font-semibold text-white">TIS Integrator Services</h2>
-              <p className="text-sm text-gray-400">
+              <h2 className={tis.h2}>TIS Integrator Services</h2>
+              <p className={tis.subtitle}>
                 Full third-party integrator package — onboard vendor taxpayers, operate KRA eTIMS invoicing, and track
                 certification. This is separate from the eTIMS sandbox test tab.
               </p>
             </div>
           </div>
-          <Badge className="shrink-0 bg-indigo-700/90 hover:bg-indigo-700/90">UjenziXform KRA Invoicing</Badge>
+          <Badge className="shrink-0 bg-indigo-600 text-white hover:bg-indigo-600">UjenziXform KRA Invoicing</Badge>
         </div>
       </div>
 
       <Tabs value={subTab} onValueChange={setSubTab}>
-        <TabsList className="flex h-auto flex-wrap gap-1 bg-slate-800/80 p-1">
+        <TabsList className={tis.tabsList}>
           {SUB_TABS.map(({ id, label, icon: Icon }) => (
-            <TabsTrigger key={id} value={id} className="gap-2 data-[state=active]:bg-indigo-700">
+            <TabsTrigger key={id} value={id} className={tis.tabsTrigger}>
               <Icon className="h-4 w-4" />
               {label}
             </TabsTrigger>

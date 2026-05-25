@@ -4907,21 +4907,7 @@ const AdminDashboard = () => {
           </TabsContent>
 
           <TabsContent value="tis-integrator" className="space-y-6">
-            <Card className="bg-slate-900/50 border-slate-800">
-              <CardHeader>
-                <CardTitle className="text-white flex items-center gap-2">
-                  <Building2 className="h-5 w-5 text-indigo-400" />
-                  TIS Integrator Services
-                </CardTitle>
-                <CardDescription className="text-gray-400">
-                  Third-party KRA eTIMS integrator package for vendor onboarding, certification, submission ops, and
-                  API console. Separate from the eTIMS sandbox test tab.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <TisIntegratorHub />
-              </CardContent>
-            </Card>
+            <TisIntegratorHub />
           </TabsContent>
 
           <TabsContent value="etims-test" className="space-y-6">

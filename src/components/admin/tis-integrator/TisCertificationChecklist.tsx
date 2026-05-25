@@ -8,6 +8,7 @@ import {
   checklistProgress,
   type TisChecklistItem,
 } from "./types";
+import { tis } from "./tisTheme";
 
 type Props = {
   checklist: Record<string, boolean>;
@@ -33,7 +34,7 @@ export const TisCertificationChecklist: React.FC<Props> = ({ checklist, onToggle
     <div className="space-y-4">
       <div className="space-y-2">
         <div className="flex items-center justify-between text-sm">
-          <span className="text-muted-foreground">
+          <span className="text-sm font-medium text-slate-700">
             KRA TIS integrator readiness: {completed}/{total} requirements
           </span>
           <Badge variant={percent >= 100 ? "default" : "secondary"}>{percent}%</Badge>
@@ -43,13 +44,10 @@ export const TisCertificationChecklist: React.FC<Props> = ({ checklist, onToggle
 
       {[...grouped.entries()].map(([category, items]) => (
         <div key={category} className="space-y-2">
-          <h4 className="text-sm font-medium text-foreground">{category}</h4>
+          <h4 className={tis.checklistCategory}>{category}</h4>
           <ul className="space-y-2">
             {items.map((item) => (
-              <li
-                key={item.id}
-                className="flex items-start gap-3 rounded-md border border-border/60 bg-muted/20 px-3 py-2"
-              >
+              <li key={item.id} className={`flex items-start gap-3 rounded-md px-3 py-2 ${tis.checklistItem}`}>
                 <Checkbox
                   id={`tis-check-${item.id}`}
                   checked={!!checklist[item.id]}
@@ -58,12 +56,12 @@ export const TisCertificationChecklist: React.FC<Props> = ({ checklist, onToggle
                   className="mt-0.5"
                 />
                 <div className="min-w-0 flex-1">
-                  <Label htmlFor={`tis-check-${item.id}`} className="cursor-pointer text-sm font-medium">
+                  <Label htmlFor={`tis-check-${item.id}`} className={`cursor-pointer ${tis.checklistLabel}`}>
                     {item.label}
                   </Label>
-                  <p className="text-xs text-muted-foreground">{item.description}</p>
+                  <p className={tis.checklistDesc}>{item.description}</p>
                   {item.kraRef ? (
-                    <p className="mt-0.5 text-[10px] text-muted-foreground/80">Ref: {item.kraRef}</p>
+                    <p className="mt-0.5 text-[10px] text-slate-500">Ref: {item.kraRef}</p>
                   ) : null}
                 </div>
               </li>
