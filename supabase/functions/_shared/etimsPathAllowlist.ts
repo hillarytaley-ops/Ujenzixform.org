@@ -6,6 +6,9 @@
 const SEG = "[A-Za-z0-9._-]+";
 
 const RULES: { methods: string[]; pattern: RegExp }[] = [
+  { methods: ["POST"], pattern: /^selectInitOsdcInfo$/ },
+  { methods: ["POST"], pattern: /^selectInitInfo$/ },
+  { methods: ["POST"], pattern: /^initialize$/ },
   { methods: ["GET"], pattern: /^countries$/ },
   { methods: ["GET"], pattern: /^currencies$/ },
   { methods: ["GET"], pattern: /^qtyunitcodes$/ },

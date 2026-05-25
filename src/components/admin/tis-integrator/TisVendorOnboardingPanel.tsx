@@ -35,8 +35,16 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
-import { CheckCircle2, Loader2, Pencil, PlugZap, RefreshCw, UserPlus, XCircle } from "lucide-react";
+import { CheckCircle2, Loader2, Pencil, PlugZap, RefreshCw, UserPlus, XCircle, Zap } from "lucide-react";
 import { testEtimsIntegratorConnection } from "@/lib/etims/purchaseOrderEtims";
+import {
+  canTransitionTo,
+  logOnboardingEvent,
+  syncPlatformCertificationChecklist,
+  WORKFLOW_ACTIONS,
+} from "@/lib/etims/tisOnboardingWorkflow";
+import { TisOscuInitializationCard } from "./TisOscuInitializationCard";
+import { TisOnboardingEventsTimeline } from "./TisOnboardingEventsTimeline";
 import {
   ONBOARDING_STATUS_LABELS,
   type TisSolutionType,
@@ -65,6 +73,8 @@ type OnboardingRow = {
   onboarding_notes: string | null;
   admin_review_notes: string | null;
   certified_at: string | null;
+  initialized_at: string | null;
+  communication_key_ref: string | null;
 };
 
 function tisReadiness(row: SupplierRow): "ready" | "partial" | "missing" {
@@ -97,6 +107,9 @@ export const TisVendorOnboardingPanel: React.FC = () => {
   const [solutionType, setSolutionType] = useState<TisSolutionType>("OSCU");
   const [onboardingNotes, setOnboardingNotes] = useState("");
   const [adminNotes, setAdminNotes] = useState("");
+  const [initializedAt, setInitializedAt] = useState<string | null>(null);
+  const [communicationKeyRef, setCommunicationKeyRef] = useState<string | null>(null);
+  const [eventsKey, setEventsKey] = useState(0);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -150,13 +163,53 @@ export const TisVendorOnboardingPanel: React.FC = () => {
     setSolutionType(ob?.solution_type ?? "OSCU");
     setOnboardingNotes(ob?.onboarding_notes ?? "");
     setAdminNotes(ob?.admin_review_notes ?? "");
+    setInitializedAt(ob?.initialized_at ?? null);
+    setCommunicationKeyRef(ob?.communication_key_ref ?? null);
+    setEventsKey((k) => k + 1);
     setEditOpen(true);
+  };
+
+  const identity = (): {
+    legalBusinessName: string;
+    kraPin: string;
+    branchCode: string;
+    deviceSerial: string;
+    initializedAt: string | null;
+  } => ({
+    legalBusinessName: legalName,
+    kraPin,
+    branchCode,
+    deviceSerial,
+    initializedAt,
+  });
+
+  const applyWorkflowTransition = async (to: TisVendorOnboardingStatus) => {
+    if (!editSupplier) return;
+    const from = onboardingStatus;
+    const err = canTransitionTo(from, to, identity());
+    if (err) {
+      toast({ title: "Cannot change status", description: err, variant: "destructive" });
+      return;
+    }
+    setOnboardingStatus(to);
+    toast({ title: `Status set to ${ONBOARDING_STATUS_LABELS[to]}`, description: "Save vendor to persist." });
   };
 
   const saveVendor = async () => {
     if (!editSupplier) return;
+
+    const existing = onboarding.get(editSupplier.id);
+    const prevStatus = existing?.onboarding_status ?? "draft";
+    const transitionErr = canTransitionTo(prevStatus, onboardingStatus, identity());
+    if (transitionErr && prevStatus !== onboardingStatus) {
+      toast({ title: "Invalid status transition", description: transitionErr, variant: "destructive" });
+      return;
+    }
+
     setSaving(true);
     try {
+      const { data: auth } = await supabase.auth.getUser();
+
       const { error: supErr } = await supabase
         .from("suppliers")
         .update({
@@ -172,8 +225,7 @@ export const TisVendorOnboardingPanel: React.FC = () => {
 
       if (supErr) throw supErr;
 
-      const existing = onboarding.get(editSupplier.id);
-      const obPayload = {
+      const obPayload: Record<string, unknown> = {
         supplier_id: editSupplier.id,
         onboarding_status: onboardingStatus,
         solution_type: solutionType,
@@ -181,14 +233,37 @@ export const TisVendorOnboardingPanel: React.FC = () => {
         admin_review_notes: adminNotes.trim() || null,
         certified_at: onboardingStatus === "active" ? new Date().toISOString() : existing?.certified_at ?? null,
       };
+      if (prevStatus !== onboardingStatus) {
+        obPayload.last_status_changed_at = new Date().toISOString();
+        obPayload.last_status_changed_by = auth.user?.id ?? null;
+      }
 
+      let onboardingId = existing?.id;
       if (existing) {
         const { error } = await supabase.from("tis_vendor_onboarding").update(obPayload).eq("id", existing.id);
         if (error) throw error;
       } else {
-        const { error } = await supabase.from("tis_vendor_onboarding").insert(obPayload);
+        const { data: inserted, error } = await supabase
+          .from("tis_vendor_onboarding")
+          .insert(obPayload)
+          .select("id")
+          .single();
         if (error) throw error;
+        onboardingId = (inserted as { id: string }).id;
       }
+
+      if (prevStatus !== onboardingStatus) {
+        await logOnboardingEvent({
+          supplierId: editSupplier.id,
+          onboardingId,
+          eventType: "status_change",
+          fromStatus: prevStatus,
+          toStatus: onboardingStatus,
+          message: `Workflow: ${ONBOARDING_STATUS_LABELS[prevStatus]} → ${ONBOARDING_STATUS_LABELS[onboardingStatus]}`,
+        });
+      }
+
+      await syncPlatformCertificationChecklist();
 
       toast({ title: "Vendor TIS profile saved" });
       setEditOpen(false);
@@ -282,6 +357,7 @@ export const TisVendorOnboardingPanel: React.FC = () => {
                   <TableHead className="text-gray-300">Branch</TableHead>
                   <TableHead className="text-gray-300">TIS readiness</TableHead>
                   <TableHead className="text-gray-300">Onboarding</TableHead>
+                  <TableHead className="text-gray-300">OSCU/VSCU</TableHead>
                   <TableHead className="text-gray-300">Solution</TableHead>
                   <TableHead className="text-gray-300 w-20" />
                 </TableRow>
@@ -289,7 +365,7 @@ export const TisVendorOnboardingPanel: React.FC = () => {
               <TableBody>
                 {filtered.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="py-8 text-center text-muted-foreground">
+                    <TableCell colSpan={8} className="py-8 text-center text-muted-foreground">
                       No vendors match your search.
                     </TableCell>
                   </TableRow>
@@ -330,6 +406,18 @@ export const TisVendorOnboardingPanel: React.FC = () => {
                             {ONBOARDING_STATUS_LABELS[status]}
                           </Badge>
                         </TableCell>
+                        <TableCell>
+                          {ob?.initialized_at ? (
+                            <Badge variant="outline" className="border-emerald-600/50 text-emerald-400">
+                              <Zap className="mr-1 h-3 w-3" />
+                              Init OK
+                            </Badge>
+                          ) : (
+                            <Badge variant="outline" className="text-amber-400 border-amber-600/50">
+                              Not init
+                            </Badge>
+                          )}
+                        </TableCell>
                         <TableCell className="text-xs text-gray-400">{ob?.solution_type ?? "—"}</TableCell>
                         <TableCell>
                           <Button type="button" variant="ghost" size="sm" onClick={() => openEdit(row)}>
@@ -347,12 +435,12 @@ export const TisVendorOnboardingPanel: React.FC = () => {
       </CardContent>
 
       <Dialog open={editOpen} onOpenChange={setEditOpen}>
-        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
           <DialogHeader>
-            <DialogTitle>Edit vendor TIS profile</DialogTitle>
+            <DialogTitle>Vendor TIS onboarding</DialogTitle>
             <DialogDescription>
-              {editSupplier?.company_name ?? editSupplier?.legal_business_name ?? "Supplier"} — KRA taxpayer identity
-              for integrator invoicing.
+              {editSupplier?.company_name ?? editSupplier?.legal_business_name ?? "Supplier"} — identity, OSCU/VSCU
+              init, then workflow to active for KRA sandbox demo.
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-2">
@@ -376,10 +464,50 @@ export const TisVendorOnboardingPanel: React.FC = () => {
                 <Input value={placeCode} onChange={(e) => setPlaceCode(e.target.value)} className="font-mono" />
               </div>
               <div className="space-y-2">
-                <Label>Device serial</Label>
+                <Label>Device serial (dvcSrlNo)</Label>
                 <Input value={deviceSerial} onChange={(e) => setDeviceSerial(e.target.value)} className="font-mono" />
               </div>
             </div>
+
+            {editSupplier ? (
+              <TisOscuInitializationCard
+                supplierId={editSupplier.id}
+                onboardingId={onboarding.get(editSupplier.id)?.id}
+                solutionType={solutionType}
+                initialPin={kraPin}
+                initialBranch={branchCode}
+                initialSerial={deviceSerial}
+                initializedAt={initializedAt}
+                communicationKeyRef={communicationKeyRef}
+                onInitialized={() => {
+                  setInitializedAt(new Date().toISOString());
+                  setEventsKey((k) => k + 1);
+                  void load();
+                }}
+              />
+            ) : null}
+
+            <div className="space-y-2">
+              <Label className="text-xs text-muted-foreground">Workflow actions</Label>
+              <div className="flex flex-wrap gap-2">
+                {WORKFLOW_ACTIONS.filter((a) => a.to !== onboardingStatus).map((action) => (
+                  <Button
+                    key={action.to}
+                    type="button"
+                    size="sm"
+                    variant={action.variant ?? "outline"}
+                    onClick={() => void applyWorkflowTransition(action.to)}
+                  >
+                    {action.label}
+                  </Button>
+                ))}
+              </div>
+              <p className="text-[10px] text-muted-foreground">
+                Current: <strong>{ONBOARDING_STATUS_LABELS[onboardingStatus]}</strong> — Activate requires successful
+                device initialization.
+              </p>
+            </div>
+
             <div className="space-y-2">
               <Label>Integrator account ref</Label>
               <Input value={integratorRef} onChange={(e) => setIntegratorRef(e.target.value)} placeholder="Tenant / sub-account id" />
@@ -425,6 +553,8 @@ export const TisVendorOnboardingPanel: React.FC = () => {
               <Label>Admin review notes</Label>
               <Textarea value={adminNotes} onChange={(e) => setAdminNotes(e.target.value)} rows={2} />
             </div>
+
+            <TisOnboardingEventsTimeline key={eventsKey} supplierId={editSupplier?.id ?? null} />
           </div>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => setEditOpen(false)}>

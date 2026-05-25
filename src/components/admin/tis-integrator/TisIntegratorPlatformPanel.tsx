@@ -20,6 +20,7 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { ExternalLink, Loader2, Save, ShieldCheck } from "lucide-react";
 import { TisCertificationChecklist } from "./TisCertificationChecklist";
+import { syncPlatformCertificationChecklist } from "@/lib/etims/tisOnboardingWorkflow";
 import {
   CERTIFICATION_STATUS_LABELS,
   defaultChecklistState,
@@ -62,6 +63,8 @@ export const TisIntegratorPlatformPanel: React.FC = () => {
   const load = useCallback(async () => {
     setLoading(true);
     try {
+      await syncPlatformCertificationChecklist();
+
       const { data, error } = await supabase
         .from("tis_integrator_platform")
         .select("*")
