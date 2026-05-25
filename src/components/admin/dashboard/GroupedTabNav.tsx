@@ -43,6 +43,7 @@ import {
   TrendingUp,
   Settings,
   Briefcase,
+  Building2,
   UserCog,
   MessageCircle,
   Star,
@@ -201,7 +202,8 @@ export const GroupedTabNav: React.FC<GroupedTabNavProps> = ({
         },
         { value: 'accounts', label: 'Accounts', icon: Landmark },
         { value: 'delivery-pay', label: 'DeliveryPay', icon: DollarSign },
-        { value: 'etims-test', label: 'KRA eTIMS / Vendor TIS', icon: Receipt },
+        { value: 'tis-integrator', label: 'TIS Integrator', icon: Building2 },
+        { value: 'etims-test', label: 'eTIMS sandbox', icon: Receipt },
       ],
     },
     {

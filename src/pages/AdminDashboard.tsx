@@ -127,6 +127,7 @@ import { AnalyticsDashboard } from "@/components/analytics/AnalyticsDashboard";
 import { ReviewsManager } from "@/components/reviews/ReviewsManager";
 import { SMSTestPanel } from "@/components/admin/SMSTestPanel";
 import { EtimsTestPanel } from "@/components/admin/EtimsTestPanel";
+import { TisIntegratorHub } from "@/components/admin/tis-integrator";
 import { Camera, UserCog, MessageCircle, Link2, Navigation as NavigationIcon } from "lucide-react";
 import { CameraAssignment } from "@/components/admin/CameraAssignment";
 import { TrackingTab } from "@/components/tracking/TrackingTab";
@@ -454,7 +455,7 @@ const AdminDashboard = () => {
     "monitoring-requests", "camera-assignment", "feedback", "documents", "financial", "accounts",
     "ml", "security", "staff", "activity-log", "scanning", "qr-codes", "communications",
     "builder-moderation", "delivery-analytics", "delivery-pay", "settings", "careers", "career-applications", "user-roles",
-    "messaging", "analytics", "reviews", "sms-test", "etims-test", "tracking", "voice-calls",
+    "messaging", "analytics", "reviews", "sms-test", "etims-test", "tis-integrator", "tracking", "voice-calls",
     "supply-chain-docs", "sales-marketing"
   ] as const;
   const [activeTab, setActiveTab] = useUrlTabSync([...ADMIN_TABS], "overview");
@@ -2652,10 +2653,16 @@ const AdminDashboard = () => {
                 SMS Test
               </TabsTrigger>
             )}
+            {shouldShowTab('tis-integrator') && (
+              <TabsTrigger value="tis-integrator" className="data-[state=active]:bg-indigo-700">
+                <Building2 className="h-4 w-4 mr-2" />
+                TIS Integrator
+              </TabsTrigger>
+            )}
             {shouldShowTab('etims-test') && (
               <TabsTrigger value="etims-test" className="data-[state=active]:bg-slate-600">
                 <Landmark className="h-4 w-4 mr-2" />
-                KRA eTIMS / Vendor TIS
+                eTIMS sandbox
               </TabsTrigger>
             )}
           </TabsList>
@@ -4899,16 +4906,34 @@ const AdminDashboard = () => {
             </Card>
           </TabsContent>
 
+          <TabsContent value="tis-integrator" className="space-y-6">
+            <Card className="bg-slate-900/50 border-slate-800">
+              <CardHeader>
+                <CardTitle className="text-white flex items-center gap-2">
+                  <Building2 className="h-5 w-5 text-indigo-400" />
+                  TIS Integrator Services
+                </CardTitle>
+                <CardDescription className="text-gray-400">
+                  Third-party KRA eTIMS integrator package for vendor onboarding, certification, submission ops, and
+                  API console. Separate from the eTIMS sandbox test tab.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <TisIntegratorHub />
+              </CardContent>
+            </Card>
+          </TabsContent>
+
           <TabsContent value="etims-test" className="space-y-6">
             <Card className="bg-slate-900/50 border-slate-800">
               <CardHeader>
                 <CardTitle className="text-white flex items-center gap-2">
                   <Landmark className="h-5 w-5 text-sky-400" />
-                  KRA eTIMS — Vendor TIS &amp; integrator
+                  KRA eTIMS sandbox
                 </CardTitle>
                 <CardDescription className="text-gray-400">
-                  Trader Invoicing System (TIS) for suppliers via OSCU/VSCU integrator. Uses Edge{" "}
-                  <code className="text-slate-300">etims-proxy</code> with your Supabase session.
+                  Connection tests and purchase-order invoice smoke tests via Edge{" "}
+                  <code className="text-slate-300">etims-proxy</code>. For integrator operations use the TIS Integrator tab.
                 </CardDescription>
               </CardHeader>
               <CardContent>

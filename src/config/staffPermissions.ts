@@ -143,6 +143,7 @@ export const ELEVATED_ADMIN_EXTRA_TABS: ReadonlySet<string> = new Set([
   "tracking",
   "voice-calls",
   "sales-marketing",
+  "tis-integrator",
 ]);
 
 /** Core RBAC tabs plus every extra nav tab — canonical super admin is never blocked by a missing id here. */
@@ -276,7 +277,8 @@ export const STAFF_ROLES: Record<string, StaffRole> = {
       'delivery-pay',
       'delivery-analytics',
       'activity-log',
-      'supply-chain-docs'
+      'supply-chain-docs',
+      'tis-integrator',
     ],
     canManageStaff: false,
     canExportData: true,
