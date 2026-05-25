@@ -2655,7 +2655,7 @@ const AdminDashboard = () => {
             {shouldShowTab('etims-test') && (
               <TabsTrigger value="etims-test" className="data-[state=active]:bg-slate-600">
                 <Landmark className="h-4 w-4 mr-2" />
-                eTIMS test
+                KRA eTIMS / Vendor TIS
               </TabsTrigger>
             )}
           </TabsList>
@@ -4904,11 +4904,11 @@ const AdminDashboard = () => {
               <CardHeader>
                 <CardTitle className="text-white flex items-center gap-2">
                   <Landmark className="h-5 w-5 text-sky-400" />
-                  eTIMS (integrator) smoke test
+                  KRA eTIMS — Vendor TIS &amp; integrator
                 </CardTitle>
                 <CardDescription className="text-gray-400">
-                  Calls the deployed Edge function <code className="text-slate-300">etims-proxy</code> using your
-                  Supabase session.
+                  Trader Invoicing System (TIS) for suppliers via OSCU/VSCU integrator. Uses Edge{" "}
+                  <code className="text-slate-300">etims-proxy</code> with your Supabase session.
                 </CardDescription>
               </CardHeader>
               <CardContent>

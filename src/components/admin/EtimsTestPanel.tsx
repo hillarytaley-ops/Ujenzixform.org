@@ -39,6 +39,7 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { invokeEtimsProxy } from "@/lib/etims/invokeEtimsProxy";
 import { EtimsPurchaseOrderSubmitCard } from "@/components/admin/EtimsPurchaseOrderSubmitCard";
+import { VendorEtimsTisRegistryPanel } from "@/components/admin/VendorEtimsTisRegistryPanel";
 import { cn } from "@/lib/utils";
 
 function secretsDashboardUrl(): string | null {
@@ -360,6 +361,8 @@ export const EtimsTestPanel: React.FC<EtimsTestPanelProps> = ({ enforceSupplierI
 
   return (
     <div className="space-y-5">
+      <VendorEtimsTisRegistryPanel />
+
       {/* Compact intro */}
       <div className="flex flex-col gap-3 rounded-lg border border-sky-200/60 bg-gradient-to-r from-sky-50/80 to-cyan-50/50 px-4 py-3 dark:border-sky-800/40 dark:from-sky-950/30 dark:to-cyan-950/20 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-start gap-3">

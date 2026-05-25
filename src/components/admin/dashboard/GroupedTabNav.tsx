@@ -201,7 +201,7 @@ export const GroupedTabNav: React.FC<GroupedTabNavProps> = ({
         },
         { value: 'accounts', label: 'Accounts', icon: Landmark },
         { value: 'delivery-pay', label: 'DeliveryPay', icon: DollarSign },
-        { value: 'etims-test', label: 'eTIMS test', icon: Receipt },
+        { value: 'etims-test', label: 'KRA eTIMS / Vendor TIS', icon: Receipt },
       ],
     },
     {
