@@ -50,8 +50,19 @@ type PoRow = {
   etims_verification_url: string | null;
   etims_credit_submitted_at: string | null;
   etims_credit_error: string | null;
-  suppliers: { company_name: string | null } | null;
+  supplier_name: string | null;
 };
+
+function formatDbError(e: unknown): string {
+  if (e instanceof Error) return e.message;
+  if (typeof e === "object" && e !== null && "message" in e && typeof (e as { message: unknown }).message === "string") {
+    return (e as { message: string }).message;
+  }
+  if (typeof e === "object" && e !== null && "details" in e && typeof (e as { details: unknown }).details === "string") {
+    return (e as { details: string }).details;
+  }
+  return "Unknown database error";
+}
 
 type LogRow = {
   id: string;
@@ -76,30 +87,60 @@ export const TisSubmissionOpsPanel: React.FC = () => {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [poRes, logRes] = await Promise.all([
-        supabase
-          .from("purchase_orders")
-          .select(
-            "id,po_number,supplier_id,total_amount,created_at,etims_submitted_at,etims_trader_invoice_no,etims_error,etims_verification_url,etims_credit_submitted_at,etims_credit_error,suppliers(company_name)",
-          )
-          .order("created_at", { ascending: false })
-          .limit(200),
-        supabase
-          .from("tis_submission_log")
-          .select("id,submission_type,status,trader_invoice_no,error_message,created_at")
-          .order("created_at", { ascending: false })
-          .limit(50),
-      ]);
+      const poRes = await supabase
+        .from("purchase_orders")
+        .select(
+          "id,po_number,supplier_id,total_amount,created_at,etims_submitted_at,etims_trader_invoice_no,etims_error,etims_verification_url,etims_credit_submitted_at,etims_credit_error",
+        )
+        .order("created_at", { ascending: false })
+        .limit(200);
 
       if (poRes.error) throw poRes.error;
-      setPos((poRes.data ?? []) as PoRow[]);
+
+      const rawPos = (poRes.data ?? []) as Omit<PoRow, "supplier_name">[];
+      const supplierIds = [...new Set(rawPos.map((p) => p.supplier_id).filter(Boolean))] as string[];
+
+      const supplierNameById = new Map<string, string>();
+      if (supplierIds.length > 0) {
+        const { data: suppliers, error: supErr } = await supabase
+          .from("suppliers")
+          .select("id,company_name,legal_business_name")
+          .in("id", supplierIds);
+        if (supErr) {
+          console.warn("TIS submission ops: could not load supplier names", supErr.message);
+        } else {
+          for (const s of suppliers ?? []) {
+            const name =
+              (s as { company_name?: string | null; legal_business_name?: string | null }).company_name ||
+              (s as { legal_business_name?: string | null }).legal_business_name ||
+              "";
+            if (name) supplierNameById.set((s as { id: string }).id, name);
+          }
+        }
+      }
+
+      setPos(
+        rawPos.map((po) => ({
+          ...po,
+          supplier_name: po.supplier_id ? supplierNameById.get(po.supplier_id) ?? null : null,
+        })),
+      );
+
+      const logRes = await supabase
+        .from("tis_submission_log")
+        .select("id,submission_type,status,trader_invoice_no,error_message,created_at")
+        .order("created_at", { ascending: false })
+        .limit(50);
+
       setLogs((logRes.error ? [] : logRes.data ?? []) as LogRow[]);
     } catch (e: unknown) {
       toast({
         title: "Could not load submissions",
-        description: e instanceof Error ? e.message : String(e),
+        description: formatDbError(e),
         variant: "destructive",
       });
+      setPos([]);
+      setLogs([]);
     } finally {
       setLoading(false);
     }
@@ -119,7 +160,7 @@ export const TisSubmissionOpsPanel: React.FC = () => {
   const filtered = pos.filter((po) => {
     if (statusFilter !== "all" && poStatus(po) !== statusFilter) return false;
     if (!q) return true;
-    const vendor = (po.suppliers?.company_name ?? "").toLowerCase();
+    const vendor = (po.supplier_name ?? "").toLowerCase();
     return po.po_number.toLowerCase().includes(q) || vendor.includes(q) || po.id.toLowerCase().includes(q);
   });
 
@@ -273,7 +314,9 @@ export const TisSubmissionOpsPanel: React.FC = () => {
                   {filtered.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={6} className="py-8 text-center text-muted-foreground">
-                        No purchase orders match filters.
+                        {pos.length === 0
+                          ? "No purchase orders in the system yet."
+                          : "No purchase orders match filters."}
                       </TableCell>
                     </TableRow>
                   ) : (
@@ -283,7 +326,7 @@ export const TisSubmissionOpsPanel: React.FC = () => {
                         <TableRow key={po.id} className="border-slate-800">
                           <TableCell className="font-mono text-xs text-white">{po.po_number}</TableCell>
                           <TableCell className="text-sm text-gray-300">
-                            {po.suppliers?.company_name ?? "—"}
+                            {po.supplier_name ?? "—"}
                           </TableCell>
                           <TableCell className="text-sm text-gray-300">
                             KES {Number(po.total_amount).toLocaleString()}
