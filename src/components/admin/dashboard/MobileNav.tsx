@@ -4,7 +4,8 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/co
 import { Badge } from '@/components/ui/badge';
 import { 
   Menu, BarChart3, Users, FileText, Settings, Shield, 
-  Activity, MessageSquare, MessageCircle, Globe, DollarSign, QrCode, ClipboardList, Landmark, Briefcase, Truck
+  Activity, MessageSquare, MessageCircle, Globe, DollarSign, QrCode, ClipboardList, Landmark, Briefcase, Truck,
+  Building2, Receipt,
 } from 'lucide-react';
 
 interface MobileNavProps {
@@ -28,6 +29,8 @@ const navItems = [
   { id: 'financial', label: 'Financial', icon: DollarSign, color: 'text-emerald-400' },
   { id: 'accounts', label: 'Accounts', icon: Landmark, color: 'text-teal-400' },
   { id: 'delivery-pay', label: 'DeliveryPay', icon: DollarSign, color: 'text-emerald-300' },
+  { id: 'tis-integrator', label: 'TIS Integrator', icon: Building2, color: 'text-sky-400' },
+  { id: 'etims-test', label: 'eTIMS sandbox', icon: Receipt, color: 'text-sky-300' },
   { id: 'careers', label: 'Careers (jobs)', icon: Briefcase, color: 'text-amber-400' },
   { id: 'career-applications', label: 'Job applications', icon: FileText, color: 'text-amber-300' },
   { id: 'delivery-apps', label: 'Delivery providers', icon: Truck, color: 'text-amber-200' },

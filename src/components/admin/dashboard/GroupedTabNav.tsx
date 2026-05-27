@@ -202,6 +202,14 @@ export const GroupedTabNav: React.FC<GroupedTabNavProps> = ({
         },
         { value: 'accounts', label: 'Accounts', icon: Landmark },
         { value: 'delivery-pay', label: 'DeliveryPay', icon: DollarSign },
+      ],
+    },
+    {
+      id: 'etims',
+      label: 'eTIMS',
+      icon: Receipt,
+      color: 'sky',
+      tabs: [
         { value: 'tis-integrator', label: 'TIS Integrator', icon: Building2 },
         { value: 'etims-test', label: 'eTIMS sandbox', icon: Receipt },
       ],
@@ -261,6 +269,7 @@ export const GroupedTabNav: React.FC<GroupedTabNavProps> = ({
     rose: 'bg-rose-600 hover:bg-rose-700',
     slate: 'bg-slate-600 hover:bg-slate-700',
     amber: 'bg-amber-600 hover:bg-amber-700',
+    sky: 'bg-sky-600 hover:bg-sky-700',
   };
 
   const getActiveGroupId = () => {

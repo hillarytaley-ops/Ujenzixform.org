@@ -4919,7 +4919,15 @@ const AdminDashboard = () => {
                 </CardTitle>
                 <CardDescription className="text-gray-400">
                   Connection tests and purchase-order invoice smoke tests via Edge{" "}
-                  <code className="text-slate-300">etims-proxy</code>. For integrator operations use the TIS Integrator tab.
+                  <code className="text-slate-300">etims-proxy</code>. For integrator operations use{" "}
+                  <button
+                    type="button"
+                    className="font-medium text-sky-400 hover:underline"
+                    onClick={() => setActiveTab("tis-integrator")}
+                  >
+                    TIS Integrator
+                  </button>{" "}
+                  under the eTIMS menu.
                 </CardDescription>
               </CardHeader>
               <CardContent>
