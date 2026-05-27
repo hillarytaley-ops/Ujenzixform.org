@@ -39,6 +39,8 @@ import { setCartProjectContext, clearCartProjectContext } from '@/utils/builderC
 import { catalogMaterialIdFromCartLineId } from '@/utils/cartLineId';
 import { sendEmailViaEdgeFunction, emailTemplates } from '@/lib/email';
 import { cartReadyForDirectCheckout, supplierIdValidForCheckout } from '@/utils/cartSupplierCheckout';
+import { assertSupplierTaxIdentityForCheckout } from '@/lib/etims/vendorTaxIdentity';
+import { fireAndForgetEtimsInvoiceOnOrderConfirmed } from '@/lib/etims/autoSubmitOnOrderConfirmed';
 
 // Project interface for project selection
 interface BuilderProject {
@@ -545,6 +547,17 @@ export const CartSidebar: React.FC = () => {
       }
 
       console.log('✅ Final supplier for order:', validatedSupplierId, supplierName);
+
+      const taxIdentity = await assertSupplierTaxIdentityForCheckout(validatedSupplierId);
+      if (!taxIdentity.ok) {
+        toast({
+          title: 'Supplier not ready for KRA invoicing',
+          description: taxIdentity.message,
+          variant: 'destructive',
+        });
+        setIsProcessing(false);
+        return;
+      }
       
       const selectedProject = projects.find(p => p.id === selectedProjectId);
       const projectName = selectedProject?.name || 'Direct Purchase - ' + new Date().toLocaleDateString();
@@ -607,6 +620,13 @@ export const CartSidebar: React.FC = () => {
       const orderData = Array.isArray(orderDataArray) ? orderDataArray[0] : orderDataArray;
       
       console.log('✅ Purchase order created:', orderData);
+
+      if (orderData?.id && (orderData.status === 'confirmed' || orderPayload.status === 'confirmed')) {
+        fireAndForgetEtimsInvoiceOnOrderConfirmed(
+          String(orderData.id),
+          taxIdentity.identity.supplierId,
+        );
+      }
 
       // Success! Store order info for delivery/monitoring prompts (snapshot items before clearing cart)
       const orderTotal = getTotalPrice();

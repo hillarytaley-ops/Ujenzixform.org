@@ -86,6 +86,7 @@ import {
 } from "@/lib/purchaseOrderMetrics";
 import { Navigation as NavigationIcon, Receipt, Landmark } from "lucide-react";
 import { SupplierInvoiceHub } from "@/components/supplier/SupplierInvoiceHub";
+import { SupplierTaxIdentityBanner } from "@/components/supplier/SupplierTaxIdentityBanner";
 import { SupplierFinanceTab } from "@/components/supplier/SupplierFinanceTab";
 import { SupplierMarketHubDashboardPanel } from "@/components/supplier/SupplierMarketHubDashboardPanel";
 
@@ -2414,6 +2415,11 @@ const SupplierDashboard = () => {
 
           {/* Overview Tab */}
           <TabsContent value="overview">
+            <SupplierTaxIdentityBanner
+              supplierRecordId={supplierRecordId}
+              onCompleteProfile={() => setActiveTab("invoice")}
+              className="mb-4"
+            />
             <div className="space-y-6">
               {/* Recent Orders Summary */}
               <Card className={cardBg}>
@@ -2998,6 +3004,10 @@ const SupplierDashboard = () => {
           {/* INVOICE TAB — invoices, delivery notes, GRN */}
           {/* ═══════════════════════════════════════════════════════════════════════════════════ */}
           <TabsContent value="invoice">
+            <SupplierTaxIdentityBanner
+              supplierRecordId={supplierRecordId}
+              className="mb-4"
+            />
             {user?.id && (
               <SupplierInvoiceHub
                 userId={user.id}

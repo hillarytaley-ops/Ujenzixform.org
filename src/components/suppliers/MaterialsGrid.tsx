@@ -1633,6 +1633,17 @@ export const MaterialsGrid: React.FC<MaterialsGridProps> = ({
         return;
       }
 
+      const { assertSupplierTaxIdentityForCheckout } = await import('@/lib/etims/vendorTaxIdentity');
+      const taxIdentity = await assertSupplierTaxIdentityForCheckout(supplierId);
+      if (!taxIdentity.ok) {
+        toast({
+          title: 'Supplier not ready for KRA invoicing',
+          description: taxIdentity.message,
+          variant: 'destructive',
+        });
+        return;
+      }
+
       const qty = getQuantity(material.id) || 1;
       const poNumber = `PO-${Date.now()}-${Math.random().toString(36).substr(2, 5).toUpperCase()}`;
       
@@ -1665,6 +1676,13 @@ export const MaterialsGrid: React.FC<MaterialsGridProps> = ({
       if (orderError) {
         console.error('Purchase order error:', orderError);
         throw orderError;
+      }
+
+      if (orderData?.id) {
+        const { fireAndForgetEtimsInvoiceOnOrderConfirmed } = await import(
+          '@/lib/etims/autoSubmitOnOrderConfirmed'
+        );
+        fireAndForgetEtimsInvoiceOnOrderConfirmed(String(orderData.id), taxIdentity.identity.supplierId);
       }
 
       const total = material.unit_price * qty;

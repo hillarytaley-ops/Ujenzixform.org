@@ -27,6 +27,25 @@ describe("buildEtimsInvoiceBodyFromPurchaseOrder", () => {
     expect(body.salesItems[0].qty).toBe(1);
   });
 
+  it("includes supplier KRA PIN on the integrator invoice payload", () => {
+    const body = buildEtimsInvoiceBodyFromPurchaseOrder(
+      {
+        id: "00000000-0000-4000-8000-000000000099",
+        po_number: "PO-KRA",
+        total_amount: 50,
+        items: [{ etims_item_code: "KE1UCT0000001", quantity: 1, unit_price: 50 }],
+      },
+      {
+        traderTin: "P051234567X",
+        traderName: "ABC Supplies Ltd",
+      },
+    );
+
+    expect(body.traderTin).toBe("P051234567X");
+    expect(body.sellerPin).toBe("P051234567X");
+    expect(body.traderName).toBe("ABC Supplies Ltd");
+  });
+
   it("does not change lines when sum already matches PO total", () => {
     const body = buildEtimsInvoiceBodyFromPurchaseOrder(
       {

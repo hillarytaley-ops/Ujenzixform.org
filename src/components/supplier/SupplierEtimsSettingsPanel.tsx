@@ -10,6 +10,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Loader2, Landmark, PlugZap } from 'lucide-react';
 import { testEtimsIntegratorConnection } from '@/lib/etims/purchaseOrderEtims';
+import { isValidKraPin, kraPinValidationMessage, normalizeKraPin } from '@/lib/etims/kraPin';
 
 const VAT_OPTIONS = [
   { value: 'registered', label: 'VAT registered' },
@@ -97,13 +98,27 @@ export const SupplierEtimsSettingsPanel: React.FC<SupplierEtimsSettingsPanelProp
   }, [load]);
 
   const handleSave = async () => {
+    const pinErr = kraPinValidationMessage(kraPin);
+    if (pinErr) {
+      toast({ title: 'Invalid KRA PIN', description: pinErr, variant: 'destructive' });
+      return;
+    }
+    if (!legalBusinessName.trim()) {
+      toast({
+        title: 'Legal business name required',
+        description: 'Enter the name registered with KRA — it is required for multi-tenant tax invoices.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     setSaving(true);
     try {
       const { error } = await supabase
         .from('suppliers')
         .update({
-          legal_business_name: legalBusinessName.trim() || null,
-          kra_pin: kraPin.trim().toUpperCase() || null,
+          legal_business_name: legalBusinessName.trim(),
+          kra_pin: normalizeKraPin(kraPin),
           vat_registration_status: vatStatus || null,
           physical_business_address: physicalAddress.trim() || null,
           invoice_contact_phone: invoicePhone.trim() || null,

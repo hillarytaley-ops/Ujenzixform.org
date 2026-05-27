@@ -15,6 +15,8 @@ import { formatEtimsSalesDate } from "./salesDate";
 import type { EtimsGenerateInvoiceRequest, EtimsSalesItem } from "./types";
 import { invokeEtimsProxy } from "./invokeEtimsProxy";
 import { supabase } from "@/integrations/supabase/client";
+import { isValidKraPin, normalizeKraPin } from "@/lib/etims/kraPin";
+import { logTisSubmission } from "@/lib/etims/logTisSubmission";
 
 export type PoItemJson = Record<string, unknown>;
 
@@ -250,6 +252,36 @@ function str(v: unknown): string {
   return typeof v === "string" ? v.trim() : "";
 }
 
+async function fetchSupplierPartyForEtims(
+  supplierKey: string | null,
+): Promise<{ traderTin?: string; traderName?: string }> {
+  if (!supplierKey || !String(supplierKey).trim()) return {};
+  const canonical = await resolveSuppliersRowId(supplierKey);
+  const id = canonical || String(supplierKey).trim();
+  const { data } = await supabase
+    .from("suppliers")
+    .select("kra_pin, legal_business_name, company_name")
+    .eq("id", id)
+    .maybeSingle();
+  if (!data) return {};
+  const row = data as {
+    kra_pin?: string | null;
+    legal_business_name?: string | null;
+    company_name?: string | null;
+  };
+  const pin = normalizeKraPin(row.kra_pin);
+  const name =
+    (typeof row.legal_business_name === "string" && row.legal_business_name.trim()
+      ? row.legal_business_name.trim()
+      : null) ||
+    (typeof row.company_name === "string" && row.company_name.trim() ? row.company_name.trim() : null) ||
+    undefined;
+  return {
+    ...(pin && isValidKraPin(pin) ? { traderTin: pin } : {}),
+    ...(name ? { traderName: name.slice(0, 200) } : {}),
+  };
+}
+
 async function fetchBuilderPartyForEtims(
   buyerKey: string | null,
 ): Promise<{ customerPin?: string; customerName?: string }> {
@@ -321,6 +353,8 @@ export function buildEtimsInvoiceBodyFromPurchaseOrder(
   options: {
     customerPin?: string;
     customerName?: string;
+    traderTin?: string;
+    traderName?: string;
     paymentType?: EtimsGenerateInvoiceRequest["paymentType"];
     /** Override trader invoice ref (default: po_number) */
     traderInvoiceNo?: string;
@@ -395,6 +429,8 @@ export function buildEtimsInvoiceBodyFromPurchaseOrder(
 
   const receiptType = options.receiptTypeCode ?? "S";
   const orgNo = str(options.originalTraderInvoiceNo);
+  const traderTin = normalizeKraPin(options.traderTin);
+  const traderName = options.traderName?.trim().slice(0, 200);
 
   return {
     traderInvoiceNo: (options.traderInvoiceNo ?? po.po_number).slice(0, 200),
@@ -411,6 +447,17 @@ export function buildEtimsInvoiceBodyFromPurchaseOrder(
     salesItems,
     customerPin: options.customerPin || undefined,
     customerName: options.customerName || undefined,
+    ...(traderTin && isValidKraPin(traderTin)
+      ? {
+          traderTin,
+          trader_tin: traderTin,
+          sellerPin: traderTin,
+          seller_pin: traderTin,
+          taxpayerTin: traderTin,
+          taxpayer_tin: traderTin,
+        }
+      : {}),
+    ...(traderName ? { traderName, trader_name: traderName } : {}),
   };
 }
 
@@ -491,16 +538,45 @@ export async function submitEtimsInvoiceForPurchaseOrder(
     };
   }
 
+  const supplierIdForPo = poSupplierCanonical || String((po as { supplier_id: string }).supplier_id);
   const { data: sup } = await supabase
     .from("suppliers")
-    .select("etims_default_payment_type")
-    .eq("id", poSupplierCanonical || String((po as { supplier_id: string }).supplier_id))
+    .select("etims_default_payment_type, kra_pin, legal_business_name, company_name")
+    .eq("id", supplierIdForPo)
     .maybeSingle();
-  const supPay = (sup as { etims_default_payment_type?: string | null } | null)?.etims_default_payment_type;
+  const supRow = sup as {
+    etims_default_payment_type?: string | null;
+    kra_pin?: string | null;
+    legal_business_name?: string | null;
+    company_name?: string | null;
+  } | null;
+  const supPay = supRow?.etims_default_payment_type;
   const paymentFromSupplier =
     typeof supPay === "string" && /^0[1-7]$/.test(supPay.trim())
       ? (supPay.trim() as EtimsGenerateInvoiceRequest["paymentType"])
       : undefined;
+
+  const supplierParty = await fetchSupplierPartyForEtims(supplierIdForPo);
+  const supplierPinFromRow = normalizeKraPin(supRow?.kra_pin);
+  const traderTin =
+    options.traderTin?.trim() ||
+    supplierParty.traderTin ||
+    (isValidKraPin(supplierPinFromRow) ? supplierPinFromRow : "");
+  if (!traderTin || !isValidKraPin(traderTin)) {
+    return {
+      ok: false,
+      message:
+        "Supplier KRA PIN is required before submitting to KRA eTIMS. The vendor must complete tax identity in the supplier dashboard (KRA PIN and legal business name).",
+    };
+  }
+  const traderName =
+    options.traderName?.trim() ||
+    supplierParty.traderName ||
+    (typeof supRow?.legal_business_name === "string" && supRow.legal_business_name.trim()
+      ? supRow.legal_business_name.trim()
+      : typeof supRow?.company_name === "string" && supRow.company_name.trim()
+        ? supRow.company_name.trim()
+        : undefined);
 
   const party = await fetchBuilderPartyForEtims((po as { buyer_id?: string | null }).buyer_id ?? null);
 
@@ -521,6 +597,8 @@ export async function submitEtimsInvoiceForPurchaseOrder(
       {
         customerPin: options.customerPin ?? party.customerPin,
         customerName: options.customerName ?? party.customerName,
+        traderTin,
+        traderName,
         paymentType: options.paymentType ?? paymentFromSupplier ?? "01",
         currency: options.currency,
         exchangeRate: options.exchangeRate,
@@ -537,6 +615,14 @@ export async function submitEtimsInvoiceForPurchaseOrder(
       .eq("id", purchaseOrderId);
     return { ok: false, message: msg, focusCatalogId };
   }
+
+  await logTisSubmission({
+    supplierId: supplierIdForPo,
+    purchaseOrderId,
+    submissionType: "sale",
+    status: "pending",
+    traderInvoiceNo: body.traderInvoiceNo,
+  }).catch(() => undefined);
 
   const res = await invokeEtimsProxy<Record<string, unknown>>({
     method: "POST",
@@ -576,6 +662,15 @@ export async function submitEtimsInvoiceForPurchaseOrder(
       message: `Invoice accepted by integrator but failed to save on order: ${upErr.message}`,
     };
   }
+
+  void logTisSubmission({
+    supplierId: supplierIdForPo,
+    purchaseOrderId,
+    submissionType: "sale",
+    status: "success",
+    traderInvoiceNo: persist.traderInvoiceNo ?? body.traderInvoiceNo,
+    responseSnapshot: res.data,
+  });
 
   return { ok: true, data: res.data };
 }

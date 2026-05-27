@@ -50,7 +50,9 @@ import {
   Loader2,
   KeyRound,
   CreditCard,
+  Landmark,
 } from "lucide-react";
+import { isValidKraPin, kraPinValidationMessage, normalizeKraPin } from "@/lib/etims/kraPin";
 import { normalizePhoneDigits } from "@/utils/phoneNormalize";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
@@ -113,6 +115,8 @@ const SupplierRegistration = () => {
   
   // Business Information
   const [businessName, setBusinessName] = useState("");
+  const [legalBusinessName, setLegalBusinessName] = useState("");
+  const [kraPin, setKraPin] = useState("");
   const [contactPerson, setContactPerson] = useState("");
   const [businessRegNumber, setBusinessRegNumber] = useState("");
   const [email, setEmail] = useState("");
@@ -237,27 +241,30 @@ const SupplierRegistration = () => {
   };
 
   const validateStep1 = () => {
+    const legal = (legalBusinessName.trim() || businessName.trim());
+    const pinErr = kraPinValidationMessage(kraPin);
+
     // If user is already logged in, they don't need to provide password
     if (existingUser) {
-      if (!businessName || !contactPerson.trim() || !phone) {
+      if (!businessName.trim() || !legal || !contactPerson.trim() || !phone || pinErr) {
         toast({
           variant: "destructive",
           title: "Missing Information",
-          description: "Please fill in all required business information fields."
+          description: pinErr || "Please fill in business name, legal name, KRA PIN, contact person, and phone.",
         });
         return false;
       }
     } else {
       // New user needs email and password
-      if (!businessName || !contactPerson.trim() || !email || !password || !phone) {
+      if (!businessName.trim() || !legal || !contactPerson.trim() || !email || !password || !phone || pinErr) {
         toast({
           variant: "destructive",
           title: "Missing Information",
-          description: "Please fill in all required business information fields."
+          description: pinErr || "Please fill in all required business and KRA tax fields.",
         });
         return false;
       }
-      
+
       if (password.length < 8) {
         toast({
           variant: "destructive",
@@ -266,6 +273,15 @@ const SupplierRegistration = () => {
         });
         return false;
       }
+    }
+
+    if (!isValidKraPin(kraPin)) {
+      toast({
+        variant: "destructive",
+        title: "Invalid KRA PIN",
+        description: kraPinValidationMessage(kraPin) ?? "Check your KRA PIN format.",
+      });
+      return false;
     }
     
     return true;
@@ -340,6 +356,16 @@ const SupplierRegistration = () => {
         variant: "destructive",
         title: "Bank details required",
         description: "Please complete your payout bank name, account holder name, and account number.",
+      });
+      return;
+    }
+
+    const pinErr = kraPinValidationMessage(kraPin);
+    if (pinErr || !(legalBusinessName.trim() || businessName.trim())) {
+      toast({
+        variant: "destructive",
+        title: "KRA tax identity required",
+        description: pinErr || "Legal business name and KRA PIN are required for supplier onboarding.",
       });
       return;
     }
@@ -525,24 +551,37 @@ const SupplierRegistration = () => {
           .eq('applicant_user_id', userId)
           .maybeSingle();
         
+        const legalName = (legalBusinessName.trim() || businessName.trim());
+        const kraPinDb = normalizeKraPin(kraPin);
+        const applicationPayload = {
+          email: email.trim().toLowerCase(),
+          company_name: businessName.trim(),
+          legal_business_name: legalName,
+          kra_pin: kraPinDb,
+          contact_person: contactPerson.trim(),
+          phone: phoneDb,
+          address: [physicalAddress, town, county].filter(Boolean).join(', '),
+          materials_offered: selectedCategories.length > 0 ? selectedCategories : ['General'],
+          business_registration_number: businessRegNumber.trim() || null,
+          bank_name: bankName.trim(),
+          bank_account_holder_name: bankAccountHolderName.trim(),
+          bank_account_number: bankAccountNumber.trim(),
+          bank_branch: bankBranch.trim() || null,
+        };
+
         if (existingApp) {
-          console.log("✅ Supplier application already exists");
+          const { error: appUpErr } = await supabase
+            .from('supplier_applications')
+            .update(applicationPayload)
+            .eq('applicant_user_id', userId);
+          if (appUpErr) console.warn("supplier_applications update warning:", appUpErr);
+          else console.log("✅ Updated supplier_applications with KRA tax identity");
         } else {
           const { error: supplierAppError } = await supabase
             .from('supplier_applications')
             .insert({
               applicant_user_id: userId,
-              email: email.trim().toLowerCase(),
-              company_name: businessName,
-              contact_person: contactPerson.trim(),
-              phone: phoneDb,
-              address: [physicalAddress, town, county].filter(Boolean).join(', '),
-              materials_offered: selectedCategories.length > 0 ? selectedCategories : ['General'],
-              business_registration_number: businessRegNumber.trim() || null,
-              bank_name: bankName.trim(),
-              bank_account_holder_name: bankAccountHolderName.trim(),
-              bank_account_number: bankAccountNumber.trim(),
-              bank_branch: bankBranch.trim() || null,
+              ...applicationPayload,
               status: 'pending',
             });
           
@@ -555,8 +594,44 @@ const SupplierRegistration = () => {
       } catch (regErr) {
         console.warn("supplier_applications save error (non-blocking):", regErr);
       }
+
+      // 5b. Persist KRA tax identity on suppliers row (multi-tenant eTIMS vendor profile)
+      try {
+        const legalName = (legalBusinessName.trim() || businessName.trim());
+        const kraPinDb = normalizeKraPin(kraPin);
+        const { data: existingSup } = await supabase
+          .from('suppliers')
+          .select('id')
+          .eq('user_id', userId)
+          .maybeSingle();
+
+        const supplierRow = {
+          user_id: userId,
+          company_name: businessName.trim(),
+          legal_business_name: legalName,
+          kra_pin: kraPinDb,
+          email: email.trim().toLowerCase(),
+          phone: phoneDb,
+          address: [physicalAddress, town, county].filter(Boolean).join(', '),
+          contact_person: contactPerson.trim(),
+          updated_at: new Date().toISOString(),
+        };
+
+        if (existingSup?.id) {
+          await supabase.from('suppliers').update(supplierRow).eq('user_id', userId);
+        } else {
+          await supabase.from('suppliers').insert({
+            ...supplierRow,
+            status: 'pending',
+            is_verified: false,
+          });
+        }
+        console.log("✅ Supplier tax identity saved for eTIMS");
+      } catch (supErr) {
+        console.warn("suppliers tax identity save (non-blocking):", supErr);
+      }
       
-      // 5. Save supplier materials (for future implementation)
+      // 6. Save supplier materials (for future implementation)
       const supplierData = {
         user_id: userId,
         business_name: businessName,
@@ -744,6 +819,45 @@ const SupplierRegistration = () => {
                           value={businessRegNumber}
                           onChange={(e) => setBusinessRegNumber(e.target.value)}
                         />
+                      </div>
+                    </div>
+
+                    <div className="rounded-lg border border-sky-200 bg-sky-50/80 p-4 space-y-4 dark:border-sky-900/50 dark:bg-sky-950/20">
+                      <div className="flex items-center gap-2 text-sm font-medium text-sky-900 dark:text-sky-100">
+                        <Landmark className="h-4 w-4 shrink-0" />
+                        KRA eTIMS — required for tax invoices
+                      </div>
+                      <p className="text-xs text-sky-800/90 dark:text-sky-200/80">
+                        UjenziXform issues KRA-compliant invoices per supplier when buyers confirm orders. Your legal
+                        name and PIN are sent to the KRA sandbox integrator on each sale.
+                      </p>
+                      <div className="space-y-2">
+                        <Label htmlFor="legalBusinessName">Legal / registered business name *</Label>
+                        <Input
+                          id="legalBusinessName"
+                          placeholder="As registered with KRA"
+                          value={legalBusinessName}
+                          onChange={(e) => setLegalBusinessName(e.target.value)}
+                          onBlur={() => {
+                            if (!legalBusinessName.trim() && businessName.trim()) {
+                              setLegalBusinessName(businessName.trim());
+                            }
+                          }}
+                          required
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="kraPin">KRA PIN *</Label>
+                        <Input
+                          id="kraPin"
+                          placeholder="P051234567X"
+                          className="font-mono uppercase"
+                          value={kraPin}
+                          onChange={(e) => setKraPin(e.target.value.toUpperCase())}
+                          maxLength={11}
+                          required
+                        />
+                        <p className="text-xs text-muted-foreground">11 characters — letter, nine digits, letter.</p>
                       </div>
                     </div>
 

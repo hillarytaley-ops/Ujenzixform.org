@@ -52,8 +52,19 @@ export interface EtimsGenerateInvoiceRequest {
   /** When integrator expects a country code on the sales payload (optional). */
   countryCode?: string;
   salesItems: EtimsSalesItem[];
+  /** Buyer KRA PIN */
   customerPin?: string;
   customerName?: string;
+  /** Issuing vendor/supplier KRA PIN (multi-tenant TIS invoicing) */
+  traderTin?: string;
+  trader_tin?: string;
+  sellerPin?: string;
+  seller_pin?: string;
+  taxpayerTin?: string;
+  taxpayer_tin?: string;
+  /** Registered legal / trading name of the issuing supplier */
+  traderName?: string;
+  trader_name?: string;
 }
 
 export interface EtimsStoreItemRequest {
