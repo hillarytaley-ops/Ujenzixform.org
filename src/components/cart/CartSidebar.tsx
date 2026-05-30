@@ -821,8 +821,9 @@ export const CartSidebar: React.FC = () => {
                               <Badge variant="outline" className="text-[10px] px-1.5 py-0 mt-1">
                                 {item.category}
                               </Badge>
-                              <p className="text-sm font-semibold text-blue-600 mt-1">
-                                KES {item.unit_price.toLocaleString()}/{item.unit}
+                              <p className="text-sm font-semibold text-foreground tabular-nums mt-1">
+                                KES {item.unit_price.toLocaleString()}
+                                <span className="text-xs font-normal text-muted-foreground">/{item.unit}</span>
                               </p>
                             </div>
                             

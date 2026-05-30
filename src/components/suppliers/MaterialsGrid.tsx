@@ -2622,18 +2622,18 @@ export const MaterialsGrid: React.FC<MaterialsGridProps> = ({
                         (() => {
                           const selectedVariant = getVariantByKey(material.variants, selectedVariants[material.id]) ?? material.variants[0];
                           return selectedVariant ? (
-                            <div className="flex items-baseline justify-between">
-                              <span className="text-lg font-bold text-blue-600">KES {selectedVariant.price.toLocaleString()}</span>
-                              <span className="text-xs text-muted-foreground">/{material.unit}</span>
-                            </div>
+                            <p className="text-base font-semibold text-foreground tabular-nums">
+                              KES {selectedVariant.price.toLocaleString()}
+                              <span className="text-xs font-normal text-muted-foreground ml-0.5">/{material.unit}</span>
+                            </p>
                           ) : null;
                         })()
                       ) : (
                         /* Single Price */
-                        <div className="flex items-baseline gap-1">
-                          <span className="text-lg font-bold text-blue-600">KES {material.unit_price.toLocaleString()}</span>
-                          <span className="text-xs text-muted-foreground">/{material.unit}</span>
-                        </div>
+                        <p className="text-base font-semibold text-foreground tabular-nums">
+                          KES {material.unit_price.toLocaleString()}
+                          <span className="text-xs font-normal text-muted-foreground ml-0.5">/{material.unit}</span>
+                        </p>
                       )}
                       
                       {/* Compare Price Checkbox - Hidden for COs in quote mode and Suppliers */}
