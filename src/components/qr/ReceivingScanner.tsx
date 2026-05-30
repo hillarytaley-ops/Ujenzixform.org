@@ -300,15 +300,13 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
 
   const checkAuth = async () => {
     try {
-      const localRole = localStorage.getItem('user_role');
-      if (localRole) setUserRole(localRole);
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
       const { data: roleData } = await supabase.from('user_roles').select('role').eq('user_id', user.id).maybeSingle();
-      setUserRole(roleData?.role || localRole || null);
+      setUserRole(roleData?.role || null);
     } catch (err) {
       console.error('Auth check failed (non-fatal):', err);
-      setUserRole(localStorage.getItem('user_role') || null);
+      setUserRole(null);
     }
   };
 

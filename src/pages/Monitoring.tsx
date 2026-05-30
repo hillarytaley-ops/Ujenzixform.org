@@ -509,30 +509,14 @@ interface ProjectMonitoring {
 const Monitoring = () => {
   const [searchParams] = useSearchParams();
   const [activeTab, setActiveTab] = useState("cameras");
-  // Start with localStorage role for instant access, then verify
-  const [userRole, setUserRole] = useState<string | null>(() => {
-    // Check localStorage immediately for instant UI
-    const cachedRole = localStorage.getItem('user_role');
-    if (cachedRole && ['admin', 'professional_builder', 'private_client', 'builder'].includes(cachedRole)) {
-      return cachedRole;
-    }
-    return null;
-  });
+  const [userRole, setUserRole] = useState<string | null>(null);
   const [user, setUser] = useState<any>(null);
   const [selectedCamera, setSelectedCamera] = useState<string | null>(null);
   const [hasMonitoringAccess, setHasMonitoringAccess] = useState<boolean>(false);
-  // Start with false if we have a cached role, true otherwise
-  const [checkingAccess, setCheckingAccess] = useState<boolean>(() => {
-    const cachedRole = localStorage.getItem('user_role');
-    return !cachedRole || !['admin', 'professional_builder', 'private_client', 'builder'].includes(cachedRole);
-  });
+  const [checkingAccess, setCheckingAccess] = useState<boolean>(true);
   const [monitoringRequest, setMonitoringRequest] = useState<any>(null);
   const [showRequestForm, setShowRequestForm] = useState<boolean>(false);
-  // If we have a cached role, consider DB verified for instant access
-  const [dbVerified, setDbVerified] = useState<boolean>(() => {
-    const cachedRole = localStorage.getItem('user_role');
-    return !!cachedRole && ['admin', 'professional_builder', 'private_client', 'builder'].includes(cachedRole);
-  });
+  const [dbVerified, setDbVerified] = useState<boolean>(false);
   const { toast } = useToast();
   const publicStats = useHomePagePublicStats();
 
@@ -875,30 +859,15 @@ const Monitoring = () => {
   const checkUserRole = async () => {
     console.log('🔐 Monitoring - Starting auth check...');
     
-    // Don't reset states if we already have valid cached data
-    const cachedRole = localStorage.getItem('user_role');
-    const isValidCachedRole = cachedRole && ['admin', 'professional_builder', 'private_client', 'builder'].includes(cachedRole);
+    setCheckingAccess(true);
+    setDbVerified(false);
     
-    if (!isValidCachedRole) {
-      setCheckingAccess(true);
-      setDbVerified(false);
-    }
-    
-    // Quick timeout - if we can't verify in 3 seconds and have cached role, use it
     const timeout = setTimeout(() => {
       console.log('🔐 Monitoring - Timeout reached');
-      if (isValidCachedRole) {
-        console.log('✅ Monitoring - Using cached role:', cachedRole);
-        setUserRole(cachedRole);
-        setDbVerified(true);
-        setCheckingAccess(false);
-      } else {
-        console.log('🚫 Monitoring - No cached role, blocking access');
-        setUserRole(null);
-        setHasMonitoringAccess(false);
-        setDbVerified(true);
-        setCheckingAccess(false);
-      }
+      setUserRole(null);
+      setHasMonitoringAccess(false);
+      setDbVerified(true);
+      setCheckingAccess(false);
     }, 3000);
     
     try {
@@ -971,20 +940,12 @@ const Monitoring = () => {
         console.log('🔐 Monitoring - REST API error');
       }
       
-      // Use cached role if REST fails
-      if (!dbRole && isValidCachedRole) {
-        dbRole = cachedRole;
-        console.log('🔐 Monitoring - Using cached role:', dbRole);
-      }
-      
       console.log('🔐 Monitoring - Final role:', dbRole);
       clearTimeout(timeout);
       
       // NO ROLE IN DATABASE = BLOCK ACCESS
       if (!dbRole) {
         console.log('🚫 Monitoring - NO ROLE IN DATABASE - Blocking access');
-        localStorage.removeItem('user_role');
-        localStorage.removeItem('user_role_id');
         setUserRole(null);
         setHasMonitoringAccess(false);
         clearTimeout(timeout);
@@ -995,8 +956,6 @@ const Monitoring = () => {
       
       // Role found in database - set it
       setUserRole(dbRole);
-      localStorage.setItem('user_role', dbRole);
-      localStorage.setItem('user_role_id', authUser.id);
       
       // For builders (including professional_builder and private_client), check if they have an approved/active monitoring request
       const isBuilderRole = ['builder', 'professional_builder', 'private_client'].includes(dbRole);
@@ -1068,9 +1027,7 @@ const Monitoring = () => {
     }
   };
 
-  // Define effectiveRole early - use userRole from state, or fall back to localStorage
-  const storedRole = typeof window !== 'undefined' ? localStorage.getItem('user_role') : null;
-  const effectiveRoleEarly = userRole || storedRole;
+  const effectiveRoleEarly = userRole;
   
   const isAdmin = effectiveRoleEarly === 'admin';
   const isBuilder = ['builder', 'professional_builder', 'private_client'].includes(effectiveRoleEarly || '');

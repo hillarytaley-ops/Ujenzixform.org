@@ -15,6 +15,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
+import useVerifiedRole from '@/hooks/useVerifiedRole';
 import { supabase, SUPABASE_URL, SUPABASE_ANON_KEY } from '@/integrations/supabase/client';
 import { PAYSTACK_NAV_KEY } from '@/components/payment/PaystackCheckout';
 import { MapLocationPicker } from '@/components/location/MapLocationPicker';
@@ -289,9 +290,8 @@ export const MonitoringServicePrompt: React.FC<MonitoringServicePromptProps> = (
   const [step, setStep] = useState<'intro' | 'packages' | 'details' | 'success'>('intro');
   const [selectedPackage, setSelectedPackage] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  
-  // Detect user role for pricing
-  const userRole = localStorage.getItem('user_role') || 'private_client';
+  const { role: verifiedRole } = useVerifiedRole();
+  const userRole = verifiedRole || 'private_client';
   const isProfessional = userRole === 'professional_builder' || userRole === 'admin';
   const packages = isProfessional ? PROFESSIONAL_PACKAGES : PRIVATE_PACKAGES;
   const [formData, setFormData] = useState({

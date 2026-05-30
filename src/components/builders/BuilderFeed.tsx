@@ -32,6 +32,7 @@ import { BuilderVideoPost, BuilderVideoPostProps, VideoComment } from './Builder
 import { BuilderStories } from './BuilderStories';
 import { SUPABASE_ANON_KEY, SUPABASE_URL, supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import useVerifiedRole from '@/hooks/useVerifiedRole';
 import { getBuilderFeedGuestId } from '@/utils/builderFeedGuestId';
 import { normalizeTimelinePageFromStats } from '@/utils/normalizeTimelinePageFromStats';
 import { normalizeEmojiForDisplay } from '@/utils/emojiDisplay';
@@ -135,30 +136,28 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
   includeAuthorPendingVideos = false,
 }) => {
   const { toast } = useToast();
+  const { role: verifiedRole } = useVerifiedRole();
   
-  // FAST PATH: Check localStorage for role if not passed via props
-  // This ensures we detect COs/contractors even if the prop wasn't set correctly
-  const storedRole = typeof window !== 'undefined' ? localStorage.getItem('user_role') : null;
   const storedUserId = typeof window !== 'undefined' ? localStorage.getItem('user_id') : null;
   const storedUserName = typeof window !== 'undefined' ? localStorage.getItem('user_name') : null;
   
   // Use stored user ID if currentUserId not provided
   const effectiveUserId = currentUserId || storedUserId;
   
-  // Get effective role from props or localStorage
-  const effectiveRole = currentUserRole || storedRole;
+  // Get effective role from props or verified auth context
+  const effectiveRole = currentUserRole || verifiedRole;
   
   // Get effective user name from props or localStorage
   const effectiveUserName =
     (currentUserName !== 'Guest' ? currentUserName : storedUserName || 'Guest') || 'Guest';
   
   const isSupplierRole =
-    effectiveRole === 'supplier' || storedRole === 'supplier';
+    effectiveRole === 'supplier';
   /** Only registered CO/contractors may post on this feed (not suppliers/admins by role alone). */
   const isCoContractor =
     isBuilder ||
     effectiveRole === 'professional_builder' ||
-    storedRole === 'professional_builder';
+    verifiedRole === 'professional_builder';
   const canPost =
     showComposer && isCoContractor && !isSupplierRole;
   const effectiveIsBuilder = isCoContractor;

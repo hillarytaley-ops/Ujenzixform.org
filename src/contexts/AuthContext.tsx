@@ -61,22 +61,22 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const role = roleData?.role || null;
       setUserRole(role);
       
-      // Sync to localStorage for components that need instant access
       if (role) {
         localStorage.setItem('user_role', role);
         localStorage.setItem('user_role_id', userId);
-        logger.debug(`Role synced to localStorage: ${role}`, undefined, 'AuthContext');
+        logger.debug(`Role synced from DB: ${role}`, undefined, 'AuthContext');
+      } else {
+        localStorage.removeItem('user_role');
+        localStorage.removeItem('user_role_id');
+      }
 
-        // Trigger data prefetch in background after login
-        if (triggerPrefetch) {
-          const accessToken = (await supabase.auth.getSession()).data.session?.access_token;
-          if (accessToken) {
-            logger.debug('Starting data prefetch for faster dashboard loading…', undefined, 'AuthContext');
-            // Run prefetch in background - don't await
-            prefetchDashboardData(userId, role, accessToken).catch((err) => {
-              logger.warn('Prefetch error (non-critical)', err, 'AuthContext');
-            });
-          }
+      if (triggerPrefetch && role) {
+        const accessToken = (await supabase.auth.getSession()).data.session?.access_token;
+        if (accessToken) {
+          logger.debug('Starting data prefetch for faster dashboard loading…', undefined, 'AuthContext');
+          prefetchDashboardData(userId, role, accessToken).catch((err) => {
+            logger.warn('Prefetch error (non-critical)', err, 'AuthContext');
+          });
         }
       }
     } catch (error) {

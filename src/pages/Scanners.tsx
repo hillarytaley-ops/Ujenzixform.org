@@ -25,6 +25,7 @@ const scannerSuspenseFallback = (
 );
 import { useNavigate } from 'react-router-dom';
 import { supabase } from "@/integrations/supabase/client";
+import { resolveRoleFromSession } from "@/utils/resolveRoleFromSession";
 import { 
   QrCode, 
   Scan, 
@@ -80,12 +81,6 @@ const ScannersAccessGuard = ({ children }: { children: React.ReactNode }) => {
       
       // Safety timeout - show UI after 3 seconds max
       const safetyTimeout = setTimeout(() => {
-        const storedRole = localStorage.getItem('user_role');
-        const storedUser = getUserFromStorage();
-        if (storedUser && storedRole) {
-          setUser(storedUser);
-          setDbRole(storedRole);
-        }
         setDbVerified(true);
         setChecking(false);
       }, 3000);
@@ -111,8 +106,7 @@ const ScannersAccessGuard = ({ children }: { children: React.ReactNode }) => {
         
         setUser(authUser);
         
-        // Try to get role from database with timeout
-        let role: string | null = localStorage.getItem('user_role'); // Start with localStorage
+        let role: string | null = null;
         try {
           const { data: roleData } = await withTimeout(
             supabase
@@ -125,26 +119,17 @@ const ScannersAccessGuard = ({ children }: { children: React.ReactNode }) => {
           
           if (roleData?.role) {
             role = roleData.role;
-            localStorage.setItem('user_role', role);
             localStorage.setItem('user_role_id', authUser.id);
           }
         } catch {
-          /* use localStorage role */
+          /* role stays null */
         }
         
         setDbRole(role);
         clearTimeout(safetyTimeout);
       } catch (error) {
         console.error('🚫 Scanners - Error checking access:', error);
-        // On error, try localStorage fallback
-        const storedRole = localStorage.getItem('user_role');
-        const storedUser = getUserFromStorage();
-        if (storedUser && storedRole) {
-          setUser(storedUser);
-          setDbRole(storedRole);
-        } else {
-          setDbRole(null);
-        }
+        setDbRole(null);
       }
       
       setDbVerified(true);
@@ -297,25 +282,19 @@ const ScannersContent = () => {
   const navigate = useNavigate();
   const publicStats = useHomePagePublicStats();
 
-  const localRole = localStorage.getItem("user_role");
-  const effectiveRole = userRole || localRole;
-
   useEffect(() => {
     if (loading) return;
 
-    const lr = localStorage.getItem("user_role");
-    const role = userRole || lr;
-
     const restrictedRoles = ["builder", "private_client", "professional_builder"];
-    if (restrictedRoles.includes(role || "")) {
+    if (restrictedRoles.includes(userRole || "")) {
       navigate("/tracking", { replace: true });
       return;
     }
-    if (role === "supplier") {
+    if (userRole === "supplier") {
       navigate("/supplier-dispatch-scanner", { replace: true });
       return;
     }
-    if (role === "delivery" || role === "delivery_provider") {
+    if (userRole === "delivery" || userRole === "delivery_provider") {
       navigate("/delivery-receiving-scanner", { replace: true });
       return;
     }
@@ -509,7 +488,7 @@ const ScannersContent = () => {
           </div>
 
           {/* Access Info Banner - for non-logged in users */}
-          {!effectiveRole && (
+          {!userRole && (
             <div className="max-w-6xl mx-auto mb-6">
               <Card className="bg-gradient-to-r from-blue-50 to-cyan-50 border-blue-200">
                 <CardContent className="py-4">

@@ -6,6 +6,7 @@ import AnimatedSection from '@/components/AnimatedSection';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
+import { resolveRoleFromSession } from '@/utils/resolveRoleFromSession';
 import { Link } from 'react-router-dom';
 import { BarChart3, TrendingUp, Zap, Video, Sparkles } from 'lucide-react';
 
@@ -24,9 +25,9 @@ const Analytics = () => {
       // First check for admin session from localStorage (admin dashboard login)
       const isAdminAuthenticated = localStorage.getItem('admin_authenticated') === 'true';
       const adminEmail = localStorage.getItem('admin_email');
-      const storedRole = localStorage.getItem('user_role');
+      const { role: sessionRole } = await resolveRoleFromSession();
       
-      if (isAdminAuthenticated && adminEmail && storedRole === 'admin') {
+      if (isAdminAuthenticated && adminEmail && sessionRole === 'admin') {
         console.log('✅ Admin session detected from localStorage');
         setIsAdminSession(true);
         setUserRole('admin');

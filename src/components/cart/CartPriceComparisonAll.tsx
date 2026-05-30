@@ -32,6 +32,7 @@ import { readAuthSessionForRest } from '@/utils/supabaseAccessToken';
 import { supplierLocationLine } from '@/utils/supplierLocationLine';
 import { cartReadyForDirectCheckout } from '@/utils/cartSupplierCheckout';
 import { useToast } from '@/hooks/use-toast';
+import useVerifiedRole from '@/hooks/useVerifiedRole';
 import { 
   Scale, 
   Star,
@@ -89,15 +90,7 @@ export const CartPriceComparisonAll: React.FC<CartPriceComparisonAllProps> = ({
 }) => {
   const { items, updateCartItem, clearCart } = useCart();
   const { toast } = useToast();
-  const [comparisons, setComparisons] = useState<ProductComparison[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [allSuppliers, setAllSuppliers] = useState<SupplierColumn[]>([]);
-  const [selectedSuppliers, setSelectedSuppliers] = useState<Set<string>>(new Set());
-  const [sending, setSending] = useState(false);
-  const [notes, setNotes] = useState('');
-  
-  // Get user role (only true pros use quote-only flow; admins/private clients use supplier select + payment)
-  const userRole = localStorage.getItem('user_role');
+  const { role: userRole } = useVerifiedRole();
   const isProfessionalBuilder = userRole === 'professional_builder';
 
   useEffect(() => {

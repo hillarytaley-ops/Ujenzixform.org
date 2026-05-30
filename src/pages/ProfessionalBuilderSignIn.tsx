@@ -31,15 +31,7 @@ const ProfessionalBuilderSignIn = () => {
           if (parsed?.user?.id) {
             console.log('🔐 Found existing session in localStorage');
             
-            // Check role from localStorage first
-            const storedRole = localStorage.getItem('user_role');
-            if (storedRole === 'professional_builder') {
-              console.log('🔐 Already logged in as professional_builder, redirecting...');
-              window.location.href = '/professional-builder-dashboard';
-              return;
-            }
-            
-            // If role not in localStorage, check database
+            // Check database for role
             try {
               const controller = new AbortController();
               const timeoutId = setTimeout(() => controller.abort(), 3000);
@@ -62,10 +54,8 @@ const ProfessionalBuilderSignIn = () => {
                 console.log('🔐 DB role:', dbRole);
                 
                 if (dbRole === 'professional_builder') {
-                  localStorage.setItem('user_role', dbRole);
                   window.location.href = '/professional-builder-dashboard';
                 } else if (dbRole) {
-                  localStorage.setItem('user_role', dbRole);
                   toast({
                     title: 'Wrong Portal',
                     description: `You are registered as ${dbRole}. Redirecting...`,
@@ -185,7 +175,6 @@ const ProfessionalBuilderSignIn = () => {
           console.log('🔐 DB role:', dbRole);
           
           // Store role info
-          localStorage.setItem('user_role', dbRole || 'professional_builder');
           localStorage.setItem('user_id', signInData.user.id);
           localStorage.setItem('user_email', signInData.user.email || '');
           localStorage.setItem('user_role_verified', Date.now().toString());
@@ -210,7 +199,6 @@ const ProfessionalBuilderSignIn = () => {
       } catch (roleError) {
         console.warn('🔐 Role check failed:', roleError);
         // Continue with default role
-        localStorage.setItem('user_role', 'professional_builder');
         localStorage.setItem('user_id', signInData.user.id);
         localStorage.setItem('user_email', signInData.user.email || '');
       }

@@ -123,25 +123,15 @@ const SupplierMarketplace = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   
-  // Check localStorage first for instant loading
-  const cachedRole = typeof window !== 'undefined' ? localStorage.getItem('user_role') : null;
-  const cachedEmail = typeof window !== 'undefined' ? localStorage.getItem('user_email') : null;
-  const isBuilderCached = cachedRole === 'builder' || cachedRole === 'professional_builder' || cachedRole === 'private_client';
-  
-  const [user, setUser] = useState<any>(isBuilderCached ? { email: cachedEmail || 'Builder' } : null);
-  const [userRole, setUserRole] = useState<string | null>(cachedRole);
-  const [loading, setLoading] = useState(!isBuilderCached); // Only show loading if no cached role
-  const [roleVerified, setRoleVerified] = useState(isBuilderCached);
+  const [user, setUser] = useState<any>(null);
+  const [userRole, setUserRole] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [roleVerified, setRoleVerified] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("All Categories");
 
   useEffect(() => {
-    // If we have cached role, verify in background
-    if (isBuilderCached) {
-      checkAuthBackground();
-    } else {
-      checkAuth();
-    }
+    checkAuth();
   }, []);
 
   // Background check - doesn't block UI (uses faster getSession)
@@ -158,7 +148,6 @@ const SupplierMarketplace = () => {
           .maybeSingle();
         if (roleData?.role) {
           setUserRole(roleData.role);
-          localStorage.setItem('user_role', roleData.role);
         }
       }
     } catch (error) {
@@ -193,19 +182,6 @@ const SupplierMarketplace = () => {
           setLoading(false);
           return;
         }
-      }
-      
-      // Fallback: Check localStorage for builder role (for users who signed in via builder-signin)
-      const storedRole = localStorage.getItem('user_role');
-      const storedEmail = localStorage.getItem('user_email');
-      
-      if (storedRole && (storedRole === 'builder' || storedRole === 'professional_builder' || storedRole === 'private_client')) {
-        console.log('🔐 SupplierMarketplace - Using localStorage role:', storedRole);
-        setUser({ email: storedEmail || 'Builder' });
-        setUserRole(storedRole);
-        setRoleVerified(true);
-        setLoading(false);
-        return;
       }
       
       console.log('🔐 SupplierMarketplace - No authenticated user');

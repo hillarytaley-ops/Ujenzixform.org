@@ -97,19 +97,8 @@ const Suppliers = () => {
     }
   }, [projectIdFromUrl, isFromDashboard]);
 
-  // Fast auth check with caching
+  // Verify auth with Supabase
   useEffect(() => {
-    // Use cached values for instant display
-    const cachedRole = localStorage.getItem('user_role');
-    const cachedUserId = localStorage.getItem('user_id');
-    
-    if (cachedRole && cachedUserId) {
-      setUser({ id: cachedUserId });
-      setUserRole(cachedRole);
-      setLoading(false);
-    }
-    
-    // Verify with Supabase in background
     checkAuth();
   }, []);
 
@@ -129,9 +118,7 @@ const Suppliers = () => {
         
         const role = roleData?.role || null;
         setUserRole(role);
-        if (role) localStorage.setItem('user_role', role);
       } else {
-        localStorage.removeItem('user_role');
         localStorage.removeItem('user_id');
         setUser(null);
         setUserRole(null);

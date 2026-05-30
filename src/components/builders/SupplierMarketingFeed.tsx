@@ -6,6 +6,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { BuilderVideoPost, BuilderVideoPostProps, VideoComment } from './BuilderVideoPost';
 import { SUPABASE_ANON_KEY, SUPABASE_URL, supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import useVerifiedRole from '@/hooks/useVerifiedRole';
 import { getBuilderFeedGuestId } from '@/utils/builderFeedGuestId';
 import { mergeViewerReactionsWithLocalFallback, setFeedReactionCache } from '@/utils/builderFeedReactionCache';
 import { normalizeEmojiForDisplay } from '@/utils/emojiDisplay';
@@ -56,18 +57,18 @@ export const SupplierMarketingFeed: React.FC<SupplierMarketingFeedProps> = ({
   authorUserIdOnly,
 }) => {
   const { toast } = useToast();
-  const storedRole = typeof window !== 'undefined' ? localStorage.getItem('user_role') : null;
+  const { role: verifiedRole } = useVerifiedRole();
   const storedUserId = typeof window !== 'undefined' ? localStorage.getItem('user_id') : null;
   const storedUserName = typeof window !== 'undefined' ? localStorage.getItem('user_name') : null;
 
   const effectiveUserId = currentUserId || storedUserId || undefined;
-  const effectiveRole = currentUserRole || storedRole;
+  const effectiveRole = currentUserRole || verifiedRole;
   const effectiveUserName =
     currentUserName !== 'Guest' ? currentUserName : storedUserName || 'Guest';
 
   const canPost =
     showComposer &&
-    (isSupplier || effectiveRole === 'supplier' || storedRole === 'supplier');
+    (isSupplier || effectiveRole === 'supplier');
 
   const [posts, setPosts] = useState<SupplierPostRow[]>([]);
   const [loadingPosts, setLoadingPosts] = useState(true);

@@ -31,9 +31,7 @@ import { Link } from 'react-router-dom';
  */
 const DeliveryReceivingScanner = () => {
   const navigate = useNavigate();
-  const { userRole } = useAuth();
-  const localRole = localStorage.getItem('user_role');
-  const effectiveRole = userRole || localRole;
+  const { userRole: effectiveRole } = useAuth();
 
   // Block builders from accessing this page
   useEffect(() => {

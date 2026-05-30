@@ -205,20 +205,6 @@ const SupplierSignIn = () => {
       const userId = authData.user.id;
       const userEmail = authData.user.email?.toLowerCase() || '';
       
-      // ✅ MOBILE OPTIMIZED: Check localStorage first for instant redirect
-      const cachedRole = localStorage.getItem('user_role');
-      const cachedRoleId = localStorage.getItem('user_role_id');
-      
-      // If we have a valid cached supplier/admin role for this user, redirect immediately
-      if (cachedRole && cachedRoleId === userId && (cachedRole === 'supplier' || cachedRole === 'admin')) {
-        console.log('🔐 Using cached role for fast redirect:', cachedRole);
-        localStorage.setItem('user_role_verified', Date.now().toString());
-        localStorage.setItem('user_email', userEmail);
-        toast({ title: "✅ Welcome!", description: "Redirecting to dashboard..." });
-        window.location.href = '/supplier-dashboard';
-        return;
-      }
-      
       // Fetch role from database (source of truth) - with timeout
       let dbRole: string | null = null;
       try {
@@ -270,7 +256,6 @@ const SupplierSignIn = () => {
       
       // Set localStorage to supplier (or admin if they're admin)
       const effectiveRole = dbRole === 'admin' ? 'admin' : 'supplier';
-      localStorage.setItem('user_role', effectiveRole);
       localStorage.setItem('user_role_id', userId);
       localStorage.setItem('user_role_verified', Date.now().toString());
       saveUserSession(userId, userEmail, effectiveRole);

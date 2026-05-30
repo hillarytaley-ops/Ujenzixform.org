@@ -86,8 +86,6 @@ const Delivery = () => {
       setUserRole(authUserRole);
       return;
     }
-    const cachedRole = localStorage.getItem("user_role");
-    if (cachedRole) setUserRole(cachedRole);
 
     const checkUserRole = async () => {
       try {

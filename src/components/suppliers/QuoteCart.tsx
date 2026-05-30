@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
+import useVerifiedRole from '@/hooks/useVerifiedRole';
 import { supabase, SUPABASE_URL, SUPABASE_ANON_KEY } from '@/integrations/supabase/client';
 import { 
   FileText, 
@@ -71,6 +72,7 @@ export function QuoteCart({
   const [loadingProjects, setLoadingProjects] = useState(false);
   const [notes, setNotes] = useState('');
   const { toast } = useToast();
+  const { role: currentRole } = useVerifiedRole();
 
   const totalItems = items.reduce((sum, item) => sum + item.quantity, 0);
   // Note: We don't show estimated prices to COs/Contractors - they get pricing via supplier quotes
@@ -124,7 +126,6 @@ export function QuoteCart({
     // SECURITY: ONLY COs/Contractors can request quotes
     // Private Clients must use Buy Now instead
     // ═══════════════════════════════════════════════════════════════════════════════
-    const currentRole = localStorage.getItem('user_role');
     
     if (currentRole === 'private_client') {
       toast({

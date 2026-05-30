@@ -137,10 +137,13 @@ const DashboardSuspenseWrapper: React.FC<{ children: React.ReactNode }> = ({ chi
   </React.Suspense>
 );
 
+import { useAuth } from "@/contexts/AuthContext";
+
 /** `/builder-dashboard` is a legacy shared URL; private clients must not be sent to the CO/contractor route. */
 const BuilderDashboardEntryRedirect = () => {
-  const role = typeof window !== "undefined" ? localStorage.getItem("user_role") : null;
-  if (role === "private_client") {
+  const { userRole, loading } = useAuth();
+  if (loading) return <PageLoader />;
+  if (userRole === "private_client") {
     return <Navigate to="/private-client-dashboard" replace />;
   }
   return <Navigate to="/professional-builder-dashboard" replace />;

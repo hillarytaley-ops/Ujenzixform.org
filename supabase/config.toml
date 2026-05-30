@@ -54,6 +54,12 @@ verify_jwt = false
 [functions.process-payment]
 verify_jwt = false
 
+[functions.provision-staff-auth]
+verify_jwt = false
+
+[functions.staff-auth-bootstrap]
+verify_jwt = false
+
 # Paystack servers only (HMAC x-paystack-signature).
 [functions.paystack-webhook]
 verify_jwt = false

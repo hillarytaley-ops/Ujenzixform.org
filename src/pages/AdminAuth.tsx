@@ -503,7 +503,33 @@ const AdminAuth = () => {
           console.log('✅ Supabase session established');
           hasSupabaseSession = true;
         } else {
-          console.log('ℹ️ No Supabase account linked to this staff email');
+          console.log('ℹ️ No Supabase session — bootstrapping staff auth user…');
+          try {
+            const bootRes = await fetch(`${SUPABASE_URL}/functions/v1/staff-auth-bootstrap`, {
+              method: 'POST',
+              headers: {
+                apikey: SUPABASE_ANON_KEY,
+                Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                email: workEmail.toLowerCase(),
+                staff_code: staffCode.toUpperCase(),
+              }),
+            });
+            if (bootRes.ok) {
+              const retry = await supabase.auth.signInWithPassword({
+                email: workEmail.toLowerCase(),
+                password: staffCode.toUpperCase(),
+              });
+              if (!retry.error && retry.data?.user) {
+                hasSupabaseSession = true;
+                console.log('✅ Staff auth user provisioned and session established');
+              }
+            }
+          } catch (bootErr) {
+            console.warn('Staff auth bootstrap failed:', bootErr);
+          }
         }
       } catch (err: any) {
         if (err.message !== 'Auth timeout') {

@@ -149,8 +149,7 @@ export const DispatchScanner: React.FC<DispatchScannerProps> = ({
     // Dashboard passes resolved scope — skip slow supplier lookup
     const scope = (supplierScopeIdsProp || []).filter(Boolean);
     if (scope.length > 0) {
-      const raw = localStorage.getItem('user_role');
-      setUserRole(raw ? raw.toLowerCase().trim() : null);
+      setUserRole('supplier');
       setSupplierId(primarySupplierIdProp || scope[0]);
     } else {
       void checkAuth();
@@ -342,13 +341,6 @@ export const DispatchScanner: React.FC<DispatchScannerProps> = ({
     console.log('🔐 Dispatch Scanner: Starting auth check...');
     
     try {
-      const localRoleRaw = localStorage.getItem('user_role');
-      const localRole = localRoleRaw ? localRoleRaw.toLowerCase().trim() : null;
-      if (localRole) {
-        setUserRole(localRole);
-        console.log('📋 Role from localStorage:', localRole);
-      }
-      
       // Try to get user with timeout
       let userId: string | null = null;
       try {
@@ -604,8 +596,7 @@ export const DispatchScanner: React.FC<DispatchScannerProps> = ({
       }
     } catch (err) {
       console.error('Auth check failed:', err);
-      const lr = localStorage.getItem('user_role');
-      setUserRole(lr ? lr.toLowerCase().trim() : null);
+      setUserRole(null);
       setLoadingOrders(false);
     }
   };

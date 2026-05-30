@@ -14,7 +14,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useToast } from '@/hooks/use-toast';
 import { Truck, Eye, EyeOff, Loader2, ArrowLeft, Mail, Lock, User, Phone, MapPin, ChevronRight, Briefcase, CheckCircle } from 'lucide-react';
-import { supabase, SUPABASE_URL, SUPABASE_ANON_KEY } from '@/integrations/supabase/client';
+import { resolveRoleFromSession } from '@/utils/resolveRoleFromSession';
+import { SUPABASE_URL, SUPABASE_ANON_KEY } from '@/integrations/supabase/client';
 
 const ROLE = 'delivery';
 const DASHBOARD = '/delivery-dashboard';
@@ -28,14 +29,6 @@ const ROLE_DASHBOARDS: Record<string, string> = {
   'delivery_provider': '/delivery-dashboard',
   'admin': '/admin-dashboard',
 };
-
-const cachedRole = localStorage.getItem('user_role');
-const cachedUserId = localStorage.getItem('user_role_id');
-if ((cachedRole === ROLE || cachedRole === 'delivery_provider') && cachedUserId) {
-  window.location.replace(DASHBOARD);
-}
-
-const APPLY_PATH = '/delivery/apply';
 
 const DeliveryAuth: React.FC = () => {
   const { toast } = useToast();
@@ -53,6 +46,15 @@ const DeliveryAuth: React.FC = () => {
   const [prefilledUserId, setPrefilledUserId] = useState<string | null>(null);
   const [prefilledAccessToken, setPrefilledAccessToken] = useState<string | null>(null);
   const redirecting = useRef(false);
+  const APPLY_PATH = '/delivery/apply';
+
+  useEffect(() => {
+    void resolveRoleFromSession().then(({ role, userId }) => {
+      if ((role === ROLE || role === 'delivery_provider') && userId) {
+        window.location.replace(DASHBOARD);
+      }
+    });
+  }, []);
 
   // Check if user is already logged in via general login
   useEffect(() => {
@@ -73,8 +75,6 @@ const DeliveryAuth: React.FC = () => {
             
             if (currentRole === ROLE || currentRole === 'delivery_provider') {
               console.log('🔐 User is already a delivery provider, redirecting...');
-              localStorage.setItem('user_role', currentRole);
-              localStorage.setItem('user_role_id', parsed.user.id);
               window.location.href = DASHBOARD;
               return;
             }

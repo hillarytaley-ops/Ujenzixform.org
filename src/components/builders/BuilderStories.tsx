@@ -25,6 +25,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
+import useVerifiedRole from '@/hooks/useVerifiedRole';
 import { SUPABASE_ANON_KEY, SUPABASE_URL, supabase } from '@/integrations/supabase/client';
 
 interface Story {
@@ -231,10 +232,10 @@ export const BuilderStories: React.FC<BuilderStoriesProps> = ({
   const [filePreview, setFilePreview] = useState<string | null>(null);
   const [storyCaption, setStoryCaption] = useState('');
   const { toast } = useToast();
+  const { role: verifiedRole } = useVerifiedRole();
 
   // Check if user can post stories
-  const storedRole = typeof window !== 'undefined' ? localStorage.getItem('user_role') : null;
-  const canPostStory = isBuilder || storedRole === 'professional_builder';
+  const canPostStory = isBuilder || verifiedRole === 'professional_builder';
 
   // Fetch real stories from database
   useEffect(() => {

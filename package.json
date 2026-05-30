@@ -38,6 +38,7 @@
     "supabase:login": "supabase login",
     "supabase:link": "supabase link",
     "supabase:deploy-etims": "supabase functions deploy etims-proxy",
+    "deploy:security-functions": "supabase functions deploy process-payment paystack-initialize paystack-verify send-email staff-auth-bootstrap provision-staff-auth verify-admin-staff-login paystack-webhook etims-proxy",
     "supabase:deploy-send-sms": "supabase functions deploy send-sms",
     "supabase:deploy-camera-vision-upload-ticket": "supabase functions deploy camera-vision-upload-ticket",
     "email:templates": "node scripts/email-templates.mjs build",

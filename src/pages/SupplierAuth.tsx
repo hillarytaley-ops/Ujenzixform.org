@@ -18,6 +18,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Package, Eye, EyeOff, Loader2, ArrowLeft, Mail, Lock, User, Phone, MapPin, ChevronRight, Briefcase, CheckCircle } from 'lucide-react';
 import { supabase, SUPABASE_URL, SUPABASE_ANON_KEY } from '@/integrations/supabase/client';
+import { resolveRoleFromSession } from '@/utils/resolveRoleFromSession';
 
 const ROLE = 'supplier';
 const DASHBOARD = '/supplier-dashboard';
@@ -31,12 +32,6 @@ const ROLE_DASHBOARDS: Record<string, string> = {
   'delivery_provider': '/delivery-dashboard',
   'admin': '/admin-dashboard',
 };
-
-const cachedRole = localStorage.getItem('user_role');
-const cachedUserId = localStorage.getItem('user_role_id');
-if (cachedRole === ROLE && cachedUserId) {
-  window.location.replace(DASHBOARD);
-}
 
 console.log('🔐 SupplierAuth BUILD v16 - PRE-FILL FROM GENERAL LOGIN');
 
@@ -80,6 +75,14 @@ const SupplierAuth: React.FC = () => {
   const [prefilledAccessToken, setPrefilledAccessToken] = useState<string | null>(null);
   const redirecting = useRef(false);
 
+  useEffect(() => {
+    void resolveRoleFromSession().then(({ role, userId }) => {
+      if (role === ROLE && userId) {
+        window.location.replace(DASHBOARD);
+      }
+    });
+  }, []);
+
   // Check if user is already logged in via general login
   useEffect(() => {
     const checkExistingAuth = async () => {
@@ -107,7 +110,6 @@ const SupplierAuth: React.FC = () => {
               const apps = await appRes.json();
               if (Array.isArray(apps) && apps.length > 0) {
                 console.log('🔐 Supplier with application — dashboard');
-                localStorage.setItem('user_role', ROLE);
                 localStorage.setItem('user_role_id', parsed.user.id);
                 window.location.href = DASHBOARD;
                 return;
@@ -151,7 +153,6 @@ const SupplierAuth: React.FC = () => {
             const apps = await appRes.json();
             if (Array.isArray(apps) && apps.length > 0) {
               console.log('🔐 Supplier with application — dashboard');
-              localStorage.setItem('user_role', ROLE);
               localStorage.setItem('user_role_id', session.user.id);
               window.location.href = DASHBOARD;
               return;
@@ -244,11 +245,9 @@ const SupplierAuth: React.FC = () => {
       
       if (dbRole !== ROLE) {
         const correctDashboard = ROLE_DASHBOARDS[dbRole] || '/home';
-        localStorage.setItem('user_role', dbRole);
         toast({ title: 'Wrong Portal', description: `You are registered as ${dbRole}. Redirecting to your dashboard.` });
         window.location.href = correctDashboard;
       } else {
-        localStorage.setItem('user_role', ROLE);
         window.location.href = DASHBOARD;
       }
     } catch (err: any) {
@@ -320,7 +319,6 @@ const SupplierAuth: React.FC = () => {
 
         if (currentRole === ROLE) {
           if (await hasSupplierApplication(userId, accessToken)) {
-            localStorage.setItem('user_role', ROLE);
             localStorage.setItem('user_role_id', userId);
             localStorage.setItem('user_email', email.trim());
             toast({ title: 'Welcome back!', description: 'Redirecting to your dashboard...' });
@@ -367,7 +365,6 @@ const SupplierAuth: React.FC = () => {
 
         if (currentRole === ROLE) {
           if (await hasSupplierApplication(userId, accessToken)) {
-            localStorage.setItem('user_role', ROLE);
             toast({ title: 'Welcome back!', description: 'Redirecting to your dashboard...' });
             window.location.href = DASHBOARD;
             return;

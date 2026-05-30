@@ -114,7 +114,6 @@ const BuilderSignIn = () => {
       const isBuilderRole = ['builder', 'professional_builder', 'private_client'].includes(dbRole || '');
       
       if (isBuilderRole) {
-        localStorage.setItem('user_role', dbRole);
         localStorage.setItem('user_role_id', user.id);
         localStorage.setItem('user_role_verified', Date.now().toString());
         toast({
@@ -214,21 +213,6 @@ const BuilderSignIn = () => {
       const userId = authData.user.id;
       const userEmail = authData.user.email?.toLowerCase() || '';
       
-      // ✅ MOBILE OPTIMIZED: Check localStorage first for instant redirect
-      const cachedRole = localStorage.getItem('user_role');
-      const cachedRoleId = localStorage.getItem('user_role_id');
-      const isCachedBuilderRole = ['builder', 'professional_builder', 'private_client'].includes(cachedRole || '');
-      
-      // If we have a valid cached builder role for this user, redirect immediately
-      if (cachedRole && cachedRoleId === userId && isCachedBuilderRole) {
-        console.log('🔐 Using cached role for fast redirect:', cachedRole);
-        localStorage.setItem('user_role_verified', Date.now().toString());
-        localStorage.setItem('user_email', userEmail);
-        toast({ title: "✅ Welcome!", description: "Redirecting to dashboard..." });
-        window.location.href = '/builder-dashboard';
-        return;
-      }
-      
       // Fetch role from database (source of truth)
       const { data: roleData } = await supabase
         .from('user_roles')
@@ -297,7 +281,6 @@ const BuilderSignIn = () => {
       // User has valid builder role - allow access
       console.log('✅ Granting builder access, role:', dbRole);
       
-      localStorage.setItem('user_role', dbRole);
       localStorage.setItem('user_role_id', userId);
       localStorage.setItem('user_role_verified', Date.now().toString());
       saveUserSession(userId, userEmail, dbRole);
@@ -462,7 +445,6 @@ const BuilderSignIn = () => {
           }
 
           const roleToStore = existingRole.role;
-          localStorage.setItem('user_role', roleToStore);
           localStorage.setItem('user_role_id', signInData.user.id);
           saveUserSession(signInData.user.id, userEmail, roleToStore);
 
@@ -520,7 +502,6 @@ const BuilderSignIn = () => {
       }
 
       const roleToStore = existingRole.role;
-      localStorage.setItem('user_role', roleToStore);
       localStorage.setItem('user_role_id', userId);
       saveUserSession(userId, userEmail, roleToStore);
 

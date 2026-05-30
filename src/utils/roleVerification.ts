@@ -180,10 +180,8 @@ export function syncRoleToStorage(role: string, userId: string): void {
  * ⚠️ NEVER use this for access control decisions - always verify with database
  */
 export function getRoleFromStorage(): { role: string | null; userId: string | null } {
-  return {
-    role: localStorage.getItem('user_role'),
-    userId: localStorage.getItem('user_role_id')
-  };
+  // Deprecated: never read user_role from localStorage for gating or display.
+  return { role: null, userId: null };
 }
 
 /**

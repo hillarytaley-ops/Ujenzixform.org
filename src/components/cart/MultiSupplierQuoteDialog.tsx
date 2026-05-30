@@ -37,6 +37,7 @@ import {
 } from 'lucide-react';
 import { SUPABASE_ANON_KEY, SUPABASE_URL, supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import useVerifiedRole from '@/hooks/useVerifiedRole';
 import { CartItem } from '@/contexts/CartContext';
 import { catalogMaterialIdFromCartLineId } from '@/utils/cartLineId';
 import {
@@ -74,6 +75,7 @@ export const MultiSupplierQuoteDialog: React.FC<MultiSupplierQuoteDialogProps> =
   const [sending, setSending] = useState(false);
   const [additionalNotes, setAdditionalNotes] = useState('');
   const { toast } = useToast();
+  const { role: currentRole } = useVerifiedRole();
 
   useEffect(() => {
     if (isOpen) {
@@ -184,7 +186,6 @@ export const MultiSupplierQuoteDialog: React.FC<MultiSupplierQuoteDialogProps> =
     // SECURITY: ONLY COs/Contractors can request quotes
     // Private Clients must use Buy Now instead
     // ═══════════════════════════════════════════════════════════════════════════════
-    const currentRole = localStorage.getItem('user_role');
     
     if (currentRole === 'private_client') {
       toast({

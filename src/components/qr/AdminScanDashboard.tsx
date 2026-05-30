@@ -88,16 +88,7 @@ export const AdminScanDashboard: React.FC = () => {
   const { toast } = useToast();
 
   useEffect(() => {
-    // FAST PATH: Check localStorage immediately for role
-    const storedRole = localStorage.getItem('user_role');
-    if (storedRole === 'admin') {
-      setUserRole('admin');
-      // Load data in background - don't block UI
-      loadDataInBackground();
-    } else {
-      // No admin role in localStorage - try Supabase with short timeout
-      checkAuthAndFetch();
-    }
+    checkAuthAndFetch();
   }, []);
 
   const loadDataInBackground = async () => {
@@ -142,22 +133,9 @@ export const AdminScanDashboard: React.FC = () => {
       if (role === 'admin') {
         setUserRole('admin');
         loadDataInBackground();
-      } else {
-        // Check localStorage as final fallback
-        const storedRole = localStorage.getItem('user_role');
-        if (storedRole === 'admin') {
-          setUserRole('admin');
-          loadDataInBackground();
-        }
       }
     } catch (error) {
       console.error('Auth error:', error);
-      // Final fallback to localStorage
-      const storedRole = localStorage.getItem('user_role');
-      if (storedRole === 'admin') {
-        setUserRole('admin');
-        loadDataInBackground();
-      }
     }
   };
 
@@ -577,8 +555,7 @@ export const AdminScanDashboard: React.FC = () => {
 
   // Don't block UI with loading - show content immediately
   // Only check role - if not admin from localStorage, show access denied
-  const storedRole = localStorage.getItem('user_role');
-  if (userRole !== 'admin' && storedRole !== 'admin') {
+  if (userRole !== 'admin') {
     return (
       <Card>
         <CardHeader>

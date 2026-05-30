@@ -43,7 +43,7 @@ export const ProfileViewDialog: React.FC<ProfileViewDialogProps> = ({
   onEditProfile,
   onExitDashboard
 }) => {
-  const { signOut } = useAuth();
+  const { signOut, userRole: authUserRole } = useAuth();
   const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
@@ -58,7 +58,7 @@ export const ProfileViewDialog: React.FC<ProfileViewDialogProps> = ({
     
     try {
       // Get user info from localStorage
-      const userRole = localStorage.getItem('user_role');
+      const userRole = authUserRole;
       const userName = localStorage.getItem('user_name');
       const userEmail = localStorage.getItem('user_email');
       const userId = localStorage.getItem('user_id');
@@ -196,7 +196,7 @@ export const ProfileViewDialog: React.FC<ProfileViewDialogProps> = ({
     } catch (error) {
       console.error('Error loading profile:', error);
       // Fallback
-      const userRole = localStorage.getItem('user_role');
+      const userRole = authUserRole;
       const userName = localStorage.getItem('user_name');
       const userEmail = localStorage.getItem('user_email');
       setProfile({

@@ -559,9 +559,8 @@ const AdminDashboard = () => {
     }
 
     const isAdminAuthenticated = localStorage.getItem('admin_authenticated') === 'true';
-    const userRole = localStorage.getItem('user_role');
     const supabaseToken = readPersistedAuthRawStringSync();
-    console.log('🔐 Admin Dashboard: Initial auth check', { isAdminAuthenticated, userRole, hasToken: !!supabaseToken });
+    console.log('🔐 Admin Dashboard: Initial auth check', { isAdminAuthenticated, hasToken: !!supabaseToken });
     
     // Listen for auth state changes (e.g., sign out)
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {

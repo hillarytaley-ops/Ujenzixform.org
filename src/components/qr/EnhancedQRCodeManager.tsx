@@ -558,13 +558,24 @@ export const EnhancedQRCodeManager: React.FC<EnhancedQRCodeManagerProps> = ({
   const fastCheckAuthAndFetch = async () => {
     console.log('⚡ QR Manager: Fast path starting...');
 
-    const rawRole = localStorage.getItem('user_role');
-    const cachedRole = rawRole ? rawRole.toLowerCase().trim() : null;
     const cachedSupplierId = localStorage.getItem('supplier_id');
     const auth = await resolveQrAuth();
+    let dbRole: string | null = null;
+    if (auth?.id) {
+      try {
+        const { data: roleData } = await supabase
+          .from('user_roles')
+          .select('role')
+          .eq('user_id', auth.id)
+          .maybeSingle();
+        dbRole = roleData?.role ? roleData.role.toLowerCase().trim() : null;
+      } catch {
+        dbRole = null;
+      }
+    }
 
-    if (auth?.id && (cachedRole || propSupplierId)) {
-      const effectiveRole = cachedRole || (propSupplierId ? 'supplier' : null);
+    if (auth?.id && (dbRole || propSupplierId)) {
+      const effectiveRole = dbRole || (propSupplierId ? 'supplier' : null);
       if (!effectiveRole) {
         await checkAuthAndFetch();
         return;
@@ -764,22 +775,17 @@ export const EnhancedQRCodeManager: React.FC<EnhancedQRCodeManagerProps> = ({
         return;
       }
 
-      // Get user role - check localStorage first (faster), then database
-      let role: string | null = localStorage.getItem('user_role');
-      console.log('🔑 QR Manager: Role from localStorage:', role);
-      
-      // If no role in localStorage, try database with timeout
-      if (!role) {
-        try {
-          const { data: roleData } = await withTimeout(
-            supabase.from('user_roles').select('role').eq('user_id', userId).maybeSingle(),
-            3000
-          );
-          role = roleData?.role || null;
-          console.log('🔑 QR Manager: Role from database:', role);
-        } catch {
-          console.log('⚠️ QR Manager: Role lookup timeout');
-        }
+      // Get user role from database
+      let role: string | null = null;
+      try {
+        const { data: roleData } = await withTimeout(
+          supabase.from('user_roles').select('role').eq('user_id', userId).maybeSingle(),
+          3000
+        );
+        role = roleData?.role || null;
+        console.log('🔑 QR Manager: Role from database:', role);
+      } catch {
+        console.log('⚠️ QR Manager: Role lookup timeout');
       }
 
       if (role) role = role.toLowerCase().trim();

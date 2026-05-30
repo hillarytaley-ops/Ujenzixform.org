@@ -386,11 +386,6 @@ export function useStaffPermissions(): StaffPermissionsReturn {
         if (storedRole) {
           return canStaffAccessDashboardTab(storedRole, tab, adminEm);
         }
-        const userRole = localStorage.getItem("user_role");
-        if (userRole === "admin" || userRole === "super_admin") {
-          const uEm = readPersistedAuthUserSync().email ?? null;
-          return canStaffAccessDashboardTab(userRole, tab, uEm);
-        }
         return false;
       }
       return canStaffAccessDashboardTab(state.staffRole, tab, state.staffEmail);

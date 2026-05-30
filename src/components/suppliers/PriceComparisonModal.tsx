@@ -22,6 +22,7 @@ import { Badge } from '@/components/ui/badge';
 import { useCart } from '@/contexts/CartContext';
 import { supplierLocationLine } from '@/utils/supplierLocationLine';
 import { useToast } from '@/hooks/use-toast';
+import useVerifiedRole from '@/hooks/useVerifiedRole';
 import { buildMaterialCartLineId } from '@/utils/cartLineId';
 import { 
   Scale, 
@@ -69,8 +70,7 @@ export const PriceComparisonModal: React.FC<PriceComparisonModalProps> = ({
   selectedMaterials,
   allMaterials
 }) => {
-  const effectiveRole =
-    (localStorage.getItem('user_role') || '').trim().toLowerCase();
+  const { role: effectiveRole } = useVerifiedRole();
   if (effectiveRole === 'supplier') return null;
 
   const { addToCart } = useCart();

@@ -3,7 +3,7 @@
  */
 
 import { LEGACY_SUPABASE_AUTH_STORAGE_KEY } from '@/utils/supabaseAccessToken';
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -13,6 +13,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import { Building2, Eye, EyeOff, Loader2, ArrowLeft, Mail, Lock, User, Phone, MapPin, ChevronRight, Briefcase } from 'lucide-react';
 import { SUPABASE_URL, SUPABASE_ANON_KEY, supabase } from '@/integrations/supabase/client';
+import { resolveRoleFromSession } from '@/utils/resolveRoleFromSession';
 
 async function syncSupabaseClientSession(accessToken: string, refreshToken: string) {
   const { error } = await supabase.auth.setSession({
@@ -35,18 +36,20 @@ const ROLE_DASHBOARDS: Record<string, string> = {
   'admin': '/admin-dashboard',
 };
 
-const cachedRole = localStorage.getItem('user_role');
-const cachedUserId = localStorage.getItem('user_role_id');
-if (cachedRole === ROLE && cachedUserId) {
-  window.location.replace(DASHBOARD);
-}
-
 console.log('🔐 ProfessionalBuilderAuth BUILD v15 - SECURE');
 
 const ProfessionalBuilderAuth: React.FC = () => {
   const { toast } = useToast();
   const [searchParams] = useSearchParams();
   const [activeTab, setActiveTab] = useState<'signin' | 'signup'>('signin');
+
+  React.useEffect(() => {
+    void resolveRoleFromSession().then(({ role, userId }) => {
+      if (role === ROLE && userId) {
+        window.location.replace(DASHBOARD);
+      }
+    });
+  }, []);
 
   React.useEffect(() => {
     const t = searchParams.get('tab');
@@ -123,14 +126,12 @@ const ProfessionalBuilderAuth: React.FC = () => {
       
       if (dbRole !== ROLE) {
         const correctDashboard = ROLE_DASHBOARDS[dbRole] || '/home';
-        localStorage.setItem('user_role', dbRole);
         localStorage.setItem('user_id', authData.user.id);
         localStorage.setItem('user_role_verified', String(Date.now()));
         toast({ title: 'Wrong Portal', description: `You are registered as ${dbRole}. Redirecting to your dashboard.` });
         await syncSupabaseClientSession(authData.access_token, authData.refresh_token);
         window.location.href = correctDashboard;
       } else {
-        localStorage.setItem('user_role', ROLE);
         localStorage.setItem('user_id', authData.user.id);
         localStorage.setItem('user_role_verified', String(Date.now()));
         await syncSupabaseClientSession(authData.access_token, authData.refresh_token);
@@ -182,7 +183,6 @@ const ProfessionalBuilderAuth: React.FC = () => {
             token_type: signInData.token_type,
             user: signInData.user
           }));
-          localStorage.setItem('user_role', ROLE);
           localStorage.setItem('user_role_id', userId);
           localStorage.setItem('user_id', userId);
           localStorage.setItem('user_email', signInData.user.email || '');
@@ -232,7 +232,6 @@ const ProfessionalBuilderAuth: React.FC = () => {
           token_type: signInData.token_type,
           user: signInData.user
         }));
-        localStorage.setItem('user_role', ROLE);
         localStorage.setItem('user_role_id', userId);
         localStorage.setItem('user_id', userId);
         localStorage.setItem('user_email', signInData.user.email || '');

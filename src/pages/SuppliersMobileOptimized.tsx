@@ -25,17 +25,6 @@ const SuppliersMobileOptimized = () => {
   const { toast } = useToast();
 
   useEffect(() => {
-    // FAST: Use cached values first for instant display
-    const cachedRole = localStorage.getItem('user_role');
-    const cachedUserId = localStorage.getItem('user_id');
-    
-    if (cachedRole && cachedUserId) {
-      setUser({ id: cachedUserId });
-      setUserRole(cachedRole);
-      setLoading(false);
-    }
-    
-    // Then verify with Supabase in background
     checkAuth();
     
     // Prefetch likely next pages for instant navigation
@@ -57,10 +46,7 @@ const SuppliersMobileOptimized = () => {
         
         const role = roleData?.role || null;
         setUserRole(role);
-        if (role) localStorage.setItem('user_role', role);
       } else {
-        // Clear cache if not authenticated
-        localStorage.removeItem('user_role');
         localStorage.removeItem('user_id');
         setUser(null);
         setUserRole(null);

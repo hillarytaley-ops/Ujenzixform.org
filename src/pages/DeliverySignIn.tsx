@@ -83,33 +83,6 @@ const DeliverySignIn = () => {
         if (session?.user) {
           console.log('🚚 DeliverySignIn: Session found for:', session.user.email);
           
-          // Quick check localStorage first for instant decision
-          const cachedRole = localStorage.getItem('user_role');
-          const cachedRoleId = localStorage.getItem('user_role_id');
-          
-          if (cachedRole && cachedRoleId === session.user.id) {
-            console.log('🚚 DeliverySignIn: Using cached role:', cachedRole);
-            if (cachedRole === 'delivery' || cachedRole === 'delivery_provider') {
-              window.location.href = '/delivery-dashboard';
-              return;
-            } else if (cachedRole === 'admin') {
-              // Admin can access delivery dashboard too
-              setCheckingAuth(false);
-              return;
-            } else {
-              // Wrong role - redirect to their dashboard
-              toast({
-                title: 'Wrong Portal',
-                description: `You are registered as ${cachedRole}. Redirecting...`,
-              });
-              if (cachedRole === 'private_client') window.location.href = '/private-client-dashboard';
-              else if (cachedRole === 'professional_builder' || cachedRole === 'builder') window.location.href = '/professional-builder-dashboard';
-              else if (cachedRole === 'supplier') window.location.href = '/supplier-dashboard';
-              else window.location.href = '/home';
-              return;
-            }
-          }
-          
           // Check database for role with timeout
           try {
             const rolePromise = supabase
@@ -127,13 +100,11 @@ const DeliverySignIn = () => {
             console.log('🚚 DeliverySignIn: DB role:', dbRole);
             
             if (dbRole === 'delivery' || dbRole === 'delivery_provider') {
-              localStorage.setItem('user_role', dbRole);
               localStorage.setItem('user_role_id', session.user.id);
               window.location.href = '/delivery-dashboard';
               return;
             } else if (dbRole) {
               // Wrong role - redirect to their actual dashboard
-              localStorage.setItem('user_role', dbRole);
               localStorage.setItem('user_role_id', session.user.id);
               toast({
                 title: 'Wrong Portal',
@@ -208,22 +179,7 @@ const DeliverySignIn = () => {
 
       console.log('🔐 User already logged in:', user.email);
       
-      // ═══════════════════════════════════════════════════════════════════════
-      // STEP 2: Check localStorage - BUT ONLY IF IT MATCHES THIS USER
-      // ═══════════════════════════════════════════════════════════════════════
-      const storedRole = localStorage.getItem('user_role');
-      const storedRoleId = localStorage.getItem('user_role_id');
-      
-      // SECURITY: If localStorage is from a DIFFERENT user, clear it!
-      if (storedRoleId && storedRoleId !== user.id) {
-        console.log('🔐 localStorage from different user, clearing. Stored:', storedRoleId, 'Current:', user.id);
-        localStorage.removeItem('user_role');
-        localStorage.removeItem('user_role_id');
-      }
-      
-      // ═══════════════════════════════════════════════════════════════════════
-      // STEP 3: ALWAYS check DATABASE for the actual role (SOURCE OF TRUTH)
-      // ═══════════════════════════════════════════════════════════════════════
+      // ALWAYS check DATABASE for the actual role (SOURCE OF TRUTH)
       const { data: roleData, error: roleError } = await supabase
         .from('user_roles')
         .select('role')
@@ -247,7 +203,6 @@ const DeliverySignIn = () => {
       // If user is already a delivery provider or admin, redirect to dashboard
       // @ts-ignore - TypeScript types may not match actual DB values
       if (dbRole === 'delivery' || dbRole === 'delivery_provider' || dbRole === 'admin') {
-        localStorage.setItem('user_role', dbRole);
         localStorage.setItem('user_role_id', user.id);
         localStorage.setItem('user_role_verified', Date.now().toString());
         console.log('🔐 Delivery/admin role confirmed, redirecting to dashboard');
@@ -258,7 +213,6 @@ const DeliverySignIn = () => {
       // If user has a different role (builder/supplier), show warning and redirect to their portal
       if (dbRole === 'builder') {
         // Clear any stale delivery localStorage
-        localStorage.setItem('user_role', 'builder');
         localStorage.setItem('user_role_id', user.id);
         toast({
           variant: "destructive",
@@ -272,7 +226,6 @@ const DeliverySignIn = () => {
         return;
       } else if (dbRole === 'supplier') {
         // Clear any stale delivery localStorage
-        localStorage.setItem('user_role', 'supplier');
         localStorage.setItem('user_role_id', user.id);
         toast({
           variant: "destructive",
@@ -442,7 +395,6 @@ const DeliverySignIn = () => {
       // If user has a DIFFERENT role (not delivery/admin), redirect them
       if (dbRole && dbRole !== 'delivery' && dbRole !== 'delivery_provider' && dbRole !== 'admin') {
         console.log('🚚 User has different role:', dbRole);
-        localStorage.setItem('user_role', dbRole);
         localStorage.setItem('user_role_id', userId);
         
         toast({
@@ -473,7 +425,6 @@ const DeliverySignIn = () => {
       }
       
       // User has valid delivery role - allow access
-      localStorage.setItem('user_role', dbRole);
       localStorage.setItem('user_role_id', userId);
       localStorage.setItem('user_role_verified', Date.now().toString());
       saveUserSession(userId, userEmail, dbRole);
@@ -670,7 +621,6 @@ const DeliverySignIn = () => {
             );
             localStorage.setItem('access_token', signInData.session.access_token);
           }
-          localStorage.setItem('user_role', existingRole.role);
           localStorage.setItem('user_role_id', signInData.user.id);
           localStorage.setItem('user_role_verified', Date.now().toString());
           saveUserSession(signInData.user.id, userEmail, existingRole.role);
@@ -749,7 +699,6 @@ const DeliverySignIn = () => {
         );
         localStorage.setItem('access_token', authData.session.access_token);
       }
-      localStorage.setItem('user_role', existingRole.role);
       localStorage.setItem('user_role_id', userId);
       localStorage.setItem('user_role_verified', Date.now().toString());
       saveUserSession(userId, userEmail, existingRole.role);

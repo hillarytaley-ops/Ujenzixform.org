@@ -15,6 +15,7 @@ import { ContactBuilderDialog } from "@/components/builders/ContactBuilderDialog
 import { BuilderProfileEdit } from "@/components/builders/BuilderProfileEdit";
 import { UserProfile } from "@/types/userProfile";
 import { useToast } from "@/hooks/use-toast";
+import useVerifiedRole from "@/hooks/useVerifiedRole";
 import {
   useBuildersPagePublicStats,
   formatBuildersStatCount,
@@ -46,6 +47,7 @@ const Builders = () => {
   const [showContactModal, setShowContactModal] = useState(false);
   const [showProfileModal, setShowProfileModal] = useState(false);
   const [userRoleState, setUserRoleState] = useState<string | null>(null);
+  const { role: verifiedRole } = useVerifiedRole();
   const [showContactDialog, setShowContactDialog] = useState(false);
   const [showProfileEdit, setShowProfileEdit] = useState(false);
   const [contactBuilder, setContactBuilder] = useState<any>(null);
@@ -66,12 +68,9 @@ const Builders = () => {
   }, []);
 
   useEffect(() => {
-    const storedRole = localStorage.getItem("user_role");
-    if (storedRole) {
-      setUserRoleState(storedRole);
-    }
-
-    if (userProfile) {
+    if (verifiedRole) {
+      setUserRoleState(verifiedRole);
+    } else if (userProfile) {
       supabase
         .from("user_roles")
         .select("role")
@@ -81,12 +80,11 @@ const Builders = () => {
         .then(({ data }) => {
           if (data?.role) {
             setUserRoleState(data.role);
-            localStorage.setItem("user_role", data.role);
           }
         })
         .catch(() => {});
     }
-  }, [userProfile]);
+  }, [userProfile, verifiedRole]);
 
   const checkUserProfile = async () => {
     setLoading(false);
