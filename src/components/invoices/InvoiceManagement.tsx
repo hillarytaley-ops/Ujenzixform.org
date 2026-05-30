@@ -66,6 +66,7 @@ interface Invoice {
   purchase_order?: {
     po_number?: string;
     etims_verification_url?: string | null;
+    created_at?: string | null;
   };
   supplier?: {
     company_name?: string;
@@ -87,6 +88,67 @@ interface InvoiceManagementProps {
 
 function invoiceIsPaid(i: Invoice): boolean {
   return String(i.payment_status || '').toLowerCase() === 'paid';
+}
+
+function resolveInvoiceOrderDate(inv: Invoice): { label: string; sortMs: number } {
+  const raw =
+    inv.purchase_order?.created_at?.trim() ||
+    inv.invoice_date?.trim() ||
+    inv.created_at?.trim() ||
+    '';
+  if (!raw) return { label: 'Unknown order date', sortMs: 0 };
+  const sortMs = Date.parse(raw);
+  if (Number.isNaN(sortMs)) return { label: 'Unknown order date', sortMs: 0 };
+  return {
+    sortMs,
+    label: new Date(sortMs).toLocaleDateString(undefined, {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+    }),
+  };
+}
+
+type InvoiceDateSupplierGroup = {
+  dateLabel: string;
+  dateSortMs: number;
+  suppliers: { supplierName: string; invoices: Invoice[] }[];
+};
+
+function groupInvoicesByOrderDateAndSupplier(invoices: Invoice[]): InvoiceDateSupplierGroup[] {
+  const byDate = new Map<
+    string,
+    { dateSortMs: number; bySupplier: Map<string, Invoice[]> }
+  >();
+
+  for (const inv of invoices) {
+    const { label, sortMs } = resolveInvoiceOrderDate(inv);
+    const supplierName = inv.supplier?.company_name?.trim() || 'Supplier';
+
+    if (!byDate.has(label)) {
+      byDate.set(label, { dateSortMs: sortMs, bySupplier: new Map() });
+    }
+    const dateEntry = byDate.get(label)!;
+    dateEntry.dateSortMs = Math.max(dateEntry.dateSortMs, sortMs);
+    if (!dateEntry.bySupplier.has(supplierName)) {
+      dateEntry.bySupplier.set(supplierName, []);
+    }
+    dateEntry.bySupplier.get(supplierName)!.push(inv);
+  }
+
+  return [...byDate.entries()]
+    .sort((a, b) => b[1].dateSortMs - a[1].dateSortMs)
+    .map(([dateLabel, { dateSortMs, bySupplier }]) => ({
+      dateLabel,
+      dateSortMs,
+      suppliers: [...bySupplier.entries()]
+        .sort(([a], [b]) => a.localeCompare(b, undefined, { sensitivity: 'base' }))
+        .map(([supplierName, supplierInvoices]) => ({
+          supplierName,
+          invoices: supplierInvoices,
+        })),
+    }));
 }
 
 /** Merge integrator-style keys into `etims_item_code` for a single editable field. */
@@ -304,7 +366,7 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
       // get_supplier_letterhead_* (column-level REVOKE on suppliers for authenticated).
       const invoiceSelect = `
           *,
-          purchase_order:purchase_orders(po_number, etims_verification_url),
+          purchase_order:purchase_orders(po_number, etims_verification_url, created_at),
           supplier:suppliers(company_name)
         `;
 
@@ -363,7 +425,7 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
             const [poChunkRows, supChunkRows] = await Promise.all([
               Promise.all(
                 chunkArray(poIds, 80).map((chunk) =>
-                  supabase.from('purchase_orders').select('id, po_number, etims_verification_url').in('id', chunk)
+                  supabase.from('purchase_orders').select('id, po_number, etims_verification_url, created_at').in('id', chunk)
                 )
               ),
               Promise.all(
@@ -390,7 +452,12 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
                 })
               ),
             ]);
-            const poMerged: { id: string; po_number?: string; etims_verification_url?: string | null }[] = [];
+            const poMerged: {
+              id: string;
+              po_number?: string;
+              etims_verification_url?: string | null;
+              created_at?: string | null;
+            }[] = [];
             for (const poRes of poChunkRows) {
               if (poRes.error) throw poRes.error;
               if (poRes.data?.length) poMerged.push(...poRes.data);
@@ -415,6 +482,7 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
                 ? {
                     po_number: poById[inv.purchase_order_id].po_number,
                     etims_verification_url: poById[inv.purchase_order_id].etims_verification_url ?? null,
+                    created_at: poById[inv.purchase_order_id].created_at ?? null,
                   }
                 : undefined,
               supplier: supById[inv.supplier_id]
@@ -729,6 +797,11 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
     if (invoicePaymentListTab === 'paid') return invoices.filter(invoiceIsPaid);
     return invoices.filter((i) => !invoiceIsPaid(i));
   }, [invoices, showBuilderSupplierPaymentTabs, invoicePaymentListTab]);
+
+  const groupedDisplayInvoices = useMemo(
+    () => groupInvoicesByOrderDateAndSupplier(displayInvoices),
+    [displayInvoices]
+  );
 
   /** KRA link from embedded PO row (hub fetch) or builder receipt list fallback */
   const etimsUrlForInvoice = useCallback(
@@ -1510,7 +1583,25 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
               </div>
             )}
 
-          {displayInvoices.map((invoice) => {
+          {groupedDisplayInvoices.length > 0 && (
+            <div className="space-y-8">
+              {groupedDisplayInvoices.map((dateGroup) => (
+                <section key={dateGroup.dateLabel} className="space-y-5">
+                  <div className="border-b border-border pb-2">
+                    <h3 className="text-base font-semibold text-foreground">{dateGroup.dateLabel}</h3>
+                    <p className="text-xs text-muted-foreground">Order date</p>
+                  </div>
+                  {dateGroup.suppliers.map((supplierGroup) => (
+                    <div key={`${dateGroup.dateLabel}::${supplierGroup.supplierName}`} className="space-y-3">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <h4 className="text-sm font-medium text-foreground">{supplierGroup.supplierName}</h4>
+                        <Badge variant="outline" className="text-xs tabular-nums">
+                          {supplierGroup.invoices.length} invoice
+                          {supplierGroup.invoices.length === 1 ? '' : 's'}
+                        </Badge>
+                      </div>
+                      <div className="space-y-4">
+                        {supplierGroup.invoices.map((invoice) => {
             const rowStatus = String(invoice.status || '').toLowerCase();
             const kraEtimsUrl = etimsUrlForInvoice(invoice);
             const poEtimsRow =
@@ -1691,7 +1782,14 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
                 </CardContent>
               </Card>
             );
-          })}
+                        })}
+                      </div>
+                    </div>
+                  ))}
+                </section>
+              ))}
+            </div>
+          )}
 
           {displayInvoices.length > 0 && (
             <div
