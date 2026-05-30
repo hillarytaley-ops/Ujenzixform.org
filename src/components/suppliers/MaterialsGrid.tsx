@@ -2235,10 +2235,11 @@ export const MaterialsGrid: React.FC<MaterialsGridProps> = ({
           {/* Active Filters & Results Count */}
           <div className="mt-3 flex flex-wrap items-center gap-2">
             {/* Results Count */}
-            <div className="flex items-center gap-1.5 text-sm text-muted-foreground bg-slate-100 dark:bg-slate-800 px-3 py-1.5 rounded-full">
-              <Filter className="h-3.5 w-3.5" />
-              <span className="font-medium">{computedFilteredMaterials.length}</span>
-              <span>of {materials.length}</span>
+            <div className="flex items-center gap-1.5 text-sm text-muted-foreground bg-slate-100 dark:bg-slate-800 px-3 py-1.5 rounded-full tabular-nums">
+              <Filter className="h-3.5 w-3.5 shrink-0" />
+              <span>
+                {computedFilteredMaterials.length} of {materials.length}
+              </span>
             </div>
             
             {/* Active Filter Chips - Show what's currently filtered */}

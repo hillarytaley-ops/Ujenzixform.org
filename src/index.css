@@ -202,7 +202,8 @@ p, span, div, h1, h2, h3, h4, h5, h6, label, button {
     font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
       "Helvetica Neue", Arial, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol",
       "Noto Color Emoji", sans-serif;
-    font-variant-emoji: emoji;
+    /* Keep digits and punctuation as normal text; emoji styling is scoped to .emoji-native / .emoji-text */
+    font-variant-emoji: text;
   }
 }
 
