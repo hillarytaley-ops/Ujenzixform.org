@@ -50,6 +50,10 @@ verify_jwt = false
 [functions.paystack-verify]
 verify_jwt = false
 
+# JWT + Paystack verification checked inside handler.
+[functions.process-payment]
+verify_jwt = false
+
 # Paystack servers only (HMAC x-paystack-signature).
 [functions.paystack-webhook]
 verify_jwt = false

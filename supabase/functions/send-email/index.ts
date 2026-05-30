@@ -2,11 +2,12 @@
  * Supabase Edge Function: Send Email via Resend
  *
  * CORS: verify_jwt is false in config.toml so browser OPTIONS preflight reaches this handler.
- * POST requests require a valid Supabase user JWT (Authorization: Bearer <access_token>).
+ * POST requires JWT; non-admins may only email their own account address.
  */
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.8";
+import { userIsPlatformAdmin } from "../_shared/requireAdminRole.ts";
 
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
@@ -19,12 +20,22 @@ const corsHeaders: Record<string, string> = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/i;
+const MAX_RECIPIENTS = 5;
+const MAX_SUBJECT_LEN = 200;
+const MAX_HTML_LEN = 100_000;
+
 interface EmailRequest {
   to: string | string[];
   subject: string;
   html: string;
   from?: string;
   replyTo?: string;
+}
+
+function normalizeRecipients(to: string | string[]): string[] {
+  const list = Array.isArray(to) ? to : [to];
+  return list.map((e) => e.trim().toLowerCase()).filter(Boolean);
 }
 
 serve(async (req) => {
@@ -72,6 +83,41 @@ serve(async (req) => {
       throw new Error("Missing required fields: to, subject, html");
     }
 
+    if (subject.length > MAX_SUBJECT_LEN || html.length > MAX_HTML_LEN) {
+      return new Response(JSON.stringify({ error: "Subject or body exceeds allowed size." }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const recipients = normalizeRecipients(to);
+    if (!recipients.length || recipients.length > MAX_RECIPIENTS) {
+      return new Response(JSON.stringify({ error: "Invalid recipient list." }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    if (!recipients.every((e) => EMAIL_RE.test(e))) {
+      return new Response(JSON.stringify({ error: "Invalid email address in recipients." }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const isAdmin = await userIsPlatformAdmin(user.id);
+    const userEmail = (user.email ?? "").trim().toLowerCase();
+
+    if (!isAdmin) {
+      const allSelf = recipients.every((r) => r === userEmail);
+      if (!allSelf || !userEmail) {
+        return new Response(
+          JSON.stringify({ error: "You may only send email to your own account address." }),
+          { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+    }
+
     const response = await fetch("https://api.resend.com/emails", {
       method: "POST",
       headers: {
@@ -80,7 +126,7 @@ serve(async (req) => {
       },
       body: JSON.stringify({
         from: from || "UjenziXform <info@ujenzixform.org>",
-        to: Array.isArray(to) ? to : [to],
+        to: recipients,
         subject,
         html,
         reply_to: replyTo || "info@ujenzixform.org",
@@ -109,7 +155,7 @@ serve(async (req) => {
       {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
         status: 500,
-      }
+      },
     );
   }
 });

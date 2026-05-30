@@ -339,6 +339,15 @@ const InvoiceManager = () => {
   };
 
   const processInvoicePayment = async (invoiceId: string, paymentMethod: string, paymentReference: string, amount: number) => {
+    if (!paymentReference?.trim()) {
+      toast({
+        title: "Payment reference required",
+        description: "Provide the Paystack transaction reference. Payments are verified server-side.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     try {
       // Process payment via edge function
       const { data, error } = await supabase.functions.invoke('process-payment', {

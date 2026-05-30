@@ -21,6 +21,7 @@ import {
   StaffRole
 } from '@/config/staffPermissions';
 import { readPersistedAuthUserSync } from "@/utils/supabaseAccessToken";
+import { allowStaffRoleTestMode } from "@/utils/securityMode";
 
 // Module-level flags to only log once across all hook instances
 let hasLoggedInit = false;
@@ -58,11 +59,9 @@ export function useStaffPermissions(): StaffPermissionsReturn {
   const storedStaffRole = typeof window !== 'undefined' ? localStorage.getItem('admin_staff_role') : null;
   const storedStaffName = typeof window !== 'undefined' ? localStorage.getItem('admin_staff_name') : null;
   
-  // ========== TEST MODE ==========
-  // Add ?test_role=logistics_officer (or other role) to URL to simulate different staff roles
-  // Remove this in production!
+  // ========== TEST MODE (dev only) ==========
   const urlParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
-  const testRole = urlParams?.get('test_role');
+  const testRole = allowStaffRoleTestMode() ? urlParams?.get('test_role') : null;
   
   if (testRole && STAFF_ROLES[testRole]) {
     const simulatedRole = STAFF_ROLES[testRole];

@@ -47,6 +47,7 @@ import { Shield, Lock, AlertTriangle, KeyRound, Users } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { canAccessAdminDashboardStorage } from "@/utils/adminStaffSession";
+import { requireSupabaseSessionForAdminShell } from "@/utils/securityMode";
 
 // Type helper for tables not yet in generated types
 const db = supabase as any;
@@ -501,20 +502,8 @@ const AdminAuth = () => {
         if (!authError && authData?.user) {
           console.log('✅ Supabase session established');
           hasSupabaseSession = true;
-          
-          // Set admin role in user_roles table (fire and forget)
-          (async () => {
-            try {
-              await supabase.from('user_roles').upsert({
-                user_id: authData.user.id,
-                role: 'admin'
-              }, { onConflict: 'user_id' });
-            } catch (err) {
-              // Ignore errors
-            }
-          })();
         } else {
-          console.log('ℹ️ No Supabase account, using localStorage auth');
+          console.log('ℹ️ No Supabase account linked to this staff email');
         }
       } catch (err: any) {
         if (err.message !== 'Auth timeout') {
@@ -522,6 +511,17 @@ const AdminAuth = () => {
         } else {
           console.log('ℹ️ Supabase auth timed out, using localStorage auth');
         }
+      }
+
+      if (!hasSupabaseSession && requireSupabaseSessionForAdminShell()) {
+        toast({
+          variant: "destructive",
+          title: "Supabase session required",
+          description:
+            "Production admin access requires a linked Supabase account. Ask a super admin to link your staff email to auth.users.",
+        });
+        setLoading(false);
+        return;
       }
 
       // Store staff status with login time (works regardless of Supabase session)

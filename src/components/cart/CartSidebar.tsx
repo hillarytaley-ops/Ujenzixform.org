@@ -141,7 +141,7 @@ export const CartSidebar: React.FC = () => {
 
   // Load user's projects for order association
   const loadProjects = async () => {
-    const currentRole = userRole || localStorage.getItem('user_role');
+    const currentRole = userRole;
     // Only load projects for builders
     if (currentRole !== 'professional_builder' && currentRole !== 'private_client') {
       return;
@@ -183,16 +183,8 @@ export const CartSidebar: React.FC = () => {
     }
   };
 
-  // Check user role on mount and when cart opens - use localStorage FIRST for instant access
+  // Verify role from database when cart opens (never trust localStorage for gating)
   useEffect(() => {
-    // INSTANT: Check localStorage first (this is always available immediately)
-    const cachedRole = localStorage.getItem('user_role');
-    if (cachedRole) {
-      console.log('🔐 Cart: Using cached role (instant):', cachedRole);
-      setUserRole(cachedRole);
-    }
-    
-    // ASYNC: Verify from database in background (but don't wait for it)
     const checkUserRole = async () => {
       try {
         const { data: { user } } = await supabase.auth.getUser();
@@ -207,24 +199,22 @@ export const CartSidebar: React.FC = () => {
           if (dbRole) {
             console.log('🔐 Cart: Database role verified:', dbRole);
             setUserRole(dbRole);
-            // Update localStorage if different
-            if (dbRole !== cachedRole) {
-              localStorage.setItem('user_role', dbRole);
-            }
+          } else {
+            setUserRole(null);
           }
+        } else {
+          setUserRole(null);
         }
       } catch (err) {
-        console.log('🔐 Cart: Role check error, using cached role');
+        console.log('🔐 Cart: Role check error');
+        setUserRole(null);
       }
     };
     
-    // Only run async check if cart is open (to avoid unnecessary calls)
     if (isCartOpen) {
       checkUserRole();
-      // Load projects for order association
       loadProjects();
       
-      // Check if project_id is in localStorage (from URL parameter)
       const storedProjectId = localStorage.getItem('cart_project_id');
       if (storedProjectId && !selectedProjectId) {
         console.log('📁 Cart: Pre-selecting project from URL:', storedProjectId);
@@ -246,7 +236,7 @@ export const CartSidebar: React.FC = () => {
     // SECURITY: ONLY COs/Contractors can request quotes
     // Private Clients must use Buy Now instead
     // ═══════════════════════════════════════════════════════════════════════════════
-    const currentRole = userRole || localStorage.getItem('user_role');
+    const currentRole = userRole;
     
     if (currentRole === 'private_client') {
       console.log('🚫 Private Client attempted quote request - blocked');
@@ -436,7 +426,7 @@ export const CartSidebar: React.FC = () => {
     // COs/Contractors must use Request Quote instead
     // Other users (visitors, suppliers, delivery) cannot purchase
     // ═══════════════════════════════════════════════════════════════════════════════
-    const currentRole = userRole || localStorage.getItem('user_role');
+    const currentRole = userRole;
     
     if (currentRole === 'professional_builder') {
       console.log('🚫 CO/Contractor attempted direct purchase - blocked');
@@ -977,7 +967,7 @@ export const CartSidebar: React.FC = () => {
                   - Other roles: Show message to register
                   ═══════════════════════════════════════════════════════════════════════════════ */}
               {(() => {
-                const effectiveRole = userRole || localStorage.getItem('user_role');
+                const effectiveRole = userRole;
                 const sessionUser = authUser;
                 const canDirectPurchase =
                   effectiveRole === 'private_client' ||
@@ -1138,7 +1128,7 @@ export const CartSidebar: React.FC = () => {
 
         {/* Price Comparison Modal */}
         {(() => {
-          const effectiveRole = userRole || localStorage.getItem('user_role');
+          const effectiveRole = userRole;
           if (effectiveRole === 'supplier') return null;
           return (
             <CartPriceComparison
@@ -1165,7 +1155,7 @@ export const CartSidebar: React.FC = () => {
 
         {/* Unified Compare & Quote Dialog */}
         {(() => {
-          const effectiveRole = userRole || localStorage.getItem('user_role');
+          const effectiveRole = userRole;
           if (effectiveRole === 'supplier') return null;
           return (
             <CartPriceComparisonAll

@@ -430,8 +430,8 @@ export const MaterialsGrid: React.FC<MaterialsGridProps> = ({
   const [priceRange, setPriceRange] = useState('all');
   const [stockFilter, setStockFilter] = useState('all');
   
-  // Derive auth state from AuthContext with localStorage fallback
-  const userRole = authUserRole || localStorage.getItem('user_role');
+  // Role from AuthContext only — never trust localStorage for purchase gating
+  const userRole = authUserRole;
   const roleLower = String(userRole || '').trim().toLowerCase();
   const isSupplierRole = roleLower === 'supplier';
   const isStaffAdminRole = roleLower === 'admin' || roleLower === 'super_admin';

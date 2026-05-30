@@ -4,6 +4,7 @@
  */
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.8";
+import { amountsMatch, resolvePaystackOrderAmount } from "../_shared/paystackOrderAmount.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
@@ -90,13 +91,11 @@ serve(async (req) => {
     });
   }
 
-  const currency = (body.currency ?? "KES").toUpperCase();
-  const amountMinor = minorUnits(body.amount, currency);
-  if (!body.email?.includes("@") || amountMinor < 100) {
-    return new Response(
-      JSON.stringify({ error: "Valid email and minimum amount (1.00 in your currency) are required." }),
-      { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-    );
+  if (!body.email?.includes("@")) {
+    return new Response(JSON.stringify({ error: "Valid email is required." }), {
+      status: 400,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
   }
 
   if (!body.orderId || typeof body.orderId !== "string") {
@@ -104,6 +103,46 @@ serve(async (req) => {
       status: 400,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
+  }
+
+  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+  const amountClient = createClient(SUPABASE_URL, serviceKey, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+
+  const resolved = await resolvePaystackOrderAmount(
+    amountClient,
+    userData.user.id,
+    body.orderId,
+  );
+  if (!resolved.ok) {
+    return new Response(JSON.stringify({ error: resolved.error }), {
+      status: resolved.status,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
+  const currency = (body.currency ?? resolved.currency).toUpperCase();
+  if (currency !== resolved.currency) {
+    return new Response(JSON.stringify({ error: "Currency mismatch for this order." }), {
+      status: 400,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
+  if (Number.isFinite(body.amount) && !amountsMatch(body.amount, resolved.amountMajor)) {
+    return new Response(JSON.stringify({ error: "Amount does not match the order total." }), {
+      status: 400,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
+  const amountMinor = minorUnits(resolved.amountMajor, currency);
+  if (amountMinor < 100) {
+    return new Response(
+      JSON.stringify({ error: "Minimum amount (1.00 in your currency) is required." }),
+      { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+    );
   }
 
   if (!body.callbackUrl?.startsWith("https://") && !body.callbackUrl?.startsWith("http://localhost")) {

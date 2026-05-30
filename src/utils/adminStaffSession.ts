@@ -1,4 +1,5 @@
 import { readAccessTokenSyncBestEffort } from '@/utils/supabaseAccessToken';
+import { requireSupabaseSessionForAdminShell } from '@/utils/securityMode';
 /**
  * Validates the admin staff portal session stored in localStorage.
  * Staff may use "limited mode" without a Supabase JWT; do not require sb-*-auth-token for access.
@@ -29,14 +30,6 @@ export function isLikelySupabaseAdminUser(): boolean {
   if (!readAccessTokenSyncBestEffort()) return false;
   const role = localStorage.getItem("user_role");
   return role === "admin" || role === "super_admin";
-}
-
-function requireSupabaseSessionForAdminShell(): boolean {
-  try {
-    return import.meta.env.VITE_REQUIRE_SUPABASE_SESSION_FOR_ADMIN === "true";
-  } catch {
-    return false;
-  }
 }
 
 /** Either staff portal session OR Supabase admin (e.g. after /auth). */

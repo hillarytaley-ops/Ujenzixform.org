@@ -59,46 +59,31 @@ export const usePaymentIntegrations = () => {
 
   const [paymentHistory, setPaymentHistory] = useState<any[]>([]);
 
-  // ADMIN ONLY: Payment processing is restricted to administrators
+  // ADMIN ONLY: reconcile invoice payment after Paystack verification (server-side)
   const processPayment = useCallback(async (request: PaymentRequest) => {
-    try {
-      // Check admin status first
-      const { data: roleData } = await supabase
-        .from('user_roles')
-        .select('role')
-        .eq('user_id', (await supabase.auth.getUser()).data.user?.id)
-        .eq('role', 'admin')
-        .maybeSingle();
-
-      if (!roleData) {
-        throw new Error('Payment processing is restricted to administrators only');
-      }
-
-      const provider = providers.find(p => p.id === request.provider);
-      if (!provider) {
-        throw new Error('Payment provider not found');
-      }
-
-      // Use secure edge function for payment processing (admin-only)
-      const { data: result, error } = await supabase.functions.invoke('process-payment', {
-        body: {
-          amount: request.amount,
-          currency: request.currency,
-          provider: request.provider,
-          phoneNumber: request.phoneNumber,
-          reference: request.reference,
-          description: request.description
-        }
-      });
-
-      if (error) throw error;
-      return result;
-
-    } catch (error) {
-      console.error('Payment processing failed:', error);
-      throw error;
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      throw new Error('Authentication required');
     }
-  }, [providers]);
+
+    const { data: roleRows } = await supabase
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', user.id);
+
+    const isAdmin = roleRows?.some((r) => r.role === 'admin' || r.role === 'super_admin');
+    if (!isAdmin) {
+      throw new Error('Payment reconciliation is restricted to administrators');
+    }
+
+    if (!request.reference?.trim()) {
+      throw new Error('Paystack payment reference is required');
+    }
+
+    throw new Error(
+      'Use process-payment with invoice_id and a verified Paystack reference. Prefer Paystack checkout + webhook for buyer payments.',
+    );
+  }, []);
 
   const processMobileMoneyPayment = async (provider: PaymentProvider, request: PaymentRequest, paymentId: string) => {
     // Simulate M-Pesa STK Push
