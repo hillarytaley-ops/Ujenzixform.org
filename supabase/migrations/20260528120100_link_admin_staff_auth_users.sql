@@ -14,7 +14,7 @@ DECLARE
   v_uid uuid;
   v_staff_id uuid;
   v_staff_role text;
-  v_platform_role text;
+  v_app_role public.app_role;
 BEGIN
   IF p_email IS NULL OR length(trim(p_email)) = 0 THEN
     RETURN jsonb_build_object('ok', false, 'error', 'email_required');
@@ -52,19 +52,17 @@ BEGIN
   WHERE id = v_staff_id
     AND (user_id IS DISTINCT FROM v_uid);
 
-  v_platform_role := CASE
-    WHEN v_staff_role IN ('super_admin', 'superadmin') THEN 'super_admin'
-    WHEN v_staff_role IN ('admin', 'administrator') THEN 'admin'
-    ELSE 'admin'
-  END;
+  -- user_roles.role is app_role (admin/supplier/builder/…); no super_admin enum value.
+  -- Staff fine-grained permissions remain on admin_staff.role.
+  v_app_role := 'admin'::public.app_role;
 
   INSERT INTO public.user_roles (user_id, role)
-  VALUES (v_uid, v_platform_role)
+  VALUES (v_uid, v_app_role)
   ON CONFLICT (user_id, role) DO NOTHING;
 
   IF NOT EXISTS (SELECT 1 FROM public.user_roles WHERE user_id = v_uid) THEN
     INSERT INTO public.user_roles (user_id, role)
-    VALUES (v_uid, v_platform_role);
+    VALUES (v_uid, v_app_role);
   END IF;
 
   RETURN jsonb_build_object(
@@ -72,7 +70,8 @@ BEGIN
     'email', v_email_norm,
     'user_id', v_uid,
     'staff_id', v_staff_id,
-    'platform_role', v_platform_role
+    'platform_role', v_app_role::text,
+    'staff_role', v_staff_role
   );
 END;
 $$;
