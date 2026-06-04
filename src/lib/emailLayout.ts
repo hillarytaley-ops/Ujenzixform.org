@@ -17,11 +17,12 @@ export function logoAbsoluteUrl(): string {
   return `${emailPublicOrigin()}${EMAIL_LOGO_PATH}`;
 }
 
-export const COMPANY_BRAND = 'UjenziXform';
-export const COMPANY_TAGLINE = "Kenya's construction materials marketplace";
-export const COMPANY_PHYSICAL_ADDRESS =
-  'Barngetuny Plaza Left Wing 3rd Floor Room 10, Ronald Ngala Street, Eldoret';
-export const COMPANY_POSTAL_ADDRESS = 'P. O. Box 4146 - 30100 Eldoret, Kenya';
+import {
+  COMPANY_BRAND,
+  COMPANY_PHYSICAL_ADDRESS,
+  COMPANY_POSTAL_ADDRESS,
+  COMPANY_TAGLINE,
+} from '@/config/appIdentity';
 
 export function companyContactFooter(): string {
   const origin = emailPublicOrigin();

@@ -3,6 +3,7 @@ import Footer from "@/components/Footer";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Shield, Eye, Lock, Database, UserCheck, Globe, Mail, AlertCircle } from "lucide-react";
+import { COMPANY_PHYSICAL_ADDRESS, COMPANY_POSTAL_ADDRESS } from "@/config/appIdentity";
 
 const PrivacyPolicy = () => {
   const lastUpdated = "December 3, 2025";
@@ -252,7 +253,7 @@ const PrivacyPolicy = () => {
               <li><strong>Data Protection Officer:</strong> privacy@UjenziXform.co.ke</li>
               <li><strong>General Inquiries:</strong> support@UjenziXform.co.ke</li>
               <li><strong>Phone:</strong> +254-700-UjenziXform</li>
-              <li><strong>Address:</strong> Nairobi, Kenya</li>
+              <li><strong>Address:</strong> {COMPANY_PHYSICAL_ADDRESS}. {COMPANY_POSTAL_ADDRESS}</li>
             </ul>
 
             <div className="mt-6 p-4 bg-muted rounded-lg">

@@ -15,7 +15,7 @@ import Footer from "@/components/Footer";
 import { useToast } from "@/hooks/use-toast";
 import AnimatedSection from "@/components/AnimatedSection";
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from "@/integrations/supabase/client";
-import { SUPPORT_PHONE_PRIMARY, SUPPORT_PHONE_SECONDARY } from "@/config/appIdentity";
+import { SUPPORT_PHONE_PRIMARY, SUPPORT_PHONE_SECONDARY, COMPANY_OFFICE_LABEL, COMPANY_PHYSICAL_ADDRESS, COMPANY_POSTAL_ADDRESS, COMPANY_OFFICE_LOCATION } from "@/config/appIdentity";
 
 function nameSchema(label: string) {
   return z
@@ -184,7 +184,7 @@ const Contact = () => {
               </div>
               <div className="flex items-center gap-2 bg-white/10 px-4 py-2 rounded-full backdrop-blur-sm">
                 <MapPin className="h-5 w-5 shrink-0" />
-                <span className="font-medium">Nairobi HQ</span>
+                <span className="font-medium">{COMPANY_OFFICE_LABEL}</span>
               </div>
             </div>
           </div>
@@ -420,14 +420,14 @@ const Contact = () => {
                         <MapPin className="h-8 w-8 text-white" />
                       </div>
                       <div>
-                        <h3 className="font-bold text-2xl mb-2 text-gray-900">Nairobi Office</h3>
+                        <h3 className="font-bold text-2xl mb-2 text-gray-900">{COMPANY_OFFICE_LABEL}</h3>
                         <p className="text-gray-700 text-lg leading-relaxed">
-                          Libra House, Suite No. 3<br />
-                          P.O BOX 73329-00200<br />
-                          Nairobi, Kenya
+                          {COMPANY_PHYSICAL_ADDRESS}<br />
+                          {COMPANY_POSTAL_ADDRESS}<br />
+                          {COMPANY_OFFICE_LOCATION}
                         </p>
                         <p className="text-sm text-green-600 font-medium mt-2">
-                          🇰🇪 Nairobi HQ — we work with teams across Kenya (major hubs first, growing nationwide).
+                          🇰🇪 Eldoret HQ — we work with teams across Kenya (major hubs first, growing nationwide).
                         </p>
                       </div>
                     </div>

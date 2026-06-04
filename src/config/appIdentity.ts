@@ -47,6 +47,17 @@ export const SOCIAL_WHATSAPP_URL =
   (import.meta.env.VITE_SOCIAL_WHATSAPP_URL as string | undefined) ||
   'https://wa.me/message/3VWSHQ4REFLMK1';
 
+/** Canonical product name (not MradiPro / UjenziPro). */
+export const COMPANY_BRAND = 'UjenziXform';
+export const COMPANY_TAGLINE = "Kenya's construction materials marketplace";
+
+/** Registered office — UjenziXform Solution (KRA TIS applicant). */
+export const COMPANY_OFFICE_LABEL = 'Eldoret Office';
+export const COMPANY_PHYSICAL_ADDRESS =
+  'Barngetuny Plaza Left Wing 3rd Floor Room 10, Ronald Ngala Street, Eldoret';
+export const COMPANY_POSTAL_ADDRESS = 'P. O. Box 4146 - 30100 Eldoret, Kenya';
+export const COMPANY_OFFICE_LOCATION = 'Eldoret, Kenya';
+
 /** localStorage session blob (UX cache; auth is server-verified). */
 export const STORAGE_SESSION_KEY = 'ujenzixform_session';
 export const STORAGE_SESSION_KEY_LEGACY = 'mradipro_session';
