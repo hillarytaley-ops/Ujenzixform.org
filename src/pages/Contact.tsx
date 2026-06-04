@@ -455,7 +455,9 @@ const Contact = () => {
                         <p className="text-gray-700 text-lg leading-relaxed">
                           <a
                             href={`tel:${SUPPORT_PHONE_PRIMARY.tel}`}
-                            className="hover:text-primary transition-colors"
+                            className="hover:text-primary transition-colors underline-offset-2 hover:underline"
+                            aria-label={`Call UjenziXform at ${SUPPORT_PHONE_PRIMARY.display}`}
+                            title={`Call ${SUPPORT_PHONE_PRIMARY.display}`}
                           >
                             {SUPPORT_PHONE_PRIMARY.display}
                           </a>

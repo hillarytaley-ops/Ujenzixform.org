@@ -112,14 +112,17 @@ const Footer = () => {
           <div className="flex flex-col sm:flex-row flex-wrap items-center justify-center gap-x-10 gap-y-3">
             <a
               href="mailto:info@ujenzixform.org"
-              className="flex items-center gap-2 hover:text-white transition-colors"
+              className="flex items-center gap-2 hover:text-white transition-colors underline-offset-2 hover:underline"
+              aria-label="Email UjenziXform at info@ujenzixform.org"
             >
               <EmailIcon size={16} />
               <span>info@ujenzixform.org</span>
             </a>
             <a
               href={`tel:${SUPPORT_PHONE_PRIMARY.tel}`}
-              className="flex items-center gap-2 hover:text-white transition-colors"
+              className="flex items-center gap-2 hover:text-white transition-colors underline-offset-2 hover:underline cursor-pointer"
+              aria-label={`Call UjenziXform at ${SUPPORT_PHONE_PRIMARY.display}`}
+              title={`Call ${SUPPORT_PHONE_PRIMARY.display}`}
             >
               <PhoneIcon size={16} />
               <span>{SUPPORT_PHONE_PRIMARY.display}</span>
