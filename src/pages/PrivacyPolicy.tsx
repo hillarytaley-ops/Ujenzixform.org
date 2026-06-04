@@ -3,7 +3,7 @@ import Footer from "@/components/Footer";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Shield, Eye, Lock, Database, UserCheck, Globe, Mail, AlertCircle } from "lucide-react";
-import { COMPANY_PHYSICAL_ADDRESS, COMPANY_POSTAL_ADDRESS } from "@/config/appIdentity";
+import { COMPANY_PHYSICAL_ADDRESS, COMPANY_POSTAL_ADDRESS, SUPPORT_PHONE_PRIMARY } from "@/config/appIdentity";
 
 const PrivacyPolicy = () => {
   const lastUpdated = "December 3, 2025";
@@ -252,7 +252,7 @@ const PrivacyPolicy = () => {
             <ul className="list-none pl-0 space-y-2 mt-4">
               <li><strong>Data Protection Officer:</strong> privacy@UjenziXform.co.ke</li>
               <li><strong>General Inquiries:</strong> support@UjenziXform.co.ke</li>
-              <li><strong>Phone:</strong> +254-700-UjenziXform</li>
+              <li><strong>Phone:</strong> {SUPPORT_PHONE_PRIMARY.display}</li>
               <li><strong>Address:</strong> {COMPANY_PHYSICAL_ADDRESS}. {COMPANY_POSTAL_ADDRESS}</li>
             </ul>
 

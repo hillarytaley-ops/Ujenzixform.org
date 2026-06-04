@@ -22,7 +22,7 @@ export const SUPPORT_PHONE_PRIMARY = {
   ).replace(/\s/g, ''),
   display:
     (import.meta.env.VITE_SUPPORT_PHONE_PRIMARY_DISPLAY as string | undefined)?.trim() ||
-    '+254 715 612 073',
+    '+254 715 612073',
 } as const;
 
 export const SUPPORT_PHONE_SECONDARY = {

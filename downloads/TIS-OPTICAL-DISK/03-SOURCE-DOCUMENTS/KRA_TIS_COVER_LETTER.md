@@ -40,7 +40,7 @@ We write on behalf of **UjenziXform Solution** (platform: **UjenziXform**) to ap
 | Contact name | _[Fill in HTML form]_ |
 | Contact title | _[Fill in HTML form]_ |
 | Contact email | _[Fill in HTML form]_ |
-| Contact telephone | _[Fill in HTML form]_ |
+| Contact telephone | +254 715 612073 |
 | Registered address | Barngetuny Plaza Left Wing 3rd Floor Room 10, Ronald Ngala Street, Eldoret. P. O. Box 4146 - 30100 Eldoret |
 | Website | https://ujenzi-pro.vercel.app/ |
 

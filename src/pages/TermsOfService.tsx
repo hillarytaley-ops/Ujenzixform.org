@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { FileText, Shield, Users, AlertTriangle, Scale, Mail } from "lucide-react";
 import { TERMS_LAST_UPDATED } from "@/lib/termsPublication";
-import { COMPANY_PHYSICAL_ADDRESS, COMPANY_POSTAL_ADDRESS } from "@/config/appIdentity";
+import { COMPANY_PHYSICAL_ADDRESS, COMPANY_POSTAL_ADDRESS, SUPPORT_PHONE_PRIMARY } from "@/config/appIdentity";
 
 const TermsOfService = () => {
   const lastUpdated = TERMS_LAST_UPDATED;
@@ -247,7 +247,7 @@ const TermsOfService = () => {
             <p>For questions about these Terms of Service, please contact us:</p>
             <ul className="list-none pl-0 space-y-2 mt-4">
               <li><strong>Email:</strong> legal@UjenziXform.co.ke</li>
-              <li><strong>Phone:</strong> +254-700-UjenziXform</li>
+              <li><strong>Phone:</strong> {SUPPORT_PHONE_PRIMARY.display}</li>
               <li><strong>Address:</strong> {COMPANY_PHYSICAL_ADDRESS}. {COMPANY_POSTAL_ADDRESS}</li>
             </ul>
           </CardContent>

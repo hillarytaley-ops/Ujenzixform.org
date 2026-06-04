@@ -15,7 +15,7 @@ import Footer from "@/components/Footer";
 import { useToast } from "@/hooks/use-toast";
 import AnimatedSection from "@/components/AnimatedSection";
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from "@/integrations/supabase/client";
-import { SUPPORT_PHONE_PRIMARY, SUPPORT_PHONE_SECONDARY, COMPANY_OFFICE_LABEL, COMPANY_PHYSICAL_ADDRESS, COMPANY_POSTAL_ADDRESS, COMPANY_OFFICE_LOCATION } from "@/config/appIdentity";
+import { SUPPORT_PHONE_PRIMARY, COMPANY_OFFICE_LABEL, COMPANY_PHYSICAL_ADDRESS, COMPANY_POSTAL_ADDRESS, COMPANY_OFFICE_LOCATION } from "@/config/appIdentity";
 
 function nameSchema(label: string) {
   return z
@@ -443,20 +443,13 @@ const Contact = () => {
                         <Phone className="h-8 w-8 text-white" />
                       </div>
                       <div>
-                        <h3 className="font-bold text-2xl mb-2 text-gray-900">Phone Numbers</h3>
+                        <h3 className="font-bold text-2xl mb-2 text-gray-900">Phone Number</h3>
                         <p className="text-gray-700 text-lg leading-relaxed">
                           <a
                             href={`tel:${SUPPORT_PHONE_PRIMARY.tel}`}
                             className="hover:text-primary transition-colors"
                           >
                             {SUPPORT_PHONE_PRIMARY.display}
-                          </a>
-                          <br />
-                          <a
-                            href={`tel:${SUPPORT_PHONE_SECONDARY.tel}`}
-                            className="hover:text-primary transition-colors"
-                          >
-                            {SUPPORT_PHONE_SECONDARY.display}
                           </a>
                         </p>
                         <p className="text-sm text-blue-600 font-medium mt-2">
