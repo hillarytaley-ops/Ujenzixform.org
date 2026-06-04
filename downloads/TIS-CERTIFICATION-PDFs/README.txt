@@ -1,0 +1,15 @@
+﻿UjenziXform TIS - All certification PDFs
+Reference: UJX-TIS-KRA-ARCH-2026-001
+
+These are real PDF files (.pdf). Open with Adobe Reader, Edge, or Chrome.
+Do NOT use the .md files in TIS-ETIMS-Architecture for KRA submission.
+
+  01_KRA_TIS_COVER_LETTER.pdf
+  02_EXECUTIVE_SUMMARY.pdf
+  03_TIS_ETIMS_INTEGRATION_ARCHITECTURE.pdf
+  04_APPENDIX_SAMPLE_SALESREQ.pdf
+  05_USER_OPERATOR_MANUAL.pdf
+  06_INSTALLATION_DEPLOYMENT_GUIDE.pdf
+  07_CERTIFICATION_TEST_PLAN.pdf
+  08_OPTICAL_DISK_SUBMISSION_INSTRUCTIONS.pdf
+  09_REPRESENTATIVE_HANDOVER_KENYA.pdf

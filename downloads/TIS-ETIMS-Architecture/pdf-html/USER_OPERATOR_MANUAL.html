@@ -1,0 +1,621 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>UjenziXform Trader Invoicing System (TIS) — User &amp; Operator Manual</title>
+  <style>
+    @page { size: A4; margin: 18mm 16mm; }
+    body {
+      font-family: "Segoe UI", Calibri, Arial, sans-serif;
+      font-size: 10.5pt;
+      line-height: 1.45;
+      max-width: 7.4in;
+      margin: 0 auto;
+      padding: 0.35in 0.2in;
+      color: #111;
+    }
+    .hint {
+      font-size: 9pt;
+      background: #ecfdf5;
+      border: 1px solid #99f6e4;
+      padding: 0.5rem 0.65rem;
+      margin-bottom: 0.85rem;
+    }
+    h1 { font-size: 16pt; margin: 0 0 0.6rem; color: #0f172a; page-break-after: avoid; }
+    h2 { font-size: 12.5pt; margin: 1.1rem 0 0.45rem; color: #1e293b; page-break-after: avoid; border-bottom: 1px solid #e2e8f0; padding-bottom: 0.15rem; }
+    h3 { font-size: 11pt; margin: 0.85rem 0 0.35rem; color: #334155; page-break-after: avoid; }
+    h4 { font-size: 10.5pt; margin: 0.65rem 0 0.25rem; color: #475569; page-break-after: avoid; }
+    p { margin: 0.35rem 0 0.55rem; }
+    ul, ol { margin: 0.35rem 0 0.65rem; padding-left: 1.25rem; }
+    li { margin: 0.15rem 0; }
+    table { width: 100%; border-collapse: collapse; margin: 0.55rem 0 0.85rem; font-size: 9.5pt; page-break-inside: avoid; }
+    th, td { border: 1px solid #cbd5e1; padding: 0.28rem 0.4rem; vertical-align: top; text-align: left; }
+    th { background: #f8fafc; font-weight: 600; }
+    tr:nth-child(even) td { background: #fcfdff; }
+    code, pre code { font-family: Consolas, "Courier New", monospace; font-size: 9pt; }
+    p code, li code, td code, th code { background: #f1f5f9; padding: 0.05rem 0.25rem; border-radius: 3px; }
+    pre {
+      background: #0f172a;
+      color: #e2e8f0;
+      padding: 0.65rem 0.75rem;
+      border-radius: 6px;
+      overflow-x: auto;
+      page-break-inside: avoid;
+      margin: 0.5rem 0 0.75rem;
+    }
+    pre code { background: transparent; color: inherit; padding: 0; }
+    blockquote {
+      margin: 0.5rem 0 0.75rem;
+      padding: 0.45rem 0.75rem;
+      border-left: 3px solid #14b8a6;
+      background: #f0fdfa;
+      color: #134e4a;
+    }
+    hr { border: none; border-top: 1px solid #e2e8f0; margin: 1rem 0; }
+    a { color: #0f766e; word-break: break-all; }
+    @media print {
+      .hint { display: none; }
+      body { padding: 0; }
+      h2 { page-break-before: auto; }
+    }
+  </style>
+</head>
+<body>
+  <div class="hint">UjenziXform TIS certification document — Ctrl+P → Save as PDF if needed.</div>
+  <h1>UjenziXform Trader Invoicing System (TIS) — User &amp; Operator Manual</h1>
+<p><strong>Document type:</strong> User / operator manual (certification submission)   <strong>Applicant:</strong> UjenziXform Solution   <strong>Product:</strong> UjenziXform Trader Invoicing System (TIS) v1.0.0   <strong>Platform:</strong> UjenziXform (construction materials marketplace, Kenya)   <strong>Reference:</strong> UJX-TIS-KRA-ARCH-2026-001   <strong>Document version:</strong> 1.0   <strong>Date:</strong> 3 June 2026  </p>
+<blockquote><p><strong>Status:</strong> Applicant / in development — KRA sandbox access not yet assigned.</p></blockquote>
+<hr />
+<h2>Table of contents</h2>
+<ol>
+<li><a href="#1-purpose-and-audience">Purpose and audience</a></li>
+<li><a href="#2-roles-and-access">Roles and access</a></li>
+<li><a href="#3-before-you-start">Before you start</a></li>
+<li><a href="#4-supplier-kra-tax-identity-setup">Supplier: KRA tax identity setup</a></li>
+<li><a href="#5-builder-buyer-profile-for-fiscal-invoices">Builder: buyer profile for fiscal invoices</a></li>
+<li><a href="#6-purchase-order--fiscal-invoice-flow">Purchase order → fiscal invoice flow</a></li>
+<li><a href="#7-viewing-the-fiscal-receipt-and-qr-code">Viewing the fiscal receipt and QR code</a></li>
+<li><a href="#8-credit-notes">Credit notes</a></li>
+<li><a href="#9-administrator-tis-integrator-hub">Administrator: TIS Integrator Hub</a></li>
+<li><a href="#10-administrator-vendor-onboarding">Administrator: vendor onboarding</a></li>
+<li><a href="#11-administrator-submission-operations-and-retry">Administrator: submission operations and retry</a></li>
+<li><a href="#12-administrator-oscu-initialization">Administrator: OSCU initialization</a></li>
+<li><a href="#13-administrator-integrator-api-console">Administrator: Integrator API console</a></li>
+<li><a href="#14-common-errors-and-resolution">Common errors and resolution</a></li>
+<li><a href="#15-support-and-escalation">Support and escalation</a></li>
+<li><a href="#16-document-control">Document control</a></li>
+</ol>
+<hr />
+<h2>1. Purpose and audience</h2>
+<p>This manual describes how <strong>operators and end users</strong> work with the <strong>UjenziXform Trader Invoicing System (TIS)</strong> — the eTIMS compliance layer embedded in UjenziXform purchase order workflows.</p>
+<table><thead><tr>
+<th>Audience</th>
+<th>What this manual covers</th>
+</tr></thead><tbody>
+<tr>
+<td><strong>Suppliers</strong></td>
+<td>Enter KRA PIN and legal business details; submit orders to eTIMS; view fiscal receipts</td>
+</tr>
+<tr>
+<td><strong>Builders (buyers)</strong></td>
+<td>Maintain billing identity; receive and verify fiscal receipts</td>
+</tr>
+<tr>
+<td><strong>Administrators</strong></td>
+<td>Onboard vendors, run OSCU initialization, monitor submissions, retry failures</td>
+</tr>
+<tr>
+<td><strong>KRA reviewers</strong></td>
+<td>Understand day-to-day operator workflows during certification</td>
+</tr>
+</tbody></table>
+<p>TIS is <strong>not</strong> a standalone accounting product. It maps <strong>purchase orders (POs)</strong> to KRA <strong>SalesReq</strong> JSON and submits them via <strong><code>POST /invoices</code></strong> once KRA assigns sandbox or production access.</p>
+<hr />
+<h2>2. Roles and access</h2>
+<table><thead><tr>
+<th>Role</th>
+<th>TIS capabilities</th>
+</tr></thead><tbody>
+<tr>
+<td><strong>Supplier</strong></td>
+<td>Edit own KRA settings; manually submit PO to eTIMS; view fiscal receipt on accepted orders</td>
+</tr>
+<tr>
+<td><strong>Builder</strong></td>
+<td>View fiscal receipt on own POs; optional KRA PIN in profile for B2B invoices</td>
+</tr>
+<tr>
+<td><strong>Admin / super_admin</strong></td>
+<td>Full TIS Integrator Hub; vendor onboarding; submission ops; OSCU init; API console</td>
+</tr>
+<tr>
+<td><strong>Guest / unauthenticated</strong></td>
+<td>No TIS API access</td>
+</tr>
+</tbody></table>
+<p>All outbound KRA calls require a signed-in user with role <code>supplier</code>, <code>admin</code>, or <code>super_admin</code>. KRA credentials are <strong>never</strong> visible in the browser.</p>
+<hr />
+<h2>3. Before you start</h2>
+<h3>3.1 Prerequisites (per supplier taxpayer)</h3>
+<p>Before the first fiscal invoice can be submitted:</p>
+<table><thead><tr>
+<th>Requirement</th>
+<th>Where configured</th>
+</tr></thead><tbody>
+<tr>
+<td>Valid <strong>KRA PIN</strong></td>
+<td>Supplier → <strong>KRA / eTIMS settings</strong></td>
+</tr>
+<tr>
+<td><strong>Legal business name</strong> (matches KRA registration)</td>
+<td>Same panel</td>
+</tr>
+<tr>
+<td><strong>Branch code</strong> (<code>bhfId</code>, e.g. <code>00</code>)</td>
+<td>Same panel — from KRA sandbox or production</td>
+</tr>
+<tr>
+<td><strong>Device serial</strong> (<code>dvcSrlNo</code>)</td>
+<td>Same panel — from KRA after OSCU initialization</td>
+</tr>
+<tr>
+<td><strong>Item codes</strong> on every PO line</td>
+<td>Supplier catalog / materials (<code>etims_item_code</code>)</td>
+</tr>
+<tr>
+<td><strong>PO status</strong> accepted or confirmed</td>
+<td>Order workflow (not quote-pending)</td>
+</tr>
+</tbody></table>
+<h3>3.2 Current platform status</h3>
+<table><thead><tr>
+<th>Item</th>
+<th>Status</th>
+</tr></thead><tbody>
+<tr>
+<td>TIS application software</td>
+<td>Ready for sandbox testing</td>
+</tr>
+<tr>
+<td>KRA eTIMS sandbox credentials</td>
+<td><strong>Pending</strong> — subject of integrator application</td>
+</tr>
+<tr>
+<td>Target sandbox URL</td>
+<td><code>https://etims-api-sbx.kra.go.ke</code></td>
+</tr>
+<tr>
+<td>Integrator certification</td>
+<td><strong>Not held</strong></td>
+</tr>
+</tbody></table>
+<p>Until KRA assigns sandbox access, connection tests may return <strong>“eTIMS proxy not configured”</strong>. Configuration is performed by administrators per the Installation &amp; Deployment Guide.</p>
+<hr />
+<h2>4. Supplier: KRA tax identity setup</h2>
+<p><strong>Navigation:</strong> Supplier dashboard → <strong>Invoices &amp; documents</strong> → <strong>KRA / eTIMS settings</strong> tab   <strong>Component:</strong> <code>SupplierEtimsSettingsPanel</code></p>
+<h3>4.1 Fields to complete</h3>
+<table><thead><tr>
+<th>Field</th>
+<th>Purpose</th>
+</tr></thead><tbody>
+<tr>
+<td>Legal business name</td>
+<td>Printed on fiscal receipt; maps to <code>traderName</code></td>
+</tr>
+<tr>
+<td>KRA PIN</td>
+<td>Supplier taxpayer ID; maps to <code>traderTin</code> / <code>sellerPin</code></td>
+</tr>
+<tr>
+<td>VAT registration status</td>
+<td>Internal compliance context</td>
+</tr>
+<tr>
+<td>Physical business address</td>
+<td>Invoice and audit reference</td>
+</tr>
+<tr>
+<td>Invoice contact phone / email</td>
+<td>Operational contact</td>
+</tr>
+<tr>
+<td>Branch code</td>
+<td>KRA branch office ID (<code>bhfId</code>)</td>
+</tr>
+<tr>
+<td>Business place code</td>
+<td>KRA business place reference where applicable</td>
+</tr>
+<tr>
+<td>Device serial</td>
+<td>OSCU device serial after initialization</td>
+</tr>
+<tr>
+<td>Default payment type</td>
+<td>Maps to KRA payment type code (default <code>01</code>)</td>
+</tr>
+<tr>
+<td>Invoice notes</td>
+<td>Optional footer text on supplier-facing documents</td>
+</tr>
+</tbody></table>
+<h3>4.2 Save and test connection</h3>
+<ol>
+<li>Enter all required fields and click <strong>Save</strong>.</li>
+<li>Click <strong>Test connection</strong> (when sandbox is configured) to verify <code>etims-proxy</code> reachability.</li>
+<li>Resolve any KRA PIN validation errors before accepting new orders.</li>
+</ol>
+<p><strong>PIN format:</strong> Validated by <code>isValidKraPin()</code> — must conform to KRA PIN rules before checkout and submission.</p>
+<hr />
+<h2>5. Builder: buyer profile for fiscal invoices</h2>
+<p><strong>Navigation:</strong> Profile → <strong>Edit profile</strong></p>
+<table><thead><tr>
+<th>Field</th>
+<th>Purpose</th>
+</tr></thead><tbody>
+<tr>
+<td>KRA PIN</td>
+<td>Maps to <code>customerPin</code> on B2B invoices</td>
+</tr>
+<tr>
+<td>Billing / company name</td>
+<td>Maps to <code>customerName</code></td>
+</tr>
+</tbody></table>
+<p>If the builder has no KRA PIN, TIS may still submit with buyer name only, depending on KRA sandbox rules for B2C sales. B2B transactions should always include a valid buyer PIN.</p>
+<hr />
+<h2>6. Purchase order → fiscal invoice flow</h2>
+<p>TIS submits <strong><code>POST /invoices</code></strong> from a <strong>purchase order</strong>, not from a separate internal invoice module.</p>
+<h3>6.1 Automatic submission paths</h3>
+<table><thead><tr>
+<th>User action</th>
+<th>Result</th>
+</tr></thead><tbody>
+<tr>
+<td><strong>Cart → Buy Now</strong></td>
+<td>PO created with status <code>confirmed</code> → automatic TIS submit</td>
+</tr>
+<tr>
+<td><strong>Materials grid → Buy Now</strong></td>
+<td>Same as above</td>
+</tr>
+</tbody></table>
+<h3>6.2 Manual submission paths</h3>
+<table><thead><tr>
+<th>User action</th>
+<th>Result</th>
+</tr></thead><tbody>
+<tr>
+<td><strong>Supplier Order Management</strong></td>
+<td>Supplier clicks <strong>Submit to KRA eTIMS</strong> on an accepted PO</td>
+</tr>
+<tr>
+<td><strong>Admin TIS / eTIMS tools</strong></td>
+<td>Staff retry or test submit on a specific PO</td>
+</tr>
+</tbody></table>
+<h3>6.3 Quote workflow</h3>
+<p>POs in quote-pending statuses (<code>quote_created</code>, <code>quote_received_by_supplier</code>, <code>quoted</code>, etc.) <strong>block</strong> automatic submission. After the builder accepts the quote and the PO reaches an accepted/confirmed status, the supplier or admin may submit manually.</p>
+<h3>6.4 Gates (submission blocked if any fail)</h3>
+<table><thead><tr>
+<th>Gate</th>
+<th>Error stored on</th>
+</tr></thead><tbody>
+<tr>
+<td>Missing or invalid supplier KRA PIN / legal name</td>
+<td><code>purchase_orders.etims_error</code></td>
+</tr>
+<tr>
+<td>PO still in draft, pending, or quote status</td>
+<td>Same</td>
+</tr>
+<tr>
+<td>PO line missing <code>etims_item_code</code></td>
+<td>Same</td>
+</tr>
+<tr>
+<td>eTIMS proxy not configured</td>
+<td>Same</td>
+</tr>
+</tbody></table>
+<h3>6.5 Successful submission outcome</h3>
+<p>On success, the platform stores on the PO:</p>
+<ul>
+<li><code>etims_validated_at</code> — timestamp of KRA acceptance  </li>
+<li><code>etims_response</code> — JSON snapshot (verification URL, SCU reference)  </li>
+<li>Entry in <code>tis_submission_log</code> — audit trail  </li>
+</ul>
+<p>The buyer and supplier can then open the <strong>fiscal receipt view</strong>.</p>
+<hr />
+<h2>7. Viewing the fiscal receipt and QR code</h2>
+<p><strong>Component:</strong> <code>EtimsFiscalReceiptView</code></p>
+<p>After a successful KRA response, the fiscal receipt displays:</p>
+<table><thead><tr>
+<th>Element</th>
+<th>Description</th>
+</tr></thead><tbody>
+<tr>
+<td>Issuer name and KRA PIN</td>
+<td>Supplier taxpayer</td>
+</tr>
+<tr>
+<td>Trader invoice number</td>
+<td>PO number (<code>traderInvoiceNo</code>)</td>
+</tr>
+<tr>
+<td>SCU / control unit fields</td>
+<td>From KRA response</td>
+</tr>
+<tr>
+<td>Line items and totals</td>
+<td>From PO</td>
+</tr>
+<tr>
+<td><strong>Verification URL</strong></td>
+<td>KRA public validation link</td>
+</tr>
+<tr>
+<td><strong>QR code</strong></td>
+<td>Encodes verification URL for mobile scanning</td>
+</tr>
+</tbody></table>
+<p><strong>Operator action:</strong> Confirm the QR code scans correctly and opens the KRA verification page during sandbox certification.</p>
+<hr />
+<h2>8. Credit notes</h2>
+<p>Credit notes reverse or adjust a prior sale.</p>
+<table><thead><tr>
+<th>Requirement</th>
+<th>Detail</th>
+</tr></thead><tbody>
+<tr>
+<td>Prior sale</td>
+<td>PO must have a successful eTIMS sale (<code>etims_validated_at</code> set)</td>
+</tr>
+<tr>
+<td>Receipt type</td>
+<td><code>receiptTypeCode: R</code></td>
+</tr>
+<tr>
+<td>Reference</td>
+<td><code>traderOrgInvoiceNo</code> links to original sale invoice number</td>
+</tr>
+<tr>
+<td>Endpoint</td>
+<td>Same <code>POST /invoices</code> via <code>etims-proxy</code></td>
+</tr>
+</tbody></table>
+<p><strong>Supplier action:</strong> Use the credit note action on the supplier invoice hub for the original PO (when enabled after sandbox assignment).</p>
+<hr />
+<h2>9. Administrator: TIS Integrator Hub</h2>
+<p><strong>Navigation:</strong> Admin dashboard → <strong>TIS Integrator</strong> tab   <strong>Component:</strong> <code>TisIntegratorHub</code></p>
+<p>The hub has four sub-tabs:</p>
+<table><thead><tr>
+<th>Tab</th>
+<th>Purpose</th>
+</tr></thead><tbody>
+<tr>
+<td><strong>Platform &amp; certification</strong></td>
+<td>Integrator metadata, environment status, KRA certification checklist</td>
+</tr>
+<tr>
+<td><strong>Vendor onboarding</strong></td>
+<td>Per-supplier onboarding lifecycle</td>
+</tr>
+<tr>
+<td><strong>Submission ops</strong></td>
+<td>Monitor and retry failed PO submissions</td>
+</tr>
+<tr>
+<td><strong>Integrator API</strong></td>
+<td>Allowlisted REST calls to KRA sandbox (items, customers, reference data)</td>
+</tr>
+</tbody></table>
+<p>This hub is separate from the <strong>eTIMS test</strong> tab, which is used for low-level proxy smoke tests.</p>
+<hr />
+<h2>10. Administrator: vendor onboarding</h2>
+<p><strong>Table:</strong> <code>tis_vendor_onboarding</code>   <strong>Panel:</strong> <code>TisVendorOnboardingPanel</code></p>
+<h3>10.1 Lifecycle states</h3>
+<pre><code>draft → pending_review → pending_kra → active
+              ↓
+           rejected
+active ↔ suspended</code></pre>
+<table><thead><tr>
+<th>Status</th>
+<th>Meaning</th>
+</tr></thead><tbody>
+<tr>
+<td><code>draft</code></td>
+<td>Supplier profile incomplete</td>
+</tr>
+<tr>
+<td><code>pending_review</code></td>
+<td>Awaiting admin review of tax identity and catalog</td>
+</tr>
+<tr>
+<td><code>pending_kra</code></td>
+<td>Awaiting OSCU init, item registration, or KRA steps</td>
+</tr>
+<tr>
+<td><code>active</code></td>
+<td>Cleared for sandbox/production invoicing</td>
+</tr>
+<tr>
+<td><code>suspended</code></td>
+<td>Temporarily blocked</td>
+</tr>
+<tr>
+<td><code>rejected</code></td>
+<td>Not approved for TIS</td>
+</tr>
+</tbody></table>
+<h3>10.2 Admin procedure</h3>
+<ol>
+<li>Open <strong>Vendor onboarding</strong> in the TIS Integrator Hub.</li>
+<li>Review supplier KRA PIN, legal name, branch, and device serial.</li>
+<li>Advance status to <code>pending_kra</code> when internal review passes.</li>
+<li>Complete OSCU initialization (§12) and item registration.</li>
+<li>Set status to <code>active</code> before the supplier’s first live sandbox invoice.</li>
+</ol>
+<hr />
+<h2>11. Administrator: submission operations and retry</h2>
+<p><strong>Panel:</strong> <code>TisSubmissionOpsPanel</code>   <strong>Audit table:</strong> <code>tis_submission_log</code></p>
+<h3>11.1 Monitoring</h3>
+<table><thead><tr>
+<th>Data source</th>
+<th>What to check</th>
+</tr></thead><tbody>
+<tr>
+<td><code>tis_submission_log</code></td>
+<td>Per-submission status, error message, response snapshot</td>
+</tr>
+<tr>
+<td><code>purchase_orders.etims_error</code></td>
+<td>Latest failure on a specific order</td>
+</tr>
+<tr>
+<td><code>purchase_orders.etims_validated_at</code></td>
+<td>Confirms successful fiscalisation</td>
+</tr>
+</tbody></table>
+<h3>11.2 Retry procedure</h3>
+<ol>
+<li>Open <strong>Submission ops</strong> or the admin PO submit card (<code>EtimsPurchaseOrderSubmitCard</code>).</li>
+<li>Identify POs with <code>etims_error</code> populated and no <code>etims_validated_at</code>.</li>
+<li>Fix the root cause (missing item code, invalid PIN, wrong PO status).</li>
+<li>Click <strong>Submit to KRA eTIMS</strong> or <strong>Retry</strong>.</li>
+<li>Confirm a new <code>tis_submission_log</code> entry with status <code>success</code>.</li>
+</ol>
+<hr />
+<h2>12. Administrator: OSCU initialization</h2>
+<p><strong>Library:</strong> <code>tisOscuInitialization.ts</code>   <strong>KRA endpoint:</strong> <code>POST selectInitOsdcInfo</code> (via <code>etims-proxy</code>)</p>
+<h3>12.1 Required inputs</h3>
+<table><thead><tr>
+<th>Field</th>
+<th>Description</th>
+</tr></thead><tbody>
+<tr>
+<td><code>tin</code></td>
+<td>Vendor/supplier KRA PIN</td>
+</tr>
+<tr>
+<td><code>bhfId</code></td>
+<td>Branch office code (e.g. <code>00</code>)</td>
+</tr>
+<tr>
+<td><code>dvcSrlNo</code></td>
+<td>KRA-assigned device serial for sandbox</td>
+</tr>
+</tbody></table>
+<h3>12.2 Procedure</h3>
+<ol>
+<li>Ensure Edge secrets point to KRA sandbox (<code>ETIMS_BASE_URL=https://etims-api-sbx.kra.go.ke</code>).</li>
+<li>Open <strong>Integrator API</strong> or the OSCU initialization form in the admin hub.</li>
+<li>Enter supplier PIN, branch, and device serial.</li>
+<li>Submit — KRA returns <code>cmcKey</code>, <code>dvcId</code>, and branch name.</li>
+<li>Store device ID on the supplier record; <strong>never</strong> store communication keys in plain text in the database.</li>
+</ol>
+<hr />
+<h2>13. Administrator: Integrator API console</h2>
+<p><strong>Panel:</strong> <code>TisIntegratorApiConsole</code></p>
+<p>Used during sandbox certification for:</p>
+<table><thead><tr>
+<th>Operation</th>
+<th>Typical path</th>
+</tr></thead><tbody>
+<tr>
+<td>Reference data sync</td>
+<td>GET endpoints (countries, tax codes, item classes)</td>
+</tr>
+<tr>
+<td>Item registration</td>
+<td><code>POST /items</code></td>
+</tr>
+<tr>
+<td>Customer registration</td>
+<td><code>POST /customers</code></td>
+</tr>
+<tr>
+<td>Manual invoice test</td>
+<td><code>POST /invoices</code></td>
+</tr>
+</tbody></table>
+<p>All paths must appear on the allowlist in <code>supabase/functions/_shared/etimsPathAllowlist.ts</code>. Requests exceeding 400 KB are rejected.</p>
+<hr />
+<h2>14. Common errors and resolution</h2>
+<table><thead><tr>
+<th>Symptom</th>
+<th>Likely cause</th>
+<th>Resolution</th>
+</tr></thead><tbody>
+<tr>
+<td>“eTIMS proxy not configured”</td>
+<td>Edge secrets missing</td>
+<td>Admin: set <code>ETIMS_BASE_URL</code>, <code>ETIMS_BASIC_USER</code>, <code>ETIMS_BASIC_PASSWORD</code></td>
+</tr>
+<tr>
+<td>“Invalid KRA PIN”</td>
+<td>PIN format or mismatch</td>
+<td>Supplier: correct PIN in KRA settings</td>
+</tr>
+<tr>
+<td>“Missing item code on line …”</td>
+<td>Catalog not mapped</td>
+<td>Admin/supplier: set <code>etims_item_code</code> on product</td>
+</tr>
+<tr>
+<td>“PO status blocks submission”</td>
+<td>Quote not accepted</td>
+<td>Complete quote workflow first</td>
+</tr>
+<tr>
+<td>HTTP 403 from proxy</td>
+<td>User lacks role</td>
+<td>Assign <code>supplier</code>, <code>admin</code>, or <code>super_admin</code></td>
+</tr>
+<tr>
+<td>KRA rejection on <code>/invoices</code></td>
+<td>Payload or master data</td>
+<td>Check SalesReq mapping; register items/customers on sandbox</td>
+</tr>
+</tbody></table>
+<hr />
+<h2>15. Support and escalation</h2>
+<table><thead><tr>
+<th>Level</th>
+<th>Contact</th>
+</tr></thead><tbody>
+<tr>
+<td>End-user (supplier/builder)</td>
+<td>UjenziXform platform support — _[Complete before submission]_</td>
+</tr>
+<tr>
+<td>TIS / integrator technical</td>
+<td>UjenziXform Solution — Barngetuny Plaza Left Wing 3rd Floor Room 10, Ronald Ngala Street, Eldoret. P. O. Box 4146 - 30100 Eldoret</td>
+</tr>
+<tr>
+<td>KRA eTIMS</td>
+<td>eTIMS portal and integrator certification unit</td>
+</tr>
+</tbody></table>
+<p>For certification testing, administrators should retain screenshots of successful submissions, fiscal receipts with QR codes, and <code>tis_submission_log</code> entries as evidence.</p>
+<hr />
+<h2>16. Document control</h2>
+<table><thead><tr>
+<th>Version</th>
+<th>Date</th>
+<th>Changes</th>
+</tr></thead><tbody>
+<tr>
+<td>1.0</td>
+<td>2026-06-03</td>
+<td>Initial release for KRA optical disk submission</td>
+</tr>
+</tbody></table>
+<p><strong>Related documents:</strong></p>
+<ul>
+<li><code>TIS_ETIMS_INTEGRATION_ARCHITECTURE.md</code> — full technical architecture  </li>
+<li><code>INSTALLATION_DEPLOYMENT_GUIDE.md</code> — deployment and Edge configuration  </li>
+<li><code>CERTIFICATION_TEST_PLAN.md</code> — sandbox test cases  </li>
+</ul>
+</body>
+</html>

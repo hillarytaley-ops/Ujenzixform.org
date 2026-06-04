@@ -19,6 +19,9 @@ export function logoAbsoluteUrl(): string {
 
 export const COMPANY_BRAND = 'UjenziXform';
 export const COMPANY_TAGLINE = "Kenya's construction materials marketplace";
+export const COMPANY_PHYSICAL_ADDRESS =
+  'Barngetuny Plaza Left Wing 3rd Floor Room 10, Ronald Ngala Street, Eldoret';
+export const COMPANY_POSTAL_ADDRESS = 'P. O. Box 4146 - 30100 Eldoret, Kenya';
 
 export function companyContactFooter(): string {
   const origin = emailPublicOrigin();
@@ -28,7 +31,9 @@ export function companyContactFooter(): string {
     <tr>
       <td>
         <p style="margin:0 0 8px;font-weight:600;color:#0f172a;">Contact ${COMPANY_BRAND}</p>
-        <p style="margin:0;">Email: <a href="mailto:info@ujenzixform.org" style="color:#15803d;">info@ujenzixform.org</a></p>
+        <p style="margin:0;">${escapeHtml(COMPANY_PHYSICAL_ADDRESS)}</p>
+        <p style="margin:4px 0 0;">${escapeHtml(COMPANY_POSTAL_ADDRESS)}</p>
+        <p style="margin:8px 0 0;">Email: <a href="mailto:info@ujenzixform.org" style="color:#15803d;">info@ujenzixform.org</a></p>
         <p style="margin:8px 0 0;">Web: <a href="${escapeHtml(origin)}" style="color:#15803d;">${escapeHtml(host)}</a></p>
         <p style="margin:12px 0 0;font-size:11px;color:#94a3b8;">You are receiving this message because of activity on your ${COMPANY_BRAND} account.</p>
       </td>

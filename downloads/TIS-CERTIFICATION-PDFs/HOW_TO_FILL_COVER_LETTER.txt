@@ -1,0 +1,29 @@
+UjenziXform — How to fill the KRA cover letter PDF
+==================================================
+
+The cover letter is a FILLABLE HTML form (not a static PDF template).
+
+STEP 1 — Open in your browser (Edge or Chrome):
+  D:\UjenziXform\downloads\TIS-ETIMS-Architecture\KRA_TIS_COVER_LETTER.html
+
+STEP 2 — Click into each grey underline field and type:
+  - Applicant KRA PIN
+  - eTIMS portal reference number
+  - Contact name, title, email, telephone
+  - Registered address (pre-filled — confirm before printing)
+  - Signatory name, title, signing date
+  (Date at top-right is editable too)
+
+STEP 3 — Click the blue "Print / Save as PDF" button
+  OR press Ctrl+P → Destination: Save as PDF → Save
+
+STEP 4 — Save as:
+  01_KRA_TIS_COVER_LETTER.pdf
+
+STEP 5 — Copy that file to:
+  D:\UjenziXform\downloads\TIS-OPTICAL-DISK\02-PDF-DOCUMENTS\
+
+Website (pre-filled): https://ujenzi-pro.vercel.app/
+
+Do NOT use the auto-generated empty PDF for KRA submission —
+always fill the HTML form first, then save as PDF.

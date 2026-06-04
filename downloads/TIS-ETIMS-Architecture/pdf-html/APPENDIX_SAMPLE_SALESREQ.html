@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Appendix A — Sample SalesReq payload (`POST /invoices`)</title>
+  <style>
+    @page { size: A4; margin: 18mm 16mm; }
+    body {
+      font-family: "Segoe UI", Calibri, Arial, sans-serif;
+      font-size: 10.5pt;
+      line-height: 1.45;
+      max-width: 7.4in;
+      margin: 0 auto;
+      padding: 0.35in 0.2in;
+      color: #111;
+    }
+    .hint {
+      font-size: 9pt;
+      background: #ecfdf5;
+      border: 1px solid #99f6e4;
+      padding: 0.5rem 0.65rem;
+      margin-bottom: 0.85rem;
+    }
+    h1 { font-size: 16pt; margin: 0 0 0.6rem; color: #0f172a; page-break-after: avoid; }
+    h2 { font-size: 12.5pt; margin: 1.1rem 0 0.45rem; color: #1e293b; page-break-after: avoid; border-bottom: 1px solid #e2e8f0; padding-bottom: 0.15rem; }
+    h3 { font-size: 11pt; margin: 0.85rem 0 0.35rem; color: #334155; page-break-after: avoid; }
+    h4 { font-size: 10.5pt; margin: 0.65rem 0 0.25rem; color: #475569; page-break-after: avoid; }
+    p { margin: 0.35rem 0 0.55rem; }
+    ul, ol { margin: 0.35rem 0 0.65rem; padding-left: 1.25rem; }
+    li { margin: 0.15rem 0; }
+    table { width: 100%; border-collapse: collapse; margin: 0.55rem 0 0.85rem; font-size: 9.5pt; page-break-inside: avoid; }
+    th, td { border: 1px solid #cbd5e1; padding: 0.28rem 0.4rem; vertical-align: top; text-align: left; }
+    th { background: #f8fafc; font-weight: 600; }
+    tr:nth-child(even) td { background: #fcfdff; }
+    code, pre code { font-family: Consolas, "Courier New", monospace; font-size: 9pt; }
+    p code, li code, td code, th code { background: #f1f5f9; padding: 0.05rem 0.25rem; border-radius: 3px; }
+    pre {
+      background: #0f172a;
+      color: #e2e8f0;
+      padding: 0.65rem 0.75rem;
+      border-radius: 6px;
+      overflow-x: auto;
+      page-break-inside: avoid;
+      margin: 0.5rem 0 0.75rem;
+    }
+    pre code { background: transparent; color: inherit; padding: 0; }
+    blockquote {
+      margin: 0.5rem 0 0.75rem;
+      padding: 0.45rem 0.75rem;
+      border-left: 3px solid #14b8a6;
+      background: #f0fdfa;
+      color: #134e4a;
+    }
+    hr { border: none; border-top: 1px solid #e2e8f0; margin: 1rem 0; }
+    a { color: #0f766e; word-break: break-all; }
+    @media print {
+      .hint { display: none; }
+      body { padding: 0; }
+      h2 { page-break-before: auto; }
+    }
+  </style>
+</head>
+<body>
+  <div class="hint">UjenziXform TIS certification document — Ctrl+P → Save as PDF if needed.</div>
+  <h1>Appendix A — Sample SalesReq payload (<code>POST /invoices</code>)</h1>
+<p><strong>Reference:</strong> UJX-TIS-KRA-ARCH-2026-001   <strong>Applies to:</strong> UjenziXform TIS → KRA eTIMS (upon sandbox assignment)   <strong>Source in codebase:</strong> <code>buildEtimsInvoiceBodyFromPurchaseOrder()</code> in <code>src/lib/etims/purchaseOrderEtims.ts</code></p>
+<p>All PINs, names, and item codes below are <strong>anonymised illustrations</strong> for KRA architecture review.</p>
+<hr />
+<h2>A.1 HTTP call (via etims-proxy)</h2>
+<table><thead><tr>
+<th>Item</th>
+<th>Value</th>
+</tr></thead><tbody>
+<tr>
+<td><strong>Method</strong></td>
+<td><code>POST</code></td>
+</tr>
+<tr>
+<td><strong>Path</strong></td>
+<td><code>invoices</code></td>
+</tr>
+<tr>
+<td><strong>Upstream (after sandbox assignment)</strong></td>
+<td><code>https://etims-api-sbx.kra.go.ke/.../invoices</code></td>
+</tr>
+<tr>
+<td><strong>Auth</strong></td>
+<td>HTTP Basic (KRA-issued sandbox credentials in Edge secrets)</td>
+</tr>
+<tr>
+<td><strong>Content-Type</strong></td>
+<td><code>application/json</code></td>
+</tr>
+</tbody></table>
+<p><strong>Proxy invocation (browser → Edge):</strong></p>
+<pre><code class="language-json">{
+  &quot;method&quot;: &quot;POST&quot;,
+  &quot;path&quot;: &quot;invoices&quot;,
+  &quot;body&quot;: { &quot;... SalesReq — see A.2 ...&quot; }
+}</code></pre>
+<hr />
+<h2>A.2 Sample sales invoice body (receipt type S)</h2>
+<p>Built from a UjenziXform PO with two construction-material lines (cement bags + steel bars). Full JSON: <a href="./APPENDIX_SAMPLE_SALESREQ.json"><code>APPENDIX_SAMPLE_SALESREQ.json</code></a>.</p>
+<pre><code class="language-json">{
+  &quot;traderInvoiceNo&quot;: &quot;PO-2026-004821&quot;,
+  &quot;totalAmount&quot;: 48750.0,
+  &quot;paymentType&quot;: &quot;01&quot;,
+  &quot;salesTypeCode&quot;: &quot;N&quot;,
+  &quot;receiptTypeCode&quot;: &quot;S&quot;,
+  &quot;salesStatusCode&quot;: &quot;01&quot;,
+  &quot;salesDate&quot;: &quot;20260603143000&quot;,
+  &quot;currency&quot;: &quot;KES&quot;,
+  &quot;exchangeRate&quot;: 1,
+  &quot;salesItems&quot;: [
+    {
+      &quot;itemCode&quot;: &quot;KE2BSG0000123&quot;,
+      &quot;taxCode&quot;: &quot;B&quot;,
+      &quot;qty&quot;: 50,
+      &quot;unitPrice&quot;: 750.0,
+      &quot;amount&quot;: 37500.0,
+      &quot;discountAmount&quot;: 0
+    },
+    {
+      &quot;itemCode&quot;: &quot;KE2MTL0000456&quot;,
+      &quot;taxCode&quot;: &quot;B&quot;,
+      &quot;qty&quot;: 25,
+      &quot;unitPrice&quot;: 450.0,
+      &quot;amount&quot;: 11250.0,
+      &quot;discountAmount&quot;: 0
+    }
+  ],
+  &quot;customerPin&quot;: &quot;P000000000A&quot;,
+  &quot;customerName&quot;: &quot;Example Builders Ltd&quot;,
+  &quot;traderTin&quot;: &quot;P000000000B&quot;,
+  &quot;traderName&quot;: &quot;Example Hardware Supplies Ltd&quot;
+}</code></pre>
+<h3>Field notes</h3>
+<table><thead><tr>
+<th>Field</th>
+<th>UjenziXform source</th>
+</tr></thead><tbody>
+<tr>
+<td><code>traderInvoiceNo</code></td>
+<td><code>purchase_orders.po_number</code></td>
+</tr>
+<tr>
+<td><code>traderTin</code> / <code>sellerPin</code></td>
+<td><code>suppliers.kra_pin</code> (issuing vendor)</td>
+</tr>
+<tr>
+<td><code>traderName</code></td>
+<td><code>suppliers.legal_business_name</code></td>
+</tr>
+<tr>
+<td><code>customerPin</code></td>
+<td><code>profiles.kra_pin</code> (buyer)</td>
+</tr>
+<tr>
+<td><code>customerName</code></td>
+<td>Buyer billing / company name from profile</td>
+</tr>
+<tr>
+<td><code>salesItems[].itemCode</code></td>
+<td>PO line or catalog <code>etims_item_code</code></td>
+</tr>
+<tr>
+<td><code>salesDate</code></td>
+<td>Generated at submit (<code>yyyyMMddHHmmss</code>)</td>
+</tr>
+<tr>
+<td><code>receiptTypeCode</code></td>
+<td><code>S</code> = sale</td>
+</tr>
+</tbody></table>
+<p>TIS may also emit duplicate snake_case keys (<code>trader_tin</code>, <code>item_code</code>) for integrator deserializers — see full JSON file.</p>
+<hr />
+<h2>A.3 Sample credit note body (receipt type R)</h2>
+<p>Same endpoint; references original sale:</p>
+<pre><code class="language-json">{
+  &quot;traderInvoiceNo&quot;: &quot;PO-2026-004821-CN1&quot;,
+  &quot;traderOrgInvoiceNo&quot;: &quot;PO-2026-004821&quot;,
+  &quot;totalAmount&quot;: 48750.0,
+  &quot;paymentType&quot;: &quot;01&quot;,
+  &quot;salesTypeCode&quot;: &quot;N&quot;,
+  &quot;receiptTypeCode&quot;: &quot;R&quot;,
+  &quot;salesStatusCode&quot;: &quot;01&quot;,
+  &quot;salesDate&quot;: &quot;20260604100000&quot;,
+  &quot;currency&quot;: &quot;KES&quot;,
+  &quot;exchangeRate&quot;: 1,
+  &quot;salesItems&quot;: [ &quot;...&quot; ],
+  &quot;customerPin&quot;: &quot;P000000000A&quot;,
+  &quot;customerName&quot;: &quot;Example Builders Ltd&quot;,
+  &quot;traderTin&quot;: &quot;P000000000B&quot;,
+  &quot;traderName&quot;: &quot;Example Hardware Supplies Ltd&quot;
+}</code></pre>
+<p>Requires prior successful sale on the PO (<code>etims_validated_at</code>, <code>etims_trader_invoice_no</code>).</p>
+<hr />
+<h2>A.4 Illustrative success response (shape may vary per KRA spec)</h2>
+<p>Stored on <code>purchase_orders.etims_response</code> and used for fiscal receipt UI:</p>
+<pre><code class="language-json">{
+  &quot;traderInvoiceNo&quot;: &quot;PO-2026-004821&quot;,
+  &quot;invoiceVerificationUrl&quot;: &quot;https://etims.kra.go.ke/common/link/etims/receipt/…&quot;,
+  &quot;scuInvoiceNo&quot;: &quot;…&quot;,
+  &quot;receiptSignature&quot;: &quot;…&quot;,
+  &quot;internalData&quot;: &quot;…&quot;
+}</code></pre>
+<p>Exact field names depend on KRA sandbox response schema. TIS extracts verification URL and trader reference via <code>pickEtimsPersistFields()</code>.</p>
+<hr />
+<h2>A.5 Mapping from purchase order (before POST)</h2>
+<table><thead><tr>
+<th>PO / catalog field</th>
+<th>SalesReq field</th>
+</tr></thead><tbody>
+<tr>
+<td><code>po_number</code></td>
+<td><code>traderInvoiceNo</code></td>
+</tr>
+<tr>
+<td><code>total_amount</code></td>
+<td><code>totalAmount</code> (reconciled to lines)</td>
+</tr>
+<tr>
+<td><code>items[].quantity</code></td>
+<td><code>salesItems[].qty</code></td>
+</tr>
+<tr>
+<td><code>items[].unit_price</code></td>
+<td><code>salesItems[].unitPrice</code></td>
+</tr>
+<tr>
+<td><code>items[].etims_item_code</code></td>
+<td><code>salesItems[].itemCode</code></td>
+</tr>
+<tr>
+<td><code>items[].tax_code</code></td>
+<td><code>salesItems[].taxCode</code></td>
+</tr>
+<tr>
+<td>Supplier row</td>
+<td><code>traderTin</code>, <code>traderName</code></td>
+</tr>
+<tr>
+<td>Buyer profile</td>
+<td><code>customerPin</code>, <code>customerName</code></td>
+</tr>
+</tbody></table>
+<p>If any line lacks <code>etims_item_code</code>, TIS <strong>blocks</strong> POST and records <code>etims_error</code> on the PO.</p>
+</body>
+</html>

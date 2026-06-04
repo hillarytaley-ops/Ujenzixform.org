@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Executive Summary — UjenziXform TIS ↔ KRA eTIMS</title>
+  <style>
+    body { font-family: "Segoe UI", sans-serif; line-height: 1.55; max-width: 800px; margin: 0 auto; padding: 1.5rem 2rem; color: #1a1a2e; font-size: 11pt; }
+    h1 { font-size: 1.35rem; border-bottom: 3px solid #0f766e; padding-bottom: 0.35rem; }
+    h2 { font-size: 1.05rem; color: #0f766e; margin-top: 1.25rem; margin-bottom: 0.35rem; }
+    table { width: 100%; border-collapse: collapse; margin: 0.5rem 0 0.75rem; font-size: 10pt; }
+    th, td { border: 1px solid #cbd5e1; padding: 0.35rem 0.5rem; text-align: left; }
+    th { background: #f0fdfa; }
+    pre { background: #f8fafc; border: 1px solid #e2e8f0; padding: 0.6rem; font-size: 9pt; overflow-x: auto; }
+    .meta { background: #f0fdfa; border: 1px solid #99f6e4; padding: 0.65rem 0.85rem; margin: 0.75rem 0 1rem; font-size: 10pt; }
+    .hint { background: #ecfdf5; padding: 0.5rem; margin-bottom: 1rem; font-size: 9pt; }
+    ul { margin: 0.25rem 0; padding-left: 1.2rem; }
+    @media print { .hint { display: none; } body { padding: 0.5in; } }
+  </style>
+</head>
+<body>
+<div class="hint">Ctrl+P → Save as PDF (one-page overview for KRA reviewers)</div>
+
+<h1>Executive Summary — UjenziXform TIS ↔ KRA eTIMS</h1>
+
+<div class="meta">
+  <strong>Applicant:</strong> UjenziXform Solution &nbsp;|&nbsp;
+  <strong>TIS v1.0.0 OSCU</strong> &nbsp;|&nbsp;
+  <strong>Ref:</strong> UJX-TIS-KRA-ARCH-2026-001 &nbsp;|&nbsp;
+  <strong>Date:</strong> 3 June 2026<br />
+  <strong>Address:</strong> Barngetuny Plaza Left Wing 3rd Floor Room 10, Ronald Ngala Street, Eldoret. P. O. Box 4146 - 30100 Eldoret<br />
+  <strong>Status:</strong> Applying for KRA eTIMS sandbox — not yet assigned; not yet certified
+</div>
+
+<h2>Purpose</h2>
+<p>UjenziXform applies as a <strong>potential third-party TIS integrator</strong> and requests sandbox access at <code>https://etims-api-sbx.kra.go.ke</code>. This pack documents <strong>how TIS will integrate with KRA eTIMS</strong> once credentials are issued.</p>
+
+<h2>Platform</h2>
+<p><strong>UjenziXform</strong> is a Kenya construction materials marketplace. <strong>TIS</strong> fiscalises <strong>supplier sales</strong> via purchase orders — KRA response becomes the tax receipt with QR verification.</p>
+
+<h2>Integration</h2>
+<pre>PO confirmed → purchaseOrderEtims → etims-proxy → POST /invoices → KRA eTIMS → fiscal receipt</pre>
+<p>Each invoice uses the <strong>supplier's KRA PIN</strong> as <code>traderTin</code>. Credentials stay in Edge secrets only.</p>
+
+<h2>Key flows (after sandbox assignment)</h2>
+<table>
+  <tr><th>Flow</th><th>Endpoint</th></tr>
+  <tr><td>OSCU init</td><td>POST selectInitOsdcInfo</td></tr>
+  <tr><td>Sales invoice</td><td>POST /invoices (type S)</td></tr>
+  <tr><td>Credit note</td><td>POST /invoices (type R)</td></tr>
+  <tr><td>Master data</td><td>POST /items, POST /customers</td></tr>
+</table>
+
+<h2>Readiness</h2>
+<table>
+  <tr><th>Item</th><th>Status</th></tr>
+  <tr><td>TIS software (proxy, mapping, receipt, audit)</td><td>Ready for sandbox testing</td></tr>
+  <tr><td>KRA sandbox credentials</td><td><strong>Pending — this application</strong></td></tr>
+  <tr><td>Integrator certification</td><td>After sandbox tests</td></tr>
+</table>
+
+<h2>Enclosed</h2>
+<p>Cover letter · Full architecture v3.3 · Sample SalesReq appendix · Flow diagrams</p>
+<p style="font-size:9pt;color:#64748b;margin-top:1rem"><strong>Brand:</strong> UjenziXform only</p>
+</body>
+</html>

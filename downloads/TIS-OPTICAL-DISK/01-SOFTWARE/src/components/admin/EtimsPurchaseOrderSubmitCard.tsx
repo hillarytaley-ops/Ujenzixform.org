@@ -1,0 +1,778 @@
+/**
+ * Beta: submit a UjenziXform purchase order to the integrator as an eTIMS/VFD invoice.
+ * eTIMS lines need a KRA item code per row (JSON, catalog DB, or aliases — see purchaseOrderEtims.ts).
+ */
+
+import React, { useEffect, useState } from "react";
+import { Check, ChevronsUpDown, HelpCircle, Loader2, RefreshCw, Send, Warehouse } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { ToastAction } from "@/components/ui/toast";
+import { useToast } from "@/hooks/use-toast";
+import {
+  enrichPurchaseOrderItemsWithEtimsCatalogCodes,
+  lineEtimsItemCode,
+  parsePurchaseOrderItems,
+  pushEtimsItemStockLevel,
+  submitEtimsInvoiceForPurchaseOrder,
+  type PoItemJson,
+} from "@/lib/etims/purchaseOrderEtims";
+import { supabase } from "@/integrations/supabase/client";
+import { cn } from "@/lib/utils";
+import { Badge } from "@/components/ui/badge";
+
+type PoPickRow = {
+  id: string;
+  po_number: string;
+  supplier_id?: string;
+  total_amount: number;
+  created_at: string;
+  items?: unknown;
+  etims_submitted_at?: string | null;
+  etims_error?: string | null;
+  etims_trader_invoice_no?: string | null;
+};
+
+const PO_LINE_DESC_MAX = 80;
+
+/** Prefer short product fields; use `description` last and cap length (PO JSON often embeds pricing/revision blobs). */
+function lineMaterialLabel(line: PoItemJson): string {
+  for (const k of ["material_name", "name", "title", "material_type", "description"] as const) {
+    const v = line[k];
+    if (typeof v !== "string" || !v.trim()) continue;
+    let t = v.trim();
+    if (k === "description" && t.length > PO_LINE_DESC_MAX) {
+      t = `${t.slice(0, Math.max(0, PO_LINE_DESC_MAX - 1))}…`;
+    }
+    return t;
+  }
+  return "";
+}
+
+/** Lines for PO picker: material names, codes, and search text (no order workflow / delivery status). */
+function poLinesSummary(items: unknown): {
+  materialLine: string;
+  codesLine: string;
+  searchText: string;
+} {
+  const lines = parsePurchaseOrderItems(items);
+  const names: string[] = [];
+  const codes: string[] = [];
+  for (const line of lines) {
+    const name = lineMaterialLabel(line);
+    const code = lineEtimsItemCode(line);
+    if (name) names.push(name);
+    if (code) codes.push(code);
+  }
+  const materialLine =
+    names.length > 0
+      ? names.join(" · ")
+      : lines.length > 0
+        ? `${lines.length} line(s) — no material name on PO JSON`
+        : "No line items on PO";
+  const codesLine =
+    codes.length > 0 ? codes.join(", ") : "No line codes (filled from catalog at submit if set)";
+  const searchText = [...names, ...codes].join(" ");
+  return { materialLine, codesLine, searchText };
+}
+
+/** One row per PO line: material label + item code (from PO JSON; catalog may add codes at submit). */
+function poLineRows(items: unknown): { material: string; code: string }[] {
+  return parsePurchaseOrderItems(items).map((line) => ({
+    material: lineMaterialLabel(line) || "(no material name on PO)",
+    code: lineEtimsItemCode(line) || "—",
+  }));
+}
+
+function etimsStatusBadge(row: Pick<PoPickRow, "etims_submitted_at" | "etims_error">): {
+  label: string;
+  variant: "destructive" | "outline";
+  className?: string;
+} | null {
+  if (!row.etims_submitted_at) return null;
+  const err = row.etims_error && String(row.etims_error).trim();
+  if (err) return { label: "eTIMS: failed", variant: "destructive" };
+  return {
+    label: "eTIMS: invoiced",
+    variant: "outline",
+    className:
+      "border-emerald-600/55 bg-emerald-50/90 font-medium text-emerald-900 dark:border-emerald-500/45 dark:bg-emerald-950/45 dark:text-emerald-100",
+  };
+}
+
+function formatPoDate(iso: string): string {
+  try {
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return "";
+    return d.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
+  } catch {
+    return "";
+  }
+}
+
+function formatKesAmount(n: number): string {
+  const x = Number.isFinite(n) ? n : 0;
+  return `KES ${x.toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
+}
+
+export type EtimsPurchaseOrderSubmitCardProps = {
+  /** Optional step badge number when embedded in EtimsTestPanel */
+  stepNumber?: number;
+  /** When set, PO must belong to this supplier row id */
+  enforceSupplierId?: string | null;
+  /** From integrator GET currencies; defaults to KES in builder if omitted */
+  invoiceCurrency?: string | null;
+  invoiceExchangeRate?: number | null;
+  /** Optional; only sent if non-empty (integrator may ignore or reject) */
+  invoiceCountryCode?: string | null;
+  /** Supplier dashboard: jump to My Materials for this catalog / materials id */
+  onOpenCatalogForEtims?: (catalogMaterialId: string) => void;
+};
+
+export const EtimsPurchaseOrderSubmitCard: React.FC<EtimsPurchaseOrderSubmitCardProps> = ({
+  stepNumber,
+  enforceSupplierId,
+  invoiceCurrency,
+  invoiceExchangeRate,
+  invoiceCountryCode,
+  onOpenCatalogForEtims,
+}) => {
+  const { toast } = useToast();
+  const [poId, setPoId] = useState("");
+  const [customerPin, setCustomerPin] = useState("");
+  const [customerName, setCustomerName] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [stockItemCode, setStockItemCode] = useState("");
+  const [stockQty, setStockQty] = useState("");
+  const [stockBusy, setStockBusy] = useState(false);
+  /** Suggestions for stock item code (materials / supplier prices with etims_item_code set) */
+  const [stockCodeSuggestions, setStockCodeSuggestions] = useState<{ code: string; label: string }[]>([]);
+  const [stockCodesLoading, setStockCodesLoading] = useState(false);
+  /** Resolved material name for typed code when datalist only had the bare integrator code */
+  const [stockResolvedCatalogLabel, setStockResolvedCatalogLabel] = useState<string | null>(null);
+  const [stockResolveBusy, setStockResolveBusy] = useState(false);
+
+  const [orders, setOrders] = useState<PoPickRow[] | null>(null);
+  const [ordersLoading, setOrdersLoading] = useState(false);
+  const [poPickerOpen, setPoPickerOpen] = useState(false);
+
+  const loadRecentOrders = async () => {
+    setOrdersLoading(true);
+    try {
+      let q = supabase
+        .from("purchase_orders")
+        .select(
+          "id, po_number, supplier_id, total_amount, created_at, items, etims_submitted_at, etims_error, etims_trader_invoice_no",
+        )
+        .order("created_at", { ascending: false })
+        .limit(75);
+      if (enforceSupplierId?.trim()) {
+        q = q.eq("supplier_id", enforceSupplierId.trim());
+      }
+      const { data, error } = await q;
+      if (error) {
+        toast({ variant: "destructive", title: "Could not load orders", description: error.message });
+        setOrders([]);
+        return;
+      }
+      const raw = (data ?? []) as PoPickRow[];
+      const enriched: PoPickRow[] = [];
+      for (const row of raw) {
+        const sid = typeof row.supplier_id === "string" ? row.supplier_id.trim() : "";
+        if (sid && row.items != null) {
+          try {
+            const items = await enrichPurchaseOrderItemsWithEtimsCatalogCodes(sid, row.items);
+            enriched.push({ ...row, items });
+          } catch {
+            enriched.push(row);
+          }
+        } else {
+          enriched.push(row);
+        }
+      }
+      setOrders(enriched);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      toast({ variant: "destructive", title: "Could not load orders", description: msg });
+      setOrders([]);
+    } finally {
+      setOrdersLoading(false);
+    }
+  };
+
+  const loadStockItemCodeSuggestions = async () => {
+    setStockCodesLoading(true);
+    try {
+      const byCode = new Map<string, string>();
+      let matQ = supabase
+        .from("materials")
+        .select("etims_item_code, name")
+        .not("etims_item_code", "is", null)
+        .limit(200);
+      const sid = enforceSupplierId?.trim();
+      if (sid) matQ = matQ.eq("supplier_id", sid);
+      const { data: mats, error: matErr } = await matQ;
+      if (matErr) throw matErr;
+      for (const row of mats ?? []) {
+        const code = typeof (row as { etims_item_code?: string | null }).etims_item_code === "string"
+          ? (row as { etims_item_code: string }).etims_item_code.trim()
+          : "";
+        if (!code) continue;
+        const name = typeof (row as { name?: string | null }).name === "string" ? (row as { name: string }).name.trim() : "";
+        if (!byCode.has(code)) byCode.set(code, name || code);
+      }
+      if (sid) {
+        const { data: prices, error: priceErr } = await supabase
+          .from("supplier_product_prices")
+          .select("etims_item_code, product_id")
+          .eq("supplier_id", sid)
+          .not("etims_item_code", "is", null)
+          .limit(200);
+        if (!priceErr) {
+          const productIds = [
+            ...new Set(
+              (prices ?? [])
+                .map((r) => (r as { product_id?: string | null }).product_id)
+                .filter((id): id is string => typeof id === "string" && id.length > 0),
+            ),
+          ];
+          const nameByProduct = new Map<string, string>();
+          if (productIds.length > 0) {
+            const { data: matNames } = await supabase
+              .from("materials")
+              .select("id, name")
+              .in("id", productIds.slice(0, 100));
+            for (const m of matNames ?? []) {
+              const id = (m as { id?: string }).id;
+              const nm = typeof (m as { name?: string | null }).name === "string" ? (m as { name: string }).name.trim() : "";
+              if (id && nm) nameByProduct.set(id, nm);
+            }
+          }
+          for (const row of prices ?? []) {
+            const code =
+              typeof (row as { etims_item_code?: string | null }).etims_item_code === "string"
+                ? (row as { etims_item_code: string }).etims_item_code.trim()
+                : "";
+            if (!code || byCode.has(code)) continue;
+            const pid = typeof (row as { product_id?: string | null }).product_id === "string"
+              ? (row as { product_id: string }).product_id.trim()
+              : "";
+            const matName = pid ? nameByProduct.get(pid) : undefined;
+            byCode.set(code, matName && matName.length > 0 ? `${matName} — ${code}` : code);
+          }
+        }
+      }
+      setStockCodeSuggestions(
+        [...byCode.entries()].map(([code, label]) => {
+          const trimmed = label.trim();
+          const same = trimmed === code;
+          const suffix =
+            code.length >= 4 && trimmed.toLowerCase().endsWith(code.toLowerCase());
+          return {
+            code,
+            label: same || suffix ? trimmed : `${trimmed} (${code})`,
+          };
+        }),
+      );
+    } catch (e) {
+      console.warn("eTIMS stock code suggestions:", e);
+      setStockCodeSuggestions([]);
+    } finally {
+      setStockCodesLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    void loadRecentOrders();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- reload when supplier scope changes; toast stable enough
+  }, [enforceSupplierId]);
+
+  useEffect(() => {
+    void loadStockItemCodeSuggestions();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [enforceSupplierId]);
+
+  /** When the user types an item code, look up a material row by `etims_item_code` so "Catalog match" shows a name. */
+  useEffect(() => {
+    const code = stockItemCode.trim();
+    if (!code || code.length < 4) {
+      setStockResolvedCatalogLabel(null);
+      setStockResolveBusy(false);
+      return;
+    }
+    const fromList = stockCodeSuggestions.find((s) => s.code === code);
+    if (fromList && fromList.label.trim() !== fromList.code) {
+      setStockResolvedCatalogLabel(fromList.label);
+      setStockResolveBusy(false);
+      return;
+    }
+
+    let cancelled = false;
+    setStockResolveBusy(true);
+    (async () => {
+      try {
+        const sid = enforceSupplierId?.trim();
+        let rows: { name?: string | null }[] | null = null;
+        if (sid) {
+          const scoped = await supabase
+            .from("materials")
+            .select("name")
+            .eq("etims_item_code", code)
+            .eq("supplier_id", sid)
+            .limit(5);
+          if (!cancelled) rows = scoped.data as { name?: string | null }[] | null;
+        }
+        if ((!rows || rows.length === 0) && !cancelled) {
+          const broad = await supabase.from("materials").select("name").eq("etims_item_code", code).limit(5);
+          if (!cancelled) rows = broad.data as { name?: string | null }[] | null;
+        }
+        if (cancelled) return;
+        const nm =
+          (rows ?? [])
+            .map((r) => (typeof r.name === "string" ? r.name.trim() : ""))
+            .find((x) => x.length > 0) ?? "";
+        setStockResolvedCatalogLabel(nm ? `${nm} — ${code}` : null);
+      } catch {
+        if (!cancelled) setStockResolvedCatalogLabel(null);
+      } finally {
+        if (!cancelled) setStockResolveBusy(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [stockItemCode, stockCodeSuggestions, enforceSupplierId]);
+
+  const selectedOrder = orders?.find((o) => o.id === poId.trim());
+
+  const onSubmitInvoice = async () => {
+    const id = poId.trim();
+    if (!id) {
+      toast({ variant: "destructive", title: "Purchase order id required" });
+      return;
+    }
+    setBusy(true);
+    try {
+      const r = await submitEtimsInvoiceForPurchaseOrder(id, {
+        enforceSupplierId: enforceSupplierId ?? undefined,
+        customerPin: customerPin.trim() || undefined,
+        customerName: customerName.trim() || undefined,
+        currency: invoiceCurrency?.trim() || undefined,
+        exchangeRate: invoiceExchangeRate ?? undefined,
+        countryCode: invoiceCountryCode?.trim() || undefined,
+      });
+      if (!r.ok) {
+        const hint =
+          /no item with name/i.test(r.message) || /item.*not found/i.test(r.message)
+            ? " The integrator has no item registered with that identifier for this environment. Confirm the code exists on your OSCU/VFD item master, or register the SKU with KRA before invoicing."
+            : "";
+        const focusCatalogId = typeof r.focusCatalogId === "string" && r.focusCatalogId.trim() ? r.focusCatalogId.trim() : undefined;
+        const openCatalog = onOpenCatalogForEtims && focusCatalogId ? () => onOpenCatalogForEtims(focusCatalogId) : undefined;
+        toast({
+          variant: "destructive",
+          title: "eTIMS submit failed",
+          description: `${r.message}${hint}`,
+          ...(openCatalog
+            ? {
+                action: (
+                  <ToastAction altText="Open My Materials to add item code" onClick={openCatalog}>
+                    My Materials
+                  </ToastAction>
+                ),
+              }
+            : focusCatalogId
+              ? {
+                  action: (
+                    <ToastAction
+                      altText="Copy catalog id"
+                      onClick={() => void navigator.clipboard?.writeText?.(focusCatalogId)}
+                    >
+                      Copy id
+                    </ToastAction>
+                  ),
+                }
+              : {}),
+        });
+        return;
+      }
+      toast({ title: "Submitted", description: "Invoice sent to integrator; order row updated." });
+      void loadRecentOrders();
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const onPushStock = async () => {
+    const code = stockItemCode.trim();
+    const n = Number(stockQty);
+    if (!code || !Number.isFinite(n)) {
+      toast({ variant: "destructive", title: "Item code and numeric stock required" });
+      return;
+    }
+    setStockBusy(true);
+    try {
+      const r = await pushEtimsItemStockLevel(code, n);
+      if (!r.ok) {
+        toast({ variant: "destructive", title: "Stock update failed", description: r.message });
+        return;
+      }
+      toast({ title: "Stock pushed", description: `${code} → ${n}` });
+    } finally {
+      setStockBusy(false);
+    }
+  };
+
+  return (
+    <Card>
+      <CardHeader className="pb-3">
+        <div className="flex items-center gap-3">
+          {stepNumber != null ? (
+            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-sky-600 text-xs font-semibold text-white">
+              {stepNumber}
+            </span>
+          ) : (
+            <Send className="h-5 w-5 shrink-0 text-sky-600" />
+          )}
+          <div>
+            <CardTitle className="text-base">Submit purchase order as invoice</CardTitle>
+            <CardDescription>Pick an order, confirm item codes, then send to the integrator.</CardDescription>
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-5">
+        {(invoiceCurrency || invoiceCountryCode || (invoiceExchangeRate != null && invoiceExchangeRate !== 1)) && (
+          <div className="flex flex-wrap gap-2 text-xs">
+            <span className="rounded-md border bg-muted/40 px-2 py-1">
+              Currency <span className="font-mono font-medium">{invoiceCurrency?.trim() || "KES"}</span>
+            </span>
+            {invoiceExchangeRate != null && invoiceExchangeRate !== 1 ? (
+              <span className="rounded-md border bg-muted/40 px-2 py-1">
+                Rate <span className="font-mono font-medium">{invoiceExchangeRate}</span>
+              </span>
+            ) : null}
+            {invoiceCountryCode?.trim() ? (
+              <span className="rounded-md border bg-muted/40 px-2 py-1">
+                Country <span className="font-mono font-medium">{invoiceCountryCode.trim()}</span>
+              </span>
+            ) : null}
+          </div>
+        )}
+
+      <div className="grid gap-3 sm:grid-cols-2">
+        <div className="sm:col-span-2 space-y-2">
+          <div className="flex flex-wrap items-end justify-between gap-2">
+            <Label className="text-foreground">Purchase order</Label>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-8 shrink-0 gap-1 text-xs"
+              disabled={ordersLoading}
+              onClick={() => void loadRecentOrders()}
+            >
+              {ordersLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
+              Refresh
+            </Button>
+          </div>
+          <Popover open={poPickerOpen} onOpenChange={setPoPickerOpen}>
+            <PopoverTrigger asChild>
+              <Button
+                type="button"
+                variant="outline"
+                role="combobox"
+                aria-expanded={poPickerOpen}
+                disabled={ordersLoading || orders === null}
+                className="h-auto min-h-10 w-full justify-between py-2 font-normal"
+              >
+                <span className="min-w-0 flex-1 text-left">
+                  {ordersLoading ? (
+                    "Loading orders…"
+                  ) : orders && orders.length === 0 ? (
+                    enforceSupplierId
+                      ? "No purchase orders for this supplier yet"
+                      : "No purchase orders visible to your account"
+                  ) : selectedOrder ? (
+                    (() => {
+                      const sum = poLinesSummary(selectedOrder.items);
+                      const badge = etimsStatusBadge(selectedOrder);
+                      return (
+                        <span className="flex min-w-0 flex-col gap-0.5">
+                          <span className="flex min-w-0 flex-wrap items-center gap-2">
+                            <span className="truncate font-medium">{selectedOrder.po_number}</span>
+                            {badge ? (
+                              <Badge
+                                variant={badge.variant}
+                                className={cn("shrink-0 text-[10px] font-normal", badge.className)}
+                              >
+                                {badge.label}
+                              </Badge>
+                            ) : null}
+                          </span>
+                          {selectedOrder.etims_submitted_at &&
+                          !String(selectedOrder.etims_error || "").trim() &&
+                          selectedOrder.etims_trader_invoice_no?.trim() ? (
+                            <span className="text-[10px] text-muted-foreground">
+                              Integrator ref:{" "}
+                              <span className="font-mono text-foreground">
+                                {selectedOrder.etims_trader_invoice_no.trim()}
+                              </span>
+                            </span>
+                          ) : null}
+                          <span className="truncate text-xs text-muted-foreground" title={sum.materialLine}>
+                            {sum.materialLine}
+                          </span>
+                          <span className="grid grid-cols-1 gap-0.5 text-[10px] text-muted-foreground sm:grid-cols-[auto_1fr] sm:gap-x-2">
+                            <span className="shrink-0 font-sans font-medium text-muted-foreground/90">Item codes</span>
+                            <span className="min-w-0 truncate font-mono text-foreground/90" title={sum.codesLine}>
+                              {sum.codesLine}
+                            </span>
+                            <span className="shrink-0 font-sans font-medium text-muted-foreground/90">Date / total</span>
+                            <span className="min-w-0 truncate font-mono">
+                              {formatPoDate(selectedOrder.created_at)} · {formatKesAmount(selectedOrder.total_amount)}
+                            </span>
+                          </span>
+                        </span>
+                      );
+                    })()
+                  ) : (
+                    "Select an order from the system…"
+                  )}
+                </span>
+                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 self-center opacity-50" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-[min(calc(100vw-2rem),28rem)] p-0" align="start">
+              <Command>
+                <CommandInput placeholder="Search PO #, materials, item codes, or UUID…" className="h-10" />
+                <CommandList>
+                  <CommandEmpty>No matching orders.</CommandEmpty>
+                  <CommandGroup>
+                    {(orders ?? []).map((row) => {
+                      const sum = poLinesSummary(row.items);
+                      const lineRows = poLineRows(row.items);
+                      const badge = etimsStatusBadge(row);
+                      const value = `${row.po_number} ${row.id} ${formatPoDate(row.created_at)} ${formatKesAmount(row.total_amount)} ${sum.searchText}`;
+                      return (
+                        <CommandItem
+                          key={row.id}
+                          value={value}
+                          onSelect={() => {
+                            setPoId(row.id);
+                            setPoPickerOpen(false);
+                          }}
+                        >
+                          <Check
+                            className={cn("mr-2 h-4 w-4 shrink-0", poId.trim() === row.id ? "opacity-100" : "opacity-0")}
+                          />
+                          <div className="min-w-0 flex-1 space-y-1.5">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className="font-medium text-foreground">{row.po_number}</span>
+                              {badge ? (
+                                <Badge
+                                  variant={badge.variant}
+                                  className={cn("text-[10px] font-normal", badge.className)}
+                                >
+                                  {badge.label}
+                                </Badge>
+                              ) : null}
+                            </div>
+                            {row.etims_submitted_at &&
+                            !String(row.etims_error || "").trim() &&
+                            row.etims_trader_invoice_no?.trim() ? (
+                              <div className="text-[10px] text-muted-foreground">
+                                Integrator ref:{" "}
+                                <span className="font-mono text-foreground">{row.etims_trader_invoice_no.trim()}</span>
+                              </div>
+                            ) : null}
+                            {lineRows.length > 0 ? (
+                              <div className="space-y-1 rounded-md border border-border/70 bg-muted/25 px-2 py-1.5">
+                                <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                                  Lines (material · item code)
+                                </div>
+                                {lineRows.slice(0, 12).map((lr, i) => (
+                                  <div
+                                    key={i}
+                                    className="grid gap-x-2 gap-y-0.5 border-b border-border/40 pb-1 text-[11px] last:border-0 last:pb-0 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-baseline"
+                                  >
+                                    <span className="min-w-0 text-foreground" title={lr.material}>
+                                      <span className="text-muted-foreground">#{i + 1}</span> {lr.material}
+                                    </span>
+                                    <span
+                                      className="shrink-0 font-mono text-xs text-foreground sm:text-right"
+                                      title={lr.code}
+                                    >
+                                      {lr.code}
+                                    </span>
+                                  </div>
+                                ))}
+                                {lineRows.length > 12 ? (
+                                  <div className="text-[10px] text-muted-foreground">
+                                    +{lineRows.length - 12} more line(s)…
+                                  </div>
+                                ) : null}
+                              </div>
+                            ) : (
+                              <div className="text-xs text-muted-foreground">{sum.materialLine}</div>
+                            )}
+                            <div className="text-[10px] text-muted-foreground">
+                              {formatPoDate(row.created_at)} · {formatKesAmount(row.total_amount)}
+                              <span className="ml-1 font-mono opacity-80" title={row.id}>
+                                · id {row.id.slice(0, 8)}…
+                              </span>
+                            </div>
+                          </div>
+                        </CommandItem>
+                      );
+                    })}
+                  </CommandGroup>
+                </CommandList>
+              </Command>
+            </PopoverContent>
+          </Popover>
+        </div>
+
+        <div className="sm:col-span-2 space-y-1.5">
+          <Label htmlFor="etims-po-id">Order UUID (optional manual entry)</Label>
+          <Input
+            id="etims-po-id"
+            placeholder="Filled when you pick above — or paste UUID"
+            value={poId}
+            onChange={(e) => setPoId(e.target.value)}
+            className="font-mono text-sm"
+          />
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="etims-pin">Buyer KRA PIN (optional)</Label>
+          <Input id="etims-pin" value={customerPin} onChange={(e) => setCustomerPin(e.target.value)} />
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="etims-name">Buyer name (optional)</Label>
+          <Input id="etims-name" value={customerName} onChange={(e) => setCustomerName(e.target.value)} />
+        </div>
+      </div>
+
+      <Button type="button" className="w-full sm:w-auto" disabled={busy} onClick={onSubmitInvoice}>
+        {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+        <span className="ml-2">Submit invoice</span>
+      </Button>
+
+      <div className="rounded-lg border bg-muted/20 p-4">
+        <div className="mb-3 flex items-center gap-2">
+          <Warehouse className="h-4 w-4 text-muted-foreground" />
+          <h4 className="text-sm font-medium">Push stock to integrator</h4>
+        </div>
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
+          <div className="min-w-0 flex-1 space-y-1.5">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <Label htmlFor="etims-stock-code">Item code</Label>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-7 shrink-0 gap-1 text-xs"
+                disabled={stockCodesLoading}
+                onClick={() => void loadStockItemCodeSuggestions()}
+              >
+                {stockCodesLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
+                Refresh codes
+              </Button>
+            </div>
+            <datalist id="etims-stock-code-datalist">
+              {stockCodeSuggestions.map((s) => (
+                <option key={s.code} value={s.code}>
+                  {s.label}
+                </option>
+              ))}
+            </datalist>
+            <Input
+              id="etims-stock-code"
+              list="etims-stock-code-datalist"
+              placeholder="Integrator item code (from your OSCU / integrator list)"
+              value={stockItemCode}
+              onChange={(e) => setStockItemCode(e.target.value)}
+              className="font-mono text-sm"
+              autoComplete="off"
+            />
+            {(() => {
+              const trimmed = stockItemCode.trim();
+              if (!trimmed) return null;
+              const hit = stockCodeSuggestions.find((s) => s.code === trimmed);
+              const label =
+                stockResolvedCatalogLabel ||
+                (hit && hit.label.trim() !== hit.code ? hit.label : null);
+              if (label) {
+                return (
+                  <p className="text-xs text-foreground">
+                    <span className="font-medium text-muted-foreground">Catalog match: </span>
+                    {label}
+                  </p>
+                );
+              }
+              if (stockResolveBusy && trimmed.length >= 4) {
+                return <p className="text-xs text-muted-foreground">Looking up material for this code…</p>;
+              }
+              if (hit) {
+                return (
+                  <p className="text-xs text-muted-foreground">
+                    Code <span className="font-mono text-foreground">{hit.code}</span> — no material name in catalog yet.
+                    Add <span className="font-mono">etims_item_code</span> on the product in My Materials, then refresh
+                    catalog codes.
+                  </p>
+                );
+              }
+              return null;
+            })()}
+          </div>
+          <div className="w-full space-y-1.5 sm:w-32">
+            <Label htmlFor="etims-stock-n">Stock</Label>
+            <Input
+              id="etims-stock-n"
+              type="number"
+              value={stockQty}
+              onChange={(e) => setStockQty(e.target.value)}
+            />
+          </div>
+          <Button type="button" variant="secondary" disabled={stockBusy} onClick={onPushStock}>
+            {stockBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+            <span className={stockBusy ? "ml-2" : ""}>Push stock</span>
+          </Button>
+        </div>
+      </div>
+
+        <Accordion type="single" collapsible className="rounded-md border">
+          <AccordionItem value="mapping" className="border-0">
+            <AccordionTrigger className="px-3 py-2 text-xs hover:no-underline">
+              <span className="flex items-center gap-2 text-muted-foreground">
+                <HelpCircle className="h-3.5 w-3.5" />
+                Item code mapping tips
+              </span>
+            </AccordionTrigger>
+            <AccordionContent className="px-3 pb-3 text-xs leading-relaxed text-muted-foreground">
+              Set <code className="rounded bg-muted px-1">etims_item_code</code> on each product in My Materials.
+              Missing codes are filled from your catalog at submit. If the integrator reports an unknown item, register
+              the SKU with KRA or use a code already on your OSCU tenant.
+            </AccordionContent>
+          </AccordionItem>
+        </Accordion>
+      </CardContent>
+    </Card>
+  );
+};

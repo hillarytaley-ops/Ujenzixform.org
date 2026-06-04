@@ -1,0 +1,1088 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>UjenziXform TIS — KRA eTIMS Certification Test Plan</title>
+  <style>
+    @page { size: A4; margin: 18mm 16mm; }
+    body {
+      font-family: "Segoe UI", Calibri, Arial, sans-serif;
+      font-size: 10.5pt;
+      line-height: 1.45;
+      max-width: 7.4in;
+      margin: 0 auto;
+      padding: 0.35in 0.2in;
+      color: #111;
+    }
+    .hint {
+      font-size: 9pt;
+      background: #ecfdf5;
+      border: 1px solid #99f6e4;
+      padding: 0.5rem 0.65rem;
+      margin-bottom: 0.85rem;
+    }
+    h1 { font-size: 16pt; margin: 0 0 0.6rem; color: #0f172a; page-break-after: avoid; }
+    h2 { font-size: 12.5pt; margin: 1.1rem 0 0.45rem; color: #1e293b; page-break-after: avoid; border-bottom: 1px solid #e2e8f0; padding-bottom: 0.15rem; }
+    h3 { font-size: 11pt; margin: 0.85rem 0 0.35rem; color: #334155; page-break-after: avoid; }
+    h4 { font-size: 10.5pt; margin: 0.65rem 0 0.25rem; color: #475569; page-break-after: avoid; }
+    p { margin: 0.35rem 0 0.55rem; }
+    ul, ol { margin: 0.35rem 0 0.65rem; padding-left: 1.25rem; }
+    li { margin: 0.15rem 0; }
+    table { width: 100%; border-collapse: collapse; margin: 0.55rem 0 0.85rem; font-size: 9.5pt; page-break-inside: avoid; }
+    th, td { border: 1px solid #cbd5e1; padding: 0.28rem 0.4rem; vertical-align: top; text-align: left; }
+    th { background: #f8fafc; font-weight: 600; }
+    tr:nth-child(even) td { background: #fcfdff; }
+    code, pre code { font-family: Consolas, "Courier New", monospace; font-size: 9pt; }
+    p code, li code, td code, th code { background: #f1f5f9; padding: 0.05rem 0.25rem; border-radius: 3px; }
+    pre {
+      background: #0f172a;
+      color: #e2e8f0;
+      padding: 0.65rem 0.75rem;
+      border-radius: 6px;
+      overflow-x: auto;
+      page-break-inside: avoid;
+      margin: 0.5rem 0 0.75rem;
+    }
+    pre code { background: transparent; color: inherit; padding: 0; }
+    blockquote {
+      margin: 0.5rem 0 0.75rem;
+      padding: 0.45rem 0.75rem;
+      border-left: 3px solid #14b8a6;
+      background: #f0fdfa;
+      color: #134e4a;
+    }
+    hr { border: none; border-top: 1px solid #e2e8f0; margin: 1rem 0; }
+    a { color: #0f766e; word-break: break-all; }
+    @media print {
+      .hint { display: none; }
+      body { padding: 0; }
+      h2 { page-break-before: auto; }
+    }
+  </style>
+</head>
+<body>
+  <div class="hint">UjenziXform TIS certification document — Ctrl+P → Save as PDF if needed.</div>
+  <h1>UjenziXform TIS — KRA eTIMS Certification Test Plan</h1>
+<p><strong>Document type:</strong> Certification test plan (sandbox testing)   <strong>Applicant:</strong> UjenziXform Solution   <strong>Product:</strong> UjenziXform Trader Invoicing System (TIS) v1.0.0   <strong>Solution type:</strong> OSCU (Online Sales Control Unit)   <strong>Reference:</strong> UJX-TIS-KRA-ARCH-2026-001   <strong>Document version:</strong> 1.0   <strong>Date:</strong> 3 June 2026  </p>
+<blockquote><p><strong>Prerequisite:</strong> KRA-assigned sandbox credentials at <code>https://etims-api-sbx.kra.go.ke</code>   <strong>Current status:</strong> Test plan prepared; execution <strong>pending sandbox assignment</strong>.</p></blockquote>
+<hr />
+<h2>Table of contents</h2>
+<ol>
+<li><a href="#1-purpose-and-scope">Purpose and scope</a></li>
+<li><a href="#2-test-environment">Test environment</a></li>
+<li><a href="#3-test-roles-and-accounts">Test roles and accounts</a></li>
+<li><a href="#4-entry-criteria">Entry criteria</a></li>
+<li><a href="#5-exit-criteria">Exit criteria</a></li>
+<li><a href="#6-test-case-summary">Test case summary</a></li>
+<li><a href="#7-detailed-test-cases">Detailed test cases</a></li>
+<li><a href="#8-evidence-and-deliverables">Evidence and deliverables</a></li>
+<li><a href="#9-defect-management">Defect management</a></li>
+<li><a href="#10-certification-checklist-mapping">Certification checklist mapping</a></li>
+<li><a href="#11-sign-off">Sign-off</a></li>
+<li><a href="#12-document-control">Document control</a></li>
+</ol>
+<hr />
+<h2>1. Purpose and scope</h2>
+<p>This document defines the <strong>sandbox test cases</strong> UjenziXform will execute to validate the <strong>Trader Invoicing System (TIS)</strong> against KRA eTIMS OSCU requirements before requesting integrator certification.</p>
+<h3>1.1 In scope</h3>
+<ul>
+<li>OSCU device initialization  </li>
+<li>Reference data and master data sync  </li>
+<li>Item and customer registration  </li>
+<li>Sales invoice submission (<code>POST /invoices</code>, type <strong>S</strong>)  </li>
+<li>Credit note submission (<code>POST /invoices</code>, type <strong>R</strong>)  </li>
+<li>Fiscal receipt and QR verification UI  </li>
+<li>Multi-vendor (per-supplier PIN) invoicing  </li>
+<li>Submission audit, error handling, and retry  </li>
+<li>Security controls (credential isolation, JWT, allowlist)  </li>
+</ul>
+<h3>1.2 Out of scope (initial certification round)</h3>
+<ul>
+<li>Production cutover to <code>https://etims-api.kra.go.ke</code>  </li>
+<li>VSCU-only deployments (OSCU is primary; VSCU paths supported in code but not primary test focus)  </li>
+<li>Non-TIS marketplace features (Paystack, delivery, SMS)  </li>
+</ul>
+<hr />
+<h2>2. Test environment</h2>
+<table><thead><tr>
+<th>Item</th>
+<th>Value</th>
+</tr></thead><tbody>
+<tr>
+<td>Platform</td>
+<td>UjenziXform staging / sandbox deployment</td>
+</tr>
+<tr>
+<td>KRA API</td>
+<td><code>https://etims-api-sbx.kra.go.ke</code></td>
+</tr>
+<tr>
+<td>API gateway</td>
+<td>Supabase Edge <code>etims-proxy</code></td>
+</tr>
+<tr>
+<td>Database</td>
+<td>Supabase PostgreSQL (staging project)</td>
+</tr>
+<tr>
+<td>Frontend</td>
+<td>HTTPS-hosted React app</td>
+</tr>
+<tr>
+<td>Credentials</td>
+<td><code>ETIMS_BASIC_USER</code>, <code>ETIMS_BASIC_PASSWORD</code> in Edge secrets</td>
+</tr>
+</tbody></table>
+<h3>2.1 Pre-test configuration</h3>
+<table><thead><tr>
+<th>Step</th>
+<th>Action</th>
+<th>Owner</th>
+</tr></thead><tbody>
+<tr>
+<td>1</td>
+<td>Deploy <code>etims-proxy</code> to staging Supabase</td>
+<td>DevOps</td>
+</tr>
+<tr>
+<td>2</td>
+<td>Set Edge secrets with KRA sandbox credentials</td>
+<td>DevOps</td>
+</tr>
+<tr>
+<td>3</td>
+<td>Apply all TIS migrations</td>
+<td>DevOps</td>
+</tr>
+<tr>
+<td>4</td>
+<td>Create test supplier with sandbox PIN</td>
+<td>Admin</td>
+</tr>
+<tr>
+<td>5</td>
+<td>Create test builder with sandbox PIN</td>
+<td>Admin</td>
+</tr>
+<tr>
+<td>6</td>
+<td>Register test catalog items with KRA item codes</td>
+<td>Admin</td>
+</tr>
+</tbody></table>
+<hr />
+<h2>3. Test roles and accounts</h2>
+<table><thead><tr>
+<th>Account</th>
+<th>Role</th>
+<th>Used for</th>
+</tr></thead><tbody>
+<tr>
+<td><code>admin@test.ujenzixform.org</code></td>
+<td><code>admin</code></td>
+<td>Integrator Hub, OSCU init, submission ops</td>
+</tr>
+<tr>
+<td><code>supplier-a@test.ujenzixform.org</code></td>
+<td><code>supplier</code></td>
+<td>Vendor A sandbox PIN, manual submit</td>
+</tr>
+<tr>
+<td><code>supplier-b@test.ujenzixform.org</code></td>
+<td><code>supplier</code></td>
+<td>Vendor B — multi-vendor test</td>
+</tr>
+<tr>
+<td><code>builder@test.ujenzixform.org</code></td>
+<td><code>builder</code></td>
+<td>Buyer PIN, receipt verification</td>
+</tr>
+<tr>
+<td>Unauthenticated</td>
+<td>—</td>
+<td>Negative security tests</td>
+</tr>
+</tbody></table>
+<p>Replace with actual test accounts created in the staging environment. Document KRA sandbox PINs in a <strong>separate confidential annex</strong> — not on the optical disk.</p>
+<hr />
+<h2>4. Entry criteria</h2>
+<p>All must be true before test execution begins:</p>
+<table><thead><tr>
+<th>#</th>
+<th>Criterion</th>
+</tr></thead><tbody>
+<tr>
+<td>E1</td>
+<td>KRA sandbox credentials received and configured in Edge secrets</td>
+</tr>
+<tr>
+<td>E2</td>
+<td><code>etims-proxy</code> deployed and returns non-503 on configured environment</td>
+</tr>
+<tr>
+<td>E3</td>
+<td>TIS database migrations applied</td>
+</tr>
+<tr>
+<td>E4</td>
+<td>At least one test supplier with valid sandbox PIN, branch, device serial</td>
+</tr>
+<tr>
+<td>E5</td>
+<td>Test catalog items mapped to valid KRA <code>etims_item_code</code> values</td>
+</tr>
+<tr>
+<td>E6</td>
+<td>Certification test plan approved internally</td>
+</tr>
+<tr>
+<td>E7</td>
+<td>This test plan submitted to KRA (on optical disk) prior to certification</td>
+</tr>
+</tbody></table>
+<hr />
+<h2>5. Exit criteria</h2>
+<p>Sandbox certification round is complete when:</p>
+<table><thead><tr>
+<th>#</th>
+<th>Criterion</th>
+</tr></thead><tbody>
+<tr>
+<td>X1</td>
+<td>All <strong>Priority 1</strong> test cases pass</td>
+</tr>
+<tr>
+<td>X2</td>
+<td>No open <strong>Critical</strong> or <strong>High</strong> defects</td>
+</tr>
+<tr>
+<td>X3</td>
+<td>Evidence pack assembled (§8)</td>
+</tr>
+<tr>
+<td>X4</td>
+<td>Admin certification checklist in TIS Integrator Hub ≥ 100% for sandbox items</td>
+</tr>
+<tr>
+<td>X5</td>
+<td>Results submitted to KRA integrator certification unit</td>
+</tr>
+<tr>
+<td>X6</td>
+<td>KRA written approval received before production cutover</td>
+</tr>
+</tbody></table>
+<hr />
+<h2>6. Test case summary</h2>
+<table><thead><tr>
+<th>ID</th>
+<th>Category</th>
+<th>Test case</th>
+<th>Priority</th>
+</tr></thead><tbody>
+<tr>
+<td>TC-01</td>
+<td>Security</td>
+<td>Proxy rejects unauthenticated request</td>
+<td>P1</td>
+</tr>
+<tr>
+<td>TC-02</td>
+<td>Security</td>
+<td>Proxy rejects disallowed REST path</td>
+<td>P1</td>
+</tr>
+<tr>
+<td>TC-03</td>
+<td>Security</td>
+<td>Credentials not exposed to browser</td>
+<td>P1</td>
+</tr>
+<tr>
+<td>TC-04</td>
+<td>Init</td>
+<td>OSCU initialization (<code>selectInitOsdcInfo</code>)</td>
+<td>P1</td>
+</tr>
+<tr>
+<td>TC-05</td>
+<td>Master data</td>
+<td>Reference data GET (tax codes, item classes)</td>
+<td>P2</td>
+</tr>
+<tr>
+<td>TC-06</td>
+<td>Master data</td>
+<td>Register item (<code>POST /items</code>)</td>
+<td>P1</td>
+</tr>
+<tr>
+<td>TC-07</td>
+<td>Master data</td>
+<td>Register customer (<code>POST /customers</code>)</td>
+<td>P2</td>
+</tr>
+<tr>
+<td>TC-08</td>
+<td>Transaction</td>
+<td>Sales invoice from Cart Buy Now (type S)</td>
+<td>P1</td>
+</tr>
+<tr>
+<td>TC-09</td>
+<td>Transaction</td>
+<td>Sales invoice from supplier manual submit</td>
+<td>P1</td>
+</tr>
+<tr>
+<td>TC-10</td>
+<td>Transaction</td>
+<td>Sales invoice — multi-vendor (two supplier PINs)</td>
+<td>P1</td>
+</tr>
+<tr>
+<td>TC-11</td>
+<td>Transaction</td>
+<td>Credit note (type R) linked to prior sale</td>
+<td>P1</td>
+</tr>
+<tr>
+<td>TC-12</td>
+<td>UI</td>
+<td>Fiscal receipt displays verification URL and QR</td>
+<td>P1</td>
+</tr>
+<tr>
+<td>TC-13</td>
+<td>UI</td>
+<td>QR code resolves on KRA public verification page</td>
+<td>P1</td>
+</tr>
+<tr>
+<td>TC-14</td>
+<td>Negative</td>
+<td>Block submit when PO in quote status</td>
+<td>P2</td>
+</tr>
+<tr>
+<td>TC-15</td>
+<td>Negative</td>
+<td>Block submit when line missing item code</td>
+<td>P2</td>
+</tr>
+<tr>
+<td>TC-16</td>
+<td>Negative</td>
+<td>Block submit when supplier PIN invalid</td>
+<td>P2</td>
+</tr>
+<tr>
+<td>TC-17</td>
+<td>Operations</td>
+<td>Failed submit logged in <code>tis_submission_log</code></td>
+<td>P1</td>
+</tr>
+<tr>
+<td>TC-18</td>
+<td>Operations</td>
+<td>Admin retry succeeds after fixing error</td>
+<td>P1</td>
+</tr>
+<tr>
+<td>TC-19</td>
+<td>Onboarding</td>
+<td>Vendor lifecycle draft → active</td>
+<td>P2</td>
+</tr>
+<tr>
+<td>TC-20</td>
+<td>Payload</td>
+<td>SalesReq field mapping matches KRA spec</td>
+<td>P1</td>
+</tr>
+</tbody></table>
+<p><strong>Priority:</strong> P1 = mandatory for certification; P2 = required where applicable to integrator scope.</p>
+<hr />
+<h2>7. Detailed test cases</h2>
+<h3>TC-01 — Proxy rejects unauthenticated request</h3>
+<table><thead><tr>
+<th>Field</th>
+<th>Detail</th>
+</tr></thead><tbody>
+<tr>
+<td><strong>Objective</strong></td>
+<td>Verify JWT required</td>
+</tr>
+<tr>
+<td><strong>Steps</strong></td>
+<td>POST to <code>etims-proxy</code> without Authorization header</td>
+</tr>
+<tr>
+<td><strong>Expected</strong></td>
+<td>HTTP 401; no upstream KRA call</td>
+</tr>
+<tr>
+<td><strong>Evidence</strong></td>
+<td>Network log / Edge function log</td>
+</tr>
+</tbody></table>
+<h3>TC-02 — Proxy rejects disallowed REST path</h3>
+<table><thead><tr>
+<th>Field</th>
+<th>Detail</th>
+</tr></thead><tbody>
+<tr>
+<td><strong>Objective</strong></td>
+<td>Verify SSRF allowlist</td>
+</tr>
+<tr>
+<td><strong>Steps</strong></td>
+<td>Invoke proxy with <code>path: &quot;../../../evil&quot;</code> or non-allowlisted path</td>
+</tr>
+<tr>
+<td><strong>Expected</strong></td>
+<td>HTTP 400; path rejected</td>
+</tr>
+<tr>
+<td><strong>Evidence</strong></td>
+<td>Response body error message</td>
+</tr>
+</tbody></table>
+<h3>TC-03 — Credentials not exposed to browser</h3>
+<table><thead><tr>
+<th>Field</th>
+<th>Detail</th>
+</tr></thead><tbody>
+<tr>
+<td><strong>Objective</strong></td>
+<td>Verify credential isolation</td>
+</tr>
+<tr>
+<td><strong>Steps</strong></td>
+<td>Inspect browser Network tab, page source, and local storage during TIS operations</td>
+</tr>
+<tr>
+<td><strong>Expected</strong></td>
+<td>No <code>ETIMS_BASIC_USER</code>, <code>ETIMS_BASIC_PASSWORD</code>, or <code>cmcKey</code> in client</td>
+</tr>
+<tr>
+<td><strong>Evidence</strong></td>
+<td>Screenshot of Network tab</td>
+</tr>
+</tbody></table>
+<h3>TC-04 — OSCU initialization</h3>
+<table><thead><tr>
+<th>Field</th>
+<th>Detail</th>
+</tr></thead><tbody>
+<tr>
+<td><strong>Objective</strong></td>
+<td>Device setup on KRA sandbox</td>
+</tr>
+<tr>
+<td><strong>Preconditions</strong></td>
+<td>KRA sandbox PIN, branch <code>bhfId</code>, device serial <code>dvcSrlNo</code></td>
+</tr>
+<tr>
+<td><strong>Steps</strong></td>
+<td>Admin → TIS Integrator Hub → run OSCU init with test supplier PIN</td>
+</tr>
+<tr>
+<td><strong>Expected</strong></td>
+<td>Success response with <code>dvcId</code>; supplier record updated; key not stored plain text</td>
+</tr>
+<tr>
+<td><strong>Evidence</strong></td>
+<td>Screenshot; <code>tis_submission_log</code> or init audit row</td>
+</tr>
+</tbody></table>
+<h3>TC-05 — Reference data sync</h3>
+<table><thead><tr>
+<th>Field</th>
+<th>Detail</th>
+</tr></thead><tbody>
+<tr>
+<td><strong>Objective</strong></td>
+<td>Verify allowlisted GET endpoints</td>
+</tr>
+<tr>
+<td><strong>Steps</strong></td>
+<td>Admin → Integrator API console → fetch tax type codes or item classification codes</td>
+</tr>
+<tr>
+<td><strong>Expected</strong></td>
+<td>HTTP 200; JSON reference data returned</td>
+</tr>
+<tr>
+<td><strong>Evidence</strong></td>
+<td>API console response screenshot</td>
+</tr>
+</tbody></table>
+<h3>TC-06 — Item registration</h3>
+<table><thead><tr>
+<th>Field</th>
+<th>Detail</th>
+</tr></thead><tbody>
+<tr>
+<td><strong>Objective</strong></td>
+<td>Register catalog item on KRA sandbox</td>
+</tr>
+<tr>
+<td><strong>Steps</strong></td>
+<td>POST /items for test product with valid item class and tax code</td>
+</tr>
+<tr>
+<td><strong>Expected</strong></td>
+<td>Item accepted on KRA sandbox; code usable on invoice lines</td>
+</tr>
+<tr>
+<td><strong>Evidence</strong></td>
+<td>Request/response log (PINs redacted)</td>
+</tr>
+</tbody></table>
+<h3>TC-07 — Customer registration</h3>
+<table><thead><tr>
+<th>Field</th>
+<th>Detail</th>
+</tr></thead><tbody>
+<tr>
+<td><strong>Objective</strong></td>
+<td>Register B2B buyer on sandbox</td>
+</tr>
+<tr>
+<td><strong>Steps</strong></td>
+<td>POST /customers with builder sandbox PIN</td>
+</tr>
+<tr>
+<td><strong>Expected</strong></td>
+<td>Customer registered; usable as <code>customerPin</code> on invoice</td>
+</tr>
+<tr>
+<td><strong>Evidence</strong></td>
+<td>Request/response log</td>
+</tr>
+</tbody></table>
+<h3>TC-08 — Sales invoice from Cart Buy Now</h3>
+<table><thead><tr>
+<th>Field</th>
+<th>Detail</th>
+</tr></thead><tbody>
+<tr>
+<td><strong>Objective</strong></td>
+<td>End-to-end automatic fiscalisation</td>
+</tr>
+<tr>
+<td><strong>Preconditions</strong></td>
+<td>Supplier A active; items coded; builder profile complete</td>
+</tr>
+<tr>
+<td><strong>Steps</strong></td>
+<td>Builder → Cart → Buy Now → confirm order</td>
+</tr>
+<tr>
+<td><strong>Expected</strong></td>
+<td>PO <code>confirmed</code>; <code>POST /invoices</code> succeeds; <code>etims_validated_at</code> set</td>
+</tr>
+<tr>
+<td><strong>Evidence</strong></td>
+<td>PO detail screenshot; <code>tis_submission_log</code> success row</td>
+</tr>
+</tbody></table>
+<h3>TC-09 — Sales invoice from supplier manual submit</h3>
+<table><thead><tr>
+<th>Field</th>
+<th>Detail</th>
+</tr></thead><tbody>
+<tr>
+<td><strong>Objective</strong></td>
+<td>Supplier-triggered submission</td>
+</tr>
+<tr>
+<td><strong>Preconditions</strong></td>
+<td>Accepted PO not yet fiscalised</td>
+</tr>
+<tr>
+<td><strong>Steps</strong></td>
+<td>Supplier → Order Management → Submit to KRA eTIMS</td>
+</tr>
+<tr>
+<td><strong>Expected</strong></td>
+<td>Same as TC-08</td>
+</tr>
+<tr>
+<td><strong>Evidence</strong></td>
+<td>Supplier dashboard screenshot</td>
+</tr>
+</tbody></table>
+<h3>TC-10 — Multi-vendor invoicing</h3>
+<table><thead><tr>
+<th>Field</th>
+<th>Detail</th>
+</tr></thead><tbody>
+<tr>
+<td><strong>Objective</strong></td>
+<td>Each invoice uses supplier PIN as <code>traderTin</code></td>
+</tr>
+<tr>
+<td><strong>Preconditions</strong></td>
+<td>Supplier A and Supplier B both active with different PINs</td>
+</tr>
+<tr>
+<td><strong>Steps</strong></td>
+<td>Create and submit PO for each supplier</td>
+</tr>
+<tr>
+<td><strong>Expected</strong></td>
+<td>Invoice 1 <code>traderTin</code> = PIN A; Invoice 2 <code>traderTin</code> = PIN B</td>
+</tr>
+<tr>
+<td><strong>Evidence</strong></td>
+<td>Two SalesReq payloads (from logs) with distinct <code>traderTin</code></td>
+</tr>
+</tbody></table>
+<h3>TC-11 — Credit note</h3>
+<table><thead><tr>
+<th>Field</th>
+<th>Detail</th>
+</tr></thead><tbody>
+<tr>
+<td><strong>Objective</strong></td>
+<td>Reverse prior sale</td>
+</tr>
+<tr>
+<td><strong>Preconditions</strong></td>
+<td>TC-08 or TC-09 completed successfully</td>
+</tr>
+<tr>
+<td><strong>Steps</strong></td>
+<td>Supplier → issue credit note on same PO</td>
+</tr>
+<tr>
+<td><strong>Expected</strong></td>
+<td><code>receiptTypeCode: R</code>; <code>traderOrgInvoiceNo</code> references original; KRA accepts</td>
+</tr>
+<tr>
+<td><strong>Evidence</strong></td>
+<td>Credit note receipt; log entry</td>
+</tr>
+</tbody></table>
+<h3>TC-12 — Fiscal receipt UI</h3>
+<table><thead><tr>
+<th>Field</th>
+<th>Detail</th>
+</tr></thead><tbody>
+<tr>
+<td><strong>Objective</strong></td>
+<td>Receipt displays required fields</td>
+</tr>
+<tr>
+<td><strong>Preconditions</strong></td>
+<td>Successful sale</td>
+</tr>
+<tr>
+<td><strong>Steps</strong></td>
+<td>Builder and supplier open fiscal receipt view</td>
+</tr>
+<tr>
+<td><strong>Expected</strong></td>
+<td>Issuer PIN, invoice number, lines, totals, verification URL visible</td>
+</tr>
+<tr>
+<td><strong>Evidence</strong></td>
+<td>Screenshot of <code>EtimsFiscalReceiptView</code></td>
+</tr>
+</tbody></table>
+<h3>TC-13 — QR verification</h3>
+<table><thead><tr>
+<th>Field</th>
+<th>Detail</th>
+</tr></thead><tbody>
+<tr>
+<td><strong>Objective</strong></td>
+<td>Public KRA validation works</td>
+</tr>
+<tr>
+<td><strong>Steps</strong></td>
+<td>Scan QR from TC-12 with mobile device</td>
+</tr>
+<tr>
+<td><strong>Expected</strong></td>
+<td>KRA verification page opens and confirms invoice</td>
+</tr>
+<tr>
+<td><strong>Evidence</strong></td>
+<td>Photo or screenshot of verification result</td>
+</tr>
+</tbody></table>
+<h3>TC-14 — Block quote-pending PO</h3>
+<table><thead><tr>
+<th>Field</th>
+<th>Detail</th>
+</tr></thead><tbody>
+<tr>
+<td><strong>Objective</strong></td>
+<td>Status gate enforced</td>
+</tr>
+<tr>
+<td><strong>Steps</strong></td>
+<td>Attempt submit on PO in <code>quote_created</code> status</td>
+</tr>
+<tr>
+<td><strong>Expected</strong></td>
+<td>No KRA call; <code>etims_error</code> explains blocked status</td>
+</tr>
+<tr>
+<td><strong>Evidence</strong></td>
+<td>PO error message screenshot</td>
+</tr>
+</tbody></table>
+<h3>TC-15 — Block missing item code</h3>
+<table><thead><tr>
+<th>Field</th>
+<th>Detail</th>
+</tr></thead><tbody>
+<tr>
+<td><strong>Objective</strong></td>
+<td>Catalog gate enforced</td>
+</tr>
+<tr>
+<td><strong>Steps</strong></td>
+<td>Create PO line without <code>etims_item_code</code>; attempt submit</td>
+</tr>
+<tr>
+<td><strong>Expected</strong></td>
+<td>Submission blocked with item code error</td>
+</tr>
+<tr>
+<td><strong>Evidence</strong></td>
+<td>Error on PO</td>
+</tr>
+</tbody></table>
+<h3>TC-16 — Block invalid supplier PIN</h3>
+<table><thead><tr>
+<th>Field</th>
+<th>Detail</th>
+</tr></thead><tbody>
+<tr>
+<td><strong>Objective</strong></td>
+<td>PIN validation enforced</td>
+</tr>
+<tr>
+<td><strong>Steps</strong></td>
+<td>Set invalid PIN on supplier; attempt checkout or submit</td>
+</tr>
+<tr>
+<td><strong>Expected</strong></td>
+<td>Blocked before or at submit with PIN error</td>
+</tr>
+<tr>
+<td><strong>Evidence</strong></td>
+<td>Validation message screenshot</td>
+</tr>
+</tbody></table>
+<h3>TC-17 — Audit log on failure</h3>
+<table><thead><tr>
+<th>Field</th>
+<th>Detail</th>
+</tr></thead><tbody>
+<tr>
+<td><strong>Objective</strong></td>
+<td>Failures recorded</td>
+</tr>
+<tr>
+<td><strong>Steps</strong></td>
+<td>Trigger a controlled KRA rejection (e.g. bad test payload via API console)</td>
+</tr>
+<tr>
+<td><strong>Expected</strong></td>
+<td><code>tis_submission_log</code> row with status <code>failed</code> and error detail</td>
+</tr>
+<tr>
+<td><strong>Evidence</strong></td>
+<td>Admin Submission ops screenshot</td>
+</tr>
+</tbody></table>
+<h3>TC-18 — Admin retry after fix</h3>
+<table><thead><tr>
+<th>Field</th>
+<th>Detail</th>
+</tr></thead><tbody>
+<tr>
+<td><strong>Objective</strong></td>
+<td>Retry path works</td>
+</tr>
+<tr>
+<td><strong>Preconditions</strong></td>
+<td>TC-15 failure; admin adds missing item code</td>
+</tr>
+<tr>
+<td><strong>Steps</strong></td>
+<td>Admin → retry submit on same PO</td>
+</tr>
+<tr>
+<td><strong>Expected</strong></td>
+<td>Success; prior error cleared</td>
+</tr>
+<tr>
+<td><strong>Evidence</strong></td>
+<td>Before/after PO state</td>
+</tr>
+</tbody></table>
+<h3>TC-19 — Vendor onboarding lifecycle</h3>
+<table><thead><tr>
+<th>Field</th>
+<th>Detail</th>
+</tr></thead><tbody>
+<tr>
+<td><strong>Objective</strong></td>
+<td>Onboarding workflow operational</td>
+</tr>
+<tr>
+<td><strong>Steps</strong></td>
+<td>Move test vendor through draft → pending_review → pending_kra → active</td>
+</tr>
+<tr>
+<td><strong>Expected</strong></td>
+<td>Status transitions logged; active vendor can submit</td>
+</tr>
+<tr>
+<td><strong>Evidence</strong></td>
+<td>Onboarding panel screenshots</td>
+</tr>
+</tbody></table>
+<h3>TC-20 — SalesReq payload mapping</h3>
+<table><thead><tr>
+<th>Field</th>
+<th>Detail</th>
+</tr></thead><tbody>
+<tr>
+<td><strong>Objective</strong></td>
+<td>Field mapping matches architecture and KRA spec</td>
+</tr>
+<tr>
+<td><strong>Steps</strong></td>
+<td>Capture SalesReq JSON from successful TC-08</td>
+</tr>
+<tr>
+<td><strong>Expected</strong></td>
+<td>See mapping table below</td>
+</tr>
+<tr>
+<td><strong>Evidence</strong></td>
+<td>Redacted JSON attached to test report</td>
+</tr>
+</tbody></table>
+<p><strong>Expected mapping (sample):</strong></p>
+<table><thead><tr>
+<th>KRA field</th>
+<th>UjenziXform source</th>
+</tr></thead><tbody>
+<tr>
+<td><code>traderInvoiceNo</code></td>
+<td>PO number</td>
+</tr>
+<tr>
+<td><code>traderTin</code></td>
+<td>Supplier <code>kra_pin</code></td>
+</tr>
+<tr>
+<td><code>traderName</code></td>
+<td>Supplier legal name</td>
+</tr>
+<tr>
+<td><code>customerPin</code></td>
+<td>Builder <code>profiles.kra_pin</code></td>
+</tr>
+<tr>
+<td><code>receiptTypeCode</code></td>
+<td><code>S</code> (sale)</td>
+</tr>
+<tr>
+<td><code>salesItems[].itemCode</code></td>
+<td>Catalog <code>etims_item_code</code></td>
+</tr>
+<tr>
+<td><code>salesDate</code></td>
+<td><code>yyyyMMddHHmmss</code> at submission</td>
+</tr>
+</tbody></table>
+<p>Reference payload: <code>appendix/APPENDIX_SAMPLE_SALESREQ.json</code></p>
+<hr />
+<h2>8. Evidence and deliverables</h2>
+<p>For each <strong>P1</strong> test case, record:</p>
+<table><thead><tr>
+<th>Artifact</th>
+<th>Format</th>
+</tr></thead><tbody>
+<tr>
+<td>Test execution log</td>
+<td>Spreadsheet or PDF</td>
+</tr>
+<tr>
+<td>Screenshots</td>
+<td>PNG (UI, receipt, QR verification)</td>
+</tr>
+<tr>
+<td>Request/response samples</td>
+<td>JSON with PINs and keys redacted</td>
+</tr>
+<tr>
+<td><code>tis_submission_log</code> export</td>
+<td>CSV for test date range</td>
+</tr>
+<tr>
+<td>Certification checklist</td>
+<td>Export from TIS Integrator Hub</td>
+</tr>
+</tbody></table>
+<p><strong>Deliver to KRA:</strong></p>
+<ol>
+<li>Completed test execution log with pass/fail per case  </li>
+<li>Evidence pack (zip or PDF) referenced by log  </li>
+<li>Updated architecture document if mapping changes during testing  </li>
+<li>Written request for production certification after all P1 cases pass  </li>
+</ol>
+<hr />
+<h2>9. Defect management</h2>
+<table><thead><tr>
+<th>Severity</th>
+<th>Definition</th>
+<th>Certification impact</th>
+</tr></thead><tbody>
+<tr>
+<td><strong>Critical</strong></td>
+<td>Data loss, credential exposure, incorrect tax submission</td>
+<td>Blocks certification</td>
+</tr>
+<tr>
+<td><strong>High</strong></td>
+<td>P1 test case fails; no workaround</td>
+<td>Blocks certification</td>
+</tr>
+<tr>
+<td><strong>Medium</strong></td>
+<td>P2 failure or workaround exists</td>
+<td>Document; fix before production</td>
+</tr>
+<tr>
+<td><strong>Low</strong></td>
+<td>Cosmetic UI issue</td>
+<td>Document; fix in next release</td>
+</tr>
+</tbody></table>
+<p>Defects logged with: ID, test case, steps, expected, actual, severity, status.</p>
+<hr />
+<h2>10. Certification checklist mapping</h2>
+<p>Tests map to the in-app checklist (<code>TIS_INTEGRATOR_CHECKLIST</code>):</p>
+<table><thead><tr>
+<th>Checklist ID</th>
+<th>Test cases</th>
+</tr></thead><tbody>
+<tr>
+<td><code>platform_registered</code></td>
+<td>Pre-test (eTIMS portal)</td>
+</tr>
+<tr>
+<td><code>sandbox_access</code></td>
+<td>E1, TC-04</td>
+</tr>
+<tr>
+<td><code>oscu_vscu_init</code></td>
+<td>TC-04</td>
+</tr>
+<tr>
+<td><code>master_data_sync</code></td>
+<td>TC-05</td>
+</tr>
+<tr>
+<td><code>item_registration</code></td>
+<td>TC-06</td>
+</tr>
+<tr>
+<td><code>customer_registration</code></td>
+<td>TC-07</td>
+</tr>
+<tr>
+<td><code>sales_invoice</code></td>
+<td>TC-08, TC-09, TC-20</td>
+</tr>
+<tr>
+<td><code>credit_note</code></td>
+<td>TC-11</td>
+</tr>
+<tr>
+<td><code>fiscal_receipt_ui</code></td>
+<td>TC-12, TC-13</td>
+</tr>
+<tr>
+<td><code>vendor_tis_identity</code></td>
+<td>TC-10</td>
+</tr>
+<tr>
+<td><code>vendor_onboarding_workflow</code></td>
+<td>TC-19</td>
+</tr>
+<tr>
+<td><code>submission_audit</code></td>
+<td>TC-17, TC-18</td>
+</tr>
+<tr>
+<td><code>secure_credentials</code></td>
+<td>TC-01, TC-02, TC-03</td>
+</tr>
+<tr>
+<td><code>production_cutover</code></td>
+<td>Post-certification (out of scope)</td>
+</tr>
+</tbody></table>
+<hr />
+<h2>11. Sign-off</h2>
+<table><thead><tr>
+<th>Role</th>
+<th>Name</th>
+<th>Signature</th>
+<th>Date</th>
+</tr></thead><tbody>
+<tr>
+<td>Test lead</td>
+<td>_[Complete before execution]_</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>Technical lead</td>
+<td>_[Complete before execution]_</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>Authorised signatory</td>
+<td>_[Complete before submission]_</td>
+<td></td>
+<td></td>
+</tr>
+</tbody></table>
+<p><strong>Sandbox test execution date range:</strong> _[To be completed after KRA assigns sandbox]_</p>
+<p><strong>Overall result:</strong> _[ Pass / Fail — pending ]_</p>
+<hr />
+<h2>12. Document control</h2>
+<table><thead><tr>
+<th>Version</th>
+<th>Date</th>
+<th>Changes</th>
+</tr></thead><tbody>
+<tr>
+<td>1.0</td>
+<td>2026-06-03</td>
+<td>Initial test plan for KRA optical disk submission</td>
+</tr>
+</tbody></table>
+<p><strong>Related documents:</strong></p>
+<ul>
+<li><code>TIS_ETIMS_INTEGRATION_ARCHITECTURE.md</code> — §23 checklist mapping  </li>
+<li><code>USER_OPERATOR_MANUAL.md</code> — operator procedures under test  </li>
+<li><code>INSTALLATION_DEPLOYMENT_GUIDE.md</code> — environment setup  </li>
+<li><code>appendix/APPENDIX_SAMPLE_SALESREQ.md</code> — sample payload  </li>
+</ul>
+</body>
+</html>

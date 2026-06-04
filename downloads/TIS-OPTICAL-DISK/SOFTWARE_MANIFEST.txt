@@ -1,0 +1,59 @@
+﻿UjenziXform Trader Invoicing System (TIS) - Software Manifest
+Product version: 1.0.0
+Generated: 2026-06-04 01:10:36
+Reference: UJX-TIS-KRA-ARCH-2026-001
+
+PATH	SIZE_BYTES	DESCRIPTION
+--------------------------------------------------------------------------------
+src/lib/etims/autoSubmitAfterQuoteAccept.ts	975	TIS core library
+src/lib/etims/formatEtimsReceiptForUi.test.ts	1175	TIS core library
+src/lib/etims/formatEtimsReceiptForUi.ts	17775	TIS core library
+src/lib/etims/index.ts	132	TIS core library
+src/lib/etims/invokeEtimsProxy.ts	2594	TIS core library
+src/lib/etims/parseBulkEtimsCsv.ts	2105	TIS core library
+src/lib/etims/purchaseOrderEtims.test.ts	3665	TIS core library
+src/lib/etims/purchaseOrderEtims.ts	32226	TIS core library
+src/lib/etims/salesDate.ts	609	TIS core library
+src/lib/etims/types.ts	2791	TIS core library
+src/lib/etims/logTisSubmission.ts	1156	TIS core library
+src/lib/etims/tisOnboardingWorkflow.ts	5120	TIS core library
+src/lib/etims/tisOscuInitialization.ts	4668	TIS core library
+src/lib/etims/kraPin.ts	937	TIS core library
+src/lib/etims/vendorTaxIdentity.ts	3666	TIS core library
+src/lib/etims/autoSubmitOnOrderConfirmed.ts	1138	TIS core library
+src/lib/etims/kraPin.test.ts	652	TIS core library
+src/lib/etims/samples/integrator-invoice-tax-code-d.json	481	TIS core library
+src/components/admin/tis-integrator/TisCertificationChecklist.tsx	2776	Admin TIS Integrator Hub
+src/components/admin/tis-integrator/TisIntegratorApiConsole.tsx	10628	Admin TIS Integrator Hub
+src/components/admin/tis-integrator/TisIntegratorHub.tsx	2930	Admin TIS Integrator Hub
+src/components/admin/tis-integrator/TisIntegratorPlatformPanel.tsx	12155	Admin TIS Integrator Hub
+src/components/admin/tis-integrator/TisOnboardingEventsTimeline.tsx	2905	Admin TIS Integrator Hub
+src/components/admin/tis-integrator/TisOscuInitializationCard.tsx	7224	Admin TIS Integrator Hub
+src/components/admin/tis-integrator/TisSubmissionOpsPanel.tsx	17172	Admin TIS Integrator Hub
+src/components/admin/tis-integrator/TisVendorOnboardingPanel.tsx	24146	Admin TIS Integrator Hub
+src/components/admin/tis-integrator/index.ts	518	Admin TIS Integrator Hub
+src/components/admin/tis-integrator/tisTheme.ts	2197	Admin TIS Integrator Hub
+src/components/admin/tis-integrator/types.ts	6428	Admin TIS Integrator Hub
+src/components/etims/BulkEtimsCodesImportCard.tsx	9797	Fiscal receipt & eTIMS UI
+src/components/etims/EtimsFiscalReceiptView.tsx	12068	Fiscal receipt & eTIMS UI
+src/components/etims/EtimsVerificationQr.tsx	4868	Fiscal receipt & eTIMS UI
+supabase/functions/etims-proxy/index.ts	6895	Edge function etims-proxy
+src/components/admin/EtimsTestPanel.tsx	27657	TIS integration component
+src/components/admin/EtimsPurchaseOrderSubmitCard.tsx	34175	TIS integration component
+src/components/admin/VendorEtimsTisRegistryPanel.tsx	8326	TIS integration component
+src/components/supplier/SupplierEtimsSettingsPanel.tsx	15114	TIS integration component
+supabase/functions/_shared/etimsPathAllowlist.ts	4035	TIS integration component
+env.local.template	4841	TIS integration component
+supabase/migrations/20260430140000_purchase_orders_etims_integrator.sql	1868	Database migration (eTIMS/TIS)
+supabase/migrations/20260501120000_etims_item_code_catalog.sql	975	Database migration (eTIMS/TIS)
+supabase/migrations/20260502143000_admin_material_images_etims_item_code.sql	561	Database migration (eTIMS/TIS)
+supabase/migrations/20260502180000_clear_demo_etims_placeholder_ke1uct.sql	476	Database migration (eTIMS/TIS)
+supabase/migrations/20260502190000_clear_demo_etims_placeholder_case_insensitive.sql	498	Database migration (eTIMS/TIS)
+supabase/migrations/20260503180000_purchase_orders_builder_etims_paystack_paid.sql	1119	Database migration (eTIMS/TIS)
+supabase/migrations/20260503230000_disable_auto_supplier_invoices_etims.sql	1212	Database migration (eTIMS/TIS)
+supabase/migrations/20260516180000_kra_etims_profiles_suppliers_products.sql	7372	Database migration (eTIMS/TIS)
+supabase/migrations/20260525120000_tis_integrator_platform.sql	8450	Database migration (eTIMS/TIS)
+supabase/migrations/20260525130000_fix_tis_integrator_rls_roles.sql	2829	Database migration (eTIMS/TIS)
+supabase/migrations/20260525140000_tis_onboarding_init_audit.sql	2367	Database migration (eTIMS/TIS)
+
+TOTAL_FILES: 50

@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Kenya Representative — TIS Optical Disk Handover Instructions</title>
+  <style>
+    @page { size: A4; margin: 18mm 16mm; }
+    body {
+      font-family: "Segoe UI", Calibri, Arial, sans-serif;
+      font-size: 10.5pt;
+      line-height: 1.45;
+      max-width: 7.4in;
+      margin: 0 auto;
+      padding: 0.35in 0.2in;
+      color: #111;
+    }
+    .hint {
+      font-size: 9pt;
+      background: #ecfdf5;
+      border: 1px solid #99f6e4;
+      padding: 0.5rem 0.65rem;
+      margin-bottom: 0.85rem;
+    }
+    h1 { font-size: 16pt; margin: 0 0 0.6rem; color: #0f172a; page-break-after: avoid; }
+    h2 { font-size: 12.5pt; margin: 1.1rem 0 0.45rem; color: #1e293b; page-break-after: avoid; border-bottom: 1px solid #e2e8f0; padding-bottom: 0.15rem; }
+    h3 { font-size: 11pt; margin: 0.85rem 0 0.35rem; color: #334155; page-break-after: avoid; }
+    h4 { font-size: 10.5pt; margin: 0.65rem 0 0.25rem; color: #475569; page-break-after: avoid; }
+    p { margin: 0.35rem 0 0.55rem; }
+    ul, ol { margin: 0.35rem 0 0.65rem; padding-left: 1.25rem; }
+    li { margin: 0.15rem 0; }
+    table { width: 100%; border-collapse: collapse; margin: 0.55rem 0 0.85rem; font-size: 9.5pt; page-break-inside: avoid; }
+    th, td { border: 1px solid #cbd5e1; padding: 0.28rem 0.4rem; vertical-align: top; text-align: left; }
+    th { background: #f8fafc; font-weight: 600; }
+    tr:nth-child(even) td { background: #fcfdff; }
+    code, pre code { font-family: Consolas, "Courier New", monospace; font-size: 9pt; }
+    p code, li code, td code, th code { background: #f1f5f9; padding: 0.05rem 0.25rem; border-radius: 3px; }
+    pre {
+      background: #0f172a;
+      color: #e2e8f0;
+      padding: 0.65rem 0.75rem;
+      border-radius: 6px;
+      overflow-x: auto;
+      page-break-inside: avoid;
+      margin: 0.5rem 0 0.75rem;
+    }
+    pre code { background: transparent; color: inherit; padding: 0; }
+    blockquote {
+      margin: 0.5rem 0 0.75rem;
+      padding: 0.45rem 0.75rem;
+      border-left: 3px solid #14b8a6;
+      background: #f0fdfa;
+      color: #134e4a;
+    }
+    hr { border: none; border-top: 1px solid #e2e8f0; margin: 1rem 0; }
+    a { color: #0f766e; word-break: break-all; }
+    @media print {
+      .hint { display: none; }
+      body { padding: 0; }
+      h2 { page-break-before: auto; }
+    }
+  </style>
+</head>
+<body>
+  <div class="hint">UjenziXform TIS certification document — Ctrl+P → Save as PDF if needed.</div>
+  <h1>Kenya Representative — TIS Optical Disk Handover Instructions</h1>
+<p><strong>For:</strong> Local representative in Kenya   <strong>From:</strong> UjenziXform Solution   <strong>Registered address:</strong> Barngetuny Plaza Left Wing 3rd Floor Room 10, Ronald Ngala Street, Eldoret. P. O. Box 4146 - 30100 Eldoret   <strong>Product:</strong> UjenziXform Trader Invoicing System (TIS) v1.0.0   <strong>Reference:</strong> UJX-TIS-KRA-ARCH-2026-001   <strong>Document version:</strong> 1.0   <strong>Date:</strong> 3 June 2026  </p>
+<hr />
+<h2>Purpose</h2>
+<p>You are helping submit a <strong>read-only CD or DVD</strong> to the <strong>Kenya Revenue Authority (KRA)</strong> as part of UjenziXform’s application to become a third-party <strong>Trader Invoicing System (TIS)</strong> integrator for eTIMS.</p>
+<p><strong>You do not need to be technical.</strong> Your main tasks are:</p>
+<ol>
+<li>Burn a read-only disc from files we send you  </li>
+<li>Print and sign the cover letter  </li>
+<li>Deliver the disc and letter to KRA  </li>
+<li>Send proof of submission back to us  </li>
+</ol>
+<hr />
+<h2>What we will send you</h2>
+<p>We will share a folder (usually as a <strong>zip file</strong> via email, WhatsApp, or cloud link) named:</p>
+<p><strong><code>TIS-OPTICAL-DISK</code></strong></p>
+<p>Inside it you should find:</p>
+<table><thead><tr>
+<th>Item</th>
+<th>What it is</th>
+</tr></thead><tbody>
+<tr>
+<td><code>README.txt</code></td>
+<td>Short index of disc contents</td>
+</tr>
+<tr>
+<td><code>SOFTWARE_MANIFEST.txt</code></td>
+<td>List of software files</td>
+</tr>
+<tr>
+<td><code>01-SOFTWARE/</code></td>
+<td>TIS integration source code</td>
+</tr>
+<tr>
+<td><code>02-PDF-DOCUMENTS/</code></td>
+<td>Eight certification PDF documents</td>
+</tr>
+<tr>
+<td><code>03-SOURCE-DOCUMENTS/</code></td>
+<td>Optional extra reference files</td>
+</tr>
+</tbody></table>
+<p><strong>You do not need to open or edit the software files.</strong></p>
+<hr />
+<h2>Before you start — checklist</h2>
+<p>Confirm you have:</p>
+<table><thead><tr>
+<th>#</th>
+<th>Item</th>
+</tr></thead><tbody>
+<tr>
+<td>1</td>
+<td>The full <code>TIS-OPTICAL-DISK</code> folder (downloaded and unzipped)</td>
+</tr>
+<tr>
+<td>2</td>
+<td>Access to a <strong>CD/DVD burn service</strong> (shop or office with a burner)</td>
+</tr>
+<tr>
+<td>3</td>
+<td>Blank <strong>CD-R</strong> or <strong>DVD-R</strong> discs (buy <strong>2</strong> — one for KRA, one backup)</td>
+</tr>
+<tr>
+<td>4</td>
+<td>A printer (for the cover letter)</td>
+</tr>
+<tr>
+<td>5</td>
+<td>Authority to sign the cover letter <strong>or</strong> an authorised signatory available</td>
+</tr>
+<tr>
+<td>6</td>
+<td>This instruction PDF for reference</td>
+</tr>
+</tbody></table>
+<hr />
+<h2>Step 1 — Download and unzip</h2>
+<ol>
+<li>Download the zip file we send you.  </li>
+<li>Right-click → <strong>Extract All</strong> (or use WinRAR / 7-Zip).  </li>
+<li>Open the extracted <strong><code>TIS-OPTICAL-DISK</code></strong> folder.  </li>
+<li>Confirm you see <code>01-SOFTWARE</code>, <code>02-PDF-DOCUMENTS</code>, and <code>README.txt</code>.  </li>
+</ol>
+<p><strong>Quick check:</strong> Open <code>02-PDF-DOCUMENTS</code> — there should be <strong>8 PDF files</strong> (numbered 01 to 08).</p>
+<hr />
+<h2>Step 2 — Burn a read-only CD or DVD</h2>
+<h3>Option A — CD/DVD shop (recommended if you have no burner)</h3>
+<ol>
+<li>Copy the entire <strong><code>TIS-OPTICAL-DISK</code></strong> folder onto a <strong>USB stick</strong>.  </li>
+<li>Go to any <strong>computer / IT / printing shop</strong> in Nairobi (or your town) that burns discs.  </li>
+<li>Give them the USB stick and this instruction slip:</li>
+</ol>
+<pre><code>Please burn a DATA CD or DVD.
+
+Copy everything INSIDE the TIS-OPTICAL-DISK folder to the disc root:
+  - README.txt
+  - SOFTWARE_MANIFEST.txt
+  - 01-SOFTWARE (folder)
+  - 02-PDF-DOCUMENTS (folder)
+  - 03-SOURCE-DOCUMENTS (folder, if present)
+
+Requirements:
+  - Finalized / read-only (not rewritable)
+  - No multi-session
+  - Make 2 copies
+
+Label each disc:
+  UjenziXform TIS v1.0.0
+  UJX-TIS-KRA-ARCH-2026-001
+  KRA eTIMS TIS Certification — Read Only
+  Date: [today's date]</code></pre>
+<ol>
+<li>Pay for <strong>2 copies</strong> — one for KRA, one for our records.  </li>
+<li>Before leaving the shop, open the disc on their PC and confirm files open (especially the PDFs).</li>
+</ol>
+<h3>Option B — Burn yourself (Windows)</h3>
+<ol>
+<li>Insert blank <strong>CD-R</strong> or <strong>DVD-R</strong>.  </li>
+<li>Open the <strong><code>TIS-OPTICAL-DISK</code></strong> folder.  </li>
+<li>Select <strong>all items inside</strong> (not the parent folder name alone).  </li>
+<li>Right-click → <strong>Send to</strong> → <strong>DVD RW Drive</strong>.  </li>
+<li>Choose <strong>With a CD/DVD player</strong> if Windows asks.  </li>
+<li>Click <strong>Burn to disc</strong>.  </li>
+<li>Eject and re-insert — confirm you <strong>cannot delete</strong> files on the disc (read-only).  </li>
+<li>Repeat for a <strong>second backup copy</strong>.</li>
+</ol>
+<hr />
+<h2>Step 3 — Print and sign the cover letter</h2>
+<ol>
+<li>Open <strong><code>02-PDF-DOCUMENTS\01_KRA_TIS_COVER_LETTER.pdf</code></strong>.  </li>
+<li><strong>Read it first</strong> — all details should already be filled in by our team in Australia.  </li>
+<li>If any field still shows brackets like <code>[Complete before submission]</code>, <strong>contact us before printing</strong>.  </li>
+<li>Print on <strong>company letterhead</strong> if available.  </li>
+<li>The <strong>authorised signatory</strong> signs and dates at the bottom.  </li>
+</ol>
+<p>Keep one printed copy for our records if possible.</p>
+<hr />
+<h2>Step 4 — Deliver to KRA</h2>
+<h3>What to take to KRA</h3>
+<table><thead><tr>
+<th>Item</th>
+<th>Notes</th>
+</tr></thead><tbody>
+<tr>
+<td>Read-only <strong>CD or DVD</strong></td>
+<td>One copy (keep the second copy safe)</td>
+</tr>
+<tr>
+<td><strong>Signed cover letter</strong></td>
+<td>Printed from PDF 01</td>
+</tr>
+<tr>
+<td><strong>Company documents</strong></td>
+<td>Only if KRA has already asked for these separately (CR12, PIN certificate, etc.)</td>
+</tr>
+<tr>
+<td><strong>This instruction PDF</strong></td>
+<td>Optional — for your reference only; do not submit unless KRA asks</td>
+</tr>
+</tbody></table>
+<h3>Where to go</h3>
+<p><strong>Default address (confirm before visiting):</strong></p>
+<p>Kenya Revenue Authority   Times Tower, Haile Selassie Avenue   P.O. Box 48240 – 00100   Nairobi, Kenya  </p>
+<p><strong>Attention:</strong> eTIMS Third-Party Integrator / OSCU Certification Unit  </p>
+<p><strong>Important:</strong> Call or check the <strong>eTIMS portal</strong> (etims.kra.go.ke) first to confirm:</p>
+<ul>
+<li>The correct office or desk for <strong>TIS integrator disc submission</strong>  </li>
+<li>Whether they accept <strong>walk-in</strong>, <strong>courier</strong>, or <strong>portal upload</strong> instead  </li>
+</ul>
+<p>If KRA gives a different address or process, <strong>follow their current instruction</strong>.</p>
+<h3>At submission</h3>
+<ol>
+<li>Politely state you are submitting the <strong>read-only optical disk</strong> and <strong>cover letter</strong> for <strong>UjenziXform Trader Invoicing System (TIS)</strong> integrator application.  </li>
+<li>Give reference: <strong>UJX-TIS-KRA-ARCH-2026-001</strong>.  </li>
+<li>Ask for a <strong>receipt, stamp, or reference number</strong> if available.  </li>
+<li>Note the <strong>date</strong>, <strong>time</strong>, and <strong>name of the officer</strong> who receives it.  </li>
+</ol>
+<h3>Courier option</h3>
+<p>If you cannot visit in person, use a <strong>reputable courier</strong> (G4S, Fargo, etc.) to Times Tower with:</p>
+<ul>
+<li>Disc in a protective sleeve  </li>
+<li>Signed cover letter in an envelope  </li>
+<li>Clear label: <strong>KRA eTIMS TIS Integrator Submission — UjenziXform — UJX-TIS-KRA-ARCH-2026-001</strong>  </li>
+</ul>
+<p>Keep the courier tracking number.</p>
+<hr />
+<h2>Step 5 — Send proof back to us (Australia)</h2>
+<p>After submission, please send us <strong>within 24 hours</strong>:</p>
+<table><thead><tr>
+<th>Proof</th>
+<th>How to send</th>
+</tr></thead><tbody>
+<tr>
+<td>Photo of <strong>disc label</strong></td>
+<td>WhatsApp / email</td>
+</tr>
+<tr>
+<td>Photo of <strong>signed cover letter</strong></td>
+<td>WhatsApp / email</td>
+</tr>
+<tr>
+<td><strong>Date and time</strong> of submission</td>
+<td>Text message</td>
+</tr>
+<tr>
+<td><strong>KRA receipt / reference number</strong> (if any)</td>
+<td>Photo or copy</td>
+</tr>
+<tr>
+<td><strong>Officer name</strong> (if in person)</td>
+<td>Text</td>
+</tr>
+<tr>
+<td><strong>Courier tracking number</strong> (if courier)</td>
+<td>Text</td>
+</tr>
+<tr>
+<td>Confirmation <strong>backup disc</strong> is stored safely</td>
+<td>Text</td>
+</tr>
+</tbody></table>
+<p>Send to the contact person in Australia who shared this document with you.</p>
+<hr />
+<h2>Disc label (write or print)</h2>
+<p>Apply to each disc and sleeve:</p>
+<pre><code>UjenziXform Trader Invoicing System (TIS) v1.0.0
+UjenziXform Solution
+Barngetuny Plaza, Ronald Ngala St, Eldoret
+P. O. Box 4146 - 30100 Eldoret
+Reference: UJX-TIS-KRA-ARCH-2026-001
+Submission date: _______________
+KRA eTIMS TIS Certification — Read Only</code></pre>
+<hr />
+<h2>What NOT to do</h2>
+<table><thead><tr>
+<th>Do not</th>
+<th>Reason</th>
+</tr></thead><tbody>
+<tr>
+<td>Edit or delete files before burning</td>
+<td>KRA expects exact submission pack</td>
+</tr>
+<tr>
+<td>Use a <strong>rewritable</strong> disc (CD-RW) without finalizing</td>
+<td>Must be read-only</td>
+</tr>
+<tr>
+<td>Submit only a USB stick</td>
+<td>Unless KRA explicitly accepts it</td>
+</tr>
+<tr>
+<td>Sign if you are not the authorised signatory</td>
+<td>Cover letter must be properly authorised</td>
+</tr>
+<tr>
+<td>Skip the backup disc</td>
+<td>We need a second copy in case the first is lost</td>
+</tr>
+</tbody></table>
+<hr />
+<h2>If something goes wrong</h2>
+<table><thead><tr>
+<th>Problem</th>
+<th>What to do</th>
+</tr></thead><tbody>
+<tr>
+<td>Zip file incomplete</td>
+<td>Contact Australia team — do not burn</td>
+</tr>
+<tr>
+<td>Fewer than 8 PDFs in folder</td>
+<td>Contact Australia team — do not burn</td>
+</tr>
+<tr>
+<td>Cover letter still has blank <code>[brackets]</code></td>
+<td>Contact Australia team for updated PDF</td>
+</tr>
+<tr>
+<td>KRA refuses USB / asks for CD only</td>
+<td>Burn CD-R at any shop (~KES 200–500)</td>
+</tr>
+<tr>
+<td>KRA gives a different submission address</td>
+<td>Follow KRA’s instruction; tell us immediately</td>
+</tr>
+<tr>
+<td>Disc not read-only after burn</td>
+<td>Reburn with finalize / mastered option</td>
+</tr>
+</tbody></table>
+<hr />
+<h2>Summary (one page)</h2>
+<pre><code>1. Unzip TIS-OPTICAL-DISK folder
+2. Verify 8 PDFs in 02-PDF-DOCUMENTS
+3. Burn read-only CD/DVD (2 copies) — shop is fine
+4. Print + sign 01_KRA_TIS_COVER_LETTER.pdf
+5. Deliver disc + letter to KRA (confirm address first)
+6. Send us photos + receipt/reference same day</code></pre>
+<hr />
+<h2>Contact</h2>
+<p><strong>Primary contact (Australia):</strong> _[Name]_   <strong>Email:</strong> _[Email]_   <strong>WhatsApp / phone:</strong> _[Phone]_  </p>
+<p><strong>Applicant name:</strong> UjenziXform Solution   <strong>Platform:</strong> UjenziXform   <strong>Reference:</strong> UJX-TIS-KRA-ARCH-2026-001  </p>
+<hr />
+<p><em>Thank you for representing UjenziXform with KRA.</em></p>
+</body>
+</html>

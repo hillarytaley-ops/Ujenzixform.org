@@ -1,0 +1,597 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>UjenziXform TIS — Optical Disk Submission Instructions</title>
+  <style>
+    @page { size: A4; margin: 18mm 16mm; }
+    body {
+      font-family: "Segoe UI", Calibri, Arial, sans-serif;
+      font-size: 10.5pt;
+      line-height: 1.45;
+      max-width: 7.4in;
+      margin: 0 auto;
+      padding: 0.35in 0.2in;
+      color: #111;
+    }
+    .hint {
+      font-size: 9pt;
+      background: #ecfdf5;
+      border: 1px solid #99f6e4;
+      padding: 0.5rem 0.65rem;
+      margin-bottom: 0.85rem;
+    }
+    h1 { font-size: 16pt; margin: 0 0 0.6rem; color: #0f172a; page-break-after: avoid; }
+    h2 { font-size: 12.5pt; margin: 1.1rem 0 0.45rem; color: #1e293b; page-break-after: avoid; border-bottom: 1px solid #e2e8f0; padding-bottom: 0.15rem; }
+    h3 { font-size: 11pt; margin: 0.85rem 0 0.35rem; color: #334155; page-break-after: avoid; }
+    h4 { font-size: 10.5pt; margin: 0.65rem 0 0.25rem; color: #475569; page-break-after: avoid; }
+    p { margin: 0.35rem 0 0.55rem; }
+    ul, ol { margin: 0.35rem 0 0.65rem; padding-left: 1.25rem; }
+    li { margin: 0.15rem 0; }
+    table { width: 100%; border-collapse: collapse; margin: 0.55rem 0 0.85rem; font-size: 9.5pt; page-break-inside: avoid; }
+    th, td { border: 1px solid #cbd5e1; padding: 0.28rem 0.4rem; vertical-align: top; text-align: left; }
+    th { background: #f8fafc; font-weight: 600; }
+    tr:nth-child(even) td { background: #fcfdff; }
+    code, pre code { font-family: Consolas, "Courier New", monospace; font-size: 9pt; }
+    p code, li code, td code, th code { background: #f1f5f9; padding: 0.05rem 0.25rem; border-radius: 3px; }
+    pre {
+      background: #0f172a;
+      color: #e2e8f0;
+      padding: 0.65rem 0.75rem;
+      border-radius: 6px;
+      overflow-x: auto;
+      page-break-inside: avoid;
+      margin: 0.5rem 0 0.75rem;
+    }
+    pre code { background: transparent; color: inherit; padding: 0; }
+    blockquote {
+      margin: 0.5rem 0 0.75rem;
+      padding: 0.45rem 0.75rem;
+      border-left: 3px solid #14b8a6;
+      background: #f0fdfa;
+      color: #134e4a;
+    }
+    hr { border: none; border-top: 1px solid #e2e8f0; margin: 1rem 0; }
+    a { color: #0f766e; word-break: break-all; }
+    @media print {
+      .hint { display: none; }
+      body { padding: 0; }
+      h2 { page-break-before: auto; }
+    }
+  </style>
+</head>
+<body>
+  <div class="hint">UjenziXform TIS certification document — Ctrl+P → Save as PDF if needed.</div>
+  <h1>UjenziXform TIS — Optical Disk Submission Instructions</h1>
+<p><strong>Document type:</strong> Step-by-step guide (KRA certification submission)   <strong>Applicant:</strong> UjenziXform Solution   <strong>Product:</strong> UjenziXform Trader Invoicing System (TIS) v1.0.0   <strong>Reference:</strong> UJX-TIS-KRA-ARCH-2026-001   <strong>Document version:</strong> 1.0   <strong>Date:</strong> 3 June 2026  </p>
+<hr />
+<h2>Table of contents</h2>
+<ol>
+<li><a href="#1-what-kra-requires">What KRA requires</a></li>
+<li><a href="#2-when-to-submit-the-disc">When to submit the disc</a></li>
+<li><a href="#3-what-must-be-on-the-disc">What must be on the disc</a></li>
+<li><a href="#4-folder-structure-on-the-disc">Folder structure on the disc</a></li>
+<li><a href="#5-step-1--prepare-content-on-your-computer">Step 1 — Prepare content on your computer</a></li>
+<li><a href="#6-step-2--pre-burn-verification-checklist">Step 2 — Pre-burn verification checklist</a></li>
+<li><a href="#7-step-3--burn-a-read-only-cd-or-dvd">Step 3 — Burn a read-only CD or DVD</a></li>
+<li><a href="#8-step-4--label-the-disc">Step 4 — Label the disc</a></li>
+<li><a href="#9-step-5--submit-to-kra">Step 5 — Submit to KRA</a></li>
+<li><a href="#10-certification-timeline">Certification timeline</a></li>
+<li><a href="#11-troubleshooting">Troubleshooting</a></li>
+<li><a href="#12-document-control">Document control</a></li>
+</ol>
+<hr />
+<h2>1. What KRA requires</h2>
+<p>Kenya Revenue Authority (KRA) requires integrator applicants to submit a <strong>read-only optical disk (CD or DVD)</strong> <strong>prior to certification</strong> of the Trader Invoicing System (TIS) integration.</p>
+<p>The disc must contain:</p>
+<table><thead><tr>
+<th>#</th>
+<th>Content</th>
+</tr></thead><tbody>
+<tr>
+<td>1</td>
+<td><strong>All files that make up the TIS integration software</strong></td>
+</tr>
+<tr>
+<td>2</td>
+<td><strong>All PDF documents needed during the certification process</strong></td>
+</tr>
+</tbody></table>
+<p>This is a <strong>physical media</strong> requirement. A GitHub link, email attachment, or cloud folder is <strong>not</strong> a substitute unless KRA explicitly accepts an alternative (always confirm with the eTIMS certification unit).</p>
+<hr />
+<h2>2. When to submit the disc</h2>
+<p>Submit the optical disk <strong>before</strong> KRA runs your formal TIS certification or sandbox test cycle.</p>
+<table><thead><tr>
+<th>Phase</th>
+<th>Action</th>
+</tr></thead><tbody>
+<tr>
+<td><strong>Now (application stage)</strong></td>
+<td>Prepare disc content, burn read-only CD/DVD</td>
+</tr>
+<tr>
+<td><strong>With your application</strong></td>
+<td>Deliver disc + cover letter to KRA</td>
+</tr>
+<tr>
+<td><strong>After KRA accepts application</strong></td>
+<td>Receive sandbox credentials</td>
+</tr>
+<tr>
+<td><strong>Sandbox testing</strong></td>
+<td>Execute certification test plan (separate document)</td>
+</tr>
+<tr>
+<td><strong>Certification decision</strong></td>
+<td>Production cutover only after KRA approval</td>
+</tr>
+</tbody></table>
+<p><strong>Rule of thumb:</strong> If KRA has not yet certified your TIS integration, and you are applying as a third-party integrator, the optical disk should be submitted <strong>with or immediately after</strong> your sandbox access application — <strong>not after</strong> certification is complete.</p>
+<hr />
+<h2>3. What must be on the disc</h2>
+<h3>3.1 TIS integration software (<code>01-SOFTWARE/</code>)</h3>
+<p>All source files that implement UjenziXform’s KRA eTIMS integration, including:</p>
+<table><thead><tr>
+<th>Component</th>
+<th>Description</th>
+</tr></thead><tbody>
+<tr>
+<td><code>src/lib/etims/</code></td>
+<td>Core TIS library (PO mapping, OSCU init, audit)</td>
+</tr>
+<tr>
+<td><code>src/components/admin/tis-integrator/</code></td>
+<td>Admin TIS Integrator Hub</td>
+</tr>
+<tr>
+<td><code>src/components/etims/</code></td>
+<td>Fiscal receipt and QR UI</td>
+</tr>
+<tr>
+<td><code>src/components/admin/Etims*.tsx</code></td>
+<td>Admin test and PO submit panels</td>
+</tr>
+<tr>
+<td><code>src/components/supplier/SupplierEtimsSettingsPanel.tsx</code></td>
+<td>Supplier KRA settings</td>
+</tr>
+<tr>
+<td><code>supabase/functions/etims-proxy/</code></td>
+<td>Secure KRA API gateway</td>
+</tr>
+<tr>
+<td><code>supabase/functions/_shared/etimsPathAllowlist.ts</code></td>
+<td>REST path allowlist</td>
+</tr>
+<tr>
+<td><code>supabase/migrations/<em>etims</em></code> / <code><em>tis</em></code></td>
+<td>Database schema for TIS</td>
+</tr>
+</tbody></table>
+<p>A machine-readable list of every file is in <strong><code>SOFTWARE_MANIFEST.txt</code></strong> at the disc root.</p>
+<h3>3.2 Certification PDFs (<code>02-PDF-DOCUMENTS/</code>)</h3>
+<table><thead><tr>
+<th>File</th>
+<th>Purpose</th>
+</tr></thead><tbody>
+<tr>
+<td><code>01_KRA_TIS_COVER_LETTER.pdf</code></td>
+<td>Sandbox access request</td>
+</tr>
+<tr>
+<td><code>02_EXECUTIVE_SUMMARY.pdf</code></td>
+<td>One-page overview</td>
+</tr>
+<tr>
+<td><code>03_TIS_ETIMS_INTEGRATION_ARCHITECTURE.pdf</code></td>
+<td>Full integration architecture</td>
+</tr>
+<tr>
+<td><code>04_APPENDIX_SAMPLE_SALESREQ.pdf</code></td>
+<td>Sample POST /invoices payload</td>
+</tr>
+<tr>
+<td><code>05_USER_OPERATOR_MANUAL.pdf</code></td>
+<td>Operator procedures</td>
+</tr>
+<tr>
+<td><code>06_INSTALLATION_DEPLOYMENT_GUIDE.pdf</code></td>
+<td>Deployment and configuration</td>
+</tr>
+<tr>
+<td><code>07_CERTIFICATION_TEST_PLAN.pdf</code></td>
+<td>Sandbox test cases</td>
+</tr>
+<tr>
+<td><code>08_OPTICAL_DISK_SUBMISSION_INSTRUCTIONS.pdf</code></td>
+<td>This guide</td>
+</tr>
+</tbody></table>
+<h3>3.3 Optional (<code>03-SOURCE-DOCUMENTS/</code>)</h3>
+<p>Markdown and HTML originals from the architecture pack may be included for KRA reviewer reference. PDFs in <code>02-PDF-DOCUMENTS/</code> remain the primary certification documents.</p>
+<h3>3.4 What must NOT be on the disc</h3>
+<table><thead><tr>
+<th>Exclude</th>
+<th>Reason</th>
+</tr></thead><tbody>
+<tr>
+<td><code>.env</code> / <code>.env.local</code></td>
+<td>May contain secrets</td>
+</tr>
+<tr>
+<td>Live KRA or Supabase passwords</td>
+<td>Security</td>
+</tr>
+<tr>
+<td>Full platform codebase unrelated to TIS</td>
+<td>Out of scope</td>
+</tr>
+<tr>
+<td>Paystack, M-Pesa, or other non-eTIMS secrets</td>
+<td>Not part of TIS submission</td>
+</tr>
+</tbody></table>
+<hr />
+<h2>4. Folder structure on the disc</h2>
+<p>When the disc is inserted, the <strong>root</strong> should show:</p>
+<pre><code>README.txt
+SOFTWARE_MANIFEST.txt
+01-SOFTWARE/
+02-PDF-DOCUMENTS/
+03-SOURCE-DOCUMENTS/     (optional)</code></pre>
+<p><strong>Important:</strong> Burn the <strong>contents</strong> of the prepared folder — not the parent directory name alone.</p>
+<p><strong>Prepared folder on your computer (before burn):</strong></p>
+<pre><code>D:\UjenziXform\downloads\TIS-OPTICAL-DISK\</code></pre>
+<hr />
+<h2>5. Step 1 — Prepare content on your computer</h2>
+<p>Open <strong>PowerShell</strong> at the UjenziXform repository root (<code>D:\UjenziXform</code>).</p>
+<h3>5.1 One-command prepare (recommended)</h3>
+<pre><code class="language-powershell">powershell -File scripts/prepare-tis-optical-disk.ps1</code></pre>
+<p>This script:</p>
+<ol>
+<li>Builds <code>01-SOFTWARE/</code> and <code>SOFTWARE_MANIFEST.txt</code></li>
+<li>Generates all PDFs in <code>02-PDF-DOCUMENTS/</code></li>
+<li>Copies optional source documents to <code>03-SOURCE-DOCUMENTS/</code></li>
+<li>Prints a pre-burn checklist</li>
+</ol>
+<h3>5.2 Manual prepare (alternative)</h3>
+<p>Run each step separately:</p>
+<pre><code class="language-powershell"># Software bundle
+powershell -File scripts/build-tis-optical-disk.ps1
+
+# All certification PDFs
+powershell -File scripts/generate-tis-cert-pdfs.ps1
+
+# Optional: source Markdown pack
+Copy-Item &quot;downloads\TIS-ETIMS-Architecture&quot; `
+  &quot;downloads\TIS-OPTICAL-DISK\03-SOURCE-DOCUMENTS&quot; -Recurse -Force</code></pre>
+<h3>5.3 Complete cover letter before final PDF</h3>
+<p>Edit bracketed fields in:</p>
+<ul>
+<li><code>downloads/TIS-ETIMS-Architecture/KRA_TIS_COVER_LETTER.md</code> (or <code>.html</code>)</li>
+</ul>
+<table><thead><tr>
+<th>Field</th>
+<th>Example</th>
+</tr></thead><tbody>
+<tr>
+<td>Applicant KRA PIN</td>
+<td>Your registered PIN</td>
+</tr>
+<tr>
+<td>eTIMS portal reference no.</td>
+<td>From etims.kra.go.ke application</td>
+</tr>
+<tr>
+<td>Primary contact person</td>
+<td>Name and title</td>
+</tr>
+<tr>
+<td>Contact email / telephone</td>
+<td>Support contact</td>
+</tr>
+<tr>
+<td>Physical / registered address</td>
+<td>Company address</td>
+</tr>
+<tr>
+<td>Authorised signatory</td>
+<td>Name, title, date</td>
+</tr>
+</tbody></table>
+<p>Then regenerate PDFs:</p>
+<pre><code class="language-powershell">powershell -File scripts/generate-tis-cert-pdfs.ps1</code></pre>
+<hr />
+<h2>6. Step 2 — Pre-burn verification checklist</h2>
+<p>Complete every item before burning:</p>
+<table><thead><tr>
+<th>#</th>
+<th>Check</th>
+<th>Pass?</th>
+</tr></thead><tbody>
+<tr>
+<td>1</td>
+<td><code>01-SOFTWARE/</code> exists and contains <code>src/lib/etims/</code> and <code>supabase/functions/etims-proxy/</code></td>
+<td>☐</td>
+</tr>
+<tr>
+<td>2</td>
+<td><code>SOFTWARE_MANIFEST.txt</code> lists all files (50+ TIS files)</td>
+<td>☐</td>
+</tr>
+<tr>
+<td>3</td>
+<td>All <strong>8 PDFs</strong> present in <code>02-PDF-DOCUMENTS/</code></td>
+<td>☐</td>
+</tr>
+<tr>
+<td>4</td>
+<td>Cover letter PDF has <strong>no bracketed placeholders</strong></td>
+<td>☐</td>
+</tr>
+<tr>
+<td>5</td>
+<td>No <code>.env</code> files anywhere on the disc folder</td>
+<td>☐</td>
+</tr>
+<tr>
+<td>6</td>
+<td>No API keys or passwords in any file (spot-check manifest)</td>
+<td>☐</td>
+</tr>
+<tr>
+<td>7</td>
+<td><code>README.txt</code> at disc root describes contents</td>
+<td>☐</td>
+</tr>
+<tr>
+<td>8</td>
+<td>Duplicate backup copy of folder saved elsewhere</td>
+<td>☐</td>
+</tr>
+</tbody></table>
+<p><strong>Quick file count:</strong></p>
+<pre><code class="language-powershell">(Get-ChildItem &quot;downloads\TIS-OPTICAL-DISK\02-PDF-DOCUMENTS\*.pdf&quot;).Count
+# Expected: 8</code></pre>
+<hr />
+<h2>7. Step 3 — Burn a read-only CD or DVD</h2>
+<h3>7.1 Media choice</h3>
+<table><thead><tr>
+<th>Media</th>
+<th>Recommendation</th>
+</tr></thead><tbody>
+<tr>
+<td><strong>CD-R</strong></td>
+<td>Sufficient (~2 MB software + ~2 MB PDFs)</td>
+</tr>
+<tr>
+<td><strong>DVD-R</strong></td>
+<td>Also fine; use if that is what you have</td>
+</tr>
+<tr>
+<td><strong>CD-RW / DVD-RW</strong></td>
+<td>Avoid if possible — finalize as read-only is harder</td>
+</tr>
+<tr>
+<td><strong>USB stick</strong></td>
+<td>Only if KRA explicitly accepts it</td>
+</tr>
+</tbody></table>
+<h3>7.2 Option A — Windows File Explorer (simplest)</h3>
+<ol>
+<li>Insert blank <strong>CD-R</strong> or <strong>DVD-R</strong>.</li>
+<li>Open <code>D:\UjenziXform\downloads\TIS-OPTICAL-DISK\</code>.</li>
+<li>Select <strong>all items</strong> inside (not the parent folder):</li>
+</ol>
+<p>   - <code>README.txt</code>    - <code>SOFTWARE_MANIFEST.txt</code>    - <code>01-SOFTWARE</code>    - <code>02-PDF-DOCUMENTS</code>    - <code>03-SOURCE-DOCUMENTS</code> (if present)</p>
+<ol>
+<li>Right-click → <strong>Send to</strong> → your <strong>DVD RW Drive (D:)</strong> or similar.</li>
+<li>Choose <strong>With a CD/DVD player</strong> (mastered) if Windows asks — this finalizes as read-only.</li>
+<li>Click <strong>Burn to disc</strong> and wait for completion.</li>
+<li><strong>Eject and re-insert</strong> the disc.</li>
+<li>Confirm you can <strong>read</strong> files but <strong>cannot delete or modify</strong> anything on the disc.</li>
+</ol>
+<h3>7.3 Option B — ISO then burn (ImgBurn / CDBurnerXP)</h3>
+<ol>
+<li>Create an ISO image from the <code>TIS-OPTICAL-DISK</code> folder contents.</li>
+<li>Burn with <strong>Finalize disc</strong> / <strong>Disc at once</strong> enabled.</li>
+<li>Verify read-only after burn.</li>
+</ol>
+<h3>7.4 Option C — IT shop / duplication service</h3>
+<p>Provide the service with:</p>
+<ul>
+<li>Folder: <code>D:\UjenziXform\downloads\TIS-OPTICAL-DISK\</code></li>
+<li>Instruction: <strong>Data disc, finalized read-only, no multi-session</strong></li>
+<li>Request <strong>two copies</strong> (one for KRA, one for your records)</li>
+</ul>
+<h3>7.5 After burn — verify on a second PC if possible</h3>
+<p>Open the disc on another computer and confirm:</p>
+<ul>
+<li>All folders open correctly</li>
+<li>PDFs open in a PDF reader</li>
+<li>Software files are readable text/source (not corrupted)</li>
+</ul>
+<hr />
+<h2>8. Step 4 — Label the disc</h2>
+<p>Apply a handwritten or printed label on the disc surface or case:</p>
+<pre><code>UjenziXform Trader Invoicing System (TIS) v1.0.0
+UjenziXform Solution
+Barngetuny Plaza, Ronald Ngala St, Eldoret
+P. O. Box 4146 - 30100 Eldoret
+Reference: UJX-TIS-KRA-ARCH-2026-001
+Submission date: [DD Month YYYY]
+KRA eTIMS TIS Certification — Read Only</code></pre>
+<p>Include the same reference on any <strong>disc sleeve</strong> or <strong>courier envelope</strong>.</p>
+<hr />
+<h2>9. Step 5 — Submit to KRA</h2>
+<h3>9.1 What to send together</h3>
+<table><thead><tr>
+<th>Item</th>
+<th>Format</th>
+</tr></thead><tbody>
+<tr>
+<td>Read-only optical disc</td>
+<td>CD or DVD (this guide)</td>
+</tr>
+<tr>
+<td>Cover letter</td>
+<td>Printed copy matching <code>01_KRA_TIS_COVER_LETTER.pdf</code></td>
+</tr>
+<tr>
+<td>Company registration docs</td>
+<td>As KRA requests (often separate from disc)</td>
+</tr>
+</tbody></table>
+<h3>9.2 Where and how to deliver</h3>
+<p>Confirm the current delivery method with KRA:</p>
+<table><thead><tr>
+<th>Channel</th>
+<th>Notes</th>
+</tr></thead><tbody>
+<tr>
+<td><strong>eTIMS portal</strong> (etims.kra.go.ke)</td>
+<td>Upload if integrator application allows attachments</td>
+</tr>
+<tr>
+<td><strong>Physical delivery</strong></td>
+<td>Times Tower, Haile Selassie Avenue, Nairobi (as per cover letter)</td>
+</tr>
+<tr>
+<td><strong>Courier</strong></td>
+<td>If KRA certification unit provides a mailing address</td>
+</tr>
+</tbody></table>
+<p><strong>Ask KRA explicitly:</strong> <em>“Where should we deliver the read-only optical disk for third-party TIS integrator certification?”</em></p>
+<h3>9.3 What to record for your files</h3>
+<table><thead><tr>
+<th>Record</th>
+<th>Why</th>
+</tr></thead><tbody>
+<tr>
+<td>Date of submission</td>
+<td>Audit trail</td>
+</tr>
+<tr>
+<td>KRA receipt / reference number</td>
+<td>Proof of delivery</td>
+</tr>
+<tr>
+<td>Name of KRA officer (if in person)</td>
+<td>Follow-up contact</td>
+</tr>
+<tr>
+<td>Copy of disc burned</td>
+<td>Backup if disc is damaged in transit</td>
+</tr>
+</tbody></table>
+<hr />
+<h2>10. Certification timeline</h2>
+<pre><code>Prepare disc content
+       ↓
+Burn read-only CD/DVD
+       ↓
+Submit disc + cover letter to KRA   ← optical disk requirement fulfilled here
+       ↓
+KRA reviews application
+       ↓
+Sandbox credentials assigned
+       ↓
+Execute certification test plan (doc 07)
+       ↓
+Submit test results to KRA
+       ↓
+KRA certification decision
+       ↓
+Production eTIMS cutover (after approval only)</code></pre>
+<p>The optical disk satisfies KRA’s <strong>pre-certification software and documentation</strong> requirement at the <strong>Submit disc + cover letter</strong> stage.</p>
+<hr />
+<h2>11. Troubleshooting</h2>
+<table><thead><tr>
+<th>Problem</th>
+<th>Solution</th>
+</tr></thead><tbody>
+<tr>
+<td>PDF script fails</td>
+<td>Ensure Microsoft Edge is installed; run from repo root</td>
+</tr>
+<tr>
+<td>Software script fails</td>
+<td>Run PowerShell as normal user; check <code>scripts/build-tis-optical-disk.ps1</code> path</td>
+</tr>
+<tr>
+<td>Disc is rewritable after burn</td>
+<td>Use CD-R/DVD-R; choose “finalize” / mastered mode; reburn</td>
+</tr>
+<tr>
+<td>Files missing on burnt disc</td>
+<td>Burn <strong>contents</strong> of <code>TIS-OPTICAL-DISK\</code>, not an empty parent folder</td>
+</tr>
+<tr>
+<td>KRA rejects USB instead of CD</td>
+<td>Obtain blank CD-R; confirm media type with KRA before resubmitting</td>
+</tr>
+<tr>
+<td>Cover letter still has <code>[brackets]</code></td>
+<td>Edit source MD/HTML; regenerate PDFs; re-burn disc</td>
+</tr>
+<tr>
+<td>Manifest count wrong</td>
+<td>Re-run <code>build-tis-optical-disk.ps1</code> after code changes</td>
+</tr>
+</tbody></table>
+<hr />
+<h2>12. Document control</h2>
+<table><thead><tr>
+<th>Version</th>
+<th>Date</th>
+<th>Changes</th>
+</tr></thead><tbody>
+<tr>
+<td>1.0</td>
+<td>2026-06-03</td>
+<td>Initial optical disk submission instructions</td>
+</tr>
+</tbody></table>
+<p><strong>Related documents:</strong></p>
+<table><thead><tr>
+<th>Document</th>
+<th>Location</th>
+</tr></thead><tbody>
+<tr>
+<td>Gap checklist</td>
+<td><code>OPTICAL_DISK_SUBMISSION_GUIDE.md</code></td>
+</tr>
+<tr>
+<td>Cover letter</td>
+<td><code>KRA_TIS_COVER_LETTER.pdf</code></td>
+</tr>
+<tr>
+<td>Architecture</td>
+<td><code>TIS_ETIMS_INTEGRATION_ARCHITECTURE.pdf</code></td>
+</tr>
+<tr>
+<td>Test plan</td>
+<td><code>CERTIFICATION_TEST_PLAN.pdf</code></td>
+</tr>
+</tbody></table>
+<p><strong>Repository scripts:</strong></p>
+<table><thead><tr>
+<th>Script</th>
+<th>Purpose</th>
+</tr></thead><tbody>
+<tr>
+<td><code>scripts/prepare-tis-optical-disk.ps1</code></td>
+<td>Full prepare (software + PDFs + optional sources)</td>
+</tr>
+<tr>
+<td><code>scripts/build-tis-optical-disk.ps1</code></td>
+<td>Software bundle only</td>
+</tr>
+<tr>
+<td><code>scripts/generate-tis-cert-pdfs.ps1</code></td>
+<td>PDF generation only</td>
+</tr>
+</tbody></table>
+<p><strong>Prepared folder (before burn):</strong> <code>D:\UjenziXform\downloads\TIS-OPTICAL-DISK\</code></p>
+</body>
+</html>

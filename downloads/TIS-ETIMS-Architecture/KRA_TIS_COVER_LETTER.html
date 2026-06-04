@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Cover Letter — KRA eTIMS Sandbox Application — UjenziXform</title>
+  <style>
+    @page { size: A4; margin: 22mm 20mm 24mm 20mm; }
+    * { box-sizing: border-box; }
+    body {
+      font-family: "Times New Roman", Times, Georgia, serif;
+      font-size: 12pt;
+      line-height: 1.5;
+      color: #111;
+      max-width: 7.2in;
+      margin: 0 auto;
+      padding: 0.15in 0;
+    }
+    .hint {
+      font-family: "Segoe UI", Arial, sans-serif;
+      font-size: 9.5pt;
+      background: #eff6ff;
+      border: 1px solid #93c5fd;
+      padding: 0.55rem 0.75rem;
+      margin-bottom: 1rem;
+      line-height: 1.45;
+    }
+    .print-btn {
+      font-family: "Segoe UI", Arial, sans-serif;
+      font-size: 10pt;
+      margin-top: 0.45rem;
+      padding: 0.35rem 0.75rem;
+      cursor: pointer;
+      background: #1e40af;
+      color: #fff;
+      border: none;
+      border-radius: 4px;
+    }
+    .print-btn:hover { background: #1d4ed8; }
+    .letterhead {
+      border-bottom: 2px solid #111;
+      padding-bottom: 0.55rem;
+      margin-bottom: 1.1rem;
+    }
+    .letterhead-org {
+      font-size: 13pt;
+      font-weight: bold;
+      letter-spacing: 0.02em;
+    }
+    .letterhead-sub {
+      font-size: 10.5pt;
+      color: #333;
+      margin-top: 0.15rem;
+    }
+    .meta-row-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 1.25rem;
+      font-size: 11pt;
+    }
+    .meta-row-table td {
+      vertical-align: top;
+      padding: 0;
+    }
+    .meta-to-cell { width: 55%; padding-right: 1rem; }
+    .meta-right-cell {
+      width: 45%;
+      font-size: 11pt;
+      line-height: 1.5;
+      vertical-align: top;
+    }
+    .meta-right-line {
+      margin: 0 0 0.4rem;
+      text-align: right;
+      white-space: nowrap;
+    }
+    .meta-right-line:last-child { margin-bottom: 0; }
+    .label {
+      font-size: 9pt;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: #555;
+      margin: 0 0 0.25rem;
+    }
+    .address { margin: 0; text-align: left; }
+    .re-block {
+      margin: 1.1rem 0 1rem;
+      padding: 0.55rem 0 0.55rem 0.75rem;
+      border-left: 3px solid #111;
+    }
+    .re-block p { margin: 0.15rem 0; }
+    p { margin: 0 0 0.65rem; text-align: justify; }
+    ol, ul { margin: 0.35rem 0 0.75rem; padding-left: 1.2rem; }
+    li { margin: 0.2rem 0; }
+    .details {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 0.75rem 0 1rem;
+      font-size: 11pt;
+    }
+    .details td {
+      padding: 0.28rem 0;
+      vertical-align: top;
+      border-bottom: 1px solid #e5e7eb;
+    }
+    .details td.field-cell { padding: 0.35rem 0; }
+    .fill-input,
+    .fill-textarea {
+      width: 100%;
+      font-family: inherit;
+      font-size: 11pt;
+      line-height: 1.35;
+      color: #111;
+      border: none;
+      border-bottom: 1px solid #94a3b8;
+      background: #f8fafc;
+      padding: 0.2rem 0.15rem;
+      margin: 0;
+    }
+    .fill-input:focus,
+    .fill-textarea:focus {
+      outline: none;
+      border-bottom-color: #111;
+      background: #fff;
+    }
+    .fill-textarea { min-height: 2.6rem; resize: vertical; }
+    .fill-input.inline-date {
+      width: auto;
+      min-width: 8rem;
+      display: inline-block;
+      text-align: right;
+    }
+    .sig-input {
+      width: 3.25in;
+      max-width: 100%;
+      font-family: inherit;
+      font-size: 11pt;
+      border: none;
+      border-bottom: 1px solid #111;
+      background: #f8fafc;
+      padding: 0.15rem 0;
+      margin: 0.35rem 0 0;
+    }
+    .details td:first-child {
+      width: 42%;
+      padding-right: 0.75rem;
+      color: #333;
+    }
+    .section-title {
+      font-size: 11pt;
+      font-weight: bold;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin: 1rem 0 0.4rem;
+      page-break-after: avoid;
+    }
+    .keep-together { page-break-inside: avoid; }
+    .enclosed {
+      font-size: 10.5pt;
+      margin: 0.5rem 0 0;
+    }
+    .enclosed td { padding: 0.22rem 0.35rem 0.22rem 0; vertical-align: top; border: none; }
+    .enclosed td:first-child { width: 1.5rem; font-weight: bold; }
+    .closing { margin-top: 1.25rem; }
+    .sig-block { margin-top: 2rem; page-break-inside: avoid; }
+    .sig-line {
+      border-bottom: 1px solid #111;
+      width: 3.25in;
+      height: 1.35rem;
+      margin: 1.75rem 0 0.35rem;
+    }
+    .sig-meta { font-size: 11pt; margin: 0.15rem 0; }
+    @media print {
+      .hint, .no-print { display: none !important; }
+      body { padding: 0; }
+      .fill-input, .fill-textarea, .sig-input {
+        border: none;
+        border-bottom: 1px solid #111;
+        background: transparent;
+      }
+    }
+  </style>
+</head>
+<body>
+
+<div class="hint no-print">
+  <strong>How to complete this cover letter</strong><br />
+  1. Type into each field below (grey underlines).<br />
+  2. Click <strong>Print / Save as PDF</strong> or press Ctrl+P → choose <strong>Save as PDF</strong>.<br />
+  3. Save as <code>01_KRA_TIS_COVER_LETTER.pdf</code> for the optical disk.<br />
+  <button type="button" class="print-btn" onclick="window.print()">Print / Save as PDF</button>
+</div>
+
+<div class="letterhead">
+  <div class="letterhead-org">UjenziXform Solution</div>
+  <div class="letterhead-sub">Barngetuny Plaza Left Wing 3rd Floor Room 10, Ronald Ngala Street, Eldoret<br />P. O. Box 4146 - 30100 Eldoret, Kenya</div>
+  <div class="letterhead-sub">Trader Invoicing System (TIS) — Third-party eTIMS integrator application</div>
+</div>
+
+<table class="meta-row-table" role="presentation">
+    <tr>
+      <td class="meta-to-cell">
+        <div class="label">To</div>
+        <p class="address">
+          The Commissioner General<br />
+          Kenya Revenue Authority<br />
+          Times Tower, Haile Selassie Avenue<br />
+          P.O. Box 48240 – 00100, Nairobi, Kenya<br />
+          <strong>Attention:</strong> eTIMS Third-Party Integrator / OSCU Certification Unit
+        </p>
+      </td>
+      <td class="meta-right-cell" align="right" valign="top">
+        <div class="meta-right-line">Date:&nbsp;<input class="fill-input inline-date" type="text" name="letter_date" value="3 June 2026" aria-label="Letter date" /></div>
+        <div class="meta-right-line">Reference:&nbsp;UJX-TIS-KRA-ARCH-2026-001</div>
+      </td>
+    </tr>
+  </table>
+
+<div class="re-block">
+  <p><strong>RE:</strong> Application for KRA eTIMS Sandbox Access and Submission of Technology Architecture</p>
+  <p><strong>Subject:</strong> UjenziXform Trader Invoicing System (TIS) v1.0.0 — OSCU</p>
+</div>
+
+<p>Dear Sir/Madam,</p>
+
+<p>
+  We write on behalf of <strong>UjenziXform Solution</strong> (platform: <strong>UjenziXform</strong>) to apply for recognition as a
+  <strong>potential third-party eTIMS Trader Invoicing System (TIS) integrator</strong> and to
+  <strong>request access to the KRA eTIMS sandbox</strong> at
+  <strong>https://etims-api-sbx.kra.go.ke</strong>.
+  Enclosed on read-only optical disk are our TIS integration software and certification documents
+  describing how UjenziXform will integrate with KRA eTIMS once sandbox credentials are issued.
+</p>
+
+<div class="section-title">Applicant particulars</div>
+<table class="details">
+  <tr><td>Organisation</td><td>UjenziXform Solution</td></tr>
+  <tr><td>Platform</td><td>UjenziXform</td></tr>
+  <tr><td>TIS product</td><td>UjenziXform Trader Invoicing System (TIS) v1.0.0</td></tr>
+  <tr><td>Solution type</td><td>OSCU (Online Sales Control Unit)</td></tr>
+  <tr><td>Applicant KRA PIN</td><td class="field-cell"><input class="fill-input" type="text" name="kra_pin" placeholder="e.g. P051234567A" aria-label="Applicant KRA PIN" /></td></tr>
+  <tr><td>eTIMS portal reference no.</td><td class="field-cell"><input class="fill-input" type="text" name="etims_ref" placeholder="From etims.kra.go.ke application" aria-label="eTIMS portal reference number" /></td></tr>
+  <tr><td>Contact name</td><td class="field-cell"><input class="fill-input" type="text" name="contact_name" placeholder="Full name" aria-label="Contact name" /></td></tr>
+  <tr><td>Contact title</td><td class="field-cell"><input class="fill-input" type="text" name="contact_title" placeholder="e.g. Director" aria-label="Contact title" /></td></tr>
+  <tr><td>Contact email</td><td class="field-cell"><input class="fill-input" type="email" name="contact_email" placeholder="email@example.com" aria-label="Contact email" /></td></tr>
+  <tr><td>Contact telephone</td><td class="field-cell"><input class="fill-input" type="tel" name="contact_phone" placeholder="+254 7XX XXX XXX" aria-label="Contact telephone" /></td></tr>
+  <tr><td>Registered address</td><td class="field-cell"><textarea class="fill-textarea" name="registered_address" aria-label="Registered address">Barngetuny Plaza Left Wing 3rd Floor Room 10, Ronald Ngala Street, Eldoret. P. O. Box 4146 - 30100 Eldoret</textarea></td></tr>
+  <tr><td>Website</td><td class="field-cell">https://ujenzi-pro.vercel.app/</td></tr>
+</table>
+
+<div class="section-title">About UjenziXform</div>
+<p>
+  <strong>UjenziXform</strong> is a digital marketplace connecting builders and construction material
+  suppliers across Kenya. Suppliers list materials; builders create and accept purchase orders. Our
+  <strong>Trader Invoicing System (TIS)</strong> will fiscalise supplier sales by transmitting invoice
+  data to KRA eTIMS when a qualifying purchase order is submitted, and by presenting the fiscal
+  receipt and verification QR code to buyers.
+</p>
+
+<div class="section-title keep-together">Primary request</div>
+<p>We respectfully request that KRA:</p>
+<ol>
+  <li>Accept our application as a potential third-party TIS integrator under the eTIMS framework;</li>
+  <li>Grant UjenziXform sandbox access to <strong>https://etims-api-sbx.kra.go.ke</strong> for OSCU integration testing;</li>
+  <li>Issue sandbox credentials and any required test device or branch data to UjenziXform Solution;</li>
+  <li>Advise on the next steps in integrator registration and certification following sandbox assignment.</li>
+</ol>
+<p>
+  We have developed TIS application software in preparation — including a secure API gateway
+  (<strong>etims-proxy</strong>), purchase-order invoice mapping, fiscal receipt display, audit logging,
+  and vendor onboarding — and require KRA-assigned sandbox access to complete OSCU initialization,
+  transaction testing, and certification.
+</p>
+
+<div class="keep-together">
+  <div class="section-title">Declaration of current status</div>
+  <p>At the date of this letter:</p>
+  <ul>
+    <li>UjenziXform is an <strong>applicant</strong> for third-party integrator status;</li>
+    <li>We <strong>do not yet</strong> hold KRA-assigned eTIMS sandbox credentials;</li>
+    <li>We <strong>do not</strong> hold KRA integrator certification;</li>
+    <li>TIS is in <strong>development</strong> pending sandbox assignment;</li>
+    <li>Production use of <strong>https://etims-api.kra.go.ke</strong> will occur only after formal KRA approval.</li>
+  </ul>
+</div>
+
+<div class="keep-together">
+  <div class="section-title">Enclosed on read-only optical disk</div>
+  <table class="enclosed">
+    <tr><td>1.</td><td>This cover letter (PDF)</td></tr>
+    <tr><td>2.</td><td>Executive summary</td></tr>
+    <tr><td>3.</td><td>Technology architecture — TIS eTIMS integration (v3.3)</td></tr>
+    <tr><td>4.</td><td>Appendix — sample POST /invoices payload</td></tr>
+    <tr><td>5.</td><td>User / operator manual</td></tr>
+    <tr><td>6.</td><td>Installation and deployment guide</td></tr>
+    <tr><td>7.</td><td>Certification test plan</td></tr>
+    <tr><td>8.</td><td>Optical disk submission instructions</td></tr>
+    <tr><td>9.</td><td><strong>01-SOFTWARE/</strong> — all TIS integration source files (see SOFTWARE_MANIFEST.txt)</td></tr>
+  </table>
+</div>
+
+<div class="section-title">Summary of planned integration</div>
+<p>
+  UjenziXform will provide TIS software and a secure server-side gateway; <strong>supplier taxpayers</strong>
+  on our marketplace remain fiscal issuers, with each invoice carrying the supplier’s KRA PIN as
+  <strong>traderTin</strong>. All calls to KRA eTIMS will pass through <strong>etims-proxy</strong> with
+  credentials stored as server-side secrets only. We will support OSCU initialization, sales invoices
+  (type S), credit notes (type R), fiscal receipts with QR verification, and multi-vendor onboarding.
+</p>
+
+<p class="closing">
+  We remain available for a demonstration of our TIS application, a technical walkthrough, or any
+  supplementary information KRA requires. Thank you for your consideration.
+</p>
+
+<p>Yours faithfully,</p>
+
+<div class="sig-block">
+  <div class="sig-line"></div>
+  <input class="sig-input" type="text" name="signatory_name" placeholder="Authorised signatory name" aria-label="Authorised signatory name" />
+  <input class="sig-input" type="text" name="signatory_title" placeholder="Title — Director / Technical Lead, UjenziXform Solution" aria-label="Signatory title" />
+  <p class="sig-meta" style="margin-top:1rem">Date:&nbsp;<input class="fill-input inline-date" type="text" name="sign_date" placeholder="Date of signing" aria-label="Date of signing" style="min-width:10rem" /></p>
+</div>
+
+</body>
+</html>

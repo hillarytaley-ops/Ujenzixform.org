@@ -1,0 +1,599 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>UjenziXform TIS — Installation &amp; Deployment Guide</title>
+  <style>
+    @page { size: A4; margin: 18mm 16mm; }
+    body {
+      font-family: "Segoe UI", Calibri, Arial, sans-serif;
+      font-size: 10.5pt;
+      line-height: 1.45;
+      max-width: 7.4in;
+      margin: 0 auto;
+      padding: 0.35in 0.2in;
+      color: #111;
+    }
+    .hint {
+      font-size: 9pt;
+      background: #ecfdf5;
+      border: 1px solid #99f6e4;
+      padding: 0.5rem 0.65rem;
+      margin-bottom: 0.85rem;
+    }
+    h1 { font-size: 16pt; margin: 0 0 0.6rem; color: #0f172a; page-break-after: avoid; }
+    h2 { font-size: 12.5pt; margin: 1.1rem 0 0.45rem; color: #1e293b; page-break-after: avoid; border-bottom: 1px solid #e2e8f0; padding-bottom: 0.15rem; }
+    h3 { font-size: 11pt; margin: 0.85rem 0 0.35rem; color: #334155; page-break-after: avoid; }
+    h4 { font-size: 10.5pt; margin: 0.65rem 0 0.25rem; color: #475569; page-break-after: avoid; }
+    p { margin: 0.35rem 0 0.55rem; }
+    ul, ol { margin: 0.35rem 0 0.65rem; padding-left: 1.25rem; }
+    li { margin: 0.15rem 0; }
+    table { width: 100%; border-collapse: collapse; margin: 0.55rem 0 0.85rem; font-size: 9.5pt; page-break-inside: avoid; }
+    th, td { border: 1px solid #cbd5e1; padding: 0.28rem 0.4rem; vertical-align: top; text-align: left; }
+    th { background: #f8fafc; font-weight: 600; }
+    tr:nth-child(even) td { background: #fcfdff; }
+    code, pre code { font-family: Consolas, "Courier New", monospace; font-size: 9pt; }
+    p code, li code, td code, th code { background: #f1f5f9; padding: 0.05rem 0.25rem; border-radius: 3px; }
+    pre {
+      background: #0f172a;
+      color: #e2e8f0;
+      padding: 0.65rem 0.75rem;
+      border-radius: 6px;
+      overflow-x: auto;
+      page-break-inside: avoid;
+      margin: 0.5rem 0 0.75rem;
+    }
+    pre code { background: transparent; color: inherit; padding: 0; }
+    blockquote {
+      margin: 0.5rem 0 0.75rem;
+      padding: 0.45rem 0.75rem;
+      border-left: 3px solid #14b8a6;
+      background: #f0fdfa;
+      color: #134e4a;
+    }
+    hr { border: none; border-top: 1px solid #e2e8f0; margin: 1rem 0; }
+    a { color: #0f766e; word-break: break-all; }
+    @media print {
+      .hint { display: none; }
+      body { padding: 0; }
+      h2 { page-break-before: auto; }
+    }
+  </style>
+</head>
+<body>
+  <div class="hint">UjenziXform TIS certification document — Ctrl+P → Save as PDF if needed.</div>
+  <h1>UjenziXform TIS — Installation &amp; Deployment Guide</h1>
+<p><strong>Document type:</strong> Installation and deployment guide (certification submission)   <strong>Applicant:</strong> UjenziXform Solution   <strong>Product:</strong> UjenziXform Trader Invoicing System (TIS) v1.0.0   <strong>Reference:</strong> UJX-TIS-KRA-ARCH-2026-001   <strong>Document version:</strong> 1.0   <strong>Date:</strong> 3 June 2026  </p>
+<blockquote><p><strong>Status:</strong> Applicant / in development — production eTIMS cutover only after KRA certification.</p></blockquote>
+<hr />
+<h2>Table of contents</h2>
+<ol>
+<li><a href="#1-scope">Scope</a></li>
+<li><a href="#2-system-requirements">System requirements</a></li>
+<li><a href="#3-architecture-overview">Architecture overview</a></li>
+<li><a href="#4-software-components">Software components</a></li>
+<li><a href="#5-development-environment-setup">Development environment setup</a></li>
+<li><a href="#6-database-migrations">Database migrations</a></li>
+<li><a href="#7-supabase-edge-function-deployment">Supabase Edge Function deployment</a></li>
+<li><a href="#8-etims--kra-credential-configuration">eTIMS / KRA credential configuration</a></li>
+<li><a href="#9-frontend-deployment">Frontend deployment</a></li>
+<li><a href="#10-post-deployment-verification">Post-deployment verification</a></li>
+<li><a href="#11-sandbox-vs-production-environments">Sandbox vs production environments</a></li>
+<li><a href="#12-security-checklist">Security checklist</a></li>
+<li><a href="#13-optical-disk-software-bundle">Optical disk software bundle</a></li>
+<li><a href="#14-document-control">Document control</a></li>
+</ol>
+<hr />
+<h2>1. Scope</h2>
+<p>This guide covers installation and deployment of the <strong>UjenziXform Trader Invoicing System (TIS)</strong> — the eTIMS integration layer within the UjenziXform platform.</p>
+<p>It is intended for:</p>
+<ul>
+<li>UjenziXform technical staff deploying sandbox or production environments  </li>
+<li>KRA reviewers verifying how TIS software is installed and configured  </li>
+</ul>
+<p>This guide does <strong>not</strong> cover general UjenziXform marketplace features unrelated to eTIMS (payments, delivery, messaging).</p>
+<hr />
+<h2>2. System requirements</h2>
+<h3>2.1 Runtime stack</h3>
+<table><thead><tr>
+<th>Layer</th>
+<th>Technology</th>
+<th>Minimum version</th>
+</tr></thead><tbody>
+<tr>
+<td>Frontend</td>
+<td>React, TypeScript, Vite</td>
+<td>Node.js 18+</td>
+</tr>
+<tr>
+<td>Backend</td>
+<td>Supabase (PostgreSQL, Auth, RLS)</td>
+<td>Supabase project</td>
+</tr>
+<tr>
+<td>API gateway</td>
+<td>Supabase Edge Functions (Deno)</td>
+<td><code>etims-proxy</code> deployed</td>
+</tr>
+<tr>
+<td>Hosting</td>
+<td>Vercel or equivalent static host</td>
+<td>HTTPS required</td>
+</tr>
+</tbody></table>
+<h3>2.2 External services</h3>
+<table><thead><tr>
+<th>Service</th>
+<th>Purpose</th>
+</tr></thead><tbody>
+<tr>
+<td>KRA eTIMS API</td>
+<td>Fiscal invoice submission (sandbox or production)</td>
+</tr>
+<tr>
+<td>Supabase Dashboard</td>
+<td>Edge secrets, migrations, auth</td>
+</tr>
+</tbody></table>
+<h3>2.3 Operator access</h3>
+<table><thead><tr>
+<th>Role</th>
+<th>Required for</th>
+</tr></thead><tbody>
+<tr>
+<td>Supabase project admin</td>
+<td>Deploy Edge functions, set secrets, run migrations</td>
+</tr>
+<tr>
+<td>Vercel (or host) admin</td>
+<td>Deploy frontend, set public env vars</td>
+</tr>
+<tr>
+<td>eTIMS portal account</td>
+<td>Integrator registration and sandbox credential request</td>
+</tr>
+</tbody></table>
+<hr />
+<h2>3. Architecture overview</h2>
+<pre><code>┌─────────────────────────────────────────────────────────────┐
+│  Browser (React)                                            │
+│  src/lib/etims/*  →  invokeEtimsProxy.ts                    │
+└──────────────────────────┬──────────────────────────────────┘
+                           │ HTTPS + Supabase JWT
+                           ▼
+┌─────────────────────────────────────────────────────────────┐
+│  Supabase Edge: etims-proxy                                 │
+│  JWT auth · role check · path allowlist · HTTP Basic auth   │
+└──────────────────────────┬──────────────────────────────────┘
+                           │ HTTPS
+                           ▼
+┌─────────────────────────────────────────────────────────────┐
+│  KRA eTIMS API                                              │
+│  Sandbox: https://etims-api-sbx.kra.go.ke                    │
+│  Production: https://etims-api.kra.go.ke (post-certification)│
+└─────────────────────────────────────────────────────────────┘</code></pre>
+<p>KRA credentials (<code>ETIMS_BASIC_USER</code>, <code>ETIMS_BASIC_PASSWORD</code>) exist <strong>only</strong> in Supabase Edge secrets. They are never committed to git, never stored in PostgreSQL, and never exposed to the browser.</p>
+<hr />
+<h2>4. Software components</h2>
+<h3>4.1 TIS integration source (included on optical disk)</h3>
+<table><thead><tr>
+<th>Path</th>
+<th>Description</th>
+</tr></thead><tbody>
+<tr>
+<td><code>src/lib/etims/</code></td>
+<td>Core TIS library (PO mapping, OSCU init, audit)</td>
+</tr>
+<tr>
+<td><code>src/components/admin/tis-integrator/</code></td>
+<td>Admin TIS Integrator Hub</td>
+</tr>
+<tr>
+<td><code>src/components/etims/</code></td>
+<td>Fiscal receipt UI</td>
+</tr>
+<tr>
+<td><code>src/components/admin/Etims*.tsx</code></td>
+<td>Admin test and PO submit panels</td>
+</tr>
+<tr>
+<td><code>src/components/supplier/SupplierEtimsSettingsPanel.tsx</code></td>
+<td>Supplier KRA settings</td>
+</tr>
+<tr>
+<td><code>supabase/functions/etims-proxy/</code></td>
+<td>Secure KRA API gateway</td>
+</tr>
+<tr>
+<td><code>supabase/functions/_shared/etimsPathAllowlist.ts</code></td>
+<td>SSRF path allowlist</td>
+</tr>
+<tr>
+<td><code>supabase/migrations/<em>etims</em></code> / <code><em>tis</em></code></td>
+<td>Database schema for TIS</td>
+</tr>
+</tbody></table>
+<h3>4.2 Key entry points</h3>
+<table><thead><tr>
+<th>Function</th>
+<th>File</th>
+</tr></thead><tbody>
+<tr>
+<td>Build SalesReq from PO</td>
+<td><code>src/lib/etims/purchaseOrderEtims.ts</code></td>
+</tr>
+<tr>
+<td>Submit PO to eTIMS</td>
+<td><code>submitEtimsInvoiceForPurchaseOrder()</code></td>
+</tr>
+<tr>
+<td>OSCU initialization</td>
+<td><code>src/lib/etims/tisOscuInitialization.ts</code></td>
+</tr>
+<tr>
+<td>Audit logging</td>
+<td><code>src/lib/etims/logTisSubmission.ts</code></td>
+</tr>
+<tr>
+<td>Proxy invocation</td>
+<td><code>src/lib/etims/invokeEtimsProxy.ts</code></td>
+</tr>
+</tbody></table>
+<hr />
+<h2>5. Development environment setup</h2>
+<h3>5.1 Clone and install</h3>
+<pre><code class="language-bash">git clone &lt;repository-url&gt;
+cd UjenziXform
+npm install</code></pre>
+<h3>5.2 Environment file</h3>
+<p>Copy the template and configure public variables only:</p>
+<pre><code class="language-bash">cp env.local.template .env.local</code></pre>
+<table><thead><tr>
+<th>Variable</th>
+<th>Required</th>
+<th>Notes</th>
+</tr></thead><tbody>
+<tr>
+<td><code>VITE_SUPABASE_URL</code></td>
+<td>Yes</td>
+<td>Supabase project URL</td>
+</tr>
+<tr>
+<td><code>VITE_SUPABASE_ANON_KEY</code></td>
+<td>Yes</td>
+<td>Public anon key — safe for browser</td>
+</tr>
+</tbody></table>
+<p><strong>Do not</strong> put <code>ETIMS_BASIC_USER</code> or <code>ETIMS_BASIC_PASSWORD</code> in <code>.env.local</code>. These belong in Supabase Edge secrets only.</p>
+<h3>5.3 Start development server</h3>
+<pre><code class="language-bash">npm run dev</code></pre>
+<p>Default Vite dev server: <code>http://localhost:5173</code></p>
+<h3>5.4 Run tests</h3>
+<pre><code class="language-bash">npm run test:run</code></pre>
+<p>TIS-related unit tests include <code>purchaseOrderEtims.test.ts</code>, <code>formatEtimsReceiptForUi.test.ts</code>, and <code>kraPin.test.ts</code>.</p>
+<hr />
+<h2>6. Database migrations</h2>
+<p>TIS requires PostgreSQL tables and RLS policies created by Supabase migrations.</p>
+<h3>6.1 Key migrations</h3>
+<table><thead><tr>
+<th>Migration</th>
+<th>Purpose</th>
+</tr></thead><tbody>
+<tr>
+<td><code>20260516180000_kra_etims_profiles_suppliers_products.sql</code></td>
+<td>Supplier/buyer tax fields, item codes</td>
+</tr>
+<tr>
+<td><code>20260525120000_tis_integrator_platform.sql</code></td>
+<td>Integrator platform metadata, checklist</td>
+</tr>
+<tr>
+<td><code>20260525130000_fix_tis_integrator_rls_roles.sql</code></td>
+<td>RLS for TIS admin tables</td>
+</tr>
+<tr>
+<td><code>20260525140000_tis_onboarding_init_audit.sql</code></td>
+<td>Vendor onboarding, init audit</td>
+</tr>
+<tr>
+<td>PO <code>etims_*</code> column migrations</td>
+<td>Fiscal outcome on purchase orders</td>
+</tr>
+</tbody></table>
+<h3>6.2 Apply migrations</h3>
+<p><strong>Option A — Supabase CLI (linked project):</strong></p>
+<pre><code class="language-bash">supabase db push</code></pre>
+<p><strong>Option B — Supabase Dashboard:</strong></p>
+<ol>
+<li>Open <strong>SQL Editor</strong>.</li>
+<li>Run migration SQL files in chronological order from <code>supabase/migrations/</code>.</li>
+</ol>
+<h3>6.3 Verify tables</h3>
+<p>Confirm these tables exist:</p>
+<ul>
+<li><code>tis_integrator_platform</code></li>
+<li><code>tis_vendor_onboarding</code></li>
+<li><code>tis_submission_log</code></li>
+<li><code>purchase_orders</code> with columns <code>etims_validated_at</code>, <code>etims_response</code>, <code>etims_error</code></li>
+</ul>
+<hr />
+<h2>7. Supabase Edge Function deployment</h2>
+<h3>7.1 Deploy etims-proxy</h3>
+<pre><code class="language-bash">supabase functions deploy etims-proxy</code></pre>
+<h3>7.2 Function behaviour</h3>
+<table><thead><tr>
+<th>Control</th>
+<th>Implementation</th>
+</tr></thead><tbody>
+<tr>
+<td>HTTP method</td>
+<td>POST only (OPTIONS for CORS)</td>
+</tr>
+<tr>
+<td>Authentication</td>
+<td>Valid Supabase JWT required</td>
+</tr>
+<tr>
+<td>Authorization</td>
+<td>Roles: <code>supplier</code>, <code>admin</code>, <code>super_admin</code></td>
+</tr>
+<tr>
+<td>Path validation</td>
+<td>Allowlist in <code>etimsPathAllowlist.ts</code></td>
+</tr>
+<tr>
+<td>Body size limit</td>
+<td>400 KB maximum</td>
+</tr>
+<tr>
+<td>Upstream auth</td>
+<td>HTTP Basic using Edge secrets</td>
+</tr>
+</tbody></table>
+<h3>7.3 Invoke format</h3>
+<pre><code class="language-json">{
+  &quot;method&quot;: &quot;POST&quot;,
+  &quot;path&quot;: &quot;invoices&quot;,
+  &quot;body&quot;: { &quot;... SalesReq JSON ...&quot; }
+}</code></pre>
+<p>The Edge function calls <code>{ETIMS_BASE_URL}/{path}</code> with the configured Basic credentials.</p>
+<hr />
+<h2>8. eTIMS / KRA credential configuration</h2>
+<h3>8.1 Edge secrets (Supabase Dashboard)</h3>
+<p>Navigate to: <strong>Project Settings → Edge Functions → Secrets</strong></p>
+<table><thead><tr>
+<th>Secret</th>
+<th>Sandbox value (after KRA assignment)</th>
+<th>Production value</th>
+</tr></thead><tbody>
+<tr>
+<td><code>ETIMS_BASE_URL</code></td>
+<td><code>https://etims-api-sbx.kra.go.ke</code></td>
+<td><code>https://etims-api.kra.go.ke</code></td>
+</tr>
+<tr>
+<td><code>ETIMS_BASIC_USER</code></td>
+<td>Issued by KRA</td>
+<td>Issued by KRA</td>
+</tr>
+<tr>
+<td><code>ETIMS_BASIC_PASSWORD</code></td>
+<td>Issued by KRA</td>
+<td>Issued by KRA</td>
+</tr>
+</tbody></table>
+<p><strong>Rules:</strong></p>
+<ul>
+<li>No trailing slash on <code>ETIMS_BASE_URL</code></li>
+<li>URL must start with <code>http://</code> or <code>https://</code></li>
+<li>Rotate credentials if compromised; never log passwords</li>
+</ul>
+<h3>8.2 Platform certification status</h3>
+<p>In the admin <strong>TIS Integrator Hub → Platform &amp; certification</strong> panel, set:</p>
+<table><thead><tr>
+<th>Field</th>
+<th>Sandbox testing</th>
+</tr></thead><tbody>
+<tr>
+<td>Environment</td>
+<td><code>sandbox_testing</code></td>
+</tr>
+<tr>
+<td>Base URL reference</td>
+<td><code>https://etims-api-sbx.kra.go.ke</code></td>
+</tr>
+</tbody></table>
+<p>Update to <code>certified</code> and production URL only after formal KRA approval.</p>
+<h3>8.3 Verify configuration</h3>
+<ol>
+<li>Sign in as admin.</li>
+<li>Open Admin dashboard → <strong>eTIMS test</strong> tab.</li>
+<li>Run a connection test or invoke a safe GET reference-data path.</li>
+<li>Expected: HTTP 200 from KRA sandbox (not 503 “proxy not configured”).</li>
+</ol>
+<hr />
+<h2>9. Frontend deployment</h2>
+<h3>9.1 Build</h3>
+<pre><code class="language-bash">npm run build</code></pre>
+<p>Output directory: <code>dist/</code></p>
+<h3>9.2 Host environment variables</h3>
+<p>Set on Vercel (or equivalent) for <strong>Production</strong> and <strong>Preview</strong>:</p>
+<table><thead><tr>
+<th>Variable</th>
+<th>Value</th>
+</tr></thead><tbody>
+<tr>
+<td><code>VITE_SUPABASE_URL</code></td>
+<td>Supabase project URL</td>
+</tr>
+<tr>
+<td><code>VITE_SUPABASE_ANON_KEY</code></td>
+<td>Supabase anon key</td>
+</tr>
+</tbody></table>
+<p>Redeploy after changing environment variables.</p>
+<h3>9.3 CORS</h3>
+<p>The <code>etims-proxy</code> Edge function returns CORS headers for browser invocation. Ensure the Supabase project URL matches the deployed frontend’s configured Supabase client.</p>
+<hr />
+<h2>10. Post-deployment verification</h2>
+<p>Run this checklist after each deployment to a new environment:</p>
+<table><thead><tr>
+<th>#</th>
+<th>Check</th>
+<th>Pass criteria</th>
+</tr></thead><tbody>
+<tr>
+<td>1</td>
+<td>Edge secrets set</td>
+<td>No 503 from <code>etims-proxy</code></td>
+</tr>
+<tr>
+<td>2</td>
+<td>Migrations applied</td>
+<td>TIS tables queryable</td>
+</tr>
+<tr>
+<td>3</td>
+<td>Admin TIS Integrator Hub loads</td>
+<td>Four sub-tabs visible</td>
+</tr>
+<tr>
+<td>4</td>
+<td>Supplier KRA settings save</td>
+<td><code>suppliers.kra_pin</code> persisted</td>
+</tr>
+<tr>
+<td>5</td>
+<td>Test PO submit (sandbox)</td>
+<td><code>etims_validated_at</code> set; receipt displays QR</td>
+</tr>
+<tr>
+<td>6</td>
+<td>Audit log</td>
+<td>Row in <code>tis_submission_log</code></td>
+</tr>
+<tr>
+<td>7</td>
+<td>Secrets scan</td>
+<td>No credentials in git or optical disk bundle</td>
+</tr>
+</tbody></table>
+<hr />
+<h2>11. Sandbox vs production environments</h2>
+<table><thead><tr>
+<th>Aspect</th>
+<th>Sandbox</th>
+<th>Production</th>
+</tr></thead><tbody>
+<tr>
+<td>KRA base URL</td>
+<td><code>https://etims-api-sbx.kra.go.ke</code></td>
+<td><code>https://etims-api.kra.go.ke</code></td>
+</tr>
+<tr>
+<td>Credentials</td>
+<td>KRA sandbox Basic auth</td>
+<td>KRA production Basic auth</td>
+</tr>
+<tr>
+<td>Device serials</td>
+<td>KRA sandbox test devices</td>
+<td>Live OSCU devices</td>
+</tr>
+<tr>
+<td>Go-live gate</td>
+<td>Internal test plan complete</td>
+<td><strong>KRA integrator certification</strong></td>
+</tr>
+<tr>
+<td>Platform status field</td>
+<td><code>sandbox_testing</code></td>
+<td><code>certified</code></td>
+</tr>
+</tbody></table>
+<p><strong>Production cutover procedure:</strong></p>
+<ol>
+<li>Obtain KRA production credentials and certification approval.</li>
+<li>Update Edge secrets to production URL and credentials.</li>
+<li>Re-run OSCU initialization for each active vendor device on production.</li>
+<li>Update <code>tis_integrator_platform.certification_status</code> to <code>certified</code>.</li>
+<li>Monitor <code>tis_submission_log</code> for 48 hours post-cutover.</li>
+</ol>
+<hr />
+<h2>12. Security checklist</h2>
+<table><thead><tr>
+<th>#</th>
+<th>Control</th>
+<th>Verification</th>
+</tr></thead><tbody>
+<tr>
+<td>1</td>
+<td>KRA credentials in Edge secrets only</td>
+<td>Grep repo — no passwords in source</td>
+</tr>
+<tr>
+<td>2</td>
+<td>JWT on every proxy call</td>
+<td>Unauthenticated requests return 401</td>
+</tr>
+<tr>
+<td>3</td>
+<td>Role-based access</td>
+<td>Non-supplier/admin roles blocked</td>
+</tr>
+<tr>
+<td>4</td>
+<td>Path allowlist</td>
+<td>Arbitrary URLs rejected by proxy</td>
+</tr>
+<tr>
+<td>5</td>
+<td>RLS on TIS tables</td>
+<td>Non-staff cannot read integrator platform</td>
+</tr>
+<tr>
+<td>6</td>
+<td>Communication keys redacted</td>
+<td>Audit logs mask <code>cmcKey</code></td>
+</tr>
+<tr>
+<td>7</td>
+<td>Optical disk has no <code>.env</code></td>
+<td>Run bundle script; manual review before burn</td>
+</tr>
+</tbody></table>
+<p>Run optional security audit:</p>
+<pre><code class="language-bash">npm run security:test</code></pre>
+<hr />
+<h2>13. Optical disk software bundle</h2>
+<p>Before submitting the read-only CD/DVD to KRA, generate the software folder:</p>
+<pre><code class="language-powershell">powershell -File scripts/build-tis-optical-disk.ps1</code></pre>
+<p><strong>Output:</strong></p>
+<pre><code>downloads/TIS-OPTICAL-DISK/
+├── README.txt
+├── SOFTWARE_MANIFEST.txt
+├── 01-SOFTWARE/          ← TIS source files (50+ files)
+└── 02-PDF-DOCUMENTS/     ← add exported PDFs manually</code></pre>
+<p>Review <code>SOFTWARE_MANIFEST.txt</code> for completeness. Confirm no secrets before burning.</p>
+<hr />
+<h2>14. Document control</h2>
+<table><thead><tr>
+<th>Version</th>
+<th>Date</th>
+<th>Changes</th>
+</tr></thead><tbody>
+<tr>
+<td>1.0</td>
+<td>2026-06-03</td>
+<td>Initial release for KRA optical disk submission</td>
+</tr>
+</tbody></table>
+<p><strong>Related documents:</strong></p>
+<ul>
+<li><code>TIS_ETIMS_INTEGRATION_ARCHITECTURE.md</code> — architecture (§14, §21)  </li>
+<li><code>USER_OPERATOR_MANUAL.md</code> — operator procedures  </li>
+<li><code>CERTIFICATION_TEST_PLAN.md</code> — sandbox test cases  </li>
+<li><code>OPTICAL_DISK_SUBMISSION_GUIDE.md</code> — disk assembly instructions  </li>
+</ul>
+</body>
+</html>

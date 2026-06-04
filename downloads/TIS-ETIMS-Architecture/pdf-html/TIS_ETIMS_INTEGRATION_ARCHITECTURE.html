@@ -1,0 +1,950 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Technology Architecture: UjenziXform TIS Integration with KRA eTIMS</title>
+  <style>
+    @page { size: A4; margin: 18mm 16mm; }
+    body {
+      font-family: "Segoe UI", Calibri, Arial, sans-serif;
+      font-size: 10.5pt;
+      line-height: 1.45;
+      max-width: 7.4in;
+      margin: 0 auto;
+      padding: 0.35in 0.2in;
+      color: #111;
+    }
+    .hint {
+      font-size: 9pt;
+      background: #ecfdf5;
+      border: 1px solid #99f6e4;
+      padding: 0.5rem 0.65rem;
+      margin-bottom: 0.85rem;
+    }
+    h1 { font-size: 16pt; margin: 0 0 0.6rem; color: #0f172a; page-break-after: avoid; }
+    h2 { font-size: 12.5pt; margin: 1.1rem 0 0.45rem; color: #1e293b; page-break-after: avoid; border-bottom: 1px solid #e2e8f0; padding-bottom: 0.15rem; }
+    h3 { font-size: 11pt; margin: 0.85rem 0 0.35rem; color: #334155; page-break-after: avoid; }
+    h4 { font-size: 10.5pt; margin: 0.65rem 0 0.25rem; color: #475569; page-break-after: avoid; }
+    p { margin: 0.35rem 0 0.55rem; }
+    ul, ol { margin: 0.35rem 0 0.65rem; padding-left: 1.25rem; }
+    li { margin: 0.15rem 0; }
+    table { width: 100%; border-collapse: collapse; margin: 0.55rem 0 0.85rem; font-size: 9.5pt; page-break-inside: avoid; }
+    th, td { border: 1px solid #cbd5e1; padding: 0.28rem 0.4rem; vertical-align: top; text-align: left; }
+    th { background: #f8fafc; font-weight: 600; }
+    tr:nth-child(even) td { background: #fcfdff; }
+    code, pre code { font-family: Consolas, "Courier New", monospace; font-size: 9pt; }
+    p code, li code, td code, th code { background: #f1f5f9; padding: 0.05rem 0.25rem; border-radius: 3px; }
+    pre {
+      background: #0f172a;
+      color: #e2e8f0;
+      padding: 0.65rem 0.75rem;
+      border-radius: 6px;
+      overflow-x: auto;
+      page-break-inside: avoid;
+      margin: 0.5rem 0 0.75rem;
+    }
+    pre code { background: transparent; color: inherit; padding: 0; }
+    blockquote {
+      margin: 0.5rem 0 0.75rem;
+      padding: 0.45rem 0.75rem;
+      border-left: 3px solid #14b8a6;
+      background: #f0fdfa;
+      color: #134e4a;
+    }
+    hr { border: none; border-top: 1px solid #e2e8f0; margin: 1rem 0; }
+    a { color: #0f766e; word-break: break-all; }
+    @media print {
+      .hint { display: none; }
+      body { padding: 0; }
+      h2 { page-break-before: auto; }
+    }
+  </style>
+</head>
+<body>
+  <div class="hint">UjenziXform TIS certification document — Ctrl+P → Save as PDF if needed.</div>
+  <h1>Technology Architecture: UjenziXform TIS Integration with KRA eTIMS</h1>
+<p><strong>Prepared for:</strong> Kenya Revenue Authority (KRA) — third-party integrator sandbox application   <strong>Platform:</strong> UjenziXform (construction materials marketplace, Kenya)   <strong>TIS product name:</strong> UjenziXform Trader Invoicing System (TIS)   <strong>Organisation name:</strong> UjenziXform Solution   <strong>TIS product version:</strong> 1.0.0   <strong>Solution type:</strong> OSCU (Online Sales Control Unit) — primary; VSCU initialization paths supported in code   <strong>Sandbox status:</strong> <strong>Not yet assigned</strong> — UjenziXform is applying for KRA eTIMS sandbox access   <strong>Target sandbox URL:</strong> <code>https://etims-api-sbx.kra.go.ke</code>   <strong>Certification status:</strong> <strong>Applicant / in development</strong> — seeking KRA sandbox access and subsequent integrator certification   <strong>Document version:</strong> 3.3   <strong>Date:</strong> 3 June 2026  </p>
+<blockquote><p><strong>One-page overview:</strong> See <a href="EXECUTIVE_SUMMARY.md"><code>EXECUTIVE_SUMMARY.md</code></a> in this pack.   <strong>Sample API payload:</strong> See <a href="appendix/APPENDIX_SAMPLE_SALESREQ.md"><code>appendix/APPENDIX_SAMPLE_SALESREQ.md</code></a>.</p></blockquote>
+<blockquote><p><strong>Scope:</strong> This document describes <strong>how UjenziXform will integrate with KRA eTIMS</strong> once KRA assigns sandbox access to us as a <strong>potential third-party TIS integrator</strong>. It is a forward-looking architecture submission — not a report of live sandbox operations.</p></blockquote>
+<hr />
+<h2>Table of contents</h2>
+<ol>
+<li><a href="#1-purpose-of-this-document">Purpose of this document</a></li>
+<li><a href="#2-what-ujenzixform-is">What UjenziXform is</a></li>
+<li><a href="#3-what-the-tis-does">What the TIS does</a></li>
+<li><a href="#4-integrator-application-status">Integrator application status</a></li>
+<li><a href="#5-parties-and-responsibilities">Parties and responsibilities</a></li>
+<li><a href="#6-integration-architecture">Integration architecture</a></li>
+<li><a href="#7-marketplace-purchase-flow--post-invoices">Marketplace purchase flow → POST /invoices</a></li>
+<li><a href="#8-sales-invoice-flow-kra-sandbox">Sales invoice flow (KRA sandbox)</a></li>
+<li><a href="#9-oscu-initialization-flow">OSCU initialization flow</a></li>
+<li><a href="#10-vendor-supplier-onboarding-flow">Vendor (supplier) onboarding flow</a></li>
+<li><a href="#11-credit-notes">Credit notes</a></li>
+<li><a href="#12-master-data-and-catalog">Master data and catalog</a></li>
+<li><a href="#13-technical-architecture-layers">Technical architecture layers</a></li>
+<li><a href="#14-api-integration-etims-proxy">API integration (etims-proxy)</a></li>
+<li><a href="#15-sales-invoice-payload-mapping">Sales invoice payload mapping</a></li>
+<li><a href="#16-data-stored-in-the-platform">Data stored in the platform</a></li>
+<li><a href="#17-multi-vendor-multi-taxpayer-model">Multi-vendor (multi-taxpayer) model</a></li>
+<li><a href="#18-security-controls">Security controls</a></li>
+<li><a href="#19-fiscal-receipt-shown-to-buyers">Fiscal receipt shown to buyers</a></li>
+<li><a href="#20-audit-errors-and-retry">Audit, errors, and retry</a></li>
+<li><a href="#21-post-sandbox-assignment-plan">Post-sandbox-assignment plan</a></li>
+<li><a href="#22-implementation-readiness-matrix">Implementation readiness matrix</a></li>
+<li><a href="#23-kra-certification-checklist-mapping">KRA certification checklist mapping</a></li>
+<li><a href="#24-source-code-references">Source code references</a></li>
+<li><a href="#25-appendix--sample-salesreq-payload">Appendix — sample SalesReq payload</a></li>
+<li><a href="#26-document-control">Document control</a></li>
+</ol>
+<hr />
+<h2>1. Purpose of this document</h2>
+<p>This document accompanies UjenziXform’s <strong>application for KRA eTIMS sandbox access</strong> as a <strong>potential third-party Trader Invoicing System (TIS) integrator</strong>.</p>
+<p>It explains:</p>
+<ul>
+<li><strong>What UjenziXform is</strong> and why we require eTIMS integration</li>
+<li><strong>How we will connect to KRA eTIMS</strong> after KRA issues sandbox credentials</li>
+<li>The <strong>TIS software we have developed</strong> in preparation (secure proxy, purchase-order mapping, fiscal receipt UI, audit, vendor onboarding)</li>
+</ul>
+<p>We do <strong>not</strong> claim that KRA sandbox access or integrator certification has already been granted.</p>
+<hr />
+<h2>2. What UjenziXform is</h2>
+<p><strong>UjenziXform</strong> is a web platform that connects:</p>
+<table><thead><tr>
+<th>User type</th>
+<th>Role</th>
+</tr></thead><tbody>
+<tr>
+<td><strong>Builders</strong></td>
+<td>Buy construction materials; create and accept purchase orders (POs)</td>
+</tr>
+<tr>
+<td><strong>Suppliers</strong></td>
+<td>Sell materials; hold catalog, pricing, and tax identity</td>
+</tr>
+<tr>
+<td><strong>Administrators</strong></td>
+<td>Operate the marketplace and TIS integrator tools</td>
+</tr>
+</tbody></table>
+<p>Typical transaction: a builder selects materials from a supplier, a <strong>purchase order</strong> is created and accepted, payment may follow (e.g. Paystack), and delivery workflows may apply. <strong>KRA fiscal invoicing will be tied to the purchase order</strong>, not to a separate internal invoice module.</p>
+<p>The platform is designed so that the <strong>eTIMS fiscal response</strong> becomes the tax receipt for supplier sales once KRA sandbox testing and certification are complete.</p>
+<hr />
+<h2>3. What the TIS does</h2>
+<p>The <strong>UjenziXform Trader Invoicing System (TIS)</strong> will:</p>
+<ol>
+<li>Collect <strong>supplier tax identity</strong> (KRA PIN, legal name, branch, device serial where required)</li>
+<li>Map <strong>purchase order line items</strong> to KRA item codes and tax metadata</li>
+<li>Submit <strong>sales invoices</strong> and <strong>credit notes</strong> to <strong>KRA eTIMS</strong> via REST (<code>POST /invoices</code>)</li>
+<li>Store the <strong>KRA/SCU response</strong> (verification URL, control unit reference, JSON snapshot)</li>
+<li>Display a <strong>fiscal receipt with QR code</strong> to buyers and suppliers</li>
+<li>Log submissions for <strong>admin review and retry</strong></li>
+</ol>
+<p>TIS is the <strong>eTIMS compliance layer</strong> embedded in UjenziXform order workflows — not a standalone accounting product.</p>
+<hr />
+<h2>4. Integrator application status</h2>
+<table><thead><tr>
+<th>Item</th>
+<th>Value</th>
+</tr></thead><tbody>
+<tr>
+<td>Applicant name</td>
+<td>UjenziXform Solution</td>
+</tr>
+<tr>
+<td>Platform</td>
+<td>UjenziXform</td>
+</tr>
+<tr>
+<td>Product name</td>
+<td>UjenziXform Trader Invoicing System (TIS)</td>
+</tr>
+<tr>
+<td>Product version</td>
+<td>1.0.0</td>
+</tr>
+<tr>
+<td>Solution type</td>
+<td>OSCU</td>
+</tr>
+<tr>
+<td><strong>KRA eTIMS sandbox</strong></td>
+<td><strong>Not yet assigned — applying for access</strong></td>
+</tr>
+<tr>
+<td>Target sandbox URL</td>
+<td><code>https://etims-api-sbx.kra.go.ke</code></td>
+</tr>
+<tr>
+<td>Target production URL</td>
+<td><code>https://etims-api.kra.go.ke</code> (only after KRA certification)</td>
+</tr>
+<tr>
+<td>Integrator certification</td>
+<td><strong>Not held</strong> — applicant in development</td>
+</tr>
+</tbody></table>
+<p>UjenziXform is registering on the eTIMS portal and submitting this architecture as part of our request to be recognised as a <strong>potential third-party TIS integrator</strong> and to receive <strong>KRA-assigned sandbox credentials</strong>.</p>
+<hr />
+<h2>5. Parties and responsibilities</h2>
+<pre><code class="language-mermaid">flowchart LR
+    KRA[KRA eTIMS / SCU]
+    INT[UjenziXform&lt;br/&gt;TIS integrator applicant]
+    SUP[Supplier&lt;br/&gt;registered taxpayer]
+    BUY[Builder&lt;br/&gt;buyer]
+
+    INT --&gt;|REST via etims-proxy&lt;br/&gt;KRA sandbox| KRA
+    SUP --&gt;|KRA PIN, catalog, branch, device| INT
+    BUY --&gt;|KRA PIN when B2B| INT
+    SUP --&gt;|Fiscal sale| BUY</code></pre>
+<table><thead><tr>
+<th>Party</th>
+<th>Responsibility</th>
+</tr></thead><tbody>
+<tr>
+<td><strong>KRA</strong></td>
+<td>Sandbox access, eTIMS policy, SCU, integrator approval</td>
+</tr>
+<tr>
+<td><strong>UjenziXform</strong></td>
+<td>TIS software, secure API gateway, vendor onboarding, audit</td>
+</tr>
+<tr>
+<td><strong>Supplier</strong></td>
+<td>Accurate KRA PIN, legal name, item codes; issues fiscal sale</td>
+</tr>
+<tr>
+<td><strong>Builder</strong></td>
+<td>Optional KRA PIN; receives fiscal receipt for verification</td>
+</tr>
+</tbody></table>
+<p>Each invoice will carry the <strong>supplier’s KRA PIN</strong> as <code>traderTin</code> — the <strong>vendor taxpayer</strong> is the issuer, not UjenziXform’s PIN alone.</p>
+<hr />
+<h2>6. Integration architecture</h2>
+<p>Once KRA assigns sandbox access, integration will work as follows:</p>
+<pre><code class="language-mermaid">flowchart TB
+    subgraph Users
+        B[Builder]
+        S[Supplier]
+        A[Admin]
+    end
+
+    subgraph UjenziXform[&quot;UjenziXform platform&quot;]
+        UI[React web app]
+        DB[(PostgreSQL)]
+        LIB[src/lib/etims]
+        EDGE[Edge Function etims-proxy]
+    end
+
+    subgraph KRA_side[&quot;KRA eTIMS sandbox&quot;]
+        SBX[etims-api-sbx.kra.go.ke]
+        SCU[OSCU / SCU]
+    end
+
+    B &amp; S &amp; A --&gt; UI
+    UI --&gt; DB
+    UI --&gt; LIB --&gt; EDGE
+    EDGE --&gt;|HTTPS + KRA-issued credentials| SBX --&gt; SCU</code></pre>
+<p>KRA-issued credentials will be stored as <strong>server-side Edge secrets only</strong>. The browser will never see them.</p>
+<hr />
+<h2>7. Marketplace purchase flow → POST /invoices</h2>
+<p><strong>Yes — POST /invoices is part of the current UjenziXform purchase flow.</strong> TIS does not receive orders from outside the platform. A <strong>purchase order (PO)</strong> is the business document; TIS maps that PO to KRA <strong>SalesReq</strong> and submits it via <code>POST /invoices</code>.</p>
+<p>This section describes the <strong>current marketplace design</strong> (how buyers and suppliers work today). Once KRA assigns sandbox access, the same flow will call <strong>KRA eTIMS sandbox</strong> instead of any other endpoint.</p>
+<h3>7.1 End-to-end path (current design)</h3>
+<pre><code class="language-mermaid">flowchart TB
+    subgraph Buyer[&quot;Builder / buyer&quot;]
+        CART[Cart or Buy Now]
+        PROFILE[Profile: KRA PIN, billing name]
+    end
+
+    subgraph Marketplace[&quot;UjenziXform marketplace&quot;]
+        PO[(purchase_orders)]
+        GATE[Supplier tax identity check]
+        ENRICH[Enrich lines with eTIMS item codes]
+        BUILD[buildEtimsInvoiceBodyFromPurchaseOrder]
+        PROXY[etims-proxy]
+    end
+
+    subgraph Supplier[&quot;Supplier taxpayer&quot;]
+        TAX[KRA PIN, legal name, catalog codes]
+    end
+
+    subgraph KRA[&quot;KRA eTIMS — upon sandbox assignment&quot;]
+        POST[POST /invoices]
+    end
+
+    CART --&gt; GATE
+    TAX --&gt; GATE
+    GATE --&gt;|PO created confirmed or accepted| PO
+    PROFILE --&gt; BUILD
+    PO --&gt; ENRICH --&gt; BUILD --&gt; PROXY --&gt; POST
+    POST --&gt;|verification URL, SCU data| PO
+    PO --&gt; RECEIPT[Fiscal receipt + QR to buyer and supplier]</code></pre>
+<h3>7.2 Purchase paths on UjenziXform today</h3>
+<table><thead><tr>
+<th>Path</th>
+<th>What happens</th>
+<th>Leads to POST /invoices?</th>
+</tr></thead><tbody>
+<tr>
+<td><strong>Cart → Buy Now</strong></td>
+<td>Builder selects supplier, passes tax-identity check, PO created with status <code>confirmed</code></td>
+<td><strong>Yes</strong> — automatic TIS submit after PO save (<code>CartSidebar</code>)</td>
+</tr>
+<tr>
+<td><strong>Materials grid → Buy Now</strong></td>
+<td>Direct single-item purchase, PO status <code>confirmed</code></td>
+<td><strong>Yes</strong> — automatic TIS submit (<code>MaterialsGrid</code>)</td>
+</tr>
+<tr>
+<td><strong>Quote workflow</strong></td>
+<td>PO progresses through quote statuses until builder accepts</td>
+<td><strong>When accepted</strong> — PO must leave quote-pending statuses; supplier or admin can submit manually</td>
+</tr>
+<tr>
+<td><strong>Supplier Order Management</strong></td>
+<td>Supplier opens accepted PO</td>
+<td><strong>Yes</strong> — manual “Submit to KRA eTIMS” button</td>
+</tr>
+<tr>
+<td><strong>Admin TIS / eTIMS tools</strong></td>
+<td>Staff retry or test on a PO</td>
+<td><strong>Yes</strong> — manual submit / retry</td>
+</tr>
+</tbody></table>
+<p><strong>Not wired today:</strong> automatic submit on quote accept (function exists in code but has no UI caller).</p>
+<h3>7.3 Gates before POST /invoices</h3>
+<table><thead><tr>
+<th>Gate</th>
+<th>Rule</th>
+</tr></thead><tbody>
+<tr>
+<td><strong>Supplier tax identity</strong></td>
+<td>Valid <code>kra_pin</code> and legal business name (<code>assertSupplierTaxIdentityForCheckout</code>)</td>
+</tr>
+<tr>
+<td><strong>PO status</strong></td>
+<td>Blocked while <code>pending</code>, <code>draft</code>, or any <code>quote_*</code> / <code>quoted</code> status</td>
+</tr>
+<tr>
+<td><strong>Line item codes</strong></td>
+<td>Every PO line must resolve to an <code>etims_item_code</code> (from line JSON or catalog)</td>
+</tr>
+<tr>
+<td><strong>Buyer identity</strong></td>
+<td><code>profiles.kra_pin</code> and billing name used as <code>customerPin</code> / <code>customerName</code> when present</td>
+</tr>
+</tbody></table>
+<p>If a gate fails, TIS <strong>does not call</strong> POST /invoices; the error is stored on <code>purchase_orders.etims_error</code>.</p>
+<h3>7.4 What POST /invoices sends (from the PO)</h3>
+<p>The PO is the single source for the integrator payload:</p>
+<ul>
+<li><strong>Header:</strong> supplier KRA PIN (<code>traderTin</code>), supplier legal name, buyer PIN/name, PO number as <code>traderInvoiceNo</code>, totals, payment type, receipt type <code>S</code></li>
+<li><strong>Lines:</strong> <code>salesItems[]</code> from PO <code>items</code> JSON — quantity, unit price, amount, tax code, item code from catalog enrichment</li>
+</ul>
+<p>Internal draft <code>invoices</code> rows on quote accept were <strong>removed</strong> (May 2026). The <strong>eTIMS fiscal response</strong> on the PO is the intended tax receipt for supplier sales.</p>
+<hr />
+<h2>8. Sales invoice flow (KRA sandbox)</h2>
+<h3>8.1 Steps (upon KRA sandbox assignment)</h3>
+<table><thead><tr>
+<th>Step</th>
+<th>Action</th>
+</tr></thead><tbody>
+<tr>
+<td>1</td>
+<td>Supplier completes KRA PIN and legal business name</td>
+</tr>
+<tr>
+<td>2</td>
+<td>Catalog lines have KRA <strong>item codes</strong></td>
+</tr>
+<tr>
+<td>3</td>
+<td>Builder’s PO reaches <strong>accepted/confirmed</strong> status</td>
+</tr>
+<tr>
+<td>4</td>
+<td>TIS builds <strong>SalesReq</strong> from the PO</td>
+</tr>
+<tr>
+<td>5</td>
+<td><code>etims-proxy</code> → <code>POST /invoices</code> on <strong>KRA sandbox</strong></td>
+</tr>
+<tr>
+<td>6</td>
+<td>KRA returns SCU reference and <strong>verification URL</strong></td>
+</tr>
+<tr>
+<td>7</td>
+<td>Response saved on PO; <strong>fiscal receipt + QR</strong> shown</td>
+</tr>
+<tr>
+<td>8</td>
+<td>Event logged in <code>tis_submission_log</code></td>
+</tr>
+</tbody></table>
+<h3>8.2 Sequence diagram</h3>
+<pre><code class="language-mermaid">sequenceDiagram
+    participant User as Builder / supplier / admin
+    participant App as purchaseOrderEtims.ts
+    participant DB as PostgreSQL
+    participant Proxy as etims-proxy
+    participant KRA as KRA eTIMS sandbox
+
+    User-&gt;&gt;App: Submit invoice for PO
+    App-&gt;&gt;DB: Load PO, supplier, buyer
+    App-&gt;&gt;App: Validate PO status, enrich item codes
+    App-&gt;&gt;App: buildEtimsInvoiceBodyFromPurchaseOrder()
+    App-&gt;&gt;DB: tis_submission_log (pending)
+    App-&gt;&gt;Proxy: POST invoices + SalesReq
+    Proxy-&gt;&gt;Proxy: JWT, role, allowlist
+    Proxy-&gt;&gt;KRA: POST /invoices (KRA credentials)
+    alt Accepted
+        KRA--&gt;&gt;Proxy: verification URL, SCU data
+        App-&gt;&gt;DB: etims_validated_at, etims_response
+        App-&gt;&gt;DB: tis_submission_log (success)
+    else Rejected
+        KRA--&gt;&gt;Proxy: error
+        App-&gt;&gt;DB: etims_error
+        App-&gt;&gt;DB: tis_submission_log (failed)
+    end</code></pre>
+<h3>8.3 Submission triggers (current design)</h3>
+<table><thead><tr>
+<th>Trigger</th>
+<th>TIS design</th>
+</tr></thead><tbody>
+<tr>
+<td>Order confirmation / checkout</td>
+<td>Automatic submit after PO confirmed</td>
+</tr>
+<tr>
+<td>Supplier manual submit</td>
+<td>Supplier dashboard action</td>
+</tr>
+<tr>
+<td>Admin operations</td>
+<td>Admin TIS tools for retry and testing</td>
+</tr>
+</tbody></table>
+<p>PO statuses that <strong>will block</strong> submission until accepted: <code>pending</code>, <code>draft</code>, <code>quote_created</code>, <code>quote_received_by_supplier</code>, <code>quote_responded</code>, <code>quote_revised</code>, <code>quote_viewed_by_builder</code>, <code>quoted</code>.</p>
+<hr />
+<h2>9. OSCU initialization flow</h2>
+<p>After KRA assigns sandbox access, vendor devices will be initialized via the admin <strong>TIS Integrator Hub</strong>:</p>
+<pre><code class="language-mermaid">sequenceDiagram
+    participant Admin as Admin UI
+    participant Init as tisOscuInitialization.ts
+    participant Proxy as etims-proxy
+    participant KRA as KRA eTIMS sandbox
+
+    Admin-&gt;&gt;Init: tin, bhfId, dvcSrlNo
+    Init-&gt;&gt;Proxy: POST selectInitOsdcInfo
+    Proxy-&gt;&gt;KRA: KRA sandbox credentials
+    KRA--&gt;&gt;Init: cmcKey, dvcId, branch name
+    Init--&gt;&gt;Admin: Success (key masked in logs)</code></pre>
+<table><thead><tr>
+<th>Field</th>
+<th>Meaning</th>
+</tr></thead><tbody>
+<tr>
+<td><code>tin</code></td>
+<td>Vendor/supplier KRA PIN</td>
+</tr>
+<tr>
+<td><code>bhfId</code></td>
+<td>Branch code (e.g. <code>00</code>)</td>
+</tr>
+<tr>
+<td><code>dvcSrlNo</code></td>
+<td>KRA sandbox device serial</td>
+</tr>
+</tbody></table>
+<p>Communication keys will <strong>never be stored in plain text</strong> in the database.</p>
+<hr />
+<h2>10. Vendor (supplier) onboarding flow</h2>
+<pre><code class="language-mermaid">stateDiagram-v2
+    [*] --&gt; draft
+    draft --&gt; pending_review
+    pending_review --&gt; pending_kra
+    pending_kra --&gt; active
+    pending_review --&gt; rejected
+    active --&gt; suspended
+    suspended --&gt; active</code></pre>
+<p>Administrators will track each supplier in <code>tis_vendor_onboarding</code>. Status <code>pending_kra</code> covers KRA-related steps (device init, item registration) under UjenziXform’s integrator application.</p>
+<p><strong>Before first sandbox invoice:</strong> valid supplier KRA PIN, legal name, item codes on all PO lines, buyer PIN when B2B.</p>
+<hr />
+<h2>11. Credit notes</h2>
+<p>Credit notes will use the same <code>POST /invoices</code> endpoint on KRA sandbox with <code>receiptTypeCode: R</code> and <code>traderOrgInvoiceNo</code> referencing the original sale. Requires a prior successful sale on the PO.</p>
+<hr />
+<h2>12. Master data and catalog</h2>
+<p>Before sandbox sales, each PO line will require a KRA <strong>item code</strong> (from PO line, <code>supplier_product_prices</code>, <code>materials</code>, or admin catalog). Item registration (<code>POST /items</code>), customer registration (<code>POST /customers</code>), and reference-data sync will be performed against <strong>KRA sandbox</strong> through the allowlisted proxy and admin Integrator API console.</p>
+<hr />
+<h2>13. Technical architecture layers</h2>
+<pre><code class="language-mermaid">flowchart LR
+    UI[Presentation layer] --&gt; APP[Application layer&lt;br/&gt;purchaseOrderEtims, etc.]
+    APP --&gt; INT[Integration layer&lt;br/&gt;etims-proxy + allowlist]
+    APP --&gt; DB[(Persistence layer)]
+    INT --&gt; KRA[KRA eTIMS sandbox]</code></pre>
+<table><thead><tr>
+<th>Layer</th>
+<th>Technology</th>
+</tr></thead><tbody>
+<tr>
+<td>Frontend</td>
+<td>React 18, TypeScript, Vite</td>
+</tr>
+<tr>
+<td>Backend</td>
+<td>Supabase PostgreSQL, Auth, Row Level Security</td>
+</tr>
+<tr>
+<td>Gateway</td>
+<td>Supabase Edge Function <code>etims-proxy</code></td>
+</tr>
+<tr>
+<td>Client library</td>
+<td><code>src/lib/etims/*</code></td>
+</tr>
+</tbody></table>
+<hr />
+<h2>14. API integration (etims-proxy)</h2>
+<p>All outbound KRA traffic will use one Edge Function calling <code>{ETIMS_BASE_URL}/{path}</code> with HTTP Basic authentication.</p>
+<p><strong>Planned configuration after sandbox assignment:</strong></p>
+<table><thead><tr>
+<th>Edge secret</th>
+<th>Value</th>
+</tr></thead><tbody>
+<tr>
+<td><code>ETIMS_BASE_URL</code></td>
+<td><code>https://etims-api-sbx.kra.go.ke</code> (no trailing slash)</td>
+</tr>
+<tr>
+<td><code>ETIMS_BASIC_USER</code></td>
+<td>Issued by KRA</td>
+</tr>
+<tr>
+<td><code>ETIMS_BASIC_PASSWORD</code></td>
+<td>Issued by KRA</td>
+</tr>
+</tbody></table>
+<p>Allowlisted paths match KRA OSCU REST specification: initialization, reference data, items, customers, invoices, stock/purchase/import sync (<code>supabase/functions/_shared/etimsPathAllowlist.ts</code>).</p>
+<p><strong>Access controls:</strong> JWT required; roles <code>supplier</code>, <code>admin</code>, or <code>super_admin</code>; SSRF path allowlist; 400 KB body limit.</p>
+<hr />
+<h2>15. Sales invoice payload mapping</h2>
+<table><thead><tr>
+<th>Integrator field</th>
+<th>UjenziXform source</th>
+</tr></thead><tbody>
+<tr>
+<td><code>traderInvoiceNo</code></td>
+<td>PO number</td>
+</tr>
+<tr>
+<td><code>traderTin</code> / <code>sellerPin</code></td>
+<td>Supplier <code>kra_pin</code></td>
+</tr>
+<tr>
+<td><code>traderName</code></td>
+<td>Supplier legal / company name</td>
+</tr>
+<tr>
+<td><code>customerPin</code></td>
+<td>Buyer <code>profiles.kra_pin</code></td>
+</tr>
+<tr>
+<td><code>salesItems[].itemCode</code></td>
+<td>Catalog / PO <code>etims_item_code</code></td>
+</tr>
+<tr>
+<td><code>receiptTypeCode</code></td>
+<td><code>S</code> (sale) or <code>R</code> (credit note)</td>
+</tr>
+<tr>
+<td><code>paymentType</code></td>
+<td>Supplier default or <code>01</code></td>
+</tr>
+<tr>
+<td><code>salesDate</code></td>
+<td><code>yyyyMMddHHmmss</code> at submission</td>
+</tr>
+<tr>
+<td><code>currency</code></td>
+<td>Default <code>KES</code></td>
+</tr>
+</tbody></table>
+<hr />
+<h2>16. Data stored in the platform</h2>
+<table><thead><tr>
+<th>Store</th>
+<th>Purpose</th>
+</tr></thead><tbody>
+<tr>
+<td><code>purchase_orders</code> (<code>etims_*</code>)</td>
+<td>Fiscal submission outcome per order</td>
+</tr>
+<tr>
+<td><code>suppliers</code></td>
+<td>Vendor tax identity, branch, device serial</td>
+</tr>
+<tr>
+<td><code>profiles</code></td>
+<td>Buyer KRA PIN and billing identity</td>
+</tr>
+<tr>
+<td><code>tis_integrator_platform</code></td>
+<td>Integrator metadata and certification checklist</td>
+</tr>
+<tr>
+<td><code>tis_vendor_onboarding</code></td>
+<td>Per-supplier onboarding lifecycle</td>
+</tr>
+<tr>
+<td><code>tis_submission_log</code></td>
+<td>Submission audit trail</td>
+</tr>
+</tbody></table>
+<p><strong>Not stored:</strong> KRA credentials, communication keys in plain text, secrets in browser code.</p>
+<hr />
+<h2>17. Multi-vendor (multi-taxpayer) model</h2>
+<p>UjenziXform will operate <strong>one integrator registration</strong> and serve <strong>many supplier taxpayers</strong> on the same marketplace. Each invoice will use that supplier’s KRA PIN as <code>traderTin</code>.</p>
+<pre><code class="language-mermaid">flowchart TB
+    subgraph Integrator[&quot;UjenziXform integrator applicant&quot;]
+        HUB[TIS Integrator Hub]
+        PROXY[etims-proxy]
+    end
+
+    subgraph Vendors[&quot;Onboarded suppliers&quot;]
+        V1[Supplier A - KRA PIN]
+        V2[Supplier B - KRA PIN]
+    end
+
+    PO[Purchase order]
+    V1 &amp; V2 --&gt; PO
+    PO --&gt;|traderTin = supplier PIN| INV[POST /invoices]
+    PROXY --&gt; INV
+    INV --&gt; KRA[KRA eTIMS sandbox]</code></pre>
+<hr />
+<h2>18. Security controls</h2>
+<table><thead><tr>
+<th>Control</th>
+<th>Implementation</th>
+</tr></thead><tbody>
+<tr>
+<td>Credential isolation</td>
+<td>KRA credentials in Supabase Edge secrets only</td>
+</tr>
+<tr>
+<td>Authentication</td>
+<td>Supabase JWT on every proxy call</td>
+</tr>
+<tr>
+<td>Authorization</td>
+<td>Roles: supplier, admin, super_admin</td>
+</tr>
+<tr>
+<td>SSRF prevention</td>
+<td>Strict path allowlist</td>
+</tr>
+<tr>
+<td>RLS</td>
+<td>TIS admin tables via <code>is_tis_integrator_staff()</code></td>
+</tr>
+<tr>
+<td>Key handling</td>
+<td>OSCU communication keys redacted in audit logs</td>
+</tr>
+<tr>
+<td>Request limit</td>
+<td>400 KB max proxy body</td>
+</tr>
+</tbody></table>
+<hr />
+<h2>19. Fiscal receipt shown to buyers</h2>
+<p>After a successful KRA submission, <code>EtimsFiscalReceiptView</code> will display:</p>
+<ul>
+<li>Issuer name and KRA PIN  </li>
+<li>Trader invoice number and SCU-related fields  </li>
+<li>Line items and totals  </li>
+<li><strong>Verification URL</strong> and <strong>QR code</strong> for KRA public validation  </li>
+</ul>
+<hr />
+<h2>20. Audit, errors, and retry</h2>
+<table><thead><tr>
+<th>Mechanism</th>
+<th>Purpose</th>
+</tr></thead><tbody>
+<tr>
+<td><code>tis_submission_log</code></td>
+<td>Per-submission audit (type, status, error, response)</td>
+</tr>
+<tr>
+<td><code>purchase_orders.etims_error</code></td>
+<td>Latest failure on the order</td>
+</tr>
+<tr>
+<td>Admin Submission Ops</td>
+<td>Staff retry and monitoring</td>
+</tr>
+<tr>
+<td>Supplier dashboard</td>
+<td>Manual submit and credit note</td>
+</tr>
+</tbody></table>
+<hr />
+<h2>21. Post-sandbox-assignment plan</h2>
+<p>Once KRA issues sandbox credentials, UjenziXform will:</p>
+<table><thead><tr>
+<th>Step</th>
+<th>Action</th>
+</tr></thead><tbody>
+<tr>
+<td>1</td>
+<td>Configure Edge secrets with KRA-issued sandbox credentials</td>
+</tr>
+<tr>
+<td>2</td>
+<td>Set <code>ETIMS_BASE_URL</code> to <code>https://etims-api-sbx.kra.go.ke</code></td>
+</tr>
+<tr>
+<td>3</td>
+<td>Set platform environment to <code>sandbox_testing</code></td>
+</tr>
+<tr>
+<td>4</td>
+<td>Complete OSCU initialization with KRA sandbox device serials</td>
+</tr>
+<tr>
+<td>5</td>
+<td>Register test items and customers on sandbox</td>
+</tr>
+<tr>
+<td>6</td>
+<td>Execute sales invoice and credit note test cases</td>
+</tr>
+<tr>
+<td>7</td>
+<td>Complete internal certification checklist</td>
+</tr>
+<tr>
+<td>8</td>
+<td>Submit sandbox test results to KRA for integrator approval</td>
+</tr>
+<tr>
+<td>9</td>
+<td>Production cutover only after formal KRA certification</td>
+</tr>
+</tbody></table>
+<hr />
+<h2>22. Implementation readiness matrix</h2>
+<table><thead><tr>
+<th>Capability</th>
+<th>Readiness</th>
+<th>Notes</th>
+</tr></thead><tbody>
+<tr>
+<td>Secure <code>etims-proxy</code> gateway</td>
+<td><strong>Ready</strong></td>
+<td>Awaiting KRA sandbox URL and credentials</td>
+</tr>
+<tr>
+<td>PO → sales invoice / credit note mapping</td>
+<td><strong>Ready</strong></td>
+<td>To be validated on KRA sandbox</td>
+</tr>
+<tr>
+<td>Fiscal receipt + QR UI</td>
+<td><strong>Ready</strong></td>
+<td></td>
+</tr>
+<tr>
+<td>OSCU initialization flow</td>
+<td><strong>Ready</strong></td>
+<td>To run on KRA sandbox</td>
+</tr>
+<tr>
+<td>Vendor onboarding workflow</td>
+<td><strong>Ready</strong></td>
+<td></td>
+</tr>
+<tr>
+<td>Submission audit logging</td>
+<td><strong>Ready</strong></td>
+<td></td>
+</tr>
+<tr>
+<td>Certification checklist tracking</td>
+<td><strong>Ready</strong></td>
+<td>Admin TIS Integrator Hub</td>
+</tr>
+<tr>
+<td><strong>KRA sandbox access</strong></td>
+<td><strong>Pending</strong></td>
+<td><strong>Subject of this application</strong></td>
+</tr>
+<tr>
+<td>KRA integrator certification</td>
+<td><strong>Pending</strong></td>
+<td>After successful sandbox testing</td>
+</tr>
+<tr>
+<td>Production eTIMS</td>
+<td><strong>Future</strong></td>
+<td>After KRA approval</td>
+</tr>
+</tbody></table>
+<hr />
+<h2>23. KRA certification checklist mapping</h2>
+<p>To be completed on <strong>KRA-assigned sandbox</strong> after access is granted:</p>
+<table><thead><tr>
+<th>ID</th>
+<th>Requirement</th>
+</tr></thead><tbody>
+<tr>
+<td><code>platform_registered</code></td>
+<td>eTIMS portal integrator registration</td>
+</tr>
+<tr>
+<td><code>sandbox_access</code></td>
+<td>KRA-issued sandbox credentials</td>
+</tr>
+<tr>
+<td><code>oscu_vscu_init</code></td>
+<td>Device initialization on KRA sandbox</td>
+</tr>
+<tr>
+<td><code>master_data_sync</code></td>
+<td>Reference data endpoints</td>
+</tr>
+<tr>
+<td><code>item_registration</code></td>
+<td>POST /items</td>
+</tr>
+<tr>
+<td><code>customer_registration</code></td>
+<td>POST /customers</td>
+</tr>
+<tr>
+<td><code>sales_invoice</code></td>
+<td>POST /invoices type S</td>
+</tr>
+<tr>
+<td><code>credit_note</code></td>
+<td>POST /invoices type R</td>
+</tr>
+<tr>
+<td><code>fiscal_receipt_ui</code></td>
+<td>Receipt + QR display</td>
+</tr>
+<tr>
+<td><code>vendor_tis_identity</code></td>
+<td>Per-supplier PIN, branch, device</td>
+</tr>
+<tr>
+<td><code>vendor_onboarding_workflow</code></td>
+<td>Onboarding lifecycle</td>
+</tr>
+<tr>
+<td><code>submission_audit</code></td>
+<td>Logging and retry</td>
+</tr>
+<tr>
+<td><code>secure_credentials</code></td>
+<td>Server-side Edge secrets</td>
+</tr>
+<tr>
+<td><code>production_cutover</code></td>
+<td>After KRA certification</td>
+</tr>
+</tbody></table>
+<hr />
+<h2>24. Source code references</h2>
+<table><thead><tr>
+<th>Component</th>
+<th>Path</th>
+</tr></thead><tbody>
+<tr>
+<td>Edge proxy</td>
+<td><code>supabase/functions/etims-proxy/index.ts</code></td>
+</tr>
+<tr>
+<td>Path allowlist</td>
+<td><code>supabase/functions/_shared/etimsPathAllowlist.ts</code></td>
+</tr>
+<tr>
+<td>PO → invoice</td>
+<td><code>src/lib/etims/purchaseOrderEtims.ts</code></td>
+</tr>
+<tr>
+<td>OSCU init</td>
+<td><code>src/lib/etims/tisOscuInitialization.ts</code></td>
+</tr>
+<tr>
+<td>Audit log</td>
+<td><code>src/lib/etims/logTisSubmission.ts</code></td>
+</tr>
+<tr>
+<td>Admin hub</td>
+<td><code>src/components/admin/tis-integrator/TisIntegratorHub.tsx</code></td>
+</tr>
+<tr>
+<td>Platform DB</td>
+<td><code>supabase/migrations/20260525120000_tis_integrator_platform.sql</code></td>
+</tr>
+</tbody></table>
+<hr />
+<h2>25. Appendix — sample SalesReq payload</h2>
+<p>KRA reviewers often require a concrete example of the <strong><code>POST /invoices</code></strong> body. UjenziXform provides a separate appendix (anonymised, illustrative PINs and item codes):</p>
+<table><thead><tr>
+<th>File</th>
+<th>Contents</th>
+</tr></thead><tbody>
+<tr>
+<td><a href="appendix/APPENDIX_SAMPLE_SALESREQ.md"><code>appendix/APPENDIX_SAMPLE_SALESREQ.md</code></a></td>
+<td>HTTP call, field mapping, credit note variant, response shape</td>
+</tr>
+<tr>
+<td><a href="appendix/APPENDIX_SAMPLE_SALESREQ.json"><code>appendix/APPENDIX_SAMPLE_SALESREQ.json</code></a></td>
+<td>Full sales invoice JSON (two PO lines)</td>
+</tr>
+</tbody></table>
+<p><strong>Summary:</strong> A confirmed UjenziXform PO (e.g. <code>PO-2026-004821</code>) maps to SalesReq with supplier <code>traderTin</code>, buyer <code>customerPin</code>, and <code>salesItems[]</code> from catalog <code>etims_item_code</code> values. See appendix for the complete payload and PO-field mapping table.</p>
+<hr />
+<h2>26. Document control</h2>
+<table><thead><tr>
+<th>Version</th>
+<th>Date</th>
+<th>Changes</th>
+</tr></thead><tbody>
+<tr>
+<td>1.0</td>
+<td>2026-06-03</td>
+<td>Initial draft</td>
+</tr>
+<tr>
+<td>2.0</td>
+<td>2026-06-03</td>
+<td>KRA presentation: business context, maturity matrix</td>
+</tr>
+<tr>
+<td>3.0</td>
+<td>2026-06-03</td>
+<td>Sandbox application framing</td>
+</tr>
+<tr>
+<td>3.1</td>
+<td>2026-06-03</td>
+<td>Application-only narrative</td>
+</tr>
+<tr>
+<td>3.2</td>
+<td>2026-06-03</td>
+<td>Marketplace purchase flow → POST /invoices</td>
+</tr>
+<tr>
+<td>3.3</td>
+<td>2026-06-03</td>
+<td>Executive summary + SalesReq appendix (separate files)</td>
+</tr>
+</tbody></table>
+<hr />
+<p><em>This document describes how UjenziXform will integrate with KRA eTIMS as a potential third-party TIS integrator after sandbox access is granted. For authoritative API contracts, refer to the official KRA eTIMS OSCU/VSCU Technical Specification.</em></p>
+</body>
+</html>

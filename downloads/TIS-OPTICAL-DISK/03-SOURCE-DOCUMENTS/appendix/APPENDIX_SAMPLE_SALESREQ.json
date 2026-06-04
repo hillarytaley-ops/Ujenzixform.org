@@ -1,0 +1,50 @@
+{
+  "_comment": "Anonymised example — POST /invoices body (SalesReq) built from UjenziXform purchase_order PO-2026-004821. PINs and codes are illustrative for KRA review only.",
+  "traderInvoiceNo": "PO-2026-004821",
+  "totalAmount": 48750.0,
+  "paymentType": "01",
+  "salesTypeCode": "N",
+  "receiptTypeCode": "S",
+  "salesStatusCode": "01",
+  "salesDate": "20260603143000",
+  "currency": "KES",
+  "exchangeRate": 1,
+  "salesItems": [
+    {
+      "itemCode": "KE2BSG0000123",
+      "item_code": "KE2BSG0000123",
+      "taxCode": "B",
+      "qtyUnitCode": "BG",
+      "pkgUnitCode": "NT",
+      "itemClassCode": "30111501",
+      "qty": 50,
+      "pkg": 0,
+      "unitPrice": 750.0,
+      "amount": 37500.0,
+      "discountAmount": 0
+    },
+    {
+      "itemCode": "KE2MTL0000456",
+      "item_code": "KE2MTL0000456",
+      "taxCode": "B",
+      "qtyUnitCode": "LM",
+      "pkgUnitCode": "NT",
+      "itemClassCode": "30103601",
+      "qty": 25,
+      "pkg": 0,
+      "unitPrice": 450.0,
+      "amount": 11250.0,
+      "discountAmount": 0
+    }
+  ],
+  "customerPin": "P000000000A",
+  "customerName": "Example Builders Ltd",
+  "traderTin": "P000000000B",
+  "trader_tin": "P000000000B",
+  "sellerPin": "P000000000B",
+  "seller_pin": "P000000000B",
+  "taxpayerTin": "P000000000B",
+  "taxpayer_tin": "P000000000B",
+  "traderName": "Example Hardware Supplies Ltd",
+  "trader_name": "Example Hardware Supplies Ltd"
+}
