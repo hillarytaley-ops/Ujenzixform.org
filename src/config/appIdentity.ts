@@ -58,6 +58,11 @@ export const COMPANY_PHYSICAL_ADDRESS =
 export const COMPANY_POSTAL_ADDRESS = 'P. O. Box 4146 - 30100 Eldoret, Kenya';
 export const COMPANY_OFFICE_LOCATION = 'Eldoret, Kenya';
 
+/** Opens Google Maps directions to the registered office. */
+export const COMPANY_MAPS_DIRECTIONS_URL = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(
+  `${COMPANY_PHYSICAL_ADDRESS}, ${COMPANY_OFFICE_LOCATION}`,
+)}`;
+
 /** localStorage session blob (UX cache; auth is server-verified). */
 export const STORAGE_SESSION_KEY = 'ujenzixform_session';
 export const STORAGE_SESSION_KEY_LEGACY = 'mradipro_session';

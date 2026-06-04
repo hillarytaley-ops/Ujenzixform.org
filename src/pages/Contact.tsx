@@ -15,7 +15,7 @@ import Footer from "@/components/Footer";
 import { useToast } from "@/hooks/use-toast";
 import AnimatedSection from "@/components/AnimatedSection";
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from "@/integrations/supabase/client";
-import { SUPPORT_PHONE_PRIMARY, COMPANY_OFFICE_LABEL, COMPANY_PHYSICAL_ADDRESS, COMPANY_POSTAL_ADDRESS, COMPANY_OFFICE_LOCATION } from "@/config/appIdentity";
+import { SUPPORT_PHONE_PRIMARY, COMPANY_OFFICE_LABEL, COMPANY_PHYSICAL_ADDRESS, COMPANY_POSTAL_ADDRESS, COMPANY_OFFICE_LOCATION, COMPANY_MAPS_DIRECTIONS_URL } from "@/config/appIdentity";
 
 function nameSchema(label: string) {
   return z
@@ -422,9 +422,17 @@ const Contact = () => {
                       <div>
                         <h3 className="font-bold text-2xl mb-2 text-gray-900">{COMPANY_OFFICE_LABEL}</h3>
                         <p className="text-gray-700 text-lg leading-relaxed">
-                          {COMPANY_PHYSICAL_ADDRESS}<br />
-                          {COMPANY_POSTAL_ADDRESS}<br />
-                          {COMPANY_OFFICE_LOCATION}
+                          <a
+                            href={COMPANY_MAPS_DIRECTIONS_URL}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="hover:text-primary transition-colors underline-offset-2 hover:underline"
+                            aria-label="Open office location in Google Maps for directions"
+                          >
+                            {COMPANY_PHYSICAL_ADDRESS}<br />
+                            {COMPANY_POSTAL_ADDRESS}<br />
+                            {COMPANY_OFFICE_LOCATION}
+                          </a>
                         </p>
                         <p className="text-sm text-green-600 font-medium mt-2">
                           🇰🇪 Eldoret HQ — we work with teams across Kenya (major hubs first, growing nationwide).

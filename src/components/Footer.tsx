@@ -7,6 +7,7 @@ import {
   SUPPORT_PHONE_PRIMARY,
   COMPANY_PHYSICAL_ADDRESS,
   COMPANY_POSTAL_ADDRESS,
+  COMPANY_MAPS_DIRECTIONS_URL,
 } from "@/config/appIdentity";
 import {
   FacebookIcon,
@@ -130,14 +131,20 @@ const Footer = () => {
               All numbers & hours
             </Link>
           </div>
-          <div className="flex items-start justify-center gap-2 max-w-xl mx-auto text-center sm:text-left leading-relaxed">
-            <MapPin className="h-4 w-4 mt-0.5 shrink-0 text-green-400" aria-hidden />
-            <address className="not-italic">
+          <a
+            href={COMPANY_MAPS_DIRECTIONS_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-start justify-center gap-2 max-w-xl mx-auto text-center sm:text-left leading-relaxed hover:text-white transition-colors group"
+            aria-label="Open UjenziXform office location in Google Maps for directions"
+          >
+            <MapPin className="h-4 w-4 mt-0.5 shrink-0 text-green-400 group-hover:text-green-300" aria-hidden />
+            <address className="not-italic underline-offset-2 group-hover:underline">
               {COMPANY_PHYSICAL_ADDRESS}
               <br />
               {COMPANY_POSTAL_ADDRESS}
             </address>
-          </div>
+          </a>
         </div>
 
         {/* Bottom bar: copyright + single social row (outline icons, all breakpoints) */}
