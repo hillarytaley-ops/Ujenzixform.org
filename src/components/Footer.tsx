@@ -1,10 +1,12 @@
-import { Building2 } from "lucide-react";
+import { Building2, MapPin } from "lucide-react";
 import { Link } from "react-router-dom";
 import {
   SOCIAL_INSTAGRAM_URL,
   SOCIAL_TIKTOK_URL,
   SOCIAL_WHATSAPP_URL,
   SUPPORT_PHONE_PRIMARY,
+  COMPANY_PHYSICAL_ADDRESS,
+  COMPANY_POSTAL_ADDRESS,
 } from "@/config/appIdentity";
 import {
   FacebookIcon,
@@ -105,27 +107,37 @@ const Footer = () => {
         </div>
 
         {/* Contact — shared row so link columns stay equal height */}
-        <div className="mt-8 flex flex-col sm:flex-row flex-wrap items-center justify-center gap-x-10 gap-y-3 text-gray-400 text-sm">
-          <a
-            href="mailto:info@ujenzixform.org"
-            className="flex items-center gap-2 hover:text-white transition-colors"
-          >
-            <EmailIcon size={16} />
-            <span>info@ujenzixform.org</span>
-          </a>
-          <a
-            href={`tel:${SUPPORT_PHONE_PRIMARY.tel}`}
-            className="flex items-center gap-2 hover:text-white transition-colors"
-          >
-            <PhoneIcon size={16} />
-            <span>{SUPPORT_PHONE_PRIMARY.display}</span>
-          </a>
-          <Link
-            to="/contact"
-            className="text-gray-500 hover:text-white transition-colors underline-offset-2 hover:underline"
-          >
-            All numbers & hours
-          </Link>
+        <div className="mt-8 flex flex-col items-center gap-4 text-gray-400 text-sm">
+          <div className="flex flex-col sm:flex-row flex-wrap items-center justify-center gap-x-10 gap-y-3">
+            <a
+              href="mailto:info@ujenzixform.org"
+              className="flex items-center gap-2 hover:text-white transition-colors"
+            >
+              <EmailIcon size={16} />
+              <span>info@ujenzixform.org</span>
+            </a>
+            <a
+              href={`tel:${SUPPORT_PHONE_PRIMARY.tel}`}
+              className="flex items-center gap-2 hover:text-white transition-colors"
+            >
+              <PhoneIcon size={16} />
+              <span>{SUPPORT_PHONE_PRIMARY.display}</span>
+            </a>
+            <Link
+              to="/contact"
+              className="text-gray-500 hover:text-white transition-colors underline-offset-2 hover:underline"
+            >
+              All numbers & hours
+            </Link>
+          </div>
+          <div className="flex items-start justify-center gap-2 max-w-xl mx-auto text-center sm:text-left leading-relaxed">
+            <MapPin className="h-4 w-4 mt-0.5 shrink-0 text-green-400" aria-hidden />
+            <address className="not-italic">
+              {COMPANY_PHYSICAL_ADDRESS}
+              <br />
+              {COMPANY_POSTAL_ADDRESS}
+            </address>
+          </div>
         </div>
 
         {/* Bottom bar: copyright + single social row (outline icons, all breakpoints) */}
