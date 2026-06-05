@@ -14,13 +14,16 @@ STEP 2 — Click into each grey underline field and type:
   - Signatory name, title, signing date
   (Date at top-right is editable too)
 
-STEP 3 — Click the blue "Print / Save as PDF" button
+STEP 3 — Sign in the box under "Yours faithfully" using finger (tablet/phone) or mouse.
+  Use "Clear signature" to redraw if needed.
+
+STEP 4 — Click the blue "Print / Save as PDF" button
   OR press Ctrl+P → Destination: Save as PDF → Save
 
-STEP 4 — Save as:
+STEP 5 — Save as:
   01_KRA_TIS_COVER_LETTER.pdf
 
-STEP 5 — Copy that file to:
+STEP 6 — Copy that file to:
   D:\UjenziXform\downloads\TIS-OPTICAL-DISK\02-PDF-DOCUMENTS\
 
 Website (pre-filled): https://ujenzi-pro.vercel.app/

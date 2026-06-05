@@ -162,11 +162,37 @@
     .enclosed td:first-child { width: 1.5rem; font-weight: bold; }
     .closing { margin-top: 1.25rem; }
     .sig-block { margin-top: 2rem; page-break-inside: avoid; }
+    .sig-pad-wrap { margin: 0.5rem 0 0.65rem; max-width: 3.25in; }
+    .sig-pad-label {
+      font-size: 9pt;
+      color: #555;
+      display: block;
+      margin-bottom: 0.3rem;
+    }
+    .sig-pad {
+      display: block;
+      width: 100%;
+      max-width: 3.25in;
+      height: 1.35in;
+      border: 1px solid #111;
+      border-radius: 2px;
+      background: #fff;
+      touch-action: none;
+      cursor: crosshair;
+    }
+    .sig-pad-clear {
+      font-family: "Segoe UI", Arial, sans-serif;
+      font-size: 9pt;
+      margin-top: 0.35rem;
+      padding: 0.25rem 0.55rem;
+      cursor: pointer;
+      background: #f1f5f9;
+      border: 1px solid #cbd5e1;
+      border-radius: 3px;
+    }
+    .sig-pad-clear:hover { background: #e2e8f0; }
     .sig-line {
-      border-bottom: 1px solid #111;
-      width: 3.25in;
-      height: 1.35rem;
-      margin: 1.75rem 0 0.35rem;
+      display: none;
     }
     .sig-meta { font-size: 11pt; margin: 0.15rem 0; }
     @media print {
@@ -177,6 +203,8 @@
         border-bottom: 1px solid #111;
         background: transparent;
       }
+      .sig-pad { border: 1px solid #111; background: #fff; }
+      .sig-pad-label { color: #333; }
     }
   </style>
 </head>
@@ -185,8 +213,9 @@
 <div class="hint no-print">
   <strong>How to complete this cover letter</strong><br />
   1. Type into each field below (grey underlines).<br />
-  2. Click <strong>Print / Save as PDF</strong> or press Ctrl+P → choose <strong>Save as PDF</strong>.<br />
-  3. Save as <code>01_KRA_TIS_COVER_LETTER.pdf</code> for the optical disk.<br />
+  2. Scroll to <strong>Yours faithfully</strong> and draw your signature in the box (finger on tablet/phone, or mouse).<br />
+  3. Click <strong>Print / Save as PDF</strong> or press Ctrl+P → choose <strong>Save as PDF</strong>.<br />
+  4. Save as <code>01_KRA_TIS_COVER_LETTER.pdf</code> for the optical disk.<br />
   <button type="button" class="print-btn" onclick="window.print()">Print / Save as PDF</button>
 </div>
 
@@ -315,11 +344,86 @@
 <p>Yours faithfully,</p>
 
 <div class="sig-block">
-  <div class="sig-line"></div>
-  <input class="sig-input" type="text" name="signatory_name" placeholder="Authorised signatory name" aria-label="Authorised signatory name" />
+  <div class="sig-pad-wrap">
+    <label class="sig-pad-label" for="signature-pad">Authorised signature — draw here with finger or mouse</label>
+    <canvas id="signature-pad" class="sig-pad" width="624" height="130" aria-label="Signature drawing area"></canvas>
+    <button type="button" class="sig-pad-clear no-print" id="clear-signature">Clear signature</button>
+  </div>
+  <input class="sig-input" type="text" name="signatory_name" placeholder="Authorised signatory name (typed)" aria-label="Authorised signatory name" />
   <input class="sig-input" type="text" name="signatory_title" placeholder="Title — Director / Technical Lead, UjenziXform Solution" aria-label="Signatory title" />
   <p class="sig-meta" style="margin-top:1rem">Date:&nbsp;<input class="fill-input inline-date" type="text" name="sign_date" placeholder="Date of signing" aria-label="Date of signing" style="min-width:10rem" /></p>
 </div>
+
+<script>
+  (function () {
+    var canvas = document.getElementById("signature-pad");
+    if (!canvas || !canvas.getContext) return;
+    var ctx = canvas.getContext("2d");
+    var drawing = false;
+
+    ctx.strokeStyle = "#111";
+    ctx.lineWidth = 2.2;
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+
+    function pointFromEvent(e) {
+      var rect = canvas.getBoundingClientRect();
+      var scaleX = canvas.width / rect.width;
+      var scaleY = canvas.height / rect.height;
+      var clientX = e.clientX;
+      var clientY = e.clientY;
+      if (e.touches && e.touches.length) {
+        clientX = e.touches[0].clientX;
+        clientY = e.touches[0].clientY;
+      } else if (e.changedTouches && e.changedTouches.length) {
+        clientX = e.changedTouches[0].clientX;
+        clientY = e.changedTouches[0].clientY;
+      }
+      return {
+        x: (clientX - rect.left) * scaleX,
+        y: (clientY - rect.top) * scaleY
+      };
+    }
+
+    function startDraw(e) {
+      e.preventDefault();
+      drawing = true;
+      var p = pointFromEvent(e);
+      ctx.beginPath();
+      ctx.moveTo(p.x, p.y);
+    }
+
+    function draw(e) {
+      if (!drawing) return;
+      e.preventDefault();
+      var p = pointFromEvent(e);
+      ctx.lineTo(p.x, p.y);
+      ctx.stroke();
+    }
+
+    function endDraw(e) {
+      if (!drawing) return;
+      e.preventDefault();
+      drawing = false;
+    }
+
+    canvas.addEventListener("mousedown", startDraw);
+    canvas.addEventListener("mousemove", draw);
+    canvas.addEventListener("mouseup", endDraw);
+    canvas.addEventListener("mouseleave", endDraw);
+    canvas.addEventListener("touchstart", startDraw, { passive: false });
+    canvas.addEventListener("touchmove", draw, { passive: false });
+    canvas.addEventListener("touchend", endDraw, { passive: false });
+    canvas.addEventListener("touchcancel", endDraw, { passive: false });
+
+    var clearBtn = document.getElementById("clear-signature");
+    if (clearBtn) {
+      clearBtn.addEventListener("click", function () {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+      });
+    }
+  })();
+</script>
 
 </body>
 </html>
