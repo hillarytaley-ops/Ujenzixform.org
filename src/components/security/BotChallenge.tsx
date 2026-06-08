@@ -25,6 +25,7 @@ interface BotChallengeProps {
 declare global {
   interface Window {
     turnstile?: {
+      ready: (callback: () => void) => void;
       render: (
         container: HTMLElement,
         options: Record<string, unknown>,
@@ -61,6 +62,16 @@ export function BotChallenge({
     [onError],
   );
 
+  const onVerifyRef = useRef(onVerify);
+  const onExpireRef = useRef(onExpire);
+  const handleErrorRef = useRef(handleError);
+
+  useEffect(() => {
+    onVerifyRef.current = onVerify;
+    onExpireRef.current = onExpire;
+    handleErrorRef.current = handleError;
+  }, [onVerify, onExpire, handleError]);
+
   useEffect(() => {
     if (!provider || !containerRef.current) {
       setLoading(false);
@@ -69,7 +80,13 @@ export function BotChallenge({
 
     const siteKey = getBotChallengeSiteKey(provider);
     if (!siteKey) {
-      handleError('Bot protection is misconfigured.');
+      handleErrorRef.current('Bot protection is misconfigured.');
+      setLoading(false);
+      return;
+    }
+
+    // Avoid tearing down a live widget when the parent re-renders (form focus, typing, etc.).
+    if (widgetIdRef.current != null) {
       setLoading(false);
       return;
     }
@@ -77,27 +94,43 @@ export function BotChallenge({
     let cancelled = false;
 
     const renderTurnstile = () => {
-      if (cancelled || !containerRef.current || !window.turnstile) return;
+      if (cancelled || !containerRef.current || !window.turnstile || widgetIdRef.current != null) {
+        return;
+      }
 
-      widgetIdRef.current = window.turnstile.render(containerRef.current, {
-        sitekey: siteKey,
-        theme,
-        callback: (token: string) => {
-          setError(null);
-          onVerify(token, 'turnstile');
-        },
-        'expired-callback': () => {
-          onExpire?.();
-        },
-        'error-callback': () => {
-          handleError('Bot verification failed. Please try again.');
-        },
-      });
-      setLoading(false);
+      const mount = () => {
+        if (cancelled || !containerRef.current || !window.turnstile || widgetIdRef.current != null) {
+          return;
+        }
+
+        widgetIdRef.current = window.turnstile.render(containerRef.current, {
+          sitekey: siteKey,
+          theme,
+          callback: (token: string) => {
+            setError(null);
+            onVerifyRef.current(token, 'turnstile');
+          },
+          'expired-callback': () => {
+            onExpireRef.current?.();
+          },
+          'error-callback': () => {
+            handleErrorRef.current('Bot verification failed. Please try again.');
+          },
+        });
+        setLoading(false);
+      };
+
+      if (window.turnstile.ready) {
+        window.turnstile.ready(mount);
+      } else {
+        mount();
+      }
     };
 
     const renderRecaptcha = () => {
-      if (cancelled || !containerRef.current || !window.grecaptcha?.render) return;
+      if (cancelled || !containerRef.current || !window.grecaptcha?.render || widgetIdRef.current != null) {
+        return;
+      }
 
       widgetIdRef.current = window.grecaptcha.render(containerRef.current, {
         sitekey: siteKey,
@@ -105,27 +138,32 @@ export function BotChallenge({
         size: 'normal',
         callback: (token: string) => {
           setError(null);
-          onVerify(token, 'recaptcha');
+          onVerifyRef.current(token, 'recaptcha');
         },
         'expired-callback': () => {
-          onExpire?.();
+          onExpireRef.current?.();
         },
         'error-callback': () => {
-          handleError('Bot verification failed. Please try again.');
+          handleErrorRef.current('Bot verification failed. Please try again.');
         },
       });
       setLoading(false);
     };
 
     if (provider === 'turnstile') {
+      const existingScript = document.querySelector(
+        'script[src*="challenges.cloudflare.com/turnstile"]',
+      );
       if (window.turnstile?.render) {
         renderTurnstile();
+      } else if (existingScript) {
+        existingScript.addEventListener('load', renderTurnstile, { once: true });
       } else {
         const script = document.createElement('script');
         script.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
         script.async = true;
         script.onload = () => renderTurnstile();
-        script.onerror = () => handleError('Failed to load bot protection.');
+        script.onerror = () => handleErrorRef.current('Failed to load bot protection.');
         document.head.appendChild(script);
       }
     } else {
@@ -138,31 +176,24 @@ export function BotChallenge({
           'https://www.google.com/recaptcha/api.js?onload=onRecaptchaLoad&render=explicit';
         script.async = true;
         script.defer = true;
-        script.onerror = () => handleError('Failed to load bot protection.');
+        script.onerror = () => handleErrorRef.current('Failed to load bot protection.');
         document.head.appendChild(script);
       }
     }
 
     return () => {
       cancelled = true;
-      if (provider === 'turnstile' && widgetIdRef.current && window.turnstile?.remove) {
-        try {
-          window.turnstile.remove(String(widgetIdRef.current));
-        } catch {
-          // ignore cleanup errors
-        }
-      }
     };
-  }, [provider, theme, onVerify, onExpire, handleError]);
+  }, [provider, theme]);
 
   const resetChallenge = () => {
     setError(null);
-    if (provider === 'turnstile' && widgetIdRef.current && window.turnstile?.reset) {
+    if (provider === 'turnstile' && widgetIdRef.current != null && window.turnstile?.reset) {
       window.turnstile.reset(String(widgetIdRef.current));
     } else if (provider === 'recaptcha' && widgetIdRef.current != null && window.grecaptcha?.reset) {
       window.grecaptcha.reset(widgetIdRef.current as number);
     }
-    onExpire?.();
+    onExpireRef.current?.();
   };
 
   if (!provider) {
@@ -211,18 +242,22 @@ export function useBotChallengeState(): BotChallengeState & {
   const [token, setToken] = useState<string | null>(null);
   const [verifiedProvider, setVerifiedProvider] = useState<BotProvider | null>(null);
 
+  const setVerified = useCallback((nextToken: string, nextProvider: BotProvider) => {
+    setToken(nextToken);
+    setVerifiedProvider(nextProvider);
+  }, []);
+
+  const clearVerification = useCallback(() => {
+    setToken(null);
+    setVerifiedProvider(null);
+  }, []);
+
   return {
     token,
     provider: verifiedProvider,
     isConfigured: provider !== null,
     isReady: provider === null || token !== null,
-    setVerified: (nextToken, nextProvider) => {
-      setToken(nextToken);
-      setVerifiedProvider(nextProvider);
-    },
-    clearVerification: () => {
-      setToken(null);
-      setVerifiedProvider(null);
-    },
+    setVerified,
+    clearVerification,
   };
 }

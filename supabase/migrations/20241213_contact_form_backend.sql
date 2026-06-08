@@ -67,6 +67,7 @@ ALTER TABLE public.contact_form_security_log ENABLE ROW LEVEL SECURITY;
 
 -- RLS Policies for contact_submissions
 -- Admins can view all submissions
+DROP POLICY IF EXISTS "contact_submissions_admin_view" ON public.contact_submissions;
 CREATE POLICY "contact_submissions_admin_view" ON public.contact_submissions
     FOR SELECT TO authenticated
     USING (
@@ -77,12 +78,14 @@ CREATE POLICY "contact_submissions_admin_view" ON public.contact_submissions
     );
 
 -- System can insert submissions
+DROP POLICY IF EXISTS "contact_submissions_system_insert" ON public.contact_submissions;
 CREATE POLICY "contact_submissions_system_insert" ON public.contact_submissions
     FOR INSERT TO authenticated, anon
     WITH CHECK (true); -- Controlled by application logic
 
 -- RLS Policies for contact_form_security_log
 -- Admins can view security logs
+DROP POLICY IF EXISTS "contact_security_log_admin_view" ON public.contact_form_security_log;
 CREATE POLICY "contact_security_log_admin_view" ON public.contact_form_security_log
     FOR SELECT TO authenticated
     USING (
@@ -93,6 +96,7 @@ CREATE POLICY "contact_security_log_admin_view" ON public.contact_form_security_
     );
 
 -- System can insert security logs
+DROP POLICY IF EXISTS "contact_security_log_system_insert" ON public.contact_form_security_log;
 CREATE POLICY "contact_security_log_system_insert" ON public.contact_form_security_log
     FOR INSERT TO authenticated, anon
     WITH CHECK (true);
