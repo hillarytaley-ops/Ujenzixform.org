@@ -41,6 +41,93 @@ declare global {
   }
 }
 
+const TURNSTILE_SCRIPT = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
+const LOAD_TIMEOUT_MS = 15000;
+
+let turnstileLoadPromise: Promise<void> | null = null;
+
+function waitForTurnstileApi(timeoutMs: number): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const started = Date.now();
+
+    const tick = () => {
+      if (window.turnstile?.render) {
+        if (window.turnstile.ready) {
+          window.turnstile.ready(() => resolve());
+        } else {
+          resolve();
+        }
+        return;
+      }
+      if (Date.now() - started >= timeoutMs) {
+        reject(new Error('Turnstile API did not become ready in time'));
+        return;
+      }
+      window.setTimeout(tick, 50);
+    };
+
+    tick();
+  });
+}
+
+function loadTurnstileApi(): Promise<void> {
+  if (window.turnstile?.render) {
+    return waitForTurnstileApi(LOAD_TIMEOUT_MS);
+  }
+  if (turnstileLoadPromise) {
+    return turnstileLoadPromise;
+  }
+
+  turnstileLoadPromise = new Promise((resolve, reject) => {
+    const existing = document.querySelector(`script[src="${TURNSTILE_SCRIPT}"]`);
+
+    if (existing) {
+      waitForTurnstileApi(LOAD_TIMEOUT_MS).then(resolve).catch(reject);
+      return;
+    }
+
+    const script = document.createElement('script');
+    script.src = TURNSTILE_SCRIPT;
+    script.async = true;
+    script.onload = () => {
+      waitForTurnstileApi(LOAD_TIMEOUT_MS).then(resolve).catch(reject);
+    };
+    script.onerror = () => {
+      turnstileLoadPromise = null;
+      reject(new Error('Failed to load Turnstile script'));
+    };
+    document.head.appendChild(script);
+  });
+
+  return turnstileLoadPromise;
+}
+
+let recaptchaLoadPromise: Promise<void> | null = null;
+
+function loadRecaptchaApi(): Promise<void> {
+  if (window.grecaptcha?.render) {
+    return Promise.resolve();
+  }
+  if (recaptchaLoadPromise) {
+    return recaptchaLoadPromise;
+  }
+
+  recaptchaLoadPromise = new Promise((resolve, reject) => {
+    window.onRecaptchaLoad = () => resolve();
+    const script = document.createElement('script');
+    script.src = 'https://www.google.com/recaptcha/api.js?onload=onRecaptchaLoad&render=explicit';
+    script.async = true;
+    script.defer = true;
+    script.onerror = () => {
+      recaptchaLoadPromise = null;
+      reject(new Error('Failed to load reCAPTCHA script'));
+    };
+    document.head.appendChild(script);
+  });
+
+  return recaptchaLoadPromise;
+}
+
 export function BotChallenge({
   onVerify,
   onExpire,
@@ -51,11 +138,13 @@ export function BotChallenge({
   const provider = getConfiguredBotProvider();
   const containerRef = useRef<HTMLDivElement>(null);
   const widgetIdRef = useRef<string | number | null>(null);
+  const mountedRef = useRef(true);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(!!provider);
 
   const handleError = useCallback(
     (message: string) => {
+      setLoading(false);
       setError(message);
       onError?.(message);
     },
@@ -73,7 +162,14 @@ export function BotChallenge({
   }, [onVerify, onExpire, handleError]);
 
   useEffect(() => {
-    if (!provider || !containerRef.current) {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!provider) {
       setLoading(false);
       return;
     }
@@ -81,54 +177,40 @@ export function BotChallenge({
     const siteKey = getBotChallengeSiteKey(provider);
     if (!siteKey) {
       handleErrorRef.current('Bot protection is misconfigured.');
-      setLoading(false);
       return;
     }
 
-    // Avoid tearing down a live widget when the parent re-renders (form focus, typing, etc.).
     if (widgetIdRef.current != null) {
       setLoading(false);
       return;
     }
 
-    let cancelled = false;
+    let timeoutId: number | undefined;
 
-    const renderTurnstile = () => {
-      if (cancelled || !containerRef.current || !window.turnstile || widgetIdRef.current != null) {
+    const mountTurnstile = () => {
+      if (!mountedRef.current || !containerRef.current || !window.turnstile || widgetIdRef.current != null) {
         return;
       }
 
-      const mount = () => {
-        if (cancelled || !containerRef.current || !window.turnstile || widgetIdRef.current != null) {
-          return;
-        }
-
-        widgetIdRef.current = window.turnstile.render(containerRef.current, {
-          sitekey: siteKey,
-          theme,
-          callback: (token: string) => {
-            setError(null);
-            onVerifyRef.current(token, 'turnstile');
-          },
-          'expired-callback': () => {
-            onExpireRef.current?.();
-          },
-          'error-callback': () => {
-            handleErrorRef.current('Bot verification failed. Please try again.');
-          },
-        });
-        setLoading(false);
-      };
-
-      if (window.turnstile.ready) {
-        window.turnstile.ready(mount);
-      } else {
-        mount();
-      }
+      widgetIdRef.current = window.turnstile.render(containerRef.current, {
+        sitekey: siteKey,
+        theme,
+        callback: (token: string) => {
+          setError(null);
+          onVerifyRef.current(token, 'turnstile');
+        },
+        'expired-callback': () => {
+          onExpireRef.current?.();
+        },
+        'error-callback': () => {
+          handleErrorRef.current('Bot verification failed. Please try again.');
+        },
+      });
+      setLoading(false);
     };
 
-    const renderRecaptcha = () => {
-      if (cancelled || !containerRef.current || !window.grecaptcha?.render || widgetIdRef.current != null) {
+    const mountRecaptcha = () => {
+      if (!mountedRef.current || !containerRef.current || !window.grecaptcha?.render || widgetIdRef.current != null) {
         return;
       }
 
@@ -150,44 +232,54 @@ export function BotChallenge({
       setLoading(false);
     };
 
-    if (provider === 'turnstile') {
-      const existingScript = document.querySelector(
-        'script[src*="challenges.cloudflare.com/turnstile"]',
-      );
-      if (window.turnstile?.render) {
-        renderTurnstile();
-      } else if (existingScript) {
-        existingScript.addEventListener('load', renderTurnstile, { once: true });
-      } else {
-        const script = document.createElement('script');
-        script.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
-        script.async = true;
-        script.onload = () => renderTurnstile();
-        script.onerror = () => handleErrorRef.current('Failed to load bot protection.');
-        document.head.appendChild(script);
+    const boot = async () => {
+      try {
+        timeoutId = window.setTimeout(() => {
+          if (mountedRef.current && widgetIdRef.current == null) {
+            handleErrorRef.current('Bot protection timed out. Please refresh and try again.');
+          }
+        }, LOAD_TIMEOUT_MS);
+
+        if (provider === 'turnstile') {
+          await loadTurnstileApi();
+          if (!mountedRef.current) return;
+          mountTurnstile();
+        } else {
+          await loadRecaptchaApi();
+          if (!mountedRef.current) return;
+          mountRecaptcha();
+        }
+      } catch (err) {
+        if (!mountedRef.current) return;
+        handleErrorRef.current(
+          err instanceof Error ? err.message : 'Failed to load bot protection.',
+        );
       }
-    } else {
-      if (window.grecaptcha?.render) {
-        renderRecaptcha();
-      } else {
-        window.onRecaptchaLoad = () => renderRecaptcha();
-        const script = document.createElement('script');
-        script.src =
-          'https://www.google.com/recaptcha/api.js?onload=onRecaptchaLoad&render=explicit';
-        script.async = true;
-        script.defer = true;
-        script.onerror = () => handleErrorRef.current('Failed to load bot protection.');
-        document.head.appendChild(script);
-      }
+    };
+
+    // Ref is attached after paint; retry once if the effect ran too early.
+    if (!containerRef.current) {
+      const retryId = window.requestAnimationFrame(() => {
+        if (mountedRef.current && containerRef.current) {
+          void boot();
+        }
+      });
+      return () => {
+        window.cancelAnimationFrame(retryId);
+        if (timeoutId) window.clearTimeout(timeoutId);
+      };
     }
 
+    void boot();
+
     return () => {
-      cancelled = true;
+      if (timeoutId) window.clearTimeout(timeoutId);
     };
   }, [provider, theme]);
 
   const resetChallenge = () => {
     setError(null);
+    setLoading(false);
     if (provider === 'turnstile' && widgetIdRef.current != null && window.turnstile?.reset) {
       window.turnstile.reset(String(widgetIdRef.current));
     } else if (provider === 'recaptcha' && widgetIdRef.current != null && window.grecaptcha?.reset) {
