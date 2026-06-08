@@ -1,5 +1,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import type { BotProvider } from '@/lib/botChallengeConfig';
+import { submitPublicForm } from '@/services/submitPublicForm';
 
 interface ContactFormMetrics {
   submissionStartTime: number;
@@ -98,11 +100,18 @@ export const useContactFormSecurity = () => {
 
       if (error) throw error;
 
-      const status = data[0] || {
-        rate_limit_ok: false,
-        current_count: 999,
-        reset_time: new Date().toISOString(),
-        blocked_until: new Date().toISOString()
+      const row = data?.[0] as {
+        rate_limit_ok?: boolean;
+        current_count?: number;
+        reset_time?: string;
+        blocked_until?: string;
+      } | undefined;
+
+      const status: RateLimitStatus = {
+        rateLimitOk: row?.rate_limit_ok ?? false,
+        currentCount: row?.current_count ?? 999,
+        resetTime: row?.reset_time ?? new Date().toISOString(),
+        blockedUntil: row?.blocked_until,
       };
 
       setRateLimitStatus(status);
@@ -216,8 +225,10 @@ export const useContactFormSecurity = () => {
     };
   }, [metrics]);
 
-  // Submit form with security checks
-  const submitSecureForm = useCallback(async (formData: any): Promise<{
+  const submitSecureForm = useCallback(async (
+    formData: Record<string, string>,
+    bot?: { token?: string; provider?: BotProvider },
+  ): Promise<{
     success: boolean;
     message: string;
     submissionId?: string;
@@ -260,33 +271,33 @@ export const useContactFormSecurity = () => {
         };
       }
 
-      // Prepare submission metadata
+      const ipResponse = await fetch('https://api.ipify.org?format=json');
+      const ipData = await ipResponse.json();
+
       const submissionMetadata = {
-        ip_address: await fetch('https://api.ipify.org?format=json').then(r => r.json()).then(d => d.ip),
+        ip_address: ipData.ip,
         user_agent: navigator.userAgent,
         referrer: document.referrer,
         session_id: metrics.sessionId,
-        honeypot_field: '', // Should be empty
+        honeypot_field: formData.honeypot ?? '',
         submission_time_ms: Date.now() - metrics.submissionStartTime,
         form_interactions: metrics.formInteractions,
         csrf_token: csrfToken.token
       };
 
-      // Submit to backend
-      const { data, error } = await supabase
-        .rpc('submit_contact_form', {
-          form_data: sanitizedData,
-          submission_metadata: submissionMetadata
-        });
+      const result = await submitPublicForm({
+        formType: 'contact',
+        formData: { ...sanitizedData, honeypot: formData.honeypot ?? '' },
+        metadata: submissionMetadata,
+        botToken: bot?.token,
+        botProvider: bot?.provider,
+      });
 
-      if (error) throw error;
-
-      const result = data[0];
       return {
         success: result.success,
         message: result.message,
-        submissionId: result.submission_id,
-        requiresReview: result.requires_review
+        submissionId: result.submissionId,
+        requiresReview: result.requiresReview,
       };
 
     } catch (error) {

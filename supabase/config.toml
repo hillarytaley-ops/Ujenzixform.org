@@ -43,6 +43,10 @@ verify_jwt = false
 [functions.rate-limit]
 verify_jwt = false
 
+# Contact + feedback: bot challenge verified server-side; no user JWT.
+[functions.submit-public-form]
+verify_jwt = false
+
 # Paystack: JWT checked inside handler (invoke sends user Bearer token).
 [functions.paystack-initialize]
 verify_jwt = false

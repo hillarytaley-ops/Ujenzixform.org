@@ -47,6 +47,11 @@ export const RATE_LIMITS: Record<string, RateLimitConfig> = {
     maxRequests: 5,
     blockDurationMs: 60 * 60 * 1000,
   },
+  feedback_form: {
+    windowMs: 60 * 60 * 1000,
+    maxRequests: 3,
+    blockDurationMs: 60 * 60 * 1000,
+  },
   password_reset: {
     windowMs: 60 * 60 * 1000,
     maxRequests: 3,

@@ -10,8 +10,10 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Star, MessageSquare, Shield, AlertTriangle, CheckCircle } from "lucide-react";
-import { SUPABASE_URL, SUPABASE_ANON_KEY } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { BotChallenge, useBotChallengeState } from "@/components/security/BotChallenge";
+import { isBotChallengeConfigured } from "@/lib/botChallengeConfig";
+import { submitPublicForm } from "@/services/submitPublicForm";
 
 const feedbackSchema = z.object({
   name: z
@@ -61,6 +63,8 @@ export function FeedbackForm({ onSuccess }: FeedbackFormProps) {
     resetTime: string | null;
   }>({ canSubmit: true, resetTime: null });
   const { toast } = useToast();
+  const botChallenge = useBotChallengeState();
+  const botProtectionEnabled = isBotChallengeConfigured();
 
   // Check rate limits
   useEffect(() => {
@@ -223,6 +227,16 @@ export function FeedbackForm({ onSuccess }: FeedbackFormProps) {
         return;
       }
 
+      if (botProtectionEnabled && !botChallenge.isReady) {
+        toast({
+          title: "Security Check Required",
+          description: "Please complete the bot protection check before submitting.",
+          variant: "destructive",
+        });
+        setIsSubmitting(false);
+        return;
+      }
+
       // Sanitize input data
       const sanitizedData = {
         name: data.name ? sanitizeInput(data.name, 'name') : null,
@@ -232,29 +246,28 @@ export function FeedbackForm({ onSuccess }: FeedbackFormProps) {
         rating: data.rating
       };
 
-      const response = await fetch(`${SUPABASE_URL}/rest/v1/feedback`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          apikey: SUPABASE_ANON_KEY,
-          Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
-          Prefer: 'return=minimal',
+      const result = await submitPublicForm({
+        formType: 'feedback',
+        formData: {
+          ...sanitizedData,
+          honeypot: data.honeypot,
         },
-        body: JSON.stringify({
-          // Send all fields separately for proper admin dashboard display
-          email: sanitizedData.email,
-          name: sanitizedData.name || 'Anonymous',
-          category: sanitizedData.subject,
-          comment: sanitizedData.message,
-          rating: sanitizedData.rating,
-          status: 'pending'
-        })
+        metadata: {
+          submission_time_ms: Date.now() - submissionStartTime,
+        },
+        botToken: botChallenge.token ?? undefined,
+        botProvider: botChallenge.provider ?? undefined,
       });
-      
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('Feedback submission error:', errorText);
-        throw new Error('Failed to submit feedback');
+
+      if (!result.success) {
+        toast({
+          title: result.requiresReview ? "Submission Under Review" : "Unable to Submit",
+          description: result.message,
+          variant: "destructive",
+        });
+        botChallenge.clearVerification();
+        setIsSubmitting(false);
+        return;
       }
 
       // Update rate limit counter
@@ -273,6 +286,7 @@ export function FeedbackForm({ onSuccess }: FeedbackFormProps) {
       reset();
       setRating(0);
       setSecurityScore(100);
+      botChallenge.clearVerification();
       onSuccess?.();
     } catch (error) {
       console.error("Error submitting feedback:", error);
@@ -461,12 +475,17 @@ export function FeedbackForm({ onSuccess }: FeedbackFormProps) {
           )}
         </div>
 
+        <BotChallenge
+          onVerify={botChallenge.setVerified}
+          onExpire={botChallenge.clearVerification}
+        />
+
         {/* Security Notice */}
         <Alert className="border-green-200 bg-green-50 dark:border-green-900 dark:bg-green-950/30">
           <Shield className="h-4 w-4" />
           <AlertDescription>
-            <strong>How we protect this form:</strong> HTTPS, a hidden honeypot field, basic spam checks, and a
-            per-browser rate limit (a few submissions per hour). We may add stricter checks if abuse increases.
+            <strong>How we protect this form:</strong> HTTPS, honeypot field, server-side rate limits, spam scoring
+            {botProtectionEnabled ? ", and Cloudflare Turnstile / reCAPTCHA bot blocking." : "."}
           </AlertDescription>
         </Alert>
 
@@ -483,7 +502,7 @@ export function FeedbackForm({ onSuccess }: FeedbackFormProps) {
         <div className="pt-4">
           <Button 
             type="submit" 
-            disabled={isSubmitting || !rateLimitStatus.canSubmit} 
+            disabled={isSubmitting || !rateLimitStatus.canSubmit || (botProtectionEnabled && !botChallenge.isReady)} 
             className="w-full h-14 text-lg font-semibold"
             size="lg"
           >

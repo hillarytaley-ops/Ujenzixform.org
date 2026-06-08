@@ -31,11 +31,28 @@ VITE_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 
 ## Optional Variables
 
-### Security - reCAPTCHA
+### Security - Bot protection (Turnstile / reCAPTCHA)
 
-Get from: [Google reCAPTCHA Admin](https://www.google.com/recaptcha/admin)
+Blocks automated spam and AI bots on contact and feedback forms. **Turnstile is recommended** (already allowed in CSP).
 
-Use reCAPTCHA v2 "I'm not a robot" Checkbox type.
+**Client** (`.env.local` / Vercel):
+
+```env
+VITE_TURNSTILE_SITE_KEY=0x4AAAAAAA...
+# or fallback:
+VITE_RECAPTCHA_SITE_KEY=6Le...your-site-key
+```
+
+**Server** (Supabase Dashboard → Edge Functions → Secrets):
+
+```text
+TURNSTILE_SECRET_KEY=...
+RECAPTCHA_SECRET_KEY=...
+```
+
+Deploy the edge function: `supabase functions deploy submit-public-form`
+
+Use reCAPTCHA v2 "I'm not a robot" Checkbox type if using Google.
 
 ```env
 VITE_RECAPTCHA_SITE_KEY=6Le...your-site-key

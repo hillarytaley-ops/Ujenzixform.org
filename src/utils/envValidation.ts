@@ -27,9 +27,14 @@ const ENV_CONFIG: EnvConfig[] = [
     validator: (v) => v.startsWith('eyJ') && v.length > 100
   },
   {
+    key: 'VITE_TURNSTILE_SITE_KEY',
+    required: false,
+    description: 'Cloudflare Turnstile site key (recommended bot protection)',
+  },
+  {
     key: 'VITE_RECAPTCHA_SITE_KEY',
     required: false,
-    description: 'Google reCAPTCHA v2 site key',
+    description: 'Google reCAPTCHA v2 site key (fallback bot protection)',
     validator: (v) => v.length === 40
   },
   {
@@ -149,8 +154,9 @@ export const logEnvironmentStatus = (): void => {
 /**
  * Check if a specific feature is configured
  */
-export const isFeatureConfigured = (feature: 'recaptcha' | 'stripe' | 'maps' | 'sentry'): boolean => {
+export const isFeatureConfigured = (feature: 'recaptcha' | 'turnstile' | 'stripe' | 'maps' | 'sentry'): boolean => {
   const featureKeys: Record<string, string> = {
+    turnstile: 'VITE_TURNSTILE_SITE_KEY',
     recaptcha: 'VITE_RECAPTCHA_SITE_KEY',
     stripe: 'VITE_STRIPE_PUBLIC_KEY',
     maps: 'VITE_GOOGLE_MAPS_API_KEY',

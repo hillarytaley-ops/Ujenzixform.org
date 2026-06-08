@@ -24,7 +24,7 @@ export const RecaptchaWrapper: React.FC<RecaptchaWrapperProps> = ({
   onExpired,
   theme = 'light',
   size = 'normal',
-  siteKey = process.env.REACT_APP_RECAPTCHA_SITE_KEY || '6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI' // Test key
+  siteKey = import.meta.env.VITE_RECAPTCHA_SITE_KEY || ''
 }) => {
   const recaptchaRef = useRef<HTMLDivElement>(null);
   const [isLoaded, setIsLoaded] = useState(false);

@@ -14,8 +14,10 @@ import Navigation from "@/components/Navigation";
 import Footer from "@/components/Footer";
 import { useToast } from "@/hooks/use-toast";
 import AnimatedSection from "@/components/AnimatedSection";
-import { SUPABASE_URL, SUPABASE_ANON_KEY } from "@/integrations/supabase/client";
 import { SUPPORT_PHONE_PRIMARY, COMPANY_OFFICE_LABEL, COMPANY_PHYSICAL_ADDRESS, COMPANY_POSTAL_ADDRESS, COMPANY_OFFICE_LOCATION, COMPANY_MAPS_DIRECTIONS_URL } from "@/config/appIdentity";
+import { useContactFormSecurity } from "@/hooks/useContactFormSecurity";
+import { BotChallenge, useBotChallengeState } from "@/components/security/BotChallenge";
+import { isBotChallengeConfigured } from "@/lib/botChallengeConfig";
 
 function nameSchema(label: string) {
   return z
@@ -54,6 +56,9 @@ type ContactForm = z.infer<typeof contactSchema>;
 const Contact = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
+  const { trackInteraction, submitSecureForm } = useContactFormSecurity();
+  const botChallenge = useBotChallengeState();
+  const botProtectionEnabled = isBotChallengeConfigured();
 
   const {
     register,
@@ -71,12 +76,10 @@ const Contact = () => {
 
   const messageLen = useWatch({ control, name: "message", defaultValue: "" })?.length ?? 0;
 
-  // Enhanced form submission with basic security
   const onSubmit = async (data: ContactForm) => {
     setIsSubmitting(true);
     
     try {
-      // Basic security validation
       if (data.honeypot && data.honeypot.length > 0) {
         toast({
           title: "Security Check Failed",
@@ -95,31 +98,38 @@ const Contact = () => {
         return;
       }
 
-      // Use direct fetch to Supabase REST API (more reliable than client)
-      // SUPABASE_URL and SUPABASE_ANON_KEY imported from centralized client
-      
-      // Format the comment with all contact form fields
-      const formattedComment = `Name: ${data.firstName} ${data.lastName}\nEmail: ${data.email}\nPhone: ${data.phone}\nSubject: ${data.subject}\n\nMessage:\n${data.message}`;
-      
-      const response = await fetch(`${SUPABASE_URL}/rest/v1/feedback`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'apikey': SUPABASE_ANON_KEY,
-          'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
-          'Prefer': 'return=minimal'
-        },
-        body: JSON.stringify({
-          category: '[CONTACT FORM]',
-          comment: formattedComment,
-          rating: null
-        })
-      });
+      if (botProtectionEnabled && !botChallenge.isReady) {
+        toast({
+          title: "Security Check Required",
+          description: "Please complete the bot protection check before submitting.",
+          variant: "destructive",
+        });
+        return;
+      }
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('Contact form submission error:', errorText);
-        throw new Error('Failed to submit contact form');
+      const result = await submitSecureForm(
+        {
+          firstName: data.firstName,
+          lastName: data.lastName,
+          email: data.email,
+          phone: data.phone,
+          subject: data.subject,
+          message: data.message,
+          honeypot: data.honeypot,
+        },
+        botProtectionEnabled
+          ? { token: botChallenge.token ?? undefined, provider: botChallenge.provider ?? undefined }
+          : undefined,
+      );
+
+      if (!result.success) {
+        toast({
+          title: result.requiresReview ? "Submission Under Review" : "Unable to Send",
+          description: result.message,
+          variant: "destructive",
+        });
+        botChallenge.clearVerification();
+        return;
       }
       
       toast({
@@ -130,6 +140,7 @@ const Contact = () => {
       });
 
       reset();
+      botChallenge.clearVerification();
       
     } catch (error) {
       console.error("Error sending message:", error);
@@ -141,6 +152,11 @@ const Contact = () => {
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const fieldInteractionProps = {
+    onFocus: () => trackInteraction("focus"),
+    onInput: () => trackInteraction("typing"),
   };
 
   return (
@@ -240,6 +256,7 @@ const Contact = () => {
                         placeholder="Enter your first name"
                         {...register("firstName")}
                         maxLength={50}
+                        {...fieldInteractionProps}
                       />
                       {errors.firstName && (
                         <p className="text-sm text-destructive">{errors.firstName.message}</p>
@@ -252,6 +269,7 @@ const Contact = () => {
                         placeholder="Enter your last name"
                         {...register("lastName")}
                         maxLength={50}
+                        {...fieldInteractionProps}
                       />
                       {errors.lastName && (
                         <p className="text-sm text-destructive">{errors.lastName.message}</p>
@@ -268,6 +286,7 @@ const Contact = () => {
                       {...register("email")}
                       maxLength={100}
                       autoComplete="email"
+                      {...fieldInteractionProps}
                     />
                     {errors.email && (
                       <p className="text-sm text-destructive">{errors.email.message}</p>
@@ -283,6 +302,7 @@ const Contact = () => {
                       {...register("phone")}
                       maxLength={20}
                       autoComplete="tel"
+                      {...fieldInteractionProps}
                     />
                     {errors.phone && (
                       <p className="text-sm text-destructive">{errors.phone.message}</p>
@@ -297,6 +317,7 @@ const Contact = () => {
                       {...register("subject")}
                       maxLength={200}
                       autoComplete="off"
+                      {...fieldInteractionProps}
                     />
                     {errors.subject && (
                       <p className="text-sm text-destructive">{errors.subject.message}</p>
@@ -311,6 +332,7 @@ const Contact = () => {
                       rows={6}
                       {...register("message")}
                       maxLength={2000}
+                      {...fieldInteractionProps}
                     />
                     {errors.message && (
                       <p className="text-sm text-destructive">{errors.message.message}</p>
@@ -361,7 +383,18 @@ const Contact = () => {
                       <p className="text-sm text-destructive">{errors.gdprConsent.message}</p>
                     )}
                   </div>
-                  <Button type="submit" disabled={isSubmitting} className="w-full" size="lg">
+
+                  <BotChallenge
+                    onVerify={botChallenge.setVerified}
+                    onExpire={botChallenge.clearVerification}
+                  />
+
+                  <Button
+                    type="submit"
+                    disabled={isSubmitting || (botProtectionEnabled && !botChallenge.isReady)}
+                    className="w-full"
+                    size="lg"
+                  >
                     {isSubmitting ? (
                       <>
                         <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
@@ -387,10 +420,12 @@ const Contact = () => {
                       </span>
                       <span className="flex items-center gap-1">
                         <CheckCircle className="h-3 w-3 text-green-500 shrink-0" />
-                        Consent recorded with your message
+                        {botProtectionEnabled ? "Bot protection (Turnstile/reCAPTCHA)" : "Server-side rate limits"}
                       </span>
                     </div>
-                    <p>We may add CAPTCHA or stricter checks if spam increases.</p>
+                    {!botProtectionEnabled && (
+                      <p>Set VITE_TURNSTILE_SITE_KEY (recommended) or VITE_RECAPTCHA_SITE_KEY for stronger bot blocking.</p>
+                    )}
                   </div>
                 </form>
               </CardContent>
