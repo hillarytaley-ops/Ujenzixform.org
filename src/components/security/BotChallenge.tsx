@@ -25,7 +25,6 @@ interface BotChallengeProps {
 declare global {
   interface Window {
     turnstile?: {
-      ready: (callback: () => void) => void;
       render: (
         container: HTMLElement,
         options: Record<string, unknown>,
@@ -51,12 +50,9 @@ function waitForTurnstileApi(timeoutMs: number): Promise<void> {
     const started = Date.now();
 
     const tick = () => {
+      // Async script load: poll for render — do NOT call turnstile.ready() with async/defer.
       if (window.turnstile?.render) {
-        if (window.turnstile.ready) {
-          window.turnstile.ready(() => resolve());
-        } else {
-          resolve();
-        }
+        resolve();
         return;
       }
       if (Date.now() - started >= timeoutMs) {
