@@ -11,7 +11,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { EtimsTestPanel } from "@/components/admin/EtimsTestPanel";
+import { EtimsLiveE2EPanel } from "@/components/admin/EtimsLiveE2EPanel";
 import { DashboardLoader } from "@/components/ui/DashboardLoader";
 import { toast } from "sonner";
 import { 
@@ -2381,7 +2381,7 @@ const SupplierDashboard = () => {
           >
             <div className="flex flex-col items-center gap-1.5 sm:gap-2 px-1">
               <Landmark className="h-5 w-5 sm:h-6 sm:w-6 shrink-0" />
-              <span className="text-[10px] sm:text-xs md:text-sm text-center leading-tight">eTIMS test</span>
+              <span className="text-[10px] sm:text-xs md:text-sm text-center leading-tight">eTIMS live</span>
             </div>
           </Button>
           <Button 
@@ -2409,7 +2409,7 @@ const SupplierDashboard = () => {
             <TabsTrigger value="analytics">Analytics</TabsTrigger>
             <TabsTrigger value="finance">Finance</TabsTrigger>
             <TabsTrigger value="invoice">Invoice</TabsTrigger>
-            <TabsTrigger value="etims-test">eTIMS test</TabsTrigger>
+            <TabsTrigger value="etims-test">eTIMS live</TabsTrigger>
             <TabsTrigger value="reports">Reports</TabsTrigger>
           </TabsList>
 
@@ -3024,15 +3024,24 @@ const SupplierDashboard = () => {
             <Card className={cardBg}>
               <CardHeader>
                 <CardTitle className={`flex items-center gap-2 ${textColor}`}>
-                  <Landmark className="h-5 w-5 text-sky-500 shrink-0" />
-                  eTIMS integrator
+                  <Landmark className="h-5 w-5 text-emerald-500 shrink-0" />
+                  eTIMS live testing
                 </CardTitle>
                 <CardDescription className={mutedText}>
-                  Test your KRA connection and submit tax invoices from purchase orders.
+                  Configure your KRA profile, map product item codes, and submit one-way sale invoices from real purchase
+                  orders.
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <EtimsTestPanel enforceSupplierId={supplierRecordId} onOpenCatalogForEtims={openCatalogForEtimsProduct} />
+                <EtimsLiveE2EPanel
+                  variant="supplier"
+                  enforceSupplierId={supplierRecordId}
+                  isDarkMode={isDarkMode}
+                  textColor={textColor}
+                  mutedText={mutedText}
+                  cardBg={cardBg}
+                  onOpenCatalogForEtims={openCatalogForEtimsProduct}
+                />
               </CardContent>
             </Card>
           </TabsContent>

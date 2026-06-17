@@ -29,6 +29,7 @@ import { useToast } from '@/hooks/use-toast';
 import { sortSupplyChainDocsNewestFirst } from '@/utils/sortSupplyChainDocs';
 import { chunkArray } from '@/utils/performance';
 import { EtimsFiscalReceiptView } from '@/components/etims/EtimsFiscalReceiptView';
+import { BuilderEtimsBillingPanel } from '@/components/etims/BuilderEtimsBillingPanel';
 import { pickEtimsTotalAmountKes, resolveEtimsReceiptTaxBreakdown } from '@/lib/etims/formatEtimsReceiptForUi';
 import { PaystackCheckout, isPaystackTestModeBanner } from '@/components/payment/PaystackCheckout';
 import { Separator } from '@/components/ui/separator';
@@ -1176,6 +1177,8 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
 
   return (
     <div className="space-y-4">
+      {userRole === 'builder' ? <BuilderEtimsBillingPanel /> : null}
+
       <div className="flex items-center justify-between gap-3">
         <h3 className="text-lg font-semibold">Supplier invoices (pay here)</h3>
         <Button

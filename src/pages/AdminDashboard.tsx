@@ -126,7 +126,7 @@ import { SalesMarketingHub } from "@/components/admin/SalesMarketingHub";
 import { AnalyticsDashboard } from "@/components/analytics/AnalyticsDashboard";
 import { ReviewsManager } from "@/components/reviews/ReviewsManager";
 import { SMSTestPanel } from "@/components/admin/SMSTestPanel";
-import { EtimsTestPanel } from "@/components/admin/EtimsTestPanel";
+import { EtimsLiveE2EPanel } from "@/components/admin/EtimsLiveE2EPanel";
 import { TisIntegratorHub } from "@/components/admin/tis-integrator";
 import { Camera, UserCog, MessageCircle, Link2, Navigation as NavigationIcon } from "lucide-react";
 import { CameraAssignment } from "@/components/admin/CameraAssignment";
@@ -4913,24 +4913,25 @@ const AdminDashboard = () => {
             <Card className="bg-slate-900/50 border-slate-800">
               <CardHeader>
                 <CardTitle className="text-white flex items-center gap-2">
-                  <Landmark className="h-5 w-5 text-sky-400" />
-                  KRA eTIMS sandbox
+                  <Landmark className="h-5 w-5 text-emerald-400" />
+                  KRA eTIMS live testing
                 </CardTitle>
                 <CardDescription className="text-gray-400">
-                  Connection tests and purchase-order invoice smoke tests via Edge{" "}
-                  <code className="text-slate-300">etims-proxy</code>. For integrator operations use{" "}
+                  End-to-end with real suppliers, buyers, and product item codes. Configure each party, then submit
+                  one-way sale invoices via Edge <code className="text-slate-300">etims-proxy</code>. For integrator
+                  certification use{" "}
                   <button
                     type="button"
                     className="font-medium text-sky-400 hover:underline"
                     onClick={() => setActiveTab("tis-integrator")}
                   >
                     TIS Integrator
-                  </button>{" "}
-                  under the eTIMS menu.
+                  </button>
+                  .
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <EtimsTestPanel />
+                <EtimsLiveE2EPanel variant="admin" />
               </CardContent>
             </Card>
           </TabsContent>

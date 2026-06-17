@@ -144,6 +144,8 @@ export type EtimsPurchaseOrderSubmitCardProps = {
   invoiceCountryCode?: string | null;
   /** Supplier dashboard: jump to My Materials for this catalog / materials id */
   onOpenCatalogForEtims?: (catalogMaterialId: string) => void;
+  /** Live E2E: sale (S) invoices only — no credit-note workflow in this panel */
+  oneWaySaleOnly?: boolean;
 };
 
 export const EtimsPurchaseOrderSubmitCard: React.FC<EtimsPurchaseOrderSubmitCardProps> = ({
@@ -153,6 +155,7 @@ export const EtimsPurchaseOrderSubmitCard: React.FC<EtimsPurchaseOrderSubmitCard
   invoiceExchangeRate,
   invoiceCountryCode,
   onOpenCatalogForEtims,
+  oneWaySaleOnly = false,
 }) => {
   const { toast } = useToast();
   const [poId, setPoId] = useState("");
@@ -452,8 +455,14 @@ export const EtimsPurchaseOrderSubmitCard: React.FC<EtimsPurchaseOrderSubmitCard
             <Send className="h-5 w-5 shrink-0 text-sky-600" />
           )}
           <div>
-            <CardTitle className="text-base">Submit purchase order as invoice</CardTitle>
-            <CardDescription>Pick an order, confirm item codes, then send to the integrator.</CardDescription>
+            <CardTitle className="text-base">
+              {oneWaySaleOnly ? "Submit sale invoice (one-way E2E)" : "Submit purchase order as invoice"}
+            </CardTitle>
+            <CardDescription>
+              {oneWaySaleOnly
+                ? "Pick a real purchase order with mapped item codes and submit a sale (S) invoice to KRA. Credit notes are not part of this test path."
+                : "Pick an order, confirm item codes, then send to the integrator."}
+            </CardDescription>
           </div>
         </div>
       </CardHeader>
