@@ -934,8 +934,8 @@ How can I help you today?`;
         message_id: `rating-${conversationId || Date.now()}`,
         user_id: userId,
         feedback_type: rating >= 4 ? 'positive' : 'negative',
-        message_content: ratingComment,
-        metadata: { rating, staffName, chatMode }
+        message_content: ratingComment || null,
+        metadata: { rating, staffName, chatMode, userName, userEmail },
       }).catch(() => {});
 
       toast({ title: '⭐ Thank you for your feedback!' });
@@ -1921,10 +1921,24 @@ ${staffOnline > 0 ? `\n💬 **${staffOnline} staff online** - Type "live chat" f
       msg.id === messageId ? { ...msg, feedback } : msg
     ));
 
+    const message = messages.find(msg => msg.id === messageId);
+    const messageIndex = messages.findIndex(msg => msg.id === messageId);
+    const priorUserMessage = messageIndex > 0
+      ? [...messages.slice(0, messageIndex)].reverse().find(msg => msg.role === 'user')
+      : undefined;
+
     await supabase.from('chat_feedback').insert({
       message_id: messageId,
       user_id: userId,
-      feedback_type: feedback
+      feedback_type: feedback,
+      message_content: message?.content || null,
+      user_query: priorUserMessage?.content || null,
+      metadata: {
+        userName,
+        userEmail,
+        chatMode,
+        rating: null,
+      },
     }).catch(() => {});
 
     toast({

@@ -105,8 +105,14 @@ interface ChatFeedback {
   user_id: string | null;
   feedback_type: 'positive' | 'negative';
   message_content: string | null;
+  user_query: string | null;
   metadata: any;
   created_at: string;
+  status?: 'pending' | 'answered';
+  staff_response?: string | null;
+  staff_response_at?: string | null;
+  staff_responder_id?: string | null;
+  staff_responder_name?: string | null;
 }
 
 interface ChatTranscript {
@@ -140,6 +146,8 @@ export function EnhancedCommunicationsManager({ staffId, staffName }: EnhancedCo
   const [showTranscriptDialog, setShowTranscriptDialog] = useState(false);
   const [selectedTranscript, setSelectedTranscript] = useState<ChatTranscript | null>(null);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [feedbackReplies, setFeedbackReplies] = useState<Record<string, string>>({});
+  const [submittingFeedbackId, setSubmittingFeedbackId] = useState<string | null>(null);
   
   const scrollRef = useRef<HTMLDivElement>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -267,13 +275,23 @@ export function EnhancedCommunicationsManager({ staffId, staffName }: EnhancedCo
         const data = await response.json();
         setFeedbacks(data || []);
       } else {
-        console.error('❌ Error fetching feedback:', response.status);
+        const errorText = await response.text();
+        console.error('Error fetching feedback:', response.status, errorText);
+        toast({
+          title: 'Unable to load feedback',
+          description: 'Check that chat feedback migrations are applied and you are signed in as staff.',
+          variant: 'destructive',
+        });
       }
     } catch (error) {
       console.error('Error fetching feedback:', error);
-      // Silent fail for feedback - non-critical
+      toast({
+        title: 'Unable to load feedback',
+        description: 'Network error while loading chat feedback.',
+        variant: 'destructive',
+      });
     }
-  }, [getRestAuthHeaders]);
+  }, [getRestAuthHeaders, toast]);
 
   // Fetch transcripts using REST API
   const fetchTranscripts = useCallback(async () => {
@@ -303,6 +321,14 @@ export function EnhancedCommunicationsManager({ staffId, staffName }: EnhancedCo
   const knownMessageIdsRef = useRef<Set<string>>(new Set());
   const lastMessageCountRef = useRef<number>(0);
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Poll feedback while on feedback tab
+  useEffect(() => {
+    if (activeTab !== 'feedback') return;
+    fetchFeedbacks();
+    const interval = setInterval(fetchFeedbacks, 10000);
+    return () => clearInterval(interval);
+  }, [activeTab, fetchFeedbacks]);
 
   // Initial fetch
   useEffect(() => {
@@ -601,6 +627,59 @@ export function EnhancedCommunicationsManager({ staffId, staffName }: EnhancedCo
     }
   };
 
+  const handleFeedbackReply = async (feedbackId: string) => {
+    const responseText = (feedbackReplies[feedbackId] || '').trim();
+    if (!responseText) return;
+
+    setSubmittingFeedbackId(feedbackId);
+    try {
+      const authHeaders = await getRestAuthHeaders();
+      if (!authHeaders) {
+        toast({
+          variant: 'destructive',
+          title: 'Not signed in',
+          description: 'Sign in with your staff account to reply to feedback.',
+        });
+        return;
+      }
+
+      const now = new Date().toISOString();
+      const patchResponse = await fetch(`${SUPABASE_URL}/rest/v1/chat_feedback?id=eq.${feedbackId}`, {
+        method: 'PATCH',
+        headers: {
+          ...authHeaders,
+          Prefer: 'return=representation',
+        },
+        body: JSON.stringify({
+          staff_response: responseText,
+          staff_response_at: now,
+          staff_responder_id: currentUserId,
+          staff_responder_name: staffName,
+          status: 'answered',
+        }),
+      });
+
+      if (!patchResponse.ok) {
+        const errorText = await patchResponse.text();
+        throw new Error(errorText || `Update failed: ${patchResponse.status}`);
+      }
+
+      const [updated] = await patchResponse.json();
+      setFeedbacks(prev => prev.map(item => (item.id === feedbackId ? { ...item, ...updated } : item)));
+      setFeedbackReplies(prev => ({ ...prev, [feedbackId]: '' }));
+      toast({ title: 'Reply saved', description: 'Your response has been recorded.' });
+    } catch (error) {
+      console.error('Error replying to feedback:', error);
+      toast({
+        variant: 'destructive',
+        title: 'Reply not saved',
+        description: 'Could not save your response. Apply the latest database migration if this persists.',
+      });
+    } finally {
+      setSubmittingFeedbackId(null);
+    }
+  };
+
   // Filter conversations
   const filteredConversations = conversations.filter(c => {
     if (filterStatus !== 'all' && c.status !== filterStatus) return false;
@@ -624,7 +703,8 @@ export function EnhancedCommunicationsManager({ staffId, staffName }: EnhancedCo
     closed: conversations.filter(c => c.status === 'closed').length,
     unread: conversations.reduce((sum, c) => sum + (c.unread_count || 0), 0),
     positiveFeedback: feedbacks.filter(f => f.feedback_type === 'positive').length,
-    negativeFeedback: feedbacks.filter(f => f.feedback_type === 'negative').length
+    negativeFeedback: feedbacks.filter(f => f.feedback_type === 'negative').length,
+    pendingFeedback: feedbacks.filter(f => f.status !== 'answered').length
   };
 
   // Get priority color
@@ -768,7 +848,7 @@ export function EnhancedCommunicationsManager({ staffId, staffName }: EnhancedCo
           <TabsTrigger value="feedback" className="data-[state=active]:bg-cyan-600">
             <Star className="w-4 h-4 mr-2" />
             Feedback
-            <Badge className="ml-2 bg-gray-600">{feedbacks.length}</Badge>
+            <Badge className="ml-2 bg-gray-600">{stats.pendingFeedback}</Badge>
           </TabsTrigger>
           <TabsTrigger value="transcripts" className="data-[state=active]:bg-cyan-600">
             <FileText className="w-4 h-4 mr-2" />
@@ -1026,7 +1106,7 @@ export function EnhancedCommunicationsManager({ staffId, staffName }: EnhancedCo
                             : 'bg-red-900/20 border-red-700'
                         }`}
                       >
-                        <div className="flex items-center justify-between">
+                        <div className="flex items-center justify-between gap-2 flex-wrap">
                           <div className="flex items-center gap-2">
                             {feedback.feedback_type === 'positive' ? (
                               <ThumbsUp className="w-5 h-5 text-green-400" />
@@ -1038,14 +1118,31 @@ export function EnhancedCommunicationsManager({ staffId, staffName }: EnhancedCo
                             }`}>
                               {feedback.feedback_type === 'positive' ? 'Positive' : 'Negative'}
                             </span>
+                            <Badge variant="outline" className={`text-xs ${
+                              feedback.status === 'answered'
+                                ? 'border-green-600 text-green-400'
+                                : 'border-yellow-600 text-yellow-400'
+                            }`}>
+                              {feedback.status === 'answered' ? 'Answered' : 'Pending'}
+                            </Badge>
                           </div>
                           <span className="text-xs text-gray-500">
                             {new Date(feedback.created_at).toLocaleString()}
                           </span>
                         </div>
+                        {feedback.user_query && (
+                          <p className="text-sm text-gray-400 mt-2">
+                            <span className="text-gray-500">User asked:</span> {feedback.user_query}
+                          </p>
+                        )}
                         {feedback.message_content && (
                           <p className="text-sm text-gray-300 mt-2 italic">
                             "{feedback.message_content}"
+                          </p>
+                        )}
+                        {feedback.metadata?.userEmail && (
+                          <p className="text-xs text-gray-500 mt-2 flex items-center gap-1">
+                            <Mail className="w-3 h-3" /> {feedback.metadata.userEmail}
                           </p>
                         )}
                         {feedback.metadata?.rating && (
@@ -1058,6 +1155,41 @@ export function EnhancedCommunicationsManager({ staffId, staffName }: EnhancedCo
                                 }`}
                               />
                             ))}
+                          </div>
+                        )}
+                        {feedback.staff_response ? (
+                          <div className="mt-3 p-3 rounded-lg bg-cyan-900/20 border border-cyan-700/50">
+                            <p className="text-xs text-cyan-400 font-medium mb-1">
+                              Staff reply{feedback.staff_responder_name ? ` · ${feedback.staff_responder_name}` : ''}
+                            </p>
+                            <p className="text-sm text-gray-200 whitespace-pre-line">{feedback.staff_response}</p>
+                            {feedback.staff_response_at && (
+                              <p className="text-xs text-gray-500 mt-2">
+                                {new Date(feedback.staff_response_at).toLocaleString()}
+                              </p>
+                            )}
+                          </div>
+                        ) : (
+                          <div className="mt-3 space-y-2">
+                            <Textarea
+                              value={feedbackReplies[feedback.id] || ''}
+                              onChange={(e) => setFeedbackReplies(prev => ({ ...prev, [feedback.id]: e.target.value }))}
+                              placeholder="Write a response for the team..."
+                              className="bg-gray-700 border-gray-600 text-white min-h-[80px]"
+                            />
+                            <Button
+                              size="sm"
+                              onClick={() => handleFeedbackReply(feedback.id)}
+                              disabled={!(feedbackReplies[feedback.id] || '').trim() || submittingFeedbackId === feedback.id}
+                              className="bg-cyan-600 hover:bg-cyan-700"
+                            >
+                              {submittingFeedbackId === feedback.id ? (
+                                <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                              ) : (
+                                <Send className="w-4 h-4 mr-2" />
+                              )}
+                              Send reply
+                            </Button>
                           </div>
                         )}
                       </div>
