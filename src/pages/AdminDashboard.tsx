@@ -4917,9 +4917,9 @@ const AdminDashboard = () => {
                   KRA eTIMS live testing
                 </CardTitle>
                 <CardDescription className="text-gray-400">
-                  End-to-end with real suppliers, buyers, and product item codes. Configure each party, then submit
-                  one-way sale invoices via Edge <code className="text-slate-300">etims-proxy</code>. For integrator
-                  certification use{" "}
+                  Real suppliers, buyers, and product <code className="text-slate-300">etims_item_code</code> values.
+                  One-way sale invoices through UjenziXform TIS during sandbox certification. OSCU init and KRA API
+                  console:{" "}
                   <button
                     type="button"
                     className="font-medium text-sky-400 hover:underline"

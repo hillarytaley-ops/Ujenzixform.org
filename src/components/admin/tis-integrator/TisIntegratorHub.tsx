@@ -32,8 +32,9 @@ export const TisIntegratorHub: React.FC = () => {
             <div>
               <h2 className={tis.h2}>TIS Integrator Services</h2>
               <p className={tis.subtitle}>
-                Full third-party integrator package — onboard vendor taxpayers, operate KRA eTIMS invoicing, and track
-                certification. This is separate from the eTIMS sandbox test tab.
+                UjenziXform is the KRA third-party TIS integrator — sandbox certification, vendor OSCU onboarding,
+                and API console. Pair with <strong>eTIMS live</strong> for end-to-end tests using real suppliers,
+                buyers, and catalog item codes.
               </p>
             </div>
           </div>

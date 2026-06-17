@@ -365,9 +365,10 @@ export const EtimsTestPanel: React.FC<EtimsTestPanelProps> = ({ enforceSupplierI
         <div className="flex items-start gap-3">
           <Landmark className="mt-0.5 h-5 w-5 shrink-0 text-sky-600 dark:text-sky-400" />
           <div>
-            <p className="text-sm font-medium text-foreground">KRA eTIMS integrator sandbox</p>
+            <p className="text-sm font-medium text-foreground">UjenziXform TIS — KRA sandbox connectivity</p>
             <p className="text-xs text-muted-foreground">
-              Test your connection, then submit a purchase order as a tax invoice.
+              Check reference data (currencies, countries, items) via the UjenziXform TIS gateway before live E2E
+              testing with real suppliers and purchase orders.
             </p>
           </div>
         </div>

@@ -99,10 +99,11 @@ export const EtimsLiveE2EPanel: React.FC<EtimsLiveE2EPanelProps> = ({
         <div className="flex items-start gap-3">
           <Landmark className="mt-0.5 h-5 w-5 shrink-0 text-emerald-600 dark:text-emerald-400" />
           <div>
-            <p className="text-sm font-medium text-foreground">Live eTIMS end-to-end testing</p>
+            <p className="text-sm font-medium text-foreground">UjenziXform TIS — live end-to-end testing</p>
             <p className="text-xs text-muted-foreground">
-              Configure real suppliers and buyers, map product item codes, then submit sale invoices to KRA via your
-              integrator. <strong>One-way only</strong> — credit notes are disabled in this E2E path.
+              UjenziXform is your KRA third-party TIS (not an external integrator). Configure real suppliers, buyers,
+              and product item codes, then submit one-way sale (S) invoices through the TIS gateway during sandbox
+              certification.
             </p>
           </div>
         </div>
@@ -111,11 +112,11 @@ export const EtimsLiveE2EPanel: React.FC<EtimsLiveE2EPanelProps> = ({
 
       <Alert>
         <ArrowRight className="h-4 w-4" />
-        <AlertTitle>One-way test flow</AlertTitle>
+        <AlertTitle>One-way sandbox E2E (sale invoices only)</AlertTitle>
         <AlertDescription className="text-sm">
-          Supplier (taxpayer) issues a <strong>sale (S)</strong> invoice to a configured buyer. Use real catalog
-          products with <code className="text-xs">etims_item_code</code> set. Credit notes and reversals are out of
-          scope for this E2E panel.
+          Each vendor supplier is the KRA taxpayer; UjenziXform TIS transmits the invoice. Use real catalog products
+          with <code className="text-xs">etims_item_code</code> set. Credit notes stay in{" "}
+          <strong>TIS Integrator → Submission ops</strong> until you move vendors to full mode after KRA approval.
         </AlertDescription>
       </Alert>
 
@@ -209,12 +210,12 @@ export const EtimsLiveE2EPanel: React.FC<EtimsLiveE2EPanelProps> = ({
       <Accordion type="single" collapsible className="rounded-lg border">
         <AccordionItem value="sandbox" className="border-0">
           <AccordionTrigger className="px-4 py-3 text-sm hover:no-underline">
-            Advanced: integrator connection sandbox (optional)
+            Advanced: TIS sandbox API connectivity (Currencies / Countries / Items)
           </AccordionTrigger>
           <AccordionContent className="px-4 pb-4">
             <p className="text-xs text-muted-foreground mb-4">
-              Use only to verify Edge secrets and reference data. Live E2E submissions above use real purchase orders
-              and configured parties.
+              Verifies UjenziXform TIS Edge gateway against the KRA sandbox. For vendor OSCU init, item registration,
+              and certification checklist use <strong>TIS Integrator Hub</strong> instead.
             </p>
             <EtimsTestPanel
               enforceSupplierId={enforceSupplierId}

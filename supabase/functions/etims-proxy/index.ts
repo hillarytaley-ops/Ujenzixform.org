@@ -1,5 +1,6 @@
 /**
- * Proxies requests to the approved eTIMS / VFD REST integrator (test or prod).
+ * UjenziXform TIS gateway — proxies authenticated app calls to the KRA eTIMS sandbox (certification) or production
+ * (after approval). UjenziXform is the third-party TIS; this is not an external vendor integrator.
  * Credentials never touch the browser — set Edge secrets:
  *   ETIMS_BASE_URL   e.g. http://46.137.15.155/api/v1  (no trailing slash)
  *   ETIMS_BASIC_USER

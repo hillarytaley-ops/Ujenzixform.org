@@ -193,8 +193,9 @@ export const SupplierEtimsSettingsPanel: React.FC<SupplierEtimsSettingsPanelProp
         <Landmark className="h-4 w-4" />
         <AlertTitle className={textColor}>Legal seller on tax invoices</AlertTitle>
         <AlertDescription className={mutedText}>
-          You are the taxpayer; the marketplace only carries data and calls your configured integrator. API passwords
-          stay in Supabase Edge secrets — use “Integrator reference” for a non-secret tenant or sub-account label only.
+          You are the KRA taxpayer on each tax invoice. UjenziXform operates as the certified third-party TIS — it
+          carries your profile and submits through the platform TIS gateway (credentials in Edge secrets, not in this
+          form). Use “Integrator reference” only for a non-secret tenant label if KRA assigns one.
         </AlertDescription>
       </Alert>
 
