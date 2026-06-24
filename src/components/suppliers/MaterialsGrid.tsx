@@ -19,6 +19,8 @@
 import {
   readPersistedAuthRawStringSync,
   getPostgrestAuthorizationHeaderSync,
+  fetchPostgrestCatalog,
+  readAuthSessionForRest,
 } from '@/utils/supabaseAccessToken';
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -414,7 +416,7 @@ export const MaterialsGrid: React.FC<MaterialsGridProps> = ({
   const [totalMaterialsCount, setTotalMaterialsCount] = useState(0);
   
   // Use AuthContext for reliable auth state (instead of making separate Supabase calls)
-  const { user: authUser, userRole: authUserRole, session } = useAuth();
+  const { user: authUser, userRole: authUserRole, session, loading: authLoading } = useAuth();
 
   /** User JWT for PostgREST catalog reads (anon lost SELECT after DB hardening). */
   const postgrestAuthorization = useMemo(
@@ -738,7 +740,8 @@ export const MaterialsGrid: React.FC<MaterialsGridProps> = ({
   }, [authUser, authUserRole]);
   
   useEffect(() => {
-    // Load materials data
+    // Wait for auth to settle — stale JWT in storage caused 401 catalog reads on mobile for visitors.
+    if (authLoading) return;
     try {
       loadMaterials();
     } catch (error) {
@@ -747,7 +750,7 @@ export const MaterialsGrid: React.FC<MaterialsGridProps> = ({
       setFilteredMaterials([]);
       setLoading(false);
     }
-  }, []);
+  }, [authLoading, session?.access_token]);
 
   useEffect(() => {
     const fetchSuppliers = async () => {
@@ -838,15 +841,10 @@ export const MaterialsGrid: React.FC<MaterialsGridProps> = ({
     const BATCH_SIZE = 100;
     const moreMaterialsRaw: any[] = [];
     for (let offset = currentCount; offset < totalMaterialsCount; offset += BATCH_SIZE) {
-      const response = await fetch(
-        `${SUPABASE_URL}/rest/v1/admin_material_images?select=id,name,category,description,unit,suggested_price,image_url&order=created_at.desc&limit=${BATCH_SIZE}&offset=${offset}`,
-        {
-          headers: {
-            apikey: SUPABASE_ANON_KEY,
-            Authorization: postgrestAuthorization,
-            'Content-Type': 'application/json',
-          },
-        }
+      const response = await fetchPostgrestCatalog(
+        `/rest/v1/admin_material_images?select=id,name,category,description,unit,suggested_price,image_url&order=created_at.desc&limit=${BATCH_SIZE}&offset=${offset}`,
+        {},
+        session?.access_token
       );
       if (!response.ok) break;
       const data = await response.json();
@@ -996,15 +994,10 @@ export const MaterialsGrid: React.FC<MaterialsGridProps> = ({
       const idsToFetch = newIds.slice(0, BATCH_SIZE);
       const idsParam = idsToFetch.map(id => `"${id}"`).join(',');
       
-      const response = await fetch(
-        `${SUPABASE_URL}/rest/v1/admin_material_images?select=id,image_url&id=in.(${idsParam})`,
-        {
-          headers: {
-            'apikey': SUPABASE_ANON_KEY,
-            'Authorization': postgrestAuthorization,
-            'Content-Type': 'application/json'
-          }
-        }
+      const response = await fetchPostgrestCatalog(
+        `/rest/v1/admin_material_images?select=id,image_url&id=in.(${idsParam})`,
+        {},
+        session?.access_token
       );
       
       if (response.ok) {
@@ -1053,7 +1046,9 @@ export const MaterialsGrid: React.FC<MaterialsGridProps> = ({
   const loadMaterials = async () => {
     try {
       setLoading(true);
-      
+
+      const { accessToken: catalogToken } = await readAuthSessionForRest();
+
       // iOS/Safari specific: Add delay to prevent race conditions
       if (isIOSSafari()) {
         await new Promise(resolve => setTimeout(resolve, 100));
@@ -1074,18 +1069,15 @@ export const MaterialsGrid: React.FC<MaterialsGridProps> = ({
       > = {};
       
       try {
-        const pricesResponse = await fetch(
-          `${SUPABASE_URL}/rest/v1/supplier_product_prices?select=*`,
+        const pricesResponse = await fetchPostgrestCatalog(
+          '/rest/v1/supplier_product_prices?select=*',
           {
             headers: {
-              'apikey': SUPABASE_ANON_KEY,
-              'Authorization': postgrestAuthorization,
-              'Content-Type': 'application/json',
               'Cache-Control': 'no-cache, no-store, must-revalidate',
-              'Pragma': 'no-cache'
+              'Pragma': 'no-cache',
             },
-            cache: 'no-store'
-          }
+          },
+          catalogToken
         );
         
         if (pricesResponse.ok) {
@@ -1156,53 +1148,45 @@ export const MaterialsGrid: React.FC<MaterialsGridProps> = ({
         try {
           // Step 1: Load first batch with images + rest as metadata only (PARALLEL)
           const [firstBatchResponse, metadataResponse] = await Promise.all([
-            // First 48 items WITH images for immediate display
-            fetch(
-              `${SUPABASE_URL}/rest/v1/admin_material_images?select=id,name,category,description,unit,suggested_price,pricing_type,variants,image_url&is_approved=eq.true&order=created_at.desc&limit=${FIRST_BATCH_WITH_IMAGES}`,
+            fetchPostgrestCatalog(
+              `/rest/v1/admin_material_images?select=id,name,category,description,unit,suggested_price,pricing_type,variants,image_url&is_approved=eq.true&order=created_at.desc&limit=${FIRST_BATCH_WITH_IMAGES}`,
               {
                 headers: {
-                  'apikey': SUPABASE_ANON_KEY,
-                  'Authorization': postgrestAuthorization,
-                  'Content-Type': 'application/json',
-                  'Cache-Control': 'no-cache, no-store, must-revalidate'
+                  'Cache-Control': 'no-cache, no-store, must-revalidate',
                 },
-                cache: 'no-store'
-              }
+              },
+              catalogToken
             ),
-            // Rest of items WITHOUT images (much faster)
-            fetch(
-              `${SUPABASE_URL}/rest/v1/admin_material_images?select=id,name,category,description,unit,suggested_price,pricing_type,variants&is_approved=eq.true&order=created_at.desc&offset=${FIRST_BATCH_WITH_IMAGES}&limit=${METADATA_LIMIT - FIRST_BATCH_WITH_IMAGES}`,
+            fetchPostgrestCatalog(
+              `/rest/v1/admin_material_images?select=id,name,category,description,unit,suggested_price,pricing_type,variants&is_approved=eq.true&order=created_at.desc&offset=${FIRST_BATCH_WITH_IMAGES}&limit=${METADATA_LIMIT - FIRST_BATCH_WITH_IMAGES}`,
               {
                 headers: {
-                  'apikey': SUPABASE_ANON_KEY,
-                  'Authorization': postgrestAuthorization,
-                  'Content-Type': 'application/json',
                   'Prefer': 'count=exact',
-                  'Cache-Control': 'no-cache, no-store, must-revalidate'
+                  'Cache-Control': 'no-cache, no-store, must-revalidate',
                 },
-                cache: 'no-store'
-              }
-            )
+              },
+              catalogToken
+            ),
           ]);
-          
-          if (firstBatchResponse.ok && metadataResponse.ok) {
+
+          if (firstBatchResponse.ok) {
             const firstBatchData = await firstBatchResponse.json();
-            const metadataData = await metadataResponse.json();
-            
-            // DEBUG: Log first few admin material IDs
-            console.log('🔍 DEBUG - First 5 admin_material_images IDs:', firstBatchData.slice(0, 5).map((m: any) => ({ id: m.id, name: m.name })));
-            console.log('🔍 DEBUG - Supplier prices product_ids:', Object.keys(supplierPrices).slice(0, 10));
-            
-            // Check for matches
-            const matchCount = firstBatchData.filter((m: any) => supplierPrices[m.id]).length;
-            console.log(`🔍 DEBUG - Matched ${matchCount} of ${firstBatchData.length} products with supplier prices`);
-            
-            // Get total count
-            const countHeader = metadataResponse.headers.get('content-range');
-            if (countHeader) {
-              const total = parseInt(countHeader.split('/')[1] || '0');
-              setTotalMaterialsCount(total);
-              setHasMoreMaterials(total > firstBatchData.length + metadataData.length);
+            let metadataData: any[] = [];
+            if (metadataResponse.ok) {
+              metadataData = await metadataResponse.json();
+              const countHeader = metadataResponse.headers.get('content-range');
+              if (countHeader) {
+                const total = parseInt(countHeader.split('/')[1] || '0');
+                setTotalMaterialsCount(total);
+                setHasMoreMaterials(total > firstBatchData.length + metadataData.length);
+              }
+            } else {
+              console.warn(
+                '⚠️ Metadata batch failed (mobile/slow network); showing first page:',
+                metadataResponse.status
+              );
+              setTotalMaterialsCount(firstBatchData.length);
+              setHasMoreMaterials(true);
             }
             
             const allData = [...firstBatchData, ...metadataData];
@@ -1261,6 +1245,8 @@ export const MaterialsGrid: React.FC<MaterialsGridProps> = ({
             // Do not setMaterials here — supplier rows are merged below; early setMaterials hid
             // approved supplier products until reload and looked like "changes did nothing".
             console.log(`✅ ${processedMaterials.length} admin catalog rows ready (will merge supplier materials next)`);
+          } else {
+            console.warn('⚠️ First catalog batch failed:', firstBatchResponse.status);
           }
         } catch (loadError) {
           console.error('❌ Fast load failed:', loadError);
@@ -1272,16 +1258,10 @@ export const MaterialsGrid: React.FC<MaterialsGridProps> = ({
         } else {
           // FALLBACK: Simple single request (smaller limit)
           console.log('⚠️ Using fallback loading...');
-          const fallbackResponse = await fetch(
-            `${SUPABASE_URL}/rest/v1/admin_material_images?select=id,name,category,description,unit,suggested_price,pricing_type,variants,image_url&is_approved=eq.true&order=created_at.desc&limit=100`,
-            {
-              headers: {
-                'apikey': SUPABASE_ANON_KEY,
-                'Authorization': postgrestAuthorization,
-                'Content-Type': 'application/json',
-                'Prefer': 'count=exact'
-              }
-            }
+          const fallbackResponse = await fetchPostgrestCatalog(
+            '/rest/v1/admin_material_images?select=id,name,category,description,unit,suggested_price,pricing_type,variants,image_url&is_approved=eq.true&order=created_at.desc&limit=100',
+            { headers: { Prefer: 'count=exact' } },
+            catalogToken
           );
           
           if (fallbackResponse.ok) {
@@ -1339,15 +1319,10 @@ export const MaterialsGrid: React.FC<MaterialsGridProps> = ({
       let data: any[] | null = null;
       
       try {
-        const response = await fetch(
-          `${SUPABASE_URL}/rest/v1/materials?select=*&order=created_at.desc&limit=2000`,
-          {
-            headers: {
-              'apikey': SUPABASE_ANON_KEY,
-              'Authorization': postgrestAuthorization,
-              'Content-Type': 'application/json'
-            }
-          }
+        const response = await fetchPostgrestCatalog(
+          '/rest/v1/materials?select=*&order=created_at.desc&limit=2000',
+          {},
+          catalogToken
         );
         
         if (response.ok) {

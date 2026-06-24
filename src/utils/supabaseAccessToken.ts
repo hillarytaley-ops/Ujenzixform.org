@@ -16,7 +16,38 @@ type ParsedAuthBlob = {
   currentSession?: { access_token?: string };
   session?: { access_token?: string };
   user?: { id?: string; email?: string };
+  expires_at?: number;
 };
+
+const JWT_EXPIRY_BUFFER_SEC = 60;
+
+/** True when JWT `exp` (or persisted expires_at) is in the past — stale tokens cause PostgREST 401 on public catalog. */
+export function isAccessTokenExpired(token: string, bufferSec = JWT_EXPIRY_BUFFER_SEC): boolean {
+  try {
+    const parts = token.split(".");
+    if (parts.length < 2) return true;
+    const b64 = parts[1].replace(/-/g, "+").replace(/_/g, "/");
+    const payload = JSON.parse(atob(b64)) as { exp?: number };
+    if (typeof payload.exp !== "number") return false;
+    return Date.now() >= (payload.exp - bufferSec) * 1000;
+  } catch {
+    return true;
+  }
+}
+
+function tokenFromParsedBlob(parsed: ParsedAuthBlob | null): string {
+  if (!parsed) return "";
+  if (typeof parsed.expires_at === "number" && Date.now() >= (parsed.expires_at - JWT_EXPIRY_BUFFER_SEC) * 1000) {
+    return "";
+  }
+  const t =
+    parsed.access_token ||
+    parsed.currentSession?.access_token ||
+    parsed.session?.access_token ||
+    "";
+  if (!t || isAccessTokenExpired(t)) return "";
+  return t;
+}
 
 function parseAuthBlob(raw: string): ParsedAuthBlob | null {
   try {
@@ -36,13 +67,7 @@ export function readPersistedAccessTokenSync(): string {
     try {
       const raw = store.getItem(key);
       if (!raw) continue;
-      const parsed = parseAuthBlob(raw);
-      if (!parsed) continue;
-      const t =
-        parsed.access_token ||
-        parsed.currentSession?.access_token ||
-        parsed.session?.access_token ||
-        "";
+      const t = tokenFromParsedBlob(parseAuthBlob(raw));
       if (t) return t;
     } catch {
       /* ignore */
@@ -76,11 +101,12 @@ export async function getAccessTokenWithPersistenceFallback(): Promise<string> {
     const {
       data: { session },
     } = await supabase.auth.getSession();
-    if (session?.access_token) return session.access_token;
+    const live = session?.access_token;
+    if (live && !isAccessTokenExpired(live)) return live;
   } catch {
     /* ignore */
   }
-  return readPersistedAccessTokenSync();
+  return readAccessTokenSyncBestEffort();
 }
 
 /** Older deploys / dev may still persist under this fixed project ref key. */
@@ -102,7 +128,10 @@ function readLegacyAuthBlob(): ParsedAuthBlob | null {
 export function readAccessTokenSyncBestEffort(): string {
   const t = readPersistedAccessTokenSync();
   if (t) return t;
-  return readLegacyAuthBlob()?.access_token || "";
+  const legacy = readLegacyAuthBlob();
+  const legacyToken = legacy?.access_token || "";
+  if (legacyToken && !isAccessTokenExpired(legacyToken)) return legacyToken;
+  return "";
 }
 
 /**
@@ -118,9 +147,44 @@ export function getPostgrestAuthorizationHeaderSync(
     preferredAccessToken && String(preferredAccessToken).trim().length > 0
       ? String(preferredAccessToken).trim()
       : "";
-  const t = fromArg || readAccessTokenSyncBestEffort();
-  if (t) return `Bearer ${t}`;
+  const candidate = fromArg || readAccessTokenSyncBestEffort();
+  if (candidate && !isAccessTokenExpired(candidate)) return `Bearer ${candidate}`;
   return `Bearer ${SUPABASE_ANON_KEY}`;
+}
+
+/**
+ * PostgREST fetch for public marketplace catalog tables.
+ * Retries with the anon key when a stale user JWT returns 401 (common on mobile after logout).
+ */
+export async function fetchPostgrestCatalog(
+  pathAndQuery: string,
+  init?: RequestInit,
+  preferredAccessToken?: string | null
+): Promise<Response> {
+  const anonAuth = `Bearer ${SUPABASE_ANON_KEY}`;
+  const buildHeaders = (authorization: string): Record<string, string> => ({
+    apikey: SUPABASE_ANON_KEY,
+    Authorization: authorization,
+    "Content-Type": "application/json",
+    ...((init?.headers as Record<string, string> | undefined) ?? {}),
+  });
+
+  const primaryAuth = getPostgrestAuthorizationHeaderSync(preferredAccessToken);
+  let response = await fetch(`${SUPABASE_URL}${pathAndQuery}`, {
+    ...init,
+    headers: buildHeaders(primaryAuth),
+    cache: init?.cache ?? "no-store",
+  });
+
+  if (response.status === 401 && primaryAuth !== anonAuth) {
+    response = await fetch(`${SUPABASE_URL}${pathAndQuery}`, {
+      ...init,
+      headers: buildHeaders(anonAuth),
+      cache: init?.cache ?? "no-store",
+    });
+  }
+
+  return response;
 }
 
 /**
