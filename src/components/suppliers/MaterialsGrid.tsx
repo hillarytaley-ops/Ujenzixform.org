@@ -751,25 +751,29 @@ export const MaterialsGrid: React.FC<MaterialsGridProps> = ({
 
   useEffect(() => {
     const fetchSuppliers = async () => {
+      // Direct SELECT on suppliers is revoked for anon — only needed for authenticated quote fallback.
+      if (!authUser?.id) {
+        setAllSuppliers([]);
+        return;
+      }
       try {
         const { data, error } = await supabase
           .from('suppliers')
           .select('id, user_id, company_name, rating');
-        
+
         if (!error && data) {
-          // Filter active suppliers and sort by rating
           const activeSuppliers = data
             .filter((s: any) => s.status !== 'inactive')
             .sort((a: any, b: any) => (b.rating || 0) - (a.rating || 0))
             .slice(0, 50);
           setAllSuppliers(activeSuppliers);
         }
-      } catch (e) {
+      } catch {
         setAllSuppliers([]);
       }
     };
     fetchSuppliers();
-  }, []);
+  }, [authUser?.id]);
 
   // Filter materials when dependencies change - using useMemo for immediate computation
   const computedFilteredMaterials = useMemo(() => {
