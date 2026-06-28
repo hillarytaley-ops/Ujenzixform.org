@@ -14,8 +14,7 @@
  * ╚══════════════════════════════════════════════════════════════════════════════╝
  */
 
-console.log('🔐 SupplierSignIn BUILD v5 - STRICT DB check Feb 8 2026');
-
+import { devLog, logAuthEvent } from "@/utils/secureLog";
 import { useState, useEffect } from "react";
 import { useNavigate, Link, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -37,6 +36,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { SimplePasswordReset } from "@/components/SimplePasswordReset";
+
+devLog('🔐 SupplierSignIn BUILD v5 - STRICT DB check Feb 8 2026');
 
 const SupplierSignIn = () => {
   const [email, setEmail] = useState("");
@@ -200,7 +201,7 @@ const SupplierSignIn = () => {
         return;
       }
 
-      console.log('🔐 Sign in successful for:', authData.user.email);
+      devLog('Sign in successful', { userId: authData.user.id });
       
       const userId = authData.user.id;
       const userEmail = authData.user.email?.toLowerCase() || '';

@@ -1,4 +1,5 @@
 import { readPersistedAuthRawStringSync } from '@/utils/supabaseAccessToken';
+import { devLog, logAuthEvent } from '@/utils/secureLog';
 import React, { useState, useEffect } from 'react';
 import Navigation from '@/components/Navigation';
 import Footer from '@/components/Footer';
@@ -153,7 +154,7 @@ const DeliveryProviderApplication = () => {
               const parsed = JSON.parse(storedSession);
               if (parsed.user) {
                 user = parsed.user;
-                console.log('📋 DeliveryProviderApplication: Got user from localStorage:', user?.email);
+                logAuthEvent('DeliveryProviderApplication', 'Got user from localStorage', user?.id);
               }
             }
           } catch (e) {
@@ -162,7 +163,7 @@ const DeliveryProviderApplication = () => {
         }
         
         setCurrentUser(user);
-        console.log('📋 DeliveryProviderApplication: User set:', user?.email || 'No user');
+        logAuthEvent('DeliveryProviderApplication', user ? 'User set' : 'No user', user?.id);
         
         if (user?.email) {
           // Pre-fill email fields
@@ -196,7 +197,7 @@ const DeliveryProviderApplication = () => {
             const parsed = JSON.parse(storedSession);
             if (parsed.user) {
               setCurrentUser(parsed.user);
-              console.log('📋 DeliveryProviderApplication: Fallback - Got user from localStorage:', parsed.user?.email);
+              logAuthEvent('DeliveryProviderApplication', 'Fallback - Got user from localStorage', parsed.user?.id);
               if (parsed.user?.email) {
                 setCompanyForm(prev => ({ ...prev, contactEmail: parsed.user.email || '' }));
                 setPrivateForm(prev => ({ ...prev, email: parsed.user.email || '' }));

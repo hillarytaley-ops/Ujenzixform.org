@@ -54,6 +54,7 @@ import {
 } from "lucide-react";
 import { isValidKraPin, kraPinValidationMessage, normalizeKraPin } from "@/lib/etims/kraPin";
 import { normalizePhoneDigits } from "@/utils/phoneNormalize";
+import { devLog, logAuthEvent } from "@/utils/secureLog";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { User } from "@supabase/supabase-js";
@@ -159,7 +160,7 @@ const SupplierRegistration = () => {
       if (!isMounted) return;
       
       if (user) {
-        console.log('📝 SupplierRegistration: User already logged in:', user.email);
+        logAuthEvent('SupplierRegistration', 'User already logged in', user.id);
         setExistingUser(user);
         setEmail(user.email || "");
         
@@ -219,7 +220,7 @@ const SupplierRegistration = () => {
     
     // Also listen for auth state changes in case session loads later
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      console.log('📝 SupplierRegistration: Auth state changed:', event, session?.user?.email);
+      logAuthEvent('SupplierRegistration', event, session?.user?.id);
       if (session?.user && isMounted) {
         setExistingUser(session.user);
         setEmail(session.user.email || "");
@@ -410,7 +411,7 @@ const SupplierRegistration = () => {
           return;
         }
 
-        console.log('📝 SupplierRegistration: Creating new auth account for:', email);
+        devLog('📝 SupplierRegistration: Creating new auth account');
         const { data: authData, error: authError } = await supabase.auth.signUp({
           email: email.trim().toLowerCase(),
           password: password,

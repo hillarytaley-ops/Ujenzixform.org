@@ -30,6 +30,7 @@ import {
   STORAGE_SESSION_KEY,
   STORAGE_SESSION_KEY_LEGACY,
 } from '@/config/appIdentity';
+import { devLog } from '@/utils/secureLog';
 
 const SESSION_EXPIRY_DAYS = 30;
 const SESSION_KEY = STORAGE_SESSION_KEY;
@@ -72,7 +73,7 @@ export const saveUserSession = (userId: string, email: string, role: string) => 
     localStorage.setItem('user_email', email.toLowerCase());
     localStorage.setItem('session_expiry', expiryTime.toString());
     
-    console.log('✅ Session saved:', { userId, email, role, expiryDays: SESSION_EXPIRY_DAYS });
+    devLog('Session saved', { userId, role, expiryDays: SESSION_EXPIRY_DAYS });
     
     // Log to activity for admin monitoring
     logSessionActivity('login', userId, email, role);

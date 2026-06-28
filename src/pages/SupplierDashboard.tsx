@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo, useRef, lazy, Suspense, useCallbac
 import { Link } from "react-router-dom";
 import { useUrlTabSync } from "@/hooks/useUrlTabSync";
 import { supabase, SUPABASE_URL, SUPABASE_ANON_KEY } from "@/integrations/supabase/client";
+import { devLog, devWarn, safeError } from '@/utils/secureLog';
 import { useAuth } from "@/contexts/AuthContext";
 import { useLanguage } from "@/contexts/LanguageContext";
 import Footer from "@/components/Footer";
@@ -907,12 +908,12 @@ const SupplierDashboard = () => {
     }
     
     if (!userId) {
-      console.log('❌ Cannot fetch quotes - no user.id available');
+      devLog('❌ Cannot fetch quotes - no user.id available');
       return;
     }
     
     setLoadingQuotes(true);
-    console.log('🔄 Fetching quotes for supplier userId:', userId, 'email:', userEmail);
+    devLog('Fetching quotes for supplier', { userId });
     
     let accessToken: string | null = null;
     try {
@@ -953,12 +954,15 @@ const SupplierDashboard = () => {
           if (supplierData?.[0]) {
             supplierIds.add(supplierData[0].id);
             if (supplierData[0].user_id) supplierIds.add(supplierData[0].user_id);
-            console.log('📦 Found supplier by user_id:', supplierData[0]);
+            devLog('Found supplier by user_id', {
+              id: supplierData[0].id,
+              company_name: supplierData[0].company_name,
+            });
             setSupplierRecordId(supplierData[0].id);
           }
         }
       } catch (e) {
-        console.warn('Supplier lookup by user_id failed');
+        devWarn('Supplier lookup by user_id failed');
       }
       
       // Also try to find supplier by email
@@ -974,12 +978,15 @@ const SupplierDashboard = () => {
             if (emailData?.[0]) {
               supplierIds.add(emailData[0].id);
               if (emailData[0].user_id) supplierIds.add(emailData[0].user_id);
-              console.log('📦 Found supplier by email:', emailData[0]);
+              devLog('Found supplier by email lookup', {
+                id: emailData[0].id,
+                company_name: emailData[0].company_name,
+              });
               if (!supplierRecordId) setSupplierRecordId(emailData[0].id);
             }
           }
         } catch (e) {
-          console.warn('Supplier lookup by email failed');
+          devWarn('Supplier lookup by email failed');
         }
       }
       
@@ -995,11 +1002,14 @@ const SupplierDashboard = () => {
           if (directData?.[0]) {
             supplierIds.add(directData[0].id);
             if (directData[0].user_id) supplierIds.add(directData[0].user_id);
-            console.log('📦 Found supplier by direct id match:', directData[0]);
+            devLog('Found supplier by direct id match', {
+              id: directData[0].id,
+              company_name: directData[0].company_name,
+            });
           }
         }
       } catch (e) {
-        console.warn('Supplier lookup by direct id failed');
+        devWarn('Supplier lookup by direct id failed');
       }
 
       // Profile chain (same as dashboard order stats) — purchase_orders.supplier_id may match profile.id
@@ -1027,7 +1037,7 @@ const SupplierDashboard = () => {
           }
         }
       } catch (e) {
-        console.warn('Quote fetch: profile/supplier chain lookup failed');
+        devWarn('Quote fetch: profile/supplier chain lookup failed');
       }
 
       // IDs already resolved for dashboard orders (avoids mismatch with quote fetch)
@@ -1037,7 +1047,7 @@ const SupplierDashboard = () => {
       if (supplierRecordId) supplierIds.add(supplierRecordId);
 
       const supplierIdsArray = Array.from(supplierIds).filter(Boolean);
-      console.log('🔍 Looking for quotes with supplier_id in:', supplierIdsArray);
+      devLog('🔍 Looking for quotes with supplier_id in:', supplierIdsArray);
 
       // STEP 2: Fetch this supplier's quote-related POs (do NOT use global limit=100 — misses older quotes)
       const quoteStatuses =
@@ -1052,11 +1062,11 @@ const SupplierDashboard = () => {
           );
           if (quotesResponse.ok) {
             purchaseOrderQuotes = await quotesResponse.json();
-            console.log('📋 Quotes from supplier-scoped query:', purchaseOrderQuotes.length);
+            devLog('📋 Quotes from supplier-scoped query:', purchaseOrderQuotes.length);
           }
         }
       } catch (e) {
-        console.error('Failed to fetch quotes (supplier-scoped)');
+        safeError('Failed to fetch quotes (supplier-scoped)');
       }
 
       // Fallback: legacy global slice + client filter (if scoped query empty but IDs exist)
@@ -1070,10 +1080,10 @@ const SupplierDashboard = () => {
           if (quotesResponse.ok) {
             allQuotes = await quotesResponse.json();
             purchaseOrderQuotes = allQuotes.filter((q: any) => supplierIdsArray.includes(q.supplier_id));
-            console.log('📋 Quotes via fallback filter:', purchaseOrderQuotes.length, 'of', allQuotes.length);
+            devLog('📋 Quotes via fallback filter:', purchaseOrderQuotes.length, 'of', allQuotes.length);
           }
         } catch (e) {
-          console.error('Failed to fetch quotes (fallback)');
+          safeError('Failed to fetch quotes (fallback)');
         }
       }
 
@@ -1114,7 +1124,7 @@ const SupplierDashboard = () => {
         index === self.findIndex(q => q.id === quote.id)
       );
 
-      console.log('📋 Quote requests loaded:', uniqueQuotes.length, 'from purchase_orders:', transformedPOQuotes.length);
+      devLog('📋 Quote requests loaded:', uniqueQuotes.length, 'from purchase_orders:', transformedPOQuotes.length);
       setQuoteRequests(uniqueQuotes);
       
       // Mark quotes as received by supplier when they're displayed
@@ -1143,9 +1153,9 @@ const SupplierDashboard = () => {
       }
     } catch (error: any) {
       if (error.name === 'AbortError') {
-        console.error('Quote fetch timed out');
+        safeError('Quote fetch timed out');
       } else {
-        console.error('Error fetching quote requests:', error);
+        safeError('Error fetching quote requests:', error);
       }
     } finally {
       setLoadingQuotes(false);
@@ -1200,13 +1210,13 @@ const SupplierDashboard = () => {
       userId = localStorage.getItem('user_id') || undefined;
     }
     
-    console.log('📋 Quote fetch trigger - user.id:', user?.id, 'fallback userId:', userId);
+    devLog('📋 Quote fetch trigger - user.id:', user?.id, 'fallback userId:', userId);
     
     if (userId) {
       // Small delay to ensure component is ready
       setTimeout(() => fetchQuoteRequests(), 500);
     } else {
-      console.log('⚠️ No user ID available for quote fetch');
+      devLog('⚠️ No user ID available for quote fetch');
     }
     
     // Set up real-time subscription for new quote requests
@@ -1216,7 +1226,7 @@ const SupplierDashboard = () => {
       .on('postgres_changes', 
         { event: 'INSERT', schema: 'public', table: 'purchase_orders' },
         (payload: any) => {
-          console.log('📬 NEW quote request detected:', payload.new?.po_number, 'supplier_id:', payload.new?.supplier_id);
+          devLog('📬 NEW quote request detected:', payload.new?.po_number, 'supplier_id:', payload.new?.supplier_id);
           fetchQuoteRequests();
           const row = payload.new;
           const sid = row?.supplier_id != null ? String(row.supplier_id) : '';
@@ -1279,13 +1289,13 @@ const SupplierDashboard = () => {
       .on('postgres_changes', 
         { event: 'UPDATE', schema: 'public', table: 'purchase_orders' },
         (payload: any) => {
-          console.log('🔄 Quote UPDATE detected:', payload.new?.po_number, 'status:', payload.new?.status);
+          devLog('🔄 Quote UPDATE detected:', payload.new?.po_number, 'status:', payload.new?.status);
           fetchQuoteRequests();
         }
       )
       .subscribe();
     
-    console.log('📡 Supplier Dashboard: Real-time subscription active for quote requests');
+    devLog('📡 Supplier Dashboard: Real-time subscription active for quote requests');
 
     return () => {
       subscription.unsubscribe();
@@ -1346,13 +1356,13 @@ const SupplierDashboard = () => {
           if (quoteResponse.validUntil) {
             updateData.quote_valid_until = quoteResponse.validUntil;
           }
-          console.log('💰 Quote amount being saved:', quoteAmountValue, 'from input:', quoteResponse.quoteAmount);
+          devLog('💰 Quote amount being saved:', quoteAmountValue, 'from input:', quoteResponse.quoteAmount);
         }
 
         const quoteId = selectedQuote.purchase_order_id || selectedQuote.id;
-        console.log('🔄 Attempting to update purchase_order:', quoteId);
-        console.log('📝 Update data:', JSON.stringify(updateData, null, 2));
-        console.log('🔑 Current user.id:', user?.id);
+        devLog('🔄 Attempting to update purchase_order:', quoteId);
+        devLog('📝 Update data:', JSON.stringify(updateData, null, 2));
+        devLog('🔑 Current user.id:', user?.id);
 
         // Use fetch API with timeout
         const controller = new AbortController();
@@ -1377,13 +1387,13 @@ const SupplierDashboard = () => {
         
         // Handle JWT expiration - refresh token and retry
         if (response.status === 401) {
-          console.log('🔄 JWT expired, refreshing token and retrying...');
+          devLog('🔄 JWT expired, refreshing token and retrying...');
           try {
             // Refresh session using Supabase client
             const { data: { session: newSession }, error: refreshError } = await supabase.auth.refreshSession();
             
             if (refreshError) {
-              console.error('❌ Token refresh failed:', refreshError);
+              safeError('❌ Token refresh failed:', refreshError);
               throw new Error('Session expired. Please refresh the page and try again.');
             }
             
@@ -1411,14 +1421,14 @@ const SupplierDashboard = () => {
               
               if (!response.ok) {
                 const errorText = await response.text();
-                console.error('❌ Error updating purchase order after retry:', response.status, errorText);
+                safeError('❌ Error updating purchase order after retry:', response.status, errorText);
                 throw new Error(`Failed to update quote: ${response.status}`);
               }
             } else {
               throw new Error('Session expired. Please refresh the page and try again.');
             }
           } catch (retryError: any) {
-            console.error('❌ Retry failed:', retryError);
+            safeError('❌ Retry failed:', retryError);
             if (retryError.message) {
               throw retryError;
             }
@@ -1426,7 +1436,7 @@ const SupplierDashboard = () => {
           }
         } else if (!response.ok) {
           const errorText = await response.text();
-          console.error('❌ Error updating purchase order:', response.status, errorText);
+          safeError('❌ Error updating purchase order:', response.status, errorText);
           throw new Error(`Failed to update quote: ${response.status}`);
         }
         
@@ -1434,16 +1444,16 @@ const SupplierDashboard = () => {
         
         // Check if any rows were actually updated
         if (!updateResult || updateResult.length === 0) {
-          console.error('⚠️ No rows updated! RLS policy may be blocking the update.');
-          console.error('Quote ID:', quoteId, 'Supplier user.id:', user?.id);
+          safeError('⚠️ No rows updated! RLS policy may be blocking the update.');
+          safeError('Quote ID:', quoteId, 'Supplier user.id:', user?.id);
           
           // This is likely an RLS policy issue - the supplier needs permission to update
           // Show a more helpful error message
           throw new Error('Database permission error. Please contact admin to run the RLS policy fix migration.');
         }
         
-        console.log(`✅ Quote ${action === 'approve' ? 'sent' : 'rejected'} - Purchase order updated:`, updateResult);
-        console.log('💰 Saved quote_amount:', updateResult[0]?.quote_amount);
+        devLog(`✅ Quote ${action === 'approve' ? 'sent' : 'rejected'} - Purchase order updated:`, updateResult);
+        devLog('💰 Saved quote_amount:', updateResult[0]?.quote_amount);
       } else {
         // Legacy: Update quotation_requests table using fetch API
         const updateData: any = {
@@ -1481,13 +1491,13 @@ const SupplierDashboard = () => {
         
         // Handle JWT expiration - refresh token and retry
         if (response.status === 401) {
-          console.log('🔄 JWT expired, refreshing token and retrying...');
+          devLog('🔄 JWT expired, refreshing token and retrying...');
           try {
             // Refresh session using Supabase client
             const { data: { session: newSession }, error: refreshError } = await supabase.auth.refreshSession();
             
             if (refreshError) {
-              console.error('❌ Token refresh failed:', refreshError);
+              safeError('❌ Token refresh failed:', refreshError);
               throw new Error('Session expired. Please refresh the page and try again.');
             }
             
@@ -1521,7 +1531,7 @@ const SupplierDashboard = () => {
               throw new Error('Session expired. Please refresh the page and try again.');
             }
           } catch (retryError: any) {
-            console.error('❌ Retry failed:', retryError);
+            safeError('❌ Retry failed:', retryError);
             if (retryError.message) {
               throw retryError;
             }
@@ -1555,7 +1565,7 @@ const SupplierDashboard = () => {
       fetchQuoteRequests();
 
     } catch (error: any) {
-      console.error('Error processing quote:', error);
+      safeError('Error processing quote:', error);
       toast.error('Failed to process quote', {
         description: error.message || 'Please try again later.',
         duration: 5000,
@@ -1622,12 +1632,12 @@ const SupplierDashboard = () => {
             if (profiles?.[0]) setSupplierProfile(profiles[0]);
           }
         } catch (e) {
-          console.log('Profile fetch timeout');
+          devLog('Profile fetch timeout');
         }
 
         // Build supplier IDs list - check suppliers table for this user using multiple methods
         const orderSupplierIds = [user.id];
-        console.log('📊 Dashboard: Starting supplier lookup for user.id:', user.id, 'email:', user.email);
+        devLog('Dashboard: starting supplier lookup', { userId: user.id });
         
         // Method 1: Look up supplier by user_id = auth.uid
         try {
@@ -1642,7 +1652,10 @@ const SupplierDashboard = () => {
           
           if (supplierResponse.ok) {
             const supplierData = await supplierResponse.json();
-            console.log('📦 Dashboard: Supplier by user_id:', supplierData);
+            devLog('Dashboard: supplier by user_id', {
+              count: supplierData?.length ?? 0,
+              ids: (supplierData ?? []).map((s: { id?: string }) => s.id).filter(Boolean),
+            });
             if (supplierData?.[0]) {
               if (supplierData[0].id && !orderSupplierIds.includes(supplierData[0].id)) {
                 orderSupplierIds.push(supplierData[0].id);
@@ -1654,7 +1667,7 @@ const SupplierDashboard = () => {
             }
           }
         } catch (e) {
-          console.log('Supplier lookup by user_id timeout');
+          devLog('Supplier lookup by user_id timeout');
         }
         
         // Method 2: Look up supplier by id = auth.uid (in case user_id is profile.id)
@@ -1671,7 +1684,10 @@ const SupplierDashboard = () => {
             
             if (supplierResponse.ok) {
               const supplierData = await supplierResponse.json();
-              console.log('📦 Dashboard: Supplier by id:', supplierData);
+              devLog('Dashboard: supplier by id', {
+                count: supplierData?.length ?? 0,
+                ids: (supplierData ?? []).map((s: { id?: string }) => s.id).filter(Boolean),
+              });
               if (supplierData?.[0]) {
                 if (supplierData[0].id && !orderSupplierIds.includes(supplierData[0].id)) {
                   orderSupplierIds.push(supplierData[0].id);
@@ -1683,7 +1699,7 @@ const SupplierDashboard = () => {
               }
             }
           } catch (e) {
-            console.log('Supplier lookup by id timeout');
+            devLog('Supplier lookup by id timeout');
           }
         }
         
@@ -1701,7 +1717,10 @@ const SupplierDashboard = () => {
             
             if (emailResponse.ok) {
               const emailData = await emailResponse.json();
-              console.log('📦 Dashboard: Supplier by email:', emailData);
+              devLog('Dashboard: supplier by email lookup', {
+                count: emailData?.length ?? 0,
+                ids: (emailData ?? []).map((s: { id?: string }) => s.id).filter(Boolean),
+              });
               if (emailData?.[0]) {
                 if (emailData[0].id && !orderSupplierIds.includes(emailData[0].id)) {
                   orderSupplierIds.push(emailData[0].id);
@@ -1713,7 +1732,7 @@ const SupplierDashboard = () => {
               }
             }
           } catch (e) {
-            console.log('Supplier lookup by email timeout');
+            devLog('Supplier lookup by email timeout');
           }
         }
         
@@ -1731,7 +1750,7 @@ const SupplierDashboard = () => {
             
             if (profileResponse.ok) {
               const profileData = await profileResponse.json();
-              console.log('📦 Dashboard: Profile lookup:', profileData);
+              devLog('📦 Dashboard: Profile lookup:', profileData);
               if (profileData?.[0]?.id && profileData[0].id !== user.id) {
                 // Profile ID is different from user ID, try to find supplier by profile.id
                 const supplierController2 = new AbortController();
@@ -1745,7 +1764,10 @@ const SupplierDashboard = () => {
                 
                 if (supplierResponse2.ok) {
                   const supplierData2 = await supplierResponse2.json();
-                  console.log('📦 Dashboard: Supplier by profile.id:', supplierData2);
+                  devLog('Dashboard: supplier by profile.id', {
+                    count: supplierData2?.length ?? 0,
+                    ids: (supplierData2 ?? []).map((s: { id?: string }) => s.id).filter(Boolean),
+                  });
                   if (supplierData2?.[0]) {
                     if (supplierData2[0].id && !orderSupplierIds.includes(supplierData2[0].id)) {
                       orderSupplierIds.push(supplierData2[0].id);
@@ -1763,7 +1785,7 @@ const SupplierDashboard = () => {
               }
             }
           } catch (e) {
-            console.log('Profile/supplier lookup timeout');
+            devLog('Profile/supplier lookup timeout');
           }
         }
         
@@ -1780,10 +1802,10 @@ const SupplierDashboard = () => {
           
           if (debugResponse.ok) {
             const debugOrders = await debugResponse.json();
-            console.log('📊 Dashboard DEBUG: All recent orders supplier_ids:');
+            devLog('📊 Dashboard DEBUG: All recent orders supplier_ids:');
             debugOrders.forEach((o: any) => {
               const matches = orderSupplierIds.includes(o.supplier_id);
-              console.log(`   ${o.po_number}: supplier_id=${o.supplier_id} ${matches ? '✅ MATCH' : '❌ no match'}`);
+              devLog(`   ${o.po_number}: supplier_id=${o.supplier_id} ${matches ? '✅ MATCH' : '❌ no match'}`);
             });
             
             // If we found orders but no matches, add the most common supplier_id
@@ -1794,14 +1816,14 @@ const SupplierDashboard = () => {
                   supplierIdCounts[o.supplier_id] = (supplierIdCounts[o.supplier_id] || 0) + 1;
                 }
               });
-              console.log('📊 Dashboard DEBUG: Supplier ID counts:', supplierIdCounts);
+              devLog('📊 Dashboard DEBUG: Supplier ID counts:', supplierIdCounts);
             }
           }
         } catch (e) {
-          console.log('Debug orders fetch timeout');
+          devLog('Debug orders fetch timeout');
         }
         
-        console.log('📊 Dashboard: Final supplier IDs for stats query:', orderSupplierIds);
+        devLog('📊 Dashboard: Final supplier IDs for stats query:', orderSupplierIds);
         setResolvedSupplierIds([...orderSupplierIds]);
 
         // Fetch ALL orders for this supplier (not just 10) for accurate stats
@@ -1818,7 +1840,7 @@ const SupplierDashboard = () => {
 
           if (ordersResponse.ok) {
             const ordersData = await ordersResponse.json();
-            console.log('📊 Dashboard: Orders loaded:', ordersData?.length || 0);
+            devLog('📊 Dashboard: Orders loaded:', ordersData?.length || 0);
             if (ordersData?.length) setOrdersForOrdersTab(ordersData);
 
             if (ordersData && ordersData.length > 0) {
@@ -1844,7 +1866,7 @@ const SupplierDashboard = () => {
                     });
                   }
                 } catch (e) {
-                  console.log('Buyer profiles fetch timeout');
+                  devLog('Buyer profiles fetch timeout');
                 }
               }
               
@@ -1885,7 +1907,7 @@ const SupplierDashboard = () => {
               const totalRevenue = ordersData.reduce((sum: number, o: any) => sum + (o.total_amount || 0), 0);
               const uniqueCustomers = new Set(ordersData.map((o: any) => o.buyer_id)).size;
               
-              console.log('📊 Dashboard stats: Orders:', ordersData.length, 'Pending:', pendingCount, 'Confirmed:', confirmedCount, 'Revenue:', totalRevenue);
+              devLog('📊 Dashboard stats: Orders:', ordersData.length, 'Pending:', pendingCount, 'Confirmed:', confirmedCount, 'Revenue:', totalRevenue);
               
               setStats((prev) => {
                 const next: DashboardStats = {
@@ -1901,7 +1923,7 @@ const SupplierDashboard = () => {
             }
           }
         } catch (e) {
-          console.log('Orders fetch timeout for stats');
+          devLog('Orders fetch timeout for stats');
         }
 
         // Fetch products count from supplier_product_prices
@@ -1918,7 +1940,7 @@ const SupplierDashboard = () => {
           
           if (productsResponse.ok) {
             const productsData = await productsResponse.json();
-            console.log('📦 Dashboard: Products count:', productsData?.length || 0);
+            devLog('📦 Dashboard: Products count:', productsData?.length || 0);
             setStats((prev) => {
               const next: DashboardStats = { ...prev, totalProducts: productsData?.length || 0 };
               if (user?.id) writeSupplierOverviewStatsToSession(user.id, next);
@@ -1926,11 +1948,11 @@ const SupplierDashboard = () => {
             });
           }
         } catch (e) {
-          console.log('Products count fetch timeout');
+          devLog('Products count fetch timeout');
         }
 
       } catch (error) {
-        console.error('Error fetching dashboard data:', error);
+        safeError('Error fetching dashboard data:', error);
       }
     };
 
@@ -1988,12 +2010,12 @@ const SupplierDashboard = () => {
 
   // Exit dashboard - goes back to home page, stays logged in
   const handleExitDashboard = () => {
-    console.log('🚪 Exit Dashboard: Redirecting to public home...');
+    devLog('🚪 Exit Dashboard: Redirecting to public home...');
     window.location.href = '/home?browse=1';
   };
 
   const handleLogoutSupplier = () => {
-    console.log('🚪 Logout: Starting sign out process...');
+    devLog('🚪 Logout: Starting sign out process...');
     localStorage.removeItem('user_role');
     localStorage.removeItem('user_role_id');
     localStorage.removeItem('user_role_verified');

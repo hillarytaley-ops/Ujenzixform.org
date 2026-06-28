@@ -8,6 +8,7 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, Mail, KeyRound } from "lucide-react";
+import { devLog } from "@/utils/secureLog";
 
 const AuthSimple = () => {
   const [loading, setLoading] = useState(false);
@@ -22,7 +23,7 @@ const AuthSimple = () => {
     const email = formData.get("email") as string;
     const password = formData.get("password") as string;
 
-    console.log('🔐 Signing in:', email);
+    devLog('🔐 Signing in');
 
     try {
       const { data, error } = await supabase.auth.signInWithPassword({
@@ -41,7 +42,7 @@ const AuthSimple = () => {
         return;
       }
 
-      console.log('✅ Sign in successful!', data);
+      devLog('Sign in successful', { userId: data.user?.id });
       toast({
         title: "Signed In!",
         description: "Redirecting to marketplace..."
@@ -71,7 +72,7 @@ const AuthSimple = () => {
     const email = formData.get("email") as string;
     const password = formData.get("password") as string;
 
-    console.log('📝 Signing up:', email);
+    devLog('📝 Signing up');
 
     try {
       const { data, error } = await supabase.auth.signUp({
@@ -90,7 +91,7 @@ const AuthSimple = () => {
         return;
       }
 
-      console.log('✅ Sign up successful!', data);
+      devLog('Sign up successful', { userId: data.user?.id });
 
       if (data.session) {
         // Instant signup - has session

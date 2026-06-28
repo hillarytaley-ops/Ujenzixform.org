@@ -14,6 +14,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Home, Eye, EyeOff, Loader2, ArrowLeft, Mail, Lock, User, Phone, MapPin, ChevronRight } from 'lucide-react';
 import { SUPABASE_URL, SUPABASE_ANON_KEY, supabase } from '@/integrations/supabase/client';
 import { resolveRoleFromSession } from '@/utils/resolveRoleFromSession';
+import { devLog, devWarn, logAuthEvent } from '@/utils/secureLog';
 
 /** Manual password grant writes legacy storage; Supabase-js reads `sb-*-auth-token` (often sessionStorage in prod). */
 async function syncSupabaseClientSession(accessToken: string, refreshToken: string) {
@@ -21,7 +22,7 @@ async function syncSupabaseClientSession(accessToken: string, refreshToken: stri
     access_token: accessToken,
     refresh_token: refreshToken,
   });
-  if (error) console.warn('PrivateClientAuth: setSession failed', error);
+  if (error) devWarn('PrivateClientAuth: setSession failed', error);
 }
 
 const ROLE = 'private_client';
@@ -38,7 +39,7 @@ const ROLE_DASHBOARDS: Record<string, string> = {
   'admin': '/admin-dashboard',
 };
 
-console.log('🔐 PrivateClientAuth BUILD v15 - SECURE');
+devLog('🔐 PrivateClientAuth BUILD v15 - SECURE');
 
 const PrivateClientAuth: React.FC = () => {
   const { toast } = useToast();
@@ -71,7 +72,7 @@ const PrivateClientAuth: React.FC = () => {
     if (redirecting.current) return;
     
     setIsLoading(true);
-    console.log('🔐 Signing in:', email);
+    devLog('🔐 Signing in');
 
     try {
       // Step 1: Authenticate with Supabase
@@ -95,7 +96,7 @@ const PrivateClientAuth: React.FC = () => {
         return;
       }
 
-      console.log('🔐 Auth success, checking DB role...');
+      devLog('Sign in successful', { userId: authData.user.id });
 
       // Step 2: Check user's ACTUAL role from database
       const roleResponse = await fetch(

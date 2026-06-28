@@ -43,6 +43,7 @@ import Navigation from "@/components/Navigation";
 import Footer from "@/components/Footer";
 import { Truck, KeyRound, Mail, Loader2, Eye, EyeOff, Package, MapPin, Clock, AlertTriangle, UserPlus } from "lucide-react";
 import { saveUserSession } from "@/utils/sessionStorage";
+import { devLog, logAuthEvent } from "@/utils/secureLog";
 import {
   Dialog,
   DialogContent,
@@ -81,7 +82,7 @@ const DeliverySignIn = () => {
         const { data: { session } } = await Promise.race([sessionPromise, timeoutPromise]) as any;
         
         if (session?.user) {
-          console.log('🚚 DeliverySignIn: Session found for:', session.user.email);
+          logAuthEvent('DeliverySignIn', 'Session found', session.user.id);
           
           // Check database for role with timeout
           try {
@@ -177,7 +178,7 @@ const DeliverySignIn = () => {
         return;
       }
 
-      console.log('🔐 User already logged in:', user.email);
+      logAuthEvent('DeliverySignIn', 'User already logged in', user.id);
       
       // ALWAYS check DATABASE for the actual role (SOURCE OF TRUTH)
       const { data: roleData, error: roleError } = await supabase
@@ -286,7 +287,7 @@ const DeliverySignIn = () => {
     }, 10000); // 10 second timeout
 
     try {
-      console.log('🚚 DeliverySignIn: Attempting sign in for:', email);
+      devLog('🚚 DeliverySignIn: Attempting sign in');
       
       // Use direct REST API for sign in (more reliable than Supabase client)
       const authResponse = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
@@ -342,7 +343,7 @@ const DeliverySignIn = () => {
         return;
       }
 
-      console.log('🚚 Sign in successful for:', authData.user.email);
+      devLog('Sign in successful', { userId: authData.user.id });
       
       // Store the session in localStorage for Supabase client to pick up
       const session = {
@@ -480,7 +481,7 @@ const DeliverySignIn = () => {
     }
 
     setLoading(true);
-    console.log('🔐 Quick sign up for:', email);
+    devLog('🔐 Quick sign up');
 
     try {
       const { data: authData, error: authError } = await supabase.auth.signUp({
@@ -525,7 +526,7 @@ const DeliverySignIn = () => {
         return;
       }
 
-      console.log('🔐 Sign up successful:', authData.user.email);
+      devLog('Sign up successful', { userId: authData.user.id });
       
       const userId = authData.user.id;
       const userEmail = authData.user.email?.toLowerCase() || '';

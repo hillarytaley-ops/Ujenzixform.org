@@ -36,6 +36,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { SimplePasswordReset } from "@/components/SimplePasswordReset";
+import { devLog, logAuthEvent } from "@/utils/secureLog";
 
 const BuilderSignIn = () => {
   const [email, setEmail] = useState("");
@@ -56,7 +57,7 @@ const BuilderSignIn = () => {
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session?.user) {
-        console.log('🔐 BuilderSignIn: Already logged in, redirecting');
+        logAuthEvent('BuilderSignIn', 'Already logged in, redirecting', session.user.id);
         window.location.href = redirectTo;
       } else {
         setCheckingAuth(false);
@@ -79,7 +80,7 @@ const BuilderSignIn = () => {
         return;
       }
 
-      console.log('🔐 User already logged in:', user.email);
+      logAuthEvent('BuilderSignIn', 'User already logged in', user.id);
       
       // ALWAYS check the DATABASE for the actual role - this is the source of truth
       const { data: roleData, error: roleError } = await supabase
@@ -208,7 +209,7 @@ const BuilderSignIn = () => {
         return;
       }
 
-      console.log('🔐 Sign in successful for:', authData.user.email);
+      devLog('Sign in successful', { userId: authData.user.id });
       
       const userId = authData.user.id;
       const userEmail = authData.user.email?.toLowerCase() || '';
@@ -327,7 +328,7 @@ const BuilderSignIn = () => {
     }
 
     setLoading(true);
-    console.log('🔐 Quick sign up for:', email);
+    devLog('🔐 Quick sign up');
 
     try {
       const { data: authData, error: authError } = await supabase.auth.signUp({
@@ -373,7 +374,7 @@ const BuilderSignIn = () => {
         return;
       }
 
-      console.log('🔐 Sign up successful:', authData.user.email);
+      devLog('Sign up successful', { userId: authData.user.id });
       
       const userId = authData.user.id;
       const userEmail = authData.user.email?.toLowerCase() || '';

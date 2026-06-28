@@ -19,6 +19,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Package, Eye, EyeOff, Loader2, ArrowLeft, Mail, Lock, User, Phone, MapPin, ChevronRight, Briefcase, CheckCircle } from 'lucide-react';
 import { supabase, SUPABASE_URL, SUPABASE_ANON_KEY } from '@/integrations/supabase/client';
 import { resolveRoleFromSession } from '@/utils/resolveRoleFromSession';
+import { devLog, logAuthEvent } from '@/utils/secureLog';
 
 const ROLE = 'supplier';
 const DASHBOARD = '/supplier-dashboard';
@@ -33,7 +34,7 @@ const ROLE_DASHBOARDS: Record<string, string> = {
   'admin': '/admin-dashboard',
 };
 
-console.log('🔐 SupplierAuth BUILD v16 - PRE-FILL FROM GENERAL LOGIN');
+devLog('🔐 SupplierAuth BUILD v16 - PRE-FILL FROM GENERAL LOGIN');
 
 const SUPPLIER_REGISTRATION = '/supplier-registration';
 
@@ -92,7 +93,7 @@ const SupplierAuth: React.FC = () => {
         if (storedSession) {
           const parsed = JSON.parse(storedSession);
           if (parsed?.user?.email && parsed?.access_token) {
-            console.log('🔐 Found existing session for:', parsed.user.email);
+            logAuthEvent('SupplierAuth', 'Found existing session', parsed.user?.id);
             
             // Check if user already has supplier role
             const roleResponse = await fetch(
@@ -136,7 +137,7 @@ const SupplierAuth: React.FC = () => {
         // Also try Supabase client
         const { data: { session } } = await supabase.auth.getSession();
         if (session?.user?.email && !isPrefilledFromLogin) {
-          console.log('🔐 Found Supabase session for:', session.user.email);
+          logAuthEvent('SupplierAuth', 'Found Supabase session', session.user.id);
           
           // Check if user already has supplier role
           const { data: roleData } = await supabase

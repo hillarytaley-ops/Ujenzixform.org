@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
+import { devLog, logAuthEvent } from "@/utils/secureLog";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
   Table,
@@ -283,7 +284,7 @@ export const StaffManagement = () => {
                 setCurrentUserRole(data[0].role);
               }
             }
-            console.log('👥 Current user email:', userEmail);
+            logAuthEvent('StaffManagement', 'Current user loaded', parsed.user?.id);
           }
         }
       } catch (e) {

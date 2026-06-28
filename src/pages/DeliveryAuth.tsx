@@ -15,6 +15,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useToast } from '@/hooks/use-toast';
 import { Truck, Eye, EyeOff, Loader2, ArrowLeft, Mail, Lock, User, Phone, MapPin, ChevronRight, Briefcase, CheckCircle } from 'lucide-react';
 import { resolveRoleFromSession } from '@/utils/resolveRoleFromSession';
+import { devLog, logAuthEvent } from '@/utils/secureLog';
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from '@/integrations/supabase/client';
 
 const ROLE = 'delivery';
@@ -64,7 +65,7 @@ const DeliveryAuth: React.FC = () => {
         if (storedSession) {
           const parsed = JSON.parse(storedSession);
           if (parsed?.user?.email && parsed?.access_token) {
-            console.log('🔐 Found existing session for:', parsed.user.email);
+            logAuthEvent('DeliveryAuth', 'Found existing session', parsed.user?.id);
             
             const roleResponse = await fetch(
               `${SUPABASE_URL}/rest/v1/user_roles?user_id=eq.${parsed.user.id}&select=role`,

@@ -37,6 +37,7 @@ import Footer from "@/components/Footer";
 import { MaterialsGrid } from "@/components/suppliers/MaterialsGrid";
 import { CartSidebar } from "@/components/cart/CartSidebar";
 import { FloatingCartButton } from "@/components/cart/FloatingCartButton";
+import { devLog, logAuthEvent } from "@/utils/secureLog";
 // FloatingSocialSidebar moved to App.tsx for global availability
 import { 
   Store, 
@@ -164,7 +165,7 @@ const SupplierMarketplace = () => {
       
       if (user) {
         setUser(user);
-        console.log('🔐 SupplierMarketplace - Supabase user:', user.email);
+        logAuthEvent('SupplierMarketplace', 'Supabase user authenticated', user.id);
         
         // Check database for role
         const { data: roleData, error } = await supabase

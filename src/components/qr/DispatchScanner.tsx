@@ -16,6 +16,7 @@ import { toast } from 'sonner';
 import { SUPABASE_ANON_KEY, SUPABASE_URL, supabase } from '@/integrations/supabase/client';
 import { LEGACY_SUPABASE_AUTH_STORAGE_KEY, getAccessTokenWithPersistenceFallback, readPersistedAccessTokenSync, readPersistedAuthRawStringSync, readPersistedAuthUserSync } from '@/utils/supabaseAccessToken';
 import { purchaseOrderRequiresDeliveryProvider } from '@/utils/purchaseOrderFulfillment';
+import { devLog } from '@/utils/secureLog';
 import { Html5Qrcode, Html5QrcodeScannerState, Html5QrcodeSupportedFormats } from 'html5-qrcode';
 
 /** Strip BOM / zero-width / nulls so camera output matches DB `material_items.qr_code`. */
@@ -499,7 +500,7 @@ export const DispatchScanner: React.FC<DispatchScannerProps> = ({
         };
         
         // Get user email from localStorage first (faster than auth.getUser())
-        console.log('📧 Getting user email for supplier lookup...');
+        devLog('📧 Resolving supplier via email lookup...');
         let userEmail: string | null = null;
         try {
           const stored = readPersistedAuthRawStringSync();
@@ -507,11 +508,11 @@ export const DispatchScanner: React.FC<DispatchScannerProps> = ({
             const parsed = JSON.parse(stored);
             userEmail = parsed.user?.email || null;
             if (userEmail) {
-              console.log('📧 Got email from localStorage:', userEmail);
+              devLog('📧 Got user context from localStorage', { userId: parsed.user?.id });
             }
           }
         } catch (e) {
-          console.log('⚠️ Could not get email from localStorage');
+          devLog('⚠️ Could not get user context from localStorage');
         }
         
         // If email not in localStorage, try auth.getUser() with timeout
@@ -520,10 +521,10 @@ export const DispatchScanner: React.FC<DispatchScannerProps> = ({
             const { data: { user } } = await withTimeout(supabase.auth.getUser(), 2000);
             userEmail = user?.email || null;
             if (userEmail) {
-              console.log('📧 Got email from auth.getUser():', userEmail);
+              devLog('📧 Got user context from auth.getUser()', { userId: user?.id });
             }
           } catch (e) {
-            console.log('⚠️ Could not get email from auth.getUser() (timeout expected)');
+            devLog('⚠️ Could not get user from auth.getUser() (timeout expected)');
           }
         }
         
@@ -531,7 +532,7 @@ export const DispatchScanner: React.FC<DispatchScannerProps> = ({
         try {
           // Method 1: Try by email FIRST (this is what works in SupplierDashboard)
           if (userEmail) {
-            console.log('📧 Trying supplier lookup by email first:', userEmail);
+            devLog('📧 Trying supplier lookup by email');
             const emailData = await lookupSupplierWithRetry(
               `${SUPABASE_URL}/rest/v1/suppliers?email=eq.${encodeURIComponent(userEmail)}&select=id,user_id,email,company_name`,
               'Supplier lookup by email'
@@ -539,12 +540,12 @@ export const DispatchScanner: React.FC<DispatchScannerProps> = ({
             
             if (emailData && emailData.length > 0) {
               foundSupplierId = emailData[0].id;
-              console.log('📦 Found supplier by email:', emailData[0]);
+              devLog('📦 Found supplier by email lookup', { supplierId: emailData[0].id });
             } else {
-              console.log('⚠️ No supplier found by email');
+              devLog('⚠️ No supplier found by email');
             }
           } else {
-            console.log('⚠️ No email available for supplier lookup');
+            devLog('⚠️ No user context available for email-based supplier lookup');
           }
           
           // Method 2: Look up supplier by user_id (if email lookup didn't work)

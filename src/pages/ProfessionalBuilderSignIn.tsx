@@ -8,8 +8,9 @@ import { useNavigate, Link } from "react-router-dom";
 import { supabase, SUPABASE_URL, SUPABASE_ANON_KEY } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Home, Eye, EyeOff, Loader2, HardHat } from "lucide-react";
+import { devLog, logAuthEvent } from "@/utils/secureLog";
 
-console.log('🔐 ProfessionalBuilderSignIn BUILD v6 - USE NATIVE FETCH Feb 13 2026');
+devLog('🔐 ProfessionalBuilderSignIn BUILD v6 - USE NATIVE FETCH Feb 13 2026');
 
 // Supabase config for native fetch
 const ProfessionalBuilderSignIn = () => {
@@ -83,7 +84,7 @@ const ProfessionalBuilderSignIn = () => {
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    console.log('🔐 Sign in button clicked! Email:', email);
+    devLog('🔐 Sign in button clicked');
     
     if (!email || !password) {
       toast({
@@ -132,7 +133,7 @@ const ProfessionalBuilderSignIn = () => {
         throw new Error('Invalid response from authentication server');
       }
       
-      console.log('🔐 Sign in successful! User:', signInData.user.email);
+      devLog('Sign in successful', { userId: signInData.user.id });
       
       // Store the session in localStorage (same format as Supabase client)
       const sessionData = {

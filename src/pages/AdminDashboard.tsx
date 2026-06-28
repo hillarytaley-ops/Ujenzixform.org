@@ -11,6 +11,7 @@ import {
 import { useState, useEffect, useLayoutEffect, useCallback, useRef } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useUrlTabSync } from "@/hooks/useUrlTabSync";
+import { devLog, logAuthEvent } from "@/utils/secureLog";
 import { supabase, SUPABASE_URL, SUPABASE_ANON_KEY } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
@@ -738,7 +739,7 @@ const AdminDashboard = () => {
     try {
       if (isAdminStaffLocalSessionValid()) {
         const adminEmailLS = localStorage.getItem('admin_email') || '';
-        console.log('🔐 Admin Dashboard Access Check (staff portal):', { adminEmail: adminEmailLS });
+        devLog('🔐 Admin Dashboard Access Check (staff portal)');
         setAdminEmail(adminEmailLS);
         setLoading(false);
 
@@ -747,7 +748,7 @@ const AdminDashboard = () => {
         }, 3000);
         supabase.auth.getSession().then(({ data: { session } }) => {
           clearTimeout(sessionCheckTimeout);
-          console.log('🔐 Supabase session:', session?.user?.email || 'none');
+          logAuthEvent('AdminDashboard', 'Supabase session', session?.user?.id);
         }).catch(() => clearTimeout(sessionCheckTimeout));
 
         loadDashboardStats();

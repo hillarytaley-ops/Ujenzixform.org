@@ -22,6 +22,7 @@ import {
   fetchPostgrestCatalog,
   readAuthSessionForRest,
 } from '@/utils/supabaseAccessToken';
+import { devLog, devWarn } from '@/utils/secureLog';
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button, buttonVariants } from '@/components/ui/button';
@@ -733,9 +734,9 @@ export const MaterialsGrid: React.FC<MaterialsGridProps> = ({
   useEffect(() => {
     if (authUser?.id) {
       setBuilderId(authUser.id);
-      console.log('MaterialsGrid - User from AuthContext:', authUser.email, 'Role:', authUserRole, 'BuilderId:', authUser.id);
+      devLog('MaterialsGrid - User from AuthContext:', { userId: authUser.id, role: authUserRole });
     } else {
-      console.log('MaterialsGrid - No user in AuthContext');
+      devLog('MaterialsGrid - No user in AuthContext');
     }
   }, [authUser, authUserRole]);
   
@@ -1700,7 +1701,7 @@ export const MaterialsGrid: React.FC<MaterialsGridProps> = ({
           });
         }
       } catch (emailErr) {
-        console.warn('MaterialsGrid Buy Now: awaiting-payment email skipped:', emailErr);
+        devWarn('MaterialsGrid Buy Now: awaiting-payment notification skipped:', emailErr);
       }
       const successPath =
         userRole === 'private_client'

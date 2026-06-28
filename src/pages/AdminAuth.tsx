@@ -32,6 +32,7 @@
  */
 
 import { useState, useEffect, Component, ErrorInfo, ReactNode } from "react";
+import { devLog } from "@/utils/secureLog";
 import { useNavigate } from "react-router-dom";
 import {
   supabase,
@@ -274,7 +275,7 @@ const AdminAuth = () => {
       const normalizedEmail = workEmail.toLowerCase().trim();
       const normalizedCode = staffCode.toUpperCase().trim();
       
-      console.log('🔐 Checking credentials:', { email: normalizedEmail, code: normalizedCode });
+      // Credentials verified server-side — never log email or staff codes.
 
       // Hardcoded super-admin bootstrap (disabled in production unless explicitly allowed)
       const allowSuperAdminFallback =
@@ -302,7 +303,7 @@ const AdminAuth = () => {
       let staffName = '';
       
       if (isSuperAdmin) {
-        console.log('🔐 Super Admin credentials verified');
+        devLog('🔐 Super Admin verified');
         isValidStaff = true;
         staffRole = 'super_admin';
         staffName = 'Super Administrator';
@@ -428,7 +429,7 @@ const AdminAuth = () => {
             setLoading(false);
             return;
           } else {
-            console.log('🔐 No matching staff credentials');
+            devLog('🔐 No matching staff record');
           }
         } catch (err: any) {
           console.error("🔐 Database check error:", err);
@@ -444,7 +445,7 @@ const AdminAuth = () => {
         }
       }
       
-      console.log('🔐 Credential check result:', isValidStaff);
+      devLog('🔐 Staff verification result:', { isValidStaff });
 
       if (!isValidStaff) {
         const newAttempts = attempts + 1;
@@ -478,7 +479,7 @@ const AdminAuth = () => {
       // This works because admin operations should use the service role key
       // or we configure permissive RLS policies for development
       
-      console.log('✅ Staff credentials verified for:', workEmail, 'Role:', staffRole);
+      devLog('Staff credentials verified', { role: staffRole });
 
       // Try to sign in with Supabase using staff code as password
       // This creates a proper session for RLS policies

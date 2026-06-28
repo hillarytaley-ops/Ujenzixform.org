@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { sanitizeChatBoldHtml } from '@/utils/sanitizeHtml';
+import { devLog } from '@/utils/secureLog';
 import { 
   MessageCircle, 
   X, 
@@ -738,7 +739,7 @@ How can I help you today?`;
     setQueuePosition(1);
     addSystemMessage('🔄 Connecting you to a staff member...');
 
-    console.log('🔄 Props:', { userId, userName, userEmail });
+    devLog('🔄 Props:', { userId, userName });
 
     try {
       // Use existing userId if available, otherwise try to get from session
@@ -760,7 +761,7 @@ How can I help you today?`;
         }
       }
       
-      console.log('🔄 Creating conversation...', { clientId, clientName, clientEmail });
+      devLog('🔄 Creating conversation...', { clientId, clientName });
       
       // Create conversation
       const { data: conv, error } = await supabase

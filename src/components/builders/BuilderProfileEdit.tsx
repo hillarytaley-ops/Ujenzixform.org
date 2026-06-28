@@ -15,6 +15,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
 import { supabase, SUPABASE_URL, SUPABASE_ANON_KEY } from '@/integrations/supabase/client';
+import { devLog, logAuthEvent } from '@/utils/secureLog';
 import {
   User,
   Building2,
@@ -182,7 +183,7 @@ export const BuilderProfileEdit: React.FC<BuilderProfileEditProps> = ({
           if (storedSession) {
             const parsed = JSON.parse(storedSession);
             user = parsed?.user;
-            console.log('📝 BuilderProfileEdit: Got user from localStorage:', user?.email);
+            logAuthEvent('BuilderProfileEdit', 'Got user from localStorage', user?.id);
           }
         } catch (e) {
           console.log('📝 BuilderProfileEdit: localStorage fallback failed');
@@ -285,7 +286,7 @@ export const BuilderProfileEdit: React.FC<BuilderProfileEditProps> = ({
           };
           setProfile(defaultProfile);
           setIsOwner(true);
-          console.log('✅ BuilderProfileEdit: Default profile created for:', user.email);
+          devLog('✅ BuilderProfileEdit: Default profile created', { userId: user.id });
           return;
         }
       }
@@ -308,7 +309,7 @@ export const BuilderProfileEdit: React.FC<BuilderProfileEditProps> = ({
       if (storedSession) {
         const parsed = JSON.parse(storedSession);
         user = parsed?.user;
-        console.log('📝 BuilderProfileEdit: Got user from localStorage for save:', user?.email);
+        logAuthEvent('BuilderProfileEdit', 'Got user from localStorage for save', user?.id);
       }
     } catch (e) {
       console.log('📝 BuilderProfileEdit: localStorage read failed');

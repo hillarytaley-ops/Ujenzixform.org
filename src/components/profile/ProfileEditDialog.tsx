@@ -18,6 +18,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { supabase, SUPABASE_URL, SUPABASE_ANON_KEY } from '@/integrations/supabase/client';
+import { devLog } from '@/utils/secureLog';
 import {
   User,
   Store,
@@ -168,7 +169,7 @@ export const ProfileEditDialog: React.FC<ProfileEditDialogProps> = ({
       userEmail = localStorage.getItem('user_email') || '';
     }
 
-    console.log('📝 ProfileEditDialog: User ID:', userId, 'Email:', userEmail);
+    devLog('📝 ProfileEditDialog: User ID:', userId);
 
     // If no user ID found, show error and close
     if (!userId) {
@@ -254,10 +255,9 @@ export const ProfileEditDialog: React.FC<ProfileEditDialogProps> = ({
           }
         } else if (profiles) {
           profileData = { ...profiles, email: userEmail };
-          console.log('✅ ProfileEditDialog: Profile loaded from Supabase client:', profiles.full_name || profiles.email || 'User');
-          console.log('📝 ProfileEditDialog: Profile data:', {
+          devLog('✅ ProfileEditDialog: Profile loaded from Supabase client:', profiles.full_name || 'User');
+          devLog('📝 ProfileEditDialog: Profile data:', {
             full_name: profiles.full_name,
-            email: userEmail,
             phone: profiles.phone,
             company_name: profiles.company_name,
             location: profiles.location,
@@ -334,9 +334,8 @@ export const ProfileEditDialog: React.FC<ProfileEditDialogProps> = ({
       clearTimeout(timeoutId);
       setProfile(profileData);
       setLoading(false);
-      console.log('✅ ProfileEditDialog: Profile loaded successfully:', {
+      devLog('✅ ProfileEditDialog: Profile loaded successfully:', {
         full_name: profileData.full_name,
-        email: profileData.email,
         phone: profileData.phone,
         company_name: profileData.company_name,
         location: profileData.location

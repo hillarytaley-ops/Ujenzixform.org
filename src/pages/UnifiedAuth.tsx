@@ -3,8 +3,7 @@
  * BUILD v25 - Same pattern as main Auth.tsx (working)
  */
 
-console.log('🔐 UnifiedAuth BUILD v25 - SAME AS MAIN AUTH Feb 8 2026');
-
+import { devLog, logAuthEvent } from '@/utils/secureLog';
 import React, { useState, useEffect } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -18,6 +17,8 @@ import {
   Home, Building2, Store, Truck, Eye, EyeOff, Loader2, 
   ArrowLeft, Mail, Lock, User, Phone, MapPin, ChevronRight
 } from 'lucide-react';
+
+devLog('🔐 UnifiedAuth BUILD v25 - SAME AS MAIN AUTH Feb 8 2026');
 
 const ROLE_CONFIG = {
   private_client: {
@@ -89,7 +90,7 @@ const UnifiedAuth: React.FC = () => {
     let redirected = false;
     
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      console.log('🔐 UnifiedAuth: Auth event:', event, session?.user?.email);
+      logAuthEvent('UnifiedAuth', event, session?.user?.id);
       
       if (!redirected && session?.user && (event === 'SIGNED_IN' || event === 'INITIAL_SESSION')) {
         redirected = true;

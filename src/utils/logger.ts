@@ -11,6 +11,8 @@
  * logger.error('Failed to fetch', error);
  */
 
+import { sanitizeForLog as sanitizeLogPayload } from '@/utils/secureLog';
+
 type LogLevel = 'debug' | 'info' | 'warn' | 'error';
 
 interface LogEntry {
@@ -117,14 +119,15 @@ const log = (level: LogLevel, message: string, data?: unknown, category?: string
   const prefix = isDev ? `${LOG_EMOJI[level]} [${entry.timestamp}]` : `[${level.toUpperCase()}]`;
   const categoryPrefix = category ? `[${category}]` : '';
   const fullMessage = `${prefix}${categoryPrefix} ${message}`;
+  const safeData = data !== undefined ? sanitizeLogPayload(data) : undefined;
 
   if (isDev) {
     // Styled output in development
-    if (data !== undefined) {
+    if (safeData !== undefined) {
       console[level === 'debug' ? 'log' : level](
         `%c${fullMessage}`,
         LOG_STYLES[level],
-        data
+        safeData
       );
     } else {
       console[level === 'debug' ? 'log' : level](
@@ -135,14 +138,14 @@ const log = (level: LogLevel, message: string, data?: unknown, category?: string
   } else {
     // Simple output in production (only for warn/error)
     if (level === 'error') {
-      console.error(fullMessage, data || '');
+      console.error(fullMessage, safeData || '');
     } else if (level === 'warn') {
-      console.warn(fullMessage, data || '');
+      console.warn(fullMessage, safeData || '');
     }
   }
 
   // Persist to storage
-  persistLog(entry);
+  persistLog({ ...entry, data: safeData });
 };
 
 /**

@@ -11,6 +11,7 @@ import { LanguageProvider } from "@/contexts/LanguageContext";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { CartProvider } from "@/contexts/CartContext";
 import { OnboardingProvider } from "@/components/onboarding/OnboardingProvider";
+import { logAuthEvent } from "@/utils/secureLog";
 
 // Critical path imports - loaded immediately
 import Index from "./pages/Index";
@@ -195,23 +196,13 @@ const App = () => {
       // Get current user immediately
       const { data: { user: currentUser } } = await supabase.auth.getUser();
       if (currentUser) {
-        console.log('🔐 Chat: User detected:', currentUser.email);
+        logAuthEvent('Chat', 'user detected', currentUser.id);
         setUser(currentUser);
       }
       
-      // Track last event to prevent duplicate logs
-      let lastEvent = '';
-      let lastEmail = '';
-      
       // Listen for auth changes (sign in, sign out)
       const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-        // Dedupe: only log if event or email actually changed
-        const email = session?.user?.email || '';
-        if (event !== lastEvent || email !== lastEmail) {
-          console.log('🔐 Chat: Auth state changed:', event, email);
-          lastEvent = event;
-          lastEmail = email;
-        }
+        logAuthEvent('Chat', event, session?.user?.id);
         
         if (session?.user) {
           setUser(session.user);

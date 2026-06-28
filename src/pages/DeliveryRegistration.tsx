@@ -31,6 +31,7 @@ import {
   CreditCard,
 } from "lucide-react";
 import { normalizePhoneDigits } from "@/utils/phoneNormalize";
+import { devLog, logAuthEvent } from "@/utils/secureLog";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { User as SupabaseUser } from "@supabase/supabase-js";
@@ -106,7 +107,7 @@ const DeliveryRegistration = () => {
     const checkExistingUser = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
-        console.log('📝 DeliveryRegistration: User already logged in:', user.email);
+        logAuthEvent('DeliveryRegistration', 'User already logged in', user.id);
         setExistingUser(user);
         setEmail(user.email || "");
         
@@ -291,7 +292,7 @@ const DeliveryRegistration = () => {
           return;
         }
 
-        console.log('📝 DeliveryRegistration: Creating new auth account for:', email);
+        devLog('📝 DeliveryRegistration: Creating new auth account');
         const { data: authData, error: authError } = await supabase.auth.signUp({
           email: email.trim().toLowerCase(),
           password: password,

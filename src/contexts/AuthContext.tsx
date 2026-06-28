@@ -28,6 +28,7 @@ import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { prefetchDashboardData, clearPrefetchCache } from '@/services/dataPrefetch';
 import { logger } from '@/utils/logger';
+import { logAuthEvent } from '@/utils/secureLog';
 
 interface AuthContextType {
   user: User | null;
@@ -149,7 +150,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, currentSession) => {
         if (!mounted) return;
 
-        console.log('Auth state changed:', event, currentSession?.user?.email);
+        logAuthEvent('Auth', event, currentSession?.user?.id);
 
         if (event === 'SIGNED_IN' && currentSession?.user) {
           setSession(currentSession);

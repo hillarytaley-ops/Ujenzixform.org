@@ -31,6 +31,7 @@ import {
 import { BuilderVideoPost, BuilderVideoPostProps, VideoComment } from './BuilderVideoPost';
 import { BuilderStories } from './BuilderStories';
 import { SUPABASE_ANON_KEY, SUPABASE_URL, supabase } from '@/integrations/supabase/client';
+import { devLog } from '@/utils/secureLog';
 import { useToast } from '@/hooks/use-toast';
 import useVerifiedRole from '@/hooks/useVerifiedRole';
 import { getBuilderFeedGuestId } from '@/utils/builderFeedGuestId';
@@ -677,8 +678,7 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
       if (storedSession) {
         const parsed = JSON.parse(storedSession);
         userId = parsed.user?.id;
-        console.log('📤 Parsed user ID:', userId);
-        console.log('📤 User email:', parsed.user?.email);
+        devLog('📤 Parsed user ID:', userId);
       }
     } catch (e) {
       console.error('📤 Error parsing localStorage:', e);
