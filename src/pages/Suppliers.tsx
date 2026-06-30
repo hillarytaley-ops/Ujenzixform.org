@@ -265,36 +265,53 @@ const Suppliers = () => {
         </section>
       )}
 
-      {/* Hero Section - Hide when coming from dashboard */}
+      {/* Hero Section — warm palette; lighter overlay (matches homepage) */}
       {!isFromDashboard && (
-      <section className="text-white relative overflow-hidden py-6 sm:py-8 md:py-10">
-        {/* Background Image */}
-        <div 
-          className="absolute inset-0 bg-cover bg-center"
-          style={{
-            backgroundImage: `url('https://images.unsplash.com/photo-1504307651254-35680f356dfd?q=80&w=2070&auto=format&fit=crop')`,
-          }}
-        />
+      <section className="text-white relative overflow-hidden py-8 sm:py-10 md:py-12 min-h-[420px] sm:min-h-[460px] flex items-center">
+        <div className="absolute inset-0">
+          <div className="absolute inset-0 bg-gradient-to-br from-orange-950 via-slate-900 to-emerald-950" />
+          <img
+            src="https://images.unsplash.com/photo-1504307651254-35680f356dfd?w=1920&q=85&auto=format&fit=crop"
+            alt="Construction materials and site"
+            loading="eager"
+            className="absolute inset-0 w-full h-full object-cover scale-105"
+          />
+          <div className="absolute inset-0 bg-gradient-to-br from-orange-950/50 via-slate-900/45 to-emerald-950/55" />
+          <div className="absolute inset-0 bg-gradient-to-t from-slate-950/75 via-transparent to-orange-900/20" />
+          <div className="absolute inset-0 bg-gradient-to-r from-slate-950/45 via-transparent to-emerald-900/25" />
+        </div>
+
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          <div className="absolute top-10 left-[10%] w-64 h-64 bg-orange-500/20 rounded-full blur-3xl animate-pulse" />
+          <div
+            className="absolute bottom-8 right-[8%] w-72 h-72 bg-emerald-400/15 rounded-full blur-3xl animate-pulse"
+            style={{ animationDelay: "1s" }}
+          />
+          <div
+            className="absolute top-1/2 left-1/3 w-56 h-56 bg-amber-400/15 rounded-full blur-3xl animate-pulse"
+            style={{ animationDelay: "2s" }}
+          />
+          <div className="absolute bottom-0 left-0 right-0 h-24 bg-gradient-to-t from-emerald-600/10 to-transparent" />
+        </div>
         
-        {/* Gradient Overlay */}
-        <div className="absolute inset-0 bg-gradient-to-br from-slate-900/95 via-emerald-900/90 to-slate-900/95" />
-        
-        <div className="container mx-auto px-4 text-center relative z-10 max-w-4xl">
+        <div className="container mx-auto px-4 text-center relative z-10 max-w-4xl w-full">
           {/* Badge */}
-          <div className="inline-flex items-center gap-1.5 bg-white/10 backdrop-blur-sm border border-white/20 rounded-full px-3 py-1.5 mb-3 md:mb-4">
+          <div className="inline-flex items-center gap-1.5 bg-white/15 backdrop-blur-md border border-white/25 rounded-full px-3 py-1.5 mb-3 md:mb-4 shadow-lg shadow-black/10">
             <span className="text-base md:text-lg leading-none">🇰🇪</span>
             <span className="text-white font-medium text-xs md:text-sm">Kenya · material marketplace</span>
           </div>
           
           {/* Title */}
-          <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-2 md:mb-3 px-1 leading-tight text-balance break-words">
+          <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-2 md:mb-3 px-1 leading-tight text-balance break-words drop-shadow-md">
             <span className="text-white">Materials</span>
-            <span className="bg-gradient-to-r from-emerald-400 to-teal-400 bg-clip-text text-transparent"> Marketplace</span>
+            <span className="bg-gradient-to-r from-orange-300 via-amber-200 to-emerald-300 bg-clip-text text-transparent">
+              {' '}Marketplace
+            </span>
           </h1>
           
           {/* Description — shorter on public view; detailed CTAs live above the catalog */}
           <p
-            className={`mb-4 max-w-2xl mx-auto text-white/80 px-2 sm:px-3 leading-snug text-balance ${
+            className={`mb-4 max-w-2xl mx-auto text-orange-50/90 px-2 sm:px-3 leading-snug text-balance drop-shadow-sm ${
               showPurchaseAccountGuidance
                 ? "text-xs sm:text-sm md:text-base"
                 : "text-xs sm:text-sm md:text-base"
@@ -318,25 +335,25 @@ const Suppliers = () => {
 
           {/* Stats — compact row */}
           <div className="flex flex-wrap justify-center gap-x-6 gap-y-2 md:gap-x-10 mb-3 md:mb-4">
-            <div className="text-center min-w-[5.5rem]">
+            <div className="text-center min-w-[5.5rem] px-3 py-2 rounded-lg bg-white/10 backdrop-blur-md border border-white/15">
               <div className="text-lg md:text-2xl font-bold text-white tabular-nums">
                 {formatHomeStatCount(publicStats.supplierCompanies, publicStats.loading)}
               </div>
-              <div className="text-[10px] md:text-xs text-white/60 leading-tight">Supplier listings</div>
+              <div className="text-[10px] md:text-xs text-orange-100/75 leading-tight">Supplier listings</div>
             </div>
-            <div className="text-center min-w-[5.5rem]">
-              <div className="text-lg md:text-2xl font-bold text-emerald-400 tabular-nums">
+            <div className="text-center min-w-[5.5rem] px-3 py-2 rounded-lg bg-white/10 backdrop-blur-md border border-white/15">
+              <div className="text-lg md:text-2xl font-bold text-amber-300 tabular-nums">
                 {formatHomeStatCount(publicStats.approvedMaterials, publicStats.loading)}
               </div>
-              <div className="text-[10px] md:text-xs text-white/60 leading-tight">Approved materials</div>
+              <div className="text-[10px] md:text-xs text-orange-100/75 leading-tight">Approved materials</div>
             </div>
-            <div className="text-center min-w-[5.5rem]">
-              <div className="text-lg md:text-2xl font-bold text-teal-400 tabular-nums">47</div>
-              <div className="text-[10px] md:text-xs text-white/60 leading-tight">Counties (Kenya)</div>
+            <div className="text-center min-w-[5.5rem] px-3 py-2 rounded-lg bg-white/10 backdrop-blur-md border border-white/15">
+              <div className="text-lg md:text-2xl font-bold text-emerald-300 tabular-nums">47</div>
+              <div className="text-[10px] md:text-xs text-orange-100/75 leading-tight">Counties (Kenya)</div>
             </div>
           </div>
           {!isLoggedInBuilder && (
-            <p className="text-[10px] md:text-[11px] text-white/40 max-w-md mx-auto mb-4 px-2 leading-snug">
+            <p className="text-[10px] md:text-[11px] text-orange-100/55 max-w-md mx-auto mb-4 px-2 leading-snug">
               Figures update from directory data; materials count matches approved rows in the catalog.
             </p>
           )}
@@ -346,7 +363,7 @@ const Suppliers = () => {
             <Button
               size="default"
               type="button"
-              className="h-10 md:h-11 px-6 md:px-8 bg-white text-slate-900 hover:bg-gray-100 font-semibold text-sm md:text-base shadow-lg"
+              className="h-10 md:h-11 px-6 md:px-8 bg-white text-slate-900 hover:bg-orange-50 font-semibold text-sm md:text-base shadow-xl shadow-black/20 ring-2 ring-white/30"
               onClick={scrollToMaterials}
             >
               <ShoppingCart className="h-4 w-4 md:h-5 md:w-5 mr-2 shrink-0" />
@@ -358,7 +375,7 @@ const Suppliers = () => {
                   to="/auth?tab=signin"
                   className={cn(
                     buttonVariants({ variant: "outline", size: "default" }),
-                    "h-10 md:h-11 px-6 md:px-8 border-2 border-white/80 bg-white/10 text-white hover:bg-white/20 font-semibold text-sm md:text-base shadow-lg no-underline"
+                    "h-10 md:h-11 px-6 md:px-8 border-2 border-white/50 bg-white/10 text-white hover:bg-white/15 hover:border-amber-200/50 font-semibold text-sm md:text-base shadow-lg backdrop-blur-md no-underline"
                   )}
                 >
                   Sign In
@@ -367,7 +384,7 @@ const Suppliers = () => {
                   to="/auth?tab=signup"
                   className={cn(
                     buttonVariants({ size: "default" }),
-                    "h-10 md:h-11 px-6 md:px-8 bg-orange-500 text-white border-2 border-orange-400 hover:bg-orange-600 font-semibold text-sm md:text-base shadow-lg no-underline"
+                    "h-10 md:h-11 px-6 md:px-8 bg-gradient-to-r from-orange-500 via-orange-600 to-red-600 text-white border-2 border-orange-400/40 hover:from-orange-400 hover:via-orange-500 hover:to-red-500 font-semibold text-sm md:text-base shadow-xl shadow-orange-900/30 no-underline"
                   )}
                 >
                   Register
@@ -377,7 +394,7 @@ const Suppliers = () => {
           </div>
 
           {showPurchaseAccountGuidance && isGuest && (
-            <div className="max-w-xl mx-auto mt-0 mb-2 flex flex-wrap items-center justify-center gap-x-3 gap-y-1.5 text-[11px] sm:text-xs text-white/70">
+            <div className="max-w-xl mx-auto mt-0 mb-2 flex flex-wrap items-center justify-center gap-x-3 gap-y-1.5 text-[11px] sm:text-xs text-orange-50/80">
               <span>Also on UjenziXform:</span>
               <Link to="/supplier-auth" className="text-amber-200 hover:text-white underline underline-offset-2">
                 Supplier sign-in
@@ -394,11 +411,11 @@ const Suppliers = () => {
           {/* Welcome message for logged-in builders */}
           {isLoggedInBuilder && !showPurchaseAccountGuidance && (
             <div className="max-w-xl mx-auto text-center">
-              <div className="bg-white/10 backdrop-blur-sm rounded-xl p-3 sm:p-4 border border-white/20">
+              <div className="bg-white/15 backdrop-blur-md rounded-xl p-3 sm:p-4 border border-white/20 shadow-lg shadow-black/10">
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-center gap-2 sm:gap-3 mb-2">
                   <div className="flex items-center justify-center gap-2">
-                    <div className="w-8 h-8 bg-emerald-500/20 rounded-full flex items-center justify-center shrink-0">
-                      <ShoppingCart className="h-4 w-4 text-emerald-400" />
+                    <div className="w-8 h-8 bg-orange-500/25 rounded-full flex items-center justify-center shrink-0">
+                      <ShoppingCart className="h-4 w-4 text-amber-300" />
                     </div>
                     <h3 className="text-base sm:text-lg font-bold text-white leading-tight">
                       Welcome back,{' '}
@@ -411,7 +428,7 @@ const Suppliers = () => {
                     </h3>
                   </div>
                 </div>
-                <p className="text-white/70 text-xs sm:text-sm mb-2 sm:mb-3 leading-snug">
+                <p className="text-orange-50/85 text-xs sm:text-sm mb-2 sm:mb-3 leading-snug">
                   Scroll down to browse and add to cart.
                   {userRole === 'professional_builder' && ' Request quotes for bulk pricing.'}
                   {userRole === 'private_client' && ' Buy at listed prices.'}
