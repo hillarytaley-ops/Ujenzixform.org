@@ -171,7 +171,7 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, in
         total_amount: po.total_amount || 0,
         status: po.status || 'pending',
         payment_status: po.payment_status || 'pending',
-        notes: po.notes || '',
+        notes: po.special_instructions || po.supplier_notes || po.notes || '',
         created_at: po.created_at,
         updated_at: po.updated_at || po.created_at,
         order_type: po.po_number?.startsWith('QR-') ? 'quote_request' : 'direct_purchase',

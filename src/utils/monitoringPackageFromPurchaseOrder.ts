@@ -26,6 +26,7 @@ function collectPurchaseOrderText(po: Record<string, unknown> | null | undefined
   };
   push(po.project_name);
   push(po.special_instructions);
+  push(po.supplier_notes);
   push(po.notes);
   push(po.description);
   const items = Array.isArray(po.items) ? po.items : [];
