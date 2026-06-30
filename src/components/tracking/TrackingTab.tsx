@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { CONVERSATION_LIST_COLUMNS, CHAT_MESSAGE_COLUMNS, CHAT_FEEDBACK_COLUMNS, CHAT_TRANSCRIPT_COLUMNS, SUPPORT_CHAT_COLUMNS, ADMIN_FINANCIAL_INVOICE_COLUMNS, ADMIN_FINANCIAL_PO_COLUMNS, ADMIN_FINANCIAL_RECEIPT_COLUMNS, ADMIN_FINANCIAL_DELIVERY_ORDER_COLUMNS, ADMIN_FINANCIAL_QUOTATION_COLUMNS, ADMIN_APPLICATION_COLUMNS, ADMIN_REGISTRATION_COLUMNS, ADMIN_DELIVERY_PROVIDER_COLUMNS, QR_SCAN_EVENT_COLUMNS, TRACKING_NUMBER_COLUMNS, DELIVERY_NOTIFICATION_COLUMNS, JOB_POSITION_COLUMNS, MATERIAL_CATALOG_COLUMNS, SUPPLIER_PRODUCT_PRICE_COLUMNS, DELIVERY_REQUEST_COLUMNS } from '@/lib/restColumnSets';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -238,7 +239,7 @@ export const TrackingTab: React.FC<TrackingTabProps> = ({
       // NOTE: No date filters - this query will fetch ALL tracking numbers, including future ones
       // Limit set to 1000 to ensure we get all records
       // Explicitly select all columns including updated_at to ensure proper sorting
-      let url = `${SUPABASE_URL}/rest/v1/tracking_numbers?order=updated_at.desc.nullslast,created_at.desc&select=*&limit=1000`;
+      let url = `${SUPABASE_URL}/rest/v1/tracking_numbers?order=updated_at.desc.nullslast,created_at.desc&select=${TRACKING_NUMBER_COLUMNS}&limit=1000`;
       
       if (userRole === 'admin') {
         // Admin sees all tracking numbers - no filter needed

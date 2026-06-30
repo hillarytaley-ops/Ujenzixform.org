@@ -1,4 +1,5 @@
 /** Careers: live job list from `job_positions`; applications to `job_applications`. */
+import { CONVERSATION_LIST_COLUMNS, CHAT_MESSAGE_COLUMNS, CHAT_FEEDBACK_COLUMNS, CHAT_TRANSCRIPT_COLUMNS, SUPPORT_CHAT_COLUMNS, ADMIN_FINANCIAL_INVOICE_COLUMNS, ADMIN_FINANCIAL_PO_COLUMNS, ADMIN_FINANCIAL_RECEIPT_COLUMNS, ADMIN_FINANCIAL_DELIVERY_ORDER_COLUMNS, ADMIN_FINANCIAL_QUOTATION_COLUMNS, ADMIN_APPLICATION_COLUMNS, ADMIN_REGISTRATION_COLUMNS, ADMIN_DELIVERY_PROVIDER_COLUMNS, QR_SCAN_EVENT_COLUMNS, TRACKING_NUMBER_COLUMNS, DELIVERY_NOTIFICATION_COLUMNS, JOB_POSITION_COLUMNS, MATERIAL_CATALOG_COLUMNS, SUPPLIER_PRODUCT_PRICE_COLUMNS, DELIVERY_REQUEST_COLUMNS } from '@/lib/restColumnSets';
 
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
@@ -210,7 +211,7 @@ const Careers = () => {
       }
 
       // 2) Anon REST — same rows a signed-out visitor would get (explicit public read)
-      const restUrl = `${SUPABASE_URL}/rest/v1/job_positions?select=*&is_active=eq.true&order=is_featured.desc,created_at.desc`;
+      const restUrl = `${SUPABASE_URL}/rest/v1/job_positions?select=${JOB_POSITION_COLUMNS}&is_active=eq.true&order=is_featured.desc,created_at.desc`;
       const restRes = await fetch(restUrl, {
         headers: {
           apikey: SUPABASE_ANON_KEY,

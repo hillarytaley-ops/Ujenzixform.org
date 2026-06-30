@@ -1,4 +1,5 @@
 import { readAccessTokenSyncBestEffort } from '@/utils/supabaseAccessToken';
+import { CONVERSATION_LIST_COLUMNS, CHAT_MESSAGE_COLUMNS, CHAT_FEEDBACK_COLUMNS, CHAT_TRANSCRIPT_COLUMNS, SUPPORT_CHAT_COLUMNS, ADMIN_FINANCIAL_INVOICE_COLUMNS, ADMIN_FINANCIAL_PO_COLUMNS, ADMIN_FINANCIAL_RECEIPT_COLUMNS, ADMIN_FINANCIAL_DELIVERY_ORDER_COLUMNS, ADMIN_FINANCIAL_QUOTATION_COLUMNS, ADMIN_APPLICATION_COLUMNS, ADMIN_REGISTRATION_COLUMNS, ADMIN_DELIVERY_PROVIDER_COLUMNS, QR_SCAN_EVENT_COLUMNS, TRACKING_NUMBER_COLUMNS, DELIVERY_NOTIFICATION_COLUMNS, JOB_POSITION_COLUMNS, MATERIAL_CATALOG_COLUMNS, SUPPLIER_PRODUCT_PRICE_COLUMNS, DELIVERY_REQUEST_COLUMNS } from '@/lib/restColumnSets';
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 export type MyMonitoringFetchOpts = {
@@ -73,7 +74,7 @@ async function loadViaDirectRest(opts: MyMonitoringFetchOpts): Promise<any[]> {
   if (userId) {
     try {
       const res = await run(
-        `${supabaseUrl}/rest/v1/monitoring_service_requests?user_id=eq.${encodeURIComponent(userId)}&select=*&order=created_at.desc`
+        `${supabaseUrl}/rest/v1/monitoring_service_requests?user_id=eq.${encodeURIComponent(userId)}&select=id,user_id,status,created_at,updated_at,package_type,site_address&order=created_at.desc`
       );
       if (res.ok) {
         const json = await res.json();

@@ -37,6 +37,8 @@
  */
 
 import { readPersistedAuthRawStringSync } from '@/utils/supabaseAccessToken';
+import { SUPPLIER_PRODUCT_PRICE_COLUMNS } from '@/lib/restColumnSets';
+import { SUPABASE_URL } from '@/integrations/supabase/client';
 import React, { useState, useEffect, useRef } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -349,7 +351,7 @@ export const ProductManagement: React.FC<ProductManagementProps> = ({ supplierId
         try {
           // Use PostgREST 'in' filter: id=in.(uuid1,uuid2,...)
           const idsParam = `in.(${batch.join(',')})`;
-          const url = `https://wuuyjjpgzgeimiptuuws.supabase.co/rest/v1/admin_material_images?select=id,image_url&id=${idsParam}`;
+          const url = `${SUPABASE_URL}/rest/v1/admin_material_images?select=id,image_url&id=${idsParam}`;
           
           const response = await fetch(url, {
             headers: {
@@ -412,7 +414,7 @@ export const ProductManagement: React.FC<ProductManagementProps> = ({ supplierId
       
       try {
         const testResponse = await fetch(
-          'https://wuuyjjpgzgeimiptuuws.supabase.co/rest/v1/admin_material_images?select=id&limit=1',
+          '${SUPABASE_URL}/rest/v1/admin_material_images?select=id&limit=1',
           {
             headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': accessToken ? `Bearer ${accessToken}` : '' }
           }
@@ -424,7 +426,7 @@ export const ProductManagement: React.FC<ProductManagementProps> = ({ supplierId
       
       // Fetch products WITHOUT image_url first (base64 images are too large - each can be 100KB-1MB!)
       // Images will be loaded in batches afterward
-      const url = 'https://wuuyjjpgzgeimiptuuws.supabase.co/rest/v1/admin_material_images?select=id,name,category,description,unit,suggested_price,pricing_type,variants,is_approved&order=created_at.desc&limit=500';
+      const url = '${SUPABASE_URL}/rest/v1/admin_material_images?select=id,name,category,description,unit,suggested_price,pricing_type,variants,is_approved&order=created_at.desc&limit=500';
       console.log('📦 Fetching products...');
       const fetchStart = Date.now();
       
@@ -523,7 +525,7 @@ export const ProductManagement: React.FC<ProductManagementProps> = ({ supplierId
       
       console.log(`📦 Loading prices for supplier: ${effectiveSupplierId}`);
       const response = await fetch(
-        `https://wuuyjjpgzgeimiptuuws.supabase.co/rest/v1/supplier_product_prices?supplier_id=eq.${effectiveSupplierId}&select=*`,
+        `${SUPABASE_URL}/rest/v1/supplier_product_prices?supplier_id=eq.${effectiveSupplierId}&select=${SUPPLIER_PRODUCT_PRICE_COLUMNS}`,
         {
           headers: {
             'apikey': SUPABASE_ANON_KEY,
@@ -634,7 +636,7 @@ export const ProductManagement: React.FC<ProductManagementProps> = ({ supplierId
         // UPDATE existing price using PATCH
         console.log('📝 Updating existing price...');
         response = await fetch(
-          `https://wuuyjjpgzgeimiptuuws.supabase.co/rest/v1/supplier_product_prices?supplier_id=eq.${effectiveSupplierId}&product_id=eq.${productId}`,
+          `${SUPABASE_URL}/rest/v1/supplier_product_prices?supplier_id=eq.${effectiveSupplierId}&product_id=eq.${productId}`,
           {
             method: 'PATCH',
             headers: {
@@ -659,7 +661,7 @@ export const ProductManagement: React.FC<ProductManagementProps> = ({ supplierId
         // INSERT new price using POST
         console.log('➕ Creating new price...');
         response = await fetch(
-          'https://wuuyjjpgzgeimiptuuws.supabase.co/rest/v1/supplier_product_prices',
+          '${SUPABASE_URL}/rest/v1/supplier_product_prices',
           {
             method: 'POST',
             headers: {
@@ -706,8 +708,8 @@ export const ProductManagement: React.FC<ProductManagementProps> = ({ supplierId
           
           const retryResponse = await fetch(
             existingPrice 
-              ? `https://wuuyjjpgzgeimiptuuws.supabase.co/rest/v1/supplier_product_prices?supplier_id=eq.${effectiveSupplierId}&product_id=eq.${productId}`
-              : 'https://wuuyjjpgzgeimiptuuws.supabase.co/rest/v1/supplier_product_prices',
+              ? `${SUPABASE_URL}/rest/v1/supplier_product_prices?supplier_id=eq.${effectiveSupplierId}&product_id=eq.${productId}`
+              : '${SUPABASE_URL}/rest/v1/supplier_product_prices',
             {
               method: existingPrice ? 'PATCH' : 'POST',
               headers: {
@@ -783,8 +785,8 @@ export const ProductManagement: React.FC<ProductManagementProps> = ({ supplierId
 
           const retryEtimsResponse = await fetch(
             existingPrice
-              ? `https://wuuyjjpgzgeimiptuuws.supabase.co/rest/v1/supplier_product_prices?supplier_id=eq.${effectiveSupplierId}&product_id=eq.${productId}`
-              : 'https://wuuyjjpgzgeimiptuuws.supabase.co/rest/v1/supplier_product_prices',
+              ? `${SUPABASE_URL}/rest/v1/supplier_product_prices?supplier_id=eq.${effectiveSupplierId}&product_id=eq.${productId}`
+              : '${SUPABASE_URL}/rest/v1/supplier_product_prices',
             {
               method: existingPrice ? 'PATCH' : 'POST',
               headers: {
@@ -2385,7 +2387,7 @@ export const ProductManagement: React.FC<ProductManagementProps> = ({ supplierId
                     
                     // Update supplier_product_prices with custom images
                     await fetch(
-                      `https://wuuyjjpgzgeimiptuuws.supabase.co/rest/v1/supplier_product_prices?supplier_id=eq.${effectiveSupplierId}&product_id=eq.${pricingProduct!.id}`,
+                      `${SUPABASE_URL}/rest/v1/supplier_product_prices?supplier_id=eq.${effectiveSupplierId}&product_id=eq.${pricingProduct!.id}`,
                       {
                         method: 'PATCH',
                         headers: {

@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { SUPPORT_CHAT_COLUMNS, SUPPORT_MESSAGE_COLUMNS } from '@/lib/restColumnSets';
 import { supabase, SUPABASE_URL, SUPABASE_ANON_KEY } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -132,7 +133,7 @@ export function AdminMessaging() {
       if (!chatsData || chatsData.length === 0) {
         const { data, error: chatsError } = await supabase
           .from('support_chats')
-          .select('*')
+          .select(SUPPORT_CHAT_COLUMNS)
           .order('updated_at', { ascending: false });
         
         if (chatsError) throw chatsError;
@@ -207,7 +208,7 @@ export function AdminMessaging() {
         // Fallback to Supabase client
         const { data, error } = await supabase
           .from('support_messages')
-          .select('*')
+          .select(SUPPORT_MESSAGE_COLUMNS)
           .eq('chat_id', chatId)
           .order('created_at', { ascending: true });
 

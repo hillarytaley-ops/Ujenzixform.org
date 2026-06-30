@@ -4066,7 +4066,7 @@ export const useDeliveryProviderData = () => {
       let notificationsData: any[] = [];
       try {
         const notifResponse = await fetch(
-          `${SUPABASE_URL}/rest/v1/delivery_notifications?select=*&order=created_at.desc&limit=50`,
+          `${SUPABASE_URL}/rest/v1/delivery_notifications?select=${DELIVERY_NOTIFICATION_COLUMNS}&order=created_at.desc&limit=50`,
           { headers: restHeaders, cache: 'no-store' }
         );
         if (notifResponse.ok) {

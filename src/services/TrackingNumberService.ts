@@ -1,4 +1,5 @@
 /**
+import { CONVERSATION_LIST_COLUMNS, CHAT_MESSAGE_COLUMNS, CHAT_FEEDBACK_COLUMNS, CHAT_TRANSCRIPT_COLUMNS, SUPPORT_CHAT_COLUMNS, ADMIN_FINANCIAL_INVOICE_COLUMNS, ADMIN_FINANCIAL_PO_COLUMNS, ADMIN_FINANCIAL_RECEIPT_COLUMNS, ADMIN_FINANCIAL_DELIVERY_ORDER_COLUMNS, ADMIN_FINANCIAL_QUOTATION_COLUMNS, ADMIN_APPLICATION_COLUMNS, ADMIN_REGISTRATION_COLUMNS, ADMIN_DELIVERY_PROVIDER_COLUMNS, QR_SCAN_EVENT_COLUMNS, TRACKING_NUMBER_COLUMNS, DELIVERY_NOTIFICATION_COLUMNS, JOB_POSITION_COLUMNS, MATERIAL_CATALOG_COLUMNS, SUPPLIER_PRODUCT_PRICE_COLUMNS, DELIVERY_REQUEST_COLUMNS } from '@/lib/restColumnSets';
  * Tracking Number Service
  * 
  * Generates and manages tracking numbers for delivery requests.
@@ -457,7 +458,7 @@ class TrackingNumberService {
       
       try {
         const response = await fetch(
-          `${SUPABASE_URL}/rest/v1/delivery_requests?id=eq.${deliveryRequestId}&select=*`,
+          `${SUPABASE_URL}/rest/v1/delivery_requests?id=eq.${deliveryRequestId}&select=${DELIVERY_REQUEST_COLUMNS}`,
           {
             headers: {
               'apikey': SUPABASE_ANON_KEY,

@@ -1,3 +1,4 @@
+import { SUPPORT_CHAT_COLUMNS, SUPPORT_MESSAGE_COLUMNS } from '@/lib/restColumnSets';
 import { useState, useEffect, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -64,7 +65,7 @@ export function SupportChat({ userId, userRole, userName }: SupportChatProps) {
     try {
       const { data, error } = await supabase
         .from('support_chats')
-        .select('*')
+        .select(SUPPORT_CHAT_COLUMNS)
         .eq('user_id', userId)
         .order('updated_at', { ascending: false });
 
@@ -86,7 +87,7 @@ export function SupportChat({ userId, userRole, userName }: SupportChatProps) {
     try {
       const { data, error } = await supabase
         .from('support_messages')
-        .select('*')
+        .select(SUPPORT_MESSAGE_COLUMNS)
         .eq('chat_id', chatId)
         .order('created_at', { ascending: true });
 

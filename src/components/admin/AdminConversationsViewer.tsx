@@ -1,3 +1,4 @@
+import { SUPPORT_CHAT_COLUMNS, SUPPORT_MESSAGE_COLUMNS, CHATBOT_MESSAGE_COLUMNS, CONTACT_FEEDBACK_COLUMNS } from '@/lib/restColumnSets';
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -90,7 +91,7 @@ export function AdminConversationsViewer({ staffId, staffName, isDarkMode = true
     try {
       const { data, error } = await supabase
         .from('chatbot_messages')
-        .select('*')
+        .select(CHATBOT_MESSAGE_COLUMNS)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -136,7 +137,7 @@ export function AdminConversationsViewer({ staffId, staffName, isDarkMode = true
     try {
       const { data: chats, error: chatsError } = await supabase
         .from('support_chats')
-        .select('*')
+        .select(SUPPORT_CHAT_COLUMNS)
         .order('updated_at', { ascending: false });
 
       if (chatsError) throw chatsError;
@@ -145,7 +146,7 @@ export function AdminConversationsViewer({ staffId, staffName, isDarkMode = true
       const chatsWithMessages = await Promise.all((chats || []).map(async (chat: any) => {
         const { data: messages } = await supabase
           .from('support_messages')
-          .select('*')
+          .select(SUPPORT_MESSAGE_COLUMNS)
           .eq('chat_id', chat.id)
           .order('created_at', { ascending: true });
 
@@ -174,7 +175,7 @@ export function AdminConversationsViewer({ staffId, staffName, isDarkMode = true
     try {
       const { data, error } = await supabase
         .from('feedback')
-        .select('*')
+        .select(CONTACT_FEEDBACK_COLUMNS)
         .eq('category', '[CONTACT FORM]')
         .order('created_at', { ascending: false });
 

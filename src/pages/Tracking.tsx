@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { CONVERSATION_LIST_COLUMNS, CHAT_MESSAGE_COLUMNS, CHAT_FEEDBACK_COLUMNS, CHAT_TRANSCRIPT_COLUMNS, SUPPORT_CHAT_COLUMNS, ADMIN_FINANCIAL_INVOICE_COLUMNS, ADMIN_FINANCIAL_PO_COLUMNS, ADMIN_FINANCIAL_RECEIPT_COLUMNS, ADMIN_FINANCIAL_DELIVERY_ORDER_COLUMNS, ADMIN_FINANCIAL_QUOTATION_COLUMNS, ADMIN_APPLICATION_COLUMNS, ADMIN_REGISTRATION_COLUMNS, ADMIN_DELIVERY_PROVIDER_COLUMNS, QR_SCAN_EVENT_COLUMNS, TRACKING_NUMBER_COLUMNS, DELIVERY_NOTIFICATION_COLUMNS, JOB_POSITION_COLUMNS, MATERIAL_CATALOG_COLUMNS, SUPPLIER_PRODUCT_PRICE_COLUMNS, DELIVERY_REQUEST_COLUMNS } from '@/lib/restColumnSets';
 import { Badge } from "@/components/ui/badge";
 import Navigation from '@/components/Navigation';
 import Footer from '@/components/Footer';
@@ -99,7 +100,7 @@ const DeliveryTrackingInput: React.FC = () => {
       // PRIORITY 1: Search tracking_numbers table using direct REST API (more reliable)
       try {
         const response = await fetch(
-          `${SUPABASE_URL}/rest/v1/tracking_numbers?tracking_number=eq.${encodeURIComponent(searchTerm)}&select=*`,
+          `${SUPABASE_URL}/rest/v1/tracking_numbers?tracking_number=eq.${encodeURIComponent(searchTerm)}&select=${TRACKING_NUMBER_COLUMNS}`,
           {
             headers: {
               'apikey': SUPABASE_ANON_KEY,

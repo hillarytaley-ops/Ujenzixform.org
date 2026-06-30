@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { CONVERSATION_LIST_COLUMNS, CHAT_MESSAGE_COLUMNS, CHAT_FEEDBACK_COLUMNS, CHAT_TRANSCRIPT_COLUMNS, SUPPORT_CHAT_COLUMNS, ADMIN_FINANCIAL_INVOICE_COLUMNS, ADMIN_FINANCIAL_PO_COLUMNS, ADMIN_FINANCIAL_RECEIPT_COLUMNS, ADMIN_FINANCIAL_DELIVERY_ORDER_COLUMNS, ADMIN_FINANCIAL_QUOTATION_COLUMNS, ADMIN_APPLICATION_COLUMNS, ADMIN_REGISTRATION_COLUMNS, ADMIN_DELIVERY_PROVIDER_COLUMNS, QR_SCAN_EVENT_COLUMNS, TRACKING_NUMBER_COLUMNS, DELIVERY_NOTIFICATION_COLUMNS, JOB_POSITION_COLUMNS, MATERIAL_CATALOG_COLUMNS, SUPPLIER_PRODUCT_PRICE_COLUMNS, DELIVERY_REQUEST_COLUMNS } from '@/lib/restColumnSets';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { captureError } from '@/utils/errorTracking';
@@ -183,10 +184,10 @@ export const useRegistrations = () => {
         deliveryRegsRes,
         deliveryProvidersRes,
       ] = await Promise.all([
-        client.from('supplier_applications').select('*').order('created_at', { ascending: false }),
-        client.from('builder_registrations').select('*').order('created_at', { ascending: false }),
-        client.from('delivery_provider_registrations').select('*').order('created_at', { ascending: false }),
-        client.from('delivery_providers').select('*').order('created_at', { ascending: false }),
+        client.from('supplier_applications').select(ADMIN_APPLICATION_COLUMNS).order('created_at', { ascending: false }),
+        client.from('builder_registrations').select(ADMIN_REGISTRATION_COLUMNS).order('created_at', { ascending: false }),
+        client.from('delivery_provider_registrations').select(ADMIN_REGISTRATION_COLUMNS).order('created_at', { ascending: false }),
+        client.from('delivery_providers').select(ADMIN_DELIVERY_PROVIDER_COLUMNS).order('created_at', { ascending: false }),
       ]);
 
       const allRegistrations: RegistrationRecord[] = [];

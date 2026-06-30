@@ -1322,7 +1322,7 @@ export const MaterialsGrid: React.FC<MaterialsGridProps> = ({
       
       try {
         const response = await fetchPostgrestCatalog(
-          '/rest/v1/materials?select=*&order=created_at.desc&limit=2000',
+          '/rest/v1/materials?select=${MATERIAL_CATALOG_COLUMNS}&order=created_at.desc&limit=2000',
           {},
           catalogToken
         );

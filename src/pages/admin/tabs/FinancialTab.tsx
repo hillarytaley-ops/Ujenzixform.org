@@ -188,12 +188,12 @@ export const FinancialTab: React.FC = () => {
         supplierAppsRes,
         deliveryRpcRes,
       ] = await Promise.all([
-        client.from('invoices').select('*').order('created_at', { ascending: false }),
+        client.from('invoices').select(ADMIN_FINANCIAL_INVOICE_COLUMNS).order('created_at', { ascending: false }),
         client.from('payments').select(PAYMENT_LIST_COLUMNS).order('created_at', { ascending: false }),
-        client.from('purchase_orders').select('*').order('created_at', { ascending: false }),
-        client.from('purchase_receipts').select('*').order('created_at', { ascending: false }),
-        client.from('delivery_orders').select('*').order('created_at', { ascending: false }),
-        client.from('quotation_requests').select('*').order('created_at', { ascending: false }),
+        client.from('purchase_orders').select(ADMIN_FINANCIAL_PO_COLUMNS).order('created_at', { ascending: false }),
+        client.from('purchase_receipts').select(ADMIN_FINANCIAL_RECEIPT_COLUMNS).order('created_at', { ascending: false }),
+        client.from('delivery_orders').select(ADMIN_FINANCIAL_DELIVERY_ORDER_COLUMNS).order('created_at', { ascending: false }),
+        client.from('quotation_requests').select(ADMIN_FINANCIAL_QUOTATION_COLUMNS).order('created_at', { ascending: false }),
         client
           .from('supplier_applications')
           .select(
