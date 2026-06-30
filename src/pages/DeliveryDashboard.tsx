@@ -1,4 +1,5 @@
 import { clearSupabasePersistedSessionSync, readPersistedAuthRawStringSync } from '@/utils/supabaseAccessToken';
+import { PROFILE_SELF_COLUMNS, PROFILE_DIRECTORY_COLUMNS, PROFILE_PARTNER_COLUMNS, SUPPLIER_SELF_COLUMNS, DELIVERY_PROVIDER_SELF_COLUMNS, PURCHASE_ORDER_LIST_COLUMNS, PURCHASE_ORDER_SEARCH_COLUMNS, PAYMENT_LIST_COLUMNS, SUPPLIER_PRODUCT_PRICE_COLUMNS } from '@/lib/restColumnSets';
 import { buildProviderDeliveryLocationLine } from '@/utils/deliveryLocationDisplay';
 import {
   buildMapStopsFromDeliveryCard,
@@ -1459,7 +1460,7 @@ const DeliveryDashboard = () => {
           // Query purchase_orders by IDs
           const poIdsFilter = poIds.join(',');
           const purchaseOrdersRes = await fetch(
-            `${SUPABASE_URL_AGGRESSIVE}/rest/v1/purchase_orders?id=in.(${poIdsFilter})&select=*&limit=50`,
+            `${SUPABASE_URL_AGGRESSIVE}/rest/v1/purchase_orders?id=in.(${poIdsFilter})&select=${PURCHASE_ORDER_LIST_COLUMNS}&limit=50`,
             {
               headers: {
                 'apikey': SUPABASE_ANON_KEY,

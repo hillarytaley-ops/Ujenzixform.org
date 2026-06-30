@@ -16,7 +16,9 @@ import { toast } from 'sonner';
 import { SUPABASE_ANON_KEY, SUPABASE_URL, supabase } from '@/integrations/supabase/client';
 import { LEGACY_SUPABASE_AUTH_STORAGE_KEY, getAccessTokenWithPersistenceFallback, readPersistedAccessTokenSync, readPersistedAuthRawStringSync, readPersistedAuthUserSync } from '@/utils/supabaseAccessToken';
 import { purchaseOrderRequiresDeliveryProvider } from '@/utils/purchaseOrderFulfillment';
-import { devLog } from '@/utils/secureLog';
+import { devLog, safeError } from '@/utils/secureLog';
+import { fetchMySupplierRecords, fetchSupplierScopeIds } from '@/lib/resolveMySuppliers';
+import { SUPPLIER_LOOKUP_COLUMNS } from '@/lib/restColumnSets';
 import { Html5Qrcode, Html5QrcodeScannerState, Html5QrcodeSupportedFormats } from 'html5-qrcode';
 
 /** Strip BOM / zero-width / nulls so camera output matches DB `material_items.qr_code`. */
@@ -530,57 +532,49 @@ export const DispatchScanner: React.FC<DispatchScannerProps> = ({
         
         // Wrap supplier lookup in try-catch with timeout to ensure it completes
         try {
-          // Method 1: Try by email FIRST (this is what works in SupplierDashboard)
-          if (userEmail) {
-            devLog('📧 Trying supplier lookup by email');
-            const emailData = await lookupSupplierWithRetry(
-              `${SUPABASE_URL}/rest/v1/suppliers?email=eq.${encodeURIComponent(userEmail)}&select=id,user_id,email,company_name`,
-              'Supplier lookup by email'
-            );
-            
-            if (emailData && emailData.length > 0) {
-              foundSupplierId = emailData[0].id;
-              devLog('📦 Found supplier by email lookup', { supplierId: emailData[0].id });
-            } else {
-              devLog('⚠️ No supplier found by email');
-            }
-          } else {
-            devLog('⚠️ No user context available for email-based supplier lookup');
+          const owned = await fetchMySupplierRecords(supabase);
+          if (owned[0]?.id) {
+            foundSupplierId = owned[0].id;
+            devLog('📦 Found supplier via get_my_supplier_records', { supplierId: owned[0].id });
           }
-          
-          // Method 2: Look up supplier by user_id (if email lookup didn't work)
+
           if (!foundSupplierId) {
-            console.log('🔍 Trying supplier lookup by user_id:', userId);
+            const scopeIds = await fetchSupplierScopeIds(supabase);
+            const candidate = scopeIds.find((id) => id !== userId);
+            if (candidate) {
+              foundSupplierId = candidate;
+              devLog('📦 Found supplier via scope ids', { supplierId: candidate });
+            }
+          }
+
+          // Fallback: user_id / id REST (no email in URL)
+          if (!foundSupplierId) {
+            devLog('🔍 Trying supplier lookup by user_id:', userId);
             const supplierData1 = await lookupSupplierWithRetry(
-              `${SUPABASE_URL}/rest/v1/suppliers?user_id=eq.${userId}&select=id,user_id,email,company_name`,
+              `${SUPABASE_URL}/rest/v1/suppliers?user_id=eq.${userId}&select=${SUPPLIER_LOOKUP_COLUMNS}`,
               'Supplier lookup by user_id'
             );
             
             if (supplierData1 && supplierData1.length > 0) {
               foundSupplierId = supplierData1[0].id;
-              console.log('📦 Found supplier by user_id:', supplierData1[0]);
-            } else {
-              console.log('⚠️ No supplier found by user_id');
+              devLog('📦 Found supplier by user_id', { id: supplierData1[0].id });
             }
           }
           
-          // Method 3: Try by id (in case userId IS the supplier.id)
-        if (!foundSupplierId) {
-            console.log('🔍 Trying supplier lookup by id:', userId);
+          if (!foundSupplierId) {
+            devLog('🔍 Trying supplier lookup by id:', userId);
             const directData = await lookupSupplierWithRetry(
-              `${SUPABASE_URL}/rest/v1/suppliers?id=eq.${userId}&select=id,user_id,email,company_name`,
+              `${SUPABASE_URL}/rest/v1/suppliers?id=eq.${userId}&select=${SUPPLIER_LOOKUP_COLUMNS}`,
               'Supplier lookup by id'
             );
             
             if (directData && directData.length > 0) {
               foundSupplierId = directData[0].id;
-              console.log('📦 Found supplier by id:', directData[0]);
-            } else {
-              console.log('⚠️ No supplier found by id');
+              devLog('📦 Found supplier by id', { id: directData[0].id });
             }
           }
         } catch (lookupErr) {
-          console.error('❌ Supplier lookup error:', lookupErr);
+          safeError('Supplier lookup error', lookupErr);
         }
 
         // Final fallback: Use userId as supplier ID (should rarely happen)

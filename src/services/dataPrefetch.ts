@@ -1,4 +1,5 @@
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from '@/integrations/supabase/client';
+import { PROFILE_SELF_COLUMNS, PROFILE_DIRECTORY_COLUMNS, PROFILE_PARTNER_COLUMNS, SUPPLIER_SELF_COLUMNS, DELIVERY_PROVIDER_SELF_COLUMNS, PURCHASE_ORDER_LIST_COLUMNS, PURCHASE_ORDER_SEARCH_COLUMNS, PAYMENT_LIST_COLUMNS, SUPPLIER_PRODUCT_PRICE_COLUMNS } from '@/lib/restColumnSets';
 import { warmBuilderInvoicesHub } from '@/lib/builderInvoicesHubCache';
 import { logger } from '@/utils/logger';
 
@@ -189,7 +190,7 @@ const prefetchSupplierData = async (userId: string, accessToken: string): Promis
       5000
     ),
     fastFetch(
-      `${SUPABASE_URL}/rest/v1/supplier_product_prices?supplier_id=eq.${supplierId}&select=*&limit=200`,
+      `${SUPABASE_URL}/rest/v1/supplier_product_prices?supplier_id=eq.${supplierId}&select=${SUPPLIER_PRODUCT_PRICE_COLUMNS}&limit=200`,
       accessToken,
       4000
     ),
@@ -327,7 +328,7 @@ const prefetchDeliveryData = async (userId: string, accessToken: string): Promis
 
   // Resolve delivery_providers.id first — delivery_requests.provider_id is often the provider row UUID, not auth uid
   const profile = await fastFetch(
-    `${SUPABASE_URL}/rest/v1/delivery_providers?user_id=eq.${userId}&select=*&limit=1`,
+    `${SUPABASE_URL}/rest/v1/delivery_providers?user_id=eq.${userId}&select=${DELIVERY_PROVIDER_SELF_COLUMNS}&limit=1`,
     accessToken,
     2000
   );

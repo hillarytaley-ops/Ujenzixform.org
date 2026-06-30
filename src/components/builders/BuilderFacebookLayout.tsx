@@ -1,4 +1,5 @@
 import { readPersistedAuthRawStringSync } from '@/utils/supabaseAccessToken';
+import { PROFILE_SELF_COLUMNS, PROFILE_DIRECTORY_COLUMNS, PROFILE_PARTNER_COLUMNS, SUPPLIER_SELF_COLUMNS, DELIVERY_PROVIDER_SELF_COLUMNS, PURCHASE_ORDER_LIST_COLUMNS, PURCHASE_ORDER_SEARCH_COLUMNS, PAYMENT_LIST_COLUMNS, SUPPLIER_PRODUCT_PRICE_COLUMNS } from '@/lib/restColumnSets';
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -245,7 +246,7 @@ export const BuilderFacebookLayout: React.FC<BuilderFacebookLayoutProps> = ({
 
         if (builderUserIds.length === 0) {
           const profilesRes = await fetch(
-            `${SUPABASE_URL}/rest/v1/profiles?role=eq.professional_builder&select=*`,
+            `${SUPABASE_URL}/rest/v1/profiles?role=eq.professional_builder&select=${PROFILE_DIRECTORY_COLUMNS}`,
             { headers: { apikey: SUPABASE_ANON_KEY, Authorization: authHeader } }
           );
           const profilesData = await profilesRes.json();
@@ -258,7 +259,7 @@ export const BuilderFacebookLayout: React.FC<BuilderFacebookLayoutProps> = ({
         }
 
         const profilesRes = await fetch(
-          `${SUPABASE_URL}/rest/v1/profiles?user_id=in.(${builderUserIds.join(',')})&select=*`,
+          `${SUPABASE_URL}/rest/v1/profiles?user_id=in.(${builderUserIds.join(',')})&select=${PROFILE_PARTNER_COLUMNS}`,
           { headers: { apikey: SUPABASE_ANON_KEY, Authorization: authHeader } }
         );
         const profilesData = await profilesRes.json();

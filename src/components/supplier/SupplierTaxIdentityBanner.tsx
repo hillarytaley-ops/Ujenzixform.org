@@ -2,8 +2,8 @@ import React, { useCallback, useEffect, useState } from "react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Landmark } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
 import { isValidKraPin, normalizeKraPin } from "@/lib/etims/kraPin";
+import { fetchMySupplierRecords } from "@/lib/resolveMySuppliers";
 
 type Props = {
   supplierRecordId: string | null;
@@ -27,16 +27,8 @@ export const SupplierTaxIdentityBanner: React.FC<Props> = ({
     }
     setLoading(true);
     try {
-      const { data } = await supabase
-        .from("suppliers")
-        .select("kra_pin, legal_business_name, company_name")
-        .eq("id", supplierRecordId)
-        .maybeSingle();
-      const row = data as {
-        kra_pin?: string | null;
-        legal_business_name?: string | null;
-        company_name?: string | null;
-      } | null;
+      const owned = await fetchMySupplierRecords();
+      const row = owned.find((r) => r.id === supplierRecordId) ?? owned[0] ?? null;
       const hasLegal =
         Boolean(row?.legal_business_name?.trim()) || Boolean(row?.company_name?.trim());
       const hasPin = isValidKraPin(normalizeKraPin(row?.kra_pin));

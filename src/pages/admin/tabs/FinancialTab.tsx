@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { PROFILE_SELF_COLUMNS, PROFILE_DIRECTORY_COLUMNS, PROFILE_PARTNER_COLUMNS, SUPPLIER_SELF_COLUMNS, DELIVERY_PROVIDER_SELF_COLUMNS, PURCHASE_ORDER_LIST_COLUMNS, PURCHASE_ORDER_SEARCH_COLUMNS, PAYMENT_LIST_COLUMNS, SUPPLIER_PRODUCT_PRICE_COLUMNS } from '@/lib/restColumnSets';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -188,7 +189,7 @@ export const FinancialTab: React.FC = () => {
         deliveryRpcRes,
       ] = await Promise.all([
         client.from('invoices').select('*').order('created_at', { ascending: false }),
-        client.from('payments').select('*').order('created_at', { ascending: false }),
+        client.from('payments').select(PAYMENT_LIST_COLUMNS).order('created_at', { ascending: false }),
         client.from('purchase_orders').select('*').order('created_at', { ascending: false }),
         client.from('purchase_receipts').select('*').order('created_at', { ascending: false }),
         client.from('delivery_orders').select('*').order('created_at', { ascending: false }),

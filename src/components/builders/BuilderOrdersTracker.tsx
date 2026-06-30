@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { PROFILE_SELF_COLUMNS, PROFILE_DIRECTORY_COLUMNS, PROFILE_PARTNER_COLUMNS, SUPPLIER_SELF_COLUMNS, DELIVERY_PROVIDER_SELF_COLUMNS, PURCHASE_ORDER_LIST_COLUMNS, PURCHASE_ORDER_SEARCH_COLUMNS, PAYMENT_LIST_COLUMNS, SUPPLIER_PRODUCT_PRICE_COLUMNS } from '@/lib/restColumnSets';
 import { Link } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -494,7 +495,7 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({
       const timeoutId = setTimeout(() => controller.abort(), 8000); // 8 second timeout
 
       const ordersResponse = await fetch(
-        `${SUPABASE_URL}/rest/v1/purchase_orders?${ordersFilter}&select=*&order=created_at.desc`,
+        `${SUPABASE_URL}/rest/v1/purchase_orders?${ordersFilter}&select=${PURCHASE_ORDER_LIST_COLUMNS}&order=created_at.desc`,
         { headers, signal: controller.signal, cache: 'no-store' }
       );
       clearTimeout(timeoutId);

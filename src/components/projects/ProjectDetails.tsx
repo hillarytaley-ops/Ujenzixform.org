@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { PROFILE_SELF_COLUMNS, PROFILE_DIRECTORY_COLUMNS, PROFILE_PARTNER_COLUMNS, SUPPLIER_SELF_COLUMNS, DELIVERY_PROVIDER_SELF_COLUMNS, PURCHASE_ORDER_LIST_COLUMNS, PURCHASE_ORDER_SEARCH_COLUMNS, PAYMENT_LIST_COLUMNS, SUPPLIER_PRODUCT_PRICE_COLUMNS } from '@/lib/restColumnSets';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
@@ -354,7 +355,7 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
           const timeout1 = setTimeout(() => controller1.abort(), 14000);
           try {
             const ordersResponse = await fetch(
-              `${SUPABASE_URL}/rest/v1/purchase_orders?buyer_id=in.(${buyerIds.join(',')})&select=*&order=created_at.desc`,
+              `${SUPABASE_URL}/rest/v1/purchase_orders?buyer_id=in.(${buyerIds.join(',')})&select=${PURCHASE_ORDER_LIST_COLUMNS}&order=created_at.desc`,
               {
                 headers: {
                   apikey: SUPABASE_ANON_KEY,
@@ -387,7 +388,7 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
           const tPid = setTimeout(() => controllerPid.abort(), 12000);
           try {
             const pidRes = await fetch(
-              `${SUPABASE_URL}/rest/v1/purchase_orders?project_id=eq.${project.id}&select=*&order=created_at.desc`,
+              `${SUPABASE_URL}/rest/v1/purchase_orders?project_id=eq.${project.id}&select=${PURCHASE_ORDER_LIST_COLUMNS}&order=created_at.desc`,
               {
                 headers: {
                   apikey: SUPABASE_ANON_KEY,

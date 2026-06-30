@@ -1,0 +1,40 @@
+/** Explicit PostgREST column lists — avoid select=* on sensitive tables. */
+
+export const PROFILE_SELF_COLUMNS =
+  'id,user_id,full_name,email,phone,company_name,role,user_type,avatar_url,bio,location,created_at,updated_at,is_paused,show_phone,show_email,allow_messages,allow_calls,facebook_url,twitter_url,instagram_url,linkedin_url,years_experience,team_size,service_areas,certifications,specialties,price_range,cover_photo_url,website,is_verified,billing_company_name,billing_address,kra_pin,procurement_contact_email';
+
+export const PROFILE_DIRECTORY_COLUMNS =
+  'id,user_id,full_name,company_name,role,user_type,avatar_url,bio,cover_photo_url,is_verified,years_experience,specialties,followers_count,posts_count,location,website';
+
+export const PROFILE_PARTNER_COLUMNS = 'user_id,full_name,company_name';
+
+export const SUPPLIER_SELF_COLUMNS =
+  'id,user_id,company_name,email,phone,address,contact_person,is_verified,rating,kra_pin,legal_business_name,specialties,materials_offered';
+
+export const SUPPLIER_LOOKUP_COLUMNS = 'id,user_id,company_name';
+
+export const SUPPLIER_TAX_COLUMNS = 'kra_pin,legal_business_name,company_name';
+
+export const DELIVERY_PROVIDER_SELF_COLUMNS =
+  'id,user_id,company_name,email,phone,vehicle_type,is_verified,status,rating';
+
+export const PURCHASE_ORDER_LIST_COLUMNS =
+  'id,po_number,supplier_id,buyer_id,builder_id,status,total_amount,currency,created_at,updated_at,items,project_name,delivery_address,quote_expires_at,project_id,notes,monitoring_package';
+
+export const PURCHASE_ORDER_SEARCH_COLUMNS =
+  'id,po_number,supplier_id,buyer_id,status,created_at';
+
+export const PAYMENT_LIST_COLUMNS =
+  'id,user_id,amount,currency,status,payment_method,provider,reference,created_at,updated_at,purchase_order_id,metadata';
+
+export const SUPPLIER_PRODUCT_PRICE_COLUMNS =
+  'id,supplier_id,product_id,material_id,price,currency,unit,stock_quantity,min_stock_level,max_stock_level,updated_at,product_name';
+
+export const MATERIAL_ITEM_COLUMNS =
+  'id,supplier_id,purchase_order_id,material_type,category,quantity,unit,status,qr_code,created_at';
+
+export const DELIVERY_REQUEST_COLUMNS =
+  'id,provider_id,purchase_order_id,status,created_at,updated_at,pickup_address,delivery_address,latitude,longitude,builder_id,supplier_id,tracking_number,estimated_delivery_at';
+
+export const INVOICE_LIST_COLUMNS =
+  'id,invoice_number,supplier_id,buyer_id,status,total_amount,currency,created_at,updated_at,purchase_order_id';

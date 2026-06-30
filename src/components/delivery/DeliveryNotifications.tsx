@@ -1,4 +1,5 @@
 // COMPLETELY RESTRUCTURED: Simple, clear approach - ONE notification per purchase_order_id
+import { PROFILE_SELF_COLUMNS, PROFILE_DIRECTORY_COLUMNS, PROFILE_PARTNER_COLUMNS, SUPPLIER_SELF_COLUMNS, DELIVERY_PROVIDER_SELF_COLUMNS, PURCHASE_ORDER_LIST_COLUMNS, PURCHASE_ORDER_SEARCH_COLUMNS, PAYMENT_LIST_COLUMNS, SUPPLIER_PRODUCT_PRICE_COLUMNS, DELIVERY_REQUEST_COLUMNS } from '@/lib/restColumnSets';
 // This replaces the complex deduplication logic with a straightforward approach
 // UPDATED: 2026-03-14 - Fixed duplicate variable declarations and ensured only ONE card per order
 
@@ -715,7 +716,7 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
           for (let i = 0; i < uniqueDrIds.length; i += chunkSize) {
             const chunk = uniqueDrIds.slice(i, i + chunkSize);
             const refRes = await fetch(
-              `${url}/rest/v1/delivery_requests?id=in.(${chunk.join(',')})&select=*`,
+              `${url}/rest/v1/delivery_requests?id=in.(${chunk.join(',')})&select=${DELIVERY_REQUEST_COLUMNS}`,
               { headers, cache: 'no-store' }
             );
             if (refRes.ok) {
@@ -1115,7 +1116,7 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
       // STEP 4: Fetch purchase_orders that DON'T have a delivery_request yet
       // CRITICAL: Only add if purchase_order_id is NOT already in addedPOIds
       const poResponse = await fetch(
-        `${url}/rest/v1/purchase_orders?status=in.(quote_accepted,order_created,awaiting_delivery_request,delivery_requested,awaiting_delivery_provider,delivery_assigned,ready_for_dispatch)&order=created_at.desc&limit=100&select=*`,
+        `${url}/rest/v1/purchase_orders?status=in.(quote_accepted,order_created,awaiting_delivery_request,delivery_requested,awaiting_delivery_provider,delivery_assigned,ready_for_dispatch)&order=created_at.desc&limit=100&select=${PURCHASE_ORDER_LIST_COLUMNS}`,
         { headers, cache: 'no-store' }
       );
       

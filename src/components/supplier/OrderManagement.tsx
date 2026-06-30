@@ -1,4 +1,6 @@
 import { readPersistedAuthRawStringSync } from '@/utils/supabaseAccessToken';
+import { PURCHASE_ORDER_LIST_COLUMNS } from '@/lib/restColumnSets';
+import { fetchSupplierScopeIds } from '@/lib/resolveMySuppliers';
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -705,14 +707,14 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, in
         if (orderSupplierIds.length > 0) {
           const { data: poData, error: poError } = await supabase
             .from('purchase_orders')
-            .select('*')
+            .select(PURCHASE_ORDER_LIST_COLUMNS)
             .in('supplier_id', orderSupplierIds)
             .order('created_at', { ascending: false })
             .limit(500);
           if (!poError && poData != null) purchaseOrders = Array.isArray(poData) ? poData : [];
           if (purchaseOrders.length === 0) {
             const res = await fetch(
-              `${SUPABASE_URL}/rest/v1/purchase_orders?supplier_id=in.(${orderSupplierIds.join(',')})&select=*&order=created_at.desc&limit=500`,
+              `${SUPABASE_URL}/rest/v1/purchase_orders?supplier_id=in.(${orderSupplierIds.join(',')})&select=${PURCHASE_ORDER_LIST_COLUMNS}&order=created_at.desc&limit=500`,
               { headers, cache: 'no-store' }
             );
             if (res.ok) {

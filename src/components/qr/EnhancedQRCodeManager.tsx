@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { PROFILE_PARTNER_COLUMNS, PURCHASE_ORDER_LIST_COLUMNS, PURCHASE_ORDER_SEARCH_COLUMNS, SUPPLIER_PRODUCT_PRICE_COLUMNS, DELIVERY_REQUEST_COLUMNS, MATERIAL_ITEM_COLUMNS } from '@/lib/restColumnSets';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -281,7 +282,7 @@ export const EnhancedQRCodeManager: React.FC<EnhancedQRCodeManagerProps> = ({
               if (orderId) {
                 console.log('🔄 Refreshing ALL items for order:', orderId);
                 const allItemsResponse = await fetch(
-                  `${SUPABASE_URL}/rest/v1/material_items?purchase_order_id=eq.${orderId}&select=*`,
+                  `${SUPABASE_URL}/rest/v1/material_items?purchase_order_id=eq.${orderId}&select=${MATERIAL_ITEM_COLUMNS}`,
                   { headers, cache: 'no-store' }
                 );
                 
@@ -321,7 +322,7 @@ export const EnhancedQRCodeManager: React.FC<EnhancedQRCodeManagerProps> = ({
               
               // Fallback: Fetch just the updated item
               const itemResponse = await fetch(
-                `${SUPABASE_URL}/rest/v1/material_items?id=eq.${updatedItem.id}&select=*&limit=1`,
+                `${SUPABASE_URL}/rest/v1/material_items?id=eq.${updatedItem.id}&select=${MATERIAL_ITEM_COLUMNS}&limit=1`,
                 { headers, cache: 'no-store' }
               );
               

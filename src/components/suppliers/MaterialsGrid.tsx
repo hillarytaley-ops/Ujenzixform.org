@@ -1,4 +1,5 @@
 /**
+import { PROFILE_PARTNER_COLUMNS, PURCHASE_ORDER_LIST_COLUMNS, PURCHASE_ORDER_SEARCH_COLUMNS, SUPPLIER_PRODUCT_PRICE_COLUMNS, DELIVERY_REQUEST_COLUMNS, MATERIAL_ITEM_COLUMNS } from '@/lib/restColumnSets';
  * ╔══════════════════════════════════════════════════════════════════════════════════════╗
  * ║                                                                                      ║
  * ║   🛡️ PROTECTED FILE - MATERIALGRID.TSX - DO NOT MODIFY WITHOUT APPROVAL             ║
@@ -1071,7 +1072,7 @@ export const MaterialsGrid: React.FC<MaterialsGridProps> = ({
       
       try {
         const pricesResponse = await fetchPostgrestCatalog(
-          '/rest/v1/supplier_product_prices?select=*',
+          '/rest/v1/supplier_product_prices?select=${SUPPLIER_PRODUCT_PRICE_COLUMNS}',
           {
             headers: {
               'Cache-Control': 'no-cache, no-store, must-revalidate',

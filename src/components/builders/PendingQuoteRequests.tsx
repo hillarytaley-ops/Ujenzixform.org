@@ -1,4 +1,5 @@
 /**
+import { PROFILE_SELF_COLUMNS, PROFILE_DIRECTORY_COLUMNS, PROFILE_PARTNER_COLUMNS, SUPPLIER_SELF_COLUMNS, DELIVERY_PROVIDER_SELF_COLUMNS, PURCHASE_ORDER_LIST_COLUMNS, PURCHASE_ORDER_SEARCH_COLUMNS, PAYMENT_LIST_COLUMNS, SUPPLIER_PRODUCT_PRICE_COLUMNS } from '@/lib/restColumnSets';
  * PendingQuoteRequests - Shows all quote requests sent to suppliers
  * 
  * This component displays:
@@ -122,8 +123,8 @@ export const PendingQuoteRequests: React.FC<PendingQuoteRequestsProps> = ({
       let builderRes: Response | undefined;
       try {
         const idIn = ownerIds.join(',');
-        const urlBuyer = `${SUPABASE_URL}/rest/v1/purchase_orders?buyer_id=in.(${idIn})&status=eq.pending&order=created_at.desc&select=*`;
-        const urlBuilder = `${SUPABASE_URL}/rest/v1/purchase_orders?builder_id=in.(${idIn})&status=eq.pending&order=created_at.desc&select=*`;
+        const urlBuyer = `${SUPABASE_URL}/rest/v1/purchase_orders?buyer_id=in.(${idIn})&status=eq.pending&order=created_at.desc&select=${PURCHASE_ORDER_LIST_COLUMNS}`;
+        const urlBuilder = `${SUPABASE_URL}/rest/v1/purchase_orders?builder_id=in.(${idIn})&status=eq.pending&order=created_at.desc&select=${PURCHASE_ORDER_LIST_COLUMNS}`;
 
         [buyerRes, builderRes] = await Promise.all([
           fetch(urlBuyer, { headers, signal: controller.signal, cache: 'no-store' }),

@@ -13,8 +13,7 @@ function edgeHeaders(): Record<string, string> {
 }
 
 /**
- * Pre-auth staff tab: Edge (rate-limited) first, then PostgREST RPC fallback when Edge is missing or errors.
- * Requires EXECUTE on public.is_admin_staff_portal_email(text) for anon (see migrations).
+ * Pre-auth staff tab: Edge (rate-limited) only — no PostgREST RPC fallback (enumeration risk).
  */
 export async function edgeIsAdminStaffPortalEmail(p_email: string): Promise<boolean> {
   const normalized = p_email.toLowerCase().trim();
@@ -32,23 +31,14 @@ export async function edgeIsAdminStaffPortalEmail(p_email: string): Promise<bool
         if (j === true) return true;
         if (j === false) return false;
       } catch {
-        /* fall through to RPC */
+        return false;
       }
     }
   } catch {
-    /* fall through to RPC */
+    /* Edge unavailable — fail closed */
   }
 
-  const { data, error } = await supabase.rpc('is_admin_staff_portal_email', {
-    p_email: normalized,
-  });
-  if (error) {
-    if (import.meta.env.DEV) {
-      console.warn('[edgeIsAdminStaffPortalEmail] RPC fallback failed:', error.message);
-    }
-    return false;
-  }
-  return data === true || data === 't' || data === 'true';
+  return false;
 }
 
 /** Guest monitoring access code (replaces anon DEFINER RPC). */

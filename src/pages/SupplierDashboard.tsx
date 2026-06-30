@@ -3,6 +3,8 @@ import { Link } from "react-router-dom";
 import { useUrlTabSync } from "@/hooks/useUrlTabSync";
 import { supabase, SUPABASE_URL, SUPABASE_ANON_KEY } from "@/integrations/supabase/client";
 import { devLog, devWarn, safeError } from '@/utils/secureLog';
+import { fetchSupplierScopeIds, fetchMySupplierRecords } from '@/lib/resolveMySuppliers';
+import { PROFILE_SELF_COLUMNS, PURCHASE_ORDER_LIST_COLUMNS } from '@/lib/restColumnSets';
 import { useAuth } from "@/contexts/AuthContext";
 import { useLanguage } from "@/contexts/LanguageContext";
 import Footer from "@/components/Footer";
@@ -938,109 +940,21 @@ const SupplierDashboard = () => {
     }
     
     try {
-      // STEP 1: Find ALL supplier records that could belong to this user
-      // Check by user_id, email, and also by id (in case userId IS the supplier.id)
-      const supplierIds = new Set<string>([userId]); // Always include userId
-      
-      // Try to find supplier by user_id
+      // Resolve supplier scope server-side (user_id, email-linked, profile chain — no email in URL)
+      const supplierIds = new Set<string>([userId]);
       try {
-        const supplierResponse = await fetch(
-          `${SUPABASE_URL}/rest/v1/suppliers?user_id=eq.${userId}&select=id,user_id,company_name,email`,
-          { headers, cache: 'no-store' }
-        );
-        
-        if (supplierResponse.ok) {
-          const supplierData = await supplierResponse.json();
-          if (supplierData?.[0]) {
-            supplierIds.add(supplierData[0].id);
-            if (supplierData[0].user_id) supplierIds.add(supplierData[0].user_id);
-            devLog('Found supplier by user_id', {
-              id: supplierData[0].id,
-              company_name: supplierData[0].company_name,
-            });
-            setSupplierRecordId(supplierData[0].id);
-          }
-        }
-      } catch (e) {
-        devWarn('Supplier lookup by user_id failed');
-      }
-      
-      // Also try to find supplier by email
-      if (userEmail) {
-        try {
-          const emailResponse = await fetch(
-            `${SUPABASE_URL}/rest/v1/suppliers?email=eq.${encodeURIComponent(userEmail)}&select=id,user_id,company_name,email`,
-            { headers, cache: 'no-store' }
-          );
-          
-          if (emailResponse.ok) {
-            const emailData = await emailResponse.json();
-            if (emailData?.[0]) {
-              supplierIds.add(emailData[0].id);
-              if (emailData[0].user_id) supplierIds.add(emailData[0].user_id);
-              devLog('Found supplier by email lookup', {
-                id: emailData[0].id,
-                company_name: emailData[0].company_name,
-              });
-              if (!supplierRecordId) setSupplierRecordId(emailData[0].id);
-            }
-          }
-        } catch (e) {
-          devWarn('Supplier lookup by email failed');
-        }
-      }
-      
-      // Also check if userId itself is a supplier.id (direct match)
-      try {
-        const directResponse = await fetch(
-          `${SUPABASE_URL}/rest/v1/suppliers?id=eq.${userId}&select=id,user_id,company_name,email`,
-          { headers, cache: 'no-store' }
-        );
-        
-        if (directResponse.ok) {
-          const directData = await directResponse.json();
-          if (directData?.[0]) {
-            supplierIds.add(directData[0].id);
-            if (directData[0].user_id) supplierIds.add(directData[0].user_id);
-            devLog('Found supplier by direct id match', {
-              id: directData[0].id,
-              company_name: directData[0].company_name,
-            });
-          }
-        }
-      } catch (e) {
-        devWarn('Supplier lookup by direct id failed');
+        const scopeIds = await fetchSupplierScopeIds(supabase);
+        scopeIds.forEach((id) => supplierIds.add(id));
+        const owned = await fetchMySupplierRecords(supabase);
+        owned.forEach((row) => {
+          if (row.id) supplierIds.add(row.id);
+          if (row.user_id) supplierIds.add(row.user_id);
+          if (row.id && !supplierRecordId) setSupplierRecordId(row.id);
+        });
+      } catch {
+        devWarn('Supplier scope RPC lookup failed');
       }
 
-      // Profile chain (same as dashboard order stats) — purchase_orders.supplier_id may match profile.id
-      try {
-        const profileResponse = await fetch(
-          `${SUPABASE_URL}/rest/v1/profiles?user_id=eq.${userId}&select=id`,
-          { headers, cache: 'no-store' }
-        );
-        if (profileResponse.ok) {
-          const profileData = await profileResponse.json();
-          const profileRow = profileData?.[0];
-          if (profileRow?.id) {
-            if (profileRow.id !== userId) supplierIds.add(profileRow.id);
-            const supRes = await fetch(
-              `${SUPABASE_URL}/rest/v1/suppliers?user_id=eq.${profileRow.id}&select=id,user_id`,
-              { headers, cache: 'no-store' }
-            );
-            if (supRes.ok) {
-              const supRows = await supRes.json();
-              if (supRows?.[0]) {
-                supplierIds.add(supRows[0].id);
-                if (supRows[0].user_id) supplierIds.add(supRows[0].user_id);
-              }
-            }
-          }
-        }
-      } catch (e) {
-        devWarn('Quote fetch: profile/supplier chain lookup failed');
-      }
-
-      // IDs already resolved for dashboard orders (avoids mismatch with quote fetch)
       resolvedSupplierIds.forEach((id) => {
         if (id) supplierIds.add(id);
       });
@@ -1049,7 +963,7 @@ const SupplierDashboard = () => {
       const supplierIdsArray = Array.from(supplierIds).filter(Boolean);
       devLog('🔍 Looking for quotes with supplier_id in:', supplierIdsArray);
 
-      // STEP 2: Fetch this supplier's quote-related POs (do NOT use global limit=100 — misses older quotes)
+      // Fetch this supplier's quote-related POs (scoped query only)
       const quoteStatuses =
         'quote_created,quote_received_by_supplier,quote_responded,quote_revised,quote_viewed_by_builder,quote_accepted,quote_rejected,pending,quoted,rejected,confirmed,processing,order_created,awaiting_delivery_request';
       let purchaseOrderQuotes: any[] = [];
@@ -1057,7 +971,7 @@ const SupplierDashboard = () => {
         if (supplierIdsArray.length > 0) {
           const inList = supplierIdsArray.join(',');
           const quotesResponse = await fetch(
-            `${SUPABASE_URL}/rest/v1/purchase_orders?supplier_id=in.(${inList})&status=in.(${quoteStatuses})&order=created_at.desc&limit=500`,
+            `${SUPABASE_URL}/rest/v1/purchase_orders?supplier_id=in.(${inList})&status=in.(${quoteStatuses})&order=created_at.desc&limit=500&select=${PURCHASE_ORDER_LIST_COLUMNS}`,
             { headers, cache: 'no-store' }
           );
           if (quotesResponse.ok) {
@@ -1069,25 +983,6 @@ const SupplierDashboard = () => {
         safeError('Failed to fetch quotes (supplier-scoped)');
       }
 
-      // Fallback: legacy global slice + client filter (if scoped query empty but IDs exist)
-      let allQuotes: any[] = purchaseOrderQuotes;
-      if (purchaseOrderQuotes.length === 0 && supplierIdsArray.length > 0) {
-        try {
-          const quotesResponse = await fetch(
-            `${SUPABASE_URL}/rest/v1/purchase_orders?status=in.(${quoteStatuses})&order=created_at.desc&limit=300`,
-            { headers, cache: 'no-store' }
-          );
-          if (quotesResponse.ok) {
-            allQuotes = await quotesResponse.json();
-            purchaseOrderQuotes = allQuotes.filter((q: any) => supplierIdsArray.includes(q.supplier_id));
-            devLog('📋 Quotes via fallback filter:', purchaseOrderQuotes.length, 'of', allQuotes.length);
-          }
-        } catch (e) {
-          safeError('Failed to fetch quotes (fallback)');
-        }
-      }
-
-      // Transform purchase_orders to match quote display format
       const transformedPOQuotes = (purchaseOrderQuotes || []).map((po) => {
         const monitoringPackageLine = summarizeMonitoringPackageFromPurchaseOrder(po as Record<string, unknown>);
         const rawMaterial =
@@ -1623,7 +1518,7 @@ const SupplierDashboard = () => {
           const controller = new AbortController();
           const timeoutId = setTimeout(() => controller.abort(), 5000);
           const profileResponse = await fetch(
-            `${SUPABASE_URL}/rest/v1/profiles?user_id=eq.${user.id}&select=*`,
+            `${SUPABASE_URL}/rest/v1/profiles?user_id=eq.${user.id}&select=${PROFILE_SELF_COLUMNS}`,
             { headers: authHeaders, signal: controller.signal, cache: 'no-store' }
           );
           clearTimeout(timeoutId);
@@ -1635,195 +1530,17 @@ const SupplierDashboard = () => {
           devLog('Profile fetch timeout');
         }
 
-        // Build supplier IDs list - check suppliers table for this user using multiple methods
-        const orderSupplierIds = [user.id];
-        devLog('Dashboard: starting supplier lookup', { userId: user.id });
-        
-        // Method 1: Look up supplier by user_id = auth.uid
+        // Resolve supplier scope server-side (no email in URL)
+        let orderSupplierIds: string[] = [user.id];
         try {
-          const supplierController = new AbortController();
-          const supplierTimeout = setTimeout(() => supplierController.abort(), 5000);
-          
-          const supplierResponse = await fetch(
-            `${SUPABASE_URL}/rest/v1/suppliers?user_id=eq.${user.id}&select=id,user_id,email,company_name`,
-            { headers: authHeaders, signal: supplierController.signal, cache: 'no-store' }
-          );
-          clearTimeout(supplierTimeout);
-          
-          if (supplierResponse.ok) {
-            const supplierData = await supplierResponse.json();
-            devLog('Dashboard: supplier by user_id', {
-              count: supplierData?.length ?? 0,
-              ids: (supplierData ?? []).map((s: { id?: string }) => s.id).filter(Boolean),
-            });
-            if (supplierData?.[0]) {
-              if (supplierData[0].id && !orderSupplierIds.includes(supplierData[0].id)) {
-                orderSupplierIds.push(supplierData[0].id);
-              }
-              if (supplierData[0].user_id && !orderSupplierIds.includes(supplierData[0].user_id)) {
-                orderSupplierIds.push(supplierData[0].user_id);
-              }
-              setSupplierRecordId(supplierData[0].id);
-            }
-          }
-        } catch (e) {
-          devLog('Supplier lookup by user_id timeout');
+          const scopeIds = await fetchSupplierScopeIds(supabase);
+          if (scopeIds.length > 0) orderSupplierIds = [...new Set(scopeIds)];
+          const owned = await fetchMySupplierRecords(supabase);
+          if (owned[0]?.id) setSupplierRecordId(owned[0].id);
+        } catch {
+          devWarn('Dashboard: supplier scope RPC failed');
         }
-        
-        // Method 2: Look up supplier by id = auth.uid (in case user_id is profile.id)
-        if (orderSupplierIds.length === 1) {
-          try {
-            const supplierController = new AbortController();
-            const supplierTimeout = setTimeout(() => supplierController.abort(), 5000);
-            
-            const supplierResponse = await fetch(
-              `${SUPABASE_URL}/rest/v1/suppliers?id=eq.${user.id}&select=id,user_id,email,company_name`,
-              { headers: authHeaders, signal: supplierController.signal, cache: 'no-store' }
-            );
-            clearTimeout(supplierTimeout);
-            
-            if (supplierResponse.ok) {
-              const supplierData = await supplierResponse.json();
-              devLog('Dashboard: supplier by id', {
-                count: supplierData?.length ?? 0,
-                ids: (supplierData ?? []).map((s: { id?: string }) => s.id).filter(Boolean),
-              });
-              if (supplierData?.[0]) {
-                if (supplierData[0].id && !orderSupplierIds.includes(supplierData[0].id)) {
-                  orderSupplierIds.push(supplierData[0].id);
-                }
-                if (supplierData[0].user_id && !orderSupplierIds.includes(supplierData[0].user_id)) {
-                  orderSupplierIds.push(supplierData[0].user_id);
-                }
-                setSupplierRecordId(supplierData[0].id);
-              }
-            }
-          } catch (e) {
-            devLog('Supplier lookup by id timeout');
-          }
-        }
-        
-        // Method 3: Look up supplier by email
-        if (orderSupplierIds.length === 1 && user.email) {
-          try {
-            const emailController = new AbortController();
-            const emailTimeout = setTimeout(() => emailController.abort(), 5000);
-            
-            const emailResponse = await fetch(
-              `${SUPABASE_URL}/rest/v1/suppliers?email=eq.${encodeURIComponent(user.email)}&select=id,user_id,email,company_name`,
-              { headers: authHeaders, signal: emailController.signal, cache: 'no-store' }
-            );
-            clearTimeout(emailTimeout);
-            
-            if (emailResponse.ok) {
-              const emailData = await emailResponse.json();
-              devLog('Dashboard: supplier by email lookup', {
-                count: emailData?.length ?? 0,
-                ids: (emailData ?? []).map((s: { id?: string }) => s.id).filter(Boolean),
-              });
-              if (emailData?.[0]) {
-                if (emailData[0].id && !orderSupplierIds.includes(emailData[0].id)) {
-                  orderSupplierIds.push(emailData[0].id);
-                }
-                if (emailData[0].user_id && !orderSupplierIds.includes(emailData[0].user_id)) {
-                  orderSupplierIds.push(emailData[0].user_id);
-                }
-                setSupplierRecordId(emailData[0].id);
-              }
-            }
-          } catch (e) {
-            devLog('Supplier lookup by email timeout');
-          }
-        }
-        
-        // Method 4: Get profile.id and look up supplier by user_id = profile.id
-        if (orderSupplierIds.length === 1) {
-          try {
-            const profileController = new AbortController();
-            const profileTimeout = setTimeout(() => profileController.abort(), 5000);
-            
-            const profileResponse = await fetch(
-              `${SUPABASE_URL}/rest/v1/profiles?user_id=eq.${user.id}&select=id`,
-              { headers: authHeaders, signal: profileController.signal, cache: 'no-store' }
-            );
-            clearTimeout(profileTimeout);
-            
-            if (profileResponse.ok) {
-              const profileData = await profileResponse.json();
-              devLog('📦 Dashboard: Profile lookup:', profileData);
-              if (profileData?.[0]?.id && profileData[0].id !== user.id) {
-                // Profile ID is different from user ID, try to find supplier by profile.id
-                const supplierController2 = new AbortController();
-                const supplierTimeout2 = setTimeout(() => supplierController2.abort(), 5000);
-                
-                const supplierResponse2 = await fetch(
-                  `${SUPABASE_URL}/rest/v1/suppliers?user_id=eq.${profileData[0].id}&select=id,user_id,email,company_name`,
-                  { headers: authHeaders, signal: supplierController2.signal, cache: 'no-store' }
-                );
-                clearTimeout(supplierTimeout2);
-                
-                if (supplierResponse2.ok) {
-                  const supplierData2 = await supplierResponse2.json();
-                  devLog('Dashboard: supplier by profile.id', {
-                    count: supplierData2?.length ?? 0,
-                    ids: (supplierData2 ?? []).map((s: { id?: string }) => s.id).filter(Boolean),
-                  });
-                  if (supplierData2?.[0]) {
-                    if (supplierData2[0].id && !orderSupplierIds.includes(supplierData2[0].id)) {
-                      orderSupplierIds.push(supplierData2[0].id);
-                    }
-                    if (supplierData2[0].user_id && !orderSupplierIds.includes(supplierData2[0].user_id)) {
-                      orderSupplierIds.push(supplierData2[0].user_id);
-                    }
-                    // Also add profile.id to the list
-                    if (!orderSupplierIds.includes(profileData[0].id)) {
-                      orderSupplierIds.push(profileData[0].id);
-                    }
-                    setSupplierRecordId(supplierData2[0].id);
-                  }
-                }
-              }
-            }
-          } catch (e) {
-            devLog('Profile/supplier lookup timeout');
-          }
-        }
-        
-        // Debug: Fetch ALL recent orders to see what supplier_id values exist
-        try {
-          const debugController = new AbortController();
-          const debugTimeout = setTimeout(() => debugController.abort(), 5000);
-          
-          const debugResponse = await fetch(
-            `${SUPABASE_URL}/rest/v1/purchase_orders?select=id,po_number,supplier_id,buyer_id,status&order=created_at.desc&limit=15`,
-            { headers: authHeaders, signal: debugController.signal, cache: 'no-store' }
-          );
-          clearTimeout(debugTimeout);
-          
-          if (debugResponse.ok) {
-            const debugOrders = await debugResponse.json();
-            devLog('📊 Dashboard DEBUG: All recent orders supplier_ids:');
-            debugOrders.forEach((o: any) => {
-              const matches = orderSupplierIds.includes(o.supplier_id);
-              devLog(`   ${o.po_number}: supplier_id=${o.supplier_id} ${matches ? '✅ MATCH' : '❌ no match'}`);
-            });
-            
-            // If we found orders but no matches, add the most common supplier_id
-            if (debugOrders.length > 0 && orderSupplierIds.length === 1) {
-              const supplierIdCounts: Record<string, number> = {};
-              debugOrders.forEach((o: any) => {
-                if (o.supplier_id) {
-                  supplierIdCounts[o.supplier_id] = (supplierIdCounts[o.supplier_id] || 0) + 1;
-                }
-              });
-              devLog('📊 Dashboard DEBUG: Supplier ID counts:', supplierIdCounts);
-            }
-          }
-        } catch (e) {
-          devLog('Debug orders fetch timeout');
-        }
-        
-        devLog('📊 Dashboard: Final supplier IDs for stats query:', orderSupplierIds);
+        devLog('Dashboard: supplier scope ids', orderSupplierIds);
         setResolvedSupplierIds([...orderSupplierIds]);
 
         // Fetch ALL orders for this supplier (not just 10) for accurate stats
@@ -1833,7 +1550,7 @@ const SupplierDashboard = () => {
           const timeoutId = setTimeout(() => controller.abort(), 8000);
           
           const ordersResponse = await fetch(
-            `${SUPABASE_URL}/rest/v1/purchase_orders?supplier_id=in.(${supplierIdsParam})&order=created_at.desc`,
+            `${SUPABASE_URL}/rest/v1/purchase_orders?supplier_id=in.(${supplierIdsParam})&order=created_at.desc&select=${PURCHASE_ORDER_LIST_COLUMNS}`,
             { headers: authHeaders, signal: controller.signal, cache: 'no-store' }
           );
           clearTimeout(timeoutId);

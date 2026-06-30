@@ -1,4 +1,5 @@
 /**
+import { PROFILE_SELF_COLUMNS, PROFILE_DIRECTORY_COLUMNS, PROFILE_PARTNER_COLUMNS, SUPPLIER_SELF_COLUMNS, DELIVERY_PROVIDER_SELF_COLUMNS, PURCHASE_ORDER_LIST_COLUMNS, PURCHASE_ORDER_SEARCH_COLUMNS, PAYMENT_LIST_COLUMNS, SUPPLIER_PRODUCT_PRICE_COLUMNS } from '@/lib/restColumnSets';
  * Data Isolation Hook
  * 
  * Ensures users can only access their own data:
@@ -600,7 +601,7 @@ export const useDeliveryProviderData = () => {
       // Fetch by primary provider id (delivery_providers.id or userId)
       // If provider_id matches, the delivery is accepted - show it regardless of status (except cancelled/delivered)
       const fastResponse = await fetch(
-        `${SUPABASE_URL}/rest/v1/delivery_requests?provider_id=eq.${providerIdToUse}&${statusFilter}&select=*&order=created_at.desc&limit=200`,
+        `${SUPABASE_URL}/rest/v1/delivery_requests?provider_id=eq.${providerIdToUse}&${statusFilter}&select=${DELIVERY_REQUEST_COLUMNS}&order=created_at.desc&limit=200`,
         opts
       );
 
@@ -612,7 +613,7 @@ export const useDeliveryProviderData = () => {
       // If we're using delivery_providers.id, also fetch by user id so we don't miss orders linked by auth.uid()
       if (userId && providerIdToUse !== userId) {
         const byUserResponse = await fetch(
-          `${SUPABASE_URL}/rest/v1/delivery_requests?provider_id=eq.${userId}&${statusFilter}&select=*&order=created_at.desc&limit=200`,
+          `${SUPABASE_URL}/rest/v1/delivery_requests?provider_id=eq.${userId}&${statusFilter}&select=${DELIVERY_REQUEST_COLUMNS}&order=created_at.desc&limit=200`,
           opts
         );
         if (byUserResponse.ok) {
@@ -644,7 +645,7 @@ export const useDeliveryProviderData = () => {
           // Fetch delivery_requests for these purchase_orders
           const poIdsParam = poIds.join(',');
           const drByPOResponse = await fetch(
-            `${SUPABASE_URL}/rest/v1/delivery_requests?purchase_order_id=in.(${poIdsParam})&${statusFilter}&select=*&order=created_at.desc&limit=200`,
+            `${SUPABASE_URL}/rest/v1/delivery_requests?purchase_order_id=in.(${poIdsParam})&${statusFilter}&select=${DELIVERY_REQUEST_COLUMNS}&order=created_at.desc&limit=200`,
             opts
           );
           if (drByPOResponse.ok) {
@@ -676,7 +677,7 @@ export const useDeliveryProviderData = () => {
           if (poByUserIds.length > 0) {
             const poByUserIdsParam = poByUserIds.join(',');
             const drByPOUserResponse = await fetch(
-              `${SUPABASE_URL}/rest/v1/delivery_requests?purchase_order_id=in.(${poByUserIdsParam})&${statusFilter}&select=*&order=created_at.desc&limit=200`,
+              `${SUPABASE_URL}/rest/v1/delivery_requests?purchase_order_id=in.(${poByUserIdsParam})&${statusFilter}&select=${DELIVERY_REQUEST_COLUMNS}&order=created_at.desc&limit=200`,
               opts
             );
             if (drByPOUserResponse.ok) {
@@ -1043,7 +1044,7 @@ export const useDeliveryProviderData = () => {
             // Fetch delivery_requests - simple query without joins (use in.() to avoid not.in parsing issues)
             const activeStatuses = 'pending,requested,assigned,accepted,scheduled,dispatched,in_transit,picked_up,out_for_delivery';
             const activeResponse = await fetch(
-                `${SUPABASE_URL}/rest/v1/delivery_requests?status=in.%28${activeStatuses}%29&select=*&order=created_at.desc&limit=200`,
+                `${SUPABASE_URL}/rest/v1/delivery_requests?status=in.%28${activeStatuses}%29&select=${DELIVERY_REQUEST_COLUMNS}&order=created_at.desc&limit=200`,
               {
                 headers: {
                   'apikey': SUPABASE_ANON_KEY,
@@ -2679,7 +2680,7 @@ export const useDeliveryProviderData = () => {
               const directQueries = knownDeliveredOrderNumbers.flatMap(num => [
                 // Try with numeric part only
                 fetch(
-                  `${SUPABASE_URL_FALLBACK}/rest/v1/purchase_orders?po_number=ilike.*${num}*&select=*&limit=5`,
+                  `${SUPABASE_URL_FALLBACK}/rest/v1/purchase_orders?po_number=ilike.*${num}*&select=${PURCHASE_ORDER_SEARCH_COLUMNS}&limit=5`,
                   {
                     headers: {
                       'apikey': SUPABASE_ANON_KEY,
@@ -2693,7 +2694,7 @@ export const useDeliveryProviderData = () => {
                   .catch(() => []),
                 // Also try with QR- prefix
                 fetch(
-                  `${SUPABASE_URL_FALLBACK}/rest/v1/purchase_orders?po_number=ilike.QR-${num}*&select=*&limit=5`,
+                  `${SUPABASE_URL_FALLBACK}/rest/v1/purchase_orders?po_number=ilike.QR-${num}*&select=${PURCHASE_ORDER_SEARCH_COLUMNS}&limit=5`,
                   {
                     headers: {
                       'apikey': SUPABASE_ANON_KEY,
@@ -2707,7 +2708,7 @@ export const useDeliveryProviderData = () => {
                   .catch(() => []),
                 // Also try with PO- prefix
                 fetch(
-                  `${SUPABASE_URL_FALLBACK}/rest/v1/purchase_orders?po_number=ilike.PO-${num}*&select=*&limit=5`,
+                  `${SUPABASE_URL_FALLBACK}/rest/v1/purchase_orders?po_number=ilike.PO-${num}*&select=${PURCHASE_ORDER_SEARCH_COLUMNS}&limit=5`,
                   {
                     headers: {
                       'apikey': SUPABASE_ANON_KEY,
@@ -3243,7 +3244,7 @@ export const useDeliveryProviderData = () => {
           // Try multiple patterns: numeric only, QR- prefix, PO- prefix
           const safetyQueries = knownOrderNumbers.flatMap(num => [
             fetch(
-              `${SUPABASE_URL_SAFETY}/rest/v1/purchase_orders?po_number=ilike.*${num}*&select=*&limit=5`,
+              `${SUPABASE_URL_SAFETY}/rest/v1/purchase_orders?po_number=ilike.*${num}*&select=${PURCHASE_ORDER_SEARCH_COLUMNS}&limit=5`,
               {
                 headers: {
                   'apikey': SUPABASE_ANON_KEY,
@@ -3255,7 +3256,7 @@ export const useDeliveryProviderData = () => {
               }
             ).then(res => res.ok ? res.json() : []).catch(() => []),
             fetch(
-              `${SUPABASE_URL_SAFETY}/rest/v1/purchase_orders?po_number=ilike.QR-${num}*&select=*&limit=5`,
+              `${SUPABASE_URL_SAFETY}/rest/v1/purchase_orders?po_number=ilike.QR-${num}*&select=${PURCHASE_ORDER_SEARCH_COLUMNS}&limit=5`,
               {
                 headers: {
                   'apikey': SUPABASE_ANON_KEY,
@@ -3267,7 +3268,7 @@ export const useDeliveryProviderData = () => {
               }
             ).then(res => res.ok ? res.json() : []).catch(() => []),
             fetch(
-              `${SUPABASE_URL_SAFETY}/rest/v1/purchase_orders?po_number=ilike.PO-${num}*&select=*&limit=5`,
+              `${SUPABASE_URL_SAFETY}/rest/v1/purchase_orders?po_number=ilike.PO-${num}*&select=${PURCHASE_ORDER_SEARCH_COLUMNS}&limit=5`,
               {
                 headers: {
                   'apikey': SUPABASE_ANON_KEY,
@@ -3368,7 +3369,7 @@ export const useDeliveryProviderData = () => {
           
           const forceQueries = ['1772673713715', '1772340447370', '1772295614017', '1772597788293', '1772598054688'].map(num =>
             fetch(
-              `${SUPABASE_URL_FORCE}/rest/v1/purchase_orders?po_number=ilike.*${num}*&select=*&limit=5`,
+              `${SUPABASE_URL_FORCE}/rest/v1/purchase_orders?po_number=ilike.*${num}*&select=${PURCHASE_ORDER_SEARCH_COLUMNS}&limit=5`,
               {
                 headers: {
                   'apikey': SUPABASE_ANON_KEY,
@@ -3768,7 +3769,7 @@ export const useDeliveryProviderData = () => {
           // Use REST API directly to bypass any RLS issues
           const finalReconciliationQueries = knownOrderNumbersFinal.map(num => 
             fetch(
-              `${SUPABASE_URL}/rest/v1/purchase_orders?po_number=ilike.*${num}*&select=*&limit=5`,
+              `${SUPABASE_URL}/rest/v1/purchase_orders?po_number=ilike.*${num}*&select=${PURCHASE_ORDER_SEARCH_COLUMNS}&limit=5`,
               {
                 headers: {
                   'apikey': SUPABASE_ANON_KEY,
@@ -3904,7 +3905,7 @@ export const useDeliveryProviderData = () => {
             const numericPart = orderNum.split('-')[1]; // Extract numeric part
             if (DEBUG_AGGRESSIVE_HOOK) console.log('AGGRESSIVE: Querying for', orderNum);
             return fetch(
-              `${SUPABASE_URL_AGGRESSIVE}/rest/v1/purchase_orders?po_number=eq.${encodeURIComponent(orderNum)}&select=*`,
+              `${SUPABASE_URL_AGGRESSIVE}/rest/v1/purchase_orders?po_number=eq.${encodeURIComponent(orderNum)}&select=${PURCHASE_ORDER_LIST_COLUMNS}`,
               {
                 headers: {
                   'apikey': SUPABASE_ANON_KEY,
@@ -3921,7 +3922,7 @@ export const useDeliveryProviderData = () => {
                 if (DEBUG_AGGRESSIVE_HOOK) console.warn('AGGRESSIVE: Query failed for', orderNum, res.status);
                 // Try with ilike as fallback
                 return fetch(
-                  `${SUPABASE_URL_AGGRESSIVE}/rest/v1/purchase_orders?po_number=ilike.*${numericPart}*&select=*&limit=5`,
+                  `${SUPABASE_URL_AGGRESSIVE}/rest/v1/purchase_orders?po_number=ilike.*${numericPart}*&select=${PURCHASE_ORDER_SEARCH_COLUMNS}&limit=5`,
                   {
                     headers: {
                       'apikey': SUPABASE_ANON_KEY,
@@ -4044,7 +4045,7 @@ export const useDeliveryProviderData = () => {
       let pendingData: any[] = [];
       try {
         const pendingResponse = await fetch(
-          `${SUPABASE_URL}/rest/v1/delivery_requests?status=eq.pending&select=*&order=created_at.desc&limit=50`,
+          `${SUPABASE_URL}/rest/v1/delivery_requests?status=eq.pending&select=${DELIVERY_REQUEST_COLUMNS}&order=created_at.desc&limit=50`,
           { headers: restHeaders, cache: 'no-store' }
         );
         if (pendingResponse.ok) {

@@ -1,4 +1,5 @@
 import { readPersistedAuthRawStringSync } from '@/utils/supabaseAccessToken';
+import { PROFILE_SELF_COLUMNS, PROFILE_DIRECTORY_COLUMNS, PROFILE_PARTNER_COLUMNS, SUPPLIER_SELF_COLUMNS, DELIVERY_PROVIDER_SELF_COLUMNS, PURCHASE_ORDER_LIST_COLUMNS, PURCHASE_ORDER_SEARCH_COLUMNS, PAYMENT_LIST_COLUMNS, SUPPLIER_PRODUCT_PRICE_COLUMNS } from '@/lib/restColumnSets';
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -206,7 +207,7 @@ export const BuilderProfileEdit: React.FC<BuilderProfileEditProps> = ({
       console.log('📝 BuilderProfileEdit: Fetching profile for user:', user.id);
       
       const profileResult = await withTimeout(
-        supabase.from('profiles').select('*').eq('user_id', user.id).single(),
+        supabase.from('profiles').select(PROFILE_SELF_COLUMNS).eq('user_id', user.id).single(),
         8000,
         { data: null, error: { message: 'Timeout' } }
       );

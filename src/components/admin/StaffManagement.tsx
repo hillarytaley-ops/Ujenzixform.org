@@ -266,23 +266,10 @@ export const StaffManagement = () => {
           
           if (userEmail) {
             setViewerEmail(String(userEmail).trim().toLowerCase());
-            // Check if this user is in admin_staff and get their role
-            const response = await fetch(
-              `${SUPABASE_URL}/rest/v1/admin_staff?email=eq.${encodeURIComponent(userEmail)}&select=role`,
-              {
-                headers: {
-                  'apikey': SUPABASE_ANON_KEY,
-                  'Authorization': `Bearer ${parsed.access_token || SUPABASE_ANON_KEY}`,
-                }
-              }
-            );
-            
-            if (response.ok) {
-              const data = await response.json();
-              if (data?.[0]?.role) {
-                console.log('👥 Current user role:', data[0].role);
-                setCurrentUserRole(data[0].role);
-              }
+            const { data: staffRole, error: roleErr } = await supabase.rpc('get_my_admin_staff_role');
+            if (!roleErr && staffRole) {
+              devLog('StaffManagement: current user role loaded');
+              setCurrentUserRole(String(staffRole));
             }
             logAuthEvent('StaffManagement', 'Current user loaded', parsed.user?.id);
           }

@@ -1,4 +1,5 @@
 /**
+import { PROFILE_SELF_COLUMNS, PROFILE_DIRECTORY_COLUMNS, PROFILE_PARTNER_COLUMNS, SUPPLIER_SELF_COLUMNS, DELIVERY_PROVIDER_SELF_COLUMNS, PURCHASE_ORDER_LIST_COLUMNS, PURCHASE_ORDER_SEARCH_COLUMNS, PAYMENT_LIST_COLUMNS, SUPPLIER_PRODUCT_PRICE_COLUMNS } from '@/lib/restColumnSets';
  * Advanced Analytics Dashboard
  * Comprehensive analytics for admin users
  */
@@ -252,10 +253,10 @@ export const AnalyticsDashboard: React.FC = () => {
         suppliersResult,
         materialsResult
       ] = await Promise.all([
-        supabase.from('purchase_orders').select('*'),
-        supabase.from('profiles').select('*'),
-        supabase.from('delivery_requests').select('*'),
-        supabase.from('suppliers').select('*'),
+        supabase.from('purchase_orders').select(PURCHASE_ORDER_LIST_COLUMNS),
+        supabase.from('profiles').select(PROFILE_SELF_COLUMNS),
+        supabase.from('delivery_requests').select(DELIVERY_REQUEST_COLUMNS),
+        supabase.from('suppliers').select('id,company_name,user_id,is_verified,rating'),
         supabase.from('admin_material_images').select('id, name, category')
       ]);
 

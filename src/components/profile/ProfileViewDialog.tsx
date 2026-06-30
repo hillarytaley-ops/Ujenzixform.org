@@ -1,4 +1,5 @@
 import { clearSupabasePersistedSessionSync, readPersistedAuthRawStringSync } from '@/utils/supabaseAccessToken';
+import { PROFILE_SELF_COLUMNS, PROFILE_DIRECTORY_COLUMNS, PROFILE_PARTNER_COLUMNS, SUPPLIER_SELF_COLUMNS, DELIVERY_PROVIDER_SELF_COLUMNS, PURCHASE_ORDER_LIST_COLUMNS, PURCHASE_ORDER_SEARCH_COLUMNS, PAYMENT_LIST_COLUMNS, SUPPLIER_PRODUCT_PRICE_COLUMNS } from '@/lib/restColumnSets';
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from '@/integrations/supabase/client';
 /**
  * ProfileViewDialog - Simple profile view popup
@@ -85,7 +86,7 @@ export const ProfileViewDialog: React.FC<ProfileViewDialogProps> = ({
         // Fetch from profiles table
         try {
           const response = await fetch(
-            `${SUPABASE_URL}/rest/v1/profiles?user_id=eq.${effectiveUserId}&select=*`,
+            `${SUPABASE_URL}/rest/v1/profiles?user_id=eq.${effectiveUserId}&select=${PROFILE_SELF_COLUMNS}`,
             { 
               headers: { 
                 'apikey': SUPABASE_ANON_KEY,
@@ -109,7 +110,7 @@ export const ProfileViewDialog: React.FC<ProfileViewDialogProps> = ({
         if (userRole === 'supplier') {
           try {
             const supplierResponse = await fetch(
-              `${SUPABASE_URL}/rest/v1/suppliers?user_id=eq.${effectiveUserId}&select=*`,
+              `${SUPABASE_URL}/rest/v1/suppliers?user_id=eq.${effectiveUserId}&select=${SUPPLIER_SELF_COLUMNS}`,
               { 
                 headers: { 
                   'apikey': SUPABASE_ANON_KEY,
@@ -134,7 +135,7 @@ export const ProfileViewDialog: React.FC<ProfileViewDialogProps> = ({
         if (userRole === 'delivery' || userRole === 'delivery_provider') {
           try {
             const deliveryResponse = await fetch(
-              `${SUPABASE_URL}/rest/v1/delivery_providers?user_id=eq.${effectiveUserId}&select=*`,
+              `${SUPABASE_URL}/rest/v1/delivery_providers?user_id=eq.${effectiveUserId}&select=${DELIVERY_PROVIDER_SELF_COLUMNS}`,
               { 
                 headers: { 
                   'apikey': SUPABASE_ANON_KEY,

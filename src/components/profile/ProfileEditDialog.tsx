@@ -1,4 +1,5 @@
 import { readPersistedAuthRawStringSync } from '@/utils/supabaseAccessToken';
+import { PROFILE_SELF_COLUMNS, PROFILE_DIRECTORY_COLUMNS, PROFILE_PARTNER_COLUMNS, SUPPLIER_SELF_COLUMNS, DELIVERY_PROVIDER_SELF_COLUMNS, PURCHASE_ORDER_LIST_COLUMNS, PURCHASE_ORDER_SEARCH_COLUMNS, PAYMENT_LIST_COLUMNS, SUPPLIER_PRODUCT_PRICE_COLUMNS } from '@/lib/restColumnSets';
 import React, { useState, useEffect } from 'react';
 import {
   Dialog,
@@ -230,7 +231,7 @@ export const ProfileEditDialog: React.FC<ProfileEditDialogProps> = ({
         // Try using Supabase client first (handles auth automatically)
         const { data: profiles, error: profileError } = await supabase
           .from('profiles')
-          .select('*')
+          .select(PROFILE_SELF_COLUMNS)
           .eq('user_id', userId)
           .maybeSingle();
         
@@ -241,7 +242,7 @@ export const ProfileEditDialog: React.FC<ProfileEditDialogProps> = ({
           const fetchTimeout = setTimeout(() => controller.abort(), 3000);
 
           const response = await fetch(
-            `${SUPABASE_URL}/rest/v1/profiles?user_id=eq.${userId}&select=*`,
+            `${SUPABASE_URL}/rest/v1/profiles?user_id=eq.${userId}&select=${PROFILE_SELF_COLUMNS}`,
             { headers, signal: controller.signal }
           );
           clearTimeout(fetchTimeout);
@@ -279,7 +280,7 @@ export const ProfileEditDialog: React.FC<ProfileEditDialogProps> = ({
           const supplierTimeout = setTimeout(() => supplierController.abort(), 3000);
 
           const supplierResponse = await fetch(
-            `${SUPABASE_URL}/rest/v1/suppliers?user_id=eq.${userId}&select=*`,
+            `${SUPABASE_URL}/rest/v1/suppliers?user_id=eq.${userId}&select=${SUPPLIER_SELF_COLUMNS}`,
             { headers, signal: supplierController.signal }
           );
           clearTimeout(supplierTimeout);

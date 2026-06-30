@@ -1,4 +1,5 @@
 import { readPersistedAuthRawStringSync } from '@/utils/supabaseAccessToken';
+import { PROFILE_SELF_COLUMNS, PROFILE_DIRECTORY_COLUMNS, PROFILE_PARTNER_COLUMNS, SUPPLIER_SELF_COLUMNS, DELIVERY_PROVIDER_SELF_COLUMNS, PURCHASE_ORDER_LIST_COLUMNS, PURCHASE_ORDER_SEARCH_COLUMNS, PAYMENT_LIST_COLUMNS, SUPPLIER_PRODUCT_PRICE_COLUMNS } from '@/lib/restColumnSets';
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -97,7 +98,7 @@ export const ArrivalScanReminder: React.FC<ArrivalScanReminderProps> = ({
 
       // Fetch order details
       const orderResponse = await fetch(
-        `${SUPABASE_URL}/rest/v1/purchase_orders?id=eq.${orderIdToFetch}&select=*`,
+        `${SUPABASE_URL}/rest/v1/purchase_orders?id=eq.${orderIdToFetch}&select=${PURCHASE_ORDER_LIST_COLUMNS}`,
         {
           headers: {
             'apikey': SUPABASE_ANON_KEY,
@@ -118,7 +119,7 @@ export const ArrivalScanReminder: React.FC<ArrivalScanReminderProps> = ({
 
       // Fetch material items for this order
       const itemsResponse = await fetch(
-        `${SUPABASE_URL}/rest/v1/material_items?purchase_order_id=eq.${orderIdToFetch}&select=*`,
+        `${SUPABASE_URL}/rest/v1/material_items?purchase_order_id=eq.${orderIdToFetch}&select=${MATERIAL_ITEM_COLUMNS}`,
         {
           headers: {
             'apikey': SUPABASE_ANON_KEY,
@@ -207,7 +208,7 @@ export const ArrivalScanReminder: React.FC<ArrivalScanReminderProps> = ({
 
       // Fetch delivery request to get the order ID
       const deliveryResponse = await fetch(
-        `${SUPABASE_URL}/rest/v1/delivery_requests?id=eq.${deliveryIdToFetch}&select=*`,
+        `${SUPABASE_URL}/rest/v1/delivery_requests?id=eq.${deliveryIdToFetch}&select=${DELIVERY_REQUEST_COLUMNS}`,
         {
           headers: {
             'apikey': SUPABASE_ANON_KEY,
