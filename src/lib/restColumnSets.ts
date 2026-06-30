@@ -98,4 +98,7 @@ export const JOB_POSITION_COLUMNS =
   'id,title,department,location,is_active,is_featured,created_at,updated_at,description';
 
 export const MATERIAL_CATALOG_COLUMNS =
-  'id,name,category,unit,description,image_url,approval_status,created_at,updated_at,supplier_id';
+  'id,supplier_id,name,description,category,unit,unit_price,image_url,in_stock,approval_status,created_at,updated_at,pricing_type,variants,etims_item_code';
+
+export const MONITORING_SERVICE_REQUEST_COLUMNS =
+  'id,user_id,status,created_at,updated_at,project_name,project_location,project_type,estimated_cost,access_code,camera_count,quote_amount';

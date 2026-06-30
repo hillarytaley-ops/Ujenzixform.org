@@ -1072,7 +1072,7 @@ export const MaterialsGrid: React.FC<MaterialsGridProps> = ({
       
       try {
         const pricesResponse = await fetchPostgrestCatalog(
-          '/rest/v1/supplier_product_prices?select=${SUPPLIER_PRODUCT_PRICE_COLUMNS}',
+          `/rest/v1/supplier_product_prices?select=${SUPPLIER_PRODUCT_PRICE_COLUMNS}`,
           {
             headers: {
               'Cache-Control': 'no-cache, no-store, must-revalidate',
@@ -1322,7 +1322,7 @@ export const MaterialsGrid: React.FC<MaterialsGridProps> = ({
       
       try {
         const response = await fetchPostgrestCatalog(
-          '/rest/v1/materials?select=${MATERIAL_CATALOG_COLUMNS}&order=created_at.desc&limit=2000',
+          `/rest/v1/materials?select=${MATERIAL_CATALOG_COLUMNS}&order=created_at.desc&limit=2000`,
           {},
           catalogToken
         );

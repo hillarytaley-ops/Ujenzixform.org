@@ -93,6 +93,12 @@ export const CartPriceComparisonAll: React.FC<CartPriceComparisonAllProps> = ({
   const { role: userRole } = useVerifiedRole();
   const isProfessionalBuilder = userRole === 'professional_builder';
 
+  const [loading, setLoading] = useState(false);
+  const [comparisons, setComparisons] = useState<ProductComparison[]>([]);
+  const [allSuppliers, setAllSuppliers] = useState<SupplierColumn[]>([]);
+  const [selectedSuppliers, setSelectedSuppliers] = useState<Set<string>>(new Set());
+  const [notes, setNotes] = useState('');
+
   useEffect(() => {
     if (isOpen && items.length > 0) {
       fetchAllPrices();

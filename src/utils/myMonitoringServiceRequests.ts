@@ -1,5 +1,5 @@
 import { readAccessTokenSyncBestEffort } from '@/utils/supabaseAccessToken';
-import { CONVERSATION_LIST_COLUMNS, CHAT_MESSAGE_COLUMNS, CHAT_FEEDBACK_COLUMNS, CHAT_TRANSCRIPT_COLUMNS, SUPPORT_CHAT_COLUMNS, ADMIN_FINANCIAL_INVOICE_COLUMNS, ADMIN_FINANCIAL_PO_COLUMNS, ADMIN_FINANCIAL_RECEIPT_COLUMNS, ADMIN_FINANCIAL_DELIVERY_ORDER_COLUMNS, ADMIN_FINANCIAL_QUOTATION_COLUMNS, ADMIN_APPLICATION_COLUMNS, ADMIN_REGISTRATION_COLUMNS, ADMIN_DELIVERY_PROVIDER_COLUMNS, QR_SCAN_EVENT_COLUMNS, TRACKING_NUMBER_COLUMNS, DELIVERY_NOTIFICATION_COLUMNS, JOB_POSITION_COLUMNS, MATERIAL_CATALOG_COLUMNS, SUPPLIER_PRODUCT_PRICE_COLUMNS, DELIVERY_REQUEST_COLUMNS } from '@/lib/restColumnSets';
+import { MONITORING_SERVICE_REQUEST_COLUMNS } from '@/lib/restColumnSets';
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 export type MyMonitoringFetchOpts = {
@@ -44,7 +44,6 @@ function mergeById(rows: any[]): any[] {
 
 /**
  * Load monitoring rows without supabase-js global fetch (15s AbortController on every call).
- * That wrapper has been implicated in hung/empty responses while plain fetch works (e.g. purchase_orders counts).
  */
 async function loadViaDirectRest(opts: MyMonitoringFetchOpts): Promise<any[]> {
   const { supabaseUrl, anonKey, accessToken, userId } = opts;
@@ -71,23 +70,7 @@ async function loadViaDirectRest(opts: MyMonitoringFetchOpts): Promise<any[]> {
 
   const collected: any[] = [];
 
-  if (userId) {
-    try {
-      const res = await run(
-        `${supabaseUrl}/rest/v1/monitoring_service_requests?user_id=eq.${encodeURIComponent(userId)}&select=id,user_id,status,created_at,updated_at,package_type,site_address&order=created_at.desc`
-      );
-      if (res.ok) {
-        const json = await res.json();
-        if (Array.isArray(json)) collected.push(...json);
-      } else {
-        const txt = await res.text().catch(() => "");
-        console.warn("[monitoring] REST user_id filter:", res.status, txt.slice(0, 280));
-      }
-    } catch (e) {
-      console.warn("[monitoring] REST user_id filter error:", e);
-    }
-  }
-
+  // Prefer RPC first (scoped, no invalid column lists)
   try {
     const res = await run(`${supabaseUrl}/rest/v1/rpc/get_my_monitoring_service_requests`, {
       method: "POST",
@@ -100,18 +83,29 @@ async function loadViaDirectRest(opts: MyMonitoringFetchOpts): Promise<any[]> {
     if (res.ok) {
       const json = await res.json();
       if (Array.isArray(json)) collected.push(...json);
-    } else {
-      const txt = await res.text().catch(() => "");
-      console.warn("[monitoring] REST RPC:", res.status, txt.slice(0, 280));
     }
-  } catch (e) {
-    console.warn("[monitoring] REST RPC error:", e);
+  } catch {
+    /* fall through */
+  }
+
+  if (userId && collected.length === 0) {
+    try {
+      const res = await run(
+        `${supabaseUrl}/rest/v1/monitoring_service_requests?user_id=eq.${encodeURIComponent(userId)}&select=${MONITORING_SERVICE_REQUEST_COLUMNS}&order=created_at.desc`
+      );
+      if (res.ok) {
+        const json = await res.json();
+        if (Array.isArray(json)) collected.push(...json);
+      }
+    } catch {
+      /* ignore */
+    }
   }
 
   return mergeById(collected);
 }
 
-/** Prefer SECURITY DEFINER RPC + direct REST (bypasses supabase-js global fetch). Legacy rows: RPC branch. */
+/** Prefer SECURITY DEFINER RPC + direct REST (bypasses supabase-js global fetch). */
 export async function fetchMyMonitoringServiceRequests(
   client: SupabaseClient,
   opts?: MyMonitoringFetchOpts
@@ -125,10 +119,12 @@ export async function fetchMyMonitoringServiceRequests(
 
   const rpc = await client.rpc("get_my_monitoring_service_requests");
   if (rpc.error) {
-    console.warn(
-      "[monitoring] supabase.rpc get_my_monitoring_service_requests:",
-      rpc.error.message
-    );
+    if (import.meta.env.DEV) {
+      console.warn(
+        "[monitoring] supabase.rpc get_my_monitoring_service_requests:",
+        rpc.error.message
+      );
+    }
   }
   if (!rpc.error && Array.isArray(rpc.data) && rpc.data.length > 0) {
     return { rows: rpc.data as any[], usedRpc: true };
@@ -136,11 +132,13 @@ export async function fetchMyMonitoringServiceRequests(
 
   const { data, error } = await client
     .from("monitoring_service_requests")
-    .select("*")
+    .select(MONITORING_SERVICE_REQUEST_COLUMNS)
     .order("created_at", { ascending: false });
 
   if (error) {
-    console.warn("[monitoring] supabase.from monitoring_service_requests:", error.message);
+    if (import.meta.env.DEV) {
+      console.warn("[monitoring] supabase.from monitoring_service_requests:", error.message);
+    }
     return { rows: [], usedRpc: false, rpcError: rpc.error?.message };
   }
   return {
