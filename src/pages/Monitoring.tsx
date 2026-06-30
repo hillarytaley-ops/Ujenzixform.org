@@ -1072,8 +1072,12 @@ const Monitoring = () => {
   };
 
   // Show loading ONLY if we don't have a cached role AND we're still checking
-  // If we have a cached builder role, show content immediately
-  const hasValidCachedRole = storedRole && ['admin', 'professional_builder', 'private_client', 'builder'].includes(storedRole);
+  const cachedRole =
+    typeof window !== 'undefined' ? localStorage.getItem('user_role') : null;
+  const effectiveRole = userRole || cachedRole;
+  const hasValidCachedRole =
+    !!effectiveRole &&
+    ['admin', 'professional_builder', 'private_client', 'builder'].includes(effectiveRole);
   
   if (checkingAccess && !hasValidCachedRole) {
     return (

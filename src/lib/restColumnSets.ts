@@ -28,7 +28,7 @@ export const PAYMENT_LIST_COLUMNS =
   'id,user_id,amount,currency,status,payment_method,provider,reference,created_at,updated_at,purchase_order_id,metadata';
 
 export const SUPPLIER_PRODUCT_PRICE_COLUMNS =
-  'id,supplier_id,product_id,material_id,price,currency,unit,stock_quantity,min_stock_level,max_stock_level,updated_at,product_name';
+  'id,supplier_id,product_id,price,in_stock,created_at,updated_at,description,stock_quantity,min_stock_level,max_stock_level,last_restocked,market_price,etims_item_code';
 
 export const MATERIAL_ITEM_COLUMNS =
   'id,supplier_id,purchase_order_id,material_type,category,quantity,unit,status,qr_code,created_at';
