@@ -1,5 +1,4 @@
 /**
-import { PROFILE_SELF_COLUMNS, PROFILE_DIRECTORY_COLUMNS, PROFILE_PARTNER_COLUMNS, SUPPLIER_SELF_COLUMNS, DELIVERY_PROVIDER_SELF_COLUMNS, PURCHASE_ORDER_LIST_COLUMNS, PURCHASE_ORDER_SEARCH_COLUMNS, PAYMENT_LIST_COLUMNS, SUPPLIER_PRODUCT_PRICE_COLUMNS } from '@/lib/restColumnSets';
  * PendingQuoteRequests - Shows all quote requests sent to suppliers
  * 
  * This component displays:
@@ -8,6 +7,7 @@ import { PROFILE_SELF_COLUMNS, PROFILE_DIRECTORY_COLUMNS, PROFILE_PARTNER_COLUMN
  * 3. Allows comparison of quotes from multiple suppliers for the same items
  */
 
+import { PURCHASE_ORDER_LIST_COLUMNS } from '@/lib/restColumnSets';
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';

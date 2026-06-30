@@ -3,6 +3,7 @@ export type SupplierLocationFields = {
   location?: string | null;
   address?: string | null;
   physical_address?: string | null;
+  physical_business_address?: string | null;
   county?: string | null;
 };
 
@@ -26,7 +27,7 @@ export function supplierLocationLine(
   const address = trim(s.address);
   if (address) return address.slice(0, MAX_LEN);
 
-  const physical = trim(s.physical_address);
+  const physical = trim(s.physical_address) || trim(s.physical_business_address);
   const county = trim(s.county);
   const streetCounty = [physical, county].filter(Boolean).join(', ');
   if (streetCounty) return streetCounty.slice(0, MAX_LEN);

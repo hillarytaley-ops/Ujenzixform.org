@@ -1,4 +1,5 @@
 import { supabase, SUPABASE_ANON_KEY, SUPABASE_URL } from '@/integrations/supabase/client';
+import { resolveSupplierRowIdForPurchaseOrder } from '@/lib/resolveMySuppliers';
 import { edgeGetSuppliersForPriceCompare } from '@/utils/edgeGuestPublic';
 /**
  * ╔══════════════════════════════════════════════════════════════════════════════════════╗
@@ -542,13 +543,14 @@ export const CartPriceComparisonAll: React.FC<CartPriceComparisonAllProps> = ({
     try {
       for (const supplierId of selectedSuppliers) {
         const supplier = allSuppliers.find(s => s.id === supplierId);
+        const targetSupplierId = await resolveSupplierRowIdForPurchaseOrder(supplierId);
         const poNumber = `QR-${Date.now()}-${Math.random().toString(36).substr(2, 5).toUpperCase()}`;
         const totalAmount = items.reduce((sum, item) => sum + (item.unit_price * item.quantity), 0);
 
         const quotePayload = {
           po_number: poNumber,
           buyer_id: userId,
-          supplier_id: supplierId,
+          supplier_id: targetSupplierId,
           total_amount: totalAmount,
           project_id: cartPid,
           delivery_address: 'To be provided',

@@ -1,5 +1,4 @@
 /**
-import { PROFILE_SELF_COLUMNS, PROFILE_DIRECTORY_COLUMNS, PROFILE_PARTNER_COLUMNS, SUPPLIER_SELF_COLUMNS, DELIVERY_PROVIDER_SELF_COLUMNS, PURCHASE_ORDER_LIST_COLUMNS, PURCHASE_ORDER_SEARCH_COLUMNS, PAYMENT_LIST_COLUMNS, SUPPLIER_PRODUCT_PRICE_COLUMNS } from '@/lib/restColumnSets';
  * Data Isolation Hook
  * 
  * Ensures users can only access their own data:
@@ -14,6 +13,8 @@ import { PROFILE_SELF_COLUMNS, PROFILE_DIRECTORY_COLUMNS, PROFILE_PARTNER_COLUMN
  */
 
 import { readPersistedAuthRawStringSync } from '@/utils/supabaseAccessToken';
+import { PURCHASE_ORDER_LIST_COLUMNS, PURCHASE_ORDER_SEARCH_COLUMNS, PROFILE_SELF_COLUMNS } from '@/lib/restColumnSets';
+import { fetchMySupplierRecords, fetchSupplierScopeIds } from '@/lib/resolveMySuppliers';
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { SUPABASE_ANON_KEY, SUPABASE_URL, supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -213,7 +214,7 @@ export const useSupplierData = () => {
       // Fetch supplier profile - ONLY for current user
       const { data: profileData, error: profileError } = await supabase
         .from('profiles')
-        .select('*')
+        .select(PROFILE_SELF_COLUMNS)
         .eq('user_id', user.id)
         .maybeSingle();
 
@@ -223,48 +224,35 @@ export const useSupplierData = () => {
       // Fetch supplier application - ONLY for current user (uses applicant_user_id)
       const { data: supplierReg } = await supabase
         .from('supplier_applications')
-        .select('*')
+        .select('id,status,rating,company_name')
         .eq('applicant_user_id', user.id)
         .maybeSingle();
 
-      // Fetch orders where this supplier is the vendor
-      // Look up supplier by user_id OR email to handle account mismatches
-      let supplierRecord = null;
-      const { data: byUserId } = await supabase
-        .from('suppliers')
-        .select('id, user_id')
-        .eq('user_id', user.id)
-        .maybeSingle();
-      
-      supplierRecord = byUserId;
-      
-      // If not found by user_id, try by email
-      if (!supplierRecord && user.email) {
-        const { data: byEmail } = await supabase
-          .from('suppliers')
-          .select('id, user_id')
-          .eq('email', user.email)
-          .maybeSingle();
-        supplierRecord = byEmail;
+      // Orders: RPC first (matches email-linked + profile-chain ownership server-side)
+      let ordersData: any[] = [];
+      const { data: rpcOrders, error: rpcErr } = await supabase.rpc(
+        'get_supplier_orders_for_current_user',
+        { _limit: 500 }
+      );
+      if (!rpcErr && Array.isArray(rpcOrders)) {
+        ordersData = rpcOrders;
+      } else {
+        const scopeIds = await fetchSupplierScopeIds();
+        const owned = await fetchMySupplierRecords();
+        const supplierIds = [...new Set([
+          user.id,
+          ...scopeIds,
+          ...owned.flatMap((r) => [r.id, r.user_id].filter(Boolean) as string[]),
+        ])];
+        const { data: restOrders, error: ordersError } = await supabase
+          .from('purchase_orders')
+          .select(PURCHASE_ORDER_LIST_COLUMNS)
+          .in('supplier_id', supplierIds)
+          .order('created_at', { ascending: false });
+        if (ordersError) throw ordersError;
+        ordersData = restOrders || [];
       }
-      
-      // Build list of IDs to check
-      const supplierIds = [user.id];
-      if (supplierRecord?.id && !supplierIds.includes(supplierRecord.id)) {
-        supplierIds.push(supplierRecord.id);
-      }
-      if (supplierRecord?.user_id && !supplierIds.includes(supplierRecord.user_id)) {
-        supplierIds.push(supplierRecord.user_id);
-      }
-
-      const { data: ordersData, error: ordersError } = await supabase
-        .from('purchase_orders')
-        .select('*')
-        .in('supplier_id', supplierIds)
-        .order('created_at', { ascending: false });
-
-      if (ordersError) throw ordersError;
-      setOrders(ordersData || []);
+      setOrders(ordersData);
 
       // Fetch payments for this supplier - ONLY for current user
       // Note: payments table uses user_id, not supplier_id

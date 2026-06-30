@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { CONVERSATION_LIST_COLUMNS, CHAT_MESSAGE_COLUMNS, CHAT_FEEDBACK_COLUMNS, CHAT_TRANSCRIPT_COLUMNS, SUPPORT_CHAT_COLUMNS, ADMIN_FINANCIAL_INVOICE_COLUMNS, ADMIN_FINANCIAL_PO_COLUMNS, ADMIN_FINANCIAL_RECEIPT_COLUMNS, ADMIN_FINANCIAL_DELIVERY_ORDER_COLUMNS, ADMIN_FINANCIAL_QUOTATION_COLUMNS, ADMIN_APPLICATION_COLUMNS, ADMIN_REGISTRATION_COLUMNS, ADMIN_DELIVERY_PROVIDER_COLUMNS, QR_SCAN_EVENT_COLUMNS, TRACKING_NUMBER_COLUMNS, DELIVERY_NOTIFICATION_COLUMNS, JOB_POSITION_COLUMNS, MATERIAL_CATALOG_COLUMNS, SUPPLIER_PRODUCT_PRICE_COLUMNS, DELIVERY_REQUEST_COLUMNS } from '@/lib/restColumnSets';
+import { CONVERSATION_LIST_COLUMNS, CHAT_MESSAGE_COLUMNS, CHAT_FEEDBACK_COLUMNS, CHAT_TRANSCRIPT_COLUMNS, SUPPORT_CHAT_COLUMNS, ADMIN_FINANCIAL_INVOICE_COLUMNS, ADMIN_FINANCIAL_PO_COLUMNS, ADMIN_FINANCIAL_RECEIPT_COLUMNS, ADMIN_FINANCIAL_DELIVERY_ORDER_COLUMNS, ADMIN_FINANCIAL_QUOTATION_COLUMNS, ADMIN_APPLICATION_COLUMNS, ADMIN_REGISTRATION_COLUMNS, ADMIN_DELIVERY_PROVIDER_COLUMNS, QR_SCAN_EVENT_COLUMNS, TRACKING_NUMBER_COLUMNS, DELIVERY_NOTIFICATION_COLUMNS, JOB_POSITION_COLUMNS, MATERIAL_CATALOG_COLUMNS, SUPPLIER_PRODUCT_PRICE_COLUMNS, DELIVERY_REQUEST_COLUMNS, SUPPLIER_LOCATION_COLUMNS } from '@/lib/restColumnSets';
 import {
   Dialog,
   DialogContent,
@@ -605,7 +605,7 @@ export const DeliveryPromptDialog: React.FC<DeliveryPromptDialogProps> = ({
       if (purchaseOrder.supplier_id) {
         try {
           const supplierResponse = await fetchWithTimeout(
-            `${SUPABASE_URL}/rest/v1/suppliers?id=eq.${purchaseOrder.supplier_id}&select=address,company_name,location,physical_address,county`,
+            `${SUPABASE_URL}/rest/v1/suppliers?id=eq.${purchaseOrder.supplier_id}&select=${SUPPLIER_LOCATION_COLUMNS}`,
             { headers: { 'apikey': SUPABASE_ANON_KEY } },
             5000
           );
@@ -615,7 +615,7 @@ export const DeliveryPromptDialog: React.FC<DeliveryPromptDialogProps> = ({
               const s = suppliers[0];
               const line = supplierLocationLine(s);
               const name = (s.company_name || 'Supplier').trim();
-              pickupAddress = line ? `${name} — ${line}` : (s.address ? `${name} — ${s.address}` : `${name} — add store address in supplier profile`);
+              pickupAddress = line ? `${name} — ${line}` : `${name} — add store address in supplier profile`;
             }
           }
         } catch (e) {

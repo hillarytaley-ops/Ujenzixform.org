@@ -43,3 +43,16 @@ export async function resolvePrimarySupplierRecordId(): Promise<string | null> {
   const scope = await fetchSupplierScopeIds();
   return scope[0] ?? null;
 }
+
+/** Normalize PO supplier_id to suppliers.id (handles legacy user_id / profile id on the row). */
+export async function resolveSupplierRowIdForPurchaseOrder(rawSupplierId: string): Promise<string> {
+  const id = rawSupplierId?.trim();
+  if (!id || id.length !== 36) return rawSupplierId;
+  const { data, error } = await supabase
+    .from('suppliers')
+    .select('id')
+    .or(`id.eq.${id},user_id.eq.${id}`)
+    .limit(1);
+  if (!error && Array.isArray(data) && data[0]?.id) return String(data[0].id);
+  return rawSupplierId;
+}

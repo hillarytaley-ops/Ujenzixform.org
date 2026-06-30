@@ -13,6 +13,10 @@ export const SUPPLIER_SELF_COLUMNS =
 
 export const SUPPLIER_LOOKUP_COLUMNS = 'id,user_id,company_name';
 
+/** Display-only supplier address fields allowed via PostgREST (no revoked `address`). */
+export const SUPPLIER_LOCATION_COLUMNS =
+  'id,company_name,location,physical_business_address';
+
 export const SUPPLIER_TAX_COLUMNS = 'kra_pin,legal_business_name,company_name';
 
 export const DELIVERY_PROVIDER_SELF_COLUMNS =

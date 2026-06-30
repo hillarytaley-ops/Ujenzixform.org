@@ -1,3 +1,4 @@
+import { SUPPLIER_LOCATION_COLUMNS } from '@/lib/restColumnSets';
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -132,7 +133,7 @@ export const SupplierQuoteReview: React.FC<SupplierQuoteReviewProps> = ({
       const suppliersTimeoutId = setTimeout(() => suppliersController.abort(), 5000);
       
       const suppliersResponse = await fetch(
-        `${SUPABASE_URL}/rest/v1/suppliers?select=id,user_id,company_name,address,location,rating`,
+        `${SUPABASE_URL}/rest/v1/suppliers?select=${SUPPLIER_LOCATION_COLUMNS},user_id,rating`,
         { headers, signal: suppliersController.signal, cache: 'no-store' }
       );
       clearTimeout(suppliersTimeoutId);

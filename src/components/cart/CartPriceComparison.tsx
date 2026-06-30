@@ -12,6 +12,7 @@
  * ╚══════════════════════════════════════════════════════════════════════════════════════╝
  */
 
+import { SUPPLIER_LOCATION_COLUMNS } from '@/lib/restColumnSets';
 import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -95,7 +96,7 @@ export const CartPriceComparison: React.FC<CartPriceComparisonProps> = ({
       // 1. Fetch all suppliers first (to map IDs to names)
       const { data: suppliersData, error: suppliersError } = await supabase
         .from('suppliers')
-        .select('id, user_id, company_name, rating, location, address, physical_address, county');
+        .select(SUPPLIER_LOCATION_COLUMNS + ',user_id,rating');
 
       if (suppliersError) {
         console.error('Error fetching suppliers:', suppliersError);
