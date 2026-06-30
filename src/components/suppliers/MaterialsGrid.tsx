@@ -1,5 +1,4 @@
 /**
-import { PROFILE_PARTNER_COLUMNS, PURCHASE_ORDER_LIST_COLUMNS, PURCHASE_ORDER_SEARCH_COLUMNS, SUPPLIER_PRODUCT_PRICE_COLUMNS, DELIVERY_REQUEST_COLUMNS, MATERIAL_ITEM_COLUMNS } from '@/lib/restColumnSets';
  * ╔══════════════════════════════════════════════════════════════════════════════════════╗
  * ║                                                                                      ║
  * ║   🛡️ PROTECTED FILE - MATERIALGRID.TSX - DO NOT MODIFY WITHOUT APPROVAL             ║
@@ -17,6 +16,14 @@ import { PROFILE_PARTNER_COLUMNS, PURCHASE_ORDER_LIST_COLUMNS, PURCHASE_ORDER_SE
  * ╚══════════════════════════════════════════════════════════════════════════════════════╝
  */
 
+import {
+  MATERIAL_CATALOG_COLUMNS,
+  MATERIAL_ITEM_COLUMNS,
+  PROFILE_PARTNER_COLUMNS,
+  PURCHASE_ORDER_LIST_COLUMNS,
+  PURCHASE_ORDER_SEARCH_COLUMNS,
+  SUPPLIER_PRODUCT_PRICE_COLUMNS,
+} from '@/lib/restColumnSets';
 import {
   readPersistedAuthRawStringSync,
   getPostgrestAuthorizationHeaderSync,

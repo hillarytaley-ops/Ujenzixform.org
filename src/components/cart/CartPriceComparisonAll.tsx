@@ -94,10 +94,14 @@ export const CartPriceComparisonAll: React.FC<CartPriceComparisonAllProps> = ({
   const isProfessionalBuilder = userRole === 'professional_builder';
 
   const [loading, setLoading] = useState(false);
+  const [sending, setSending] = useState(false);
   const [comparisons, setComparisons] = useState<ProductComparison[]>([]);
   const [allSuppliers, setAllSuppliers] = useState<SupplierColumn[]>([]);
   const [selectedSuppliers, setSelectedSuppliers] = useState<Set<string>>(new Set());
   const [notes, setNotes] = useState('');
+
+  const isRealSupplierId = (id: string | undefined) =>
+    !!id && id.length === 36 && id !== 'admin-catalog' && id !== 'general';
 
   useEffect(() => {
     if (isOpen && items.length > 0) {
@@ -216,20 +220,23 @@ export const CartPriceComparisonAll: React.FC<CartPriceComparisonAllProps> = ({
 
       // Collect unique suppliers from prices AND all suppliers for quote requests
       const uniqueSupplierIds = new Set<string>();
-      pricesData.forEach((p: any) => uniqueSupplierIds.add(p.supplier_id));
-      items.forEach(item => {
-        if (item.supplier_id) uniqueSupplierIds.add(item.supplier_id);
+      pricesData.forEach((p: any) => {
+        if (isRealSupplierId(p.supplier_id)) uniqueSupplierIds.add(p.supplier_id);
       });
-      
+      items.forEach(item => {
+        if (isRealSupplierId(item.supplier_id)) uniqueSupplierIds.add(item.supplier_id!);
+      });
+
       // For COs/contractors, also show all suppliers (even without prices)
       if (isProfessionalBuilder) {
-        suppliersData.forEach(s => uniqueSupplierIds.add(s.id));
+        suppliersData.forEach(s => {
+          if (isRealSupplierId(s.id)) uniqueSupplierIds.add(s.id);
+        });
       }
 
       // RLS on `suppliers` often hides rows from buyers even when those suppliers have public prices.
       // SECURITY DEFINER RPC returns name + address for the exact UUIDs on the price rows.
-      const uuidLike = (id: string | undefined) => !!id && id.length === 36 && id !== 'admin-catalog' && id !== 'general';
-      const compareRpcIds = [...uniqueSupplierIds].filter(uuidLike).slice(0, 200);
+      const compareRpcIds = [...uniqueSupplierIds].slice(0, 200);
       if (compareRpcIds.length > 0) {
         const applyRpcRows = (rpcRows: any[]) => {
           for (const row of rpcRows) {
@@ -278,7 +285,9 @@ export const CartPriceComparisonAll: React.FC<CartPriceComparisonAllProps> = ({
         if (rpcRows.length > 0) applyRpcRows(rpcRows);
       }
 
-      const missingIds = [...uniqueSupplierIds].filter((id) => !suppliersMap.has(id));
+      const missingIds = [...uniqueSupplierIds].filter(
+        (id) => isRealSupplierId(id) && !suppliersMap.has(id)
+      );
       if (missingIds.length > 0) {
         const { data: extraRows } = await supabase
           .from('suppliers')
