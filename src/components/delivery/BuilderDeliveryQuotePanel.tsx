@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { DELIVERY_QUOTE_LIST_COLUMNS } from "@/lib/restColumnSets";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -7,6 +8,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, Banknote, ThumbsUp, ThumbsDown, Lock } from "lucide-react";
 import { PaystackCheckout } from "@/components/payment/PaystackCheckout";
+import { fetchPurchaseBuyerIdsForBuilder } from "@/utils/builderProjectPurchaseOrders";
 import {
   deliveryQuoteStatusLabel,
   isDeliveryQuotePaid,
@@ -48,29 +50,32 @@ export function BuilderDeliveryQuotePanel({
   const [busyId, setBusyId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
-    const pid = profileId?.trim();
     const aid = authUserId?.trim();
-    if (!pid && !aid) {
+    const pid = profileId?.trim();
+    if (!aid && !pid) {
       setRows([]);
       return;
     }
     setLoading(true);
     try {
-      let q = supabase
+      const { data: sessionData } = await supabase.auth.getSession();
+      const ownerIds = await fetchPurchaseBuyerIdsForBuilder(
+        aid || pid || "",
+        sessionData.session?.access_token ?? null,
+        pid ? [pid] : null
+      );
+      if (ownerIds.length === 0) {
+        setRows([]);
+        return;
+      }
+
+      const { data, error } = await supabase
         .from("delivery_requests")
-        .select(
-          "id,status,estimated_cost,delivery_quote_notes,delivery_quote_sent_at,delivery_quote_paid_at,pickup_address,delivery_address,material_type,pickup_date"
-        )
+        .select(DELIVERY_QUOTE_LIST_COLUMNS)
+        .in("builder_id", ownerIds)
         .in("status", ["quoted", "quote_accepted"])
         .order("created_at", { ascending: false });
 
-      if (pid && aid && pid !== aid) {
-        q = q.or(`builder_id.eq.${pid},builder_id.eq.${aid}`);
-      } else {
-        q = q.eq("builder_id", (pid || aid) as string);
-      }
-
-      const { data, error } = await q;
       if (error) throw error;
       setRows((data as DrRow[]) || []);
     } catch (e: unknown) {
@@ -87,27 +92,33 @@ export function BuilderDeliveryQuotePanel({
   }, [load]);
 
   useEffect(() => {
-    const bid = profileId?.trim() || authUserId?.trim();
-    if (!bid) return;
+    const aid = authUserId?.trim();
+    const pid = profileId?.trim();
+    const seedIds = [...new Set([aid, pid].filter(Boolean))] as string[];
+    if (seedIds.length === 0) return;
 
-    const ch = supabase
-      .channel(`builder-delivery-quotes-${bid}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "delivery_requests",
-          filter: `builder_id=eq.${bid}`,
-        },
-        () => {
-          void load();
-        }
-      )
-      .subscribe();
+    const channels = seedIds.map((id) =>
+      supabase
+        .channel(`builder-delivery-quotes-${id}`)
+        .on(
+          "postgres_changes",
+          {
+            event: "*",
+            schema: "public",
+            table: "delivery_requests",
+            filter: `builder_id=eq.${id}`,
+          },
+          () => {
+            void load();
+          }
+        )
+        .subscribe()
+    );
 
     return () => {
-      void supabase.removeChannel(ch);
+      for (const ch of channels) {
+        void supabase.removeChannel(ch);
+      }
     };
   }, [authUserId, load, profileId]);
 
@@ -190,6 +201,9 @@ export function BuilderDeliveryQuotePanel({
 
   if (rows.length === 0) return null;
 
+  const quotedCount = rows.filter((r) => normalizeDeliveryQuoteStatus(r.status) === "quoted").length;
+  const awaitingPayCount = rows.filter((r) => needsDeliveryQuotePayment(r)).length;
+
   return (
     <div id="delivery-quotes-from-admin" className="mb-6">
       <Card className="border-blue-200 bg-blue-50/50 dark:bg-blue-950/20">
@@ -200,6 +214,15 @@ export function BuilderDeliveryQuotePanel({
           </CardTitle>
           <CardDescription>
             Accept the quote, then pay with Paystack. Drivers are notified only after payment succeeds.
+            {quotedCount + awaitingPayCount > 0 ? (
+              <span className="mt-1 block text-blue-800 dark:text-blue-200">
+                {quotedCount > 0 ? `${quotedCount} quote${quotedCount === 1 ? "" : "s"} to review` : null}
+                {quotedCount > 0 && awaitingPayCount > 0 ? " · " : null}
+                {awaitingPayCount > 0
+                  ? `${awaitingPayCount} awaiting payment`
+                  : null}
+              </span>
+            ) : null}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">

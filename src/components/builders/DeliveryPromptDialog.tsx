@@ -600,6 +600,18 @@ export const DeliveryPromptDialog: React.FC<DeliveryPromptDialogProps> = ({
 
       console.log('🚚 User ID:', userId);
 
+      let builderIdForRequest = userId;
+      try {
+        const { data: profRow } = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('user_id', userId)
+          .maybeSingle();
+        if (profRow?.id) builderIdForRequest = profRow.id;
+      } catch {
+        /* keep auth uid */
+      }
+
       // Get supplier info for pickup address using fetch
       let pickupAddress = purchaseOrder.supplier_address || 'Supplier location';
       if (purchaseOrder.supplier_id) {
@@ -684,7 +696,7 @@ export const DeliveryPromptDialog: React.FC<DeliveryPromptDialogProps> = ({
       // CRITICAL: delivery_address is shared DIRECTLY to the delivery provider dashboard (delivery_requests table);
       // the provider who accepts the order sees this address on their dashboard.
       const deliveryPayload: Record<string, any> = {
-        builder_id: userId,
+        builder_id: builderIdForRequest,
         purchase_order_id: purchaseOrder.id,
         pickup_address: pickupAddress,
         delivery_address: fullDeliveryAddress.trim(),

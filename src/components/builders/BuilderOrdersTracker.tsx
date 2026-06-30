@@ -569,6 +569,9 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({
               status: dr.status,
               updated_at: dr.updated_at,
               created_at: dr.created_at,
+              estimated_cost: dr.estimated_cost ?? null,
+              delivery_quote_paid_at: dr.delivery_quote_paid_at ?? null,
+              delivery_quote_notes: dr.delivery_quote_notes ?? null,
             }))
           );
 

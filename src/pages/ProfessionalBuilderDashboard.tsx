@@ -3218,6 +3218,13 @@ const ProfessionalBuilderDashboardPage = () => {
                   {builderId && userId ? (
                     <MissingDeliveryAddressAlert builderId={builderId} userId={userId} />
                   ) : null}
+                  {(profile?.id || user?.id) ? (
+                    <BuilderDeliveryQuotePanel
+                      profileId={profile?.id}
+                      authUserId={user?.id}
+                      paystackSuccessPath="/professional-builder-dashboard?tab=deliveries"
+                    />
+                  ) : null}
                   {builderId ? (
                     <div className="mb-6">
                       <BuilderOrdersTracker
@@ -3257,14 +3264,6 @@ const ProfessionalBuilderDashboardPage = () => {
                       <span>Delivery History</span>
                     </TabsTrigger>
                   </TabsList>
-
-                  <div className="px-4 sm:px-6">
-                    <BuilderDeliveryQuotePanel
-                      profileId={profile?.id}
-                      authUserId={user?.id}
-                      paystackSuccessPath="/professional-builder-dashboard?tab=deliveries"
-                    />
-                  </div>
                   
                   {/* Request Delivery Sub-tab */}
                   <TabsContent value="request" className="mt-0 px-4 sm:px-6 pb-6">

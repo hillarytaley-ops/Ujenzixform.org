@@ -40,6 +40,10 @@ export const MATERIAL_ITEM_COLUMNS =
 export const DELIVERY_REQUEST_COLUMNS =
   'id,provider_id,purchase_order_id,status,created_at,updated_at,pickup_address,delivery_address,latitude,longitude,builder_id,supplier_id,tracking_number,estimated_delivery_at';
 
+/** Builder admin-quote panel — quote pipeline fields only. */
+export const DELIVERY_QUOTE_LIST_COLUMNS =
+  'id,builder_id,status,estimated_cost,delivery_quote_notes,delivery_quote_sent_at,delivery_quote_paid_at,pickup_address,delivery_address,material_type,pickup_date,purchase_order_id,created_at';
+
 export const INVOICE_LIST_COLUMNS =
   'id,invoice_number,supplier_id,buyer_id,status,total_amount,currency,created_at,updated_at,purchase_order_id';
 
