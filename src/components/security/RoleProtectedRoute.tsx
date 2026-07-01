@@ -9,8 +9,6 @@ import { supabase } from '@/integrations/supabase/client';
 import { fetchUserRolesViaRest } from '@/lib/userRolesRest';
 import { canAccessAdminDashboardStorage } from '@/utils/adminStaffSession';
 import {
-  DELIVERY_PROVIDER_PUBLIC_HOME,
-  getDeliveryHiringApprovalState,
   isDeliveryProviderRole,
 } from '@/utils/deliveryProviderHiringApproval';
 import { fetchAccountPaused } from '@/utils/accountPaused';
@@ -59,10 +57,6 @@ export const RoleProtectedRoute = ({ children, allowedRoles }: RoleProtectedRout
   });
   const [sessionUser, setSessionUser] = useState<User | null>(null);
   const [dbRole, setDbRole] = useState<string | null>(null);
-  const [hiringGate, setHiringGate] = useState<{ ready: boolean; approved: boolean | null }>({
-    ready: false,
-    approved: null,
-  });
   const [accountPaused, setAccountPaused] = useState<{ ready: boolean; paused: boolean }>({
     ready: false,
     paused: false,
@@ -154,26 +148,6 @@ export const RoleProtectedRoute = ({ children, allowedRoles }: RoleProtectedRout
     };
   }, [sessionUser?.id, dbRole, isAdminDashboardPath]);
 
-  useEffect(() => {
-    if (!sessionUser?.id || !dbRole || !isDeliveryProviderRole(dbRole)) {
-      setHiringGate({ ready: true, approved: null });
-      return;
-    }
-
-    let cancelled = false;
-    setHiringGate({ ready: false, approved: null });
-
-    void getDeliveryHiringApprovalState(sessionUser.id).then((state) => {
-      if (!cancelled) {
-        setHiringGate({ ready: true, approved: state.canAcceptDeliveryOrders });
-      }
-    });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [sessionUser?.id, dbRole]);
-
   if (!ready) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-slate-950">
@@ -211,32 +185,11 @@ export const RoleProtectedRoute = ({ children, allowedRoles }: RoleProtectedRout
     if (accountPaused.paused) {
       return <Navigate to="/account-paused" replace />;
     }
-    if (isDeliveryProviderRole(dbRole)) {
-      if (!hiringGate.ready) {
-        return (
-          <div className="flex items-center justify-center min-h-screen bg-slate-950">
-            <div className="animate-spin rounded-full h-8 w-8 border-4 border-blue-500 border-t-transparent" />
-          </div>
-        );
-      }
-      if (hiringGate.approved !== true) {
-        return <Navigate to={DELIVERY_PROVIDER_PUBLIC_HOME} replace />;
-      }
-    }
     return <>{children}</>;
   }
 
   if (isDeliveryProviderRole(dbRole)) {
-    if (!hiringGate.ready) {
-      return (
-        <div className="flex items-center justify-center min-h-screen bg-slate-950">
-          <div className="animate-spin rounded-full h-8 w-8 border-4 border-blue-500 border-t-transparent" />
-        </div>
-      );
-    }
-    if (hiringGate.approved !== true) {
-      return <Navigate to={DELIVERY_PROVIDER_PUBLIC_HOME} replace />;
-    }
+    return <>{children}</>;
   }
 
   const correctDashboard = DASHBOARDS[dbRole] || '/home';

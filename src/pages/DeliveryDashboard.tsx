@@ -296,8 +296,7 @@ const DeliveryDashboard = () => {
   } = useDeliveryProviderData();
 
   const isAdminUser = userRole === "admin";
-  const dashboardLocked =
-    !isAdminUser && !dataLoading && !canAcceptDeliveryOrders;
+  const dashboardLocked = false;
 
   // Single source for Deliveries tab: one RPC, aligned with Supplier Orders/QR
   const {

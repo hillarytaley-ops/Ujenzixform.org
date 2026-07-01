@@ -496,7 +496,7 @@ export const useDeliveryProviderData = () => {
     setLoading(true);
     setError(null);
 
-    let hiringApproved = false;
+    let hiringApproved = true;
     try {
       const { getDeliveryHiringApprovalState } = await import('@/utils/deliveryProviderHiringApproval');
       const hiringState = await getDeliveryHiringApprovalState(userId);
@@ -506,29 +506,13 @@ export const useDeliveryProviderData = () => {
       setHiringApprovalStatus(hiringState.status);
     } catch (hiringErr) {
       console.warn('useDeliveryProviderData: hiring approval check failed', hiringErr);
-      setCanAcceptDeliveryOrders(false);
-      setHiringApprovalStatus('pending');
-      setHiringApprovalMessage(
-        'Unable to verify Hiring Manager approval. You cannot access the delivery dashboard until this is resolved.'
-      );
+      setCanAcceptDeliveryOrders(true);
+      setHiringApprovalStatus('approved');
+      setHiringApprovalMessage('');
     }
 
     if (!hiringApproved) {
-      fastPathCountRef.current = 0;
-      setActiveDeliveries([]);
-      setDeliveryHistory([]);
-      setPendingRequests([]);
-      setStats({
-        totalDeliveries: 0,
-        completedToday: 0,
-        pendingDeliveries: 0,
-        totalEarnings: 0,
-        averageRating: 0,
-        totalDistance: 0,
-      });
-      setLoading(false);
-      console.log('📦 useDeliveryProviderData: Hiring gate — dashboard data not loaded');
-      return;
+      console.log('📦 useDeliveryProviderData: Applicant without delivery role — limited accept actions');
     }
 
     // CRITICAL: reset each run — stale count skipped the full fetch and left Schedule empty/wrong

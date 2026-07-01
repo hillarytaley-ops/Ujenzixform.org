@@ -25,13 +25,13 @@ export interface DeliveryHiringApprovalState {
 const STATUS_MESSAGES: Record<DeliveryHiringStatus, string> = {
   approved: '',
   pending:
-    'Your application is pending admin or Hiring Manager review. You cannot access the delivery dashboard until you are approved.',
+    'Your application is pending admin or Hiring Manager review. You cannot accept new delivery jobs until you are approved.',
   rejected:
     'Your delivery provider application was not approved. Contact support if you believe this is an error.',
   under_review:
-    'Your application is under review. You cannot access the delivery dashboard until admin or Hiring Manager approval.',
+    'Your application is under review. You cannot accept new delivery jobs until admin or Hiring Manager approval.',
   none:
-    'Complete your delivery provider registration at ujenzixform.org and wait for admin or Hiring Manager approval before using the dashboard.',
+    'Complete your delivery provider registration and wait for admin approval before accepting delivery jobs.',
 };
 
 function statusFromRegistration(raw: string): DeliveryHiringStatus {
@@ -43,28 +43,49 @@ function statusFromRegistration(raw: string): DeliveryHiringStatus {
   return 'none';
 }
 
-async function legacyVerifiedProvider(userId: string): Promise<boolean> {
-  const { data: provider, error } = await supabase
-    .from('delivery_providers')
-    .select('is_verified, is_active')
+async function fetchDeliveryRole(userId: string): Promise<string | null> {
+  const { data, error } = await supabase
+    .from('user_roles')
+    .select('role')
     .eq('user_id', userId)
     .maybeSingle();
 
   if (error) {
-    console.warn('getDeliveryHiringApprovalState: delivery_providers lookup failed', error);
-    return false;
+    console.warn('getDeliveryHiringApprovalState: user_roles lookup failed', error);
+    return null;
   }
 
-  return provider?.is_verified === true && provider?.is_active === true;
+  return data?.role ?? null;
 }
 
 /**
- * Hiring Manager gate — RPC is_delivery_provider_hiring_approved when available,
- * with registration + legacy delivery_providers fallback (matches DB intent).
+ * Anyone with a delivery role in user_roles may use the dashboard and accept jobs.
+ * Applicants without that role yet see pending/none (registration pipeline only).
  */
 export async function getDeliveryHiringApprovalState(
   userId: string
 ): Promise<DeliveryHiringApprovalState> {
+  const role = await fetchDeliveryRole(userId);
+  if (isDeliveryProviderRole(role)) {
+    return { canAcceptDeliveryOrders: true, status: 'approved', message: '' };
+  }
+
+  let rpcApproved = false;
+  try {
+    const { data, error } = await supabase.rpc('is_delivery_provider_hiring_approved', {
+      p_user_id: userId,
+    });
+    if (!error && data === true) {
+      rpcApproved = true;
+    }
+  } catch {
+    /* RPC optional until migration applied */
+  }
+
+  if (rpcApproved) {
+    return { canAcceptDeliveryOrders: true, status: 'approved', message: '' };
+  }
+
   const { data: registration, error: regError } = await supabase
     .from('delivery_provider_registrations')
     .select('status')
@@ -83,43 +104,11 @@ export async function getDeliveryHiringApprovalState(
     return { canAcceptDeliveryOrders: true, status: 'approved', message: '' };
   }
 
-  if (await legacyVerifiedProvider(userId)) {
-    return { canAcceptDeliveryOrders: true, status: 'approved', message: '' };
-  }
-
-  let rpcApproved = false;
-  let rpcChecked = false;
-  try {
-    const { data, error } = await supabase.rpc('is_delivery_provider_hiring_approved', {
-      p_user_id: userId,
-    });
-    if (!error) {
-      rpcChecked = true;
-      rpcApproved = data === true;
-    } else {
-      console.warn('getDeliveryHiringApprovalState: RPC failed', error.message);
-    }
-  } catch (e) {
-    console.warn('getDeliveryHiringApprovalState: RPC error', e);
-  }
-
-  if (rpcChecked && rpcApproved) {
-    return { canAcceptDeliveryOrders: true, status: 'approved', message: '' };
-  }
-
   if (registration && regStatus !== 'none') {
     return {
       canAcceptDeliveryOrders: false,
       status: regStatus,
       message: STATUS_MESSAGES[regStatus],
-    };
-  }
-
-  if (rpcChecked && !rpcApproved) {
-    return {
-      canAcceptDeliveryOrders: false,
-      status: 'none',
-      message: STATUS_MESSAGES.none,
     };
   }
 
@@ -137,12 +126,15 @@ export async function assertDeliveryProviderHiringApproved(userId: string): Prom
   }
 }
 
-/** Post-login destination for delivery providers (dashboard or public browse home). */
+/** Post-login destination for delivery providers. */
 export async function resolveDeliveryProviderDashboardPath(
   userId: string,
   role?: string | null
 ): Promise<string> {
   if (role === 'admin' || role === 'super_admin') {
+    return '/delivery-dashboard';
+  }
+  if (isDeliveryProviderRole(role)) {
     return '/delivery-dashboard';
   }
   const state = await getDeliveryHiringApprovalState(userId);

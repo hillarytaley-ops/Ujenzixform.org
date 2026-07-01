@@ -226,21 +226,13 @@ export function AuthFormPanel({
         const isDelivery =
           picked === "delivery" || picked === "delivery_provider";
         if (isDelivery) {
-          const { getDeliveryHiringApprovalState } = await import(
-            "@/utils/deliveryProviderHiringApproval"
-          );
-          const hiring = await getDeliveryHiringApprovalState(session.user.id);
-          if (!hiring.canAcceptDeliveryOrders) {
-            toast({
-              title: "✅ Signed in",
-              description:
-                "Your delivery application is pending approval. Browse the site until admin approves you.",
-            });
-            navigate("/home?browse=1", { replace: true });
-            return;
-          }
+          toast({
+            title: "✅ Welcome back!",
+            description: "Opening your delivery dashboard…",
+          });
+        } else {
+          toast({ title: "✅ Welcome back!" });
         }
-        toast({ title: "✅ Welcome back!" });
         navigate(path, { replace: true });
         return;
       }
