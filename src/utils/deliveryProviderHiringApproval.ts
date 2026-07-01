@@ -43,26 +43,28 @@ function statusFromRegistration(raw: string): DeliveryHiringStatus {
   return 'none';
 }
 
+async function legacyVerifiedProvider(userId: string): Promise<boolean> {
+  const { data: provider, error } = await supabase
+    .from('delivery_providers')
+    .select('is_verified, is_active')
+    .eq('user_id', userId)
+    .maybeSingle();
+
+  if (error) {
+    console.warn('getDeliveryHiringApprovalState: delivery_providers lookup failed', error);
+    return false;
+  }
+
+  return provider?.is_verified === true && provider?.is_active === true;
+}
+
 /**
- * Hiring Manager gate — uses DB RPC is_delivery_provider_hiring_approved (matches RLS/enforcement).
+ * Hiring Manager gate — RPC is_delivery_provider_hiring_approved when available,
+ * with registration + legacy delivery_providers fallback (matches DB intent).
  */
 export async function getDeliveryHiringApprovalState(
   userId: string
 ): Promise<DeliveryHiringApprovalState> {
-  let hiringApproved = false;
-  try {
-    const { data, error } = await supabase.rpc('is_delivery_provider_hiring_approved', {
-      p_user_id: userId,
-    });
-    if (error) {
-      console.warn('getDeliveryHiringApprovalState: RPC failed', error.message);
-    } else {
-      hiringApproved = data === true;
-    }
-  } catch (e) {
-    console.warn('getDeliveryHiringApprovalState: RPC error', e);
-  }
-
   const { data: registration, error: regError } = await supabase
     .from('delivery_provider_registrations')
     .select('status')
@@ -77,15 +79,47 @@ export async function getDeliveryHiringApprovalState(
 
   const regStatus = statusFromRegistration(String(registration?.status ?? ''));
 
-  if (hiringApproved) {
+  if (regStatus === 'approved') {
+    return { canAcceptDeliveryOrders: true, status: 'approved', message: '' };
+  }
+
+  if (await legacyVerifiedProvider(userId)) {
+    return { canAcceptDeliveryOrders: true, status: 'approved', message: '' };
+  }
+
+  let rpcApproved = false;
+  let rpcChecked = false;
+  try {
+    const { data, error } = await supabase.rpc('is_delivery_provider_hiring_approved', {
+      p_user_id: userId,
+    });
+    if (!error) {
+      rpcChecked = true;
+      rpcApproved = data === true;
+    } else {
+      console.warn('getDeliveryHiringApprovalState: RPC failed', error.message);
+    }
+  } catch (e) {
+    console.warn('getDeliveryHiringApprovalState: RPC error', e);
+  }
+
+  if (rpcChecked && rpcApproved) {
     return { canAcceptDeliveryOrders: true, status: 'approved', message: '' };
   }
 
   if (registration && regStatus !== 'none') {
     return {
       canAcceptDeliveryOrders: false,
-      status: regStatus === 'approved' ? 'pending' : regStatus,
-      message: STATUS_MESSAGES[regStatus === 'approved' ? 'pending' : regStatus],
+      status: regStatus,
+      message: STATUS_MESSAGES[regStatus],
+    };
+  }
+
+  if (rpcChecked && !rpcApproved) {
+    return {
+      canAcceptDeliveryOrders: false,
+      status: 'none',
+      message: STATUS_MESSAGES.none,
     };
   }
 
@@ -101,4 +135,16 @@ export async function assertDeliveryProviderHiringApproved(userId: string): Prom
   if (!state.canAcceptDeliveryOrders) {
     throw new Error(state.message || STATUS_MESSAGES.pending);
   }
+}
+
+/** Post-login destination for delivery providers (dashboard or public browse home). */
+export async function resolveDeliveryProviderDashboardPath(
+  userId: string,
+  role?: string | null
+): Promise<string> {
+  if (role === 'admin' || role === 'super_admin') {
+    return '/delivery-dashboard';
+  }
+  const state = await getDeliveryHiringApprovalState(userId);
+  return state.canAcceptDeliveryOrders ? '/delivery-dashboard' : DELIVERY_PROVIDER_PUBLIC_HOME;
 }

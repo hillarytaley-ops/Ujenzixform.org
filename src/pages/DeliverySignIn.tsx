@@ -44,6 +44,7 @@ import Footer from "@/components/Footer";
 import { Truck, KeyRound, Mail, Loader2, Eye, EyeOff, Package, MapPin, Clock, AlertTriangle, UserPlus } from "lucide-react";
 import { saveUserSession } from "@/utils/sessionStorage";
 import { devLog, logAuthEvent } from "@/utils/secureLog";
+import { resolveDeliveryProviderDashboardPath } from "@/utils/deliveryProviderHiringApproval";
 import {
   Dialog,
   DialogContent,
@@ -102,7 +103,7 @@ const DeliverySignIn = () => {
             
             if (dbRole === 'delivery' || dbRole === 'delivery_provider') {
               localStorage.setItem('user_role_id', session.user.id);
-              window.location.href = '/delivery-dashboard';
+              window.location.href = await resolveDeliveryProviderDashboardPath(session.user.id, dbRole);
               return;
             } else if (dbRole) {
               // Wrong role - redirect to their actual dashboard
@@ -207,7 +208,7 @@ const DeliverySignIn = () => {
         localStorage.setItem('user_role_id', user.id);
         localStorage.setItem('user_role_verified', Date.now().toString());
         console.log('🔐 Delivery/admin role confirmed, redirecting to dashboard');
-        window.location.href = '/delivery-dashboard';
+        window.location.href = await resolveDeliveryProviderDashboardPath(user.id, dbRole);
         return;
       }
       
@@ -431,13 +432,15 @@ const DeliverySignIn = () => {
       saveUserSession(userId, userEmail, dbRole);
       
       console.log('🚚 Redirecting to delivery dashboard...');
+      const dest = await resolveDeliveryProviderDashboardPath(userId, dbRole);
       toast({
-        title: "✅ Welcome Delivery Provider!",
-        description: "Redirecting to dashboard...",
+        title: dest.includes('browse') ? '✅ Signed in' : '✅ Welcome Delivery Provider!',
+        description: dest.includes('browse')
+          ? 'Your application is pending approval. Browse the site until admin approves you.'
+          : 'Redirecting to dashboard...',
       });
 
-      // Redirect to delivery dashboard
-      window.location.replace('/delivery-dashboard');
+      window.location.replace(dest);
 
     } catch (error: any) {
       clearTimeout(timeoutId);
@@ -626,12 +629,15 @@ const DeliverySignIn = () => {
           localStorage.setItem('user_role_verified', Date.now().toString());
           saveUserSession(signInData.user.id, userEmail, existingRole.role);
 
+          const dest = await resolveDeliveryProviderDashboardPath(signInData.user.id, existingRole.role);
           toast({
-            title: "✅ Welcome Delivery Provider!",
-            description: "Redirecting to dashboard...",
+            title: dest.includes('browse') ? '✅ Signed in' : '✅ Welcome Delivery Provider!',
+            description: dest.includes('browse')
+              ? 'Your application is pending approval. Browse the site until admin approves you.'
+              : 'Redirecting to dashboard...',
           });
 
-          window.location.replace('/delivery-dashboard');
+          window.location.replace(dest);
           return;
         }
       }
@@ -704,12 +710,15 @@ const DeliverySignIn = () => {
       localStorage.setItem('user_role_verified', Date.now().toString());
       saveUserSession(userId, userEmail, existingRole.role);
 
+      const dest = await resolveDeliveryProviderDashboardPath(userId, existingRole.role);
       toast({
-        title: "✅ Account Created!",
-        description: "Welcome! Redirecting to dashboard...",
+        title: dest.includes('browse') ? '✅ Account Created!' : '✅ Account Created!',
+        description: dest.includes('browse')
+          ? 'Registration received. Browse the site until admin approves your application.'
+          : 'Welcome! Redirecting to dashboard...',
       });
 
-      window.location.replace('/delivery-dashboard');
+      window.location.replace(dest);
       return;
 
     } catch (error: any) {

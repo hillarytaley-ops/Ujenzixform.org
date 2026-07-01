@@ -234,7 +234,7 @@ export const RoleProtectedRoute = ({ children, allowedRoles }: RoleProtectedRout
         </div>
       );
     }
-    if (!hiringGate.approved) {
+    if (hiringGate.approved !== true) {
       return <Navigate to={DELIVERY_PROVIDER_PUBLIC_HOME} replace />;
     }
   }
