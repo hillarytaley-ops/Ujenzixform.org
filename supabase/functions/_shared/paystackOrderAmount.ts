@@ -63,21 +63,22 @@ export async function resolvePaystackOrderAmount(
 
   if (orderId.startsWith("drq_")) {
     const drId = orderId.slice(4);
-    const { data: prof } = await supabase.from("profiles").select("id").eq("user_id", authUserId).maybeSingle();
-    if (!prof?.id) return { ok: false, error: "Profile required for delivery payment.", status: 403 };
     const { data: dr, error } = await supabase
       .from("delivery_requests")
-      .select("id, builder_id, status, delivery_quote_amount")
+      .select("id, builder_id, status, estimated_cost, delivery_quote_amount")
       .eq("id", drId)
       .maybeSingle();
     if (error || !dr) return { ok: false, error: "Delivery request not found.", status: 404 };
-    if (dr.builder_id !== prof.id) {
+    const builderId = String((dr as { builder_id?: string }).builder_id ?? "");
+    if (!(await buyerOwnsProfile(supabase, builderId, authUserId))) {
       return { ok: false, error: "You are not authorized to pay this delivery quote.", status: 403 };
     }
     if (dr.status !== "quote_accepted") {
       return { ok: false, error: "Delivery quote is not ready for payment.", status: 409 };
     }
-    const amount = parsePositiveAmount((dr as { delivery_quote_amount?: unknown }).delivery_quote_amount);
+    const amount =
+      parsePositiveAmount((dr as { delivery_quote_amount?: unknown }).delivery_quote_amount) ??
+      parsePositiveAmount((dr as { estimated_cost?: unknown }).estimated_cost);
     if (amount == null) return { ok: false, error: "Delivery quote has no amount.", status: 400 };
     return { ok: true, amountMajor: amount, currency: "KES" };
   }

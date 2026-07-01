@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Loader2, CheckCircle2, XCircle } from "lucide-react";
 import { PAYSTACK_NAV_KEY } from "@/components/payment/PaystackCheckout";
+import { finalizeDeliveryQuotePayment } from "@/utils/finalizeDeliveryQuotePayment";
 
 /**
  * Paystack redirects here with ?reference=…&trxref=… after the customer attempts payment.
@@ -94,37 +95,7 @@ export default function PaystackPaymentCallback() {
           const drId = orderId.slice(4);
           const stamp = new Date().toISOString();
           const ref = typeof data.reference === "string" ? data.reference.trim() : "";
-
-          const { data: updated, error: upErr } = await supabase
-            .from("delivery_requests")
-            .update({
-              status: "delivery_quote_paid",
-              delivery_quote_paid_at: stamp,
-              delivery_quote_paystack_reference: ref || null,
-              updated_at: stamp,
-            })
-            .eq("id", drId)
-            .eq("status", "quote_accepted")
-            .select(
-              "id,pickup_address,delivery_address,pickup_date,material_type,special_instructions,pickup_latitude,pickup_longitude,delivery_latitude,delivery_longitude"
-            )
-            .maybeSingle();
-
-          if (upErr) {
-            console.warn("[paystack-callback] delivery quote update:", upErr.message);
-          } else if (updated) {
-            const row = updated as { id: string };
-            try {
-              const { error: rpcErr } = await supabase.rpc("notify_delivery_providers_quote_paid", {
-                p_delivery_request_id: row.id,
-              });
-              if (rpcErr) {
-                console.warn("[paystack-callback] notify_delivery_providers_quote_paid:", rpcErr.message);
-              }
-            } catch (e: unknown) {
-              console.warn("[paystack-callback] notify_delivery_providers_quote_paid:", e);
-            }
-          }
+          await finalizeDeliveryQuotePayment(supabase, drId, ref, stamp);
         } else if (orderId.startsWith("inv_")) {
           /** Mirrors paystack-webhook so the UI moves Unpaid → Paid even if the webhook is delayed. */
           const invoiceId = orderId.slice(4);

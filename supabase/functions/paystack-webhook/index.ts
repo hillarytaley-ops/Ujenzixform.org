@@ -219,21 +219,30 @@ serve(async (req) => {
 
       if (profErr) {
         console.error("[paystack-webhook] profile lookup:", profErr.message);
-      } else if (prof?.id) {
-        const { data: dr, error: drErr } = await admin
-          .from("delivery_requests")
-          .select("id, builder_id, status")
-          .eq("id", drId)
-          .maybeSingle();
+      }
 
-        if (drErr) {
-          console.error("[paystack-webhook] delivery_request lookup:", drErr.message);
-        } else if (
-          dr &&
-          dr.builder_id === prof.id &&
-          dr.status === "quote_accepted"
-        ) {
-          const stamp = new Date().toISOString();
+      const { data: dr, error: drErr } = await admin
+        .from("delivery_requests")
+        .select("id, builder_id, status")
+        .eq("id", drId)
+        .maybeSingle();
+
+      if (drErr) {
+        console.error("[paystack-webhook] delivery_request lookup:", drErr.message);
+      } else if (
+        dr &&
+        (dr.builder_id === metaUser || (prof?.id != null && dr.builder_id === prof.id))
+      ) {
+        const stamp = new Date().toISOString();
+
+        if (dr.status === "delivery_quote_paid") {
+          const { error: rpcErr } = await admin.rpc("notify_delivery_providers_quote_paid", {
+            p_delivery_request_id: drId,
+          });
+          if (rpcErr) {
+            console.error("[paystack-webhook] notify_delivery_providers_quote_paid (already paid):", rpcErr.message);
+          }
+        } else if (dr.status === "quote_accepted") {
           const { data: drPaidRows, error: upDr } = await admin
             .from("delivery_requests")
             .update({
