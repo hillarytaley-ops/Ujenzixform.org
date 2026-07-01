@@ -89,6 +89,10 @@ export const ADMIN_FINANCIAL_QUOTATION_COLUMNS =
 export const ADMIN_APPLICATION_COLUMNS =
   'id,applicant_user_id,status,company_name,created_at,updated_at,email,phone';
 
+/** Supplier dashboard: own application row (no `rating` — lives on `suppliers`). */
+export const SUPPLIER_APPLICATION_SELF_COLUMNS =
+  'id,applicant_user_id,status,company_name,created_at,updated_at';
+
 export const ADMIN_REGISTRATION_COLUMNS =
   'id,user_id,status,full_name,company_name,email,phone,created_at,updated_at';
 

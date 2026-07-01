@@ -13,7 +13,7 @@
  */
 
 import { readPersistedAuthRawStringSync } from '@/utils/supabaseAccessToken';
-import { DELIVERY_REQUEST_COLUMNS, PURCHASE_ORDER_LIST_COLUMNS, PURCHASE_ORDER_SEARCH_COLUMNS, PROFILE_SELF_COLUMNS } from '@/lib/restColumnSets';
+import { DELIVERY_REQUEST_COLUMNS, PURCHASE_ORDER_LIST_COLUMNS, PURCHASE_ORDER_SEARCH_COLUMNS, PROFILE_SELF_COLUMNS, SUPPLIER_APPLICATION_SELF_COLUMNS } from '@/lib/restColumnSets';
 import { fetchMySupplierRecords, fetchSupplierScopeIds } from '@/lib/resolveMySuppliers';
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { SUPABASE_ANON_KEY, SUPABASE_URL, supabase } from '@/integrations/supabase/client';
@@ -224,9 +224,26 @@ export const useSupplierData = () => {
       // Fetch supplier application - ONLY for current user (uses applicant_user_id)
       const { data: supplierReg } = await supabase
         .from('supplier_applications')
-        .select('id,status,rating,company_name')
+        .select(SUPPLIER_APPLICATION_SELF_COLUMNS)
         .eq('applicant_user_id', user.id)
         .maybeSingle();
+
+      const profileIdForSupplier = profileData?.id as string | undefined;
+      let averageRating = 0;
+      try {
+        const ratingFilter =
+          profileIdForSupplier && profileIdForSupplier !== user.id
+            ? `user_id.eq.${user.id},user_id.eq.${profileIdForSupplier}`
+            : `user_id.eq.${user.id}`;
+        const { data: ratingRows } = await supabase
+          .from('suppliers')
+          .select('rating')
+          .or(ratingFilter)
+          .limit(1);
+        averageRating = Number(ratingRows?.[0]?.rating) || 0;
+      } catch {
+        /* optional */
+      }
 
       // Orders: RPC first (matches email-linked + profile-chain ownership server-side)
       let ordersData: any[] = [];
@@ -281,7 +298,7 @@ export const useSupplierData = () => {
         pendingOrders,
         totalRevenue,
         totalCustomers: uniqueCustomers,
-        averageRating: supplierReg?.rating || 0
+        averageRating,
       });
 
     } catch (err: any) {
