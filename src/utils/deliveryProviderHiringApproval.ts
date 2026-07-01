@@ -34,12 +34,35 @@ const STATUS_MESSAGES: Record<DeliveryHiringStatus, string> = {
     'Complete your delivery provider registration at ujenzixform.org and wait for admin or Hiring Manager approval before using the dashboard.',
 };
 
+function statusFromRegistration(raw: string): DeliveryHiringStatus {
+  const s = raw.trim().toLowerCase();
+  if (s === 'approved') return 'approved';
+  if (s === 'rejected') return 'rejected';
+  if (s === 'under_review') return 'under_review';
+  if (s) return 'pending';
+  return 'none';
+}
+
 /**
- * Hiring Manager gate — mirrors DB function is_delivery_provider_hiring_approved.
+ * Hiring Manager gate — uses DB RPC is_delivery_provider_hiring_approved (matches RLS/enforcement).
  */
 export async function getDeliveryHiringApprovalState(
   userId: string
 ): Promise<DeliveryHiringApprovalState> {
+  let hiringApproved = false;
+  try {
+    const { data, error } = await supabase.rpc('is_delivery_provider_hiring_approved', {
+      p_user_id: userId,
+    });
+    if (error) {
+      console.warn('getDeliveryHiringApprovalState: RPC failed', error.message);
+    } else {
+      hiringApproved = data === true;
+    }
+  } catch (e) {
+    console.warn('getDeliveryHiringApprovalState: RPC error', e);
+  }
+
   const { data: registration, error: regError } = await supabase
     .from('delivery_provider_registrations')
     .select('status')
@@ -52,33 +75,18 @@ export async function getDeliveryHiringApprovalState(
     console.warn('getDeliveryHiringApprovalState: registration lookup failed', regError);
   }
 
-  const rawStatus = (registration?.status || '').trim().toLowerCase();
-  if (rawStatus === 'approved') {
+  const regStatus = statusFromRegistration(String(registration?.status ?? ''));
+
+  if (hiringApproved) {
     return { canAcceptDeliveryOrders: true, status: 'approved', message: '' };
   }
-  if (registration && rawStatus) {
-    const status = (['pending', 'rejected', 'under_review'].includes(rawStatus)
-      ? rawStatus
-      : 'pending') as DeliveryHiringStatus;
+
+  if (registration && regStatus !== 'none') {
     return {
       canAcceptDeliveryOrders: false,
-      status,
-      message: STATUS_MESSAGES[status],
+      status: regStatus === 'approved' ? 'pending' : regStatus,
+      message: STATUS_MESSAGES[regStatus === 'approved' ? 'pending' : regStatus],
     };
-  }
-
-  const { data: provider, error: dpError } = await supabase
-    .from('delivery_providers')
-    .select('is_verified, is_active')
-    .eq('user_id', userId)
-    .maybeSingle();
-
-  if (dpError) {
-    console.warn('getDeliveryHiringApprovalState: delivery_providers lookup failed', dpError);
-  }
-
-  if (provider?.is_verified && provider?.is_active) {
-    return { canAcceptDeliveryOrders: true, status: 'approved', message: '' };
   }
 
   return {

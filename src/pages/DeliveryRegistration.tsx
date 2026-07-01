@@ -32,6 +32,7 @@ import {
 } from "lucide-react";
 import { normalizePhoneDigits } from "@/utils/phoneNormalize";
 import { devLog, logAuthEvent } from "@/utils/secureLog";
+import { DELIVERY_PROVIDER_PUBLIC_HOME, getDeliveryHiringApprovalState } from "@/utils/deliveryProviderHiringApproval";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { User as SupabaseUser } from "@supabase/supabase-js";
@@ -119,12 +120,22 @@ const DeliveryRegistration = () => {
           .maybeSingle();
         
         if (roleData?.role === 'delivery_provider' || roleData?.role === 'delivery') {
-          toast({
-            title: "Already Registered",
-            description: "You're already registered as a delivery provider. Redirecting to your dashboard...",
-            duration: 2000,
-          });
-          setTimeout(() => navigate('/delivery-dashboard'), 1000);
+          const hiring = await getDeliveryHiringApprovalState(user.id);
+          if (hiring.canAcceptDeliveryOrders) {
+            toast({
+              title: "Already Registered",
+              description: "You're already registered as a delivery provider. Redirecting to your dashboard...",
+              duration: 2000,
+            });
+            setTimeout(() => navigate('/delivery-dashboard'), 1000);
+          } else {
+            toast({
+              title: "Application pending",
+              description: hiring.message || "Your delivery application is awaiting approval.",
+              duration: 5000,
+            });
+            setTimeout(() => navigate(DELIVERY_PROVIDER_PUBLIC_HOME), 1000);
+          }
         } else if (roleData?.role === 'builder') {
           toast({
             variant: "destructive",
@@ -361,7 +372,7 @@ const DeliveryRegistration = () => {
             bank_account_holder_name: bankAccountHolderName.trim(),
             bank_account_number: bankAccountNumber.trim(),
             bank_branch: bankBranch.trim() || null,
-            status: 'approved',
+            status: 'pending',
             terms_accepted: acceptTerms,
             privacy_accepted: acceptPrivacy,
             background_check_consent: hasGoodConduct
@@ -393,7 +404,7 @@ const DeliveryRegistration = () => {
           bankAccountHolderName: bankAccountHolderName.trim(),
           bankAccountNumber: bankAccountNumber.trim(),
           bankBranch: bankBranch.trim() || undefined,
-          isVerified: true,
+          isVerified: false,
         });
       } catch (dpSyncErr) {
         console.warn('Delivery provider sync after registration (non-blocking):', dpSyncErr);
@@ -458,15 +469,23 @@ const DeliveryRegistration = () => {
         console.log('✅ Role saved to user metadata (survives logout)');
       }
 
+      const hiring = await getDeliveryHiringApprovalState(userId);
+      const postRegPath = hiring.canAcceptDeliveryOrders
+        ? '/delivery-dashboard'
+        : DELIVERY_PROVIDER_PUBLIC_HOME;
+      const postRegDescription = hiring.canAcceptDeliveryOrders
+        ? 'Your delivery provider profile is ready. Redirecting to your dashboard...'
+        : 'Registration received. An admin will review your application — you can browse the site until you are approved.';
+
       // Success!
       if (existingUser) {
         toast({
           title: "✅ Registration Successful!",
-          description: "Your delivery provider profile has been created. Redirecting to your dashboard...",
-          duration: 3000,
+          description: postRegDescription,
+          duration: 5000,
         });
         setTimeout(() => {
-          navigate('/delivery-dashboard');
+          navigate(postRegPath);
         }, 2000);
       } else {
         const { data: { session } } = await supabase.auth.getSession();
@@ -474,11 +493,11 @@ const DeliveryRegistration = () => {
         if (session) {
           toast({
             title: "✅ Registration Successful!",
-            description: "Your delivery provider account has been created. Redirecting to your dashboard...",
-            duration: 3000,
+            description: postRegDescription,
+            duration: 5000,
           });
           setTimeout(() => {
-            navigate('/delivery-dashboard');
+            navigate(postRegPath);
           }, 2000);
         } else {
           toast({

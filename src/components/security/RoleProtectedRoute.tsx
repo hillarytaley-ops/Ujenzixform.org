@@ -59,9 +59,9 @@ export const RoleProtectedRoute = ({ children, allowedRoles }: RoleProtectedRout
   });
   const [sessionUser, setSessionUser] = useState<User | null>(null);
   const [dbRole, setDbRole] = useState<string | null>(null);
-  const [hiringGate, setHiringGate] = useState<{ ready: boolean; approved: boolean }>({
+  const [hiringGate, setHiringGate] = useState<{ ready: boolean; approved: boolean | null }>({
     ready: false,
-    approved: true,
+    approved: null,
   });
   const [accountPaused, setAccountPaused] = useState<{ ready: boolean; paused: boolean }>({
     ready: false,
@@ -156,12 +156,12 @@ export const RoleProtectedRoute = ({ children, allowedRoles }: RoleProtectedRout
 
   useEffect(() => {
     if (!sessionUser?.id || !dbRole || !isDeliveryProviderRole(dbRole)) {
-      setHiringGate({ ready: true, approved: true });
+      setHiringGate({ ready: true, approved: null });
       return;
     }
 
     let cancelled = false;
-    setHiringGate({ ready: false, approved: false });
+    setHiringGate({ ready: false, approved: null });
 
     void getDeliveryHiringApprovalState(sessionUser.id).then((state) => {
       if (!cancelled) {
@@ -219,7 +219,7 @@ export const RoleProtectedRoute = ({ children, allowedRoles }: RoleProtectedRout
           </div>
         );
       }
-      if (!hiringGate.approved) {
+      if (hiringGate.approved !== true) {
         return <Navigate to={DELIVERY_PROVIDER_PUBLIC_HOME} replace />;
       }
     }
