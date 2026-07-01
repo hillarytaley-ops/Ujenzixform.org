@@ -6,8 +6,6 @@ CREATE POLICY "delivery_provider_registrations_insert"
   TO authenticated
   WITH CHECK (
     auth_user_id = auth.uid()
-    OR user_id = auth.uid()
-    OR applicant_user_id = auth.uid()
     OR EXISTS (
       SELECT 1 FROM public.user_roles
       WHERE user_id = auth.uid() AND role = 'admin'::app_role
@@ -20,8 +18,6 @@ CREATE POLICY "delivery_provider_registrations_update"
   TO authenticated
   USING (
     auth_user_id = auth.uid()
-    OR user_id = auth.uid()
-    OR applicant_user_id = auth.uid()
     OR EXISTS (
       SELECT 1 FROM public.user_roles
       WHERE user_id = auth.uid() AND role = 'admin'::app_role

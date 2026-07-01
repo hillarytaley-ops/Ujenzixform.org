@@ -1,4 +1,5 @@
--- Run in Supabase SQL Editor (same as migration 20260624200000_fix_delivery_hiring_gate_rls.sql)
+-- Run in Supabase SQL Editor (migration 20260624200000)
+-- delivery_provider_registrations uses auth_user_id (not user_id / applicant_user_id)
 
 DROP POLICY IF EXISTS "delivery_provider_registrations_insert" ON public.delivery_provider_registrations;
 CREATE POLICY "delivery_provider_registrations_insert"
@@ -6,8 +7,6 @@ CREATE POLICY "delivery_provider_registrations_insert"
   TO authenticated
   WITH CHECK (
     auth_user_id = auth.uid()
-    OR user_id = auth.uid()
-    OR applicant_user_id = auth.uid()
     OR EXISTS (
       SELECT 1 FROM public.user_roles
       WHERE user_id = auth.uid() AND role = 'admin'::app_role
@@ -20,8 +19,6 @@ CREATE POLICY "delivery_provider_registrations_update"
   TO authenticated
   USING (
     auth_user_id = auth.uid()
-    OR user_id = auth.uid()
-    OR applicant_user_id = auth.uid()
     OR EXISTS (
       SELECT 1 FROM public.user_roles
       WHERE user_id = auth.uid() AND role = 'admin'::app_role
