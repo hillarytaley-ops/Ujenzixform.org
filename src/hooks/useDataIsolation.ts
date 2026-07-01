@@ -13,7 +13,7 @@
  */
 
 import { readPersistedAuthRawStringSync } from '@/utils/supabaseAccessToken';
-import { DELIVERY_REQUEST_COLUMNS, PURCHASE_ORDER_LIST_COLUMNS, PURCHASE_ORDER_SEARCH_COLUMNS, PROFILE_SELF_COLUMNS, SUPPLIER_APPLICATION_SELF_COLUMNS } from '@/lib/restColumnSets';
+import { DELIVERY_NOTIFICATION_COLUMNS, DELIVERY_REQUEST_COLUMNS, PURCHASE_ORDER_LIST_COLUMNS, PURCHASE_ORDER_SEARCH_COLUMNS, PROFILE_SELF_COLUMNS, SUPPLIER_APPLICATION_SELF_COLUMNS } from '@/lib/restColumnSets';
 import { fetchMySupplierRecords, fetchSupplierScopeIds } from '@/lib/resolveMySuppliers';
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { SUPABASE_ANON_KEY, SUPABASE_URL, supabase } from '@/integrations/supabase/client';
@@ -4020,6 +4020,7 @@ export const useDeliveryProviderData = () => {
       console.log('✅ CRITICAL: setDeliveryHistory called with', dedupedHistory.length, 'items (deduped from', filteredHistory.length, ')');
 
       // Open jobs only for Hiring Manager–approved providers (RLS also enforces server-side)
+      let pendingCountForStats = 0;
       if (!hiringApproved) {
         setPendingRequests([]);
         console.log('📦 Skipping pending requests — provider not approved by Hiring Manager');
@@ -4034,7 +4035,7 @@ export const useDeliveryProviderData = () => {
       let pendingData: any[] = [];
       try {
         const pendingResponse = await fetch(
-          `${SUPABASE_URL}/rest/v1/delivery_requests?status=eq.pending&select=${DELIVERY_REQUEST_COLUMNS}&order=created_at.desc&limit=50`,
+          `${SUPABASE_URL}/rest/v1/delivery_requests?status=in.(pending,delivery_quote_paid,assigned)&provider_id=is.null&select=${DELIVERY_REQUEST_COLUMNS}&order=created_at.desc&limit=50`,
           { headers: restHeaders, cache: 'no-store' }
         );
         if (pendingResponse.ok) {
@@ -4123,6 +4124,7 @@ export const useDeliveryProviderData = () => {
 
       console.log(`📦 Loaded ${allPending.length} pending delivery requests for provider`);
       setPendingRequests(allPending);
+      pendingCountForStats = allPending.length;
       }
 
       // Calculate stats from actual data
@@ -4153,7 +4155,7 @@ export const useDeliveryProviderData = () => {
       setStats({
         totalDeliveries: activeCount + historyCount,
         completedToday,
-        pendingDeliveries: (allPending || []).length,
+        pendingDeliveries: pendingCountForStats,
         totalEarnings,
         averageRating: Number(providerReg?.rating) || 0,
         totalDistance: 0 // Would need delivery_tracking to compute
