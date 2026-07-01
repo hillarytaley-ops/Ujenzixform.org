@@ -93,8 +93,14 @@ export const ADMIN_APPLICATION_COLUMNS =
 export const SUPPLIER_APPLICATION_SELF_COLUMNS =
   'id,applicant_user_id,status,company_name,created_at,updated_at';
 
-export const ADMIN_REGISTRATION_COLUMNS =
-  'id,user_id,status,full_name,company_name,email,phone,created_at,updated_at';
+export const BUILDER_REGISTRATION_ADMIN_COLUMNS =
+  'id,auth_user_id,status,full_name,company_name,email,phone,county,builder_category,builder_type,created_at,updated_at';
+
+export const DELIVERY_PROVIDER_REGISTRATION_ADMIN_COLUMNS =
+  'id,auth_user_id,status,full_name,company_name,email,phone,county,vehicle_type,service_areas,created_at,updated_at';
+
+/** @deprecated Prefer BUILDER_REGISTRATION_ADMIN_COLUMNS or DELIVERY_PROVIDER_REGISTRATION_ADMIN_COLUMNS */
+export const ADMIN_REGISTRATION_COLUMNS = BUILDER_REGISTRATION_ADMIN_COLUMNS;
 
 export const ADMIN_DELIVERY_PROVIDER_COLUMNS =
   'id,user_id,provider_name,phone,provider_type,is_verified,is_active,created_at,updated_at';
