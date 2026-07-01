@@ -13,7 +13,7 @@
  */
 
 import { readPersistedAuthRawStringSync } from '@/utils/supabaseAccessToken';
-import { PURCHASE_ORDER_LIST_COLUMNS, PURCHASE_ORDER_SEARCH_COLUMNS, PROFILE_SELF_COLUMNS } from '@/lib/restColumnSets';
+import { DELIVERY_REQUEST_COLUMNS, PURCHASE_ORDER_LIST_COLUMNS, PURCHASE_ORDER_SEARCH_COLUMNS, PROFILE_SELF_COLUMNS } from '@/lib/restColumnSets';
 import { fetchMySupplierRecords, fetchSupplierScopeIds } from '@/lib/resolveMySuppliers';
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { SUPABASE_ANON_KEY, SUPABASE_URL, supabase } from '@/integrations/supabase/client';

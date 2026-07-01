@@ -20,7 +20,9 @@ export const SUPPLIER_LOCATION_COLUMNS =
 export const SUPPLIER_TAX_COLUMNS = 'kra_pin,legal_business_name,company_name';
 
 export const DELIVERY_PROVIDER_SELF_COLUMNS =
-  'id,user_id,company_name,email,phone,vehicle_type,is_verified,status,rating';
+  'id,user_id,provider_name,phone,provider_type,is_verified,is_active,rating,current_latitude,current_longitude';
+
+export const DELIVERY_PROVIDER_LOOKUP_COLUMNS = 'id,user_id,provider_name,phone';
 
 export const PURCHASE_ORDER_LIST_COLUMNS =
   'id,po_number,supplier_id,buyer_id,builder_id,status,total_amount,created_at,updated_at,items,project_name,delivery_address,quote_valid_until,project_id,special_instructions,supplier_notes,quote_amount,delivery_requested_at';
@@ -38,7 +40,7 @@ export const MATERIAL_ITEM_COLUMNS =
   'id,supplier_id,purchase_order_id,material_type,category,quantity,unit,status,qr_code,created_at';
 
 export const DELIVERY_REQUEST_COLUMNS =
-  'id,provider_id,purchase_order_id,status,created_at,updated_at,pickup_address,delivery_address,latitude,longitude,builder_id,supplier_id,tracking_number,estimated_delivery_at';
+  'id,provider_id,purchase_order_id,status,created_at,updated_at,pickup_address,delivery_address,delivery_latitude,delivery_longitude,pickup_latitude,pickup_longitude,builder_id,material_type,pickup_date,preferred_time,tracking_number,estimated_cost,special_instructions,rejection_reason,delivery_quote_paid_at';
 
 /** Builder admin-quote panel — quote pipeline fields only. */
 export const DELIVERY_QUOTE_LIST_COLUMNS =
@@ -91,7 +93,7 @@ export const ADMIN_REGISTRATION_COLUMNS =
   'id,user_id,status,full_name,company_name,email,phone,created_at,updated_at';
 
 export const ADMIN_DELIVERY_PROVIDER_COLUMNS =
-  'id,user_id,company_name,provider_name,phone,is_verified,status,created_at,updated_at';
+  'id,user_id,provider_name,phone,provider_type,is_verified,is_active,created_at,updated_at';
 
 export const QR_SCAN_EVENT_COLUMNS =
   'id,scanned_at,scan_type,material_item_id,purchase_order_id,scanner_user_id,location,metadata';
